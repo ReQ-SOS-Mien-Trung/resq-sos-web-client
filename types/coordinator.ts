@@ -37,7 +37,7 @@ export interface Rescuer {
   location: Location;
   currentLoad: number;
   capacity: number;
-  capabilities: string[]; // ["MEDIC", "SWIMMER"]
+  capabilities: string[];
 }
 
 export interface Depot {

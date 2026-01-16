@@ -8,7 +8,7 @@ import {
   SOSCluster,
   AIDispatchDecision,
   Mission,
-} from "@/types/coordinator";
+} from "@/type";
 
 // Central Vietnam coordinates (Hue area)
 const BASE_LAT = 16.4637;
