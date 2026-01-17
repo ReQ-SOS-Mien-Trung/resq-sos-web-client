@@ -10,6 +10,15 @@ import {
   Mission,
 } from "@/type";
 
+import {
+  InventoryItem,
+  InventoryCategory,
+  SupplyRequest,
+  Shipment,
+  DepotInfo,
+  ActivityLog,
+} from "@/types/inventory";
+
 // Central Vietnam coordinates (Hue area)
 const BASE_LAT = 16.4637;
 const BASE_LNG = 107.5909;
@@ -352,5 +361,687 @@ export function getRescuerTypeIcon(type: string): string {
       return "🛶";
     default:
       return "🚗";
+  }
+}
+
+// ==========================================
+// INVENTORY MOCK DATA - Depot Manager Dashboard
+// ==========================================
+
+function daysAgo(days: number): Date {
+  const baseTime = new Date("2026-01-15T10:00:00Z");
+  return new Date(baseTime.getTime() - days * 24 * 60 * 60000);
+}
+
+function hoursAgo(hours: number): Date {
+  const baseTime = new Date("2026-01-15T10:00:00Z");
+  return new Date(baseTime.getTime() - hours * 60 * 60000);
+}
+
+export const mockInventoryItems: InventoryItem[] = [
+  // Medical Items
+  {
+    id: "item-001",
+    name: "Bộ Sơ Cứu Y Tế",
+    category: "MEDICAL",
+    sku: "MED-001",
+    quantity: 15,
+    unit: "bộ",
+    minStock: 50,
+    maxStock: 200,
+    stockLevel: "CRITICAL",
+    location: "A-01-01",
+    lastUpdated: hoursAgo(2),
+  },
+  {
+    id: "item-002",
+    name: "Băng Gạc Vô Trùng",
+    category: "MEDICAL",
+    sku: "MED-002",
+    quantity: 180,
+    unit: "cuộn",
+    minStock: 100,
+    maxStock: 500,
+    stockLevel: "NORMAL",
+    location: "A-01-02",
+    lastUpdated: hoursAgo(5),
+  },
+  {
+    id: "item-003",
+    name: "Thuốc Kháng Sinh",
+    category: "MEDICAL",
+    sku: "MED-003",
+    quantity: 45,
+    unit: "hộp",
+    minStock: 80,
+    maxStock: 300,
+    stockLevel: "LOW",
+    location: "A-01-03",
+    expiryDate: daysAgo(-30), // Expires in 30 days
+    lastUpdated: hoursAgo(12),
+  },
+  {
+    id: "item-004",
+    name: "Thuốc Hạ Sốt",
+    category: "MEDICAL",
+    sku: "MED-004",
+    quantity: 200,
+    unit: "hộp",
+    minStock: 100,
+    maxStock: 400,
+    stockLevel: "NORMAL",
+    location: "A-01-04",
+    expiryDate: daysAgo(-90),
+    lastUpdated: daysAgo(1),
+  },
+  // Food Items
+  {
+    id: "item-005",
+    name: "Mì Gói Khẩn Cấp",
+    category: "FOOD",
+    sku: "FOOD-001",
+    quantity: 500,
+    unit: "thùng",
+    minStock: 300,
+    maxStock: 1000,
+    stockLevel: "NORMAL",
+    location: "B-02-01",
+    expiryDate: daysAgo(-180),
+    lastUpdated: hoursAgo(8),
+  },
+  {
+    id: "item-006",
+    name: "Gạo Đóng Gói 5kg",
+    category: "FOOD",
+    sku: "FOOD-002",
+    quantity: 120,
+    unit: "bao",
+    minStock: 200,
+    maxStock: 600,
+    stockLevel: "LOW",
+    location: "B-02-02",
+    lastUpdated: daysAgo(2),
+  },
+  {
+    id: "item-007",
+    name: "Đồ Hộp Các Loại",
+    category: "FOOD",
+    sku: "FOOD-003",
+    quantity: 350,
+    unit: "lon",
+    minStock: 200,
+    maxStock: 800,
+    stockLevel: "NORMAL",
+    location: "B-02-03",
+    expiryDate: daysAgo(-365),
+    lastUpdated: hoursAgo(6),
+  },
+  {
+    id: "item-008",
+    name: "Sữa Hộp",
+    category: "FOOD",
+    sku: "FOOD-004",
+    quantity: 80,
+    unit: "thùng",
+    minStock: 100,
+    maxStock: 300,
+    stockLevel: "LOW",
+    location: "B-02-04",
+    expiryDate: daysAgo(-60),
+    lastUpdated: daysAgo(1),
+  },
+  // Water
+  {
+    id: "item-009",
+    name: "Nước Đóng Chai 500ml",
+    category: "WATER",
+    sku: "WATER-001",
+    quantity: 2000,
+    unit: "chai",
+    minStock: 1000,
+    maxStock: 5000,
+    stockLevel: "NORMAL",
+    location: "C-01-01",
+    lastUpdated: hoursAgo(4),
+  },
+  {
+    id: "item-010",
+    name: "Bình Nước Lọc 20L",
+    category: "WATER",
+    sku: "WATER-002",
+    quantity: 50,
+    unit: "bình",
+    minStock: 100,
+    maxStock: 300,
+    stockLevel: "LOW",
+    location: "C-01-02",
+    lastUpdated: daysAgo(3),
+  },
+  // Equipment
+  {
+    id: "item-011",
+    name: "Áo Phao Cứu Sinh",
+    category: "EQUIPMENT",
+    sku: "EQP-001",
+    quantity: 8,
+    unit: "cái",
+    minStock: 100,
+    maxStock: 300,
+    stockLevel: "CRITICAL",
+    location: "D-01-01",
+    lastUpdated: hoursAgo(1),
+  },
+  {
+    id: "item-012",
+    name: "Đèn Pin LED",
+    category: "EQUIPMENT",
+    sku: "EQP-002",
+    quantity: 150,
+    unit: "cái",
+    minStock: 50,
+    maxStock: 200,
+    stockLevel: "NORMAL",
+    location: "D-01-02",
+    lastUpdated: daysAgo(5),
+  },
+  {
+    id: "item-013",
+    name: "Pin AA",
+    category: "EQUIPMENT",
+    sku: "EQP-003",
+    quantity: 500,
+    unit: "viên",
+    minStock: 200,
+    maxStock: 1000,
+    stockLevel: "NORMAL",
+    location: "D-01-03",
+    lastUpdated: daysAgo(2),
+  },
+  {
+    id: "item-014",
+    name: "Dây Thừng 50m",
+    category: "EQUIPMENT",
+    sku: "EQP-004",
+    quantity: 25,
+    unit: "cuộn",
+    minStock: 30,
+    maxStock: 100,
+    stockLevel: "LOW",
+    location: "D-01-04",
+    lastUpdated: daysAgo(4),
+  },
+  // Shelter
+  {
+    id: "item-015",
+    name: "Lều Cứu Trợ 4 Người",
+    category: "SHELTER",
+    sku: "SHL-001",
+    quantity: 35,
+    unit: "bộ",
+    minStock: 50,
+    maxStock: 150,
+    stockLevel: "LOW",
+    location: "E-01-01",
+    lastUpdated: daysAgo(7),
+  },
+  {
+    id: "item-016",
+    name: "Bạt Che Mưa",
+    category: "SHELTER",
+    sku: "SHL-002",
+    quantity: 100,
+    unit: "tấm",
+    minStock: 80,
+    maxStock: 250,
+    stockLevel: "NORMAL",
+    location: "E-01-02",
+    lastUpdated: daysAgo(3),
+  },
+  {
+    id: "item-017",
+    name: "Chăn Cứu Trợ",
+    category: "SHELTER",
+    sku: "SHL-003",
+    quantity: 200,
+    unit: "cái",
+    minStock: 150,
+    maxStock: 400,
+    stockLevel: "NORMAL",
+    location: "E-01-03",
+    lastUpdated: daysAgo(1),
+  },
+  // Clothing
+  {
+    id: "item-018",
+    name: "Áo Mưa",
+    category: "CLOTHING",
+    sku: "CLO-001",
+    quantity: 300,
+    unit: "cái",
+    minStock: 200,
+    maxStock: 600,
+    stockLevel: "NORMAL",
+    location: "F-01-01",
+    lastUpdated: hoursAgo(10),
+  },
+  {
+    id: "item-019",
+    name: "Ủng Cao Su",
+    category: "CLOTHING",
+    sku: "CLO-002",
+    quantity: 50,
+    unit: "đôi",
+    minStock: 100,
+    maxStock: 300,
+    stockLevel: "LOW",
+    location: "F-01-02",
+    lastUpdated: daysAgo(6),
+  },
+  {
+    id: "item-020",
+    name: "Quần Áo Khô",
+    category: "CLOTHING",
+    sku: "CLO-003",
+    quantity: 150,
+    unit: "bộ",
+    minStock: 100,
+    maxStock: 400,
+    stockLevel: "NORMAL",
+    location: "F-01-03",
+    lastUpdated: daysAgo(2),
+  },
+];
+
+export const mockInventoryCategories: InventoryCategory[] = [
+  {
+    id: "cat-001",
+    name: "Y Tế",
+    icon: "Stethoscope",
+    itemCount: 4,
+    totalQuantity: 440,
+    criticalItems: 1,
+    lowStockItems: 1,
+  },
+  {
+    id: "cat-002",
+    name: "Thực Phẩm",
+    icon: "UtensilsCrossed",
+    itemCount: 4,
+    totalQuantity: 1050,
+    criticalItems: 0,
+    lowStockItems: 2,
+  },
+  {
+    id: "cat-003",
+    name: "Nước Uống",
+    icon: "Droplets",
+    itemCount: 2,
+    totalQuantity: 2050,
+    criticalItems: 0,
+    lowStockItems: 1,
+  },
+  {
+    id: "cat-004",
+    name: "Thiết Bị",
+    icon: "Wrench",
+    itemCount: 4,
+    totalQuantity: 683,
+    criticalItems: 1,
+    lowStockItems: 1,
+  },
+  {
+    id: "cat-005",
+    name: "Lều Trại",
+    icon: "Tent",
+    itemCount: 3,
+    totalQuantity: 335,
+    criticalItems: 0,
+    lowStockItems: 1,
+  },
+  {
+    id: "cat-006",
+    name: "Quần Áo",
+    icon: "Shirt",
+    itemCount: 3,
+    totalQuantity: 500,
+    criticalItems: 0,
+    lowStockItems: 1,
+  },
+];
+
+export const mockSupplyRequests: SupplyRequest[] = [
+  {
+    id: "req-001",
+    type: "OUTBOUND",
+    status: "PENDING",
+    items: [
+      {
+        itemId: "item-001",
+        itemName: "Bộ Sơ Cứu Y Tế",
+        quantity: 20,
+        unit: "bộ",
+      },
+      {
+        itemId: "item-011",
+        itemName: "Áo Phao Cứu Sinh",
+        quantity: 30,
+        unit: "cái",
+      },
+    ],
+    requestedBy: "Trung Tâm Điều Phối",
+    requestedAt: hoursAgo(2),
+    priority: "HIGH",
+    notes: "Cần gấp cho vùng lũ Hương Thủy",
+    destinationDepot: "Điểm Tập Kết Phú Bài",
+    missionId: "mission-001",
+  },
+  {
+    id: "req-002",
+    type: "OUTBOUND",
+    status: "APPROVED",
+    items: [
+      {
+        itemId: "item-005",
+        itemName: "Mì Gói Khẩn Cấp",
+        quantity: 100,
+        unit: "thùng",
+      },
+      {
+        itemId: "item-009",
+        itemName: "Nước Đóng Chai 500ml",
+        quantity: 500,
+        unit: "chai",
+      },
+    ],
+    requestedBy: "Đội Cứu Hộ Alpha",
+    requestedAt: hoursAgo(5),
+    approvedBy: "Nguyễn Văn A",
+    approvedAt: hoursAgo(4),
+    priority: "MEDIUM",
+    destinationDepot: "Điểm An Toàn A",
+  },
+  {
+    id: "req-003",
+    type: "INBOUND",
+    status: "IN_TRANSIT",
+    items: [
+      {
+        itemId: "item-001",
+        itemName: "Bộ Sơ Cứu Y Tế",
+        quantity: 100,
+        unit: "bộ",
+      },
+      {
+        itemId: "item-011",
+        itemName: "Áo Phao Cứu Sinh",
+        quantity: 150,
+        unit: "cái",
+      },
+    ],
+    requestedBy: "Hội Chữ Thập Đỏ",
+    requestedAt: daysAgo(1),
+    approvedBy: "Nguyễn Văn A",
+    approvedAt: hoursAgo(20),
+    priority: "HIGH",
+    sourceDepot: "Kho Trung Ương Hà Nội",
+    notes: "Hàng cứu trợ từ TW",
+  },
+  {
+    id: "req-004",
+    type: "OUTBOUND",
+    status: "DELIVERED",
+    items: [
+      {
+        itemId: "item-015",
+        itemName: "Lều Cứu Trợ 4 Người",
+        quantity: 20,
+        unit: "bộ",
+      },
+      {
+        itemId: "item-017",
+        itemName: "Chăn Cứu Trợ",
+        quantity: 50,
+        unit: "cái",
+      },
+    ],
+    requestedBy: "UBND Hương Thủy",
+    requestedAt: daysAgo(2),
+    approvedBy: "Nguyễn Văn A",
+    approvedAt: daysAgo(2),
+    priority: "MEDIUM",
+    destinationDepot: "Trường Tiểu Học Phú Bài",
+  },
+  {
+    id: "req-005",
+    type: "INBOUND",
+    status: "PENDING",
+    items: [
+      {
+        itemId: "item-006",
+        itemName: "Gạo Đóng Gói 5kg",
+        quantity: 200,
+        unit: "bao",
+      },
+      { itemId: "item-008", itemName: "Sữa Hộp", quantity: 100, unit: "thùng" },
+    ],
+    requestedBy: "Mạnh Thường Quân",
+    requestedAt: hoursAgo(8),
+    priority: "LOW",
+    sourceDepot: "Đà Nẵng",
+    notes: "Hàng quyên góp từ nhà hảo tâm",
+  },
+];
+
+export const mockShipments: Shipment[] = [
+  {
+    id: "ship-001",
+    requestId: "req-002",
+    status: "PREPARING",
+    items: [
+      {
+        itemId: "item-005",
+        itemName: "Mì Gói Khẩn Cấp",
+        quantity: 100,
+        unit: "thùng",
+      },
+      {
+        itemId: "item-009",
+        itemName: "Nước Đóng Chai 500ml",
+        quantity: 500,
+        unit: "chai",
+      },
+    ],
+    origin: "Kho Trung Tâm Huế",
+    destination: "Điểm An Toàn A",
+    carrier: "Xe Cứu Trợ Echo",
+    estimatedArrival: hoursAgo(-3), // 3 hours from now
+    createdAt: hoursAgo(4),
+  },
+  {
+    id: "ship-002",
+    requestId: "req-003",
+    status: "IN_TRANSIT",
+    items: [
+      {
+        itemId: "item-001",
+        itemName: "Bộ Sơ Cứu Y Tế",
+        quantity: 100,
+        unit: "bộ",
+      },
+      {
+        itemId: "item-011",
+        itemName: "Áo Phao Cứu Sinh",
+        quantity: 150,
+        unit: "cái",
+      },
+    ],
+    origin: "Kho Trung Ương Hà Nội",
+    destination: "Kho Trung Tâm Huế",
+    carrier: "Xe Tải Chữ Thập Đỏ",
+    trackingNumber: "CTD-2026-001234",
+    estimatedArrival: hoursAgo(-8), // 8 hours from now
+    createdAt: daysAgo(1),
+  },
+  {
+    id: "ship-003",
+    requestId: "req-004",
+    status: "DELIVERED",
+    items: [
+      {
+        itemId: "item-015",
+        itemName: "Lều Cứu Trợ 4 Người",
+        quantity: 20,
+        unit: "bộ",
+      },
+      {
+        itemId: "item-017",
+        itemName: "Chăn Cứu Trợ",
+        quantity: 50,
+        unit: "cái",
+      },
+    ],
+    origin: "Kho Trung Tâm Huế",
+    destination: "Trường Tiểu Học Phú Bài",
+    carrier: "Xe Tải Bravo",
+    estimatedArrival: daysAgo(1),
+    actualArrival: daysAgo(1),
+    createdAt: daysAgo(2),
+  },
+];
+
+export const mockDepotInfo: DepotInfo = {
+  id: "depot-001",
+  name: "Kho Trung Tâm Huế",
+  address: "123 Lê Lợi, TP. Huế, Thừa Thiên Huế",
+  phone: "0234 123 456",
+  manager: "Nguyễn Văn A",
+  totalItems: 20,
+  totalCategories: 6,
+  criticalAlerts: 2,
+  lowStockAlerts: 7,
+  pendingRequests: 2,
+  activeShipments: 2,
+};
+
+export const mockActivityLogs: ActivityLog[] = [
+  {
+    id: "log-001",
+    action: "STOCK_OUT",
+    itemId: "item-011",
+    itemName: "Áo Phao Cứu Sinh",
+    quantity: 50,
+    performedBy: "Nguyễn Văn A",
+    performedAt: hoursAgo(1),
+    details: "Xuất cho Đội Cứu Hộ Alpha - Mission #001",
+  },
+  {
+    id: "log-002",
+    action: "REQUEST_APPROVED",
+    performedBy: "Nguyễn Văn A",
+    performedAt: hoursAgo(4),
+    details: "Phê duyệt yêu cầu REQ-002 - Xuất hàng đến Điểm An Toàn A",
+  },
+  {
+    id: "log-003",
+    action: "SHIPMENT_SENT",
+    performedBy: "Trần Văn B",
+    performedAt: hoursAgo(4),
+    details: "Gửi hàng SHIP-001 - Xe Cứu Trợ Echo",
+  },
+  {
+    id: "log-004",
+    action: "STOCK_OUT",
+    itemId: "item-001",
+    itemName: "Bộ Sơ Cứu Y Tế",
+    quantity: 35,
+    performedBy: "Nguyễn Văn A",
+    performedAt: hoursAgo(6),
+    details: "Xuất cho nhiệm vụ cứu trợ khẩn cấp",
+  },
+  {
+    id: "log-005",
+    action: "ADJUSTMENT",
+    itemId: "item-012",
+    itemName: "Đèn Pin LED",
+    quantity: -5,
+    performedBy: "Lê Thị C",
+    performedAt: hoursAgo(10),
+    details: "Điều chỉnh kiểm kê - 5 đèn hỏng",
+  },
+  {
+    id: "log-006",
+    action: "SHIPMENT_RECEIVED",
+    performedBy: "Nguyễn Văn A",
+    performedAt: daysAgo(1),
+    details: "Nhận hàng SHIP-003 - Lều và chăn từ TW",
+  },
+];
+
+// Helper functions for inventory
+export function getStockLevelColor(level: string): string {
+  switch (level) {
+    case "CRITICAL":
+      return "bg-red-500";
+    case "LOW":
+      return "bg-orange-500";
+    case "NORMAL":
+      return "bg-green-500";
+    case "OVERSTOCKED":
+      return "bg-blue-500";
+    default:
+      return "bg-gray-500";
+  }
+}
+
+export function getStockLevelBadgeVariant(
+  level: string,
+): "destructive" | "warning" | "success" | "info" | "default" {
+  switch (level) {
+    case "CRITICAL":
+      return "destructive";
+    case "LOW":
+      return "warning";
+    case "NORMAL":
+      return "success";
+    case "OVERSTOCKED":
+      return "info";
+    default:
+      return "default";
+  }
+}
+
+export function getRequestStatusColor(status: string): string {
+  switch (status) {
+    case "PENDING":
+      return "bg-yellow-500";
+    case "APPROVED":
+      return "bg-blue-500";
+    case "IN_TRANSIT":
+      return "bg-purple-500";
+    case "DELIVERED":
+      return "bg-green-500";
+    case "CANCELLED":
+      return "bg-gray-500";
+    default:
+      return "bg-gray-500";
+  }
+}
+
+export function getCategoryIcon(category: string): string {
+  switch (category) {
+    case "MEDICAL":
+      return "Stethoscope";
+    case "FOOD":
+      return "UtensilsCrossed";
+    case "WATER":
+      return "Droplets";
+    case "EQUIPMENT":
+      return "Wrench";
+    case "SHELTER":
+      return "Tent";
+    case "CLOTHING":
+      return "Shirt";
+    default:
+      return "Package";
   }
 }
