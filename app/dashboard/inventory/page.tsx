@@ -18,12 +18,6 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import DepotSidebar from "@/components/inventory/DepotSidebar";
-import InventoryStats from "@/components/inventory/InventoryStats";
-import ItemDetailsSheet from "@/components/inventory/ItemDetailsSheet";
-import RecentActivity from "@/components/inventory/RecentActivity";
-import CategoryOverview from "@/components/inventory/CategoryOverview";
-import LowStockAlerts from "@/components/inventory/LowStockAlerts";
 import {
   PanelLeftClose,
   PanelLeft,
@@ -39,6 +33,7 @@ import {
   FileDown,
   Warehouse,
 } from "lucide-react";
+import { CategoryOverview, DepotSidebar, InventoryStats, ItemDetailsSheet, LowStockAlerts, RecentActivity } from "@/components/inventory";
 
 export default function InventoryDashboardPage() {
   // State management

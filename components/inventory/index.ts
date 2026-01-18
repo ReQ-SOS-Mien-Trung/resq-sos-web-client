@@ -1,4 +1,3 @@
-// Inventory Management Components Export
 export { default as DepotSidebar } from "./DepotSidebar";
 export { default as InventoryStats } from "./InventoryStats";
 export { default as ItemDetailsSheet } from "./ItemDetailsSheet";

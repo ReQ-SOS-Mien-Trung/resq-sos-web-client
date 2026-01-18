@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { ActivityLog } from "@/types/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -67,8 +68,7 @@ const actionConfig: Record<
   },
 };
 
-function formatTimeAgo(date: Date): string {
-  const now = new Date();
+function formatTimeAgo(date: Date, now: Date): string {
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
@@ -87,7 +87,13 @@ export default function RecentActivity({
   activities,
   maxItems = 10,
 }: RecentActivityProps) {
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const displayedActivities = activities.slice(0, maxItems);
+
+  // Only calculate current time on client side after mount
+  useEffect(() => {
+    setCurrentTime(new Date());
+  }, []);
 
   return (
     <Card className="h-full flex flex-col">
@@ -136,7 +142,9 @@ export default function RecentActivity({
                           {config?.label || activity.action}
                         </span>
                         <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {formatTimeAgo(activity.performedAt)}
+                          {currentTime
+                            ? formatTimeAgo(activity.performedAt, currentTime)
+                            : "..."}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
