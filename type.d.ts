@@ -20,9 +20,7 @@ type Period =
   | "yearly"
   | "max";
 
-// Coordinator Dashboard Types - ReQ-SOS Mien Trung
 // Based on the Hybrid Logic: Backend (PostGIS + Gemini AI)
-
 export type Priority = "P1" | "P2" | "P3";
 export type RescuerType = "TRUCK" | "MOTORBOAT" | "SMALL_BOAT";
 export type SOSStatus = "PENDING" | "ASSIGNED" | "RESCUED";
@@ -35,7 +33,7 @@ export interface Location {
 
 export interface SOSRequest {
   id: string;
-  groupId: string; // Family ID - for logical grouping
+  groupId: string;
   location: Location;
   priority: Priority;
   needs: {
@@ -44,10 +42,10 @@ export interface SOSRequest {
     boat: boolean;
   };
   status: SOSStatus;
-  message: string; // e.g., "Water at roof level, pregnant wife"
+  message: string;
   createdAt: Date;
   aiAnalysis?: {
-    riskFactors: string[]; // ["Deep Water", "Medical Emergency"]
+    riskFactors: string[];
   };
 }
 
@@ -73,7 +71,6 @@ export interface Depot {
   };
 }
 
-// Cluster for map display (DBSCAN spatial clustering)
 export interface SOSCluster {
   id: string;
   center: Location;
@@ -123,3 +120,12 @@ export interface MapViewState {
   center: Location;
   zoom: number;
 }
+
+export type SOSItem = {
+  image: string;
+  title: string;
+  slug: string;
+  location: string;
+  date: string;
+  time: string;
+};

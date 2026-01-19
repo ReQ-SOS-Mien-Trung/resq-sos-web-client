@@ -1,6 +1,3 @@
-// Coordinator Dashboard Types - ReQ-SOS Mien Trung
-// Based on the Hybrid Logic: Backend (PostGIS + Gemini AI)
-
 export type Priority = "P1" | "P2" | "P3";
 export type RescuerType = "TRUCK" | "MOTORBOAT" | "SMALL_BOAT";
 export type SOSStatus = "PENDING" | "ASSIGNED" | "RESCUED";

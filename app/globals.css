@@ -504,3 +504,48 @@ input:focus {
 button {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* 404 Page Animations */
+@keyframes bubbleFloat {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-30px) translateX(15px);
+    opacity: 0.7;
+  }
+}
+
+@keyframes lifebuoyFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(2deg);
+  }
+}
+
+.bubble-float {
+  animation: bubbleFloat 3s ease-in-out infinite;
+}
+
+.lifebuoy-float {
+  animation: lifebuoyFloat 4s ease-in-out infinite;
+}
+
+.number-4-left {
+  color: #1e40af;
+  text-shadow: 4px 4px 0px #3b82f6, 8px 8px 0px #60a5fa,
+    12px 12px 20px rgba(30, 64, 175, 0.3);
+  transform: perspective(500px) rotateY(-8deg);
+}
+
+.number-4-right {
+  color: #1e40af;
+  text-shadow: 4px 4px 0px #3b82f6, 8px 8px 0px #60a5fa,
+    12px 12px 20px rgba(30, 64, 175, 0.3);
+  transform: perspective(500px) rotateY(8deg);
+}
