@@ -129,3 +129,7 @@ export type SOSItem = {
   date: string;
   time: string;
 };
+
+export interface CalendarWidgetProps {
+  data: CalendarData;
+}

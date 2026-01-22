@@ -60,4 +60,4 @@ export const SOSs: SOSItem[] = [
   },
 ];
 
-export default SOSs;
+export const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
