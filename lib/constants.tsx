@@ -1,11 +1,5 @@
-export type SOSItem = {
-  image: string;
-  title: string;
-  slug: string;
-  location: string;
-  date: string; // e.g., "2025-11-07"
-  time: string; // e.g., "09:00 AM"
-};
+import { SOSItem } from "@/type";
+
 
 export const SOSs: SOSItem[] = [
   {
@@ -66,4 +60,4 @@ export const SOSs: SOSItem[] = [
   },
 ];
 
-export default SOSs;
+export const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];

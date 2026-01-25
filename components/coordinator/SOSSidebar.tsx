@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { SOSRequest, SOSCluster, Rescuer, Mission } from "@/types/coordinator";
+import { SOSRequest, SOSCluster, Rescuer, Mission } from "@/type";
 import { getRescuerTypeIcon } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

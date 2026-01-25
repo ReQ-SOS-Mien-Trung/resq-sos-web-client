@@ -8,7 +8,7 @@ import {
   Depot,
   Location,
   AIDispatchDecision,
-} from "@/types/coordinator";
+} from "@/type";
 
 // Dynamically import react-leaflet components to avoid SSR issues
 const MapContainer = dynamic(
@@ -62,6 +62,31 @@ export default function CoordinatorMap({
     return () => clearTimeout(timer);
   }, []);
 
+  // Load Leaflet CSS in the document head
+  useEffect(() => {
+    // Check if Leaflet CSS is already loaded
+    const existingLink = document.querySelector('link[href*="leaflet.css"]');
+
+    if (!existingLink) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      link.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
+      link.crossOrigin = "";
+      document.head.appendChild(link);
+
+      // Cleanup function to remove the link when component unmounts
+      return () => {
+        const linkToRemove = document.querySelector(
+          'link[href*="leaflet.css"]'
+        );
+        if (linkToRemove) {
+          document.head.removeChild(linkToRemove);
+        }
+      };
+    }
+  }, []);
+
   // Central Vietnam coordinates (Hue)
   const defaultCenter: [number, number] = [16.4637, 107.5909];
   const defaultZoom = 13;
@@ -86,14 +111,6 @@ export default function CoordinatorMap({
 
   return (
     <div className="w-full h-full relative">
-      {/* Import Leaflet CSS */}
-      <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossOrigin=""
-      />
-
       <MapContainer
         center={
           flyToLocation ? [flyToLocation.lat, flyToLocation.lng] : defaultCenter

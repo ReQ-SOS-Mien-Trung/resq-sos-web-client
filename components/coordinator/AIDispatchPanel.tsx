@@ -6,7 +6,7 @@ import {
   SOSCluster,
   Rescuer,
   MissionStep,
-} from "@/types/coordinator";
+} from "@/type";
 import { getRescuerTypeIcon } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

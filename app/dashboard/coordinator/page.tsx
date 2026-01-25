@@ -8,7 +8,7 @@ import {
   Rescuer,
   AIDispatchDecision,
   Location,
-} from "@/types/coordinator";
+} from "@/type";
 import {
   mockSOSRequests,
   mockRescuers,
@@ -20,9 +20,11 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import SOSSidebar from "@/components/coordinator/SOSSidebar";
-import AIDispatchPanel from "@/components/coordinator/AIDispatchPanel";
-import ClusterDetailsSheet from "@/components/coordinator/ClusterDetailsSheet";
+import {
+  AIDispatchPanel,
+  ClusterDetailsSheet,
+  SOSSidebar,
+} from "@/components/coordinator";
 import {
   PanelLeftClose,
   PanelLeft,
@@ -36,7 +38,6 @@ import {
   Moon,
 } from "lucide-react";
 
-// Dynamically import the map component to avoid SSR issues
 const CoordinatorMap = dynamic(
   () => import("@/components/coordinator/CoordinatorMap"),
   {
