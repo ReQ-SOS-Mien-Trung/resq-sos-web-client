@@ -11,16 +11,15 @@ interface TopCountriesProps {
 }
 
 const countryFlags: Record<string, string> = {
-  Australia: "🇦🇺",
-  Malaysia: "🇲🇾",
-  Indonesia: "🇮🇩",
-  Singapore: "🇸🇬",
-  Thailand: "🇹🇭",
-  Vietnam: "🇻🇳",
-  Philippines: "🇵🇭",
+  "Đà Nẵng": "🇲",
+  "Quảng Nam": "🇲",
+  "Thừa Thiên Huế": "🇲",
+  "Quảng Ngãi": "🇲",
+  "Quảng Bình": "🇲",
+  "Quảng Trị": "🇲",
 };
 
-// Animated map component
+// Animated map component for Central Vietnam
 const AnimatedMap = ({
   countries,
 }: {
@@ -29,13 +28,13 @@ const AnimatedMap = ({
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
 
   return (
-    <div className="w-full h-44 bg-gradient-to-br from-violet-50 to-purple-100 dark:from-violet-950/30 dark:to-purple-900/20 rounded-xl flex items-center justify-center relative overflow-hidden group">
+    <div className="w-full h-44 bg-gradient-to-br from-red-50 to-orange-100 dark:from-red-950/30 dark:to-orange-900/20 rounded-xl flex items-center justify-center relative overflow-hidden group">
       {/* Animated background dots */}
       <div className="absolute inset-0 opacity-30">
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-1 h-1 bg-purple-400 rounded-full animate-pulse"
+            className="absolute w-1 h-1 bg-red-400 rounded-full animate-pulse"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -54,12 +53,12 @@ const AnimatedMap = ({
       >
         <defs>
           <linearGradient id="countryGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#9333ea" />
-            <stop offset="100%" stopColor="#7c3aed" />
+            <stop offset="0%" stopColor="#ef4444" />
+            <stop offset="100%" stopColor="#f97316" />
           </linearGradient>
           <filter id="countryGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3" result="blur" />
-            <feFlood floodColor="#9333ea" floodOpacity="0.5" />
+            <feFlood floodColor="#ef4444" floodOpacity="0.5" />
             <feComposite in2="blur" operator="in" />
             <feMerge>
               <feMergeNode />
@@ -68,96 +67,98 @@ const AnimatedMap = ({
           </filter>
         </defs>
 
-        {/* Australia */}
+        {/* Đà Nẵng */}
         <path
-          d="M 80 120 Q 100 100 140 110 Q 180 90 200 120 Q 210 160 180 190 Q 140 210 100 190 Q 60 170 80 120"
+          d="M 180 80 Q 200 70 220 80 Q 230 100 210 120 Q 180 125 170 100 Q 165 85 180 80"
           fill={
-            countries.find((c) => c.name === "Australia")
+            countries.find((c) => c.name === "Đà Nẵng")
               ? "url(#countryGradient)"
               : "#e5e7eb"
           }
           className="transition-all duration-500 cursor-pointer hover:brightness-110"
           opacity={
-            hoveredCountry === "Australia"
+            hoveredCountry === "Đà Nẵng"
               ? 1
-              : countries.find((c) => c.name === "Australia")
+              : countries.find((c) => c.name === "Đà Nẵng")
                 ? 0.85
                 : 0.3
           }
-          filter={hoveredCountry === "Australia" ? "url(#countryGlow)" : "none"}
-          onMouseEnter={() => setHoveredCountry("Australia")}
+          filter={hoveredCountry === "Đà Nẵng" ? "url(#countryGlow)" : "none"}
+          onMouseEnter={() => setHoveredCountry("Đà Nẵng")}
           onMouseLeave={() => setHoveredCountry(null)}
         />
 
-        {/* Malaysia */}
+        {/* Quảng Nam */}
         <path
-          d="M 240 60 Q 260 50 290 55 Q 310 65 300 85 Q 280 95 250 90 Q 230 80 240 60"
+          d="M 190 120 Q 220 110 250 120 Q 270 140 250 160 Q 210 170 180 155 Q 165 140 190 120"
           fill={
-            countries.find((c) => c.name === "Malaysia")
+            countries.find((c) => c.name === "Quảng Nam")
               ? "url(#countryGradient)"
               : "#e5e7eb"
           }
           className="transition-all duration-500 cursor-pointer hover:brightness-110"
           opacity={
-            hoveredCountry === "Malaysia"
+            hoveredCountry === "Quảng Nam"
               ? 1
-              : countries.find((c) => c.name === "Malaysia")
+              : countries.find((c) => c.name === "Quảng Nam")
                 ? 0.7
                 : 0.3
           }
-          filter={hoveredCountry === "Malaysia" ? "url(#countryGlow)" : "none"}
-          onMouseEnter={() => setHoveredCountry("Malaysia")}
+          filter={hoveredCountry === "Quảng Nam" ? "url(#countryGlow)" : "none"}
+          onMouseEnter={() => setHoveredCountry("Quảng Nam")}
           onMouseLeave={() => setHoveredCountry(null)}
         />
 
-        {/* Indonesia */}
+        {/* Thừa Thiên Huế */}
         <path
-          d="M 220 100 Q 260 90 320 95 Q 360 110 350 140 Q 320 160 260 155 Q 200 145 220 100"
+          d="M 140 50 Q 170 40 190 55 Q 200 75 175 85 Q 145 90 130 70 Q 125 55 140 50"
           fill={
-            countries.find((c) => c.name === "Indonesia")
+            countries.find((c) => c.name === "Thừa Thiên Huế")
               ? "url(#countryGradient)"
               : "#e5e7eb"
           }
           className="transition-all duration-500 cursor-pointer hover:brightness-110"
           opacity={
-            hoveredCountry === "Indonesia"
+            hoveredCountry === "Thừa Thiên Huế"
               ? 1
-              : countries.find((c) => c.name === "Indonesia")
+              : countries.find((c) => c.name === "Thừa Thiên Huế")
                 ? 0.6
                 : 0.3
           }
-          filter={hoveredCountry === "Indonesia" ? "url(#countryGlow)" : "none"}
-          onMouseEnter={() => setHoveredCountry("Indonesia")}
+          filter={
+            hoveredCountry === "Thừa Thiên Huế" ? "url(#countryGlow)" : "none"
+          }
+          onMouseEnter={() => setHoveredCountry("Thừa Thiên Huế")}
           onMouseLeave={() => setHoveredCountry(null)}
         />
 
-        {/* Singapore */}
-        <circle
-          cx="275"
-          cy="95"
-          r="8"
+        {/* Quảng Ngãi */}
+        <path
+          d="M 220 160 Q 250 150 280 165 Q 290 185 265 200 Q 230 210 210 190 Q 200 175 220 160"
           fill={
-            countries.find((c) => c.name === "Singapore")
+            countries.find((c) => c.name === "Quảng Ngãi")
               ? "url(#countryGradient)"
               : "#e5e7eb"
           }
           className="transition-all duration-500 cursor-pointer"
           opacity={
-            hoveredCountry === "Singapore"
+            hoveredCountry === "Quảng Ngãi"
               ? 1
-              : countries.find((c) => c.name === "Singapore")
+              : countries.find((c) => c.name === "Quảng Ngãi")
                 ? 0.5
                 : 0.3
           }
-          filter={hoveredCountry === "Singapore" ? "url(#countryGlow)" : "none"}
-          onMouseEnter={() => setHoveredCountry("Singapore")}
+          filter={
+            hoveredCountry === "Quảng Ngãi" ? "url(#countryGlow)" : "none"
+          }
+          onMouseEnter={() => setHoveredCountry("Quảng Ngãi")}
           onMouseLeave={() => setHoveredCountry(null)}
         />
 
         {/* Animated connection lines */}
         <path
-          d="M 140 150 Q 200 120 275 95"
-          stroke="#9333ea"
+          d="M 160 70 Q 180 90 200 100"
+          stroke="#ef4444"
           strokeWidth="1"
           strokeDasharray="4 4"
           fill="none"
@@ -178,7 +179,9 @@ export function TopCountries({ data }: TopCountriesProps) {
     <Card className="border border-border/50 overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold">Top Country</CardTitle>
+          <CardTitle className="text-base font-semibold">
+            Khu vực cứu hộ
+          </CardTitle>
           <MoreVertical className="h-4 w-4 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors" />
         </div>
       </CardHeader>
@@ -209,10 +212,10 @@ export function TopCountries({ data }: TopCountriesProps) {
                     <div
                       className={cn(
                         "h-full rounded-full transition-all duration-700 ease-out",
-                        index === 0 && "bg-violet-600",
-                        index === 1 && "bg-violet-500",
-                        index === 2 && "bg-violet-400",
-                        index === 3 && "bg-violet-300",
+                        index === 0 && "bg-red-600",
+                        index === 1 && "bg-red-500",
+                        index === 2 && "bg-orange-500",
+                        index === 3 && "bg-orange-400",
                       )}
                       style={{ width: `${country.percentage}%` }}
                     />
@@ -225,7 +228,7 @@ export function TopCountries({ data }: TopCountriesProps) {
             ))}
           </div>
           <button className="w-full text-sm text-primary hover:text-primary/80 font-medium flex items-center justify-center gap-1.5 mt-2 py-2 rounded-lg hover:bg-primary/5 transition-all duration-200 group">
-            View more
+            Xem thêm
             <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>

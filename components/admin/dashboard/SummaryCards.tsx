@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 import {
   TrendingUp,
   TrendingDown,
+  AlertCircle,
   Users,
-  Clock,
   Target,
-  DollarSign,
+  Clock,
   Info,
 } from "lucide-react";
 import type { SummaryMetric } from "@/types/admin-dashboard";
@@ -19,17 +19,16 @@ interface SummaryCardsProps {
 
 const getMetricIcon = (label: string) => {
   switch (label.toLowerCase()) {
-    case "leads":
+    case "yêu cầu sos":
+      return AlertCircle;
+    case "cứu hộ viên":
       return Users;
-    case "clv":
-      return Clock;
-    case "convertion rate":
-    case "conversion rate":
+    case "tỷ lệ thành công":
       return Target;
-    case "revenue":
-      return DollarSign;
+    case "thời gian phản hồi":
+      return Clock;
     default:
-      return Users;
+      return AlertCircle;
   }
 };
 

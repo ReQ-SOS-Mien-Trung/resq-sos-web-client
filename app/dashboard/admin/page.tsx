@@ -4,7 +4,15 @@ import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import type { DashboardData } from "@/types/admin-dashboard";
 import { Check } from "lucide-react";
-import { CalendarWidget, DashboardLayout, LeadsManagement, RetentionRate, RevenueChart, SummaryCards, TopCountries } from "@/components/admin/dashboard";
+import {
+  CalendarWidget,
+  DashboardLayout,
+  LeadsManagement,
+  RetentionRate,
+  RevenueChart,
+  SummaryCards,
+  TopCountries,
+} from "@/components/admin/dashboard";
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -27,14 +35,14 @@ export default function AdminDashboardPage() {
 
   if (loading || !data) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20">
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20">
         <div className="text-center">
           <div className="relative">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 mx-auto mb-6 animate-pulse shadow-xl shadow-violet-500/30" />
-            <div className="absolute inset-0 h-16 w-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 mx-auto animate-ping opacity-20" />
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-orange-600 mx-auto mb-6 animate-pulse shadow-xl shadow-red-500/30" />
+            <div className="absolute inset-0 h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-orange-600 mx-auto animate-ping opacity-20" />
           </div>
           <p className="text-muted-foreground font-medium">
-            Loading dashboard...
+            Đang tải dữ liệu...
           </p>
         </div>
       </div>
@@ -60,7 +68,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
               <span className="text-emerald-700 dark:text-emerald-300 font-medium">
-                Last updated now
+                Cập nhật lúc: vừa xong
               </span>
             </div>
           </div>

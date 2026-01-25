@@ -12,16 +12,20 @@ interface LeadsManagementProps {
 }
 
 const categoryColors: Record<string, string> = {
-  Qualified: "from-violet-500 to-purple-600",
-  Contacted: "from-purple-400 to-violet-500",
-  Lost: "from-pink-400 to-rose-500",
-  Won: "from-emerald-400 to-green-500",
-  Website: "from-blue-400 to-cyan-500",
-  Referral: "from-amber-400 to-orange-500",
-  Social: "from-pink-400 to-red-500",
-  Hot: "from-red-500 to-orange-500",
-  Warm: "from-amber-400 to-yellow-500",
-  Cold: "from-blue-400 to-indigo-500",
+  // Trạng thái
+  "Đang xử lý": "from-blue-500 to-cyan-500",
+  "Hoàn thành": "from-emerald-400 to-green-500",
+  "Đang chờ": "from-amber-400 to-orange-500",
+  "Hủy bỏ": "from-red-400 to-rose-500",
+  // Nguồn
+  "Ứng dụng SOS": "from-red-500 to-orange-500",
+  Hotline: "from-blue-400 to-indigo-500",
+  Website: "from-purple-400 to-violet-500",
+  "Báo cáo trực tiếp": "from-emerald-400 to-teal-500",
+  // Mức độ
+  "Khẩn cấp": "from-red-500 to-rose-600",
+  "Trung bình": "from-amber-400 to-yellow-500",
+  Thấp: "from-blue-400 to-cyan-500",
 };
 
 export function LeadsManagement({ data }: LeadsManagementProps) {
@@ -81,7 +85,7 @@ export function LeadsManagement({ data }: LeadsManagementProps) {
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold">
-            Leads Management
+            Quản lý yêu cầu cứu hộ
           </CardTitle>
           <MoreVertical className="h-4 w-4 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors" />
         </div>
@@ -97,19 +101,19 @@ export function LeadsManagement({ data }: LeadsManagementProps) {
               value="status"
               className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
             >
-              Status
+              Trạng thái
             </TabsTrigger>
             <TabsTrigger
               value="sources"
               className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
             >
-              Sources
+              Nguồn
             </TabsTrigger>
             <TabsTrigger
               value="qualification"
               className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
             >
-              Qualification
+              Mức độ
             </TabsTrigger>
           </TabsList>
           <TabsContent value="status" className="mt-2">

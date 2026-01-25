@@ -32,24 +32,22 @@ const timeFrames: Array<"1D" | "1W" | "1M" | "6M" | "1Y" | "ALL"> = [
 ];
 
 const formatCurrency = (value: number) => {
-  // Format as $32.209 (with dot instead of comma)
-  const formatted = value.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-  return `$${formatted.replace(/,/g, ".")}`;
+  // Format as number for rescue operations
+  return value.toLocaleString("vi-VN");
 };
 
-const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { month: string; date: string; value: number } }> }) => {
+const CustomTooltip = ({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: { month: string; date: string; value: number } }>;
+}) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     // Get month name from date
     const date = new Date(data.date);
-    const monthNames = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sept", "Oct", "Nov", "Des"
-    ];
-    const monthName = monthNames[date.getMonth()];
+    const monthName = `Tháng ${date.getMonth() + 1}`;
     const year = date.getFullYear();
 
     return (
@@ -58,7 +56,7 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<
           {monthName}, {year}
         </p>
         <p className="text-lg font-bold text-foreground">
-          {formatCurrency(data.value)}
+          {formatCurrency(data.value)} vụ
         </p>
         <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1">
           <TrendingUp className="h-3 w-3" />
@@ -81,16 +79,16 @@ export function RevenueChart({ data }: RevenueChartProps) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <CardTitle className="text-base font-semibold text-foreground">
-                Revenue
+                Thống kê cứu hộ
               </CardTitle>
               <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold tracking-tight text-foreground">
-                {formatCurrency(data.currentValue)}
+                {formatCurrency(data.currentValue)} vụ
               </span>
               <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-                +{data.change}% vs last month
+                +{data.change}% so với tháng trước
               </span>
             </div>
           </div>
@@ -119,20 +117,24 @@ export function RevenueChart({ data }: RevenueChartProps) {
           <ComposedChart
             data={data.data}
             onMouseMove={(e) => {
-              if (e && 'activeTooltipIndex' in e && typeof e.activeTooltipIndex === 'number') {
+              if (
+                e &&
+                "activeTooltipIndex" in e &&
+                typeof e.activeTooltipIndex === "number"
+              ) {
                 setHoveredBar(e.activeTooltipIndex);
               }
             }}
             onMouseLeave={() => setHoveredBar(null)}
           >
             <defs>
-              {/* Purple to white gradient bars */}
+              {/* Red to orange gradient bars */}
               <linearGradient id="colorBarRevenue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#9333ea" stopOpacity={0.8} />
-                <stop offset="50%" stopColor="#a855f7" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="#f3f4f6" stopOpacity={0.3} />
+                <stop offset="0%" stopColor="#ef4444" stopOpacity={0.9} />
+                <stop offset="50%" stopColor="#f97316" stopOpacity={0.6} />
+                <stop offset="100%" stopColor="#fef3c7" stopOpacity={0.3} />
               </linearGradient>
-              {/* Purple highlighted bar */}
+              {/* Red highlighted bar */}
               <linearGradient
                 id="colorBarRevenueHover"
                 x1="0"
@@ -140,9 +142,9 @@ export function RevenueChart({ data }: RevenueChartProps) {
                 x2="0"
                 y2="1"
               >
-                <stop offset="0%" stopColor="#9333ea" stopOpacity={1} />
-                <stop offset="50%" stopColor="#a855f7" stopOpacity={0.7} />
-                <stop offset="100%" stopColor="#f3f4f6" stopOpacity={0.4} />
+                <stop offset="0%" stopColor="#dc2626" stopOpacity={1} />
+                <stop offset="50%" stopColor="#ea580c" stopOpacity={0.8} />
+                <stop offset="100%" stopColor="#fef3c7" stopOpacity={0.4} />
               </linearGradient>
               {/* Dotted line pattern */}
               <pattern
@@ -171,18 +173,18 @@ export function RevenueChart({ data }: RevenueChartProps) {
               tickFormatter={(value) => {
                 // Map month abbreviations
                 const monthMap: Record<string, string> = {
-                  "Mar": "Mar",
-                  "Apr": "Apr",
-                  "May": "May",
-                  "Jun": "Jun",
-                  "Jul": "Jul",
-                  "Aug": "Aug",
-                  "Sep": "Sept",
-                  "Oct": "Oct",
-                  "Nov": "Nov",
-                  "Dec": "Des",
-                  "Jan": "Jan",
-                  "Feb": "Feb",
+                  Mar: "Mar",
+                  Apr: "Apr",
+                  May: "May",
+                  Jun: "Jun",
+                  Jul: "Jul",
+                  Aug: "Aug",
+                  Sep: "Sept",
+                  Oct: "Oct",
+                  Nov: "Nov",
+                  Dec: "Des",
+                  Jan: "Jan",
+                  Feb: "Feb",
                 };
                 return monthMap[value] || value;
               }}
@@ -190,25 +192,34 @@ export function RevenueChart({ data }: RevenueChartProps) {
             <YAxis
               className="text-xs"
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-              tickFormatter={(value) => `${value / 1000}k`}
+              tickFormatter={(value) => `${value}`}
               axisLine={false}
               tickLine={false}
               dx={-10}
-              domain={[0, 40000]}
-              ticks={[0, 10000, 20000, 30000, 40000]}
+              domain={[0, 300]}
+              ticks={[0, 50, 100, 150, 200, 250, 300]}
             />
-            <Tooltip
-              content={<CustomTooltip />}
-              cursor={false}
-            />
+            <Tooltip content={<CustomTooltip />} cursor={false} />
             <Bar
               dataKey="value"
               radius={[4, 4, 0, 0]}
               maxBarSize={35}
               animationDuration={1000}
               animationEasing="ease-out"
-              shape={(props: { x?: number; y?: number; width?: number; height?: number; index?: number }) => {
-                const { x = 0, y = 0, width = 0, height = 0, index = 0 } = props;
+              shape={(props: {
+                x?: number;
+                y?: number;
+                width?: number;
+                height?: number;
+                index?: number;
+              }) => {
+                const {
+                  x = 0,
+                  y = 0,
+                  width = 0,
+                  height = 0,
+                  index = 0,
+                } = props;
                 const isHovered = hoveredBar === index;
                 const centerX = x + width / 2;
 
@@ -220,17 +231,16 @@ export function RevenueChart({ data }: RevenueChartProps) {
                       y={y}
                       width={width}
                       height={height}
-                      fill={isHovered ? "url(#colorBarRevenueHover)" : "url(#colorBarRevenue)"}
+                      fill={
+                        isHovered
+                          ? "url(#colorBarRevenueHover)"
+                          : "url(#colorBarRevenue)"
+                      }
                       rx={4}
                       ry={4}
                     />
                     {/* Black dot at top center */}
-                    <circle
-                      cx={centerX}
-                      cy={y}
-                      r={2.5}
-                      fill="#000000"
-                    />
+                    <circle cx={centerX} cy={y} r={2.5} fill="#000000" />
                     {/* Dotted vertical line */}
                     <line
                       x1={centerX}
@@ -253,7 +263,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
             <Line
               type="monotone"
               dataKey="value"
-              stroke="#9ca3af"
+              stroke="#ef4444"
               strokeWidth={2}
               strokeDasharray="4 4"
               dot={false}

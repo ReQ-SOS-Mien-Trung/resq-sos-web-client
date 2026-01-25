@@ -67,9 +67,9 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50">
-            <LayoutGrid className="h-4 w-4 text-violet-500" />
+            <LayoutGrid className="h-4 w-4 text-red-500" />
             <span className="text-sm font-semibold text-foreground">
-              Dashboard
+              Tổng quan
             </span>
           </div>
         </div>
@@ -78,13 +78,13 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
       {/* Center Section - Search */}
       <div className="flex-1 max-w-md mx-8">
         <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-violet-500 transition-colors" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-red-500 transition-colors" />
           <Input
-            placeholder="Search AI Mode"
-            className="w-full pl-10 pr-4 h-10 bg-muted/50 border-border/50 rounded-xl focus:bg-background focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all duration-200"
+            placeholder="Tìm kiếm..."
+            className="w-full pl-10 pr-4 h-10 bg-muted/50 border-border/50 rounded-xl focus:bg-background focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 transition-all duration-200"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-xs text-muted-foreground">
-            <Sparkles className="h-3 w-3 text-violet-500" />
+            <Sparkles className="h-3 w-3 text-red-500" />
             <span>AI</span>
           </div>
         </div>
@@ -96,10 +96,10 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
         <Button
           variant="outline"
           size="sm"
-          className="hidden md:flex gap-2 h-9 rounded-lg border-border/50 hover:border-violet-500/50 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-all duration-200"
+          className="hidden md:flex gap-2 h-9 rounded-lg border-border/50 hover:border-red-500/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-200"
         >
           <Settings className="h-4 w-4" />
-          Customize Widget
+          Tùy chỉnh
         </Button>
 
         {/* Imports Dropdown */}
@@ -108,9 +108,9 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
             <Button
               variant="outline"
               size="sm"
-              className="hidden md:flex gap-1.5 h-9 rounded-lg border-border/50 hover:border-violet-500/50 hover:bg-violet-50 dark:hover:bg-violet-950/30 transition-all duration-200"
+              className="hidden md:flex gap-1.5 h-9 rounded-lg border-border/50 hover:border-red-500/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-200"
             >
-              Imports
+              Nhập dữ liệu
               <ChevronDown className="h-3.5 w-3.5" />
             </Button>
           </DropdownMenuTrigger>
@@ -119,20 +119,20 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
             className="w-48 rounded-xl border-border/50 shadow-xl"
           >
             <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Import Options
+              Tùy chọn nhập
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Upload className="h-4 w-4 text-violet-500" />
-              Import CSV
+              <Upload className="h-4 w-4 text-red-500" />
+              Nhập CSV
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Upload className="h-4 w-4 text-violet-500" />
-              Import Excel
+              <Upload className="h-4 w-4 text-red-500" />
+              Nhập Excel
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Upload className="h-4 w-4 text-violet-500" />
-              Import JSON
+              <Upload className="h-4 w-4 text-red-500" />
+              Nhập JSON
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -142,9 +142,9 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button
               size="sm"
-              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 h-9 rounded-lg gap-1.5 transition-all duration-200"
+              className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 h-9 rounded-lg gap-1.5 transition-all duration-200"
             >
-              Exports
+              Xuất dữ liệu
               <ChevronDown className="h-3.5 w-3.5" />
             </Button>
           </DropdownMenuTrigger>
@@ -153,20 +153,20 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
             className="w-48 rounded-xl border-border/50 shadow-xl"
           >
             <DropdownMenuLabel className="text-xs text-muted-foreground">
-              Export Options
+              Tùy chọn xuất
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Download className="h-4 w-4 text-violet-500" />
-              Export CSV
+              <Download className="h-4 w-4 text-red-500" />
+              Xuất CSV
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Download className="h-4 w-4 text-violet-500" />
-              Export Excel
+              <Download className="h-4 w-4 text-red-500" />
+              Xuất Excel
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Download className="h-4 w-4 text-violet-500" />
-              Export PDF
+              <Download className="h-4 w-4 text-red-500" />
+              Xuất PDF
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -200,11 +200,11 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full h-9 w-9 p-0 hover:ring-2 hover:ring-violet-500/20 transition-all"
+              className="rounded-full h-9 w-9 p-0 hover:ring-2 hover:ring-red-500/20 transition-all"
             >
               <Avatar className="h-9 w-9 ring-2 ring-border">
-                <AvatarFallback className="bg-gradient-to-br from-amber-400 to-orange-500 text-white font-semibold">
-                  W
+                <AvatarFallback className="bg-gradient-to-br from-red-400 to-orange-500 text-white font-semibold">
+                  A
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -215,18 +215,18 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
           >
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-semibold">williams@mesh.com</p>
-                <p className="text-xs text-muted-foreground">Administrator</p>
+                <p className="text-sm font-semibold">admin@sosresq.vn</p>
+                <p className="text-xs text-muted-foreground">Quản trị viên</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <User className="h-4 w-4 text-violet-500" />
-              Profile
+              <User className="h-4 w-4 text-red-500" />
+              Hồ sơ
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Settings className="h-4 w-4 text-violet-500" />
-              Settings
+              <Settings className="h-4 w-4 text-red-500" />
+              Cài đặt
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -234,7 +234,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
               onClick={handleLogout}
             >
               <LogOut className="h-4 w-4" />
-              Log out
+              Đăng xuất
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

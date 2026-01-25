@@ -4,11 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  ChevronLeft,
-  ChevronRight,
-  MoreVertical,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, MoreVertical } from "lucide-react";
 import {
   format,
   startOfMonth,
@@ -19,8 +15,6 @@ import {
 } from "date-fns";
 import { weekDays } from "@/lib/constants";
 import { CalendarWidgetProps } from "@/type";
-
-
 
 function getMonthIndex(monthName: string): number {
   const months = [
@@ -36,8 +30,21 @@ function getMonthIndex(monthName: string): number {
     "October",
     "November",
     "December",
+    "Tháng 1",
+    "Tháng 2",
+    "Tháng 3",
+    "Tháng 4",
+    "Tháng 5",
+    "Tháng 6",
+    "Tháng 7",
+    "Tháng 8",
+    "Tháng 9",
+    "Tháng 10",
+    "Tháng 11",
+    "Tháng 12",
   ];
-  return months.indexOf(monthName);
+  const index = months.indexOf(monthName);
+  return index >= 12 ? index - 12 : index;
 }
 
 export function CalendarWidget({ data }: CalendarWidgetProps) {
@@ -90,7 +97,9 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
     <Card className="border border-border/50 overflow-hidden hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold">Calendar</CardTitle>
+          <CardTitle className="text-base font-semibold">
+            Lịch hoạt động
+          </CardTitle>
           <MoreVertical className="h-4 w-4 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors" />
         </div>
       </CardHeader>

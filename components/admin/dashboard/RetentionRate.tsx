@@ -19,21 +19,23 @@ interface RetentionRateProps {
 
 // Get color mapping helper
 const getSegmentColor = (name: string) => {
-  if (name === "SMEs") return "#c084fc"; // Light purple
-  if (name === "Startups") return "#a855f7"; // Medium purple
-  if (name === "Enterprises") return "#9333ea"; // Dark purple
-  return "#9333ea";
+  if (name === "Lũ lụt") return "#ef4444"; // Red
+  if (name === "Sạt lở") return "#f97316"; // Orange
+  if (name === "Bão") return "#eab308"; // Yellow
+  return "#ef4444";
 };
 
 // CustomTooltip component outside render
 const CustomTooltip = ({
   active,
   payload,
-  segments
+  segments,
 }: {
   active?: boolean;
-  payload?: Array<{ payload: { month: string;[key: string]: string | number } }>;
-  segments: RetentionRateData["segments"]
+  payload?: Array<{
+    payload: { month: string; [key: string]: string | number };
+  }>;
+  segments: RetentionRateData["segments"];
 }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
@@ -42,7 +44,8 @@ const CustomTooltip = ({
         <p className="text-sm font-semibold mb-2">{String(data.month)}</p>
         {segments.map((segment) => {
           const color = getSegmentColor(segment.name);
-          const value = typeof data[segment.name] === 'number' ? data[segment.name] : 0;
+          const value =
+            typeof data[segment.name] === "number" ? data[segment.name] : 0;
           return (
             <div
               key={segment.name}
@@ -55,15 +58,13 @@ const CustomTooltip = ({
                 />
                 <span className="text-muted-foreground">{segment.name}</span>
               </div>
-              <span className="font-medium">
-                {value}%
-              </span>
+              <span className="font-medium">{value}%</span>
             </div>
           );
         })}
         <div className="border-t border-border/50 mt-2 pt-2">
           <p className="text-sm font-bold">
-            Total: {typeof data.total === 'number' ? data.total : 0}%
+            Total: {typeof data.total === "number" ? data.total : 0}%
           </p>
         </div>
       </div>
@@ -79,11 +80,11 @@ export function RetentionRate({ data }: RetentionRateProps) {
     total: item.total,
   }));
 
-  // Order segments: Enterprises (bottom), Startups (middle), SMEs (top)
+  // Order segments: Bão (bottom), Sạt lở (middle), Lũ lụt (top)
   const orderedSegments = [
-    data.segments.find((s) => s.name === "Enterprises")!,
-    data.segments.find((s) => s.name === "Startups")!,
-    data.segments.find((s) => s.name === "SMEs")!,
+    data.segments.find((s) => s.name === "Bão")!,
+    data.segments.find((s) => s.name === "Sạt lở")!,
+    data.segments.find((s) => s.name === "Lũ lụt")!,
   ].filter(Boolean);
 
   return (
@@ -93,7 +94,7 @@ export function RetentionRate({ data }: RetentionRateProps) {
           <div>
             <div className="flex items-center gap-2">
               <CardTitle className="text-base font-semibold">
-                Retention Rate
+                Hiệu suất cứu hộ
               </CardTitle>
               <MoreVertical className="h-4 w-4 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors" />
             </div>
@@ -103,7 +104,7 @@ export function RetentionRate({ data }: RetentionRateProps) {
               </span>
               <div className="flex items-center gap-1 text-xs text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full">
                 <TrendingUp className="h-3 w-3" />
-                <span>+{data.change}% vs last month</span>
+                <span>+{data.change}% so với tháng trước</span>
               </div>
             </div>
           </div>

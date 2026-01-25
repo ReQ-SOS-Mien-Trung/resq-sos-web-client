@@ -13,169 +13,171 @@ import type {
 
 export const mockSummaryMetrics: SummaryMetric[] = [
   {
-    label: "Leads",
-    value: "129",
-    change: 2,
+    label: "Yêu cầu SOS",
+    value: "156",
+    change: 12,
     changeType: "increase",
-    comparison: "vs last week",
+    comparison: "so với tuần trước",
   },
   {
-    label: "CLV",
-    value: "14d",
-    change: 4,
+    label: "Cứu hộ viên",
+    value: "89",
+    change: 8,
     changeType: "increase",
-    comparison: "vs last week",
+    comparison: "đang hoạt động",
   },
   {
-    label: "Conversion Rate",
-    value: "24%",
-    change: 2,
+    label: "Tỷ lệ thành công",
+    value: "94%",
+    change: 3,
     changeType: "increase",
-    comparison: "vs last week",
+    comparison: "so với tháng trước",
   },
   {
-    label: "Revenue",
-    value: "$1.4K",
-    change: 4,
-    changeType: "increase",
-    comparison: "vs last month",
+    label: "Thời gian phản hồi",
+    value: "8 phút",
+    change: 15,
+    changeType: "decrease",
+    comparison: "so với tuần trước",
   },
 ];
 
 export const mockRevenueData: RevenueChartData = {
-  currentValue: 32209,
-  change: 22,
+  currentValue: 1245,
+  change: 18,
   changeType: "increase",
   timeFrame: "1Y",
   data: [
-    { month: "Mar", value: 18500, date: "2025-03-01" },
-    { month: "Apr", value: 19200, date: "2025-04-01" },
-    { month: "May", value: 21000, date: "2025-05-01" },
-    { month: "Jun", value: 22500, date: "2025-06-01" },
-    { month: "Jul", value: 23800, date: "2025-07-01" },
-    { month: "Aug", value: 25100, date: "2025-08-01" },
-    { month: "Sep", value: 18202, date: "2025-09-01" },
-    { month: "Oct", value: 26500, date: "2025-10-01" },
-    { month: "Nov", value: 28000, date: "2025-11-01" },
-    { month: "Dec", value: 29500, date: "2025-12-01" },
-    { month: "Jan", value: 31000, date: "2026-01-01" },
-    { month: "Feb", value: 32209, date: "2026-02-01" },
+    { month: "T3", value: 85, date: "2025-03-01" },
+    { month: "T4", value: 92, date: "2025-04-01" },
+    { month: "T5", value: 78, date: "2025-05-01" },
+    { month: "T6", value: 145, date: "2025-06-01" },
+    { month: "T7", value: 168, date: "2025-07-01" },
+    { month: "T8", value: 132, date: "2025-08-01" },
+    { month: "T9", value: 198, date: "2025-09-01" },
+    { month: "T10", value: 245, date: "2025-10-01" },
+    { month: "T11", value: 178, date: "2025-11-01" },
+    { month: "T12", value: 112, date: "2025-12-01" },
+    { month: "T1", value: 156, date: "2026-01-01" },
+    { month: "T2", value: 142, date: "2026-02-01" },
   ],
 };
 
 export const mockCalendarData: CalendarData = {
-  currentMonth: "October",
-  currentYear: 2025,
-  highlightedDate: 8,
+  currentMonth: "Tháng 1",
+  currentYear: 2026,
+  highlightedDate: 25,
   meetings: [
     {
       id: "1",
-      title: "Mesh Weekly Meeting",
-      time: "9:00 am - 10:00 am",
+      title: "Họp điều phối cứu hộ",
+      time: "8:00 SA - 9:00 SA",
       duration: "1h",
-      participants: 10,
+      participants: 15,
       platform: "Google Meet",
       link: "https://meet.google.com/xxx",
     },
     {
       id: "2",
-      title: "Gamification Demo",
-      time: "10:45 am - 11:45 am",
-      duration: "1h",
-      participants: 8,
-      platform: "Slack",
-      link: "https://slack.com/xxx",
+      title: "Tập huấn cứu hộ viên mới",
+      time: "14:00 CH - 16:00 CH",
+      duration: "2h",
+      participants: 25,
+      platform: "Zoom",
+      link: "https://zoom.us/xxx",
     },
   ],
 };
 
 export const mockLeadsData: LeadsData = {
   status: [
-    { name: "Qualified", value: 85, percentage: 65 },
-    { name: "Contacted", value: 45, percentage: 35 },
-    { name: "Lost", value: 12, percentage: 9 },
-    { name: "Won", value: 38, percentage: 29 },
+    { name: "Đang xử lý", value: 45, percentage: 29 },
+    { name: "Hoàn thành", value: 98, percentage: 63 },
+    { name: "Đang chờ", value: 18, percentage: 12 },
+    { name: "Hủy bỏ", value: 5, percentage: 3 },
   ],
   sources: [
-    { name: "Website", value: 52, percentage: 40 },
-    { name: "Social Media", value: 35, percentage: 27 },
-    { name: "Referral", value: 28, percentage: 22 },
-    { name: "Email", value: 14, percentage: 11 },
+    { name: "Ứng dụng SOS", value: 78, percentage: 50 },
+    { name: "Hotline", value: 42, percentage: 27 },
+    { name: "Website", value: 25, percentage: 16 },
+    { name: "Báo cáo trực tiếp", value: 11, percentage: 7 },
   ],
   qualification: [
-    { name: "High", value: 48, percentage: 37 },
-    { name: "Medium", value: 55, percentage: 43 },
-    { name: "Low", value: 26, percentage: 20 },
+    { name: "Khẩn cấp", value: 38, percentage: 24 },
+    { name: "Trung bình", value: 75, percentage: 48 },
+    { name: "Thấp", value: 43, percentage: 28 },
   ],
 };
 
 export const mockTopCountriesData: TopCountriesData = {
   countries: [
-    { name: "Australia", percentage: 48, code: "AU" },
-    { name: "Malaysia", percentage: 33, code: "MY" },
-    { name: "Indonesia", percentage: 25, code: "ID" },
-    { name: "Singapore", percentage: 17, code: "SG" },
+    { name: "Đà Nẵng", percentage: 35, code: "DN" },
+    { name: "Quảng Nam", percentage: 28, code: "QN" },
+    { name: "Thừa Thiên Huế", percentage: 22, code: "TTH" },
+    { name: "Quảng Ngãi", percentage: 15, code: "QNG" },
   ],
 };
 
 export const mockRetentionData: RetentionRateData = {
-  currentRate: 95,
-  change: 12,
+  currentRate: 94,
+  change: 5,
   changeType: "increase",
   segments: [
-    { name: "SMEs", color: "#c084fc", value: 35 }, // Light purple
-    { name: "Startups", color: "#a855f7", value: 30 }, // Medium purple
-    { name: "Enterprises", color: "#9333ea", value: 30 }, // Dark purple
+    { name: "Lũ lụt", color: "#ef4444", value: 45 },
+    { name: "Sạt lở", color: "#f97316", value: 30 },
+    { name: "Bão", color: "#eab308", value: 25 },
   ],
   monthlyData: [
     {
-      month: "Jun",
-      segments: { SMEs: 28, Startups: 25, Enterprises: 22 },
-      total: 75,
+      month: "T6",
+      segments: { "Lũ lụt": 15, "Sạt lở": 8, Bão: 5 },
+      total: 28,
     },
     {
-      month: "Jul",
-      segments: { SMEs: 30, Startups: 26, Enterprises: 24 },
+      month: "T7",
+      segments: { "Lũ lụt": 18, "Sạt lở": 10, Bão: 8 },
+      total: 36,
+    },
+    {
+      month: "T8",
+      segments: { "Lũ lụt": 22, "Sạt lở": 12, Bão: 10 },
+      total: 44,
+    },
+    {
+      month: "T9",
+      segments: { "Lũ lụt": 35, "Sạt lở": 18, Bão: 15 },
+      total: 68,
+    },
+    {
+      month: "T10",
+      segments: { "Lũ lụt": 48, "Sạt lở": 25, Bão: 22 },
+      total: 95,
+    },
+    {
+      month: "T11",
+      segments: { "Lũ lụt": 42, "Sạt lở": 20, Bão: 18 },
       total: 80,
     },
     {
-      month: "Aug",
-      segments: { SMEs: 32, Startups: 27, Enterprises: 26 },
-      total: 85,
-    },
-    {
-      month: "Sep",
-      segments: { SMEs: 33, Startups: 28, Enterprises: 27 },
-      total: 88,
-    },
-    {
-      month: "Oct",
-      segments: { SMEs: 34, Startups: 29, Enterprises: 28 },
-      total: 91,
-    },
-    {
-      month: "Nov",
-      segments: { SMEs: 35, Startups: 29, Enterprises: 29 },
-      total: 93,
-    },
-    {
-      month: "Dec",
-      segments: { SMEs: 35, Startups: 30, Enterprises: 30 },
-      total: 95,
+      month: "T12",
+      segments: { "Lũ lụt": 28, "Sạt lở": 12, Bão: 8 },
+      total: 48,
     },
   ],
 };
 
 export const mockFavorites: FavoriteItem[] = [
-  { id: "1", name: "Companies", count: 1212 },
-  { id: "2", name: "Contacts", count: 898 },
-  { id: "3", name: "Meetings", count: 32 },
+  { id: "1", name: "Cứu hộ viên", count: 89 },
+  { id: "2", name: "Cảnh báo", count: 12 },
+  { id: "3", name: "Hoạt động", count: 156 },
 ];
 
 export const mockProjects: Project[] = [
-  { id: "1", name: "Project Alpha", status: "active" },
-  { id: "2", name: "Project Beta", status: "active" },
-  { id: "3", name: "Project Gamma", status: "completed" },
+  { id: "1", name: "Đà Nẵng", status: "active" },
+  { id: "2", name: "Quảng Nam", status: "active" },
+  { id: "3", name: "Thừa Thiên Huế", status: "active" },
+  { id: "4", name: "Quảng Ngãi", status: "active" },
+  { id: "5", name: "Quảng Bình", status: "active" },
 ];
 
 export const mockCloudStorage: CloudStorage = {
