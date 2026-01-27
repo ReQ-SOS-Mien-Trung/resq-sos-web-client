@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import type { DashboardData } from "@/types/admin-dashboard";
 import { Check } from "lucide-react";
+import { PageLoading } from "@/components/admin/PageLoading";
 import {
   CalendarWidget,
   DashboardLayout,
@@ -34,19 +35,7 @@ export default function AdminDashboardPage() {
   }, []);
 
   if (loading || !data) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20">
-        <div className="text-center">
-          <div className="relative">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-orange-600 mx-auto mb-6 animate-pulse shadow-xl shadow-red-500/30" />
-            <div className="absolute inset-0 h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-orange-600 mx-auto animate-ping opacity-20" />
-          </div>
-          <p className="text-muted-foreground font-medium">
-            Đang tải dữ liệu...
-          </p>
-        </div>
-      </div>
-    );
+    return <PageLoading />;
   }
 
   return (
@@ -60,14 +49,14 @@ export default function AdminDashboardPage() {
         <div className="flex items-center justify-between">
           {/* Last Updated Indicator */}
           <div className="flex items-center gap-2 text-sm">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-300 dark:border-emerald-700 shadow-sm">
               <div className="relative">
-                <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <Check className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
                 <div className="absolute inset-0 h-4 w-4 animate-ping opacity-30">
-                  <Check className="h-4 w-4 text-emerald-600" />
+                  <Check className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
                 </div>
               </div>
-              <span className="text-emerald-700 dark:text-emerald-300 font-medium">
+              <span className="text-emerald-800 dark:text-emerald-300 font-semibold">
                 Cập nhật lúc: vừa xong
               </span>
             </div>

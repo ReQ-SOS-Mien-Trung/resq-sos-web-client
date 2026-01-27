@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -46,16 +47,15 @@ const navigationItems = [
     icon: LayoutDashboard,
     label: "Tổng quan",
     href: "/dashboard/admin",
-    active: true,
   },
-  { icon: Users, label: "Quản lý người dùng", href: "#" },
-  { icon: CloudSun, label: "Bài đăng thời tiết", href: "#" },
-  { icon: Droplets, label: "Thời tiết & Lũ lụt", href: "#" },
-  { icon: FileBarChart, label: "Báo cáo cứu hộ", href: "#" },
-  { icon: UserCheck, label: "Đăng ký cứu hộ viên", href: "#" },
-  { icon: Bot, label: "Cấu hình AI Prompt", href: "#" },
-  { icon: MessageSquare, label: "Cấu hình phòng chat", href: "#" },
-  { icon: UserPlus, label: "Xác nhận cứu hộ viên", href: "#" },
+  { icon: Users, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
+  { icon: CloudSun, label: "Bài đăng thời tiết", href: "/dashboard/admin/weather-posts" },
+  { icon: Droplets, label: "Thời tiết & Lũ lụt", href: "/dashboard/admin/weather-flood" },
+  { icon: FileBarChart, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
+  { icon: UserCheck, label: "Đăng ký cứu hộ viên", href: "/dashboard/admin/rescuer-registration" },
+  { icon: Bot, label: "Cấu hình AI Prompt", href: "/dashboard/admin/ai-prompt" },
+  { icon: MessageSquare, label: "Cấu hình phòng chat", href: "/dashboard/admin/chat-config" },
+  { icon: UserPlus, label: "Xác nhận cứu hộ viên", href: "/dashboard/admin/rescuer-verification" },
 ];
 
 const getFavoriteIcon = (name: string) => {
@@ -77,6 +77,7 @@ export function Sidebar({
   cloudStorage,
   isOpen = true,
 }: SidebarProps) {
+  const pathname = usePathname();
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
 
@@ -126,13 +127,14 @@ export function Sidebar({
           <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
             {navigationItems.map((item, index) => {
               const Icon = item.icon;
+              const isActive = pathname === item.href || (item.href !== "/dashboard/admin" && pathname?.startsWith(item.href));
               return (
                 <Link
                   key={item.label}
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
-                    item.active
+                    isActive
                       ? "bg-gradient-to-r from-red-500/10 to-orange-500/10 text-red-600 dark:text-red-400 shadow-sm border border-red-500/10"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1",
                   )}
@@ -141,11 +143,11 @@ export function Sidebar({
                   <Icon
                     className={cn(
                       "h-5 w-5 transition-colors flex-shrink-0",
-                      item.active && "text-red-500",
+                      isActive && "text-red-500",
                     )}
                   />
                   <span className="truncate">{item.label}</span>
-                  {item.active && (
+                  {isActive && (
                     <div className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
                   )}
                 </Link>

@@ -54,22 +54,40 @@ export function LeadsManagement({ data }: LeadsManagementProps) {
                 </span>
               </div>
               <div className="relative h-9 bg-muted/50 rounded-lg overflow-hidden group cursor-pointer">
-                <div
-                  className={cn(
-                    "h-full bg-gradient-to-r rounded-lg transition-all duration-700 ease-out",
-                    "flex items-center justify-end pr-3",
-                    "group-hover:shadow-lg group-hover:shadow-purple-500/20",
-                    colorClass,
-                  )}
-                  style={{
-                    width: `${(category.value / maxValue) * 100}%`,
-                    animationDelay: `${index * 150}ms`,
-                  }}
-                >
-                  <span className="text-xs font-semibold text-white drop-shadow-sm">
-                    {category.percentage}%
-                  </span>
-                </div>
+                {(() => {
+                  const percent = (category.value / maxValue) * 100;
+                  const isTiny = percent < 12;
+                  return (
+                    <>
+                      <div
+                        className={cn(
+                          "h-full bg-gradient-to-r rounded-lg transition-all duration-700 ease-out",
+                          isTiny
+                            ? "flex items-center justify-start pl-3"
+                            : "flex items-center justify-end pr-3",
+                          "group-hover:shadow-lg group-hover:shadow-purple-500/20",
+                          colorClass,
+                        )}
+                        style={{
+                          width: `${percent}%`,
+                          minWidth: isTiny ? "56px" : undefined,
+                          animationDelay: `${index * 150}ms`,
+                        }}
+                      >
+                        {!isTiny && (
+                          <span className="text-xs font-semibold text-white drop-shadow-sm">
+                            {category.percentage}%
+                          </span>
+                        )}
+                      </div>
+                      {isTiny && (
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-foreground/90">
+                          {category.percentage}%
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
                 {/* Hover effect shine */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
               </div>

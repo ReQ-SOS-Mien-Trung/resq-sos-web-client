@@ -11,7 +11,6 @@ const axiosInstance: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor: tự động gắn token (nếu có)
 axiosInstance.interceptors.request.use(
   (config) => {
     if (typeof window !== "undefined") {
@@ -25,7 +24,6 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor: xử lý lỗi chung (ví dụ logout khi 401)
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error) => {

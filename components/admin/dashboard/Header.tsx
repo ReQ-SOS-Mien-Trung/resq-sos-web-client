@@ -81,7 +81,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-red-500 transition-colors" />
           <Input
             placeholder="Tìm kiếm..."
-            className="w-full pl-10 pr-4 h-10 bg-muted/50 border-border/50 rounded-xl focus:bg-background focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20 transition-all duration-200"
+            className="w-full pl-10 pr-4 h-10 bg-muted/60 border-2 border-border/60 rounded-xl focus:bg-background focus:border-red-600 focus:ring-2 focus:ring-red-500/30 transition-all duration-200 text-foreground placeholder:text-foreground/50"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-xs text-muted-foreground">
             <Sparkles className="h-3 w-3 text-red-500" />
