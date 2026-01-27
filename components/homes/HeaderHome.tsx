@@ -4,15 +4,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Shield, Github } from "lucide-react";
 import { useState } from "react";
+import { navLinks } from "@/lib/constants";
 
 const HeaderHome = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  const navLinks = [
-    { href: "#features", label: "Tính năng" },
-    { href: "#demo", label: "Demo" },
-    { href: "#about", label: "Về chúng tôi" },
-  ];
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#0f0f11]/80 backdrop-blur-xl border-b border-white/5">

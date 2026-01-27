@@ -1,69 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Shield, Heart, Users } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { testimonials } from "@/lib/constants";
 
-interface Testimonial {
-  id: string;
-  orgName: string;
-  orgIcon: React.ReactNode;
-  headline: string;
-  highlightText: string;
-  quote: string;
-  author: {
-    name: string;
-    role: string;
-    avatar: string;
-  };
-}
+
 
 const TestimonialsSection = () => {
   const [activeId, setActiveId] = useState<string>("redcross");
-
-  const testimonials: Testimonial[] = [
-    {
-      id: "redcross",
-      orgName: "Hội Chữ Thập Đỏ",
-      orgIcon: <Heart className="w-5 h-5" />,
-      headline: "Hội Chữ Thập Đỏ giảm 60% thời gian phản hồi",
-      highlightText: "và tối ưu hóa nguồn lực cứu trợ",
-      quote:
-        "ResQ SOS đã giúp chúng tôi kết nối nhanh chóng với người dân cần hỗ trợ. Hệ thống AI phân tích giúp tiết kiệm thời gian và nguồn lực đáng kể.",
-      author: {
-        name: "Nguyễn Văn Minh",
-        role: "Giám đốc Cứu trợ, Hội Chữ Thập Đỏ Đà Nẵng",
-        avatar: "NM",
-      },
-    },
-    {
-      id: "military",
-      orgName: "Quân Khu 5",
-      orgIcon: <Shield className="w-5 h-5" />,
-      headline: "Quân Khu 5 điều phối hiệu quả hơn 80%",
-      highlightText: "trong các chiến dịch cứu hộ lớn",
-      quote:
-        "Với ResQ SOS, việc phối hợp giữa các đơn vị trở nên dễ dàng hơn bao giờ hết. Bản đồ real-time giúp chúng tôi nắm bắt tình hình chính xác.",
-      author: {
-        name: "Đại tá Trần Quốc Hùng",
-        role: "Phó Tham mưu trưởng, Quân Khu 5",
-        avatar: "TH",
-      },
-    },
-    {
-      id: "volunteer",
-      orgName: "Đội Tình Nguyện",
-      orgIcon: <Users className="w-5 h-5" />,
-      headline: "500+ tình nguyện viên kết nối",
-      highlightText: "cùng hành động khi thiên tai xảy ra",
-      quote:
-        "Ứng dụng rất dễ sử dụng, giúp chúng tôi nhận được thông báo ngay khi có ca SOS mới. Việc báo cáo tiến độ cũng rất thuận tiện.",
-      author: {
-        name: "Lê Thị Hương",
-        role: "Trưởng nhóm Tình nguyện viên Quảng Nam",
-        avatar: "LH",
-      },
-    },
-  ];
 
   const activeTestimonial = testimonials.find((t) => t.id === activeId);
   const inactiveTestimonials = testimonials.filter((t) => t.id !== activeId);

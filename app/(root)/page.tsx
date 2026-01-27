@@ -1,25 +1,18 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import HeaderHome from "@/components/homes/HeaderHome";
-import TestimonialsSection from "@/components/homes/TestimonialsSection";
-import NetworkMapSection from "@/components/homes/NetworkMapSection";
 import {
   Shield,
   Users,
   Package,
-  MapPin,
   Play,
   ArrowRight,
   Bell,
   Radio,
-  BarChart3,
   Activity,
   AlertTriangle,
   CheckCircle2,
   Truck,
-  Heart,
-  Brain,
   MessageSquare,
   Map,
   Lock,
@@ -30,44 +23,12 @@ import {
   ShieldCheck,
   Database,
   Wifi,
+  Brain,
 } from "lucide-react";
+import { HeaderHome, NetworkMapSection, TestimonialsSection } from "@/components/homes";
+import { features, partners } from "@/lib/constants";
 
 const Home = () => {
-  const partners = [
-    { name: "Bộ Công An", icon: <Shield className="w-6 h-6" /> },
-    { name: "Hội Chữ Thập Đỏ", icon: <Heart className="w-6 h-6" /> },
-    { name: "UNDP Vietnam", icon: <Users className="w-6 h-6" /> },
-    { name: "Quân Khu 5", icon: <Shield className="w-6 h-6" /> },
-    { name: "UNICEF", icon: <Users className="w-6 h-6" /> },
-    { name: "WHO", icon: <Activity className="w-6 h-6" /> },
-  ];
-
-  const features = [
-    {
-      icon: <Bell className="w-5 h-5" />,
-      label: "Tiếp nhận SOS",
-    },
-    {
-      icon: <MapPin className="w-5 h-5" />,
-      label: "Định vị GPS",
-    },
-    {
-      icon: <Radio className="w-5 h-5" />,
-      label: "Điều phối",
-    },
-    {
-      icon: <BarChart3 className="w-5 h-5" />,
-      label: "Báo cáo",
-    },
-    {
-      icon: <Package className="w-5 h-5" />,
-      label: "Quản lý kho",
-    },
-    {
-      icon: <Users className="w-5 h-5" />,
-      label: "Đội cứu hộ",
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-[#0f0f11] text-white">
