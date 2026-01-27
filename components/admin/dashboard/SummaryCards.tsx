@@ -55,8 +55,8 @@ export function SummaryCards({ metrics }: SummaryCardsProps) {
                     {metric.label}
                   </span>
                 </div>
-                <button className="h-6 w-6 rounded-full border border-border/40 flex items-center justify-center hover:bg-muted/80 transition-colors flex-shrink-0 ml-2">
-                  <Info className="h-4 w-4 text-muted-foreground/70" />
+                <button className="h-6 w-6 rounded-full border border-border/50 flex items-center justify-center hover:bg-muted/80 transition-colors flex-shrink-0 ml-2">
+                  <Info className="h-4 w-4 text-foreground/70 hover:text-foreground" />
                 </button>
               </div>
 
@@ -67,10 +67,10 @@ export function SummaryCards({ metrics }: SummaryCardsProps) {
                 </div>
                 <div
                   className={cn(
-                    "flex items-center gap-1 text-xs font-semibold whitespace-nowrap flex-shrink-0",
+                    "flex items-center gap-1 text-xs font-bold whitespace-nowrap flex-shrink-0",
                     metric.changeType === "increase"
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-rose-600 dark:text-rose-400",
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : "text-rose-700 dark:text-rose-400",
                   )}
                 >
                   {metric.changeType === "increase" ? (
@@ -87,7 +87,7 @@ export function SummaryCards({ metrics }: SummaryCardsProps) {
 
               {/* Bottom: Comparison Text */}
               <div className="mt-auto">
-                <div className="text-xs text-muted-foreground leading-relaxed">
+                <div className="text-xs text-foreground/80 dark:text-foreground/70 leading-relaxed font-medium">
                   {metric.comparison}
                 </div>
               </div>

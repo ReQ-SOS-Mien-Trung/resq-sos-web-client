@@ -58,7 +58,7 @@ const CustomTooltip = ({
         <p className="text-lg font-bold text-foreground">
           {formatCurrency(data.value)} vụ
         </p>
-        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1">
+        <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1">
           <TrendingUp className="h-3 w-3" />
           +2%
         </p>
@@ -87,7 +87,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
               <span className="text-2xl font-bold tracking-tight text-foreground">
                 {formatCurrency(data.currentValue)} vụ
               </span>
-              <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+              <span className="text-sm text-emerald-700 dark:text-emerald-400 font-semibold">
                 +{data.change}% so với tháng trước
               </span>
             </div>
@@ -166,7 +166,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
             <XAxis
               dataKey="month"
               className="text-xs"
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+              tick={{ fill: "hsl(var(--foreground) / 0.8)", fontSize: 11, fontWeight: 500 }}
               axisLine={false}
               tickLine={false}
               dy={10}
@@ -191,7 +191,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
             />
             <YAxis
               className="text-xs"
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+              tick={{ fill: "hsl(var(--foreground) / 0.8)", fontSize: 11, fontWeight: 500 }}
               tickFormatter={(value) => `${value}`}
               axisLine={false}
               tickLine={false}
