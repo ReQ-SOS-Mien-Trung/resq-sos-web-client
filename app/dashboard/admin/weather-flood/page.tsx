@@ -1,12 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import { FloodAlerts, WeatherChart, WeatherMap } from "@/components/admin/weather-flood";
+import { FloodAlerts, WeatherChart } from "@/components/admin/weather-flood";
 import type { FloodAlert, WeatherData } from "@/types/admin-pages";
 import { mockFloodAlerts } from "@/lib/mock-data/admin-weather-flood";
 import { PageLoading } from "@/components/admin/PageLoading";
+
+const WeatherMap = dynamic(
+  () => import("@/components/admin/weather-flood").then((mod) => ({ default: mod.WeatherMap })),
+  { ssr: false }
+);
 
 export default function WeatherFloodPage() {
   const [dashboardData, setDashboardData] = useState<any>(null);
