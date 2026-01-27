@@ -1,10 +1,8 @@
-"use client";
+"use client"
 
 import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { testimonials } from "@/lib/constants";
-
-
 
 const TestimonialsSection = () => {
   const [activeId, setActiveId] = useState<string>("redcross");
