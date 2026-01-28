@@ -27,7 +27,6 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error) => {
-    // TODO: kiểm tra error.response.status === 401 để redirect login
     return Promise.reject(error);
   }
 );
