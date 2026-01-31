@@ -19,21 +19,27 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  PanelLeftClose,
-  PanelLeft,
+  SidebarSimple,
   Bell,
-  Settings,
+  Gear,
   User,
-  RefreshCw,
-  Wifi,
-  WifiOff,
+  ArrowsClockwise,
+  WifiHigh,
+  WifiSlash,
   Sun,
   Moon,
   Plus,
-  FileDown,
+  FileArrowDown,
   Warehouse,
-} from "lucide-react";
-import { CategoryOverview, DepotSidebar, InventoryStats, ItemDetailsSheet, LowStockAlerts, RecentActivity } from "@/components/inventory";
+} from "@phosphor-icons/react";
+import {
+  CategoryOverview,
+  DepotSidebar,
+  InventoryStats,
+  ItemDetailsSheet,
+  LowStockAlerts,
+  RecentActivity,
+} from "@/components/inventory";
 
 export default function InventoryDashboardPage() {
   // State management
@@ -133,9 +139,9 @@ export default function InventoryDashboardPage() {
             className="shrink-0"
           >
             {sidebarOpen ? (
-              <PanelLeftClose className="h-5 w-5" />
+              <SidebarSimple className="h-5 w-5" weight="fill" />
             ) : (
-              <PanelLeft className="h-5 w-5" />
+              <SidebarSimple className="h-5 w-5" />
             )}
           </Button>
           <div className="flex items-center gap-2">
@@ -149,9 +155,9 @@ export default function InventoryDashboardPage() {
             className="hidden sm:flex items-center gap-1"
           >
             {isConnected ? (
-              <Wifi className="h-3 w-3" />
+              <WifiHigh className="h-3 w-3" weight="bold" />
             ) : (
-              <WifiOff className="h-3 w-3" />
+              <WifiSlash className="h-3 w-3" weight="bold" />
             )}
             {isConnected ? "Đang kết nối" : "Mất kết nối"}
           </Badge>
@@ -164,7 +170,7 @@ export default function InventoryDashboardPage() {
             Nhập kho
           </Button>
           <Button variant="outline" size="sm" className="hidden md:flex gap-2">
-            <FileDown className="h-4 w-4" />
+            <FileArrowDown className="h-4 w-4" />
             Xuất báo cáo
           </Button>
 
@@ -181,15 +187,15 @@ export default function InventoryDashboardPage() {
           {/* Dark Mode Toggle */}
           <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
             {isDarkMode ? (
-              <Sun className="h-5 w-5" />
+              <Sun className="h-5 w-5" weight="fill" />
             ) : (
-              <Moon className="h-5 w-5" />
+              <Moon className="h-5 w-5" weight="fill" />
             )}
           </Button>
 
           {/* Settings */}
           <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
+            <Gear className="h-5 w-5" />
           </Button>
 
           {/* User */}
@@ -235,7 +241,7 @@ export default function InventoryDashboardPage() {
                 </p>
               </div>
               <Button variant="outline" size="sm" className="gap-2">
-                <RefreshCw className="h-4 w-4" />
+                <ArrowsClockwise className="h-4 w-4" />
                 Làm mới
               </Button>
             </div>

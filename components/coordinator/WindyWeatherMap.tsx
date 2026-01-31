@@ -11,7 +11,13 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Cloud, Wind, Thermometer, Droplets, Maximize2 } from "lucide-react";
+import {
+  Cloud,
+  Wind,
+  Thermometer,
+  Drop,
+  ArrowsOut,
+} from "@phosphor-icons/react";
 
 interface WindyWeatherMapProps {
   open: boolean;
@@ -27,7 +33,11 @@ const WINDY_LAYERS: {
 }[] = [
   { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
   { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
-  { id: "rain", label: "Mưa", icon: <Droplets className="h-4 w-4" /> },
+  {
+    id: "rain",
+    label: "Mưa",
+    icon: <Drop className="h-4 w-4" weight="fill" />,
+  },
   { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
 ];
 
@@ -77,7 +87,7 @@ export default function WindyWeatherMap({
                 onClick={() => setIsFullscreen(!isFullscreen)}
                 className="h-8 w-8"
               >
-                <Maximize2 className="h-4 w-4" />
+                <ArrowsOut className="h-4 w-4" />
               </Button>
             </div>
           </div>

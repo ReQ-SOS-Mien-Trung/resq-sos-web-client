@@ -174,7 +174,7 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
             {data.meetings.map((meeting, index) => (
               <div
                 key={meeting.id}
-                className="group flex items-start justify-between gap-3 p-3 rounded-xl border border-border/30 bg-gradient-to-r from-card to-muted/20 hover:from-muted/30 hover:to-muted/40 hover:border-border/50 transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-bottom-2"
+                className="group flex items-start justify-between gap-3 p-3 rounded-xl border border-border/30 bg-linear-to-r from-card to-muted/20 hover:from-muted/30 hover:to-muted/40 hover:border-border/50 transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-bottom-2"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 <div className="flex-1 min-w-0">

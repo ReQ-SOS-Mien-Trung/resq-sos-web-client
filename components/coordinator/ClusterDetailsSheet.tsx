@@ -20,12 +20,12 @@ import {
   Clock,
   Users,
   Stethoscope,
-  UtensilsCrossed,
+  ForkKnife,
   Anchor,
-  AlertCircle,
-  Zap,
-  ChevronRight,
-} from "lucide-react";
+  WarningCircle,
+  Lightning,
+  CaretRight,
+} from "@phosphor-icons/react";
 
 // Time elapsed display component
 function TimeElapsed({ date }: { date: Date }) {
@@ -86,7 +86,7 @@ export default function ClusterDetailsSheet({
   // Get all unique risk factors
   const allRiskFactors = [
     ...new Set(
-      cluster.sosRequests.flatMap((s) => s.aiAnalysis?.riskFactors || [])
+      cluster.sosRequests.flatMap((s) => s.aiAnalysis?.riskFactors || []),
     ),
   ];
 
@@ -105,7 +105,7 @@ export default function ClusterDetailsSheet({
                   <div
                     className={cn(
                       "w-3 h-3 rounded-full animate-pulse",
-                      priorityColors[cluster.highestPriority]
+                      priorityColors[cluster.highestPriority],
                     )}
                   />
                   Cụm SOS #{cluster.id.split("-")[1]}
@@ -119,8 +119,8 @@ export default function ClusterDetailsSheet({
                   cluster.highestPriority === "P1"
                     ? "p1"
                     : cluster.highestPriority === "P2"
-                    ? "p2"
-                    : "p3"
+                      ? "p2"
+                      : "p3"
                 }
                 className="text-sm"
               >
@@ -143,7 +143,7 @@ export default function ClusterDetailsSheet({
                 <div className="text-xs text-muted-foreground">Điểm SOS</div>
               </div>
               <div className="bg-muted rounded-lg p-3 text-center">
-                <AlertCircle className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                <WarningCircle className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
                 <div className="text-lg font-bold">{allRiskFactors.length}</div>
                 <div className="text-xs text-muted-foreground">Rủi ro</div>
               </div>
@@ -159,19 +159,19 @@ export default function ClusterDetailsSheet({
                 <div className="flex flex-wrap gap-2">
                   {hasMedicalEmergency && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg">
-                      <Stethoscope className="h-4 w-4" />
+                      <Stethoscope className="h-4 w-4" weight="fill" />
                       <span className="text-sm font-medium">Y tế khẩn cấp</span>
                     </div>
                   )}
                   {needsBoat && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg">
-                      <Anchor className="h-4 w-4" />
+                      <Anchor className="h-4 w-4" weight="fill" />
                       <span className="text-sm font-medium">Cần thuyền</span>
                     </div>
                   )}
                   {needsFood && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg">
-                      <UtensilsCrossed className="h-4 w-4" />
+                      <ForkKnife className="h-4 w-4" weight="fill" />
                       <span className="text-sm font-medium">Cần thực phẩm</span>
                     </div>
                   )}
@@ -182,7 +182,10 @@ export default function ClusterDetailsSheet({
               {allRiskFactors.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-yellow-500" />
+                    <Lightning
+                      className="h-4 w-4 text-yellow-500"
+                      weight="fill"
+                    />
                     Phân tích AI
                   </h4>
                   <div className="flex flex-wrap gap-2">
@@ -229,7 +232,7 @@ export default function ClusterDetailsSheet({
               size="lg"
               onClick={onProcessCluster}
             >
-              <Zap className="h-5 w-5 mr-2" />
+              <Lightning className="h-5 w-5 mr-2" weight="fill" />
               Xử lý với AI Dispatch
             </Button>
           </SheetFooter>
@@ -263,7 +266,7 @@ function SOSDetailCard({
     <Card
       className={cn(
         "cursor-pointer transition-all hover:shadow-md border-l-4 py-3",
-        priorityColors[sos.priority]
+        priorityColors[sos.priority],
       )}
       onClick={onClick}
     >
@@ -275,8 +278,8 @@ function SOSDetailCard({
                 sos.priority === "P1"
                   ? "p1"
                   : sos.priority === "P2"
-                  ? "p2"
-                  : "p3"
+                    ? "p2"
+                    : "p3"
               }
             >
               {sos.priority}
@@ -289,7 +292,10 @@ function SOSDetailCard({
             <Badge variant={statusLabels[sos.status].variant}>
               {statusLabels[sos.status].text}
             </Badge>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <CaretRight
+              className="h-4 w-4 text-muted-foreground"
+              weight="bold"
+            />
           </div>
         </div>
 
@@ -298,12 +304,14 @@ function SOSDetailCard({
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-3">
             {sos.needs.medical && (
-              <Stethoscope className="h-3 w-3 text-red-500" />
+              <Stethoscope className="h-3 w-3 text-red-500" weight="fill" />
             )}
             {sos.needs.food && (
-              <UtensilsCrossed className="h-3 w-3 text-orange-500" />
+              <ForkKnife className="h-3 w-3 text-orange-500" weight="fill" />
             )}
-            {sos.needs.boat && <Anchor className="h-3 w-3 text-blue-500" />}
+            {sos.needs.boat && (
+              <Anchor className="h-3 w-3 text-blue-500" weight="fill" />
+            )}
           </div>
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3" />

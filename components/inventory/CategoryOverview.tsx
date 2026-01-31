@@ -4,26 +4,25 @@ import { InventoryItem, ItemCategory } from "@/types/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getStockLevelBadgeVariant } from "@/lib/mock-data";
 import {
   Stethoscope,
-  UtensilsCrossed,
-  Droplets,
+  ForkKnife,
+  Drop,
   Wrench,
   Tent,
-  Shirt,
-  AlertTriangle,
+  TShirt,
+  Warning,
   Package,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 
 // Category icon mapping
 const categoryIcons: Record<ItemCategory, React.ReactNode> = {
-  MEDICAL: <Stethoscope className="h-5 w-5" />,
-  FOOD: <UtensilsCrossed className="h-5 w-5" />,
-  WATER: <Droplets className="h-5 w-5" />,
-  EQUIPMENT: <Wrench className="h-5 w-5" />,
-  SHELTER: <Tent className="h-5 w-5" />,
-  CLOTHING: <Shirt className="h-5 w-5" />,
+  MEDICAL: <Stethoscope className="h-5 w-5" weight="fill" />,
+  FOOD: <ForkKnife className="h-5 w-5" weight="fill" />,
+  WATER: <Drop className="h-5 w-5" weight="fill" />,
+  EQUIPMENT: <Wrench className="h-5 w-5" weight="fill" />,
+  SHELTER: <Tent className="h-5 w-5" weight="fill" />,
+  CLOTHING: <TShirt className="h-5 w-5" weight="fill" />,
 };
 
 const categoryNames: Record<ItemCategory, string> = {
@@ -115,7 +114,7 @@ export default function CategoryOverview({
                   <span className="relative flex h-5 w-5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 items-center justify-center">
-                      <AlertTriangle className="h-3 w-3 text-white" />
+                      <Warning className="h-3 w-3 text-white" weight="fill" />
                     </span>
                   </span>
                 </div>

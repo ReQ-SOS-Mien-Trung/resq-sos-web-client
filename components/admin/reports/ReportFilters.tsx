@@ -34,7 +34,7 @@ export function ReportFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
-      <div className="flex-1 min-w-[200px]">
+      <div className="flex-1 min-w-52">
         <div className="relative">
           <MagnifyingGlass
             size={16}
@@ -60,7 +60,7 @@ export function ReportFilters({
           })
         }
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-44">
           <SelectValue placeholder="Loại" />
         </SelectTrigger>
         <SelectContent>
@@ -83,7 +83,7 @@ export function ReportFilters({
           })
         }
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-45">
           <SelectValue placeholder="Trạng thái" />
         </SelectTrigger>
         <SelectContent>

@@ -146,7 +146,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button
               size="sm"
-              className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 h-9 rounded-lg gap-1.5 transition-all duration-200"
+              className="bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 h-9 rounded-lg gap-1.5 transition-all duration-200"
             >
               Xuất dữ liệu
               <CaretDown size={14} />
@@ -183,7 +183,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
         >
           <Bell size={20} />
           {notificationCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-red-500/30 animate-pulse">
+            <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-linear-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-red-500/30 animate-pulse">
               {notificationCount}
             </span>
           )}
@@ -207,7 +207,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
               className="rounded-full h-9 w-9 p-0 hover:ring-2 hover:ring-red-500/20 transition-all"
             >
               <Avatar className="h-9 w-9 ring-2 ring-border">
-                <AvatarFallback className="bg-gradient-to-br from-red-400 to-orange-500 text-white font-semibold">
+                <AvatarFallback className="bg-linear-to-br from-red-400 to-orange-500 text-white font-semibold">
                   A
                 </AvatarFallback>
               </Avatar>

@@ -51,7 +51,7 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
       </div>
 
       {/* Mobile Header */}
-      <div className="lg:hidden w-full p-6 bg-gradient-to-r from-orange-500/10 to-orange-400/5">
+      <div className="lg:hidden w-full p-6 bg-linear-to-r from-orange-500/10 to-orange-400/5">
         <Link
           href="/"
           className="flex items-center gap-3 transition-transform hover:scale-105"

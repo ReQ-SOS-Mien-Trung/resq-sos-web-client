@@ -17,33 +17,33 @@ import { Input } from "@/components/ui/input";
 import {
   Warehouse,
   Package,
-  TruckIcon,
-  ClipboardList,
-  AlertTriangle,
-  Search,
+  Truck,
+  ClipboardText,
+  Warning,
+  MagnifyingGlass,
   Stethoscope,
-  UtensilsCrossed,
-  Droplets,
+  ForkKnife,
+  Drop,
   Wrench,
   Tent,
-  Shirt,
-  ArrowDownToLine,
-  ArrowUpFromLine,
+  TShirt,
+  ArrowLineDown,
+  ArrowLineUp,
   Clock,
-  CheckCircle2,
+  CheckCircle,
   XCircle,
-  ChevronRight,
-} from "lucide-react";
+  CaretRight,
+} from "@phosphor-icons/react";
 import { getStockLevelBadgeVariant } from "@/lib/mock-data";
 
 // Category icon mapping
 const categoryIcons: Record<string, React.ReactNode> = {
-  MEDICAL: <Stethoscope className="h-4 w-4" />,
-  FOOD: <UtensilsCrossed className="h-4 w-4" />,
-  WATER: <Droplets className="h-4 w-4" />,
-  EQUIPMENT: <Wrench className="h-4 w-4" />,
-  SHELTER: <Tent className="h-4 w-4" />,
-  CLOTHING: <Shirt className="h-4 w-4" />,
+  MEDICAL: <Stethoscope className="h-4 w-4" weight="fill" />,
+  FOOD: <ForkKnife className="h-4 w-4" weight="fill" />,
+  WATER: <Drop className="h-4 w-4" weight="fill" />,
+  EQUIPMENT: <Wrench className="h-4 w-4" weight="fill" />,
+  SHELTER: <Tent className="h-4 w-4" weight="fill" />,
+  CLOTHING: <TShirt className="h-4 w-4" weight="fill" />,
 };
 
 const categoryNames: Record<ItemCategory, string> = {
@@ -174,11 +174,11 @@ export default function DepotSidebar({
             Kho
           </TabsTrigger>
           <TabsTrigger value="requests" className="text-xs">
-            <ClipboardList className="h-3 w-3 mr-1" />
+            <ClipboardText className="h-3 w-3 mr-1" />
             Yêu cầu
           </TabsTrigger>
           <TabsTrigger value="shipments" className="text-xs">
-            <TruckIcon className="h-3 w-3 mr-1" />
+            <Truck className="h-3 w-3 mr-1" />
             Vận chuyển
           </TabsTrigger>
         </TabsList>
@@ -191,7 +191,7 @@ export default function DepotSidebar({
           {/* Search */}
           <div className="px-3 pb-3">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <MagnifyingGlass className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Tìm kiếm hàng hóa..."
                 className="pl-9 h-9"
@@ -229,7 +229,7 @@ export default function DepotSidebar({
               {criticalItems.length > 0 && (
                 <>
                   <div className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" />
+                    <Warning className="h-3 w-3" weight="fill" />
                     Cần Bổ Sung Gấp ({criticalItems.length})
                   </div>
                   {criticalItems.map((item) => (
@@ -331,7 +331,7 @@ export default function DepotSidebar({
 
               {supplyRequests.length === 0 && (
                 <div className="text-center text-muted-foreground py-8">
-                  <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <ClipboardText className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">Không có yêu cầu nào</p>
                 </div>
               )}
@@ -361,7 +361,7 @@ export default function DepotSidebar({
                 </>
               ) : (
                 <div className="text-center text-muted-foreground py-8">
-                  <TruckIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <Truck className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">Không có vận chuyển đang thực hiện</p>
                 </div>
               )}
@@ -370,7 +370,7 @@ export default function DepotSidebar({
               {shipments.filter((s) => s.status === "DELIVERED").length > 0 && (
                 <>
                   <div className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-2 mt-4 flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
+                    <CheckCircle className="h-3 w-3" weight="fill" />
                     Đã Hoàn Thành
                   </div>
                   {shipments
@@ -509,9 +509,9 @@ function RequestCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             {request.type === "INBOUND" ? (
-              <ArrowDownToLine className="h-4 w-4 text-green-500" />
+              <ArrowLineDown className="h-4 w-4 text-green-500" />
             ) : (
-              <ArrowUpFromLine className="h-4 w-4 text-blue-500" />
+              <ArrowLineUp className="h-4 w-4 text-blue-500" />
             )}
             <div>
               <h4 className="font-medium text-sm">
@@ -542,7 +542,7 @@ function RequestCard({
           <span className="text-xs text-muted-foreground">
             {request.notes ? request.notes.substring(0, 30) + "..." : ""}
           </span>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <CaretRight className="h-4 w-4 text-muted-foreground" weight="bold" />
         </div>
       </CardContent>
     </Card>
@@ -568,17 +568,17 @@ function ShipmentCard({
     },
     IN_TRANSIT: {
       label: "Đang vận chuyển",
-      icon: <TruckIcon className="h-3 w-3" />,
+      icon: <Truck className="h-3 w-3" />,
       color: "text-blue-500",
     },
     DELIVERED: {
       label: "Đã giao",
-      icon: <CheckCircle2 className="h-3 w-3" />,
+      icon: <CheckCircle className="h-3 w-3" weight="fill" />,
       color: "text-green-500",
     },
     RETURNED: {
       label: "Đã trả",
-      icon: <XCircle className="h-3 w-3" />,
+      icon: <XCircle className="h-3 w-3" weight="fill" />,
       color: "text-red-500",
     },
   };
@@ -591,7 +591,7 @@ function ShipmentCard({
       <CardContent className="p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <TruckIcon className="h-4 w-4 text-primary" />
+            <Truck className="h-4 w-4 text-primary" />
             <div>
               <h4 className="font-medium text-sm">{shipment.id}</h4>
               <p className="text-xs text-muted-foreground">
@@ -623,7 +623,7 @@ function ShipmentCard({
           <span className="text-xs text-muted-foreground">
             {shipment.items.length} mặt hàng
           </span>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <CaretRight className="h-4 w-4 text-muted-foreground" weight="bold" />
         </div>
       </CardContent>
     </Card>

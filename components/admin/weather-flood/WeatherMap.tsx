@@ -8,16 +8,14 @@ import {
   CloudRain,
   Warning,
   Thermometer,
-  Drop,
   Wind,
   WarningCircle,
-  ArrowsClockwise,
   ArrowsCounterClockwise,
 } from "@phosphor-icons/react";
 import type { FloodAlert } from "@/types/admin-pages";
 import { Button } from "@/components/ui/button";
 import { WeatherMapSkeleton } from "./WeatherMapSkeleton";
-import { Droplets, RefreshCw } from "lucide-react";
+import { Droplets } from "lucide-react";
 
 interface WeatherMapProps {
   floodAlerts: FloodAlert[];
@@ -286,7 +284,7 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
             </div>
           </div>
         )}
-        <div className="h-[400px] rounded-lg overflow-hidden">
+        <div className="h-100 rounded-lg overflow-hidden">
           <MapContainer
             center={mapCenter}
             zoom={defaultZoom}
@@ -316,7 +314,7 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
                       icon={windIcon}
                     >
                       <Popup>
-                        <div className="p-2 min-w-[220px]">
+                        <div className="p-2 min-w-55">
                           <h3 className="font-semibold text-foreground mb-2">
                             {p.name}
                           </h3>
@@ -368,7 +366,7 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
                   icon={makeWaterIcon()}
                 >
                   <Popup>
-                    <div className="p-2 min-w-[240px]">
+                    <div className="p-2 min-w-60">
                       <div className="flex items-center gap-2 mb-2">
                         <Droplets className="h-5 w-5 text-sky-500" />
                         <h3 className="font-semibold text-foreground">
@@ -404,7 +402,7 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
                   position={[alert.coordinates.lat, alert.coordinates.lng]}
                 >
                   <Popup>
-                    <div className="p-2 min-w-[250px]">
+                    <div className="p-2 min-w-64">
                       <div className="flex items-center gap-2 mb-2">
                         <Warning className="h-5 w-5 text-red-500" />
                         <h3 className="font-semibold text-foreground">

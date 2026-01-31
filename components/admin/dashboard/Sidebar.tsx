@@ -90,12 +90,7 @@ const getFavoriteIcon = (name: string) => {
   }
 };
 
-export function Sidebar({
-  favorites,
-  projects,
-  cloudStorage,
-  isOpen = true,
-}: SidebarProps) {
+export function Sidebar({ favorites, projects, isOpen = true }: SidebarProps) {
   const pathname = usePathname();
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
@@ -112,7 +107,7 @@ export function Sidebar({
           {/* Logo & Brand Section */}
           <div className="p-4 border-b border-sidebar-border">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-red-500/30">
+              <div className="h-9 w-9 rounded-xl bg-linear-to-br from-red-500 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-red-500/30">
                 <span className="text-lg font-bold">R</span>
               </div>
               <div className="flex-1 min-w-0">
@@ -133,7 +128,7 @@ export function Sidebar({
           {/* User Profile Section */}
           <div className="px-4 py-3">
             <div className="flex items-center gap-3 p-2 rounded-xl bg-sidebar-accent/50 hover:bg-sidebar-accent transition-colors cursor-pointer group">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-red-400 to-orange-500 flex items-center justify-center text-white text-sm font-semibold ring-2 ring-background">
+              <div className="h-8 w-8 rounded-full bg-linear-to-br from-red-400 to-orange-500 flex items-center justify-center text-white text-sm font-semibold ring-2 ring-background">
                 A
               </div>
               <div className="flex-1 min-w-0">
@@ -163,7 +158,7 @@ export function Sidebar({
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                     isActive
-                      ? "bg-gradient-to-r from-red-500/10 to-orange-500/10 text-red-600 dark:text-red-400 shadow-sm border border-red-500/10"
+                      ? "bg-linear-to-r from-red-500/10 to-orange-500/10 text-red-600 dark:text-red-400 shadow-sm border border-red-500/10"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1",
                   )}
                   style={{ animationDelay: `${index * 50}ms` }}
@@ -171,13 +166,13 @@ export function Sidebar({
                   <Icon
                     size={20}
                     className={cn(
-                      "transition-colors flex-shrink-0",
+                      "transition-colors shrink-0",
                       isActive && "text-red-500",
                     )}
                   />
                   <span className="truncate">{item.label}</span>
                   {isActive && (
-                    <div className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                    <div className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
                   )}
                 </Link>
               );

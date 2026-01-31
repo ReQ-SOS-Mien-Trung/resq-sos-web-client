@@ -99,7 +99,7 @@ export function ChatRoomList({ rooms, onEdit, onDelete }: ChatRoomListProps) {
                       {room.lastMessage && (
                         <div className="flex items-center gap-1">
                           <ChatCircle size={16} />
-                          <span className="truncate max-w-[200px]">
+                          <span className="truncate max-w-50">
                             {room.lastMessage}
                           </span>
                         </div>

@@ -10,7 +10,6 @@ import {
   Trash,
   Prohibit,
   CheckCircle,
-  XCircle,
 } from "@phosphor-icons/react";
 import {
   DropdownMenu,
@@ -19,7 +18,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { User, UserFilters } from "@/types/admin-pages";
-import { cn } from "@/lib/utils";
 
 interface UserTableProps {
   users: User[];
@@ -257,7 +255,7 @@ export function UserTable({
                       variant={p === page ? "default" : "outline"}
                       size="sm"
                       onClick={() => setPage(p)}
-                      className="min-w-[40px]"
+                      className="min-w-10"
                     >
                       {p}
                     </Button>

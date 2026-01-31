@@ -4,14 +4,14 @@ import { InventoryStats as IInventoryStats } from "@/types/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Package,
-  AlertTriangle,
-  AlertCircle,
+  Warning,
+  WarningCircle,
   CheckCircle,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  TruckIcon,
+  ArrowLineDown,
+  ArrowLineUp,
+  Truck,
   Clock,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 
 interface InventoryStatsProps {
   stats: IInventoryStats;
@@ -30,7 +30,7 @@ export default function InventoryStats({ stats }: InventoryStatsProps) {
     {
       title: "Cảnh Báo Nghiêm Trọng",
       value: stats.criticalStock,
-      icon: AlertTriangle,
+      icon: Warning,
       color: "text-red-500",
       bgColor: "bg-red-500/10",
       description: "Cần bổ sung gấp",
@@ -38,7 +38,7 @@ export default function InventoryStats({ stats }: InventoryStatsProps) {
     {
       title: "Sắp Hết Hàng",
       value: stats.lowStock,
-      icon: AlertCircle,
+      icon: WarningCircle,
       color: "text-orange-500",
       bgColor: "bg-orange-500/10",
       description: "Cần theo dõi",
@@ -54,7 +54,7 @@ export default function InventoryStats({ stats }: InventoryStatsProps) {
     {
       title: "Chờ Nhập",
       value: stats.pendingInbound,
-      icon: ArrowDownToLine,
+      icon: ArrowLineDown,
       color: "text-emerald-500",
       bgColor: "bg-emerald-500/10",
       description: "Yêu cầu nhập kho",
@@ -62,7 +62,7 @@ export default function InventoryStats({ stats }: InventoryStatsProps) {
     {
       title: "Chờ Xuất",
       value: stats.pendingOutbound,
-      icon: ArrowUpFromLine,
+      icon: ArrowLineUp,
       color: "text-violet-500",
       bgColor: "bg-violet-500/10",
       description: "Yêu cầu xuất kho",
@@ -70,7 +70,7 @@ export default function InventoryStats({ stats }: InventoryStatsProps) {
     {
       title: "Đang Vận Chuyển",
       value: stats.activeShipments,
-      icon: TruckIcon,
+      icon: Truck,
       color: "text-cyan-500",
       bgColor: "bg-cyan-500/10",
       description: "Đơn hàng đang giao",

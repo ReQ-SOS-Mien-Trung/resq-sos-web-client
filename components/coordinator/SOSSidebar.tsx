@@ -9,16 +9,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  AlertTriangle,
+  Warning,
   Clock,
   MapPin,
   Users,
-  Activity,
-  ChevronRight,
+  Pulse,
+  CaretRight,
   Stethoscope,
-  UtensilsCrossed,
+  ForkKnife,
   Anchor,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 
 // Client-side time elapsed hook
 function useTimeElapsed(date: Date): string {
@@ -90,7 +90,7 @@ export default function SOSSidebar({
       {/* Header */}
       <div className="p-4 border-b">
         <h2 className="font-bold text-lg flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-red-500" />
+          <Warning className="h-5 w-5 text-red-500" weight="fill" />
           Trung Tâm Điều Phối
         </h2>
         <p className="text-sm text-muted-foreground mt-1">ReQ-SOS Miền Trung</p>
@@ -189,7 +189,7 @@ export default function SOSSidebar({
                 ))
               ) : (
                 <div className="text-center text-muted-foreground py-8">
-                  <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">Không có nhiệm vụ đang thực hiện</p>
                 </div>
               )}
@@ -253,7 +253,7 @@ function ClusterCard({
     <Card
       className={cn(
         "cursor-pointer transition-all hover:shadow-md py-3",
-        isSelected && "ring-2 ring-primary"
+        isSelected && "ring-2 ring-primary",
       )}
       onClick={onClick}
     >
@@ -267,7 +267,7 @@ function ClusterCard({
               Cụm #{cluster.id.split("-")[1]}
             </span>
           </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <CaretRight className="h-4 w-4 text-muted-foreground" weight="bold" />
         </div>
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-1">
@@ -305,7 +305,7 @@ function SOSCard({
       className={cn(
         "cursor-pointer transition-all hover:shadow-md py-3",
         isSelected && "ring-2 ring-primary",
-        sos.priority === "P1" && "border-l-4 border-l-red-500"
+        sos.priority === "P1" && "border-l-4 border-l-red-500",
       )}
       onClick={onClick}
     >
@@ -331,19 +331,19 @@ function SOSCard({
         <div className="flex items-center gap-2 mb-2">
           {sos.needs.medical && (
             <div className="flex items-center gap-1 text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">
-              <Stethoscope className="h-3 w-3" />
+              <Stethoscope className="h-3 w-3" weight="fill" />
               <span>Y tế</span>
             </div>
           )}
           {sos.needs.food && (
             <div className="flex items-center gap-1 text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
-              <UtensilsCrossed className="h-3 w-3" />
+              <ForkKnife className="h-3 w-3" weight="fill" />
               <span>Thực phẩm</span>
             </div>
           )}
           {sos.needs.boat && (
             <div className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-              <Anchor className="h-3 w-3" />
+              <Anchor className="h-3 w-3" weight="fill" />
               <span>Thuyền</span>
             </div>
           )}
@@ -399,13 +399,13 @@ function MissionCard({
               key={idx}
               className={cn(
                 "flex items-center gap-2 text-xs",
-                idx === 0 ? "text-foreground" : "text-muted-foreground"
+                idx === 0 ? "text-foreground" : "text-muted-foreground",
               )}
             >
               <div
                 className={cn(
                   "w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold",
-                  idx === 0 ? "bg-primary text-primary-foreground" : "bg-muted"
+                  idx === 0 ? "bg-primary text-primary-foreground" : "bg-muted",
                 )}
               >
                 {step.stepNumber}
@@ -440,7 +440,7 @@ function RescuerCard({
     <Card
       className={cn(
         "cursor-pointer transition-all hover:shadow-md py-3",
-        rescuer.status === "AVAILABLE" && "border-l-4 border-l-green-500"
+        rescuer.status === "AVAILABLE" && "border-l-4 border-l-green-500",
       )}
       onClick={onClick}
     >
