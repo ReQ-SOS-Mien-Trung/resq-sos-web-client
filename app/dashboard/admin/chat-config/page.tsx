@@ -12,7 +12,7 @@ import {
   ChatSettings,
   MessageTemplates,
 } from "@/components/admin/chat-config";
-import { PageLoading } from "@/components/admin/PageLoading";
+import { PageLoading } from "@/components/admin";
 
 export default function ChatConfigPage() {
   const [dashboardData, setDashboardData] = useState<any>(null);

@@ -6,7 +6,7 @@ import { mockUsers, mockUserStats } from "@/lib/mock-data/admin-users";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import { UserStats, UserFilters, UserTable } from "@/components/admin/users";
 import type { UserFilters as UserFiltersType } from "@/types/admin-pages";
-import { PageLoading } from "@/components/admin/PageLoading";
+import { PageLoading } from "@/components/admin";
 
 export default function UsersPage() {
   const [dashboardData, setDashboardData] = useState<any>(null);

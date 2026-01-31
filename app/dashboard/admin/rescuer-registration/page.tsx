@@ -10,7 +10,7 @@ import {
 } from "@/components/admin/rescuer-registration";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";
-import { PageLoading } from "@/components/admin/PageLoading";
+import { PageLoading } from "@/components/admin";
 
 export default function RescuerRegistrationPage() {
   const [dashboardData, setDashboardData] = useState<any>(null);

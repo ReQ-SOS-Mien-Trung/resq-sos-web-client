@@ -7,8 +7,12 @@ import {
   mockReportStats,
 } from "@/lib/mock-data/admin-reports";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import { ReportStats, ReportFilters, ReportTable } from "@/components/admin/reports";
-import { PageLoading } from "@/components/admin/PageLoading";
+import {
+  ReportStats,
+  ReportFilters,
+  ReportTable,
+} from "@/components/admin/reports";
+import { PageLoading } from "@/components/admin";
 
 export default function ReportsPage() {
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -30,7 +34,12 @@ export default function ReportsPage() {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading title="Đang tải báo cáo" subtitle="Đang tổng hợp dữ liệu cứu hộ…" />;
+    return (
+      <PageLoading
+        title="Đang tải báo cáo"
+        subtitle="Đang tổng hợp dữ liệu cứu hộ…"
+      />
+    );
   }
 
   return (

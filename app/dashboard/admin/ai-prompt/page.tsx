@@ -14,7 +14,7 @@ import {
 } from "@/components/admin/ai-prompt";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";
-import { PageLoading } from "@/components/admin/PageLoading";
+import { PageLoading } from "@/components/admin";
 
 export default function AIPromptPage() {
   const [dashboardData, setDashboardData] = useState<any>(null);

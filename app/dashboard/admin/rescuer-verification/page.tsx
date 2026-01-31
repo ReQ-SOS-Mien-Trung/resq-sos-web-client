@@ -10,7 +10,7 @@ import {
   DocumentViewer,
 } from "@/components/admin/rescuer-verification";
 import type { RescuerVerification } from "@/types/admin-pages";
-import { PageLoading } from "@/components/admin/PageLoading";
+import { PageLoading } from "@/components/admin";
 
 export default function RescuerVerificationPage() {
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -33,7 +33,12 @@ export default function RescuerVerificationPage() {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading title="Đang tải xác minh" subtitle="Đang chuẩn bị hồ sơ cứu hộ viên…" />;
+    return (
+      <PageLoading
+        title="Đang tải xác minh"
+        subtitle="Đang chuẩn bị hồ sơ cứu hộ viên…"
+      />
+    );
   }
 
   return (

@@ -11,7 +11,7 @@ import {
 } from "@/components/admin/weather-posts";
 import { Button } from "@/components/ui/button";
 import { Plus, SquaresFour, List } from "@phosphor-icons/react";
-import { PageLoading } from "@/components/admin/PageLoading";
+import { PageLoading } from "@/components/admin";
 
 export default function WeatherPostsPage() {
   const [dashboardData, setDashboardData] = useState<any>(null);
