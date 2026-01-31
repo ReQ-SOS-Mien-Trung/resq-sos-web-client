@@ -8,11 +8,11 @@ type PageLoadingProps = {
   className?: string;
 };
 
-export function PageLoading({
+const PageLoading = ({
   title = "Đang tải dữ liệu",
   subtitle = "Vui lòng chờ trong giây lát…",
   className,
-}: PageLoadingProps) {
+}: PageLoadingProps) => {
   return (
     <div
       className={cn(
@@ -65,5 +65,6 @@ export function PageLoading({
       `}</style>
     </div>
   );
-}
+};
 
+export default PageLoading;

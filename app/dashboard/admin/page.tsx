@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import type { DashboardData } from "@/types/admin-dashboard";
 import { Check } from "@phosphor-icons/react";
-import { PageLoading } from "@/components/admin/PageLoading";
 import {
   CalendarWidget,
   DashboardLayout,
@@ -14,6 +13,7 @@ import {
   SummaryCards,
   TopCountries,
 } from "@/components/admin/dashboard";
+import { PageLoading } from "@/components/admin";
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
