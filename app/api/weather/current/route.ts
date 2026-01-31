@@ -1,4 +1,4 @@
-import { CENTRAL_VN_LOCATIONS } from "@/lib/constants";
+import { CENTRAL_VN_LOCATIONS } from "@/lib/locations";
 import { WeatherApiCurrentResponse } from "@/type";
 import { NextResponse } from "next/server";
 

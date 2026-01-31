@@ -1,3 +1,5 @@
+"use client";
+
 import { partners } from "@/lib/constants";
 
 const PartnersSection = () => {
@@ -31,4 +33,3 @@ const PartnersSection = () => {
 };
 
 export default PartnersSection;
-

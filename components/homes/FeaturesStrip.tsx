@@ -1,3 +1,5 @@
+"use client";
+
 import { features } from "@/lib/constants";
 
 const FeaturesStrip = () => {
@@ -30,4 +32,3 @@ const FeaturesStrip = () => {
 };
 
 export default FeaturesStrip;
-
