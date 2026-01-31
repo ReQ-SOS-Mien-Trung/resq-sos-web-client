@@ -51,7 +51,7 @@ const WindyWeatherMap = ({ open, onOpenChange }: WindyWeatherMapProps) => {
 
   const getWindyUrl = (layer: WeatherLayer) => {
     // Windy.com embed URL with different overlays
-    return `https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=${DEFAULT_ZOOM}&overlay=${layer}&product=ecmwf&level=surface&lat=${DEFAULT_LAT}&lon=${DEFAULT_LON}&detailLat=${DEFAULT_LAT}&detailLon=${DEFAULT_LON}&marker=true&message=true`;
+    return `https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=${DEFAULT_ZOOM}&overlay=${layer}&product=ecmwf&level=surface&lat=${DEFAULT_LAT}&lon=${DEFAULT_LON}&marker=false&message=false`;
   };
 
   return (
@@ -65,12 +65,6 @@ const WindyWeatherMap = ({ open, onOpenChange }: WindyWeatherMapProps) => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
                 <Cloud className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <SheetTitle className="text-lg">Bản đồ Thời tiết</SheetTitle>
-                <SheetDescription className="text-xs">
-                  Dữ liệu từ Windy.com - ECMWF
-                </SheetDescription>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -153,14 +147,6 @@ const WindyWeatherMap = ({ open, onOpenChange }: WindyWeatherMapProps) => {
                   Bão
                 </span>
               </div>
-              <a
-                href="https://www.windy.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:underline"
-              >
-                Powered by Windy.com
-              </a>
             </div>
           </div>
         </div>
