@@ -7,12 +7,27 @@ import { mockFloodAlerts } from "@/lib/mock-data/admin-weather-flood";
 import { PageLoading } from "@/components/admin";
 import { FloodAlert, WeatherData } from "@/type";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import { FloodAlerts, WeatherChart } from "@/components/admin/weather-flood";
 
 const WeatherMap = dynamic(
   () =>
     import("@/components/admin/weather-flood").then((mod) => ({
       default: mod.WeatherMap,
+    })),
+  { ssr: false },
+);
+
+const FloodAlerts = dynamic(
+  () =>
+    import("@/components/admin/weather-flood").then((mod) => ({
+      default: mod.FloodAlerts,
+    })),
+  { ssr: false },
+);
+
+const WeatherChart = dynamic(
+  () =>
+    import("@/components/admin/weather-flood").then((mod) => ({
+      default: mod.WeatherChart,
     })),
   { ssr: false },
 );
