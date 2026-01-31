@@ -123,7 +123,7 @@ export const partners = [
   { name: "UNDP Vietnam", icon: <Users className="w-6 h-6" /> },
   { name: "Quân Khu 5", icon: <Shield className="w-6 h-6" /> },
   { name: "UNICEF", icon: <Users className="w-6 h-6" /> },
-  { name: "WHO", icon: <Activity className="w-6 h-6" /> },
+  { name: "WHO", icon: <Pulse className="w-6 h-6" /> },
 ];
 
 export const features = [
@@ -393,11 +393,11 @@ export const getStatusBadge = (status: RescueReport["status"]) => {
 
 //Inventory Category Overview
 export const categoryIcons: Record<ItemCategory, React.ReactNode> = {
-  MEDICAL: <Stethoscope className="h-5 w-5" weight="fill" />,
-  FOOD: <ForkKnife className="h-5 w-5" weight="fill" />,
+  MEDICAL: <Stethoscope className="h-5 w-5" />,
+  FOOD: <ForkKnife className="h-5 w-5" />,
   WATER: <Drop className="h-5 w-5" weight="fill" />,
-  EQUIPMENT: <Wrench className="h-5 w-5" weight="fill" />,
-  SHELTER: <Tent className="h-5 w-5" weight="fill" />,
+  EQUIPMENT: <Wrench className="h-5 w-5" />,
+  SHELTER: <Tent className="h-5 w-5" />,
   CLOTHING: <TShirt className="h-5 w-5" weight="fill" />,
 };
 
