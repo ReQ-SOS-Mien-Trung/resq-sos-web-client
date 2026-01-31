@@ -13,7 +13,7 @@ import {
   PromptPreview,
 } from "@/components/admin/ai-prompt";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus } from "@phosphor-icons/react";
 import { PageLoading } from "@/components/admin/PageLoading";
 
 export default function AIPromptPage() {
@@ -63,7 +63,7 @@ export default function AIPromptPage() {
             </p>
           </div>
           <Button onClick={() => setShowEditor(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus size={16} className="mr-2" />
             Tạo Prompt mới
           </Button>
         </div>

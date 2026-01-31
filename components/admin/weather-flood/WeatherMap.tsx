@@ -6,16 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   MapPin,
   CloudRain,
-  AlertTriangle,
+  Warning,
   Thermometer,
-  Droplets,
+  Drop,
   Wind,
-  AlertCircle,
-  RefreshCw,
-} from "lucide-react";
+  WarningCircle,
+  ArrowsClockwise,
+  ArrowsCounterClockwise,
+} from "@phosphor-icons/react";
 import type { FloodAlert } from "@/types/admin-pages";
 import { Button } from "@/components/ui/button";
 import { WeatherMapSkeleton } from "./WeatherMapSkeleton";
+import { Droplets, RefreshCw } from "lucide-react";
 
 interface WeatherMapProps {
   floodAlerts: FloodAlert[];
@@ -45,9 +47,9 @@ type WeatherApiCurrentPoint =
 
 export function WeatherMap({ floodAlerts }: WeatherMapProps) {
   const [isMounted, setIsMounted] = useState(false);
-  const [liveWeather, setLiveWeather] = useState<WeatherApiCurrentPoint[] | null>(
-    null,
-  );
+  const [liveWeather, setLiveWeather] = useState<
+    WeatherApiCurrentPoint[] | null
+  >(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const [leaflet, setLeaflet] = useState<null | typeof import("leaflet")>(null);
@@ -62,7 +64,8 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
       const json = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(
-          json?.error || `Không lấy được dữ liệu thời tiết (HTTP ${res.status})`,
+          json?.error ||
+            `Không lấy được dữ liệu thời tiết (HTTP ${res.status})`,
         );
       }
       setLiveWeather(json?.locations || []);
@@ -92,7 +95,9 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
       document.head.appendChild(link);
 
       return () => {
-        const linkToRemove = document.querySelector('link[href*="leaflet.css"]');
+        const linkToRemove = document.querySelector(
+          'link[href*="leaflet.css"]',
+        );
         if (linkToRemove) {
           document.head.removeChild(linkToRemove);
         }
@@ -112,7 +117,10 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
   }, [loadWeather]);
 
   // Central Vietnam coordinates (Hue)
-  const defaultCenter = useMemo<[number, number]>(() => [16.4637, 107.5909], []);
+  const defaultCenter = useMemo<[number, number]>(
+    () => [16.4637, 107.5909],
+    [],
+  );
   const defaultZoom = 8;
 
   const mapCenter: [number, number] = useMemo(() => {
@@ -131,11 +139,36 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
 
   const waterStations = useMemo(
     () => [
-      { id: "wl-hue", name: "Trạm Huế (placeholder)", lat: 16.4637, lon: 107.5909 },
-      { id: "wl-danang", name: "Trạm Đà Nẵng (placeholder)", lat: 16.0544, lon: 108.2022 },
-      { id: "wl-quangnam", name: "Trạm Quảng Nam (placeholder)", lat: 15.5394, lon: 108.0191 },
-      { id: "wl-quangngai", name: "Trạm Quảng Ngãi (placeholder)", lat: 15.1214, lon: 108.8044 },
-      { id: "wl-binhdinh", name: "Trạm Bình Định (placeholder)", lat: 13.7765, lon: 109.2237 },
+      {
+        id: "wl-hue",
+        name: "Trạm Huế (placeholder)",
+        lat: 16.4637,
+        lon: 107.5909,
+      },
+      {
+        id: "wl-danang",
+        name: "Trạm Đà Nẵng (placeholder)",
+        lat: 16.0544,
+        lon: 108.2022,
+      },
+      {
+        id: "wl-quangnam",
+        name: "Trạm Quảng Nam (placeholder)",
+        lat: 15.5394,
+        lon: 108.0191,
+      },
+      {
+        id: "wl-quangngai",
+        name: "Trạm Quảng Ngãi (placeholder)",
+        lat: 15.1214,
+        lon: 108.8044,
+      },
+      {
+        id: "wl-binhdinh",
+        name: "Trạm Bình Định (placeholder)",
+        lat: 13.7765,
+        lon: 109.2237,
+      },
     ],
     [],
   );
@@ -236,7 +269,7 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
               className="gap-2"
               title="Tải lại dữ liệu WeatherAPI"
             >
-              <RefreshCw
+              <ArrowsCounterClockwise
                 className={weatherLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"}
               />
               Tải lại
@@ -247,7 +280,7 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
       <CardContent>
         {weatherLoading && (
           <div className="mb-3 flex items-start gap-2 rounded-lg border border-border/50 bg-muted/30 p-3 text-sm">
-            <RefreshCw className="h-4 w-4 mt-0.5 animate-spin text-muted-foreground" />
+            <ArrowsCounterClockwise className="h-4 w-4 mt-0.5 animate-spin text-muted-foreground" />
             <div className="text-muted-foreground">
               Đang tải dữ liệu thời tiết từ WeatherAPI...
             </div>
@@ -273,7 +306,9 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
                     "lat" in p && "lon" in p,
                 )
                 .map((p) => {
-                  const windIcon = showWindLayer ? makeWindIcon(p.wind_degree) : undefined;
+                  const windIcon = showWindLayer
+                    ? makeWindIcon(p.wind_degree)
+                    : undefined;
                   return (
                     <Marker
                       key={`weather-live-${p.name}`}
@@ -371,7 +406,7 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
                   <Popup>
                     <div className="p-2 min-w-[250px]">
                       <div className="flex items-center gap-2 mb-2">
-                        <AlertTriangle className="h-5 w-5 text-red-500" />
+                        <Warning className="h-5 w-5 text-red-500" />
                         <h3 className="font-semibold text-foreground">
                           {alert.region}
                         </h3>
@@ -391,7 +426,9 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
                           </span>
                           <span>{statusLabels[alert.status]}</span>
                         </div>
-                        <p className="text-foreground/80">{alert.description}</p>
+                        <p className="text-foreground/80">
+                          {alert.description}
+                        </p>
                         {alert.affectedAreas.length > 0 && (
                           <div>
                             <span className="font-medium text-foreground">
@@ -418,12 +455,13 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
         </div>
         {weatherError && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/20 p-3 text-sm">
-            <AlertCircle className="h-4 w-4 mt-0.5 text-rose-600 dark:text-rose-400" />
+            <WarningCircle className="h-4 w-4 mt-0.5 text-rose-600 dark:text-rose-400" />
             <div className="text-rose-800 dark:text-rose-300">
               Không lấy được dữ liệu WeatherAPI: {weatherError}
               <div className="text-rose-700/80 dark:text-rose-300/80 text-xs mt-1">
                 Điểm thời tiết sẽ không hiển thị cho đến khi API hoạt động. Bấm
-                “Tải lại” sau khi bạn sửa cấu hình `.env.local` và restart server.
+                “Tải lại” sau khi bạn sửa cấu hình `.env.local` và restart
+                server.
               </div>
             </div>
           </div>
@@ -441,7 +479,10 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded-full bg-sky-500 border-2 border-white"></div>
-            <span>Mực nước (placeholder: {showWaterLayer ? waterStations.length : 0})</span>
+            <span>
+              Mực nước (placeholder: {showWaterLayer ? waterStations.length : 0}
+              )
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded-full bg-red-500 border-2 border-white animate-pulse"></div>

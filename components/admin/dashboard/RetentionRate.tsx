@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, MoreVertical } from "lucide-react";
+import { TrendUp, DotsThreeVertical } from "@phosphor-icons/react";
 import {
   BarChart,
   Bar,
@@ -96,14 +96,17 @@ export function RetentionRate({ data }: RetentionRateProps) {
               <CardTitle className="text-base font-semibold">
                 Hiệu suất cứu hộ
               </CardTitle>
-              <MoreVertical className="h-4 w-4 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors" />
+              <DotsThreeVertical
+                size={16}
+                className="text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors"
+              />
             </div>
             <div className="flex items-baseline gap-2 mt-2">
               <span className="text-3xl font-bold tracking-tight">
                 {data.currentRate}%
               </span>
               <div className="flex items-center gap-1 text-xs text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full">
-                <TrendingUp className="h-3 w-3" />
+                <TrendUp size={12} />
                 <span>+{data.change}% so với tháng trước</span>
               </div>
             </div>

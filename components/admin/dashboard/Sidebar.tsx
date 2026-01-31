@@ -4,31 +4,26 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import {
-  LayoutDashboard,
+  SquaresFour,
   Users,
   CloudSun,
-  Droplets,
-  FileBarChart,
+  Drop,
+  ChartBar,
   UserCheck,
-  Bot,
-  MessageSquare,
+  Robot,
+  ChatCircle,
   UserPlus,
-  ChevronDown,
-  ChevronRight,
+  CaretDown,
+  CaretRight,
   Plus,
-  MoreVertical,
-  Settings,
-  HelpCircle,
-  ChevronRight as ChevronRightIcon,
+  DotsThreeVertical,
+  Gear,
+  Question,
   Shield,
-  AlertTriangle,
-  Activity,
-  Cloud,
-  Zap,
-} from "lucide-react";
+  Warning,
+  Pulse,
+} from "@phosphor-icons/react";
 import type {
   FavoriteItem,
   Project,
@@ -44,18 +39,42 @@ interface SidebarProps {
 
 const navigationItems = [
   {
-    icon: LayoutDashboard,
+    icon: SquaresFour,
     label: "Tổng quan",
     href: "/dashboard/admin",
   },
   { icon: Users, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
-  { icon: CloudSun, label: "Bài đăng thời tiết", href: "/dashboard/admin/weather-posts" },
-  { icon: Droplets, label: "Thời tiết & Lũ lụt", href: "/dashboard/admin/weather-flood" },
-  { icon: FileBarChart, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
-  { icon: UserCheck, label: "Đăng ký cứu hộ viên", href: "/dashboard/admin/rescuer-registration" },
-  { icon: Bot, label: "Cấu hình AI Prompt", href: "/dashboard/admin/ai-prompt" },
-  { icon: MessageSquare, label: "Cấu hình phòng chat", href: "/dashboard/admin/chat-config" },
-  { icon: UserPlus, label: "Xác nhận cứu hộ viên", href: "/dashboard/admin/rescuer-verification" },
+  {
+    icon: CloudSun,
+    label: "Bài đăng thời tiết",
+    href: "/dashboard/admin/weather-posts",
+  },
+  {
+    icon: Drop,
+    label: "Thời tiết & Lũ lụt",
+    href: "/dashboard/admin/weather-flood",
+  },
+  { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
+  {
+    icon: UserCheck,
+    label: "Đăng ký cứu hộ viên",
+    href: "/dashboard/admin/rescuer-registration",
+  },
+  {
+    icon: Robot,
+    label: "Cấu hình AI Prompt",
+    href: "/dashboard/admin/ai-prompt",
+  },
+  {
+    icon: ChatCircle,
+    label: "Cấu hình phòng chat",
+    href: "/dashboard/admin/chat-config",
+  },
+  {
+    icon: UserPlus,
+    label: "Xác nhận cứu hộ viên",
+    href: "/dashboard/admin/rescuer-verification",
+  },
 ];
 
 const getFavoriteIcon = (name: string) => {
@@ -63,9 +82,9 @@ const getFavoriteIcon = (name: string) => {
     case "Cứu hộ viên":
       return Shield;
     case "Cảnh báo":
-      return AlertTriangle;
+      return Warning;
     case "Hoạt động":
-      return Activity;
+      return Pulse;
     default:
       return Shield;
   }
@@ -104,7 +123,10 @@ export function Sidebar({
                   Hệ thống cứu hộ miền Trung
                 </div>
               </div>
-              <ChevronDown className="h-4 w-4 text-sidebar-foreground/40 hover:text-sidebar-foreground transition-colors cursor-pointer" />
+              <CaretDown
+                size={16}
+                className="text-sidebar-foreground/40 hover:text-sidebar-foreground transition-colors cursor-pointer"
+              />
             </div>
           </div>
 
@@ -119,7 +141,10 @@ export function Sidebar({
                   admin@sosresq.vn
                 </div>
               </div>
-              <ChevronDown className="h-4 w-4 text-sidebar-foreground/40 group-hover:text-sidebar-foreground transition-colors" />
+              <CaretDown
+                size={16}
+                className="text-sidebar-foreground/40 group-hover:text-sidebar-foreground transition-colors"
+              />
             </div>
           </div>
 
@@ -127,7 +152,10 @@ export function Sidebar({
           <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
             {navigationItems.map((item, index) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || (item.href !== "/dashboard/admin" && pathname?.startsWith(item.href));
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/dashboard/admin" &&
+                  pathname?.startsWith(item.href));
               return (
                 <Link
                   key={item.label}
@@ -141,8 +169,9 @@ export function Sidebar({
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <Icon
+                    size={20}
                     className={cn(
-                      "h-5 w-5 transition-colors flex-shrink-0",
+                      "transition-colors flex-shrink-0",
                       isActive && "text-red-500",
                     )}
                   />
@@ -162,11 +191,15 @@ export function Sidebar({
               >
                 <span>Thống kê nhanh</span>
                 <div className="flex items-center gap-1.5">
-                  <Plus className="h-3.5 w-3.5 hover:text-red-500 transition-colors" />
-                  <MoreVertical className="h-3.5 w-3.5" />
-                  <ChevronDown
+                  <Plus
+                    size={14}
+                    className="hover:text-red-500 transition-colors"
+                  />
+                  <DotsThreeVertical size={14} />
+                  <CaretDown
+                    size={14}
                     className={cn(
-                      "h-3.5 w-3.5 transition-transform duration-200",
+                      "transition-transform duration-200",
                       !favoritesExpanded && "-rotate-90",
                     )}
                   />
@@ -191,7 +224,10 @@ export function Sidebar({
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
                         <div className="flex items-center gap-3">
-                          <Icon className="h-4 w-4 text-sidebar-foreground/50 group-hover:text-red-500 transition-colors" />
+                          <Icon
+                            size={16}
+                            className="text-sidebar-foreground/50 group-hover:text-red-500 transition-colors"
+                          />
                           <span>{favorite.name}</span>
                         </div>
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-sidebar-accent text-sidebar-foreground/60 group-hover:bg-red-500/10 group-hover:text-red-500 transition-colors">
@@ -212,11 +248,15 @@ export function Sidebar({
               >
                 <span>Khu vực cứu hộ</span>
                 <div className="flex items-center gap-1.5">
-                  <Plus className="h-3.5 w-3.5 hover:text-red-500 transition-colors" />
-                  <MoreVertical className="h-3.5 w-3.5" />
-                  <ChevronDown
+                  <Plus
+                    size={14}
+                    className="hover:text-red-500 transition-colors"
+                  />
+                  <DotsThreeVertical size={14} />
+                  <CaretDown
+                    size={14}
                     className={cn(
-                      "h-3.5 w-3.5 transition-transform duration-200",
+                      "transition-transform duration-200",
                       !projectsExpanded && "-rotate-90",
                     )}
                   />
@@ -253,20 +293,29 @@ export function Sidebar({
               className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200 group"
             >
               <div className="flex items-center gap-3">
-                <Settings className="h-4 w-4 group-hover:rotate-90 transition-transform duration-300" />
+                <Gear
+                  size={16}
+                  className="group-hover:rotate-90 transition-transform duration-300"
+                />
                 <span>Cài đặt</span>
               </div>
-              <ChevronRightIcon className="h-4 w-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              <CaretRight
+                size={16}
+                className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"
+              />
             </Link>
             <Link
               href="#"
               className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200 group"
             >
               <div className="flex items-center gap-3">
-                <HelpCircle className="h-4 w-4" />
+                <Question size={16} />
                 <span>Trung tâm hỗ trợ</span>
               </div>
-              <ChevronRightIcon className="h-4 w-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              <CaretRight
+                size={16}
+                className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"
+              />
             </Link>
           </div>
         </div>

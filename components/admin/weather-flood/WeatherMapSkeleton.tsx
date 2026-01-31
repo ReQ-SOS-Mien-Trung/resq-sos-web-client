@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin } from "lucide-react";
+import { MapPin } from "@phosphor-icons/react";
 
 export function WeatherMapSkeleton() {
   return (
@@ -9,7 +9,7 @@ export function WeatherMapSkeleton() {
       <CardHeader>
         <CardTitle className="flex items-center justify-between gap-4">
           <span className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-red-500" />
+            <MapPin size={20} className="text-red-500" />
             Bản đồ thời tiết & Lũ lụt
           </span>
           <span className="hidden sm:flex items-center gap-2">
@@ -32,4 +32,3 @@ export function WeatherMapSkeleton() {
     </Card>
   );
 }
-

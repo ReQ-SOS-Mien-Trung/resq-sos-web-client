@@ -19,13 +19,19 @@ export const sfUIDisplay = localFont({
       style: "normal",
     },
     {
-      path: "../public/fonts/sf-ui-display-medium-58646be638f96.otf",
+      // Dùng Light cho weight 400 vì không có file Regular
+      path: "../public/fonts/sf-ui-display-light-58646b33e0551.otf",
       weight: "400",
       style: "normal",
     },
     {
-      path: "../public/fonts/sf-ui-display-semibold-58646eddcae92.otf",
+      path: "../public/fonts/sf-ui-display-medium-58646be638f96.otf",
       weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/sf-ui-display-semibold-58646eddcae92.otf",
+      weight: "600",
       style: "normal",
     },
     {

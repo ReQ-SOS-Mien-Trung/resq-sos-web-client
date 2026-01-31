@@ -1,5 +1,3 @@
-"use client";
-
 import { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,7 +9,7 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         {/* Background Image - Full Screen */}
         <Image
-          src="/images/authenbackground.png"
+          src="/images/authenbackground.jpg"
           alt="ResQ SOS Branding"
           fill
           className="object-cover"
@@ -19,18 +17,12 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
           quality={90}
         />
 
-        {/* Light overlay for better text readability - very subtle */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-black/10 to-black/15" />
-
-        {/* Orange tint overlay - subtle */}
-        <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-orange-400/5 to-transparent" />
-
         {/* Content Overlay - Logo and Text */}
         <div className="relative z-10 flex flex-col justify-between p-12 text-white h-full">
-          {/* Logo - Overlay on top */}
+          {/* Logo - Overlay on top with backdrop */}
           <Link
             href="/"
-            className="flex items-center gap-3 transition-transform hover:scale-105 z-20"
+            className="flex items-center gap-3 transition-transform hover:scale-105 z-20 w-fit px-4 py-2 rounded-xl bg-black/30 backdrop-blur-sm"
           >
             <Image
               src="/icons/logo.svg"
@@ -40,21 +32,17 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
               className="w-12 h-12 drop-shadow-lg"
             />
             <div>
-              <h1 className="text-2xl font-bold font-sans drop-shadow-lg">
-                ResQ SOS
-              </h1>
-              <p className="text-sm opacity-90 font-sans drop-shadow-md">
-                Miền Trung
-              </p>
+              <h1 className="text-2xl font-bold font-sans">ResQ SOS</h1>
+              <p className="text-sm opacity-90 font-sans">Miền Trung</p>
             </div>
           </Link>
 
-          {/* Text Content - Overlay on bottom */}
-          <div className="space-y-6 max-w-md animate-in fade-in-0 slide-in-from-left duration-700">
-            <h2 className="text-4xl font-bold leading-tight font-sans drop-shadow-lg">
+          {/* Text Content - Overlay on bottom with backdrop */}
+          <div className="space-y-4 max-w-lg animate-in fade-in-0 slide-in-from-left duration-700 p-6 rounded-2xl bg-black/40 backdrop-blur-sm">
+            <h2 className="text-4xl font-bold leading-tight font-sans">
               Hệ thống tiếp nhận tin báo SOS và điều phối cứu hộ khẩn cấp
             </h2>
-            <p className="text-lg opacity-95 leading-relaxed font-sans drop-shadow-md">
+            <p className="text-lg opacity-95 leading-relaxed font-sans">
               Hỗ trợ kịp thời cho người dân khu vực Miền Trung trong các tình
               huống khẩn cấp
             </p>

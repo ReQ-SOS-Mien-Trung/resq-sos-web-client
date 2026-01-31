@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, Eye, FileText } from "lucide-react";
+import { DownloadSimple, Eye, FileText } from "@phosphor-icons/react";
 import type { RescueReport } from "@/types/admin-pages";
 
 interface ReportTableProps {
@@ -13,11 +13,7 @@ interface ReportTableProps {
   onDownload?: (report: RescueReport) => void;
 }
 
-export function ReportTable({
-  reports,
-  onView,
-  onDownload,
-}: ReportTableProps) {
+export function ReportTable({ reports, onView, onDownload }: ReportTableProps) {
   const [page, setPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -29,21 +25,48 @@ export function ReportTable({
 
   const getTypeBadge = (type: RescueReport["type"]) => {
     const variants = {
-      rescue: { label: "Cứu hộ", className: "bg-red-500/10 text-red-700 dark:text-red-400" },
-      evacuation: { label: "Sơ tán", className: "bg-orange-500/10 text-orange-700 dark:text-orange-400" },
-      supply: { label: "Cung cấp", className: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
-      medical: { label: "Y tế", className: "bg-pink-500/10 text-pink-700 dark:text-pink-400" },
-      other: { label: "Khác", className: "bg-gray-500/10 text-gray-700 dark:text-gray-400" },
+      rescue: {
+        label: "Cứu hộ",
+        className: "bg-red-500/10 text-red-700 dark:text-red-400",
+      },
+      evacuation: {
+        label: "Sơ tán",
+        className: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+      },
+      supply: {
+        label: "Cung cấp",
+        className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+      },
+      medical: {
+        label: "Y tế",
+        className: "bg-pink-500/10 text-pink-700 dark:text-pink-400",
+      },
+      other: {
+        label: "Khác",
+        className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+      },
     };
     return variants[type];
   };
 
   const getStatusBadge = (status: RescueReport["status"]) => {
     const variants = {
-      pending: { label: "Đang chờ", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
-      "in-progress": { label: "Đang xử lý", className: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
-      completed: { label: "Hoàn thành", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
-      cancelled: { label: "Đã hủy", className: "bg-rose-500/10 text-rose-700 dark:text-rose-400" },
+      pending: {
+        label: "Đang chờ",
+        className: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+      },
+      "in-progress": {
+        label: "Đang xử lý",
+        className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+      },
+      completed: {
+        label: "Hoàn thành",
+        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      },
+      cancelled: {
+        label: "Đã hủy",
+        className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+      },
     };
     return variants[status];
   };
@@ -81,7 +104,10 @@ export function ReportTable({
             <tbody>
               {paginatedReports.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={6}
+                    className="p-8 text-center text-muted-foreground"
+                  >
                     Không có báo cáo nào
                   </td>
                 </tr>
@@ -122,7 +148,7 @@ export function ReportTable({
                             size="sm"
                             onClick={() => onView?.(report)}
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye size={16} />
                           </Button>
                           {report.fileUrl && (
                             <Button
@@ -130,7 +156,7 @@ export function ReportTable({
                               size="sm"
                               onClick={() => onDownload?.(report)}
                             >
-                              <Download className="h-4 w-4" />
+                              <DownloadSimple size={16} />
                             </Button>
                           )}
                         </div>

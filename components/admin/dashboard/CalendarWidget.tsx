@@ -4,7 +4,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, MoreVertical } from "lucide-react";
+import {
+  CaretLeft,
+  CaretRight,
+  DotsThreeVertical,
+} from "@phosphor-icons/react";
 import {
   format,
   startOfMonth,
@@ -100,7 +104,10 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
           <CardTitle className="text-base font-semibold">
             Lịch hoạt động
           </CardTitle>
-          <MoreVertical className="h-4 w-4 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors" />
+          <DotsThreeVertical
+            size={16}
+            className="text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors"
+          />
         </div>
       </CardHeader>
       <CardContent>
@@ -113,7 +120,7 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
               className="h-8 w-8 hover:bg-muted/80 transition-colors"
               onClick={goToPreviousMonth}
             >
-              <ChevronLeft className="h-4 w-4" />
+              <CaretLeft size={16} />
             </Button>
             <span className="text-sm font-semibold">
               {format(currentDate, "MMMM yyyy")}
@@ -124,7 +131,7 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
               className="h-8 w-8 hover:bg-muted/80 transition-colors"
               onClick={goToNextMonth}
             >
-              <ChevronRight className="h-4 w-4" />
+              <CaretRight size={16} />
             </Button>
           </div>
 
@@ -215,7 +222,7 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
                   }
                 >
                   On {meeting.platform}
-                  <ChevronRight className="h-3 w-3 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                  <CaretRight className="h-3 w-3 ml-1 group-hover:translate-x-0.5 transition-transform" />
                 </Button>
               </div>
             ))}

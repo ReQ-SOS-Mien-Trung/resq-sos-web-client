@@ -3,14 +3,14 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
-  TrendingUp,
-  TrendingDown,
-  AlertCircle,
+  TrendUp,
+  TrendDown,
+  WarningCircle,
   Users,
   Target,
   Clock,
   Info,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import type { SummaryMetric } from "@/types/admin-dashboard";
 
 interface SummaryCardsProps {
@@ -20,7 +20,7 @@ interface SummaryCardsProps {
 const getMetricIcon = (label: string) => {
   switch (label.toLowerCase()) {
     case "yêu cầu sos":
-      return AlertCircle;
+      return WarningCircle;
     case "cứu hộ viên":
       return Users;
     case "tỷ lệ thành công":
@@ -28,7 +28,7 @@ const getMetricIcon = (label: string) => {
     case "thời gian phản hồi":
       return Clock;
     default:
-      return AlertCircle;
+      return WarningCircle;
   }
 };
 
@@ -49,14 +49,17 @@ export function SummaryCards({ metrics }: SummaryCardsProps) {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5 flex-1 min-w-0">
                   <div className="h-9 w-9 rounded-lg bg-muted/80 flex items-center justify-center border border-border/50 group-hover:border-primary/20 transition-colors flex-shrink-0">
-                    <Icon className="h-4.5 w-4.5 text-foreground/80" />
+                    <Icon size={18} className="text-foreground/80" />
                   </div>
                   <span className="text-sm font-semibold text-foreground leading-tight truncate">
                     {metric.label}
                   </span>
                 </div>
                 <button className="h-6 w-6 rounded-full border border-border/50 flex items-center justify-center hover:bg-muted/80 transition-colors flex-shrink-0 ml-2">
-                  <Info className="h-4 w-4 text-foreground/70 hover:text-foreground" />
+                  <Info
+                    size={16}
+                    className="text-foreground/70 hover:text-foreground"
+                  />
                 </button>
               </div>
 
@@ -74,9 +77,9 @@ export function SummaryCards({ metrics }: SummaryCardsProps) {
                   )}
                 >
                   {metric.changeType === "increase" ? (
-                    <TrendingUp className="h-3.5 w-3.5" />
+                    <TrendUp size={14} />
                   ) : (
-                    <TrendingDown className="h-3.5 w-3.5" />
+                    <TrendDown size={14} />
                   )}
                   <span>
                     {metric.changeType === "increase" ? "+" : ""}

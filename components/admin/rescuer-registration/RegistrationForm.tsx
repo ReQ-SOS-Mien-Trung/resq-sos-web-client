@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, X } from "lucide-react";
+import { Plus, X } from "@phosphor-icons/react";
 
 interface RegistrationFormProps {
   onSubmit: (data: any) => void;
@@ -143,7 +143,7 @@ export function RegistrationForm({
                 placeholder="Nhập kỹ năng và nhấn Enter"
               />
               <Button type="button" onClick={addSkill}>
-                <Plus className="h-4 w-4" />
+                <Plus size={16} />
               </Button>
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
@@ -158,7 +158,7 @@ export function RegistrationForm({
                     onClick={() => removeSkill(index)}
                     className="hover:text-destructive"
                   >
-                    <X className="h-3 w-3" />
+                    <X size={12} />
                   </button>
                 </span>
               ))}

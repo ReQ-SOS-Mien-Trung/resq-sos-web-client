@@ -3,7 +3,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, FileText, Download } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  FileText,
+  DownloadSimple,
+} from "@phosphor-icons/react";
 import type { RescuerVerification } from "@/types/admin-pages";
 
 interface DocumentViewerProps {
@@ -32,7 +37,7 @@ export function DocumentViewer({
     <Card className="border border-border/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
+          <FileText size={20} />
           Tài liệu
         </CardTitle>
       </CardHeader>
@@ -49,12 +54,10 @@ export function DocumentViewer({
                     <h4 className="font-semibold text-foreground">
                       {doc.name}
                     </h4>
-                    <Badge variant="outline">
-                      {getDocTypeLabel(doc.type)}
-                    </Badge>
+                    <Badge variant="outline">{getDocTypeLabel(doc.type)}</Badge>
                     {doc.verified ? (
                       <Badge className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
-                        <CheckCircle className="h-3 w-3 mr-1" />
+                        <CheckCircle size={12} className="mr-1" />
                         Đã xác minh
                       </Badge>
                     ) : (
@@ -73,7 +76,7 @@ export function DocumentViewer({
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" asChild>
                     <a href={doc.url} target="_blank" rel="noopener noreferrer">
-                      <Download className="h-4 w-4 mr-1" />
+                      <DownloadSimple size={16} className="mr-1" />
                       Xem
                     </a>
                   </Button>
@@ -85,7 +88,7 @@ export function DocumentViewer({
                         onClick={() => onVerify?.(doc.id)}
                         className="text-emerald-600 dark:text-emerald-400"
                       >
-                        <CheckCircle className="h-4 w-4" />
+                        <CheckCircle size={16} />
                       </Button>
                       <Button
                         variant="outline"
@@ -93,7 +96,7 @@ export function DocumentViewer({
                         onClick={() => onReject?.(doc.id)}
                         className="text-rose-600 dark:text-rose-400"
                       >
-                        <XCircle className="h-4 w-4" />
+                        <XCircle size={16} />
                       </Button>
                     </>
                   )}

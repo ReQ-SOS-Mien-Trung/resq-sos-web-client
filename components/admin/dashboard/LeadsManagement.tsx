@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { MoreVertical } from "lucide-react";
+import { DotsThreeVertical } from "@phosphor-icons/react";
 import type { LeadsData } from "@/types/admin-dashboard";
 
 interface LeadsManagementProps {
@@ -105,7 +105,10 @@ export function LeadsManagement({ data }: LeadsManagementProps) {
           <CardTitle className="text-base font-semibold">
             Quản lý yêu cầu cứu hộ
           </CardTitle>
-          <MoreVertical className="h-4 w-4 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors" />
+          <DotsThreeVertical
+            size={16}
+            className="text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors"
+          />
         </div>
       </CardHeader>
       <CardContent>

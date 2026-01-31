@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ArrowRight, MoreVertical } from "lucide-react";
+import { ArrowRight, DotsThreeVertical } from "@phosphor-icons/react";
 import type { TopCountriesData } from "@/types/admin-dashboard";
+import { MoreVertical } from "lucide-react";
 
 interface TopCountriesProps {
   data: TopCountriesData;

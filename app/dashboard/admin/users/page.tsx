@@ -5,7 +5,7 @@ import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockUsers, mockUserStats } from "@/lib/mock-data/admin-users";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import { UserStats, UserFilters, UserTable } from "@/components/admin/users";
-import type { User, UserFilters as UserFiltersType } from "@/types/admin-pages";
+import type { UserFilters as UserFiltersType } from "@/types/admin-pages";
 import { PageLoading } from "@/components/admin/PageLoading";
 
 export default function UsersPage() {
@@ -28,7 +28,12 @@ export default function UsersPage() {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading title="Đang tải người dùng" subtitle="Đang đồng bộ danh sách tài khoản…" />;
+    return (
+      <PageLoading
+        title="Đang tải người dùng"
+        subtitle="Đang đồng bộ danh sách tài khoản…"
+      />
+    );
   }
 
   return (

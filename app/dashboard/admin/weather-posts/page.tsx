@@ -10,8 +10,7 @@ import {
   PostScheduler,
 } from "@/components/admin/weather-posts";
 import { Button } from "@/components/ui/button";
-import { Plus, Grid, List } from "lucide-react";
-import type { WeatherPost } from "@/types/admin-pages";
+import { Plus, SquaresFour, List } from "@phosphor-icons/react";
 import { PageLoading } from "@/components/admin/PageLoading";
 
 export default function WeatherPostsPage() {
@@ -37,7 +36,12 @@ export default function WeatherPostsPage() {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading title="Đang tải bài đăng" subtitle="Đang chuẩn bị nội dung thời tiết…" />;
+    return (
+      <PageLoading
+        title="Đang tải bài đăng"
+        subtitle="Đang chuẩn bị nội dung thời tiết…"
+      />
+    );
   }
 
   return (
@@ -63,13 +67,13 @@ export default function WeatherPostsPage() {
               onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
             >
               {viewMode === "grid" ? (
-                <List className="h-4 w-4" />
+                <List size={16} />
               ) : (
-                <Grid className="h-4 w-4" />
+                <SquaresFour size={16} />
               )}
             </Button>
             <Button onClick={() => setShowEditor(true)}>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus size={16} className="mr-2" />
               Tạo bài đăng
             </Button>
           </div>

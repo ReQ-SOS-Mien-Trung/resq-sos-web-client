@@ -9,7 +9,7 @@ import {
   RescuerList,
 } from "@/components/admin/rescuer-registration";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus } from "@phosphor-icons/react";
 import { PageLoading } from "@/components/admin/PageLoading";
 
 export default function RescuerRegistrationPage() {
@@ -32,7 +32,12 @@ export default function RescuerRegistrationPage() {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading title="Đang tải đăng ký" subtitle="Đang lấy danh sách cứu hộ viên…" />;
+    return (
+      <PageLoading
+        title="Đang tải đăng ký"
+        subtitle="Đang lấy danh sách cứu hộ viên…"
+      />
+    );
   }
 
   return (
@@ -52,7 +57,7 @@ export default function RescuerRegistrationPage() {
             </p>
           </div>
           <Button onClick={() => setShowForm(!showForm)}>
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus size={16} className="mr-2" />
             {showForm ? "Ẩn form" : "Tạo đăng ký mới"}
           </Button>
         </div>

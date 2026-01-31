@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import type { ReportStats as ReportStatsType } from "@/types/admin-pages";
-import { FileText, Clock, CheckCircle, XCircle } from "lucide-react";
+import { FileText, Clock, CheckCircle, XCircle } from "@phosphor-icons/react";
 
 interface ReportStatsProps {
   stats: ReportStatsType;
@@ -66,7 +66,7 @@ export function ReportStats({ stats }: ReportStatsProps) {
                 <div
                   className={`h-12 w-12 rounded-lg ${item.bgColor} flex items-center justify-center`}
                 >
-                  <Icon className={`h-6 w-6 ${item.color}`} />
+                  <Icon size={24} className={item.color} />
                 </div>
               </div>
             </CardContent>

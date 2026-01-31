@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, X, Download } from "lucide-react";
+import { MagnifyingGlass, X, DownloadSimple } from "@phosphor-icons/react";
 import type { RescueReport } from "@/types/admin-pages";
 
 interface ReportFiltersProps {
@@ -36,7 +36,10 @@ export function ReportFilters({
     <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
       <div className="flex-1 min-w-[200px]">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <MagnifyingGlass
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             placeholder="Tìm kiếm..."
             value={filters.search || ""}
@@ -76,9 +79,7 @@ export function ReportFilters({
           onFiltersChange({
             ...filters,
             status:
-              value === "all"
-                ? undefined
-                : (value as RescueReport["status"]),
+              value === "all" ? undefined : (value as RescueReport["status"]),
           })
         }
       >
@@ -96,13 +97,13 @@ export function ReportFilters({
 
       {(filters.type || filters.status || filters.region || filters.search) && (
         <Button variant="outline" size="sm" onClick={handleReset}>
-          <X className="h-4 w-4 mr-1" />
+          <X size={16} className="mr-1" />
           Xóa bộ lọc
         </Button>
       )}
 
       <Button variant="default" size="sm" onClick={onExport}>
-        <Download className="h-4 w-4 mr-1" />
+        <DownloadSimple size={16} className="mr-1" />
         Xuất
       </Button>
     </div>

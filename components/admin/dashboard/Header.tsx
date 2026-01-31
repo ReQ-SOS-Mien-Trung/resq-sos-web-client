@@ -15,19 +15,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  PanelLeft,
-  Search,
+  SidebarSimple,
+  MagnifyingGlass,
   Bell,
   User,
-  ChevronDown,
-  Settings,
-  LogOut,
-  Download,
-  Upload,
-  LayoutGrid,
-  Sparkles,
-  Share2,
-} from "lucide-react";
+  CaretDown,
+  Gear,
+  SignOut,
+  DownloadSimple,
+  UploadSimple,
+  SquaresFour,
+  Sparkle,
+  ShareNetwork,
+} from "@phosphor-icons/react";
 
 interface HeaderProps {
   onSidebarToggle?: () => void;
@@ -57,9 +57,10 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
           onClick={onSidebarToggle}
           className="shrink-0 hover:bg-muted/80 transition-colors"
         >
-          <PanelLeft
+          <SidebarSimple
+            size={20}
             className={cn(
-              "h-5 w-5 transition-transform duration-300",
+              "transition-transform duration-300",
               !sidebarOpen && "rotate-180",
             )}
           />
@@ -67,7 +68,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50">
-            <LayoutGrid className="h-4 w-4 text-red-500" />
+            <SquaresFour size={16} className="text-red-500" />
             <span className="text-sm font-semibold text-foreground">
               Tổng quan
             </span>
@@ -78,13 +79,16 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
       {/* Center Section - Search */}
       <div className="flex-1 max-w-md mx-8">
         <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-red-500 transition-colors" />
+          <MagnifyingGlass
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-red-500 transition-colors"
+          />
           <Input
             placeholder="Tìm kiếm..."
             className="w-full pl-10 pr-4 h-10 bg-muted/60 border-2 border-border/60 rounded-xl focus:bg-background focus:border-red-600 focus:ring-2 focus:ring-red-500/30 transition-all duration-200 text-foreground placeholder:text-foreground/50"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-xs text-muted-foreground">
-            <Sparkles className="h-3 w-3 text-red-500" />
+            <Sparkle size={12} className="text-red-500" />
             <span>AI</span>
           </div>
         </div>
@@ -98,7 +102,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
           size="sm"
           className="hidden md:flex gap-2 h-9 rounded-lg border-border/50 hover:border-red-500/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-200"
         >
-          <Settings className="h-4 w-4" />
+          <Gear size={16} />
           Tùy chỉnh
         </Button>
 
@@ -111,7 +115,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
               className="hidden md:flex gap-1.5 h-9 rounded-lg border-border/50 hover:border-red-500/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-200"
             >
               Nhập dữ liệu
-              <ChevronDown className="h-3.5 w-3.5" />
+              <CaretDown size={14} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -123,15 +127,15 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Upload className="h-4 w-4 text-red-500" />
+              <UploadSimple size={16} className="text-red-500" />
               Nhập CSV
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Upload className="h-4 w-4 text-red-500" />
+              <UploadSimple size={16} className="text-red-500" />
               Nhập Excel
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Upload className="h-4 w-4 text-red-500" />
+              <UploadSimple size={16} className="text-red-500" />
               Nhập JSON
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -145,7 +149,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
               className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 h-9 rounded-lg gap-1.5 transition-all duration-200"
             >
               Xuất dữ liệu
-              <ChevronDown className="h-3.5 w-3.5" />
+              <CaretDown size={14} />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -157,15 +161,15 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Download className="h-4 w-4 text-red-500" />
+              <DownloadSimple size={16} className="text-red-500" />
               Xuất CSV
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Download className="h-4 w-4 text-red-500" />
+              <DownloadSimple size={16} className="text-red-500" />
               Xuất Excel
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Download className="h-4 w-4 text-red-500" />
+              <DownloadSimple size={16} className="text-red-500" />
               Xuất PDF
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -177,7 +181,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
           size="icon"
           className="relative h-9 w-9 rounded-lg hover:bg-muted/80 transition-colors"
         >
-          <Bell className="h-5 w-5" />
+          <Bell size={20} />
           {notificationCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-red-500/30 animate-pulse">
               {notificationCount}
@@ -191,7 +195,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
           size="icon"
           className="h-9 w-9 rounded-lg hover:bg-muted/80 transition-colors"
         >
-          <Share2 className="h-5 w-5" />
+          <ShareNetwork size={20} />
         </Button>
 
         {/* User Profile */}
@@ -221,11 +225,11 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <User className="h-4 w-4 text-red-500" />
+              <User size={16} className="text-red-500" />
               Hồ sơ
             </DropdownMenuItem>
             <DropdownMenuItem className="gap-2 rounded-lg cursor-pointer">
-              <Settings className="h-4 w-4 text-red-500" />
+              <Gear size={16} className="text-red-500" />
               Cài đặt
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -233,7 +237,7 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
               className="gap-2 rounded-lg cursor-pointer text-red-500 focus:text-red-500"
               onClick={handleLogout}
             >
-              <LogOut className="h-4 w-4" />
+              <SignOut size={16} />
               Đăng xuất
             </DropdownMenuItem>
           </DropdownMenuContent>

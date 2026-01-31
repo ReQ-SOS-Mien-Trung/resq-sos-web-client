@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, MapPin, Clock, CheckCircle } from "lucide-react";
+import { Warning, MapPin, Clock, CheckCircle } from "@phosphor-icons/react";
 import type { FloodAlert } from "@/types/admin-pages";
 import { cn } from "@/lib/utils";
 
@@ -13,11 +13,7 @@ interface FloodAlertsProps {
   onResolve?: (alert: FloodAlert) => void;
 }
 
-export function FloodAlerts({
-  alerts,
-  onView,
-  onResolve,
-}: FloodAlertsProps) {
+export function FloodAlerts({ alerts, onView, onResolve }: FloodAlertsProps) {
   const getLevelBadge = (level: FloodAlert["level"]) => {
     const variants = {
       low: {
@@ -62,7 +58,7 @@ export function FloodAlerts({
     <Card className="border border-border/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-red-500" />
+          <Warning size={20} className="text-red-500" />
           Cảnh báo lũ lụt
         </CardTitle>
       </CardHeader>
@@ -84,7 +80,7 @@ export function FloodAlerts({
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <MapPin size={16} className="text-muted-foreground" />
                         <span className="font-semibold text-foreground">
                           {alert.region}
                         </span>
@@ -110,7 +106,7 @@ export function FloodAlerts({
                       </div>
                       <div className="flex items-center gap-4 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
+                          <Clock size={12} />
                           <span>
                             {new Date(alert.createdAt).toLocaleString("vi-VN")}
                           </span>
@@ -132,7 +128,7 @@ export function FloodAlerts({
                           onClick={() => onResolve?.(alert)}
                           className="text-emerald-600 dark:text-emerald-400"
                         >
-                          <CheckCircle className="h-4 w-4 mr-1" />
+                          <CheckCircle size={16} className="mr-1" />
                           Giải quyết
                         </Button>
                       )}

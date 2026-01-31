@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "lucide-react";
+import { CalendarBlank } from "@phosphor-icons/react";
 
 interface PostSchedulerProps {
   onSchedule: (date: string, time: string) => void;
@@ -28,7 +28,7 @@ export function PostScheduler({ onSchedule, onCancel }: PostSchedulerProps) {
     <Card className="border border-border/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
+          <CalendarBlank size={20} />
           Lên lịch bài đăng
         </CardTitle>
       </CardHeader>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Play } from "lucide-react";
+import { Play } from "@phosphor-icons/react";
 import { useState } from "react";
 
 interface PromptPreviewProps {
@@ -56,7 +56,7 @@ export function PromptPreview({
               </div>
             ))}
             <Button onClick={handleTest} className="w-full">
-              <Play className="h-4 w-4 mr-2" />
+              <Play size={16} className="mr-2" />
               Test Prompt
             </Button>
           </div>
