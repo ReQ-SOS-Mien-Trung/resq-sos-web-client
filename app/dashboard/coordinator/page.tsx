@@ -36,6 +36,8 @@ import {
   WifiOff,
   Sun,
   Moon,
+  CloudSun,
+  Map,
 } from "lucide-react";
 
 const CoordinatorMap = dynamic(
@@ -52,7 +54,24 @@ const CoordinatorMap = dynamic(
         </div>
       </div>
     ),
-  }
+  },
+);
+
+const WindyMapEmbed = dynamic(
+  () => import("@/components/coordinator/WindyMapEmbed"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full bg-muted flex items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            Đang tải bản đồ thời tiết...
+          </span>
+        </div>
+      </div>
+    ),
+  },
 );
 
 export default function CoordinatorDashboardPage() {
@@ -60,7 +79,7 @@ export default function CoordinatorDashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedSOS, setSelectedSOS] = useState<SOSRequest | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<SOSCluster | null>(
-    null
+    null,
   );
   const [selectedRescuer, setSelectedRescuer] = useState<Rescuer | null>(null);
   const [flyToLocation, setFlyToLocation] = useState<Location | null>(null);
@@ -70,6 +89,7 @@ export default function CoordinatorDashboardPage() {
   // Panel states
   const [clusterSheetOpen, setClusterSheetOpen] = useState(false);
   const [aiPanelOpen, setAIPanelOpen] = useState(false);
+  const [showWeatherMap, setShowWeatherMap] = useState(false);
   const [currentAIDecision, setCurrentAIDecision] =
     useState<AIDispatchDecision | null>(null);
 
@@ -124,7 +144,7 @@ export default function CoordinatorDashboardPage() {
         });
       }
     },
-    [currentAIDecision]
+    [currentAIDecision],
   );
 
   const toggleDarkMode = () => {
@@ -136,7 +156,7 @@ export default function CoordinatorDashboardPage() {
     <div
       className={cn(
         "h-screen flex flex-col overflow-hidden",
-        isDarkMode && "dark"
+        isDarkMode && "dark",
       )}
     >
       {/* Top Header Bar */}
@@ -172,7 +192,7 @@ export default function CoordinatorDashboardPage() {
               "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium",
               isConnected
                 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
             )}
           >
             {isConnected ? (
@@ -187,6 +207,21 @@ export default function CoordinatorDashboardPage() {
               </>
             )}
           </div>
+
+          {/* Weather Map Toggle */}
+          <Button
+            variant={showWeatherMap ? "default" : "ghost"}
+            size="icon"
+            onClick={() => setShowWeatherMap(!showWeatherMap)}
+            title={showWeatherMap ? "Xem bản đồ SOS" : "Xem bản đồ thời tiết"}
+            className={showWeatherMap ? "bg-blue-500 hover:bg-blue-600" : ""}
+          >
+            {showWeatherMap ? (
+              <Map className="h-5 w-5" />
+            ) : (
+              <CloudSun className="h-5 w-5" />
+            )}
+          </Button>
 
           {/* Dark Mode Toggle */}
           <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
@@ -225,7 +260,7 @@ export default function CoordinatorDashboardPage() {
         <aside
           className={cn(
             "shrink-0 transition-all duration-300 ease-in-out overflow-hidden",
-            sidebarOpen ? "w-80" : "w-0"
+            sidebarOpen ? "w-80" : "w-0",
           )}
         >
           {sidebarOpen && (
@@ -245,65 +280,72 @@ export default function CoordinatorDashboardPage() {
 
         {/* Map Container */}
         <main className="flex-1 relative">
-          <CoordinatorMap
-            clusters={mockSOSClusters}
-            rescuers={mockRescuers}
-            depots={mockDepots}
-            selectedCluster={selectedCluster}
-            selectedRescuer={selectedRescuer}
-            aiDecision={currentAIDecision}
-            onClusterSelect={handleClusterSelect}
-            onRescuerSelect={handleRescuerSelect}
-            flyToLocation={flyToLocation}
-          />
+          {showWeatherMap ? (
+            <WindyMapEmbed />
+          ) : (
+            <>
+              <CoordinatorMap
+                clusters={mockSOSClusters}
+                rescuers={mockRescuers}
+                depots={mockDepots}
+                selectedCluster={selectedCluster}
+                selectedRescuer={selectedRescuer}
+                aiDecision={currentAIDecision}
+                onClusterSelect={handleClusterSelect}
+                onRescuerSelect={handleRescuerSelect}
+                flyToLocation={flyToLocation}
+              />
 
-          {/* Floating Stats Panel */}
-          <div className="absolute top-4 right-4 z-1000">
-            <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Thống kê thời gian thực
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div>
-                  <div className="text-2xl font-bold text-red-500">
-                    {
-                      mockSOSRequests.filter(
-                        (s) => s.priority === "P1" && s.status === "PENDING"
-                      ).length
-                    }
+              {/* Floating Stats Panel */}
+              <div className="absolute top-4 right-4 z-1000">
+                <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                    Thống kê thời gian thực
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    P1 Khẩn cấp
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-red-500">
+                        {
+                          mockSOSRequests.filter(
+                            (s) =>
+                              s.priority === "P1" && s.status === "PENDING",
+                          ).length
+                        }
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        P1 Khẩn cấp
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-green-500">
+                        {
+                          mockRescuers.filter((r) => r.status === "AVAILABLE")
+                            .length
+                        }
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Đội sẵn sàng
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-green-500">
-                    {
-                      mockRescuers.filter((r) => r.status === "AVAILABLE")
-                        .length
-                    }
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Đội sẵn sàng
-                  </div>
-                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Quick Action Floating Button */}
-          <div className="absolute bottom-4 right-4 z-1000">
-            <Button
-              size="lg"
-              className="rounded-full h-14 w-14 shadow-lg bg-linear-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
-              onClick={() => {
-                // Quick add SOS functionality
-                alert("Thêm SOS nhanh - Chức năng đang phát triển");
-              }}
-            >
-              <span className="text-2xl">+</span>
-            </Button>
-          </div>
+              {/* Quick Action Floating Button */}
+              <div className="absolute bottom-4 right-4 z-1000">
+                <Button
+                  size="lg"
+                  className="rounded-full h-14 w-14 shadow-lg bg-linear-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
+                  onClick={() => {
+                    // Quick add SOS functionality
+                    alert("Thêm SOS nhanh - Chức năng đang phát triển");
+                  }}
+                >
+                  <span className="text-2xl">+</span>
+                </Button>
+              </div>
+            </>
+          )}
         </main>
       </div>
 

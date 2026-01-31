@@ -11,6 +11,20 @@ interface Ticker {
   trade_url: string;
 }
 
+export interface Testimonial {
+  id: string;
+  orgName: string;
+  orgIcon: React.ReactNode;
+  headline: string;
+  highlightText: string;
+  quote: string;
+  author: {
+    name: string;
+    role: string;
+    avatar: string;
+  };
+}
+
 type Period =
   | "daily"
   | "weekly"
