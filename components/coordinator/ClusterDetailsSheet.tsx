@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { SOSCluster, SOSRequest } from "@/type";
+import { ClusterDetailsSheetProps, SOSRequest } from "@/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,14 +54,6 @@ function TimeElapsed({ date }: { date: Date }) {
   }, [date]);
 
   return <span>{elapsed}</span>;
-}
-
-interface ClusterDetailsSheetProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  cluster: SOSCluster | null;
-  onProcessCluster: () => void;
-  onSOSSelect: (sos: SOSRequest) => void;
 }
 
 const ClusterDetailsSheet = ({

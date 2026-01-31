@@ -1,6 +1,5 @@
 "use client";
 
-import { InventoryItem, ItemCategory } from "@/types/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ import {
   TShirt,
   TrendDown,
 } from "@phosphor-icons/react";
+import { ItemCategory, LowStockAlertsProps } from "@/type";
 
 const categoryIcons: Record<ItemCategory, React.ReactNode> = {
   MEDICAL: <Stethoscope className="h-4 w-4" weight="fill" />,
@@ -34,12 +34,6 @@ const stockLevelNames: Record<string, string> = {
   NORMAL: "Bình Thường",
   OVERSTOCKED: "Dư Thừa",
 };
-
-interface LowStockAlertsProps {
-  items: InventoryItem[];
-  onItemClick?: (item: InventoryItem) => void;
-  onViewAll?: () => void;
-}
 
 const LowStockAlerts = ({
   items,

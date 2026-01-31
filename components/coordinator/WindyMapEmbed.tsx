@@ -4,8 +4,7 @@ import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Cloud, Wind, Thermometer, Drop } from "@phosphor-icons/react";
-
-type WeatherLayer = "wind" | "temp" | "rain" | "clouds";
+import { WeatherLayer } from "@/type";
 
 const WINDY_LAYERS: {
   id: WeatherLayer;

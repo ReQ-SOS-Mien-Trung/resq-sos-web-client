@@ -2,13 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import {
-  SOSCluster,
-  Rescuer,
-  Depot,
-  Location,
-  AIDispatchDecision,
-} from "@/type";
+import { SOSCluster, Rescuer, Depot, CoordinatorMapProps } from "@/type";
 
 // Dynamically import react-leaflet components to avoid SSR issues
 const MapContainer = dynamic(
@@ -30,18 +24,6 @@ const Polyline = dynamic(
   () => import("react-leaflet").then((mod) => mod.Polyline),
   { ssr: false },
 );
-
-interface CoordinatorMapProps {
-  clusters: SOSCluster[];
-  rescuers: Rescuer[];
-  depots: Depot[];
-  selectedCluster?: SOSCluster | null;
-  selectedRescuer?: Rescuer | null;
-  aiDecision?: AIDispatchDecision | null;
-  onClusterSelect: (cluster: SOSCluster) => void;
-  onRescuerSelect: (rescuer: Rescuer) => void;
-  flyToLocation?: Location | null;
-}
 
 const CoordinatorMap = ({
   clusters,

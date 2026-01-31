@@ -1,60 +1,11 @@
 "use client";
 
-import { InventoryItem, ItemCategory } from "@/types/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import {
-  Stethoscope,
-  ForkKnife,
-  Drop,
-  Wrench,
-  Tent,
-  TShirt,
-  Warning,
-  Package,
-} from "@phosphor-icons/react";
-
-// Category icon mapping
-const categoryIcons: Record<ItemCategory, React.ReactNode> = {
-  MEDICAL: <Stethoscope className="h-5 w-5" weight="fill" />,
-  FOOD: <ForkKnife className="h-5 w-5" weight="fill" />,
-  WATER: <Drop className="h-5 w-5" weight="fill" />,
-  EQUIPMENT: <Wrench className="h-5 w-5" weight="fill" />,
-  SHELTER: <Tent className="h-5 w-5" weight="fill" />,
-  CLOTHING: <TShirt className="h-5 w-5" weight="fill" />,
-};
-
-const categoryNames: Record<ItemCategory, string> = {
-  MEDICAL: "Y Tế",
-  FOOD: "Thực Phẩm",
-  WATER: "Nước Uống",
-  EQUIPMENT: "Thiết Bị",
-  SHELTER: "Lều Trại",
-  CLOTHING: "Quần Áo",
-};
-
-const stockLevelNames: Record<string, string> = {
-  CRITICAL: "Thiếu",
-  LOW: "Thấp",
-  NORMAL: "Đủ",
-  OVERSTOCKED: "Dư",
-};
-
-interface CategoryOverviewProps {
-  items: InventoryItem[];
-  onCategorySelect?: (category: ItemCategory) => void;
-  selectedCategory?: ItemCategory | null;
-}
-
-interface CategorySummary {
-  category: ItemCategory;
-  totalItems: number;
-  totalQuantity: number;
-  criticalCount: number;
-  lowCount: number;
-  normalCount: number;
-}
+import { Warning, Package } from "@phosphor-icons/react";
+import { categoryIcons, categoryNames, stockLevelNames } from "@/lib/constants";
+import { CategoryOverviewProps, CategorySummary, ItemCategory } from "@/type";
 
 const CategoryOverview = ({
   items,

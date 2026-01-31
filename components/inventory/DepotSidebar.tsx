@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  InventoryItem,
-  SupplyRequest,
-  Shipment,
-  DepotInfo,
-  ItemCategory,
-} from "@/types/inventory";
+
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -35,6 +29,13 @@ import {
   CaretRight,
 } from "@phosphor-icons/react";
 import { getStockLevelBadgeVariant } from "@/lib/mock-data";
+import {
+  DepotSidebarProps,
+  InventoryItem,
+  ItemCategory,
+  Shipment,
+  SupplyRequest,
+} from "@/type";
 
 // Category icon mapping
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -61,20 +62,6 @@ const stockLevelNames: Record<string, string> = {
   NORMAL: "Bình Thường",
   OVERSTOCKED: "Dư Thừa",
 };
-
-interface DepotSidebarProps {
-  depotInfo: DepotInfo;
-  inventoryItems: InventoryItem[];
-  supplyRequests: SupplyRequest[];
-  shipments: Shipment[];
-  onItemSelect: (item: InventoryItem) => void;
-  onRequestSelect: (request: SupplyRequest) => void;
-  onShipmentSelect: (shipment: Shipment) => void;
-  selectedItem?: InventoryItem | null;
-  selectedRequest?: SupplyRequest | null;
-  selectedCategory?: ItemCategory | null;
-  onCategorySelect?: (category: ItemCategory | null) => void;
-}
 
 const DepotSidebar = ({
   depotInfo,

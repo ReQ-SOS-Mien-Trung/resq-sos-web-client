@@ -695,3 +695,347 @@ export interface RescuerVerification {
     note?: string;
   }[];
 }
+
+//Coordinator Dashboard Types
+export interface AIDispatchPanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  cluster: SOSCluster | null;
+  aiDecision: AIDispatchDecision | null;
+  availableRescuers: Rescuer[];
+  onApprove: () => void;
+  onOverride: (rescuerId: string) => void;
+}
+
+export interface ClusterDetailsSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  cluster: SOSCluster | null;
+  onProcessCluster: () => void;
+  onSOSSelect: (sos: SOSRequest) => void;
+}
+
+export interface CoordinatorMapProps {
+  clusters: SOSCluster[];
+  rescuers: Rescuer[];
+  depots: Depot[];
+  selectedCluster?: SOSCluster | null;
+  selectedRescuer?: Rescuer | null;
+  aiDecision?: AIDispatchDecision | null;
+  onClusterSelect: (cluster: SOSCluster) => void;
+  onRescuerSelect: (rescuer: Rescuer) => void;
+  flyToLocation?: Location | null;
+}
+
+export interface SOSSidebarProps {
+  sosRequests: SOSRequest[];
+  clusters: SOSCluster[];
+  rescuers: Rescuer[];
+  missions: Mission[];
+  onSOSSelect: (sos: SOSRequest) => void;
+  onClusterSelect: (cluster: SOSCluster) => void;
+  onRescuerSelect: (rescuer: Rescuer) => void;
+  selectedSOS?: SOSRequest | null;
+  selectedCluster?: SOSCluster | null;
+}
+
+export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";
+
+// Inventory Management Types - ReQ-SOS Depot Manager Dashboard
+// For managing warehouse inventory in disaster relief operations
+
+export type StockLevel = "CRITICAL" | "LOW" | "NORMAL" | "OVERSTOCKED";
+export type ItemCategory =
+  | "MEDICAL"
+  | "FOOD"
+  | "EQUIPMENT"
+  | "CLOTHING"
+  | "SHELTER"
+  | "WATER";
+export type RequestStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "IN_TRANSIT"
+  | "DELIVERED"
+  | "CANCELLED";
+export type RequestType = "INBOUND" | "OUTBOUND";
+export type ShipmentStatus =
+  | "PREPARING"
+  | "IN_TRANSIT"
+  | "DELIVERED"
+  | "RETURNED";
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: ItemCategory;
+  sku: string;
+  quantity: number;
+  unit: string;
+  minStock: number;
+  maxStock: number;
+  stockLevel: StockLevel;
+  location: string; // Warehouse location code (e.g., "A-01-02")
+  expiryDate?: Date;
+  lastUpdated: Date;
+  imageUrl?: string;
+}
+
+export interface InventoryCategory {
+  id: string;
+  name: string;
+  icon: string;
+  itemCount: number;
+  totalQuantity: number;
+  criticalItems: number;
+  lowStockItems: number;
+}
+
+export interface SupplyRequest {
+  id: string;
+  type: RequestType;
+  status: RequestStatus;
+  items: RequestItem[];
+  requestedBy: string;
+  requestedAt: Date;
+  approvedBy?: string;
+  approvedAt?: Date;
+  priority: "HIGH" | "MEDIUM" | "LOW";
+  notes?: string;
+  destinationDepot?: string;
+  sourceDepot?: string;
+  missionId?: string; // Link to rescue mission if applicable
+}
+
+export interface RequestItem {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface Shipment {
+  id: string;
+  requestId: string;
+  status: ShipmentStatus;
+  items: RequestItem[];
+  origin: string;
+  destination: string;
+  carrier: string;
+  trackingNumber?: string;
+  estimatedArrival: Date;
+  actualArrival?: Date;
+  createdAt: Date;
+}
+
+export interface DepotManager {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  depotId: string;
+  depotName: string;
+  role: "DEPOT_MANAGER" | "DEPOT_STAFF";
+}
+
+export interface DepotInfo {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  manager: string;
+  totalItems: number;
+  totalCategories: number;
+  criticalAlerts: number;
+  lowStockAlerts: number;
+  pendingRequests: number;
+  activeShipments: number;
+}
+
+// Dashboard Statistics
+export interface InventoryStats {
+  totalItems: number;
+  totalCategories: number;
+  criticalStock: number;
+  lowStock: number;
+  normalStock: number;
+  pendingInbound: number;
+  pendingOutbound: number;
+  activeShipments: number;
+  itemsExpiringSoon: number;
+}
+
+// Activity Log
+export interface ActivityLog {
+  id: string;
+  action:
+    | "STOCK_IN"
+    | "STOCK_OUT"
+    | "ADJUSTMENT"
+    | "REQUEST_CREATED"
+    | "REQUEST_APPROVED"
+    | "SHIPMENT_SENT"
+    | "SHIPMENT_RECEIVED";
+  itemId?: string;
+  itemName?: string;
+  quantity?: number;
+  performedBy: string;
+  performedAt: Date;
+  details: string;
+}
+
+//Inventory Management Types - ReQ-SOS Depot Manager Dashboard
+export interface RecentActivityProps {
+  activities: ActivityLog[];
+  maxItems?: number;
+}
+
+export interface LowStockAlertsProps {
+  items: InventoryItem[];
+  onItemClick?: (item: InventoryItem) => void;
+  onViewAll?: () => void;
+}
+
+export interface ItemDetailsSheetProps {
+  item: InventoryItem | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onRequestInbound?: () => void;
+  onRequestOutbound?: () => void;
+  onEdit?: () => void;
+}
+
+export interface InventoryStatsProps {
+  stats: IInventoryStats;
+}
+
+export interface DepotSidebarProps {
+  depotInfo: DepotInfo;
+  inventoryItems: InventoryItem[];
+  supplyRequests: SupplyRequest[];
+  shipments: Shipment[];
+  onItemSelect: (item: InventoryItem) => void;
+  onRequestSelect: (request: SupplyRequest) => void;
+  onShipmentSelect: (shipment: Shipment) => void;
+  selectedItem?: InventoryItem | null;
+  selectedRequest?: SupplyRequest | null;
+  selectedCategory?: ItemCategory | null;
+  onCategorySelect?: (category: ItemCategory | null) => void;
+}
+
+export interface CategoryOverviewProps {
+  items: InventoryItem[];
+  onCategorySelect?: (category: ItemCategory) => void;
+  selectedCategory?: ItemCategory | null;
+}
+
+export interface CategorySummary {
+  category: ItemCategory;
+  totalItems: number;
+  totalQuantity: number;
+  criticalCount: number;
+  lowCount: number;
+  normalCount: number;
+}
+
+//Coordinator Dashboard Types
+export type Priority = "P1" | "P2" | "P3";
+export type RescuerType = "TRUCK" | "MOTORBOAT" | "SMALL_BOAT";
+export type SOSStatus = "PENDING" | "ASSIGNED" | "RESCUED";
+export type RescuerStatus = "AVAILABLE" | "BUSY";
+
+export interface Location {
+  lat: number;
+  lng: number;
+}
+
+export interface SOSRequest {
+  id: string;
+  groupId: string; // Family ID - for logical grouping
+  location: Location;
+  priority: Priority;
+  needs: {
+    medical: boolean;
+    food: boolean;
+    boat: boolean;
+  };
+  status: SOSStatus;
+  message: string; // e.g., "Water at roof level, pregnant wife"
+  createdAt: Date;
+  aiAnalysis?: {
+    riskFactors: string[]; // ["Deep Water", "Medical Emergency"]
+  };
+}
+
+export interface Rescuer {
+  id: string;
+  name: string;
+  type: RescuerType;
+  status: RescuerStatus;
+  location: Location;
+  currentLoad: number;
+  capacity: number;
+  capabilities: string[];
+}
+
+export interface Depot {
+  id: string;
+  name: string;
+  location: Location;
+  inventory: {
+    lifeJackets: number;
+    foodPacks: number;
+    medKits: number;
+  };
+}
+
+// Cluster for map display (DBSCAN spatial clustering)
+export interface SOSCluster {
+  id: string;
+  center: Location;
+  sosRequests: SOSRequest[];
+  highestPriority: Priority;
+  totalVictims: number;
+}
+
+// AI Dispatch Decision
+export interface AIDispatchDecision {
+  clusterId: string;
+  situation: string;
+  reasoning: string;
+  proposedPlan: MissionStep[];
+  recommendedRescuer: Rescuer;
+  alternativeRescuers: Rescuer[];
+  confidence: number; // 0-100
+}
+
+export interface MissionStep {
+  stepNumber: number;
+  action:
+    | "PICKUP_SUPPLIES"
+    | "GO_TO_VICTIM"
+    | "TRANSPORT_TO_SAFETY"
+    | "RETURN_TO_BASE";
+  location: Location;
+  locationName: string;
+  details: string;
+  estimatedTime: number; // minutes
+}
+
+export interface Mission {
+  id: string;
+  rescuerId: string;
+  clusterId: string;
+  sosRequestIds: string[];
+  status: "PENDING_APPROVAL" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  steps: MissionStep[];
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+}
+
+// Map state
+export interface MapViewState {
+  center: Location;
+  zoom: number;
+}

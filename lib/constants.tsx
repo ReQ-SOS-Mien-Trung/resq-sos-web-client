@@ -1,14 +1,16 @@
-import { RescueReport, SOSItem, Testimonial } from "@/type";
+import { ItemCategory, RescueReport, SOSItem, Testimonial } from "@/type";
 import {
   ChartBar,
   ChatCircle,
   Clock,
   CloudSun,
   Drop,
+  Package,
   Pulse,
   Robot,
   SquaresFour,
   Target,
+  TShirt,
   UserCheck,
   UserPlus,
   Warning,
@@ -24,8 +26,10 @@ import {
   Warehouse,
   Radio,
   BarChart3,
-  Package,
-  Activity,
+  Stethoscope,
+  ForkKnife,
+  Wrench,
+  Tent,
 } from "lucide-react";
 
 export const navLinks = [
@@ -385,4 +389,30 @@ export const getStatusBadge = (status: RescueReport["status"]) => {
     },
   };
   return variants[status];
+};
+
+//Inventory Category Overview
+export const categoryIcons: Record<ItemCategory, React.ReactNode> = {
+  MEDICAL: <Stethoscope className="h-5 w-5" weight="fill" />,
+  FOOD: <ForkKnife className="h-5 w-5" weight="fill" />,
+  WATER: <Drop className="h-5 w-5" weight="fill" />,
+  EQUIPMENT: <Wrench className="h-5 w-5" weight="fill" />,
+  SHELTER: <Tent className="h-5 w-5" weight="fill" />,
+  CLOTHING: <TShirt className="h-5 w-5" weight="fill" />,
+};
+
+export const categoryNames: Record<ItemCategory, string> = {
+  MEDICAL: "Y Tế",
+  FOOD: "Thực Phẩm",
+  WATER: "Nước Uống",
+  EQUIPMENT: "Thiết Bị",
+  SHELTER: "Lều Trại",
+  CLOTHING: "Quần Áo",
+};
+
+export const stockLevelNames: Record<string, string> = {
+  CRITICAL: "Thiếu",
+  LOW: "Thấp",
+  NORMAL: "Đủ",
+  OVERSTOCKED: "Dư",
 };

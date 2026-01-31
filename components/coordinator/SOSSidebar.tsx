@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { SOSRequest, SOSCluster, Rescuer, Mission } from "@/type";
+import {
+  SOSRequest,
+  SOSCluster,
+  Rescuer,
+  Mission,
+  SOSSidebarProps,
+} from "@/type";
 import { getRescuerTypeIcon } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,18 +59,6 @@ function useTimeElapsed(date: Date): string {
 function TimeElapsed({ date }: { date: Date }) {
   const elapsed = useTimeElapsed(date);
   return <span>{elapsed}</span>;
-}
-
-interface SOSSidebarProps {
-  sosRequests: SOSRequest[];
-  clusters: SOSCluster[];
-  rescuers: Rescuer[];
-  missions: Mission[];
-  onSOSSelect: (sos: SOSRequest) => void;
-  onClusterSelect: (cluster: SOSCluster) => void;
-  onRescuerSelect: (rescuer: Rescuer) => void;
-  selectedSOS?: SOSRequest | null;
-  selectedCluster?: SOSCluster | null;
 }
 
 const SOSSidebar = ({

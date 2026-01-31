@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AIDispatchDecision, SOSCluster, Rescuer, MissionStep } from "@/type";
+import { MissionStep, AIDispatchPanelProps } from "@/type";
 import { getRescuerTypeIcon } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -39,16 +39,6 @@ import {
   CaretDown,
   CaretUp,
 } from "@phosphor-icons/react";
-
-interface AIDispatchPanelProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  cluster: SOSCluster | null;
-  aiDecision: AIDispatchDecision | null;
-  availableRescuers: Rescuer[];
-  onApprove: () => void;
-  onOverride: (rescuerId: string) => void;
-}
 
 const AIDispatchPanel = ({
   open,

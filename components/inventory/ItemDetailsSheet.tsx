@@ -1,6 +1,5 @@
 "use client";
 
-import { InventoryItem, ItemCategory } from "@/types/inventory";
 import {
   Sheet,
   SheetContent,
@@ -24,32 +23,9 @@ import {
   ArrowLineUp,
   ArrowLineDown,
   ClockCounterClockwise,
-  Stethoscope,
-  ForkKnife,
-  Drop,
-  Wrench,
-  Tent,
-  TShirt,
 } from "@phosphor-icons/react";
-
-// Category icon mapping
-const categoryIcons: Record<ItemCategory, React.ReactNode> = {
-  MEDICAL: <Stethoscope className="h-5 w-5" weight="fill" />,
-  FOOD: <ForkKnife className="h-5 w-5" weight="fill" />,
-  WATER: <Drop className="h-5 w-5" weight="fill" />,
-  EQUIPMENT: <Wrench className="h-5 w-5" weight="fill" />,
-  SHELTER: <Tent className="h-5 w-5" weight="fill" />,
-  CLOTHING: <TShirt className="h-5 w-5" weight="fill" />,
-};
-
-const categoryNames: Record<ItemCategory, string> = {
-  MEDICAL: "Y Tế",
-  FOOD: "Thực Phẩm",
-  WATER: "Nước Uống",
-  EQUIPMENT: "Thiết Bị",
-  SHELTER: "Lều Trại",
-  CLOTHING: "Quần Áo",
-};
+import { ItemDetailsSheetProps } from "@/type";
+import { categoryIcons, categoryNames } from "@/lib/constants";
 
 const stockLevelNames: Record<string, string> = {
   CRITICAL: "Cực Kỳ Thiếu",
@@ -57,15 +33,6 @@ const stockLevelNames: Record<string, string> = {
   NORMAL: "Bình Thường",
   OVERSTOCKED: "Dư Thừa",
 };
-
-interface ItemDetailsSheetProps {
-  item: InventoryItem | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onRequestInbound?: () => void;
-  onRequestOutbound?: () => void;
-  onEdit?: () => void;
-}
 
 const ItemDetailsSheet = ({
   item,

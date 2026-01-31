@@ -18,13 +18,12 @@ import {
   Drop,
   ArrowsOut,
 } from "@phosphor-icons/react";
+import { WeatherLayer } from "@/type";
 
 interface WindyWeatherMapProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-type WeatherLayer = "wind" | "temp" | "rain" | "clouds";
 
 const WINDY_LAYERS: {
   id: WeatherLayer;

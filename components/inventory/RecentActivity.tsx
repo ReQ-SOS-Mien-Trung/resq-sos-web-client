@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ActivityLog } from "@/types/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -14,11 +13,7 @@ import {
   Package,
   ClockCounterClockwise,
 } from "@phosphor-icons/react";
-
-interface RecentActivityProps {
-  activities: ActivityLog[];
-  maxItems?: number;
-}
+import { RecentActivityProps } from "@/type";
 
 const actionConfig: Record<
   string,

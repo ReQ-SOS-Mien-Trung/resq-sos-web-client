@@ -1,6 +1,5 @@
 "use client";
 
-import { InventoryStats as IInventoryStats } from "@/types/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Package,
@@ -12,10 +11,7 @@ import {
   Truck,
   Clock,
 } from "@phosphor-icons/react";
-
-interface InventoryStatsProps {
-  stats: IInventoryStats;
-}
+import { InventoryStatsProps } from "@/type";
 
 const InventoryStats = ({ stats }: InventoryStatsProps) => {
   const statCards = [
