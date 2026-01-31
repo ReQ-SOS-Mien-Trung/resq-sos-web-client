@@ -1,55 +1,155 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useLayoutEffect } from "react";
 import { ArrowRight } from "lucide-react";
 import { testimonials } from "@/lib/constants";
+import gsap from "gsap";
 
 const TestimonialsSection = () => {
-  // Set middle card as default active
   const middleIndex = Math.floor(testimonials.length / 2);
   const [activeId, setActiveId] = useState<string>(
     testimonials[middleIndex]?.id || testimonials[0]?.id,
   );
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const contentRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const orgNameRefs = useRef<Map<string, HTMLSpanElement>>(new Map());
+  const iconRefs = useRef<Map<string, HTMLSpanElement>>(new Map());
+
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      testimonials.forEach((testimonial) => {
+        const card = cardRefs.current.get(testimonial.id);
+        const content = contentRefs.current.get(testimonial.id);
+        const orgName = orgNameRefs.current.get(testimonial.id);
+        const icon = iconRefs.current.get(testimonial.id);
+        const isActive = testimonial.id === activeId;
+
+        if (card) {
+          gsap.to(card, {
+            flex: isActive ? 2.5 : 0,
+            minWidth: isActive ? 0 : 80,
+            backgroundColor: isActive ? "#18181b" : "#141417",
+            borderColor: isActive
+              ? "rgba(255,255,255,0.2)"
+              : "rgba(255,255,255,0.1)",
+            duration: 0.35,
+            ease: "power2.inOut",
+          });
+        }
+
+        if (content) {
+          gsap.to(content, {
+            opacity: isActive ? 1 : 0,
+            y: isActive ? 0 : 8,
+            duration: 0.25,
+            delay: isActive ? 0.15 : 0,
+            ease: "power2.out",
+            pointerEvents: isActive ? "auto" : "none",
+          });
+        }
+
+        if (orgName) {
+          gsap.to(orgName, {
+            opacity: isActive ? 1 : 0,
+            maxWidth: isActive ? 200 : 0,
+            marginLeft: isActive ? 8 : 0,
+            duration: 0.25,
+            ease: "power2.out",
+          });
+        }
+
+        if (icon) {
+          gsap.to(icon, {
+            color: isActive ? "var(--color-primary)" : "#4b5563",
+            scale: 1,
+            duration: 0.2,
+            ease: "power2.out",
+          });
+        }
+      });
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, [activeId]);
+
+  const handleHover = (id: string, isEntering: boolean) => {
+    if (id === activeId) return;
+
+    const card = cardRefs.current.get(id);
+    const icon = iconRefs.current.get(id);
+
+    if (card) {
+      gsap.to(card, {
+        backgroundColor: isEntering ? "#1a1a1f" : "#141417",
+        borderColor: isEntering
+          ? "rgba(255,255,255,0.2)"
+          : "rgba(255,255,255,0.1)",
+        duration: 0.2,
+        ease: "power2.out",
+      });
+    }
+
+    if (icon) {
+      gsap.to(icon, {
+        color: isEntering ? "var(--color-primary)" : "#4b5563",
+        duration: 0.2,
+        ease: "power2.out",
+      });
+    }
+  };
+
   return (
     <section className="py-20 lg:py-32 bg-[#0a0a0c]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-row gap-4 items-stretch">
+        <div ref={containerRef} className="flex flex-row gap-4 items-stretch">
           {testimonials.map((testimonial) => {
             const isActive = testimonial.id === activeId;
 
             return (
               <button
                 key={testimonial.id}
+                ref={(el) => {
+                  if (el) cardRefs.current.set(testimonial.id, el);
+                }}
                 onClick={() => setActiveId(testimonial.id)}
+                onMouseEnter={() => handleHover(testimonial.id, true)}
+                onMouseLeave={() => handleHover(testimonial.id, false)}
                 className={`
-                  relative rounded-2xl border overflow-hidden cursor-pointer
-                  transition-all duration-700 ease-out
-                  ${
-                    isActive
-                      ? "flex-[2.5] border-white/20 bg-[#18181b] min-h-[380px]"
-                      : "flex-[0] w-[80px] min-w-[80px] border-white/10 bg-[#141417] hover:bg-[#1a1a1f] hover:border-white/20 min-h-[380px] hover:scale-[1.02] active:scale-[0.98]"
-                  }
+                  relative rounded-2xl border overflow-hidden cursor-pointer min-h-[380px]
+                  ${isActive ? "flex-[2.5] border-white/20 bg-[#18181b]" : "flex-[0] w-[80px] min-w-[80px] border-white/10 bg-[#141417]"}
                 `}
+                style={{
+                  willChange: "flex, min-width, background-color, border-color",
+                }}
               >
                 <div
-                  className={`h-full flex transition-all duration-500 ${isActive ? "flex-col p-6 lg:p-10" : "flex-col items-center justify-center"}`}
+                  className={`h-full flex ${isActive ? "flex-col p-6 lg:p-10" : "flex-col items-center justify-center"}`}
                 >
                   {/* Logo/Icon - Always visible */}
                   <div
-                    className={`flex transition-all duration-500 ${isActive ? "items-center gap-2 mb-8 text-gray-400" : "flex-col items-center justify-center gap-0 hover:text-primary"}`}
+                    className={`flex ${isActive ? "items-center mb-8 text-gray-400" : "flex-col items-center justify-center"}`}
                   >
                     <span
-                      className={`transition-colors duration-500 ${isActive ? "text-primary" : "text-gray-600"}`}
+                      ref={(el) => {
+                        if (el) iconRefs.current.set(testimonial.id, el);
+                      }}
+                      className={isActive ? "text-primary" : "text-gray-600"}
+                      style={{ willChange: "color, transform" }}
                     >
                       {testimonial.orgIcon}
                     </span>
                     <span
-                      className={`text-sm font-semibold tracking-wide uppercase transition-all duration-500 overflow-hidden whitespace-nowrap ${
-                        isActive
-                          ? "opacity-100 max-w-[200px]"
-                          : "opacity-0 max-w-0"
-                      }`}
+                      ref={(el) => {
+                        if (el) orgNameRefs.current.set(testimonial.id, el);
+                      }}
+                      className="text-sm font-semibold tracking-wide uppercase overflow-hidden whitespace-nowrap"
+                      style={{
+                        opacity: isActive ? 1 : 0,
+                        maxWidth: isActive ? 200 : 0,
+                        willChange: "opacity, max-width",
+                      }}
                     >
                       {testimonial.orgName}
                     </span>
@@ -57,11 +157,16 @@ const TestimonialsSection = () => {
 
                   {/* Expanded Content - Only when active */}
                   <div
-                    className={`flex flex-col flex-1 transition-opacity duration-500 ${
-                      isActive
-                        ? "opacity-100 delay-300"
-                        : "opacity-0 pointer-events-none absolute"
-                    }`}
+                    ref={(el) => {
+                      if (el) contentRefs.current.set(testimonial.id, el);
+                    }}
+                    className="flex flex-col flex-1"
+                    style={{
+                      opacity: isActive ? 1 : 0,
+                      pointerEvents: isActive ? "auto" : "none",
+                      position: isActive ? "relative" : "absolute",
+                      willChange: "opacity, transform",
+                    }}
                   >
                     {/* Headline */}
                     <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-[1.2] mb-1 text-left">
