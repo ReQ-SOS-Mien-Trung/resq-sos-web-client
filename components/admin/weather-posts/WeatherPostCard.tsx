@@ -10,22 +10,14 @@ import {
   CalendarBlank,
   User,
 } from "@phosphor-icons/react";
-import type { WeatherPost } from "@/types/admin-pages";
-import { cn } from "@/lib/utils";
+import { WeatherPost, WeatherPostCardProps } from "@/type";
 
-interface WeatherPostCardProps {
-  post: WeatherPost;
-  onEdit?: (post: WeatherPost) => void;
-  onDelete?: (post: WeatherPost) => void;
-  onView?: (post: WeatherPost) => void;
-}
-
-export function WeatherPostCard({
+const WeatherPostCard = ({
   post,
   onEdit,
   onDelete,
   onView,
-}: WeatherPostCardProps) {
+}: WeatherPostCardProps) => {
   const getStatusBadge = (status: WeatherPost["status"]) => {
     const variants = {
       published: {
@@ -150,4 +142,6 @@ export function WeatherPostCard({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default WeatherPostCard;

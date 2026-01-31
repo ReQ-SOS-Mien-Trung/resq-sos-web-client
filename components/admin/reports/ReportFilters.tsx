@@ -9,25 +9,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ReportFiltersProps, RescueReport } from "@/type";
 import { MagnifyingGlass, X, DownloadSimple } from "@phosphor-icons/react";
-import type { RescueReport } from "@/types/admin-pages";
 
-interface ReportFiltersProps {
-  filters: {
-    type?: RescueReport["type"];
-    status?: RescueReport["status"];
-    region?: string;
-    search?: string;
-  };
-  onFiltersChange: (filters: any) => void;
-  onExport?: () => void;
-}
-
-export function ReportFilters({
+const ReportFilters = ({
   filters,
   onFiltersChange,
   onExport,
-}: ReportFiltersProps) {
+}: ReportFiltersProps) => {
   const handleReset = () => {
     onFiltersChange({});
   };
@@ -108,4 +97,6 @@ export function ReportFilters({
       </Button>
     </div>
   );
-}
+};
+
+export default ReportFilters;

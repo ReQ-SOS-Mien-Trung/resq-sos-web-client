@@ -4,21 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Eye, Clock } from "@phosphor-icons/react";
-import type { RescuerVerification } from "@/types/admin-pages";
+import { RescuerVerification, VerificationQueueProps } from "@/type";
 
-interface VerificationQueueProps {
-  verifications: RescuerVerification[];
-  onView?: (verification: RescuerVerification) => void;
-  onApprove?: (verification: RescuerVerification) => void;
-  onReject?: (verification: RescuerVerification) => void;
-}
-
-export function VerificationQueue({
+const VerificationQueue = ({
   verifications,
   onView,
   onApprove,
   onReject,
-}: VerificationQueueProps) {
+}: VerificationQueueProps) => {
   const getStatusBadge = (status: RescuerVerification["status"]) => {
     const variants = {
       pending: {
@@ -146,4 +139,6 @@ export function VerificationQueue({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default VerificationQueue;

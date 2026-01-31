@@ -2,13 +2,9 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { RescuerVerification } from "@/types/admin-pages";
+import { RescuerProfileProps } from "@/type";
 
-interface RescuerProfileProps {
-  verification: RescuerVerification;
-}
-
-export function RescuerProfile({ verification }: RescuerProfileProps) {
+const RescuerProfile = ({ verification }: RescuerProfileProps) => {
   return (
     <Card className="border border-border/50">
       <CardHeader>
@@ -58,7 +54,10 @@ export function RescuerProfile({ verification }: RescuerProfileProps) {
             <h4 className="font-semibold text-foreground mb-2">Chứng chỉ</h4>
             <div className="flex flex-wrap gap-2">
               {verification.profile.certifications.map((cert, idx) => (
-                <Badge key={idx} className="bg-blue-500/10 text-blue-700 dark:text-blue-400">
+                <Badge
+                  key={idx}
+                  className="bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                >
                   {cert}
                 </Badge>
               ))}
@@ -79,4 +78,6 @@ export function RescuerProfile({ verification }: RescuerProfileProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RescuerProfile;

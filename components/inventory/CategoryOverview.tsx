@@ -56,11 +56,11 @@ interface CategorySummary {
   normalCount: number;
 }
 
-export default function CategoryOverview({
+const CategoryOverview = ({
   items,
   onCategorySelect,
   selectedCategory,
-}: CategoryOverviewProps) {
+}: CategoryOverviewProps) => {
   // Calculate category summaries
   const categories = (Object.keys(categoryNames) as ItemCategory[]).map(
     (category) => {
@@ -168,4 +168,6 @@ export default function CategoryOverview({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default CategoryOverview;

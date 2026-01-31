@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockRescuerRegistrations } from "@/lib/mock-data/admin-rescuer-registration";
-import { DashboardLayout } from "@/components/admin/dashboard";
-import {
-  RegistrationForm,
-  RescuerList,
-} from "@/components/admin/rescuer-registration";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";
-import { PageLoading } from "@/components/admin";
+import {
+  DashboardLayout,
+  PageLoading,
+  RegistrationForm,
+  RescuerList,
+} from "@/components/admin";
 
-export default function RescuerRegistrationPage() {
+const RescuerRegistrationPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -80,4 +80,6 @@ export default function RescuerRegistrationPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default RescuerRegistrationPage;

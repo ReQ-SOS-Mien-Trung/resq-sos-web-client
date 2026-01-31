@@ -12,18 +12,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { RetentionRateData } from "@/types/admin-dashboard";
-
-interface RetentionRateProps {
-  data: RetentionRateData;
-}
-
-// Get color mapping helper
-const getSegmentColor = (name: string) => {
-  if (name === "Lũ lụt") return "#ef4444"; // Red
-  if (name === "Sạt lở") return "#f97316"; // Orange
-  if (name === "Bão") return "#eab308"; // Yellow
-  return "#ef4444";
-};
+import { RetentionRateProps } from "@/type";
+import { getSegmentColor } from "@/lib/constants";
 
 // CustomTooltip component outside render
 const CustomTooltip = ({
@@ -73,7 +63,7 @@ const CustomTooltip = ({
   return null;
 };
 
-export function RetentionRate({ data }: RetentionRateProps) {
+const RetentionRate = ({ data }: RetentionRateProps) => {
   const chartData = data.monthlyData.map((item) => ({
     month: item.month,
     ...item.segments,
@@ -185,4 +175,6 @@ export function RetentionRate({ data }: RetentionRateProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RetentionRate;

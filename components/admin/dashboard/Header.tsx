@@ -28,13 +28,9 @@ import {
   Sparkle,
   ShareNetwork,
 } from "@phosphor-icons/react";
+import { HeaderProps } from "@/type";
 
-interface HeaderProps {
-  onSidebarToggle?: () => void;
-  sidebarOpen?: boolean;
-}
-
-export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
+const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
   const router = useRouter();
   const [notificationCount] = useState(3);
 
@@ -245,4 +241,6 @@ export function Header({ onSidebarToggle, sidebarOpen = true }: HeaderProps) {
       </div>
     </header>
   );
-}
+};
+
+export default Header;

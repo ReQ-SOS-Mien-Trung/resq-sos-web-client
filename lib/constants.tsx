@@ -1,6 +1,32 @@
-import { SOSItem, Testimonial } from "@/type";
-import { Bell, Cloud, Heart, MapPin, Shield, Users, Warehouse, Radio, BarChart3, Package, Activity } from "lucide-react";
-
+import { RescueReport, SOSItem, Testimonial } from "@/type";
+import {
+  ChartBar,
+  ChatCircle,
+  Clock,
+  CloudSun,
+  Drop,
+  Pulse,
+  Robot,
+  SquaresFour,
+  Target,
+  UserCheck,
+  UserPlus,
+  Warning,
+  WarningCircle,
+} from "@phosphor-icons/react";
+import {
+  Bell,
+  Cloud,
+  Heart,
+  MapPin,
+  Shield,
+  Users,
+  Warehouse,
+  Radio,
+  BarChart3,
+  Package,
+  Activity,
+} from "lucide-react";
 
 export const navLinks = [
   { href: "#features", label: "Tính năng" },
@@ -183,3 +209,180 @@ export const SOSs: SOSItem[] = [
 ];
 
 export const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+export const CENTRAL_VN_LOCATIONS: Array<{ name: string; q: string }> = [
+  // Using coordinates avoids ambiguity in city/province names.
+  { name: "Thừa Thiên Huế", q: "16.4637,107.5909" },
+  { name: "Đà Nẵng", q: "16.0544,108.2022" },
+  { name: "Quảng Nam", q: "15.5394,108.0191" },
+  { name: "Quảng Ngãi", q: "15.1214,108.8044" },
+  { name: "Bình Định", q: "13.7765,109.2237" },
+];
+
+//Admin Prompt
+export const variantsCategory = {
+  dispatch: {
+    label: "Điều phối",
+    className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  },
+  classification: {
+    label: "Phân loại",
+    className: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
+  },
+  recommendation: {
+    label: "Đề xuất",
+    className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  },
+  other: {
+    label: "Khác",
+    className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+  },
+};
+
+export const variantsBadge = {
+  public: {
+    label: "Công khai",
+    className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  },
+  private: {
+    label: "Riêng tư",
+    className: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
+  },
+  support: {
+    label: "Hỗ trợ",
+    className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  },
+};
+
+export const categoryColors: Record<string, string> = {
+  // Trạng thái
+  "Đang xử lý": "from-blue-500 to-cyan-500",
+  "Hoàn thành": "from-emerald-400 to-green-500",
+  "Đang chờ": "from-amber-400 to-orange-500",
+  "Hủy bỏ": "from-red-400 to-rose-500",
+  // Nguồn
+  "Ứng dụng SOS": "from-red-500 to-orange-500",
+  Hotline: "from-blue-400 to-indigo-500",
+  Website: "from-purple-400 to-violet-500",
+  "Báo cáo trực tiếp": "from-emerald-400 to-teal-500",
+  // Mức độ
+  "Khẩn cấp": "from-red-500 to-rose-600",
+  "Trung bình": "from-amber-400 to-yellow-500",
+  Thấp: "from-blue-400 to-cyan-500",
+};
+
+export const getSegmentColor = (name: string) => {
+  if (name === "Lũ lụt") return "#ef4444"; // Red
+  if (name === "Sạt lở") return "#f97316"; // Orange
+  if (name === "Bão") return "#eab308"; // Yellow
+  return "#ef4444";
+};
+
+export const timeFrames: Array<"1D" | "1W" | "1M" | "6M" | "1Y" | "ALL"> = [
+  "1D",
+  "1W",
+  "1M",
+  "6M",
+  "1Y",
+  "ALL",
+];
+
+export const navigationItems = [
+  {
+    icon: SquaresFour,
+    label: "Tổng quan",
+    href: "/dashboard/admin",
+  },
+  { icon: Users, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
+  {
+    icon: CloudSun,
+    label: "Bài đăng thời tiết",
+    href: "/dashboard/admin/weather-posts",
+  },
+  {
+    icon: Drop,
+    label: "Thời tiết & Lũ lụt",
+    href: "/dashboard/admin/weather-flood",
+  },
+  { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
+  {
+    icon: UserCheck,
+    label: "Đăng ký cứu hộ viên",
+    href: "/dashboard/admin/rescuer-registration",
+  },
+  {
+    icon: Robot,
+    label: "Cấu hình AI Prompt",
+    href: "/dashboard/admin/ai-prompt",
+  },
+  {
+    icon: ChatCircle,
+    label: "Cấu hình phòng chat",
+    href: "/dashboard/admin/chat-config",
+  },
+  {
+    icon: UserPlus,
+    label: "Xác nhận cứu hộ viên",
+    href: "/dashboard/admin/rescuer-verification",
+  },
+];
+
+export const getFavoriteIcon = (name: string) => {
+  switch (name) {
+    case "Cứu hộ viên":
+      return Shield;
+    case "Cảnh báo":
+      return Warning;
+    case "Hoạt động":
+      return Pulse;
+    default:
+      return Shield;
+  }
+};
+
+export const getMetricIcon = (label: string) => {
+  switch (label.toLowerCase()) {
+    case "yêu cầu sos":
+      return WarningCircle;
+    case "cứu hộ viên":
+      return Users;
+    case "tỷ lệ thành công":
+      return Target;
+    case "thời gian phản hồi":
+      return Clock;
+    default:
+      return WarningCircle;
+  }
+};
+
+//Admin Tops Countries
+export const countryFlags: Record<string, string> = {
+  "Đà Nẵng": "🇲",
+  "Quảng Nam": "🇲",
+  "Thừa Thiên Huế": "🇲",
+  "Quảng Ngãi": "🇲",
+  "Quảng Bình": "🇲",
+  "Quảng Trị": "🇲",
+};
+
+export const getStatusBadge = (status: RescueReport["status"]) => {
+  const variants = {
+    pending: {
+      label: "Đang chờ",
+      className: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    },
+    "in-progress": {
+      label: "Đang xử lý",
+      className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+    },
+    completed: {
+      label: "Hoàn thành",
+      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    },
+    cancelled: {
+      label: "Đã hủy",
+      className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+    },
+  };
+  return variants[status];
+};

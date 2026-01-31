@@ -10,21 +10,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MagnifyingGlass, X } from "@phosphor-icons/react";
-import type { UserFilters as UserFiltersType } from "@/types/admin-pages";
+import { UserFiltersProps, UserFilters as UserFiltersType } from "@/type";
 
-interface UserFiltersProps {
-  filters: UserFiltersType;
-  onFiltersChange: (filters: UserFiltersType) => void;
-}
-
-export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
+const UserFilters = ({ filters, onFiltersChange }: UserFiltersProps) => {
   const handleReset = () => {
     onFiltersChange({});
   };
 
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
-      <div className="flex-1 min-w-[200px]">
+      <div className="flex-1 min-w-50">
         <div className="relative">
           <MagnifyingGlass
             size={16}
@@ -51,7 +46,7 @@ export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
           })
         }
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-45">
           <SelectValue placeholder="Vai trò" />
         </SelectTrigger>
         <SelectContent>
@@ -75,7 +70,7 @@ export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
           })
         }
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-45">
           <SelectValue placeholder="Trạng thái" />
         </SelectTrigger>
         <SelectContent>
@@ -96,7 +91,7 @@ export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
           })
         }
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-45">
           <SelectValue placeholder="Khu vực" />
         </SelectTrigger>
         <SelectContent>
@@ -117,4 +112,6 @@ export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
       )}
     </div>
   );
-}
+};
+
+export default UserFilters;

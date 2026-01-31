@@ -5,30 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { DotsThreeVertical } from "@phosphor-icons/react";
-import type { LeadsData } from "@/types/admin-dashboard";
+import { LeadsManagementProps } from "@/type";
+import { categoryColors } from "@/lib/constants";
 
-interface LeadsManagementProps {
-  data: LeadsData;
-}
-
-const categoryColors: Record<string, string> = {
-  // Trạng thái
-  "Đang xử lý": "from-blue-500 to-cyan-500",
-  "Hoàn thành": "from-emerald-400 to-green-500",
-  "Đang chờ": "from-amber-400 to-orange-500",
-  "Hủy bỏ": "from-red-400 to-rose-500",
-  // Nguồn
-  "Ứng dụng SOS": "from-red-500 to-orange-500",
-  Hotline: "from-blue-400 to-indigo-500",
-  Website: "from-purple-400 to-violet-500",
-  "Báo cáo trực tiếp": "from-emerald-400 to-teal-500",
-  // Mức độ
-  "Khẩn cấp": "from-red-500 to-rose-600",
-  "Trung bình": "from-amber-400 to-yellow-500",
-  Thấp: "from-blue-400 to-cyan-500",
-};
-
-export function LeadsManagement({ data }: LeadsManagementProps) {
+const LeadsManagement = ({ data }: LeadsManagementProps) => {
   const [activeTab, setActiveTab] = useState("status");
 
   const renderBarChart = (categories: typeof data.status) => {
@@ -61,7 +41,7 @@ export function LeadsManagement({ data }: LeadsManagementProps) {
                     <>
                       <div
                         className={cn(
-                          "h-full bg-gradient-to-r rounded-lg transition-all duration-700 ease-out",
+                          "h-full bg-linear-to-r rounded-lg transition-all duration-700 ease-out",
                           isTiny
                             ? "flex items-center justify-start pl-3"
                             : "flex items-center justify-end pr-3",
@@ -89,7 +69,7 @@ export function LeadsManagement({ data }: LeadsManagementProps) {
                   );
                 })()}
                 {/* Hover effect shine */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
               </div>
             </div>
           );
@@ -150,4 +130,6 @@ export function LeadsManagement({ data }: LeadsManagementProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default LeadsManagement;

@@ -13,22 +13,22 @@ import {
 // Dynamically import react-leaflet components to avoid SSR issues
 const MapContainer = dynamic(
   () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false }
+  { ssr: false },
 );
 const TileLayer = dynamic(
   () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false }
+  { ssr: false },
 );
 const Marker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
-  { ssr: false }
+  { ssr: false },
 );
 const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
   ssr: false,
 });
 const Polyline = dynamic(
   () => import("react-leaflet").then((mod) => mod.Polyline),
-  { ssr: false }
+  { ssr: false },
 );
 
 interface CoordinatorMapProps {
@@ -43,7 +43,7 @@ interface CoordinatorMapProps {
   flyToLocation?: Location | null;
 }
 
-export default function CoordinatorMap({
+const CoordinatorMap = ({
   clusters,
   rescuers,
   depots,
@@ -53,7 +53,7 @@ export default function CoordinatorMap({
   onClusterSelect,
   onRescuerSelect,
   flyToLocation,
-}: CoordinatorMapProps) {
+}: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function CoordinatorMap({
       // Cleanup function to remove the link when component unmounts
       return () => {
         const linkToRemove = document.querySelector(
-          'link[href*="leaflet.css"]'
+          'link[href*="leaflet.css"]',
         );
         if (linkToRemove) {
           document.head.removeChild(linkToRemove);
@@ -167,7 +167,9 @@ export default function CoordinatorMap({
       <MapLegend />
     </div>
   );
-}
+};
+
+export default CoordinatorMap;
 
 // SOS Cluster Marker Component
 function SOSClusterMarker({
@@ -201,8 +203,8 @@ function SOSClusterMarker({
           <div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>
           <div class="relative rounded-full flex items-center justify-center text-white font-bold text-xs" 
                style="width: ${size - 8}px; height: ${
-        size - 8
-      }px; background-color: ${color}; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                 size - 8
+               }px; background-color: ${color}; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
             ${cluster.totalVictims}
           </div>
         </div>

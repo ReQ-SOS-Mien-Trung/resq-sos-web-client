@@ -3,11 +3,14 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
-import { DashboardLayout } from "@/components/admin/dashboard";
-import { FloodAlerts, WeatherChart } from "@/components/admin/weather-flood";
 import type { FloodAlert, WeatherData } from "@/types/admin-pages";
 import { mockFloodAlerts } from "@/lib/mock-data/admin-weather-flood";
-import { PageLoading } from "@/components/admin";
+import {
+  DashboardLayout,
+  FloodAlerts,
+  PageLoading,
+  WeatherChart,
+} from "@/components/admin";
 
 const WeatherMap = dynamic(
   () =>
@@ -17,7 +20,7 @@ const WeatherMap = dynamic(
   { ssr: false },
 );
 
-export default function WeatherFloodPage() {
+const WeatherFloodPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [floodAlerts] = useState<FloodAlert[]>(mockFloodAlerts);
   const [weatherData, setWeatherData] = useState<WeatherData[]>([]);
@@ -134,4 +137,6 @@ export default function WeatherFloodPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default WeatherFloodPage;

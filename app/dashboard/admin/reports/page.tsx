@@ -6,15 +6,14 @@ import {
   mockRescueReports,
   mockReportStats,
 } from "@/lib/mock-data/admin-reports";
-import { DashboardLayout } from "@/components/admin/dashboard";
 import {
   ReportStats,
   ReportFilters,
   ReportTable,
 } from "@/components/admin/reports";
-import { PageLoading } from "@/components/admin";
+import { DashboardLayout, PageLoading } from "@/components/admin";
 
-export default function ReportsPage() {
+const ReportsPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [filters, setFilters] = useState<any>({});
   const [loading, setLoading] = useState(true);
@@ -70,4 +69,6 @@ export default function ReportsPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default ReportsPage;

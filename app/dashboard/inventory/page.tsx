@@ -41,7 +41,7 @@ import {
   RecentActivity,
 } from "@/components/inventory";
 
-export default function InventoryDashboardPage() {
+const InventoryDashboardPage = () => {
   // State management
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -292,4 +292,6 @@ export default function InventoryDashboardPage() {
       />
     </div>
   );
-}
+};
+
+export default InventoryDashboardPage;

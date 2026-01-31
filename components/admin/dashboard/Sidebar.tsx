@@ -5,92 +5,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  SquaresFour,
-  Users,
-  CloudSun,
-  Drop,
-  ChartBar,
-  UserCheck,
-  Robot,
-  ChatCircle,
-  UserPlus,
   CaretDown,
   CaretRight,
   Plus,
   DotsThreeVertical,
   Gear,
   Question,
-  Shield,
-  Warning,
-  Pulse,
 } from "@phosphor-icons/react";
-import type {
-  FavoriteItem,
-  Project,
-  CloudStorage,
-} from "@/types/admin-dashboard";
+import { SidebarProps } from "@/type";
+import { getFavoriteIcon, navigationItems } from "@/lib/constants";
 
-interface SidebarProps {
-  favorites: FavoriteItem[];
-  projects: Project[];
-  cloudStorage: CloudStorage;
-  isOpen?: boolean;
-}
-
-const navigationItems = [
-  {
-    icon: SquaresFour,
-    label: "Tổng quan",
-    href: "/dashboard/admin",
-  },
-  { icon: Users, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
-  {
-    icon: CloudSun,
-    label: "Bài đăng thời tiết",
-    href: "/dashboard/admin/weather-posts",
-  },
-  {
-    icon: Drop,
-    label: "Thời tiết & Lũ lụt",
-    href: "/dashboard/admin/weather-flood",
-  },
-  { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
-  {
-    icon: UserCheck,
-    label: "Đăng ký cứu hộ viên",
-    href: "/dashboard/admin/rescuer-registration",
-  },
-  {
-    icon: Robot,
-    label: "Cấu hình AI Prompt",
-    href: "/dashboard/admin/ai-prompt",
-  },
-  {
-    icon: ChatCircle,
-    label: "Cấu hình phòng chat",
-    href: "/dashboard/admin/chat-config",
-  },
-  {
-    icon: UserPlus,
-    label: "Xác nhận cứu hộ viên",
-    href: "/dashboard/admin/rescuer-verification",
-  },
-];
-
-const getFavoriteIcon = (name: string) => {
-  switch (name) {
-    case "Cứu hộ viên":
-      return Shield;
-    case "Cảnh báo":
-      return Warning;
-    case "Hoạt động":
-      return Pulse;
-    default:
-      return Shield;
-  }
-};
-
-export function Sidebar({ favorites, projects, isOpen = true }: SidebarProps) {
+const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
   const pathname = usePathname();
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
@@ -317,4 +242,6 @@ export function Sidebar({ favorites, projects, isOpen = true }: SidebarProps) {
       )}
     </aside>
   );
-}
+};
+
+export default Sidebar;

@@ -1,14 +1,10 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import type { ReportStats as ReportStatsType } from "@/types/admin-pages";
+import { ReportStatsProps } from "@/type";
 import { FileText, Clock, CheckCircle, XCircle } from "@phosphor-icons/react";
 
-interface ReportStatsProps {
-  stats: ReportStatsType;
-}
-
-export function ReportStats({ stats }: ReportStatsProps) {
+const ReportStats = ({ stats }: ReportStatsProps) => {
   const statItems = [
     {
       label: "Tổng báo cáo",
@@ -75,4 +71,6 @@ export function ReportStats({ stats }: ReportStatsProps) {
       })}
     </div>
   );
-}
+};
+
+export default ReportStats;

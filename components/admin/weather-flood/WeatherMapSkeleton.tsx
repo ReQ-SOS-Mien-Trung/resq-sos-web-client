@@ -1,9 +1,7 @@
-"use client";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin } from "@phosphor-icons/react";
 
-export function WeatherMapSkeleton() {
+const WeatherMapSkeleton = () => {
   return (
     <Card className="border border-border/50">
       <CardHeader>
@@ -20,8 +18,8 @@ export function WeatherMapSkeleton() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[400px] rounded-lg bg-muted overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-100/40 via-sky-100/40 to-slate-100/40 dark:from-slate-800 dark:via-slate-900 dark:to-slate-950 animate-pulse" />
+        <div className="h-100 rounded-lg bg-muted overflow-hidden relative">
+          <div className="absolute inset-0 bg-linear-to-br from-blue-100/40 via-sky-100/40 to-slate-100/40 dark:from-slate-800 dark:via-slate-900 dark:to-slate-950 animate-pulse" />
           <div className="absolute inset-4 border border-border/40 rounded-xl" />
           <div className="absolute bottom-4 left-4 flex flex-col gap-2">
             <span className="h-4 w-32 rounded-full bg-background/70 shadow-sm animate-pulse" />
@@ -31,4 +29,6 @@ export function WeatherMapSkeleton() {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default WeatherMapSkeleton;

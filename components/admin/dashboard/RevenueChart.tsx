@@ -16,25 +16,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { TrendUp, CaretUp } from "@phosphor-icons/react";
-import type { RevenueChartData } from "@/types/admin-dashboard";
-
-interface RevenueChartProps {
-  data: RevenueChartData;
-}
-
-const timeFrames: Array<"1D" | "1W" | "1M" | "6M" | "1Y" | "ALL"> = [
-  "1D",
-  "1W",
-  "1M",
-  "6M",
-  "1Y",
-  "ALL",
-];
-
-const formatCurrency = (value: number) => {
-  // Format as number for rescue operations
-  return value.toLocaleString("vi-VN");
-};
+import { RevenueChartProps } from "@/type";
+import { timeFrames } from "@/lib/constants";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const CustomTooltip = ({
   active,
@@ -68,7 +52,7 @@ const CustomTooltip = ({
   return null;
 };
 
-export function RevenueChart({ data }: RevenueChartProps) {
+const RevenueChart = ({ data }: RevenueChartProps) => {
   const [selectedTimeFrame, setSelectedTimeFrame] = useState(data.timeFrame);
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
 
@@ -284,4 +268,6 @@ export function RevenueChart({ data }: RevenueChartProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RevenueChart;

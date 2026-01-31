@@ -6,19 +6,18 @@ import {
   mockAIPrompts,
   mockPromptTemplates,
 } from "@/lib/mock-data/admin-ai-prompt";
-import { DashboardLayout } from "@/components/admin/dashboard";
-import {
-  PromptEditor,
-  PromptTemplates,
-  PromptPreview,
-} from "@/components/admin/ai-prompt";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";
-import { PageLoading } from "@/components/admin";
+import {
+  DashboardLayout,
+  PageLoading,
+  PromptEditor,
+  PromptPreview,
+  PromptTemplates,
+} from "@/components/admin";
 
-export default function AIPromptPage() {
+const AIPromptPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [prompts, setPrompts] = useState(mockAIPrompts);
   const [selectedPrompt, setSelectedPrompt] = useState(mockAIPrompts[0]);
   const [showEditor, setShowEditor] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -99,4 +98,6 @@ export default function AIPromptPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default AIPromptPage;

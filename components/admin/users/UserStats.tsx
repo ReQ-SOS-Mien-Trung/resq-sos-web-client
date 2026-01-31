@@ -1,14 +1,10 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import type { UserStats as UserStatsType } from "@/types/admin-pages";
+import { UserStatsProps } from "@/type";
 import { Users, UserCheck, UserMinus, Clock } from "@phosphor-icons/react";
 
-interface UserStatsProps {
-  stats: UserStatsType;
-}
-
-export function UserStats({ stats }: UserStatsProps) {
+const UserStats = ({ stats }: UserStatsProps) => {
   const statItems = [
     {
       label: "Tổng người dùng",
@@ -68,4 +64,6 @@ export function UserStats({ stats }: UserStatsProps) {
       })}
     </div>
   );
-}
+};
+
+export default UserStats;

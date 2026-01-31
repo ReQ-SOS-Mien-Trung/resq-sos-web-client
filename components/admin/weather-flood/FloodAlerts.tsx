@@ -4,16 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Warning, MapPin, Clock, CheckCircle } from "@phosphor-icons/react";
-import type { FloodAlert } from "@/types/admin-pages";
-import { cn } from "@/lib/utils";
+import { FloodAlert, FloodAlertsProps } from "@/type";
 
-interface FloodAlertsProps {
-  alerts: FloodAlert[];
-  onView?: (alert: FloodAlert) => void;
-  onResolve?: (alert: FloodAlert) => void;
-}
-
-export function FloodAlerts({ alerts, onView, onResolve }: FloodAlertsProps) {
+const FloodAlerts = ({ alerts, onView, onResolve }: FloodAlertsProps) => {
   const getLevelBadge = (level: FloodAlert["level"]) => {
     const variants = {
       low: {
@@ -142,4 +135,6 @@ export function FloodAlerts({ alerts, onView, onResolve }: FloodAlertsProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default FloodAlerts;

@@ -27,7 +27,7 @@ const DEFAULT_LAT = 16.0544;
 const DEFAULT_LON = 108.2022;
 const DEFAULT_ZOOM = 7;
 
-export default function WindyMapEmbed() {
+const WindyMapEmbed = () => {
   const [activeLayer, setActiveLayer] = useState<WeatherLayer>("wind");
 
   const getWindyUrl = (layer: WeatherLayer) => {
@@ -119,4 +119,6 @@ export default function WindyMapEmbed() {
       </div>
     </div>
   );
-}
+};
+
+export default WindyMapEmbed;

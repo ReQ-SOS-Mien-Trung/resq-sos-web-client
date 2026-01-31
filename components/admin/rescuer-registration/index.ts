@@ -1,2 +1,2 @@
-export { RescuerList } from "./RescuerList";
-export { RegistrationForm } from "./RegistrationForm";
+export { default as RescuerList } from "./RescuerList";
+export { default as RegistrationForm } from "./RegistrationForm";

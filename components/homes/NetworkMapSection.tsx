@@ -9,10 +9,9 @@ const NetworkMapSection = () => {
     "centers",
   );
 
-
   return (
     <section className="py-20 lg:py-32 bg-[#ffffff]">
-      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-6">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
@@ -33,7 +32,7 @@ const NetworkMapSection = () => {
         {/* Map Container */}
         <div className="relative mt-12 mb-8">
           {/* Vietnam Map with Image - switches based on active tab */}
-          <div className="relative w-full max-w-md mx-auto aspect-[9/16]">
+          <div className="relative w-full max-w-md mx-auto aspect-9/16">
             <Image
               key={activeTab}
               src={mapImages[activeTab]}
@@ -54,9 +53,10 @@ const NetworkMapSection = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`
                   flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-300
-                  ${activeTab === tab.id
-                    ? "bg-primary text-white shadow-md"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  ${
+                    activeTab === tab.id
+                      ? "bg-primary text-white shadow-md"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
                   }
                 `}
               >

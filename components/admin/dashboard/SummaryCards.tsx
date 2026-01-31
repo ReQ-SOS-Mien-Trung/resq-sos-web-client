@@ -1,7 +1,9 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { getMetricIcon } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { SummaryCardsProps } from "@/type";
 import {
   TrendUp,
   TrendDown,
@@ -11,28 +13,8 @@ import {
   Clock,
   Info,
 } from "@phosphor-icons/react";
-import type { SummaryMetric } from "@/types/admin-dashboard";
 
-interface SummaryCardsProps {
-  metrics: SummaryMetric[];
-}
-
-const getMetricIcon = (label: string) => {
-  switch (label.toLowerCase()) {
-    case "yêu cầu sos":
-      return WarningCircle;
-    case "cứu hộ viên":
-      return Users;
-    case "tỷ lệ thành công":
-      return Target;
-    case "thời gian phản hồi":
-      return Clock;
-    default:
-      return WarningCircle;
-  }
-};
-
-export function SummaryCards({ metrics }: SummaryCardsProps) {
+const SummaryCards = ({ metrics }: SummaryCardsProps) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
       {metrics.map((metric, index) => {
@@ -100,4 +82,6 @@ export function SummaryCards({ metrics }: SummaryCardsProps) {
       })}
     </div>
   );
-}
+};
+
+export default SummaryCards;

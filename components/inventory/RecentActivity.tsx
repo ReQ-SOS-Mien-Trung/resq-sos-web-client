@@ -83,10 +83,7 @@ function formatTimeAgo(date: Date, now: Date): string {
   }
 }
 
-export default function RecentActivity({
-  activities,
-  maxItems = 10,
-}: RecentActivityProps) {
+const RecentActivity = ({ activities, maxItems = 10 }: RecentActivityProps) => {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const displayedActivities = activities.slice(0, maxItems);
 
@@ -195,4 +192,6 @@ export default function RecentActivity({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RecentActivity;

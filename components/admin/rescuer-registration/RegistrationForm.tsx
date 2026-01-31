@@ -7,16 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, X } from "@phosphor-icons/react";
+import { RegistrationFormProps } from "@/type";
 
-interface RegistrationFormProps {
-  onSubmit: (data: any) => void;
-  onCancel: () => void;
-}
-
-export function RegistrationForm({
-  onSubmit,
-  onCancel,
-}: RegistrationFormProps) {
+const RegistrationForm = ({ onSubmit, onCancel }: RegistrationFormProps) => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -175,4 +168,6 @@ export function RegistrationForm({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RegistrationForm;

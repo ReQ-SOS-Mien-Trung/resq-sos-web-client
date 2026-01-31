@@ -17,25 +17,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { User, UserFilters } from "@/types/admin-pages";
+import { User, UserTableProps } from "@/type";
 
-interface UserTableProps {
-  users: User[];
-  filters?: UserFilters;
-  onEdit?: (user: User) => void;
-  onDelete?: (user: User) => void;
-  onBan?: (user: User) => void;
-  onActivate?: (user: User) => void;
-}
-
-export function UserTable({
+const UserTable = ({
   users,
   filters,
   onEdit,
   onDelete,
   onBan,
   onActivate,
-}: UserTableProps) {
+}: UserTableProps) => {
   const [page, setPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -276,4 +267,6 @@ export function UserTable({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default UserTable;

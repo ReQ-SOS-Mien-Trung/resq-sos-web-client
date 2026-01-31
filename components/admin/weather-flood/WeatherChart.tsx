@@ -12,14 +12,10 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import type { WeatherData } from "@/types/admin-pages";
 import { CloudRain, Thermometer, Drop, Wind } from "@phosphor-icons/react";
+import { WeatherChartProps } from "@/type";
 
-interface WeatherChartProps {
-  data: WeatherData[];
-}
-
-export function WeatherChart({ data }: WeatherChartProps) {
+const WeatherChart = ({ data }: WeatherChartProps) => {
   const chartData = data.map((item) => ({
     region: item.region,
     temperature: item.temperature,
@@ -121,4 +117,6 @@ export function WeatherChart({ data }: WeatherChartProps) {
       </Card>
     </div>
   );
-}
+};
+
+export default WeatherChart;

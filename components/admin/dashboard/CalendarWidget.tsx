@@ -19,39 +19,9 @@ import {
 } from "date-fns";
 import { weekDays } from "@/lib/constants";
 import { CalendarWidgetProps } from "@/type";
+import { getMonthIndex } from "@/lib/getMonthIndex";
 
-function getMonthIndex(monthName: string): number {
-  const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-    "Tháng 1",
-    "Tháng 2",
-    "Tháng 3",
-    "Tháng 4",
-    "Tháng 5",
-    "Tháng 6",
-    "Tháng 7",
-    "Tháng 8",
-    "Tháng 9",
-    "Tháng 10",
-    "Tháng 11",
-    "Tháng 12",
-  ];
-  const index = months.indexOf(monthName);
-  return index >= 12 ? index - 12 : index;
-}
-
-export function CalendarWidget({ data }: CalendarWidgetProps) {
+const CalendarWidget = ({ data }: CalendarWidgetProps) => {
   const [currentDate, setCurrentDate] = useState(
     new Date(data.currentYear, getMonthIndex(data.currentMonth), 1),
   );
@@ -231,4 +201,6 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default CalendarWidget;

@@ -4,16 +4,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DownloadSimple, Eye, FileText } from "@phosphor-icons/react";
-import type { RescueReport } from "@/types/admin-pages";
+import { DownloadSimple, Eye } from "@phosphor-icons/react";
+import { ReportTableProps, RescueReport } from "@/type";
+import { getStatusBadge } from "@/lib/constants";
 
-interface ReportTableProps {
-  reports: RescueReport[];
-  onView?: (report: RescueReport) => void;
-  onDownload?: (report: RescueReport) => void;
-}
-
-export function ReportTable({ reports, onView, onDownload }: ReportTableProps) {
+const ReportTable = ({ reports, onView, onDownload }: ReportTableProps) => {
   const [page, setPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -47,28 +42,6 @@ export function ReportTable({ reports, onView, onDownload }: ReportTableProps) {
       },
     };
     return variants[type];
-  };
-
-  const getStatusBadge = (status: RescueReport["status"]) => {
-    const variants = {
-      pending: {
-        label: "Đang chờ",
-        className: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-      },
-      "in-progress": {
-        label: "Đang xử lý",
-        className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-      },
-      completed: {
-        label: "Hoàn thành",
-        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-      },
-      cancelled: {
-        label: "Đã hủy",
-        className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
-      },
-    };
-    return variants[status];
   };
 
   return (
@@ -193,7 +166,7 @@ export function ReportTable({ reports, onView, onDownload }: ReportTableProps) {
                       variant={p === page ? "default" : "outline"}
                       size="sm"
                       onClick={() => setPage(p)}
-                      className="min-w-[40px]"
+                      className="min-w-10"
                     >
                       {p}
                     </Button>
@@ -214,4 +187,6 @@ export function ReportTable({ reports, onView, onDownload }: ReportTableProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default ReportTable;

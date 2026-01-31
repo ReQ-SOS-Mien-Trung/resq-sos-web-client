@@ -50,7 +50,7 @@ interface AIDispatchPanelProps {
   onOverride: (rescuerId: string) => void;
 }
 
-export default function AIDispatchPanel({
+const AIDispatchPanel = ({
   open,
   onOpenChange,
   cluster,
@@ -58,7 +58,7 @@ export default function AIDispatchPanel({
   availableRescuers,
   onApprove,
   onOverride,
-}: AIDispatchPanelProps) {
+}: AIDispatchPanelProps) => {
   const [showOverride, setShowOverride] = useState(false);
   const [selectedRescuerId, setSelectedRescuerId] = useState<string | null>(
     null,
@@ -348,7 +348,7 @@ export default function AIDispatchPanel({
       </Dialog>
     </>
   );
-}
+};
 
 // Mission Step Item Component
 function MissionStepItem({
@@ -400,3 +400,5 @@ function MissionStepItem({
     </div>
   );
 }
+
+export default AIDispatchPanel;

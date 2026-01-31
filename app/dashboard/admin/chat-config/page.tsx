@@ -6,15 +6,15 @@ import {
   mockChatRooms,
   mockMessageTemplates,
 } from "@/lib/mock-data/admin-chat-config";
-import { DashboardLayout } from "@/components/admin/dashboard";
 import {
   ChatRoomList,
   ChatSettings,
+  DashboardLayout,
   MessageTemplates,
-} from "@/components/admin/chat-config";
-import { PageLoading } from "@/components/admin";
+  PageLoading,
+} from "@/components/admin";
 
-export default function ChatConfigPage() {
+const ChatConfigPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -74,4 +74,6 @@ export default function ChatConfigPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default ChatConfigPage;

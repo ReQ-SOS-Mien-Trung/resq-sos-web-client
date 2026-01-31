@@ -12,38 +12,12 @@ import {
   WarningCircle,
   ArrowsCounterClockwise,
 } from "@phosphor-icons/react";
-import type { FloodAlert } from "@/types/admin-pages";
 import { Button } from "@/components/ui/button";
-import { WeatherMapSkeleton } from "./WeatherMapSkeleton";
 import { Droplets } from "lucide-react";
+import WeatherMapSkeleton from "./WeatherMapSkeleton";
+import { WeatherApiCurrentPoint, WeatherMapProps } from "@/type";
 
-interface WeatherMapProps {
-  floodAlerts: FloodAlert[];
-}
-
-type WeatherApiCurrentPoint =
-  | {
-      name: string;
-      lat: number;
-      lon: number;
-      localtime: string;
-      last_updated: string;
-      temp_c: number;
-      humidity: number;
-      wind_degree: number;
-      wind_dir: string;
-      wind_kph: number;
-      precip_mm: number;
-      condition_text: string;
-      condition_icon: string;
-    }
-  | {
-      name: string;
-      q: string;
-      error: string;
-    };
-
-export function WeatherMap({ floodAlerts }: WeatherMapProps) {
+const WeatherMap = ({ floodAlerts }: WeatherMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
   const [liveWeather, setLiveWeather] = useState<
     WeatherApiCurrentPoint[] | null
@@ -490,4 +464,6 @@ export function WeatherMap({ floodAlerts }: WeatherMapProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default WeatherMap;

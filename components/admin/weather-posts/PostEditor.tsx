@@ -13,15 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { WeatherPost } from "@/types/admin-pages";
+import { PostEditorProps, WeatherPost } from "@/type";
 
-interface PostEditorProps {
-  post?: WeatherPost;
-  onSave: (post: Partial<WeatherPost>) => void;
-  onCancel: () => void;
-}
-
-export function PostEditor({ post, onSave, onCancel }: PostEditorProps) {
+const PostEditor = ({ post, onSave, onCancel }: PostEditorProps) => {
   const [formData, setFormData] = useState<Partial<WeatherPost>>({
     title: post?.title || "",
     content: post?.content || "",
@@ -38,7 +32,9 @@ export function PostEditor({ post, onSave, onCancel }: PostEditorProps) {
   return (
     <Card className="border border-border/50">
       <CardHeader>
-        <CardTitle>{post ? "Chỉnh sửa bài đăng" : "Tạo bài đăng mới"}</CardTitle>
+        <CardTitle>
+          {post ? "Chỉnh sửa bài đăng" : "Tạo bài đăng mới"}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -140,4 +136,6 @@ export function PostEditor({ post, onSave, onCancel }: PostEditorProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default PostEditor;

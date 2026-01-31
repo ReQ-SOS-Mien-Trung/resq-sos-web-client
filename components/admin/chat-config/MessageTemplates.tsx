@@ -4,19 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PencilSimple, Trash, ChatCircle } from "@phosphor-icons/react";
-import type { MessageTemplate } from "@/types/admin-pages";
+import { MessageTemplate, MessageTemplatesProps } from "@/type";
 
-interface MessageTemplatesProps {
-  templates: MessageTemplate[];
-  onEdit?: (template: MessageTemplate) => void;
-  onDelete?: (template: MessageTemplate) => void;
-}
-
-export function MessageTemplates({
+const MessageTemplates = ({
   templates,
   onEdit,
   onDelete,
-}: MessageTemplatesProps) {
+}: MessageTemplatesProps) => {
   const getCategoryBadge = (category: MessageTemplate["category"]) => {
     const variants = {
       greeting: {
@@ -107,4 +101,6 @@ export function MessageTemplates({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default MessageTemplates;

@@ -67,7 +67,7 @@ interface SOSSidebarProps {
   selectedCluster?: SOSCluster | null;
 }
 
-export default function SOSSidebar({
+const SOSSidebar = ({
   sosRequests,
   clusters,
   rescuers,
@@ -77,7 +77,7 @@ export default function SOSSidebar({
   onRescuerSelect,
   selectedSOS,
   selectedCluster,
-}: SOSSidebarProps) {
+}: SOSSidebarProps) => {
   const [activeTab, setActiveTab] = useState("incoming");
 
   const pendingRequests = sosRequests.filter((s) => s.status === "PENDING");
@@ -231,7 +231,9 @@ export default function SOSSidebar({
       </Tabs>
     </div>
   );
-}
+};
+
+export default SOSSidebar;
 
 // Cluster Card Component
 function ClusterCard({

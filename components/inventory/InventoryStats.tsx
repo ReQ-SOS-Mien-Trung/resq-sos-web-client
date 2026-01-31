@@ -17,7 +17,7 @@ interface InventoryStatsProps {
   stats: IInventoryStats;
 }
 
-export default function InventoryStats({ stats }: InventoryStatsProps) {
+const InventoryStats = ({ stats }: InventoryStatsProps) => {
   const statCards = [
     {
       title: "Tổng Mặt Hàng",
@@ -113,4 +113,6 @@ export default function InventoryStats({ stats }: InventoryStatsProps) {
       ))}
     </div>
   );
-}
+};
+
+export default InventoryStats;

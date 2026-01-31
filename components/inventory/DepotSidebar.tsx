@@ -76,7 +76,7 @@ interface DepotSidebarProps {
   onCategorySelect?: (category: ItemCategory | null) => void;
 }
 
-export default function DepotSidebar({
+const DepotSidebar = ({
   depotInfo,
   inventoryItems,
   supplyRequests,
@@ -88,7 +88,7 @@ export default function DepotSidebar({
   selectedRequest,
   selectedCategory,
   onCategorySelect,
-}: DepotSidebarProps) {
+}: DepotSidebarProps) => {
   const [activeTab, setActiveTab] = useState("inventory");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -390,7 +390,9 @@ export default function DepotSidebar({
       </Tabs>
     </div>
   );
-}
+};
+
+export default DepotSidebar;
 
 // Inventory Item Card Component
 function InventoryItemCard({

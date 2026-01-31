@@ -46,10 +46,7 @@ const DEFAULT_LAT = 16.0544;
 const DEFAULT_LON = 108.2022;
 const DEFAULT_ZOOM = 7;
 
-export default function WindyWeatherMap({
-  open,
-  onOpenChange,
-}: WindyWeatherMapProps) {
+const WindyWeatherMap = ({ open, onOpenChange }: WindyWeatherMapProps) => {
   const [activeLayer, setActiveLayer] = useState<WeatherLayer>("wind");
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -171,4 +168,6 @@ export default function WindyWeatherMap({
       </SheetContent>
     </Sheet>
   );
-}
+};
+
+export default WindyWeatherMap;

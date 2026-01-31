@@ -9,37 +9,18 @@ import {
   Gear,
   DotsThreeVertical,
 } from "@phosphor-icons/react";
-import type { ChatRoom } from "@/types/admin-pages";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ChatRoom, ChatRoomListProps } from "@/type";
+import { variantsBadge } from "@/lib/constants";
 
-interface ChatRoomListProps {
-  rooms: ChatRoom[];
-  onEdit?: (room: ChatRoom) => void;
-  onDelete?: (room: ChatRoom) => void;
-}
-
-export function ChatRoomList({ rooms, onEdit, onDelete }: ChatRoomListProps) {
+const ChatRoomList = ({ rooms, onEdit, onDelete }: ChatRoomListProps) => {
   const getTypeBadge = (type: ChatRoom["type"]) => {
-    const variants = {
-      public: {
-        label: "Công khai",
-        className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-      },
-      private: {
-        label: "Riêng tư",
-        className: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
-      },
-      support: {
-        label: "Hỗ trợ",
-        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-      },
-    };
-    return variants[type];
+    return variantsBadge[type];
   };
 
   const getStatusBadge = (status: ChatRoom["status"]) => {
@@ -133,4 +114,6 @@ export function ChatRoomList({ rooms, onEdit, onDelete }: ChatRoomListProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default ChatRoomList;

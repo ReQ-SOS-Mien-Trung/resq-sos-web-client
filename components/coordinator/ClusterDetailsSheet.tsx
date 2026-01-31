@@ -64,13 +64,13 @@ interface ClusterDetailsSheetProps {
   onSOSSelect: (sos: SOSRequest) => void;
 }
 
-export default function ClusterDetailsSheet({
+const ClusterDetailsSheet = ({
   open,
   onOpenChange,
   cluster,
   onProcessCluster,
   onSOSSelect,
-}: ClusterDetailsSheetProps) {
+}: ClusterDetailsSheetProps) => {
   if (!cluster) return null;
 
   const priorityColors = {
@@ -240,7 +240,9 @@ export default function ClusterDetailsSheet({
       </SheetContent>
     </Sheet>
   );
-}
+};
+
+export default ClusterDetailsSheet;
 
 // Individual SOS Detail Card
 function SOSDetailCard({

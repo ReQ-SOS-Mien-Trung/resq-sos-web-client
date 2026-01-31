@@ -21,11 +21,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  AIDispatchPanel,
-  ClusterDetailsSheet,
-  SOSSidebar,
-} from "@/components/coordinator";
-import {
   SidebarSimple,
   Bell,
   Gear,
@@ -38,6 +33,11 @@ import {
   CloudSun,
   MapTrifold,
 } from "@phosphor-icons/react";
+import {
+  AIDispatchPanel,
+  ClusterDetailsSheet,
+  SOSSidebar,
+} from "@/components/coordinator";
 
 const CoordinatorMap = dynamic(
   () => import("@/components/coordinator/CoordinatorMap"),
@@ -73,7 +73,7 @@ const WindyMapEmbed = dynamic(
   },
 );
 
-export default function CoordinatorDashboardPage() {
+const CoordinatorDashboardPage = () => {
   // State management
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedSOS, setSelectedSOS] = useState<SOSRequest | null>(null);
@@ -369,4 +369,6 @@ export default function CoordinatorDashboardPage() {
       />
     </div>
   );
-}
+};
+
+export default CoordinatorDashboardPage;

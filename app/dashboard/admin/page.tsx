@@ -8,14 +8,14 @@ import {
   CalendarWidget,
   DashboardLayout,
   LeadsManagement,
+  PageLoading,
   RetentionRate,
   RevenueChart,
   SummaryCards,
   TopCountries,
-} from "@/components/admin/dashboard";
-import { PageLoading } from "@/components/admin";
+} from "@/components/admin";
 
-export default function AdminDashboardPage() {
+const AdminDashboardPage = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -125,4 +125,6 @@ export default function AdminDashboardPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default AdminDashboardPage;

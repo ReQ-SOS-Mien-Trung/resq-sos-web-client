@@ -9,19 +9,13 @@ import {
   FileText,
   DownloadSimple,
 } from "@phosphor-icons/react";
-import type { RescuerVerification } from "@/types/admin-pages";
+import { DocumentViewerProps } from "@/type";
 
-interface DocumentViewerProps {
-  verification: RescuerVerification;
-  onVerify?: (docId: string) => void;
-  onReject?: (docId: string) => void;
-}
-
-export function DocumentViewer({
+const DocumentViewer = ({
   verification,
   onVerify,
   onReject,
-}: DocumentViewerProps) {
+}: DocumentViewerProps) => {
   const getDocTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       id: "CMND/CCCD",
@@ -108,4 +102,6 @@ export function DocumentViewer({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default DocumentViewer;

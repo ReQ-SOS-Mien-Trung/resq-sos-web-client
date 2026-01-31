@@ -1,12 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-
-type PageLoadingProps = {
-  title?: string;
-  subtitle?: string;
-  className?: string;
-};
+import { PageLoadingProps } from "@/type";
 
 const PageLoading = ({
   title = "Đang tải dữ liệu",

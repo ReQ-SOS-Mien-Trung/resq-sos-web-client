@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockUsers, mockUserStats } from "@/lib/mock-data/admin-users";
-import { DashboardLayout } from "@/components/admin/dashboard";
-import { UserStats, UserFilters, UserTable } from "@/components/admin/users";
 import type { UserFilters as UserFiltersType } from "@/types/admin-pages";
-import { PageLoading } from "@/components/admin";
+import {
+  DashboardLayout,
+  PageLoading,
+  UserFilters,
+  UserStats,
+  UserTable,
+} from "@/components/admin";
 
-export default function UsersPage() {
+const UsersPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [filters, setFilters] = useState<UserFiltersType>({});
   const [loading, setLoading] = useState(true);
@@ -60,4 +64,6 @@ export default function UsersPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default UsersPage;

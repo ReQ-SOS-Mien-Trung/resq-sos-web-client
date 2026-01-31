@@ -41,11 +41,11 @@ interface LowStockAlertsProps {
   onViewAll?: () => void;
 }
 
-export default function LowStockAlerts({
+const LowStockAlerts = ({
   items,
   onItemClick,
   onViewAll,
-}: LowStockAlertsProps) {
+}: LowStockAlertsProps) => {
   // Filter critical and low stock items
   const alertItems = items
     .filter(
@@ -196,4 +196,6 @@ export default function LowStockAlerts({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default LowStockAlerts;

@@ -67,14 +67,14 @@ interface ItemDetailsSheetProps {
   onEdit?: () => void;
 }
 
-export default function ItemDetailsSheet({
+const ItemDetailsSheet = ({
   item,
   open,
   onOpenChange,
   onRequestInbound,
   onRequestOutbound,
   onEdit,
-}: ItemDetailsSheetProps) {
+}: ItemDetailsSheetProps) => {
   if (!item) return null;
 
   const stockPercentage = Math.min((item.quantity / item.maxStock) * 100, 100);
@@ -273,4 +273,6 @@ export default function ItemDetailsSheet({
       </SheetContent>
     </Sheet>
   );
-}
+};
+
+export default ItemDetailsSheet;
