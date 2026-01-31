@@ -3,14 +3,11 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
-import type { FloodAlert, WeatherData } from "@/types/admin-pages";
 import { mockFloodAlerts } from "@/lib/mock-data/admin-weather-flood";
-import {
-  DashboardLayout,
-  FloodAlerts,
-  PageLoading,
-  WeatherChart,
-} from "@/components/admin";
+import { PageLoading } from "@/components/admin";
+import { FloodAlert, WeatherData } from "@/type";
+import { DashboardLayout } from "@/components/admin/dashboard";
+import { FloodAlerts, WeatherChart } from "@/components/admin/weather-flood";
 
 const WeatherMap = dynamic(
   () =>

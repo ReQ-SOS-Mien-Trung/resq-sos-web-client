@@ -8,13 +8,13 @@ import {
 } from "@/lib/mock-data/admin-ai-prompt";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";
+import { PageLoading } from "@/components/admin";
+import { DashboardLayout } from "@/components/admin/dashboard";
 import {
-  DashboardLayout,
-  PageLoading,
   PromptEditor,
   PromptPreview,
   PromptTemplates,
-} from "@/components/admin";
+} from "@/components/admin/ai-prompt";
 
 const AIPromptPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);

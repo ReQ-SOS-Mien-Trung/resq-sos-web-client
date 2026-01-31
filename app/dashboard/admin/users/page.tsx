@@ -3,14 +3,9 @@
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockUsers, mockUserStats } from "@/lib/mock-data/admin-users";
-import type { UserFilters as UserFiltersType } from "@/types/admin-pages";
-import {
-  DashboardLayout,
-  PageLoading,
-  UserFilters,
-  UserStats,
-  UserTable,
-} from "@/components/admin";
+import { PageLoading } from "@/components/admin";
+import { DashboardLayout } from "@/components/admin/dashboard";
+import { UserFilters, UserStats, UserTable } from "@/components/admin/users";
 
 const UsersPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);

@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockRescuerVerifications } from "@/lib/mock-data/admin-rescuer-verification";
-import type { RescuerVerification } from "@/types/admin-pages";
+import { PageLoading } from "@/components/admin";
+import { RescuerVerification } from "@/type";
+import { DashboardLayout } from "@/components/admin/dashboard";
 import {
-  DashboardLayout,
   DocumentViewer,
-  PageLoading,
   RescuerProfile,
   VerificationQueue,
-} from "@/components/admin";
+} from "@/components/admin/rescuer-verification";
 
 const RescuerVerificationPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);

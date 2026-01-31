@@ -6,13 +6,13 @@ import {
   mockChatRooms,
   mockMessageTemplates,
 } from "@/lib/mock-data/admin-chat-config";
+import { PageLoading } from "@/components/admin";
+import { DashboardLayout } from "@/components/admin/dashboard";
 import {
   ChatRoomList,
   ChatSettings,
-  DashboardLayout,
   MessageTemplates,
-  PageLoading,
-} from "@/components/admin";
+} from "@/components/admin/chat-config";
 
 const ChatConfigPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);

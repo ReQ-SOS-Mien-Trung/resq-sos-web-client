@@ -11,7 +11,8 @@ import {
   ReportFilters,
   ReportTable,
 } from "@/components/admin/reports";
-import { DashboardLayout, PageLoading } from "@/components/admin";
+import { PageLoading } from "@/components/admin";
+import { DashboardLayout } from "@/components/admin/dashboard";
 
 const ReportsPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);

@@ -1,10 +1,1 @@
 export { default as PageLoading } from "./PageLoading";
-export * from "./dashboard";
-export * from "./reports";
-export * from "./users";
-export * from "./rescuer-registration";
-export * from "./rescuer-verification";
-export * from "./ai-prompt";
-export * from "./weather-flood";
-export * from "./weather-posts";
-export * from "./chat-config";

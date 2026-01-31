@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
-import type { DashboardData } from "@/types/admin-dashboard";
 import { Check } from "@phosphor-icons/react";
 import {
   CalendarWidget,
   DashboardLayout,
   LeadsManagement,
-  PageLoading,
   RetentionRate,
   RevenueChart,
   SummaryCards,
   TopCountries,
-} from "@/components/admin";
+} from "@/components/admin/dashboard";
+import { DashboardData } from "@/type";
+import { PageLoading } from "@/components/admin";
 
 const AdminDashboardPage = () => {
   const [data, setData] = useState<DashboardData | null>(null);

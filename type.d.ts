@@ -853,7 +853,7 @@ export interface DepotInfo {
 }
 
 // Dashboard Statistics
-export interface InventoryStats {
+export interface IInventoryStats {
   totalItems: number;
   totalCategories: number;
   criticalStock: number;

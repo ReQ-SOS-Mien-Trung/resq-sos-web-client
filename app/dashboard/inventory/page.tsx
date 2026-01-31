@@ -2,13 +2,6 @@
 
 import { useState, useCallback, useMemo } from "react";
 import {
-  InventoryItem,
-  SupplyRequest,
-  Shipment,
-  ItemCategory,
-  InventoryStats as IInventoryStats,
-} from "@/types/inventory";
-import {
   mockInventoryItems,
   mockSupplyRequests,
   mockShipments,
@@ -40,6 +33,13 @@ import {
   LowStockAlerts,
   RecentActivity,
 } from "@/components/inventory";
+import {
+  InventoryItem,
+  IInventoryStats,
+  ItemCategory,
+  Shipment,
+  SupplyRequest,
+} from "@/type";
 
 const InventoryDashboardPage = () => {
   // State management

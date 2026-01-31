@@ -5,13 +5,13 @@ import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockWeatherPosts } from "@/lib/mock-data/admin-weather-posts";
 import { Button } from "@/components/ui/button";
 import { Plus, SquaresFour, List } from "@phosphor-icons/react";
+import { PageLoading } from "@/components/admin";
+import { DashboardLayout } from "@/components/admin/dashboard";
 import {
-  DashboardLayout,
-  PageLoading,
   PostEditor,
   PostScheduler,
   WeatherPostCard,
-} from "@/components/admin";
+} from "@/components/admin/weather-posts";
 
 const WeatherPostsPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);

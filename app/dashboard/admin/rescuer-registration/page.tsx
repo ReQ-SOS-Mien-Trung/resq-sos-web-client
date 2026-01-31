@@ -5,12 +5,12 @@ import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockRescuerRegistrations } from "@/lib/mock-data/admin-rescuer-registration";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";
+import { PageLoading } from "@/components/admin";
+import { DashboardLayout } from "@/components/admin/dashboard";
 import {
-  DashboardLayout,
-  PageLoading,
   RegistrationForm,
   RescuerList,
-} from "@/components/admin";
+} from "@/components/admin/rescuer-registration";
 
 const RescuerRegistrationPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
