@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -85,7 +85,8 @@ const WindyLeafletMap = dynamic(
   },
 );
 
-const CoordinatorDashboardPage = () => {
+// Inner component that uses searchParams
+const CoordinatorDashboardContent = () => {
   // URL params for weather map mode
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -475,6 +476,24 @@ const CoordinatorDashboardPage = () => {
         onOverride={handleOverrideDecision}
       />
     </div>
+  );
+};
+
+// Wrapper component with Suspense for useSearchParams
+const CoordinatorDashboardPage = () => {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <span className="text-sm text-muted-foreground">Đang tải...</span>
+          </div>
+        </div>
+      }
+    >
+      <CoordinatorDashboardContent />
+    </Suspense>
   );
 };
 
