@@ -11,14 +11,19 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Cloud, Wind, Thermometer, Droplets, Maximize2 } from "lucide-react";
+import {
+  Cloud,
+  Wind,
+  Thermometer,
+  Drop,
+  ArrowsOut,
+} from "@phosphor-icons/react";
+import { WeatherLayer } from "@/type";
 
 interface WindyWeatherMapProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-type WeatherLayer = "wind" | "temp" | "rain" | "clouds";
 
 const WINDY_LAYERS: {
   id: WeatherLayer;
@@ -27,7 +32,11 @@ const WINDY_LAYERS: {
 }[] = [
   { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
   { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
-  { id: "rain", label: "Mưa", icon: <Droplets className="h-4 w-4" /> },
+  {
+    id: "rain",
+    label: "Mưa",
+    icon: <Drop className="h-4 w-4" weight="fill" />,
+  },
   { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
 ];
 
@@ -36,16 +45,13 @@ const DEFAULT_LAT = 16.0544;
 const DEFAULT_LON = 108.2022;
 const DEFAULT_ZOOM = 7;
 
-export default function WindyWeatherMap({
-  open,
-  onOpenChange,
-}: WindyWeatherMapProps) {
+const WindyWeatherMap = ({ open, onOpenChange }: WindyWeatherMapProps) => {
   const [activeLayer, setActiveLayer] = useState<WeatherLayer>("wind");
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const getWindyUrl = (layer: WeatherLayer) => {
     // Windy.com embed URL with different overlays
-    return `https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=${DEFAULT_ZOOM}&overlay=${layer}&product=ecmwf&level=surface&lat=${DEFAULT_LAT}&lon=${DEFAULT_LON}&detailLat=${DEFAULT_LAT}&detailLon=${DEFAULT_LON}&marker=true&message=true`;
+    return `https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=${DEFAULT_ZOOM}&overlay=${layer}&product=ecmwf&level=surface&lat=${DEFAULT_LAT}&lon=${DEFAULT_LON}&marker=false&message=false`;
   };
 
   return (
@@ -60,12 +66,6 @@ export default function WindyWeatherMap({
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
                 <Cloud className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <div>
-                <SheetTitle className="text-lg">Bản đồ Thời tiết</SheetTitle>
-                <SheetDescription className="text-xs">
-                  Dữ liệu từ Windy.com - ECMWF
-                </SheetDescription>
-              </div>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs">
@@ -77,7 +77,7 @@ export default function WindyWeatherMap({
                 onClick={() => setIsFullscreen(!isFullscreen)}
                 className="h-8 w-8"
               >
-                <Maximize2 className="h-4 w-4" />
+                <ArrowsOut className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -147,18 +147,12 @@ export default function WindyWeatherMap({
                   Bão
                 </span>
               </div>
-              <a
-                href="https://www.windy.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:underline"
-              >
-                Powered by Windy.com
-              </a>
             </div>
           </div>
         </div>
       </SheetContent>
     </Sheet>
   );
-}
+};
+
+export default WindyWeatherMap;

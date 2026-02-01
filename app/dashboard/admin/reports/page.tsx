@@ -6,11 +6,15 @@ import {
   mockRescueReports,
   mockReportStats,
 } from "@/lib/mock-data/admin-reports";
+import {
+  ReportStats,
+  ReportFilters,
+  ReportTable,
+} from "@/components/admin/reports";
+import { PageLoading } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import { ReportStats, ReportFilters, ReportTable } from "@/components/admin/reports";
-import { PageLoading } from "@/components/admin/PageLoading";
 
-export default function ReportsPage() {
+const ReportsPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [filters, setFilters] = useState<any>({});
   const [loading, setLoading] = useState(true);
@@ -30,7 +34,12 @@ export default function ReportsPage() {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading title="Đang tải báo cáo" subtitle="Đang tổng hợp dữ liệu cứu hộ…" />;
+    return (
+      <PageLoading
+        title="Đang tải báo cáo"
+        subtitle="Đang tổng hợp dữ liệu cứu hộ…"
+      />
+    );
   }
 
   return (
@@ -61,4 +70,6 @@ export default function ReportsPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default ReportsPage;

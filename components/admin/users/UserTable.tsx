@@ -5,39 +5,28 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  MoreVertical,
-  Edit,
-  Trash2,
-  Ban,
+  DotsThreeVertical,
+  PencilSimple,
+  Trash,
+  Prohibit,
   CheckCircle,
-  XCircle,
-} from "lucide-react";
+} from "@phosphor-icons/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { User, UserFilters } from "@/types/admin-pages";
-import { cn } from "@/lib/utils";
+import { User, UserTableProps } from "@/type";
 
-interface UserTableProps {
-  users: User[];
-  filters?: UserFilters;
-  onEdit?: (user: User) => void;
-  onDelete?: (user: User) => void;
-  onBan?: (user: User) => void;
-  onActivate?: (user: User) => void;
-}
-
-export function UserTable({
+const UserTable = ({
   users,
   filters,
   onEdit,
   onDelete,
   onBan,
   onActivate,
-}: UserTableProps) {
+}: UserTableProps) => {
   const [page, setPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -65,7 +54,10 @@ export function UserTable({
   const getRoleBadge = (role: User["role"]) => {
     const variants: Record<User["role"], { label: string; className: string }> =
       {
-        admin: { label: "Admin", className: "bg-red-500/10 text-red-700 dark:text-red-400" },
+        admin: {
+          label: "Admin",
+          className: "bg-red-500/10 text-red-700 dark:text-red-400",
+        },
         coordinator: {
           label: "Điều phối",
           className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
@@ -143,7 +135,10 @@ export function UserTable({
             <tbody>
               {paginatedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={7}
+                    className="p-8 text-center text-muted-foreground"
+                  >
                     Không tìm thấy người dùng nào
                   </td>
                 </tr>
@@ -187,24 +182,24 @@ export function UserTable({
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon">
-                                <MoreVertical className="h-4 w-4" />
+                                <DotsThreeVertical size={16} />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => onEdit?.(user)}>
-                                <Edit className="h-4 w-4 mr-2" />
+                                <PencilSimple size={16} className="mr-2" />
                                 Chỉnh sửa
                               </DropdownMenuItem>
                               {user.status === "active" ? (
                                 <DropdownMenuItem onClick={() => onBan?.(user)}>
-                                  <Ban className="h-4 w-4 mr-2" />
+                                  <Prohibit size={16} className="mr-2" />
                                   Cấm
                                 </DropdownMenuItem>
                               ) : (
                                 <DropdownMenuItem
                                   onClick={() => onActivate?.(user)}
                                 >
-                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  <CheckCircle size={16} className="mr-2" />
                                   Kích hoạt
                                 </DropdownMenuItem>
                               )}
@@ -212,7 +207,7 @@ export function UserTable({
                                 onClick={() => onDelete?.(user)}
                                 className="text-destructive"
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
+                                <Trash size={16} className="mr-2" />
                                 Xóa
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -231,8 +226,8 @@ export function UserTable({
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
             <div className="text-sm text-muted-foreground">
               Hiển thị {(page - 1) * itemsPerPage + 1}-
-              {Math.min(page * itemsPerPage, filteredUsers.length)} trong tổng số{" "}
-              {filteredUsers.length} người dùng
+              {Math.min(page * itemsPerPage, filteredUsers.length)} trong tổng
+              số {filteredUsers.length} người dùng
             </div>
             <div className="flex gap-2">
               <Button
@@ -251,7 +246,7 @@ export function UserTable({
                       variant={p === page ? "default" : "outline"}
                       size="sm"
                       onClick={() => setPage(p)}
-                      className="min-w-[40px]"
+                      className="min-w-10"
                     >
                       {p}
                     </Button>
@@ -272,4 +267,6 @@ export function UserTable({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default UserTable;

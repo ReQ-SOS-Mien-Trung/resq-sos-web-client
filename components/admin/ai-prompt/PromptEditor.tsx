@@ -13,15 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { AIPrompt } from "@/types/admin-pages";
+import { AIPrompt, PromptEditorProps } from "@/type";
 
-interface PromptEditorProps {
-  prompt?: AIPrompt;
-  onSave: (prompt: Partial<AIPrompt>) => void;
-  onCancel: () => void;
-}
-
-export function PromptEditor({ prompt, onSave, onCancel }: PromptEditorProps) {
+const PromptEditor = ({ prompt, onSave, onCancel }: PromptEditorProps) => {
   const [formData, setFormData] = useState<Partial<AIPrompt>>({
     name: prompt?.name || "",
     category: prompt?.category || "dispatch",
@@ -117,4 +111,6 @@ export function PromptEditor({ prompt, onSave, onCancel }: PromptEditorProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default PromptEditor;

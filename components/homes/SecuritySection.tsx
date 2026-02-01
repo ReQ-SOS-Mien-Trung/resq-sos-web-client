@@ -13,7 +13,7 @@ import {
 const SecuritySection = () => {
   return (
     <section className="py-20 lg:py-32 bg-[#ffffff] text-gray-900">
-      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8 mb-16 lg:mb-20">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-[1.15] max-w-xl">
@@ -80,8 +80,8 @@ const SecuritySection = () => {
               Sao lưu tự động
             </h3>
             <p className="text-gray-600 text-sm leading-relaxed">
-              Dữ liệu được sao lưu tự động hàng ngày, đảm bảo không mất mát thông
-              tin quan trọng.
+              Dữ liệu được sao lưu tự động hàng ngày, đảm bảo không mất mát
+              thông tin quan trọng.
             </p>
           </div>
 
@@ -133,8 +133,8 @@ const SecuritySection = () => {
               Lịch sử đầy đủ
             </h3>
             <p className="text-gray-600 text-sm leading-relaxed">
-              Lưu trữ lịch sử hoạt động chi tiết, hỗ trợ báo cáo và phân tích sau
-              sự kiện.
+              Lưu trữ lịch sử hoạt động chi tiết, hỗ trợ báo cáo và phân tích
+              sau sự kiện.
             </p>
           </div>
         </div>
@@ -144,4 +144,3 @@ const SecuritySection = () => {
 };
 
 export default SecuritySection;
-

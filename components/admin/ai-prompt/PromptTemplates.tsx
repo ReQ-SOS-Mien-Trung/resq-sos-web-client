@@ -3,25 +3,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { PromptTemplate } from "@/types/admin-pages";
+import { PromptTemplate, PromptTemplatesProps } from "@/type";
+import { variantsCategory } from "@/lib/constants";
 
-interface PromptTemplatesProps {
-  templates: PromptTemplate[];
-  onUseTemplate?: (template: PromptTemplate) => void;
-}
-
-export function PromptTemplates({
+const PromptTemplates = ({
   templates,
   onUseTemplate,
-}: PromptTemplatesProps) {
+}: PromptTemplatesProps) => {
   const getCategoryBadge = (category: PromptTemplate["category"]) => {
-    const variants = {
-      dispatch: { label: "Điều phối", className: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
-      classification: { label: "Phân loại", className: "bg-purple-500/10 text-purple-700 dark:text-purple-400" },
-      recommendation: { label: "Đề xuất", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
-      other: { label: "Khác", className: "bg-gray-500/10 text-gray-700 dark:text-gray-400" },
-    };
-    return variants[category];
+    return variantsCategory[category];
   };
 
   return (
@@ -70,4 +60,6 @@ export function PromptTemplates({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default PromptTemplates;

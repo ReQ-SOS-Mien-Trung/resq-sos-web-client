@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockUsers, mockUserStats } from "@/lib/mock-data/admin-users";
+import { PageLoading } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import { UserStats, UserFilters, UserTable } from "@/components/admin/users";
-import type { User, UserFilters as UserFiltersType } from "@/types/admin-pages";
-import { PageLoading } from "@/components/admin/PageLoading";
+import { UserFilters, UserStats, UserTable } from "@/components/admin/users";
 
-export default function UsersPage() {
+const UsersPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [filters, setFilters] = useState<UserFiltersType>({});
   const [loading, setLoading] = useState(true);
@@ -28,7 +27,12 @@ export default function UsersPage() {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading title="Đang tải người dùng" subtitle="Đang đồng bộ danh sách tài khoản…" />;
+    return (
+      <PageLoading
+        title="Đang tải người dùng"
+        subtitle="Đang đồng bộ danh sách tài khoản…"
+      />
+    );
   }
 
   return (
@@ -55,4 +59,6 @@ export default function UsersPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default UsersPage;

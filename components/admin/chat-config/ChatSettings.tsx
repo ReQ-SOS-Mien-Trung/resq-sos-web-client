@@ -5,19 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ChatRoom } from "@/types/admin-pages";
+import { ChatSettingsProps } from "@/type";
 
-interface ChatSettingsProps {
-  room: ChatRoom;
-  onSave: (settings: ChatRoom["settings"]) => void;
-  onCancel: () => void;
-}
-
-export function ChatSettings({
-  room,
-  onSave,
-  onCancel,
-}: ChatSettingsProps) {
+const ChatSettings = ({ room, onSave, onCancel }: ChatSettingsProps) => {
   const [settings, setSettings] = useState(room.settings);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -49,9 +39,7 @@ export function ChatSettings({
 
           {settings.maxParticipants !== undefined && (
             <div>
-              <Label htmlFor="maxParticipants">
-                Số người tham gia tối đa
-              </Label>
+              <Label htmlFor="maxParticipants">Số người tham gia tối đa</Label>
               <Input
                 id="maxParticipants"
                 type="number"
@@ -110,4 +98,6 @@ export function ChatSettings({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default ChatSettings;

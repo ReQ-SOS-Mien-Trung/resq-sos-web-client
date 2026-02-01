@@ -1,24 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Play } from "lucide-react";
-import { useState } from "react";
+import { Play } from "@phosphor-icons/react";
+import { PromptPreviewProps } from "@/type";
 
-interface PromptPreviewProps {
-  prompt: string;
-  variables: string[];
-  onTest?: (input: Record<string, string>) => void;
-}
-
-export function PromptPreview({
-  prompt,
-  variables,
-  onTest,
-}: PromptPreviewProps) {
+const PromptPreview = ({ prompt, variables, onTest }: PromptPreviewProps) => {
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [output, setOutput] = useState<string>("");
 
@@ -56,7 +47,7 @@ export function PromptPreview({
               </div>
             ))}
             <Button onClick={handleTest} className="w-full">
-              <Play className="h-4 w-4 mr-2" />
+              <Play size={16} className="mr-2" />
               Test Prompt
             </Button>
           </div>
@@ -76,4 +67,6 @@ export function PromptPreview({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default PromptPreview;

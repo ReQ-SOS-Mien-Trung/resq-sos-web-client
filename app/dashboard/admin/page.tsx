@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
-import type { DashboardData } from "@/types/admin-dashboard";
-import { Check } from "lucide-react";
-import { PageLoading } from "@/components/admin/PageLoading";
+import { Check } from "@phosphor-icons/react";
 import {
   CalendarWidget,
   DashboardLayout,
@@ -14,8 +12,10 @@ import {
   SummaryCards,
   TopCountries,
 } from "@/components/admin/dashboard";
+import { DashboardData } from "@/type";
+import { PageLoading } from "@/components/admin";
 
-export default function AdminDashboardPage() {
+const AdminDashboardPage = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -51,9 +51,15 @@ export default function AdminDashboardPage() {
           <div className="flex items-center gap-2 text-sm">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-300 dark:border-emerald-700 shadow-sm">
               <div className="relative">
-                <Check className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                <Check
+                  size={16}
+                  className="text-emerald-700 dark:text-emerald-400"
+                />
                 <div className="absolute inset-0 h-4 w-4 animate-ping opacity-30">
-                  <Check className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                  <Check
+                    size={16}
+                    className="text-emerald-700 dark:text-emerald-400"
+                  />
                 </div>
               </div>
               <span className="text-emerald-800 dark:text-emerald-300 font-semibold">
@@ -119,4 +125,6 @@ export default function AdminDashboardPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default AdminDashboardPage;

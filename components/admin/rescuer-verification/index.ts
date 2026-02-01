@@ -1,3 +1,3 @@
-export { VerificationQueue } from "./VerificationQueue";
-export { RescuerProfile } from "./RescuerProfile";
-export { DocumentViewer } from "./DocumentViewer";
+export { default as VerificationQueue } from "./VerificationQueue";
+export { default as RescuerProfile } from "./RescuerProfile";
+export { default as DocumentViewer } from "./DocumentViewer";

@@ -3,22 +3,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Eye, FileText } from "lucide-react";
-import type { RescuerRegistration } from "@/types/admin-pages";
+import { CheckCircle, XCircle, Eye } from "@phosphor-icons/react";
+import { RescuerListProps, RescuerRegistration } from "@/type";
 
-interface RescuerListProps {
-  registrations: RescuerRegistration[];
-  onView?: (registration: RescuerRegistration) => void;
-  onApprove?: (registration: RescuerRegistration) => void;
-  onReject?: (registration: RescuerRegistration) => void;
-}
-
-export function RescuerList({
+const RescuerList = ({
   registrations,
   onView,
   onApprove,
   onReject,
-}: RescuerListProps) {
+}: RescuerListProps) => {
   const getStatusBadge = (status: RescuerRegistration["status"]) => {
     const variants = {
       pending: {
@@ -107,7 +100,7 @@ export function RescuerList({
                         size="sm"
                         onClick={() => onView?.(registration)}
                       >
-                        <Eye className="h-4 w-4 mr-1" />
+                        <Eye size={16} className="mr-1" />
                         Xem
                       </Button>
                       {registration.status === "pending" && (
@@ -118,7 +111,7 @@ export function RescuerList({
                             onClick={() => onApprove?.(registration)}
                             className="text-emerald-600 dark:text-emerald-400"
                           >
-                            <CheckCircle className="h-4 w-4 mr-1" />
+                            <CheckCircle size={16} className="mr-1" />
                             Phê duyệt
                           </Button>
                           <Button
@@ -127,7 +120,7 @@ export function RescuerList({
                             onClick={() => onReject?.(registration)}
                             className="text-rose-600 dark:text-rose-400"
                           >
-                            <XCircle className="h-4 w-4 mr-1" />
+                            <XCircle size={16} className="mr-1" />
                             Từ chối
                           </Button>
                         </>
@@ -142,4 +135,6 @@ export function RescuerList({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RescuerList;

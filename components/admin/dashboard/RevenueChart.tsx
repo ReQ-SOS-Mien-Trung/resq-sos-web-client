@@ -15,26 +15,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { TrendingUp, ChevronUp } from "lucide-react";
-import type { RevenueChartData } from "@/types/admin-dashboard";
-
-interface RevenueChartProps {
-  data: RevenueChartData;
-}
-
-const timeFrames: Array<"1D" | "1W" | "1M" | "6M" | "1Y" | "ALL"> = [
-  "1D",
-  "1W",
-  "1M",
-  "6M",
-  "1Y",
-  "ALL",
-];
-
-const formatCurrency = (value: number) => {
-  // Format as number for rescue operations
-  return value.toLocaleString("vi-VN");
-};
+import { TrendUp, CaretUp } from "@phosphor-icons/react";
+import { RevenueChartProps } from "@/type";
+import { timeFrames } from "@/lib/constants";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const CustomTooltip = ({
   active,
@@ -59,7 +43,7 @@ const CustomTooltip = ({
           {formatCurrency(data.value)} vụ
         </p>
         <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1">
-          <TrendingUp className="h-3 w-3" />
+          <TrendUp size={12} />
           +2%
         </p>
       </div>
@@ -68,7 +52,7 @@ const CustomTooltip = ({
   return null;
 };
 
-export function RevenueChart({ data }: RevenueChartProps) {
+const RevenueChart = ({ data }: RevenueChartProps) => {
   const [selectedTimeFrame, setSelectedTimeFrame] = useState(data.timeFrame);
   const [hoveredBar, setHoveredBar] = useState<number | null>(null);
 
@@ -81,7 +65,7 @@ export function RevenueChart({ data }: RevenueChartProps) {
               <CardTitle className="text-base font-semibold text-foreground">
                 Thống kê cứu hộ
               </CardTitle>
-              <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+              <CaretUp size={14} className="text-muted-foreground" />
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold tracking-tight text-foreground">
@@ -166,7 +150,11 @@ export function RevenueChart({ data }: RevenueChartProps) {
             <XAxis
               dataKey="month"
               className="text-xs"
-              tick={{ fill: "hsl(var(--foreground) / 0.8)", fontSize: 11, fontWeight: 500 }}
+              tick={{
+                fill: "hsl(var(--foreground) / 0.8)",
+                fontSize: 11,
+                fontWeight: 500,
+              }}
               axisLine={false}
               tickLine={false}
               dy={10}
@@ -191,7 +179,11 @@ export function RevenueChart({ data }: RevenueChartProps) {
             />
             <YAxis
               className="text-xs"
-              tick={{ fill: "hsl(var(--foreground) / 0.8)", fontSize: 11, fontWeight: 500 }}
+              tick={{
+                fill: "hsl(var(--foreground) / 0.8)",
+                fontSize: 11,
+                fontWeight: 500,
+              }}
               tickFormatter={(value) => `${value}`}
               axisLine={false}
               tickLine={false}
@@ -276,4 +268,6 @@ export function RevenueChart({ data }: RevenueChartProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RevenueChart;

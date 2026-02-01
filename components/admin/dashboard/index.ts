@@ -1,9 +1,9 @@
-export { Sidebar } from "./Sidebar";
-export { Header } from "./Header";
-export { DashboardLayout } from "./DashboardLayout";
-export { SummaryCards } from "./SummaryCards";
-export { RevenueChart } from "./RevenueChart";
-export { CalendarWidget } from "./CalendarWidget";
-export { LeadsManagement } from "./LeadsManagement";
-export { TopCountries } from "./TopCountries";
-export { RetentionRate } from "./RetentionRate";
+export { default as Sidebar } from "./Sidebar";
+export { default as Header } from "./Header";
+export { default as DashboardLayout } from "./DashboardLayout";
+export { default as SummaryCards } from "./SummaryCards";
+export { default as RevenueChart } from "./RevenueChart";
+export { default as CalendarWidget } from "./CalendarWidget";
+export { default as LeadsManagement } from "./LeadsManagement";
+export { default as TopCountries } from "./TopCountries";
+export { default as RetentionRate } from "./RetentionRate";

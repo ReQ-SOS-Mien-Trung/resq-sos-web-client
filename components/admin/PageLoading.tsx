@@ -1,18 +1,13 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { PageLoadingProps } from "@/type";
 
-type PageLoadingProps = {
-  title?: string;
-  subtitle?: string;
-  className?: string;
-};
-
-export function PageLoading({
+const PageLoading = ({
   title = "Đang tải dữ liệu",
   subtitle = "Vui lòng chờ trong giây lát…",
   className,
-}: PageLoadingProps) {
+}: PageLoadingProps) => {
   return (
     <div
       className={cn(
@@ -65,5 +60,6 @@ export function PageLoading({
       `}</style>
     </div>
   );
-}
+};
 
+export default PageLoading;

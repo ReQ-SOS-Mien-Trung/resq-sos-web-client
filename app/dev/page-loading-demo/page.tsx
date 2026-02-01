@@ -1,6 +1,6 @@
 "use client";
 
-import { PageLoading } from "@/components/admin/PageLoading";
+import { PageLoading } from "@/components/admin";
 
 export default function PageLoadingDemoPage() {
   return (
@@ -10,4 +10,3 @@ export default function PageLoadingDemoPage() {
     />
   );
 }
-

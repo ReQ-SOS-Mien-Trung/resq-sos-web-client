@@ -1,30 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { User, Lock, Eye, EyeSlash, ArrowRight } from "@phosphor-icons/react";
+import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { useLogin } from "@/services/auth/hooks";
+import { useAuthStore } from "@/stores/auth.store";
 
 const SignIn = () => {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    email: "",
+    username: "",
     password: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { mutate: login, isPending: isLoading } = useLogin();
+  const { setAuth, logout } = useAuthStore();
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.email) {
-      newErrors.email = "Email là bắt buộc";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Email không hợp lệ";
+    if (!formData.username) {
+      newErrors.username = "Tên đăng nhập là bắt buộc";
+    } else if (formData.username.length < 3) {
+      newErrors.username = "Tên đăng nhập phải có ít nhất 3 ký tự";
     }
 
     if (!formData.password) {
@@ -44,16 +48,37 @@ const SignIn = () => {
       return;
     }
 
-    setIsLoading(true);
+    login(formData, {
+      onSuccess: (data) => {
+        // Lưu auth data vào Zustand store
+        setAuth(data);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // TODO: Replace with actual API call
-    console.log("Sign in:", formData);
-
-    setIsLoading(false);
-    router.push("/dashboard");
+        // Redirect dựa trên roleId
+        // 1: Admin, 2: Coordinator, 4: Manager (Inventory)
+        switch (data.roleId) {
+          case 1:
+            router.push("/dashboard/admin");
+            break;
+          case 2:
+            router.push("/dashboard/coordinator");
+            break;
+          case 4:
+            router.push("/dashboard/inventory");
+            break;
+          default:
+            // Role không được phép truy cập (Rescuer, Victim)
+            setErrors({
+              general: "Tài khoản của bạn không có quyền truy cập hệ thống này",
+            });
+            logout();
+            return;
+        }
+      },
+      onError: (error) => {
+        setErrors({ general: "Tên đăng nhập hoặc mật khẩu không đúng" });
+        console.error("Login error:", error);
+      },
+    });
   };
 
   const handleChange = (field: string, value: string) => {
@@ -73,117 +98,129 @@ const SignIn = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Input */}
-            <div className="space-y-2">
-              <label
-                htmlFor="email"
-                className="text-sm font-medium text-foreground font-sans"
-              >
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={formData.email}
-                onChange={(e) => handleChange("email", e.target.value)}
-                leftIcon={<Mail className="h-4 w-4" />}
-                variant={errors.email ? "error" : "default"}
-                className={cn(
-                  "h-11",
-                  errors.email && "border-destructive"
-                )}
-              />
-              {errors.email && (
-                <p className="text-sm text-destructive font-sans animate-in fade-in-0 slide-in-from-top-1 duration-200">
-                  {errors.email}
-                </p>
-              )}
-            </div>
-
-            {/* Password Input */}
-            <div className="space-y-2">
-              <label
-                htmlFor="password"
-                className="text-sm font-medium text-foreground font-sans"
-              >
-                Mật khẩu
-              </label>
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Nhập mật khẩu của bạn"
-                value={formData.password}
-                onChange={(e) => handleChange("password", e.target.value)}
-                leftIcon={<Lock className="h-4 w-4" />}
-                rightIcon={
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="hover:text-foreground transition-colors"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </button>
-                }
-                variant={errors.password ? "error" : "default"}
-                className={cn(
-                  "h-11",
-                  errors.password && "border-destructive"
-                )}
-              />
-              {errors.password && (
-                <p className="text-sm text-destructive font-sans animate-in fade-in-0 slide-in-from-top-1 duration-200">
-                  {errors.password}
-                </p>
-              )}
-            </div>
-
-            {/* Forgot Password Link */}
-            <div className="flex items-center justify-end">
-              <Link
-                href="/forgot-password"
-                className="text-sm text-primary hover:underline font-sans transition-colors"
-              >
-                Quên mật khẩu?
-              </Link>
-            </div>
-
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              className="w-full h-12 text-base font-semibold font-sans transition-all hover:scale-[1.02] active:scale-[0.98]"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  Đang đăng nhập...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  Đăng nhập
-                  <ArrowRight className="h-4 w-4" />
-                </span>
-              )}
-            </Button>
-          </form>
-
-          {/* Sign Up Link */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground font-sans">
-              Chưa có tài khoản?{" "}
-              <Link
-                href="/sign-up"
-                className="text-primary font-semibold hover:underline transition-colors"
-              >
-                Đăng ký ngay
-              </Link>
+        {/* General Error */}
+        {errors.general && (
+          <div className="p-3 rounded-md bg-destructive/10 border border-destructive">
+            <p className="text-sm text-destructive font-sans">
+              {errors.general}
             </p>
           </div>
+        )}
+
+        {/* Username Input */}
+        <div className="space-y-2">
+          <label
+            htmlFor="username"
+            className="text-sm font-medium text-foreground font-sans"
+          >
+            Tên đăng nhập
+          </label>
+          <Input
+            id="username"
+            type="text"
+            placeholder="Nhập tên đăng nhập"
+            value={formData.username}
+            onChange={(e) => handleChange("username", e.target.value)}
+            leftIcon={<User size={16} />}
+            variant={errors.username ? "error" : "default"}
+            className={cn("h-11", errors.username && "border-destructive")}
+          />
+          {errors.username && (
+            <p className="text-sm text-destructive font-sans animate-in fade-in-0 slide-in-from-top-1 duration-200">
+              {errors.username}
+            </p>
+          )}
+        </div>
+
+        {/* Password Input */}
+        <div className="space-y-2">
+          <label
+            htmlFor="password"
+            className="text-sm font-medium text-foreground font-sans"
+          >
+            Mật khẩu
+          </label>
+          <Input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            placeholder="Nhập mật khẩu của bạn"
+            value={formData.password}
+            onChange={(e) => handleChange("password", e.target.value)}
+            leftIcon={<Lock size={16} />}
+            rightIcon={
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="hover:text-foreground transition-colors"
+              >
+                {showPassword ? <EyeSlash size={16} /> : <Eye size={16} />}
+              </button>
+            }
+            variant={errors.password ? "error" : "default"}
+            className={cn("h-11", errors.password && "border-destructive")}
+          />
+          {errors.password && (
+            <p className="text-sm text-destructive font-sans animate-in fade-in-0 slide-in-from-top-1 duration-200">
+              {errors.password}
+            </p>
+          )}
+        </div>
+
+        {/* Forgot Password Link */}
+        <div className="flex items-center justify-end">
+          <Link
+            href="/forgot-password"
+            className="text-sm text-primary hover:underline font-sans transition-colors"
+          >
+            Quên mật khẩu?
+          </Link>
+        </div>
+
+        {/* Submit Button */}
+        <Button
+          type="submit"
+          className="w-full h-12 text-base font-semibold font-sans transition-all hover:scale-[1.02] active:scale-[0.98]"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+              Đang đăng nhập...
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              Đăng nhập
+              <ArrowRight size={16} />
+            </span>
+          )}
+        </Button>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground font-sans">
+              Hoặc tiếp tục với
+            </span>
+          </div>
+        </div>
+
+        {/* Google Login Button */}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full h-12 text-base font-medium font-sans transition-all hover:scale-[1.02] active:scale-[0.98] gap-3"
+          onClick={() => {
+            // TODO: Implement Google OAuth
+            console.log("Google login");
+          }}
+        >
+          <Image src="/icons/google.svg" alt="Google" width={20} height={20} />
+          Đăng nhập với Google
+        </Button>
+      </form>
     </div>
   );
 };

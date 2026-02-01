@@ -1,6 +1,5 @@
 "use client";
 
-import { InventoryItem, ItemCategory } from "@/types/inventory";
 import {
   Sheet,
   SheetContent,
@@ -17,39 +16,16 @@ import {
   Package,
   MapPin,
   Calendar,
-  AlertTriangle,
-  TrendingUp,
-  TrendingDown,
-  Edit,
-  ArrowUpFromLine,
-  ArrowDownToLine,
-  History,
-  Stethoscope,
-  UtensilsCrossed,
-  Droplets,
-  Wrench,
-  Tent,
-  Shirt,
-} from "lucide-react";
-
-// Category icon mapping
-const categoryIcons: Record<ItemCategory, React.ReactNode> = {
-  MEDICAL: <Stethoscope className="h-5 w-5" />,
-  FOOD: <UtensilsCrossed className="h-5 w-5" />,
-  WATER: <Droplets className="h-5 w-5" />,
-  EQUIPMENT: <Wrench className="h-5 w-5" />,
-  SHELTER: <Tent className="h-5 w-5" />,
-  CLOTHING: <Shirt className="h-5 w-5" />,
-};
-
-const categoryNames: Record<ItemCategory, string> = {
-  MEDICAL: "Y Tế",
-  FOOD: "Thực Phẩm",
-  WATER: "Nước Uống",
-  EQUIPMENT: "Thiết Bị",
-  SHELTER: "Lều Trại",
-  CLOTHING: "Quần Áo",
-};
+  Warning,
+  TrendUp,
+  TrendDown,
+  PencilSimple,
+  ArrowLineUp,
+  ArrowLineDown,
+  ClockCounterClockwise,
+} from "@phosphor-icons/react";
+import { ItemDetailsSheetProps } from "@/type";
+import { categoryIcons, categoryNames } from "@/lib/constants";
 
 const stockLevelNames: Record<string, string> = {
   CRITICAL: "Cực Kỳ Thiếu",
@@ -58,23 +34,14 @@ const stockLevelNames: Record<string, string> = {
   OVERSTOCKED: "Dư Thừa",
 };
 
-interface ItemDetailsSheetProps {
-  item: InventoryItem | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onRequestInbound?: () => void;
-  onRequestOutbound?: () => void;
-  onEdit?: () => void;
-}
-
-export default function ItemDetailsSheet({
+const ItemDetailsSheet = ({
   item,
   open,
   onOpenChange,
   onRequestInbound,
   onRequestOutbound,
   onEdit,
-}: ItemDetailsSheetProps) {
+}: ItemDetailsSheetProps) => {
   if (!item) return null;
 
   const stockPercentage = Math.min((item.quantity / item.maxStock) * 100, 100);
@@ -164,7 +131,7 @@ export default function ItemDetailsSheet({
 
               {needsRestock && (
                 <div className="flex items-center gap-2 text-red-500 bg-red-500/10 rounded-md p-2 mt-2">
-                  <AlertTriangle className="h-4 w-4" />
+                  <Warning className="h-4 w-4" weight="fill" />
                   <span className="text-sm font-medium">
                     Cần bổ sung thêm {restockAmount} {item.unit}
                   </span>
@@ -193,13 +160,14 @@ export default function ItemDetailsSheet({
               </div>
               {item.expiryDate && (
                 <div className="flex items-center gap-3 text-sm">
-                  <AlertTriangle
+                  <Warning
                     className={cn(
                       "h-4 w-4",
                       new Date(item.expiryDate) < new Date()
                         ? "text-red-500"
                         : "text-muted-foreground",
                     )}
+                    weight="fill"
                   />
                   <span className="text-muted-foreground">Hạn sử dụng:</span>
                   <span
@@ -222,12 +190,12 @@ export default function ItemDetailsSheet({
             <h3 className="text-sm font-semibold">Chỉ Số Tồn Kho</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <TrendingDown className="h-5 w-5 mx-auto text-orange-500 mb-1" />
+                <TrendDown className="h-5 w-5 mx-auto text-orange-500 mb-1" />
                 <p className="text-lg font-bold">{item.minStock}</p>
                 <p className="text-xs text-muted-foreground">Tồn tối thiểu</p>
               </div>
               <div className="bg-muted/50 rounded-lg p-3 text-center">
-                <TrendingUp className="h-5 w-5 mx-auto text-blue-500 mb-1" />
+                <TrendUp className="h-5 w-5 mx-auto text-blue-500 mb-1" />
                 <p className="text-lg font-bold">{item.maxStock}</p>
                 <p className="text-xs text-muted-foreground">Tồn tối đa</p>
               </div>
@@ -245,7 +213,7 @@ export default function ItemDetailsSheet({
                 className="w-full"
                 onClick={onRequestInbound}
               >
-                <ArrowDownToLine className="h-4 w-4 mr-2" />
+                <ArrowLineDown className="h-4 w-4 mr-2" />
                 Nhập kho
               </Button>
               <Button
@@ -253,17 +221,17 @@ export default function ItemDetailsSheet({
                 className="w-full"
                 onClick={onRequestOutbound}
               >
-                <ArrowUpFromLine className="h-4 w-4 mr-2" />
+                <ArrowLineUp className="h-4 w-4 mr-2" />
                 Xuất kho
               </Button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" className="w-full" onClick={onEdit}>
-                <Edit className="h-4 w-4 mr-2" />
+                <PencilSimple className="h-4 w-4 mr-2" />
                 Chỉnh sửa
               </Button>
               <Button variant="outline" className="w-full">
-                <History className="h-4 w-4 mr-2" />
+                <ClockCounterClockwise className="h-4 w-4 mr-2" />
                 Lịch sử
               </Button>
             </div>
@@ -272,4 +240,6 @@ export default function ItemDetailsSheet({
       </SheetContent>
     </Sheet>
   );
-}
+};
+
+export default ItemDetailsSheet;

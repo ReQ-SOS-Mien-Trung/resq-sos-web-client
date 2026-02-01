@@ -9,24 +9,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, X } from "lucide-react";
-import type { UserFilters as UserFiltersType } from "@/types/admin-pages";
+import { MagnifyingGlass, X } from "@phosphor-icons/react";
+import { UserFiltersProps, UserFilters as UserFiltersType } from "@/type";
 
-interface UserFiltersProps {
-  filters: UserFiltersType;
-  onFiltersChange: (filters: UserFiltersType) => void;
-}
-
-export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
+const UserFilters = ({ filters, onFiltersChange }: UserFiltersProps) => {
   const handleReset = () => {
     onFiltersChange({});
   };
 
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border border-border/50">
-      <div className="flex-1 min-w-[200px]">
+      <div className="flex-1 min-w-50">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <MagnifyingGlass
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             placeholder="Tìm kiếm theo tên, email..."
             value={filters.search || ""}
@@ -43,11 +41,12 @@ export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
         onValueChange={(value) =>
           onFiltersChange({
             ...filters,
-            role: value === "all" ? undefined : (value as UserFiltersType["role"]),
+            role:
+              value === "all" ? undefined : (value as UserFiltersType["role"]),
           })
         }
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-45">
           <SelectValue placeholder="Vai trò" />
         </SelectTrigger>
         <SelectContent>
@@ -64,11 +63,14 @@ export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
         onValueChange={(value) =>
           onFiltersChange({
             ...filters,
-            status: value === "all" ? undefined : (value as UserFiltersType["status"]),
+            status:
+              value === "all"
+                ? undefined
+                : (value as UserFiltersType["status"]),
           })
         }
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-45">
           <SelectValue placeholder="Trạng thái" />
         </SelectTrigger>
         <SelectContent>
@@ -89,7 +91,7 @@ export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
           })
         }
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-45">
           <SelectValue placeholder="Khu vực" />
         </SelectTrigger>
         <SelectContent>
@@ -104,10 +106,12 @@ export function UserFilters({ filters, onFiltersChange }: UserFiltersProps) {
 
       {(filters.role || filters.status || filters.region || filters.search) && (
         <Button variant="outline" size="sm" onClick={handleReset}>
-          <X className="h-4 w-4 mr-1" />
+          <X size={16} className="mr-1" />
           Xóa bộ lọc
         </Button>
       )}
     </div>
   );
-}
+};
+
+export default UserFilters;

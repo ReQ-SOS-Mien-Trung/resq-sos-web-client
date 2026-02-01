@@ -3,18 +3,36 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
-import { DashboardLayout } from "@/components/admin/dashboard";
-import { FloodAlerts, WeatherChart } from "@/components/admin/weather-flood";
-import type { FloodAlert, WeatherData } from "@/types/admin-pages";
 import { mockFloodAlerts } from "@/lib/mock-data/admin-weather-flood";
-import { PageLoading } from "@/components/admin/PageLoading";
+import { PageLoading } from "@/components/admin";
+import { FloodAlert, WeatherData } from "@/type";
+import { DashboardLayout } from "@/components/admin/dashboard";
 
 const WeatherMap = dynamic(
-  () => import("@/components/admin/weather-flood").then((mod) => ({ default: mod.WeatherMap })),
-  { ssr: false }
+  () =>
+    import("@/components/admin/weather-flood").then((mod) => ({
+      default: mod.WeatherMap,
+    })),
+  { ssr: false },
 );
 
-export default function WeatherFloodPage() {
+const FloodAlerts = dynamic(
+  () =>
+    import("@/components/admin/weather-flood").then((mod) => ({
+      default: mod.FloodAlerts,
+    })),
+  { ssr: false },
+);
+
+const WeatherChart = dynamic(
+  () =>
+    import("@/components/admin/weather-flood").then((mod) => ({
+      default: mod.WeatherChart,
+    })),
+  { ssr: false },
+);
+
+const WeatherFloodPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [floodAlerts] = useState<FloodAlert[]>(mockFloodAlerts);
   const [weatherData, setWeatherData] = useState<WeatherData[]>([]);
@@ -47,14 +65,19 @@ export default function WeatherFloodPage() {
           const locations = (json?.locations as WeatherLocation[]) || [];
 
           const isOk = (loc: WeatherLocation): loc is WeatherLocationOk =>
-            !!loc && !("error" in loc) && typeof (loc as WeatherLocationOk).condition_text === "string";
+            !!loc &&
+            !("error" in loc) &&
+            typeof (loc as WeatherLocationOk).condition_text === "string";
 
           const mappedWeather: WeatherData[] = locations
             .filter(isOk)
             .map((loc) => {
               const conditionText = loc.condition_text.toLowerCase();
               let condition: WeatherData["condition"] = "sunny";
-              if (conditionText.includes("rain") || conditionText.includes("mưa")) {
+              if (
+                conditionText.includes("rain") ||
+                conditionText.includes("mưa")
+              ) {
                 condition = "rainy";
               } else if (
                 conditionText.includes("storm") ||
@@ -81,7 +104,10 @@ export default function WeatherFloodPage() {
 
           setWeatherData(mappedWeather);
         } else {
-          console.error("Failed to fetch weather current:", await weatherRes.text());
+          console.error(
+            "Failed to fetch weather current:",
+            await weatherRes.text(),
+          );
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -123,4 +149,6 @@ export default function WeatherFloodPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default WeatherFloodPage;

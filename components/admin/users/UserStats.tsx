@@ -1,14 +1,10 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import type { UserStats as UserStatsType } from "@/types/admin-pages";
-import { Users, UserCheck, UserX, Clock } from "lucide-react";
+import { UserStatsProps } from "@/type";
+import { Users, UserCheck, UserMinus, Clock } from "@phosphor-icons/react";
 
-interface UserStatsProps {
-  stats: UserStatsType;
-}
-
-export function UserStats({ stats }: UserStatsProps) {
+const UserStats = ({ stats }: UserStatsProps) => {
   const statItems = [
     {
       label: "Tổng người dùng",
@@ -34,7 +30,7 @@ export function UserStats({ stats }: UserStatsProps) {
     {
       label: "Bị cấm",
       value: stats.banned,
-      icon: UserX,
+      icon: UserMinus,
       color: "text-rose-600 dark:text-rose-400",
       bgColor: "bg-rose-50 dark:bg-rose-950/30",
     },
@@ -59,7 +55,7 @@ export function UserStats({ stats }: UserStatsProps) {
                 <div
                   className={`h-12 w-12 rounded-lg ${item.bgColor} flex items-center justify-center`}
                 >
-                  <Icon className={`h-6 w-6 ${item.color}`} />
+                  <Icon size={24} className={item.color} />
                 </div>
               </div>
             </CardContent>
@@ -68,4 +64,6 @@ export function UserStats({ stats }: UserStatsProps) {
       })}
     </div>
   );
-}
+};
+
+export default UserStats;

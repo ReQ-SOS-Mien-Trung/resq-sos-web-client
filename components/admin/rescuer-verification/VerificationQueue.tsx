@@ -3,22 +3,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Eye, Clock } from "lucide-react";
-import type { RescuerVerification } from "@/types/admin-pages";
+import { CheckCircle, XCircle, Eye, Clock } from "@phosphor-icons/react";
+import { RescuerVerification, VerificationQueueProps } from "@/type";
 
-interface VerificationQueueProps {
-  verifications: RescuerVerification[];
-  onView?: (verification: RescuerVerification) => void;
-  onApprove?: (verification: RescuerVerification) => void;
-  onReject?: (verification: RescuerVerification) => void;
-}
-
-export function VerificationQueue({
+const VerificationQueue = ({
   verifications,
   onView,
   onApprove,
   onReject,
-}: VerificationQueueProps) {
+}: VerificationQueueProps) => {
   const getStatusBadge = (status: RescuerVerification["status"]) => {
     const variants = {
       pending: {
@@ -46,7 +39,7 @@ export function VerificationQueue({
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-amber-500" />
+            <Clock size={20} className="text-amber-500" />
             Hàng đợi xác nhận
           </div>
           {pendingCount > 0 && (
@@ -111,7 +104,7 @@ export function VerificationQueue({
                         size="sm"
                         onClick={() => onView?.(verification)}
                       >
-                        <Eye className="h-4 w-4 mr-1" />
+                        <Eye size={16} className="mr-1" />
                         Xem chi tiết
                       </Button>
                       {verification.status === "pending" && (
@@ -122,7 +115,7 @@ export function VerificationQueue({
                             onClick={() => onApprove?.(verification)}
                             className="text-emerald-600 dark:text-emerald-400"
                           >
-                            <CheckCircle className="h-4 w-4 mr-1" />
+                            <CheckCircle size={16} className="mr-1" />
                             Phê duyệt
                           </Button>
                           <Button
@@ -131,7 +124,7 @@ export function VerificationQueue({
                             onClick={() => onReject?.(verification)}
                             className="text-rose-600 dark:text-rose-400"
                           >
-                            <XCircle className="h-4 w-4 mr-1" />
+                            <XCircle size={16} className="mr-1" />
                             Từ chối
                           </Button>
                         </>
@@ -146,4 +139,6 @@ export function VerificationQueue({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default VerificationQueue;

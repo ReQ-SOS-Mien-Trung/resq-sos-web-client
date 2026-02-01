@@ -1,27 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Sidebar } from "./Sidebar";
-import { Header } from "./Header";
-import type {
-  FavoriteItem,
-  Project,
-  CloudStorage,
-} from "@/types/admin-dashboard";
+import Header from "./Header";
+import Sidebar from "./Sidebar";
+import { DashboardLayoutProps } from "@/type";
 
-interface DashboardLayoutProps {
-  children: React.ReactNode;
-  favorites: FavoriteItem[];
-  projects: Project[];
-  cloudStorage: CloudStorage;
-}
-
-export function DashboardLayout({
+const DashboardLayout = ({
   children,
   favorites,
   projects,
   cloudStorage,
-}: DashboardLayoutProps) {
+}: DashboardLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
@@ -37,7 +26,7 @@ export function DashboardLayout({
           cloudStorage={cloudStorage}
           isOpen={sidebarOpen}
         />
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-muted/30 via-background to-muted/20 p-6 relative">
+        <main className="flex-1 overflow-y-auto bg-linear-to-br from-muted/30 via-background to-muted/20 p-6 relative">
           {/* Subtle background pattern */}
           <div className="absolute inset-0 bg-grid-pattern opacity-[0.02] pointer-events-none" />
           <div className="relative z-10">{children}</div>
@@ -45,4 +34,6 @@ export function DashboardLayout({
       </div>
     </div>
   );
-}
+};
+
+export default DashboardLayout;

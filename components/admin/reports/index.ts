@@ -1,3 +1,3 @@
-export { ReportStats } from "./ReportStats";
-export { ReportFilters } from "./ReportFilters";
-export { ReportTable } from "./ReportTable";
+export { default as ReportStats } from "./ReportStats";
+export { default as ReportFilters } from "./ReportFilters";
+export { default as ReportTable } from "./ReportTable";

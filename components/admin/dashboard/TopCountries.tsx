@@ -1,46 +1,31 @@
-"use client";
-
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ArrowRight, MoreVertical } from "lucide-react";
-import type { TopCountriesData } from "@/types/admin-dashboard";
+import { ArrowRight, DotsThreeVertical } from "@phosphor-icons/react";
+import { CountryData, TopCountriesProps } from "@/type";
+import { countryFlags } from "@/lib/constants";
+import { useState } from "react";
 
-interface TopCountriesProps {
-  data: TopCountriesData;
-}
-
-const countryFlags: Record<string, string> = {
-  "Đà Nẵng": "🇲",
-  "Quảng Nam": "🇲",
-  "Thừa Thiên Huế": "🇲",
-  "Quảng Ngãi": "🇲",
-  "Quảng Bình": "🇲",
-  "Quảng Trị": "🇲",
-};
+// Pre-generated random positions for dots to avoid impure function calls during render
+const DOT_POSITIONS = Array.from({ length: 20 }, (_, i) => ({
+  left: `${(i * 17 + 5) % 100}%`,
+  top: `${(i * 23 + 10) % 100}%`,
+  animationDelay: `${(i * 0.15) % 2}s`,
+  animationDuration: `${2 + ((i * 0.2) % 2)}s`,
+}));
 
 // Animated map component for Central Vietnam
-const AnimatedMap = ({
-  countries,
-}: {
-  countries: typeof TopCountriesData.prototype.countries;
-}) => {
+export const AnimatedMap = ({ countries }: { countries: CountryData[] }) => {
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
 
   return (
-    <div className="w-full h-44 bg-gradient-to-br from-red-50 to-orange-100 dark:from-red-950/30 dark:to-orange-900/20 rounded-xl flex items-center justify-center relative overflow-hidden group">
+    <div className="w-full h-44 bg-linear-to-br from-red-50 to-orange-100 dark:from-red-950/30 dark:to-orange-900/20 rounded-xl flex items-center justify-center relative overflow-hidden group">
       {/* Animated background dots */}
       <div className="absolute inset-0 opacity-30">
-        {[...Array(20)].map((_, i) => (
+        {DOT_POSITIONS.map((pos, i) => (
           <div
             key={i}
             className="absolute w-1 h-1 bg-red-400 rounded-full animate-pulse"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 2}s`,
-              animationDuration: `${2 + Math.random() * 2}s`,
-            }}
+            style={pos}
           />
         ))}
       </div>
@@ -170,7 +155,7 @@ const AnimatedMap = ({
   );
 };
 
-export function TopCountries({ data }: TopCountriesProps) {
+const TopCountries = ({ data }: TopCountriesProps) => {
   const sortedCountries = [...data.countries].sort(
     (a, b) => b.percentage - a.percentage,
   );
@@ -182,7 +167,10 @@ export function TopCountries({ data }: TopCountriesProps) {
           <CardTitle className="text-base font-semibold">
             Khu vực cứu hộ
           </CardTitle>
-          <MoreVertical className="h-4 w-4 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors" />
+          <DotsThreeVertical
+            size={16}
+            className="text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors"
+          />
         </div>
       </CardHeader>
       <CardContent>
@@ -220,7 +208,7 @@ export function TopCountries({ data }: TopCountriesProps) {
                       style={{ width: `${country.percentage}%` }}
                     />
                   </div>
-                  <span className="text-sm font-semibold text-muted-foreground min-w-[40px] text-right">
+                  <span className="text-sm font-semibold text-muted-foreground min-w-10 text-right">
                     {country.percentage}%
                   </span>
                 </div>
@@ -229,10 +217,15 @@ export function TopCountries({ data }: TopCountriesProps) {
           </div>
           <button className="w-full text-sm text-primary hover:text-primary/80 font-medium flex items-center justify-center gap-1.5 mt-2 py-2 rounded-lg hover:bg-primary/5 transition-all duration-200 group">
             Xem thêm
-            <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight
+              size={16}
+              className="group-hover:translate-x-1 transition-transform"
+            />
           </button>
         </div>
       </CardContent>
     </Card>
   );
-}
+};
+
+export default TopCountries;

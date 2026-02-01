@@ -3,26 +3,32 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, MessageSquare } from "lucide-react";
-import type { MessageTemplate } from "@/types/admin-pages";
+import { PencilSimple, Trash, ChatCircle } from "@phosphor-icons/react";
+import { MessageTemplate, MessageTemplatesProps } from "@/type";
 
-interface MessageTemplatesProps {
-  templates: MessageTemplate[];
-  onEdit?: (template: MessageTemplate) => void;
-  onDelete?: (template: MessageTemplate) => void;
-}
-
-export function MessageTemplates({
+const MessageTemplates = ({
   templates,
   onEdit,
   onDelete,
-}: MessageTemplatesProps) {
+}: MessageTemplatesProps) => {
   const getCategoryBadge = (category: MessageTemplate["category"]) => {
     const variants = {
-      greeting: { label: "Chào hỏi", className: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
-      response: { label: "Phản hồi", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
-      escalation: { label: "Chuyển tiếp", className: "bg-orange-500/10 text-orange-700 dark:text-orange-400" },
-      closing: { label: "Kết thúc", className: "bg-gray-500/10 text-gray-700 dark:text-gray-400" },
+      greeting: {
+        label: "Chào hỏi",
+        className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+      },
+      response: {
+        label: "Phản hồi",
+        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      },
+      escalation: {
+        label: "Chuyển tiếp",
+        className: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+      },
+      closing: {
+        label: "Kết thúc",
+        className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+      },
     };
     return variants[category];
   };
@@ -31,7 +37,7 @@ export function MessageTemplates({
     <Card className="border border-border/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <MessageSquare className="h-5 w-5" />
+          <ChatCircle size={20} />
           Templates tin nhắn
         </CardTitle>
       </CardHeader>
@@ -76,7 +82,7 @@ export function MessageTemplates({
                       size="sm"
                       onClick={() => onEdit?.(template)}
                     >
-                      <Edit className="h-4 w-4" />
+                      <PencilSimple size={16} />
                     </Button>
                     <Button
                       variant="outline"
@@ -84,7 +90,7 @@ export function MessageTemplates({
                       onClick={() => onDelete?.(template)}
                       className="text-destructive"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash size={16} />
                     </Button>
                   </div>
                 </div>
@@ -95,4 +101,6 @@ export function MessageTemplates({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default MessageTemplates;

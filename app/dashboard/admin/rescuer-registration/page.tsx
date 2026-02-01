@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockRescuerRegistrations } from "@/lib/mock-data/admin-rescuer-registration";
+import { Button } from "@/components/ui/button";
+import { Plus } from "@phosphor-icons/react";
+import { PageLoading } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
   RegistrationForm,
   RescuerList,
 } from "@/components/admin/rescuer-registration";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { PageLoading } from "@/components/admin/PageLoading";
 
-export default function RescuerRegistrationPage() {
+const RescuerRegistrationPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -32,7 +32,12 @@ export default function RescuerRegistrationPage() {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading title="Đang tải đăng ký" subtitle="Đang lấy danh sách cứu hộ viên…" />;
+    return (
+      <PageLoading
+        title="Đang tải đăng ký"
+        subtitle="Đang lấy danh sách cứu hộ viên…"
+      />
+    );
   }
 
   return (
@@ -52,7 +57,7 @@ export default function RescuerRegistrationPage() {
             </p>
           </div>
           <Button onClick={() => setShowForm(!showForm)}>
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus size={16} className="mr-2" />
             {showForm ? "Ẩn form" : "Tạo đăng ký mới"}
           </Button>
         </div>
@@ -75,4 +80,6 @@ export default function RescuerRegistrationPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default RescuerRegistrationPage;

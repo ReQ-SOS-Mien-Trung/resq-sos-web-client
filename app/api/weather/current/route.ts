@@ -1,37 +1,6 @@
+import { CENTRAL_VN_LOCATIONS } from "@/lib/locations";
+import { WeatherApiCurrentResponse } from "@/type";
 import { NextResponse } from "next/server";
-
-type WeatherApiCurrentResponse = {
-  location: {
-    name: string;
-    region: string;
-    country: string;
-    lat: number;
-    lon: number;
-    localtime: string;
-  };
-  current: {
-    last_updated: string;
-    temp_c: number;
-    humidity: number;
-    wind_degree: number;
-    wind_dir: string;
-    wind_kph: number;
-    precip_mm: number;
-    condition: {
-      text: string;
-      icon: string;
-    };
-  };
-};
-
-const CENTRAL_VN_LOCATIONS: Array<{ name: string; q: string }> = [
-  // Using coordinates avoids ambiguity in city/province names.
-  { name: "Thừa Thiên Huế", q: "16.4637,107.5909" },
-  { name: "Đà Nẵng", q: "16.0544,108.2022" },
-  { name: "Quảng Nam", q: "15.5394,108.0191" },
-  { name: "Quảng Ngãi", q: "15.1214,108.8044" },
-  { name: "Bình Định", q: "13.7765,109.2237" },
-];
 
 export async function GET() {
   // Configure locally in `.env.local`:
@@ -106,4 +75,3 @@ export async function GET() {
     },
   );
 }
-

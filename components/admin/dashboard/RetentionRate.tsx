@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, MoreVertical } from "lucide-react";
+import { TrendUp, DotsThreeVertical } from "@phosphor-icons/react";
 import {
   BarChart,
   Bar,
@@ -12,18 +12,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { RetentionRateData } from "@/types/admin-dashboard";
-
-interface RetentionRateProps {
-  data: RetentionRateData;
-}
-
-// Get color mapping helper
-const getSegmentColor = (name: string) => {
-  if (name === "Lũ lụt") return "#ef4444"; // Red
-  if (name === "Sạt lở") return "#f97316"; // Orange
-  if (name === "Bão") return "#eab308"; // Yellow
-  return "#ef4444";
-};
+import { RetentionRateProps } from "@/type";
+import { getSegmentColor } from "@/lib/constants";
 
 // CustomTooltip component outside render
 const CustomTooltip = ({
@@ -73,7 +63,7 @@ const CustomTooltip = ({
   return null;
 };
 
-export function RetentionRate({ data }: RetentionRateProps) {
+const RetentionRate = ({ data }: RetentionRateProps) => {
   const chartData = data.monthlyData.map((item) => ({
     month: item.month,
     ...item.segments,
@@ -96,14 +86,17 @@ export function RetentionRate({ data }: RetentionRateProps) {
               <CardTitle className="text-base font-semibold">
                 Hiệu suất cứu hộ
               </CardTitle>
-              <MoreVertical className="h-4 w-4 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors" />
+              <DotsThreeVertical
+                size={16}
+                className="text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors"
+              />
             </div>
             <div className="flex items-baseline gap-2 mt-2">
               <span className="text-3xl font-bold tracking-tight">
                 {data.currentRate}%
               </span>
               <div className="flex items-center gap-1 text-xs text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full">
-                <TrendingUp className="h-3 w-3" />
+                <TrendUp size={12} />
                 <span>+{data.change}% so với tháng trước</span>
               </div>
             </div>
@@ -182,4 +175,6 @@ export function RetentionRate({ data }: RetentionRateProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RetentionRate;

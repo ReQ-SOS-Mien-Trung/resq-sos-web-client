@@ -117,8 +117,8 @@ const TestimonialsSection = () => {
                 onMouseEnter={() => handleHover(testimonial.id, true)}
                 onMouseLeave={() => handleHover(testimonial.id, false)}
                 className={`
-                  relative rounded-2xl border overflow-hidden cursor-pointer min-h-[380px]
-                  ${isActive ? "flex-[2.5] border-white/20 bg-[#18181b]" : "flex-[0] w-[80px] min-w-[80px] border-white/10 bg-[#141417]"}
+                  relative rounded-2xl border overflow-hidden cursor-pointer min-h-96
+                  ${isActive ? "flex-[2.5] border-white/20 bg-[#18181b]" : "flex w-20 min-w-20 border-white/10 bg-[#141417]"}
                 `}
                 style={{
                   willChange: "flex, min-width, background-color, border-color",

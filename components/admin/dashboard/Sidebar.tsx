@@ -4,79 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import {
-  LayoutDashboard,
-  Users,
-  CloudSun,
-  Droplets,
-  FileBarChart,
-  UserCheck,
-  Bot,
-  MessageSquare,
-  UserPlus,
-  ChevronDown,
-  ChevronRight,
+  CaretDown,
+  CaretRight,
   Plus,
-  MoreVertical,
-  Settings,
-  HelpCircle,
-  ChevronRight as ChevronRightIcon,
-  Shield,
-  AlertTriangle,
-  Activity,
-  Cloud,
-  Zap,
-} from "lucide-react";
-import type {
-  FavoriteItem,
-  Project,
-  CloudStorage,
-} from "@/types/admin-dashboard";
+  DotsThreeVertical,
+  Gear,
+  Question,
+} from "@phosphor-icons/react";
+import { SidebarProps } from "@/type";
+import { getFavoriteIcon, navigationItems } from "@/lib/constants";
 
-interface SidebarProps {
-  favorites: FavoriteItem[];
-  projects: Project[];
-  cloudStorage: CloudStorage;
-  isOpen?: boolean;
-}
-
-const navigationItems = [
-  {
-    icon: LayoutDashboard,
-    label: "Tổng quan",
-    href: "/dashboard/admin",
-  },
-  { icon: Users, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
-  { icon: CloudSun, label: "Bài đăng thời tiết", href: "/dashboard/admin/weather-posts" },
-  { icon: Droplets, label: "Thời tiết & Lũ lụt", href: "/dashboard/admin/weather-flood" },
-  { icon: FileBarChart, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
-  { icon: UserCheck, label: "Đăng ký cứu hộ viên", href: "/dashboard/admin/rescuer-registration" },
-  { icon: Bot, label: "Cấu hình AI Prompt", href: "/dashboard/admin/ai-prompt" },
-  { icon: MessageSquare, label: "Cấu hình phòng chat", href: "/dashboard/admin/chat-config" },
-  { icon: UserPlus, label: "Xác nhận cứu hộ viên", href: "/dashboard/admin/rescuer-verification" },
-];
-
-const getFavoriteIcon = (name: string) => {
-  switch (name) {
-    case "Cứu hộ viên":
-      return Shield;
-    case "Cảnh báo":
-      return AlertTriangle;
-    case "Hoạt động":
-      return Activity;
-    default:
-      return Shield;
-  }
-};
-
-export function Sidebar({
-  favorites,
-  projects,
-  cloudStorage,
-  isOpen = true,
-}: SidebarProps) {
+const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
   const pathname = usePathname();
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
@@ -93,7 +32,7 @@ export function Sidebar({
           {/* Logo & Brand Section */}
           <div className="p-4 border-b border-sidebar-border">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-red-500/30">
+              <div className="h-9 w-9 rounded-xl bg-linear-to-br from-red-500 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-red-500/30">
                 <span className="text-lg font-bold">R</span>
               </div>
               <div className="flex-1 min-w-0">
@@ -104,14 +43,17 @@ export function Sidebar({
                   Hệ thống cứu hộ miền Trung
                 </div>
               </div>
-              <ChevronDown className="h-4 w-4 text-sidebar-foreground/40 hover:text-sidebar-foreground transition-colors cursor-pointer" />
+              <CaretDown
+                size={16}
+                className="text-sidebar-foreground/40 hover:text-sidebar-foreground transition-colors cursor-pointer"
+              />
             </div>
           </div>
 
           {/* User Profile Section */}
           <div className="px-4 py-3">
             <div className="flex items-center gap-3 p-2 rounded-xl bg-sidebar-accent/50 hover:bg-sidebar-accent transition-colors cursor-pointer group">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-red-400 to-orange-500 flex items-center justify-center text-white text-sm font-semibold ring-2 ring-background">
+              <div className="h-8 w-8 rounded-full bg-linear-to-br from-red-400 to-orange-500 flex items-center justify-center text-white text-sm font-semibold ring-2 ring-background">
                 A
               </div>
               <div className="flex-1 min-w-0">
@@ -119,7 +61,10 @@ export function Sidebar({
                   admin@sosresq.vn
                 </div>
               </div>
-              <ChevronDown className="h-4 w-4 text-sidebar-foreground/40 group-hover:text-sidebar-foreground transition-colors" />
+              <CaretDown
+                size={16}
+                className="text-sidebar-foreground/40 group-hover:text-sidebar-foreground transition-colors"
+              />
             </div>
           </div>
 
@@ -127,7 +72,10 @@ export function Sidebar({
           <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
             {navigationItems.map((item, index) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || (item.href !== "/dashboard/admin" && pathname?.startsWith(item.href));
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/dashboard/admin" &&
+                  pathname?.startsWith(item.href));
               return (
                 <Link
                   key={item.label}
@@ -135,20 +83,21 @@ export function Sidebar({
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                     isActive
-                      ? "bg-gradient-to-r from-red-500/10 to-orange-500/10 text-red-600 dark:text-red-400 shadow-sm border border-red-500/10"
+                      ? "bg-linear-to-r from-red-500/10 to-orange-500/10 text-red-600 dark:text-red-400 shadow-sm border border-red-500/10"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1",
                   )}
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <Icon
+                    size={20}
                     className={cn(
-                      "h-5 w-5 transition-colors flex-shrink-0",
+                      "transition-colors shrink-0",
                       isActive && "text-red-500",
                     )}
                   />
                   <span className="truncate">{item.label}</span>
                   {isActive && (
-                    <div className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                    <div className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
                   )}
                 </Link>
               );
@@ -162,11 +111,15 @@ export function Sidebar({
               >
                 <span>Thống kê nhanh</span>
                 <div className="flex items-center gap-1.5">
-                  <Plus className="h-3.5 w-3.5 hover:text-red-500 transition-colors" />
-                  <MoreVertical className="h-3.5 w-3.5" />
-                  <ChevronDown
+                  <Plus
+                    size={14}
+                    className="hover:text-red-500 transition-colors"
+                  />
+                  <DotsThreeVertical size={14} />
+                  <CaretDown
+                    size={14}
                     className={cn(
-                      "h-3.5 w-3.5 transition-transform duration-200",
+                      "transition-transform duration-200",
                       !favoritesExpanded && "-rotate-90",
                     )}
                   />
@@ -191,7 +144,10 @@ export function Sidebar({
                         style={{ animationDelay: `${index * 50}ms` }}
                       >
                         <div className="flex items-center gap-3">
-                          <Icon className="h-4 w-4 text-sidebar-foreground/50 group-hover:text-red-500 transition-colors" />
+                          <Icon
+                            size={16}
+                            className="text-sidebar-foreground/50 group-hover:text-red-500 transition-colors"
+                          />
                           <span>{favorite.name}</span>
                         </div>
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-sidebar-accent text-sidebar-foreground/60 group-hover:bg-red-500/10 group-hover:text-red-500 transition-colors">
@@ -212,11 +168,15 @@ export function Sidebar({
               >
                 <span>Khu vực cứu hộ</span>
                 <div className="flex items-center gap-1.5">
-                  <Plus className="h-3.5 w-3.5 hover:text-red-500 transition-colors" />
-                  <MoreVertical className="h-3.5 w-3.5" />
-                  <ChevronDown
+                  <Plus
+                    size={14}
+                    className="hover:text-red-500 transition-colors"
+                  />
+                  <DotsThreeVertical size={14} />
+                  <CaretDown
+                    size={14}
                     className={cn(
-                      "h-3.5 w-3.5 transition-transform duration-200",
+                      "transition-transform duration-200",
                       !projectsExpanded && "-rotate-90",
                     )}
                   />
@@ -253,24 +213,35 @@ export function Sidebar({
               className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200 group"
             >
               <div className="flex items-center gap-3">
-                <Settings className="h-4 w-4 group-hover:rotate-90 transition-transform duration-300" />
+                <Gear
+                  size={16}
+                  className="group-hover:rotate-90 transition-transform duration-300"
+                />
                 <span>Cài đặt</span>
               </div>
-              <ChevronRightIcon className="h-4 w-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              <CaretRight
+                size={16}
+                className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"
+              />
             </Link>
             <Link
               href="#"
               className="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200 group"
             >
               <div className="flex items-center gap-3">
-                <HelpCircle className="h-4 w-4" />
+                <Question size={16} />
                 <span>Trung tâm hỗ trợ</span>
               </div>
-              <ChevronRightIcon className="h-4 w-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+              <CaretRight
+                size={16}
+                className="opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all"
+              />
             </Link>
           </div>
         </div>
       )}
     </aside>
   );
-}
+};
+
+export default Sidebar;

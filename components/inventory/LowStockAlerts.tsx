@@ -1,6 +1,5 @@
 "use client";
 
-import { InventoryItem, ItemCategory } from "@/types/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,24 +7,25 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { getStockLevelBadgeVariant } from "@/lib/mock-data";
 import {
-  AlertTriangle,
+  Warning,
   ArrowRight,
   Stethoscope,
-  UtensilsCrossed,
-  Droplets,
+  ForkKnife,
+  Drop,
   Wrench,
   Tent,
-  Shirt,
-  TrendingDown,
-} from "lucide-react";
+  TShirt,
+  TrendDown,
+} from "@phosphor-icons/react";
+import { ItemCategory, LowStockAlertsProps } from "@/type";
 
 const categoryIcons: Record<ItemCategory, React.ReactNode> = {
-  MEDICAL: <Stethoscope className="h-4 w-4" />,
-  FOOD: <UtensilsCrossed className="h-4 w-4" />,
-  WATER: <Droplets className="h-4 w-4" />,
-  EQUIPMENT: <Wrench className="h-4 w-4" />,
-  SHELTER: <Tent className="h-4 w-4" />,
-  CLOTHING: <Shirt className="h-4 w-4" />,
+  MEDICAL: <Stethoscope className="h-4 w-4" weight="fill" />,
+  FOOD: <ForkKnife className="h-4 w-4" weight="fill" />,
+  WATER: <Drop className="h-4 w-4" weight="fill" />,
+  EQUIPMENT: <Wrench className="h-4 w-4" weight="fill" />,
+  SHELTER: <Tent className="h-4 w-4" weight="fill" />,
+  CLOTHING: <TShirt className="h-4 w-4" weight="fill" />,
 };
 
 const stockLevelNames: Record<string, string> = {
@@ -35,17 +35,11 @@ const stockLevelNames: Record<string, string> = {
   OVERSTOCKED: "Dư Thừa",
 };
 
-interface LowStockAlertsProps {
-  items: InventoryItem[];
-  onItemClick?: (item: InventoryItem) => void;
-  onViewAll?: () => void;
-}
-
-export default function LowStockAlerts({
+const LowStockAlerts = ({
   items,
   onItemClick,
   onViewAll,
-}: LowStockAlertsProps) {
+}: LowStockAlertsProps) => {
   // Filter critical and low stock items
   const alertItems = items
     .filter(
@@ -70,7 +64,7 @@ export default function LowStockAlerts({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-red-500" />
+            <Warning className="h-5 w-5 text-red-500" weight="fill" />
             Cảnh Báo Tồn Kho
           </CardTitle>
           <div className="flex items-center gap-2">
@@ -88,7 +82,7 @@ export default function LowStockAlerts({
         </div>
       </CardHeader>
       <CardContent className="flex-1 p-0">
-        <ScrollArea className="h-[300px] px-6">
+        <ScrollArea className="h-75 px-6">
           {alertItems.length > 0 ? (
             <div className="space-y-2 pb-4">
               {alertItems.slice(0, 8).map((item) => {
@@ -150,7 +144,7 @@ export default function LowStockAlerts({
                         </span>
                       </div>
                       <div className="flex items-center gap-1 mt-1">
-                        <TrendingDown
+                        <TrendDown
                           className={cn(
                             "h-3 w-3",
                             item.stockLevel === "CRITICAL"
@@ -176,7 +170,7 @@ export default function LowStockAlerts({
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center py-8">
               <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-4">
-                <AlertTriangle className="h-8 w-8 text-green-500" />
+                <Warning className="h-8 w-8 text-green-500" />
               </div>
               <h3 className="font-medium text-lg">Tuyệt vời!</h3>
               <p className="text-sm text-muted-foreground mt-1">
@@ -196,4 +190,6 @@ export default function LowStockAlerts({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default LowStockAlerts;

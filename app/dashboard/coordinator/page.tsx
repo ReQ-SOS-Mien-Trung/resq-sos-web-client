@@ -21,24 +21,23 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  SidebarSimple,
+  Bell,
+  Gear,
+  User,
+  ArrowsClockwise,
+  WifiHigh,
+  WifiSlash,
+  Sun,
+  Moon,
+  CloudSun,
+  MapTrifold,
+} from "@phosphor-icons/react";
+import {
   AIDispatchPanel,
   ClusterDetailsSheet,
   SOSSidebar,
 } from "@/components/coordinator";
-import {
-  PanelLeftClose,
-  PanelLeft,
-  Bell,
-  Settings,
-  User,
-  RefreshCw,
-  Wifi,
-  WifiOff,
-  Sun,
-  Moon,
-  CloudSun,
-  Map,
-} from "lucide-react";
 
 const CoordinatorMap = dynamic(
   () => import("@/components/coordinator/CoordinatorMap"),
@@ -47,7 +46,7 @@ const CoordinatorMap = dynamic(
     loading: () => (
       <div className="w-full h-full bg-muted flex items-center justify-center">
         <div className="flex flex-col items-center gap-2">
-          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+          <ArrowsClockwise className="h-8 w-8 animate-spin text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
             Đang tải bản đồ...
           </span>
@@ -64,7 +63,7 @@ const WindyMapEmbed = dynamic(
     loading: () => (
       <div className="w-full h-full bg-muted flex items-center justify-center">
         <div className="flex flex-col items-center gap-2">
-          <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+          <ArrowsClockwise className="h-8 w-8 animate-spin text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
             Đang tải bản đồ thời tiết...
           </span>
@@ -74,7 +73,7 @@ const WindyMapEmbed = dynamic(
   },
 );
 
-export default function CoordinatorDashboardPage() {
+const CoordinatorDashboardPage = () => {
   // State management
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedSOS, setSelectedSOS] = useState<SOSRequest | null>(null);
@@ -169,9 +168,9 @@ export default function CoordinatorDashboardPage() {
             className="shrink-0"
           >
             {sidebarOpen ? (
-              <PanelLeftClose className="h-5 w-5" />
+              <SidebarSimple className="h-5 w-5" weight="fill" />
             ) : (
-              <PanelLeft className="h-5 w-5" />
+              <SidebarSimple className="h-5 w-5" />
             )}
           </Button>
 
@@ -197,12 +196,12 @@ export default function CoordinatorDashboardPage() {
           >
             {isConnected ? (
               <>
-                <Wifi className="h-3 w-3" />
+                <WifiHigh className="h-3 w-3" weight="bold" />
                 <span>Đang kết nối</span>
               </>
             ) : (
               <>
-                <WifiOff className="h-3 w-3" />
+                <WifiSlash className="h-3 w-3" weight="bold" />
                 <span>Mất kết nối</span>
               </>
             )}
@@ -217,7 +216,7 @@ export default function CoordinatorDashboardPage() {
             className={showWeatherMap ? "bg-blue-500 hover:bg-blue-600" : ""}
           >
             {showWeatherMap ? (
-              <Map className="h-5 w-5" />
+              <MapTrifold className="h-5 w-5" weight="fill" />
             ) : (
               <CloudSun className="h-5 w-5" />
             )}
@@ -226,9 +225,9 @@ export default function CoordinatorDashboardPage() {
           {/* Dark Mode Toggle */}
           <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
             {isDarkMode ? (
-              <Sun className="h-5 w-5" />
+              <Sun className="h-5 w-5" weight="fill" />
             ) : (
-              <Moon className="h-5 w-5" />
+              <Moon className="h-5 w-5" weight="fill" />
             )}
           </Button>
 
@@ -244,7 +243,7 @@ export default function CoordinatorDashboardPage() {
 
           {/* Settings */}
           <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
+            <Gear className="h-5 w-5" />
           </Button>
 
           {/* User Profile */}
@@ -370,4 +369,6 @@ export default function CoordinatorDashboardPage() {
       />
     </div>
   );
-}
+};
+
+export default CoordinatorDashboardPage;

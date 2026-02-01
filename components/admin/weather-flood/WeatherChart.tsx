@@ -12,14 +12,10 @@ import {
   BarChart,
   Bar,
 } from "recharts";
-import type { WeatherData } from "@/types/admin-pages";
-import { CloudRain, Thermometer, Droplets, Wind } from "lucide-react";
+import { CloudRain, Thermometer, Drop, Wind } from "@phosphor-icons/react";
+import { WeatherChartProps } from "@/type";
 
-interface WeatherChartProps {
-  data: WeatherData[];
-}
-
-export function WeatherChart({ data }: WeatherChartProps) {
+const WeatherChart = ({ data }: WeatherChartProps) => {
   const chartData = data.map((item) => ({
     region: item.region,
     temperature: item.temperature,
@@ -33,7 +29,7 @@ export function WeatherChart({ data }: WeatherChartProps) {
       <Card className="border border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Thermometer className="h-5 w-5 text-orange-500" />
+            <Thermometer size={20} className="text-orange-500" />
             Nhiệt độ
           </CardTitle>
         </CardHeader>
@@ -53,7 +49,7 @@ export function WeatherChart({ data }: WeatherChartProps) {
       <Card className="border border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CloudRain className="h-5 w-5 text-blue-500" />
+            <CloudRain size={20} className="text-blue-500" />
             Lượng mưa
           </CardTitle>
         </CardHeader>
@@ -73,7 +69,7 @@ export function WeatherChart({ data }: WeatherChartProps) {
       <Card className="border border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Droplets className="h-5 w-5 text-cyan-500" />
+            <Drop size={20} className="text-cyan-500" />
             Độ ẩm
           </CardTitle>
         </CardHeader>
@@ -98,7 +94,7 @@ export function WeatherChart({ data }: WeatherChartProps) {
       <Card className="border border-border/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Wind className="h-5 w-5 text-gray-500" />
+            <Wind size={20} className="text-gray-500" />
             Tốc độ gió
           </CardTitle>
         </CardHeader>
@@ -121,4 +117,6 @@ export function WeatherChart({ data }: WeatherChartProps) {
       </Card>
     </div>
   );
-}
+};
+
+export default WeatherChart;

@@ -1,67 +1,62 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ActivityLog } from "@/types/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  ClipboardCheck,
-  Pencil,
-  TruckIcon,
-  PackageCheck,
-  History,
-} from "lucide-react";
-
-interface RecentActivityProps {
-  activities: ActivityLog[];
-  maxItems?: number;
-}
+  ArrowLineDown,
+  ArrowLineUp,
+  ClipboardText,
+  PencilSimple,
+  Truck,
+  Package,
+  ClockCounterClockwise,
+} from "@phosphor-icons/react";
+import { RecentActivityProps } from "@/type";
 
 const actionConfig: Record<
   string,
   { icon: React.ReactNode; color: string; bgColor: string; label: string }
 > = {
   STOCK_IN: {
-    icon: <ArrowDownToLine className="h-4 w-4" />,
+    icon: <ArrowLineDown className="h-4 w-4" />,
     color: "text-green-500",
     bgColor: "bg-green-500/10",
     label: "Nhập kho",
   },
   STOCK_OUT: {
-    icon: <ArrowUpFromLine className="h-4 w-4" />,
+    icon: <ArrowLineUp className="h-4 w-4" />,
     color: "text-blue-500",
     bgColor: "bg-blue-500/10",
     label: "Xuất kho",
   },
   ADJUSTMENT: {
-    icon: <Pencil className="h-4 w-4" />,
+    icon: <PencilSimple className="h-4 w-4" />,
     color: "text-orange-500",
     bgColor: "bg-orange-500/10",
     label: "Điều chỉnh",
   },
   REQUEST_CREATED: {
-    icon: <ClipboardCheck className="h-4 w-4" />,
+    icon: <ClipboardText className="h-4 w-4" />,
     color: "text-purple-500",
     bgColor: "bg-purple-500/10",
     label: "Tạo yêu cầu",
   },
   REQUEST_APPROVED: {
-    icon: <ClipboardCheck className="h-4 w-4" />,
+    icon: <ClipboardText className="h-4 w-4" />,
     color: "text-emerald-500",
     bgColor: "bg-emerald-500/10",
     label: "Duyệt yêu cầu",
   },
   SHIPMENT_SENT: {
-    icon: <TruckIcon className="h-4 w-4" />,
+    icon: <Truck className="h-4 w-4" />,
     color: "text-cyan-500",
     bgColor: "bg-cyan-500/10",
     label: "Gửi hàng",
   },
   SHIPMENT_RECEIVED: {
-    icon: <PackageCheck className="h-4 w-4" />,
+    icon: <Package className="h-4 w-4" weight="fill" />,
     color: "text-teal-500",
     bgColor: "bg-teal-500/10",
     label: "Nhận hàng",
@@ -83,28 +78,28 @@ function formatTimeAgo(date: Date, now: Date): string {
   }
 }
 
-export default function RecentActivity({
-  activities,
-  maxItems = 10,
-}: RecentActivityProps) {
+const RecentActivity = ({ activities, maxItems = 10 }: RecentActivityProps) => {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const displayedActivities = activities.slice(0, maxItems);
 
-  // Only calculate current time on client side after mount
+  // Use setTimeout to avoid synchronous setState warning in effect
   useEffect(() => {
-    setCurrentTime(new Date());
+    const timeoutId = setTimeout(() => {
+      setCurrentTime(new Date());
+    }, 0);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <History className="h-5 w-5 text-primary" />
+          <ClockCounterClockwise className="h-5 w-5 text-primary" />
           Hoạt Động Gần Đây
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 p-0">
-        <ScrollArea className="h-[400px] px-6">
+        <ScrollArea className="h-100 px-6">
           <div className="space-y-1 pb-4">
             {displayedActivities.map((activity, index) => {
               const config = actionConfig[activity.action];
@@ -126,7 +121,9 @@ export default function RecentActivity({
                       <span
                         className={config?.color || "text-muted-foreground"}
                       >
-                        {config?.icon || <History className="h-4 w-4" />}
+                        {config?.icon || (
+                          <ClockCounterClockwise className="h-4 w-4" />
+                        )}
                       </span>
                     </div>
 
@@ -181,7 +178,7 @@ export default function RecentActivity({
 
             {activities.length === 0 && (
               <div className="text-center text-muted-foreground py-8">
-                <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <ClockCounterClockwise className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">Chưa có hoạt động nào</p>
               </div>
             )}
@@ -190,4 +187,6 @@ export default function RecentActivity({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default RecentActivity;

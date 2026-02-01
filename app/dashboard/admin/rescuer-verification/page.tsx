@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockRescuerVerifications } from "@/lib/mock-data/admin-rescuer-verification";
+import { PageLoading } from "@/components/admin";
+import { RescuerVerification } from "@/type";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
-  VerificationQueue,
-  RescuerProfile,
   DocumentViewer,
+  RescuerProfile,
+  VerificationQueue,
 } from "@/components/admin/rescuer-verification";
-import type { RescuerVerification } from "@/types/admin-pages";
-import { PageLoading } from "@/components/admin/PageLoading";
 
-export default function RescuerVerificationPage() {
+const RescuerVerificationPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [selectedVerification, setSelectedVerification] =
     useState<RescuerVerification | null>(null);
@@ -33,7 +33,12 @@ export default function RescuerVerificationPage() {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading title="Đang tải xác minh" subtitle="Đang chuẩn bị hồ sơ cứu hộ viên…" />;
+    return (
+      <PageLoading
+        title="Đang tải xác minh"
+        subtitle="Đang chuẩn bị hồ sơ cứu hộ viên…"
+      />
+    );
   }
 
   return (
@@ -80,4 +85,6 @@ export default function RescuerVerificationPage() {
       </div>
     </DashboardLayout>
   );
-}
+};
+
+export default RescuerVerificationPage;

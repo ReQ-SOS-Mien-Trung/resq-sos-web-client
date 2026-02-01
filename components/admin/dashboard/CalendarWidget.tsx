@@ -4,7 +4,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, MoreVertical } from "lucide-react";
+import {
+  CaretLeft,
+  CaretRight,
+  DotsThreeVertical,
+} from "@phosphor-icons/react";
 import {
   format,
   startOfMonth,
@@ -15,39 +19,9 @@ import {
 } from "date-fns";
 import { weekDays } from "@/lib/constants";
 import { CalendarWidgetProps } from "@/type";
+import { getMonthIndex } from "@/lib/getMonthIndex";
 
-function getMonthIndex(monthName: string): number {
-  const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-    "Tháng 1",
-    "Tháng 2",
-    "Tháng 3",
-    "Tháng 4",
-    "Tháng 5",
-    "Tháng 6",
-    "Tháng 7",
-    "Tháng 8",
-    "Tháng 9",
-    "Tháng 10",
-    "Tháng 11",
-    "Tháng 12",
-  ];
-  const index = months.indexOf(monthName);
-  return index >= 12 ? index - 12 : index;
-}
-
-export function CalendarWidget({ data }: CalendarWidgetProps) {
+const CalendarWidget = ({ data }: CalendarWidgetProps) => {
   const [currentDate, setCurrentDate] = useState(
     new Date(data.currentYear, getMonthIndex(data.currentMonth), 1),
   );
@@ -100,7 +74,10 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
           <CardTitle className="text-base font-semibold">
             Lịch hoạt động
           </CardTitle>
-          <MoreVertical className="h-4 w-4 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors" />
+          <DotsThreeVertical
+            size={16}
+            className="text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors"
+          />
         </div>
       </CardHeader>
       <CardContent>
@@ -113,7 +90,7 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
               className="h-8 w-8 hover:bg-muted/80 transition-colors"
               onClick={goToPreviousMonth}
             >
-              <ChevronLeft className="h-4 w-4" />
+              <CaretLeft size={16} />
             </Button>
             <span className="text-sm font-semibold">
               {format(currentDate, "MMMM yyyy")}
@@ -124,7 +101,7 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
               className="h-8 w-8 hover:bg-muted/80 transition-colors"
               onClick={goToNextMonth}
             >
-              <ChevronRight className="h-4 w-4" />
+              <CaretRight size={16} />
             </Button>
           </div>
 
@@ -167,7 +144,7 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
             {data.meetings.map((meeting, index) => (
               <div
                 key={meeting.id}
-                className="group flex items-start justify-between gap-3 p-3 rounded-xl border border-border/30 bg-gradient-to-r from-card to-muted/20 hover:from-muted/30 hover:to-muted/40 hover:border-border/50 transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-bottom-2"
+                className="group flex items-start justify-between gap-3 p-3 rounded-xl border border-border/30 bg-linear-to-r from-card to-muted/20 hover:from-muted/30 hover:to-muted/40 hover:border-border/50 transition-all duration-300 cursor-pointer animate-in fade-in slide-in-from-bottom-2"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 <div className="flex-1 min-w-0">
@@ -215,7 +192,7 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
                   }
                 >
                   On {meeting.platform}
-                  <ChevronRight className="h-3 w-3 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                  <CaretRight className="h-3 w-3 ml-1 group-hover:translate-x-0.5 transition-transform" />
                 </Button>
               </div>
             ))}
@@ -224,4 +201,6 @@ export function CalendarWidget({ data }: CalendarWidgetProps) {
       </CardContent>
     </Card>
   );
-}
+};
+
+export default CalendarWidget;

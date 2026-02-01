@@ -1,67 +1,17 @@
 "use client";
 
-import { InventoryItem, ItemCategory } from "@/types/inventory";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getStockLevelBadgeVariant } from "@/lib/mock-data";
-import {
-  Stethoscope,
-  UtensilsCrossed,
-  Droplets,
-  Wrench,
-  Tent,
-  Shirt,
-  AlertTriangle,
-  Package,
-} from "lucide-react";
+import { Warning, Package } from "@phosphor-icons/react";
+import { categoryIcons, categoryNames, stockLevelNames } from "@/lib/constants";
+import { CategoryOverviewProps, CategorySummary, ItemCategory } from "@/type";
 
-// Category icon mapping
-const categoryIcons: Record<ItemCategory, React.ReactNode> = {
-  MEDICAL: <Stethoscope className="h-5 w-5" />,
-  FOOD: <UtensilsCrossed className="h-5 w-5" />,
-  WATER: <Droplets className="h-5 w-5" />,
-  EQUIPMENT: <Wrench className="h-5 w-5" />,
-  SHELTER: <Tent className="h-5 w-5" />,
-  CLOTHING: <Shirt className="h-5 w-5" />,
-};
-
-const categoryNames: Record<ItemCategory, string> = {
-  MEDICAL: "Y Tế",
-  FOOD: "Thực Phẩm",
-  WATER: "Nước Uống",
-  EQUIPMENT: "Thiết Bị",
-  SHELTER: "Lều Trại",
-  CLOTHING: "Quần Áo",
-};
-
-const stockLevelNames: Record<string, string> = {
-  CRITICAL: "Thiếu",
-  LOW: "Thấp",
-  NORMAL: "Đủ",
-  OVERSTOCKED: "Dư",
-};
-
-interface CategoryOverviewProps {
-  items: InventoryItem[];
-  onCategorySelect?: (category: ItemCategory) => void;
-  selectedCategory?: ItemCategory | null;
-}
-
-interface CategorySummary {
-  category: ItemCategory;
-  totalItems: number;
-  totalQuantity: number;
-  criticalCount: number;
-  lowCount: number;
-  normalCount: number;
-}
-
-export default function CategoryOverview({
+const CategoryOverview = ({
   items,
   onCategorySelect,
   selectedCategory,
-}: CategoryOverviewProps) {
+}: CategoryOverviewProps) => {
   // Calculate category summaries
   const categories = (Object.keys(categoryNames) as ItemCategory[]).map(
     (category) => {
@@ -115,7 +65,7 @@ export default function CategoryOverview({
                   <span className="relative flex h-5 w-5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 items-center justify-center">
-                      <AlertTriangle className="h-3 w-3 text-white" />
+                      <Warning className="h-3 w-3 text-white" weight="fill" />
                     </span>
                   </span>
                 </div>
@@ -169,4 +119,6 @@ export default function CategoryOverview({
       </CardContent>
     </Card>
   );
-}
+};
+
+export default CategoryOverview;

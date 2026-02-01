@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse } from "axios";
+import { useAuthStore } from "@/stores/auth.store";
 
 const API_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
@@ -13,22 +14,21 @@ const axiosInstance: AxiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use(
   (config) => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("token");
-      if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    // Lấy token từ Zustand store
+    const token = useAuthStore.getState().accessToken;
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 export default axiosInstance;
