@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,26 +32,32 @@ import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 
 const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
-  const router = useRouter();
   const [notificationCount] = useState(3);
-  const { mutate: logoutApi, isPending: isLoggingOut } = useLogout();
-  const { logout: clearAuthStore } = useAuthStore();
+  const { mutate: logout, isPending: isLoggingOut } = useLogout();
+  const user = useAuthStore((state) => state.user);
 
-  const handleLogout = () => {
-    logoutApi(undefined, {
-      onSuccess: () => {
-        // Xóa auth state trong Zustand store
-        clearAuthStore();
-        // Redirect về trang đăng nhập
-        router.push("/sign-in");
-      },
-      onError: (error) => {
-        console.error("Logout failed:", error);
-        // Vẫn xóa store và redirect nếu API lỗi
-        clearAuthStore();
-        router.push("/sign-in");
-      },
-    });
+  // Get user initials for avatar
+  const userInitials = user?.fullName
+    ? user.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "U";
+
+  // Get role name based on roleId
+  const getRoleName = (roleId?: number) => {
+    switch (roleId) {
+      case 1:
+        return "Quản trị viên";
+      case 2:
+        return "Điều phối viên";
+      case 4:
+        return "Quản lý kho";
+      default:
+        return "Người dùng";
+    }
   };
 
   return (
@@ -216,7 +221,7 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
             >
               <Avatar className="h-9 w-9 ring-2 ring-border">
                 <AvatarFallback className="bg-linear-to-br from-red-400 to-orange-500 text-white font-semibold">
-                  A
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -227,8 +232,12 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
           >
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-semibold">admin@sosresq.vn</p>
-                <p className="text-xs text-muted-foreground">Quản trị viên</p>
+                <p className="text-sm font-semibold">
+                  {user?.fullName || "Người dùng"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {getRoleName(user?.roleId)}
+                </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -243,7 +252,7 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 rounded-lg cursor-pointer text-red-500 focus:text-red-500"
-              onClick={handleLogout}
+              onClick={() => logout()}
               disabled={isLoggingOut}
             >
               {isLoggingOut ? (

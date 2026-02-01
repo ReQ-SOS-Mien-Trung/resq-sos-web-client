@@ -21,6 +21,14 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   SidebarSimple,
   Bell,
   Gear,
@@ -32,12 +40,15 @@ import {
   Moon,
   CloudSun,
   MapTrifold,
+  SignOut,
 } from "@phosphor-icons/react";
 import {
   AIDispatchPanel,
   ClusterDetailsSheet,
   SOSSidebar,
 } from "@/components/coordinator";
+import { useLogout } from "@/services/auth/hooks";
+import { useAuthStore } from "@/stores/auth.store";
 
 const CoordinatorMap = dynamic(
   () => import("@/components/coordinator/CoordinatorMap"),
@@ -94,6 +105,22 @@ const CoordinatorDashboardPage = () => {
 
   // Notification count (mock)
   const [notificationCount] = useState(3);
+
+  // Logout hook
+  const { mutate: logout, isPending: isLoggingOut } = useLogout();
+
+  // User info from auth store
+  const user = useAuthStore((state) => state.user);
+
+  // Get user initials for avatar
+  const userInitials = user?.fullName
+    ? user.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "U";
 
   // Handlers
   const handleSOSSelect = useCallback((sos: SOSRequest) => {
@@ -246,10 +273,55 @@ const CoordinatorDashboardPage = () => {
             <Gear className="h-5 w-5" />
           </Button>
 
-          {/* User Profile */}
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <User className="h-5 w-5" />
-          </Button>
+          {/* User Profile Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-red-400 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
+                  {userInitials}
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>
+                <div className="flex flex-col">
+                  <span className="font-semibold">
+                    {user?.fullName || "Người dùng"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Điều phối viên
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2 cursor-pointer">
+                <User className="h-4 w-4" />
+                Hồ sơ
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2 cursor-pointer">
+                <Gear className="h-4 w-4" />
+                Cài đặt
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer text-red-500 focus:text-red-500"
+                onClick={() => logout()}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                    Đang đăng xuất...
+                  </>
+                ) : (
+                  <>
+                    <SignOut className="h-4 w-4" />
+                    Đăng xuất
+                  </>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
