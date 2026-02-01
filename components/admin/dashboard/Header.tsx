@@ -29,18 +29,30 @@ import {
   ShareNetwork,
 } from "@phosphor-icons/react";
 import { HeaderProps } from "@/type";
+import { useLogout } from "@/services/auth/hooks";
+import { useAuthStore } from "@/stores/auth.store";
 
 const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
   const router = useRouter();
   const [notificationCount] = useState(3);
+  const { mutate: logoutApi, isPending: isLoggingOut } = useLogout();
+  const { logout: clearAuthStore } = useAuthStore();
 
   const handleLogout = () => {
-    // Clear any stored authentication data if needed
-    // localStorage.removeItem('token');
-    // sessionStorage.clear();
-
-    // Redirect to sign-in page
-    router.push("/sign-in");
+    logoutApi(undefined, {
+      onSuccess: () => {
+        // Xóa auth state trong Zustand store
+        clearAuthStore();
+        // Redirect về trang đăng nhập
+        router.push("/sign-in");
+      },
+      onError: (error) => {
+        console.error("Logout failed:", error);
+        // Vẫn xóa store và redirect nếu API lỗi
+        clearAuthStore();
+        router.push("/sign-in");
+      },
+    });
   };
 
   return (
@@ -232,9 +244,19 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
             <DropdownMenuItem
               className="gap-2 rounded-lg cursor-pointer text-red-500 focus:text-red-500"
               onClick={handleLogout}
+              disabled={isLoggingOut}
             >
-              <SignOut size={16} />
-              Đăng xuất
+              {isLoggingOut ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                  Đang đăng xuất...
+                </>
+              ) : (
+                <>
+                  <SignOut size={16} />
+                  Đăng xuất
+                </>
+              )}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

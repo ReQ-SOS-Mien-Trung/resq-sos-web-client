@@ -2,36 +2,33 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Envelope,
-  Lock,
-  Eye,
-  EyeSlash,
-  ArrowRight,
-} from "@phosphor-icons/react";
+import { User, Lock, Eye, EyeSlash, ArrowRight } from "@phosphor-icons/react";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useLogin } from "@/services/auth/hooks";
+import { useAuthStore } from "@/stores/auth.store";
 
 const SignIn = () => {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    email: "",
+    username: "",
     password: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { mutate: login, isPending: isLoading } = useLogin();
+  const { setAuth, logout } = useAuthStore();
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.email) {
-      newErrors.email = "Email là bắt buộc";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Email không hợp lệ";
+    if (!formData.username) {
+      newErrors.username = "Tên đăng nhập là bắt buộc";
+    } else if (formData.username.length < 3) {
+      newErrors.username = "Tên đăng nhập phải có ít nhất 3 ký tự";
     }
 
     if (!formData.password) {
@@ -51,16 +48,37 @@ const SignIn = () => {
       return;
     }
 
-    setIsLoading(true);
+    login(formData, {
+      onSuccess: (data) => {
+        // Lưu auth data vào Zustand store
+        setAuth(data);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // TODO: Replace with actual API call
-    console.log("Sign in:", formData);
-
-    setIsLoading(false);
-    router.push("/dashboard");
+        // Redirect dựa trên roleId
+        // 1: Admin, 2: Coordinator, 4: Manager (Inventory)
+        switch (data.roleId) {
+          case 1:
+            router.push("/dashboard/admin");
+            break;
+          case 2:
+            router.push("/dashboard/coordinator");
+            break;
+          case 4:
+            router.push("/dashboard/inventory");
+            break;
+          default:
+            // Role không được phép truy cập (Rescuer, Victim)
+            setErrors({
+              general: "Tài khoản của bạn không có quyền truy cập hệ thống này",
+            });
+            logout();
+            return;
+        }
+      },
+      onError: (error) => {
+        setErrors({ general: "Tên đăng nhập hoặc mật khẩu không đúng" });
+        console.error("Login error:", error);
+      },
+    });
   };
 
   const handleChange = (field: string, value: string) => {
@@ -80,27 +98,36 @@ const SignIn = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Email Input */}
+        {/* General Error */}
+        {errors.general && (
+          <div className="p-3 rounded-md bg-destructive/10 border border-destructive">
+            <p className="text-sm text-destructive font-sans">
+              {errors.general}
+            </p>
+          </div>
+        )}
+
+        {/* Username Input */}
         <div className="space-y-2">
           <label
-            htmlFor="email"
+            htmlFor="username"
             className="text-sm font-medium text-foreground font-sans"
           >
-            Email
+            Tên đăng nhập
           </label>
           <Input
-            id="email"
-            type="email"
-            placeholder="name@example.com"
-            value={formData.email}
-            onChange={(e) => handleChange("email", e.target.value)}
-            leftIcon={<Envelope size={16} />}
-            variant={errors.email ? "error" : "default"}
-            className={cn("h-11", errors.email && "border-destructive")}
+            id="username"
+            type="text"
+            placeholder="Nhập tên đăng nhập"
+            value={formData.username}
+            onChange={(e) => handleChange("username", e.target.value)}
+            leftIcon={<User size={16} />}
+            variant={errors.username ? "error" : "default"}
+            className={cn("h-11", errors.username && "border-destructive")}
           />
-          {errors.email && (
+          {errors.username && (
             <p className="text-sm text-destructive font-sans animate-in fade-in-0 slide-in-from-top-1 duration-200">
-              {errors.email}
+              {errors.username}
             </p>
           )}
         </div>

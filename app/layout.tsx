@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { sfUIDisplay } from "./fonts";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "ResQ SOS Mien Trung",
@@ -15,7 +16,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${sfUIDisplay.variable} antialiased`}>{children}</body>
+      <body className={`${sfUIDisplay.variable} antialiased`}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
