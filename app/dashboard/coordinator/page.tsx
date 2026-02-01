@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   SOSRequest,
@@ -67,8 +68,8 @@ const CoordinatorMap = dynamic(
   },
 );
 
-const WindyMapEmbed = dynamic(
-  () => import("@/components/coordinator/WindyMapEmbed"),
+const WindyLeafletMap = dynamic(
+  () => import("@/components/coordinator/WindyLeafletMap"),
   {
     ssr: false,
     loading: () => (
@@ -85,6 +86,11 @@ const WindyMapEmbed = dynamic(
 );
 
 const CoordinatorDashboardPage = () => {
+  // URL params for weather map mode
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const isWeatherMode = searchParams.get("mode") === "weather";
+
   // State management
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedSOS, setSelectedSOS] = useState<SOSRequest | null>(null);
@@ -99,9 +105,29 @@ const CoordinatorDashboardPage = () => {
   // Panel states
   const [clusterSheetOpen, setClusterSheetOpen] = useState(false);
   const [aiPanelOpen, setAIPanelOpen] = useState(false);
-  const [showWeatherMap, setShowWeatherMap] = useState(false);
   const [currentAIDecision, setCurrentAIDecision] =
     useState<AIDispatchDecision | null>(null);
+
+  // Track if CoordinatorMap has been loaded (which loads Leaflet 1.9.4)
+  const coordinatorMapLoadedRef = useRef(false);
+
+  // Handle weather map toggle - use URL navigation to force full page reload
+  const handleWeatherMapToggle = useCallback(() => {
+    if (isWeatherMode) {
+      // Switch back to SOS map - remove mode param
+      router.push("/dashboard/coordinator");
+    } else {
+      // Switch to weather map - add mode param (this will cause a navigation/reload)
+      window.location.href = "/dashboard/coordinator?mode=weather";
+    }
+  }, [isWeatherMode, router]);
+
+  // Track when CoordinatorMap loads
+  useEffect(() => {
+    if (!isWeatherMode) {
+      coordinatorMapLoadedRef.current = true;
+    }
+  }, [isWeatherMode]);
 
   // Notification count (mock)
   const [notificationCount] = useState(3);
@@ -236,13 +262,13 @@ const CoordinatorDashboardPage = () => {
 
           {/* Weather Map Toggle */}
           <Button
-            variant={showWeatherMap ? "default" : "ghost"}
+            variant={isWeatherMode ? "default" : "ghost"}
             size="icon"
-            onClick={() => setShowWeatherMap(!showWeatherMap)}
-            title={showWeatherMap ? "Xem bản đồ SOS" : "Xem bản đồ thời tiết"}
-            className={showWeatherMap ? "bg-blue-500 hover:bg-blue-600" : ""}
+            onClick={handleWeatherMapToggle}
+            title={isWeatherMode ? "Xem bản đồ SOS" : "Xem bản đồ thời tiết"}
+            className={isWeatherMode ? "bg-blue-500 hover:bg-blue-600" : ""}
           >
-            {showWeatherMap ? (
+            {isWeatherMode ? (
               <MapTrifold className="h-5 w-5" weight="fill" />
             ) : (
               <CloudSun className="h-5 w-5" />
@@ -351,8 +377,17 @@ const CoordinatorDashboardPage = () => {
 
         {/* Map Container */}
         <main className="flex-1 relative">
-          {showWeatherMap ? (
-            <WindyMapEmbed />
+          {isWeatherMode ? (
+            <WindyLeafletMap
+              clusters={mockSOSClusters}
+              rescuers={mockRescuers}
+              depots={mockDepots}
+              selectedCluster={selectedCluster}
+              selectedRescuer={selectedRescuer}
+              onClusterSelect={handleClusterSelect}
+              onRescuerSelect={handleRescuerSelect}
+              flyToLocation={flyToLocation}
+            />
           ) : (
             <>
               <CoordinatorMap
