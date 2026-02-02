@@ -1,12 +1,13 @@
 "use client";
 
 import { RoleGuard } from "@/components/auth";
-import { ROLES } from "@/lib/roles";
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <RoleGuard allowedRoles={[ROLES.ADMIN]}>{children}</RoleGuard>;
+  // RoleGuard now auto-detects permissions from route-config
+  // No need to pass allowedRoles manually
+  return <RoleGuard>{children}</RoleGuard>;
 }
