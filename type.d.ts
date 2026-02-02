@@ -1039,3 +1039,14 @@ export interface MapViewState {
   center: Location;
   zoom: number;
 }
+
+export interface WindyLeafletMapProps {
+  clusters: SOSCluster[];
+  rescuers: Rescuer[];
+  depots: Depot[];
+  selectedCluster?: SOSCluster | null;
+  selectedRescuer?: Rescuer | null;
+  onClusterSelect: (cluster: SOSCluster) => void;
+  onRescuerSelect: (rescuer: Rescuer) => void;
+  flyToLocation?: Location | null;
+}

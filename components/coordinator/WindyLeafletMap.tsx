@@ -2,35 +2,8 @@
 
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Cloud, Wind, Thermometer, Drop } from "@phosphor-icons/react";
-import { WeatherLayer, SOSCluster, Rescuer, Depot, Location } from "@/type";
-
-interface WindyLeafletMapProps {
-  clusters: SOSCluster[];
-  rescuers: Rescuer[];
-  depots: Depot[];
-  selectedCluster?: SOSCluster | null;
-  selectedRescuer?: Rescuer | null;
-  onClusterSelect: (cluster: SOSCluster) => void;
-  onRescuerSelect: (rescuer: Rescuer) => void;
-  flyToLocation?: Location | null;
-}
-
-const WINDY_LAYERS: {
-  id: WeatherLayer;
-  label: string;
-  icon: React.ReactNode;
-}[] = [
-  { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
-  { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
-  {
-    id: "rain",
-    label: "Mưa",
-    icon: <Drop className="h-4 w-4" weight="fill" />,
-  },
-  { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
-];
+import { WeatherLayer, WindyLeafletMapProps } from "@/type";
+import { WINDY_LAYERS } from "@/lib/constants";
 
 // Default coordinates for Central Vietnam (Huế)
 const DEFAULT_LAT = 16.4637;
