@@ -2,6 +2,8 @@ export { default as CoordinatorMap } from "./CoordinatorMap";
 export { default as SOSSidebar } from "./SOSSidebar";
 export { default as AIDispatchPanel } from "./AIDispatchPanel";
 export { default as ClusterDetailsSheet } from "./ClusterDetailsSheet";
+export { default as ClusterDetailsPanel } from "./ClusterDetailsPanel";
+export { default as RescuePlanPanel } from "./RescuePlanPanel";
 export { default as WindyWeatherMap } from "./WindyWeatherMap";
 export { default as WindyMapEmbed } from "./WindyMapEmbed";
 export { default as WindyLeafletMap } from "./WindyLeafletMap";

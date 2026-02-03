@@ -43,11 +43,8 @@ import {
   MapTrifold,
   SignOut,
 } from "@phosphor-icons/react";
-import {
-  AIDispatchPanel,
-  ClusterDetailsSheet,
-  SOSSidebar,
-} from "@/components/coordinator";
+import { ClusterDetailsPanel, SOSSidebar } from "@/components/coordinator";
+import RescuePlanPanel from "@/components/coordinator/RescuePlanPanel";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 
@@ -105,7 +102,7 @@ const CoordinatorDashboardContent = () => {
 
   // Panel states
   const [clusterSheetOpen, setClusterSheetOpen] = useState(false);
-  const [aiPanelOpen, setAIPanelOpen] = useState(false);
+  const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
   const [currentAIDecision, setCurrentAIDecision] =
     useState<AIDispatchDecision | null>(null);
 
@@ -174,15 +171,16 @@ const CoordinatorDashboardContent = () => {
         ...mockAIDecision,
         clusterId: selectedCluster.id,
       });
-      setClusterSheetOpen(false);
-      setAIPanelOpen(true);
+      // Keep cluster panel open and open rescue plan panel
+      setRescuePlanOpen(true);
     }
   }, [selectedCluster]);
 
   const handleApproveDecision = useCallback(() => {
     // Simulate mission approval
     alert("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
-    setAIPanelOpen(false);
+    setRescuePlanOpen(false);
+    setClusterSheetOpen(false);
     setSelectedCluster(null);
     setCurrentAIDecision(null);
   }, []);
@@ -377,7 +375,7 @@ const CoordinatorDashboardContent = () => {
         </aside>
 
         {/* Map Container */}
-        <main className="flex-1 relative">
+        <main className="flex-1 relative overflow-hidden">
           {isWeatherMode ? (
             <WindyLeafletMap
               clusters={mockSOSClusters}
@@ -403,43 +401,45 @@ const CoordinatorDashboardContent = () => {
                 flyToLocation={flyToLocation}
               />
 
-              {/* Floating Stats Panel */}
-              <div className="absolute top-4 right-4 z-1000">
-                <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                    Thống kê thời gian thực
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <div className="text-2xl font-bold text-red-500">
-                        {
-                          mockSOSRequests.filter(
-                            (s) =>
-                              s.priority === "P1" && s.status === "PENDING",
-                          ).length
-                        }
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        P1 Khẩn cấp
-                      </div>
+              {/* Floating Stats Panel - Only show when cluster panel is closed */}
+              {!clusterSheetOpen && (
+                <div className="absolute top-4 right-4 z-[500]">
+                  <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Thống kê thời gian thực
                     </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-500">
-                        {
-                          mockRescuers.filter((r) => r.status === "AVAILABLE")
-                            .length
-                        }
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                      <div>
+                        <div className="text-2xl font-bold text-red-500">
+                          {
+                            mockSOSRequests.filter(
+                              (s) =>
+                                s.priority === "P1" && s.status === "PENDING",
+                            ).length
+                          }
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          P1 Khẩn cấp
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Đội sẵn sàng
+                      <div>
+                        <div className="text-2xl font-bold text-green-500">
+                          {
+                            mockRescuers.filter((r) => r.status === "AVAILABLE")
+                              .length
+                          }
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Đội sẵn sàng
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Quick Action Floating Button */}
-              <div className="absolute bottom-4 right-4 z-1000">
+              <div className="absolute bottom-4 right-4 z-[500]">
                 <Button
                   size="lg"
                   className="rounded-full h-14 w-14 shadow-lg bg-linear-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
@@ -451,30 +451,32 @@ const CoordinatorDashboardContent = () => {
                   <span className="text-2xl">+</span>
                 </Button>
               </div>
+
+              {/* Cluster Details Panel - Overlays on map from right */}
+              <ClusterDetailsPanel
+                open={clusterSheetOpen}
+                onOpenChange={setClusterSheetOpen}
+                cluster={selectedCluster}
+                onProcessCluster={handleProcessCluster}
+                onSOSSelect={handleSOSSelect}
+              />
+
+              {/* Rescue Plan Panel - Slides up from bottom, overlays map and sidebar */}
+              <RescuePlanPanel
+                open={rescuePlanOpen}
+                onOpenChange={setRescuePlanOpen}
+                cluster={selectedCluster}
+                aiDecision={currentAIDecision}
+                availableRescuers={mockRescuers.filter(
+                  (r) => r.status === "AVAILABLE",
+                )}
+                onApprove={handleApproveDecision}
+                onOverride={handleOverrideDecision}
+              />
             </>
           )}
         </main>
       </div>
-
-      {/* Cluster Details Sheet */}
-      <ClusterDetailsSheet
-        open={clusterSheetOpen}
-        onOpenChange={setClusterSheetOpen}
-        cluster={selectedCluster}
-        onProcessCluster={handleProcessCluster}
-        onSOSSelect={handleSOSSelect}
-      />
-
-      {/* AI Dispatch Panel */}
-      <AIDispatchPanel
-        open={aiPanelOpen}
-        onOpenChange={setAIPanelOpen}
-        cluster={selectedCluster}
-        aiDecision={currentAIDecision}
-        availableRescuers={mockRescuers.filter((r) => r.status === "AVAILABLE")}
-        onApprove={handleApproveDecision}
-        onOverride={handleOverrideDecision}
-      />
     </div>
   );
 };

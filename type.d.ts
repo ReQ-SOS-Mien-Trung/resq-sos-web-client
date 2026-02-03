@@ -725,6 +725,8 @@ export interface CoordinatorMapProps {
   onClusterSelect: (cluster: SOSCluster) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   flyToLocation?: Location | null;
+  /** Used to trigger map resize when side panel opens/closes */
+  panelOpen?: boolean;
 }
 
 export interface SOSSidebarProps {
