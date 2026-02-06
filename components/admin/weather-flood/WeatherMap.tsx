@@ -80,7 +80,20 @@ const WeatherMap = ({ floodAlerts }: WeatherMapProps) => {
   useEffect(() => {
     // Needed for custom divIcons (wind arrows / water stations)
     import("leaflet")
-      .then((mod) => setLeaflet(mod))
+      .then((mod) => {
+        // Fix default marker icon broken by webpack/Next.js bundling
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (mod.Icon.Default.prototype as any)._getIconUrl;
+        mod.Icon.Default.mergeOptions({
+          iconRetinaUrl:
+            "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+          iconUrl:
+            "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+          shadowUrl:
+            "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+        });
+        setLeaflet(mod);
+      })
       .catch(() => setLeaflet(null));
   }, []);
 
@@ -200,7 +213,7 @@ const WeatherMap = ({ floodAlerts }: WeatherMapProps) => {
     });
   }, [leaflet]);
 
-  if (!isMounted) {
+  if (!isMounted || !leaflet) {
     return <WeatherMapSkeleton />;
   }
 
@@ -285,7 +298,7 @@ const WeatherMap = ({ floodAlerts }: WeatherMapProps) => {
                     <Marker
                       key={`weather-live-${p.name}`}
                       position={[p.lat, p.lon]}
-                      icon={windIcon}
+                      {...(windIcon ? { icon: windIcon } : {})}
                     >
                       <Popup>
                         <div className="p-2 min-w-55">

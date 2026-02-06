@@ -725,6 +725,8 @@ export interface CoordinatorMapProps {
   onClusterSelect: (cluster: SOSCluster) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   flyToLocation?: Location | null;
+  /** Used to trigger map resize when side panel opens/closes */
+  panelOpen?: boolean;
 }
 
 export interface SOSSidebarProps {
@@ -1038,4 +1040,15 @@ export interface Mission {
 export interface MapViewState {
   center: Location;
   zoom: number;
+}
+
+export interface WindyLeafletMapProps {
+  clusters: SOSCluster[];
+  rescuers: Rescuer[];
+  depots: Depot[];
+  selectedCluster?: SOSCluster | null;
+  selectedRescuer?: Rescuer | null;
+  onClusterSelect: (cluster: SOSCluster) => void;
+  onRescuerSelect: (rescuer: Rescuer) => void;
+  flyToLocation?: Location | null;
 }

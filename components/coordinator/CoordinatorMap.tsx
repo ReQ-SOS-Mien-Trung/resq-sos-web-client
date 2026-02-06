@@ -365,7 +365,7 @@ function DepotMarker({ depot }: { depot: Depot }) {
 // Map Legend Component
 function MapLegend() {
   return (
-    <div className="absolute bottom-4 left-4 z-1000 bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-3">
+    <div className="absolute bottom-4 left-4 z-[400] bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-3">
       <div className="text-xs font-semibold mb-2">Chú thích</div>
       <div className="space-y-1.5 text-xs">
         <div className="flex items-center gap-2">

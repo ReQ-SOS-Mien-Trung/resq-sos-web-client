@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   SOSRequest,
@@ -21,6 +22,14 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   SidebarSimple,
   Bell,
   Gear,
@@ -32,12 +41,12 @@ import {
   Moon,
   CloudSun,
   MapTrifold,
+  SignOut,
 } from "@phosphor-icons/react";
-import {
-  AIDispatchPanel,
-  ClusterDetailsSheet,
-  SOSSidebar,
-} from "@/components/coordinator";
+import { ClusterDetailsPanel, SOSSidebar } from "@/components/coordinator";
+import RescuePlanPanel from "@/components/coordinator/RescuePlanPanel";
+import { useLogout } from "@/services/auth/hooks";
+import { useAuthStore } from "@/stores/auth.store";
 
 const CoordinatorMap = dynamic(
   () => import("@/components/coordinator/CoordinatorMap"),
@@ -56,8 +65,8 @@ const CoordinatorMap = dynamic(
   },
 );
 
-const WindyMapEmbed = dynamic(
-  () => import("@/components/coordinator/WindyMapEmbed"),
+const WindyLeafletMap = dynamic(
+  () => import("@/components/coordinator/WindyLeafletMap"),
   {
     ssr: false,
     loading: () => (
@@ -73,7 +82,13 @@ const WindyMapEmbed = dynamic(
   },
 );
 
-const CoordinatorDashboardPage = () => {
+// Inner component that uses searchParams
+const CoordinatorDashboardContent = () => {
+  // URL params for weather map mode
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const isWeatherMode = searchParams.get("mode") === "weather";
+
   // State management
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedSOS, setSelectedSOS] = useState<SOSRequest | null>(null);
@@ -87,13 +102,49 @@ const CoordinatorDashboardPage = () => {
 
   // Panel states
   const [clusterSheetOpen, setClusterSheetOpen] = useState(false);
-  const [aiPanelOpen, setAIPanelOpen] = useState(false);
-  const [showWeatherMap, setShowWeatherMap] = useState(false);
+  const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
   const [currentAIDecision, setCurrentAIDecision] =
     useState<AIDispatchDecision | null>(null);
 
+  // Track if CoordinatorMap has been loaded (which loads Leaflet 1.9.4)
+  const coordinatorMapLoadedRef = useRef(false);
+
+  // Handle weather map toggle - use URL navigation to force full page reload
+  const handleWeatherMapToggle = useCallback(() => {
+    if (isWeatherMode) {
+      // Switch back to SOS map - remove mode param
+      router.push("/dashboard/coordinator");
+    } else {
+      // Switch to weather map - add mode param (this will cause a navigation/reload)
+      window.location.href = "/dashboard/coordinator?mode=weather";
+    }
+  }, [isWeatherMode, router]);
+
+  // Track when CoordinatorMap loads
+  useEffect(() => {
+    if (!isWeatherMode) {
+      coordinatorMapLoadedRef.current = true;
+    }
+  }, [isWeatherMode]);
+
   // Notification count (mock)
   const [notificationCount] = useState(3);
+
+  // Logout hook
+  const { mutate: logout, isPending: isLoggingOut } = useLogout();
+
+  // User info from auth store
+  const user = useAuthStore((state) => state.user);
+
+  // Get user initials for avatar
+  const userInitials = user?.fullName
+    ? user.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "U";
 
   // Handlers
   const handleSOSSelect = useCallback((sos: SOSRequest) => {
@@ -120,15 +171,16 @@ const CoordinatorDashboardPage = () => {
         ...mockAIDecision,
         clusterId: selectedCluster.id,
       });
-      setClusterSheetOpen(false);
-      setAIPanelOpen(true);
+      // Keep cluster panel open and open rescue plan panel
+      setRescuePlanOpen(true);
     }
   }, [selectedCluster]);
 
   const handleApproveDecision = useCallback(() => {
     // Simulate mission approval
     alert("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
-    setAIPanelOpen(false);
+    setRescuePlanOpen(false);
+    setClusterSheetOpen(false);
     setSelectedCluster(null);
     setCurrentAIDecision(null);
   }, []);
@@ -209,13 +261,13 @@ const CoordinatorDashboardPage = () => {
 
           {/* Weather Map Toggle */}
           <Button
-            variant={showWeatherMap ? "default" : "ghost"}
+            variant={isWeatherMode ? "default" : "ghost"}
             size="icon"
-            onClick={() => setShowWeatherMap(!showWeatherMap)}
-            title={showWeatherMap ? "Xem bản đồ SOS" : "Xem bản đồ thời tiết"}
-            className={showWeatherMap ? "bg-blue-500 hover:bg-blue-600" : ""}
+            onClick={handleWeatherMapToggle}
+            title={isWeatherMode ? "Xem bản đồ SOS" : "Xem bản đồ thời tiết"}
+            className={isWeatherMode ? "bg-blue-500 hover:bg-blue-600" : ""}
           >
-            {showWeatherMap ? (
+            {isWeatherMode ? (
               <MapTrifold className="h-5 w-5" weight="fill" />
             ) : (
               <CloudSun className="h-5 w-5" />
@@ -246,10 +298,55 @@ const CoordinatorDashboardPage = () => {
             <Gear className="h-5 w-5" />
           </Button>
 
-          {/* User Profile */}
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <User className="h-5 w-5" />
-          </Button>
+          {/* User Profile Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-red-400 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
+                  {userInitials}
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>
+                <div className="flex flex-col">
+                  <span className="font-semibold">
+                    {user?.fullName || "Người dùng"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Điều phối viên
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="gap-2 cursor-pointer">
+                <User className="h-4 w-4" />
+                Hồ sơ
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2 cursor-pointer">
+                <Gear className="h-4 w-4" />
+                Cài đặt
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer text-red-500 focus:text-red-500"
+                onClick={() => logout()}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                    Đang đăng xuất...
+                  </>
+                ) : (
+                  <>
+                    <SignOut className="h-4 w-4" />
+                    Đăng xuất
+                  </>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
@@ -278,9 +375,18 @@ const CoordinatorDashboardPage = () => {
         </aside>
 
         {/* Map Container */}
-        <main className="flex-1 relative">
-          {showWeatherMap ? (
-            <WindyMapEmbed />
+        <main className="flex-1 relative overflow-hidden">
+          {isWeatherMode ? (
+            <WindyLeafletMap
+              clusters={mockSOSClusters}
+              rescuers={mockRescuers}
+              depots={mockDepots}
+              selectedCluster={selectedCluster}
+              selectedRescuer={selectedRescuer}
+              onClusterSelect={handleClusterSelect}
+              onRescuerSelect={handleRescuerSelect}
+              flyToLocation={flyToLocation}
+            />
           ) : (
             <>
               <CoordinatorMap
@@ -295,43 +401,45 @@ const CoordinatorDashboardPage = () => {
                 flyToLocation={flyToLocation}
               />
 
-              {/* Floating Stats Panel */}
-              <div className="absolute top-4 right-4 z-1000">
-                <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                    Thống kê thời gian thực
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <div className="text-2xl font-bold text-red-500">
-                        {
-                          mockSOSRequests.filter(
-                            (s) =>
-                              s.priority === "P1" && s.status === "PENDING",
-                          ).length
-                        }
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        P1 Khẩn cấp
-                      </div>
+              {/* Floating Stats Panel - Only show when cluster panel is closed */}
+              {!clusterSheetOpen && (
+                <div className="absolute top-4 right-4 z-[500]">
+                  <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Thống kê thời gian thực
                     </div>
-                    <div>
-                      <div className="text-2xl font-bold text-green-500">
-                        {
-                          mockRescuers.filter((r) => r.status === "AVAILABLE")
-                            .length
-                        }
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                      <div>
+                        <div className="text-2xl font-bold text-red-500">
+                          {
+                            mockSOSRequests.filter(
+                              (s) =>
+                                s.priority === "P1" && s.status === "PENDING",
+                            ).length
+                          }
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          P1 Khẩn cấp
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Đội sẵn sàng
+                      <div>
+                        <div className="text-2xl font-bold text-green-500">
+                          {
+                            mockRescuers.filter((r) => r.status === "AVAILABLE")
+                              .length
+                          }
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Đội sẵn sàng
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Quick Action Floating Button */}
-              <div className="absolute bottom-4 right-4 z-1000">
+              <div className="absolute bottom-4 right-4 z-[500]">
                 <Button
                   size="lg"
                   className="rounded-full h-14 w-14 shadow-lg bg-linear-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
@@ -343,31 +451,51 @@ const CoordinatorDashboardPage = () => {
                   <span className="text-2xl">+</span>
                 </Button>
               </div>
+
+              {/* Cluster Details Panel - Overlays on map from right */}
+              <ClusterDetailsPanel
+                open={clusterSheetOpen}
+                onOpenChange={setClusterSheetOpen}
+                cluster={selectedCluster}
+                onProcessCluster={handleProcessCluster}
+                onSOSSelect={handleSOSSelect}
+              />
+
+              {/* Rescue Plan Panel - Slides up from bottom, overlays map and sidebar */}
+              <RescuePlanPanel
+                open={rescuePlanOpen}
+                onOpenChange={setRescuePlanOpen}
+                cluster={selectedCluster}
+                aiDecision={currentAIDecision}
+                availableRescuers={mockRescuers.filter(
+                  (r) => r.status === "AVAILABLE",
+                )}
+                onApprove={handleApproveDecision}
+                onOverride={handleOverrideDecision}
+              />
             </>
           )}
         </main>
       </div>
-
-      {/* Cluster Details Sheet */}
-      <ClusterDetailsSheet
-        open={clusterSheetOpen}
-        onOpenChange={setClusterSheetOpen}
-        cluster={selectedCluster}
-        onProcessCluster={handleProcessCluster}
-        onSOSSelect={handleSOSSelect}
-      />
-
-      {/* AI Dispatch Panel */}
-      <AIDispatchPanel
-        open={aiPanelOpen}
-        onOpenChange={setAIPanelOpen}
-        cluster={selectedCluster}
-        aiDecision={currentAIDecision}
-        availableRescuers={mockRescuers.filter((r) => r.status === "AVAILABLE")}
-        onApprove={handleApproveDecision}
-        onOverride={handleOverrideDecision}
-      />
     </div>
+  );
+};
+
+// Wrapper component with Suspense for useSearchParams
+const CoordinatorDashboardPage = () => {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <span className="text-sm text-muted-foreground">Đang tải...</span>
+          </div>
+        </div>
+      }
+    >
+      <CoordinatorDashboardContent />
+    </Suspense>
   );
 };
 

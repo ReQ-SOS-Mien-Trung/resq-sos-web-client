@@ -1,8 +1,15 @@
-import { ItemCategory, RescueReport, SOSItem, Testimonial } from "@/type";
+import {
+  ItemCategory,
+  RescueReport,
+  SOSItem,
+  Testimonial,
+  WeatherLayer,
+} from "@/type";
 import {
   ChartBar,
   ChatCircle,
   Clock,
+  Cloud as CloudIcon,
   CloudSun,
   Drop,
   Package,
@@ -10,11 +17,13 @@ import {
   Robot,
   SquaresFour,
   Target,
+  Thermometer,
   TShirt,
   UserCheck,
   UserPlus,
   Warning,
   WarningCircle,
+  Wind,
 } from "@phosphor-icons/react";
 import {
   Bell,
@@ -410,3 +419,19 @@ export const stockLevelNames: Record<string, string> = {
   NORMAL: "Đủ",
   OVERSTOCKED: "Dư",
 };
+
+// Windy Weather Map Layers
+export const WINDY_LAYERS: {
+  id: WeatherLayer;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
+  { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
+  {
+    id: "rain",
+    label: "Mưa",
+    icon: <Drop className="h-4 w-4" weight="fill" />,
+  },
+  { id: "clouds", label: "Mây", icon: <CloudIcon className="h-4 w-4" /> },
+];

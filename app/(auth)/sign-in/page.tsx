@@ -1,26 +1,61 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { User, Lock, Eye, EyeSlash, ArrowRight } from "@phosphor-icons/react";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useLogin } from "@/services/auth/hooks";
-import { useAuthStore } from "@/stores/auth.store";
+import {
+  useLogin,
+  useGoogleLogin as useGoogleLoginApi,
+} from "@/services/auth/hooks";
+import { useGoogleLogin as useGoogleOAuth } from "@react-oauth/google";
 
 const SignIn = () => {
-  const router = useRouter();
   const [formData, setFormData] = useState({
     username: "",
     password: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
-  const { mutate: login, isPending: isLoading } = useLogin();
-  const { setAuth, logout } = useAuthStore();
+
+  // Login hook with error callbacks
+  const { mutate: login, isPending: isLoading } = useLogin({
+    onError: () => {
+      setErrors({ general: "Tên đăng nhập hoặc mật khẩu không đúng" });
+    },
+    onUnauthorizedRole: () => {
+      setErrors({
+        general: "Tài khoản của bạn không có quyền truy cập hệ thống này",
+      });
+    },
+  });
+
+  // Google login hook with error callbacks
+  const { mutate: googleLoginApi, isPending: isGoogleLoading } =
+    useGoogleLoginApi({
+      onError: () => {
+        setErrors({ general: "Đăng nhập với Google thất bại" });
+      },
+      onUnauthorizedRole: () => {
+        setErrors({
+          general: "Tài khoản của bạn không có quyền truy cập hệ thống này",
+        });
+      },
+    });
+
+  // Google OAuth handler
+  const handleGoogleLogin = useGoogleOAuth({
+    onSuccess: (tokenResponse) => {
+      googleLoginApi({ idToken: tokenResponse.access_token });
+    },
+    onError: (error) => {
+      setErrors({ general: "Đăng nhập với Google thất bại" });
+      console.error("Google OAuth error:", error);
+    },
+  });
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -48,37 +83,8 @@ const SignIn = () => {
       return;
     }
 
-    login(formData, {
-      onSuccess: (data) => {
-        // Lưu auth data vào Zustand store
-        setAuth(data);
-
-        // Redirect dựa trên roleId
-        // 1: Admin, 2: Coordinator, 4: Manager (Inventory)
-        switch (data.roleId) {
-          case 1:
-            router.push("/dashboard/admin");
-            break;
-          case 2:
-            router.push("/dashboard/coordinator");
-            break;
-          case 4:
-            router.push("/dashboard/inventory");
-            break;
-          default:
-            // Role không được phép truy cập (Rescuer, Victim)
-            setErrors({
-              general: "Tài khoản của bạn không có quyền truy cập hệ thống này",
-            });
-            logout();
-            return;
-        }
-      },
-      onError: (error) => {
-        setErrors({ general: "Tên đăng nhập hoặc mật khẩu không đúng" });
-        console.error("Login error:", error);
-      },
-    });
+    // Just call login - hooks handle success/error internally
+    login(formData);
   };
 
   const handleChange = (field: string, value: string) => {
@@ -212,13 +218,25 @@ const SignIn = () => {
           type="button"
           variant="outline"
           className="w-full h-12 text-base font-medium font-sans transition-all hover:scale-[1.02] active:scale-[0.98] gap-3"
-          onClick={() => {
-            // TODO: Implement Google OAuth
-            console.log("Google login");
-          }}
+          onClick={() => handleGoogleLogin()}
+          disabled={isGoogleLoading || isLoading}
         >
-          <Image src="/icons/google.svg" alt="Google" width={20} height={20} />
-          Đăng nhập với Google
+          {isGoogleLoading ? (
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+              Đang xử lý...
+            </span>
+          ) : (
+            <>
+              <Image
+                src="/icons/google.svg"
+                alt="Google"
+                width={20}
+                height={20}
+              />
+              Đăng nhập với Google
+            </>
+          )}
         </Button>
       </form>
     </div>

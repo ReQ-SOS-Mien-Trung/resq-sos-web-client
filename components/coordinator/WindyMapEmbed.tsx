@@ -2,24 +2,8 @@
 
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Cloud, Wind, Thermometer, Drop } from "@phosphor-icons/react";
 import { WeatherLayer } from "@/type";
-
-const WINDY_LAYERS: {
-  id: WeatherLayer;
-  label: string;
-  icon: React.ReactNode;
-}[] = [
-  { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
-  { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
-  {
-    id: "rain",
-    label: "Mưa",
-    icon: <Drop className="h-4 w-4" weight="fill" />,
-  },
-  { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
-];
+import { WINDY_LAYERS } from "@/lib/constants";
 
 // Default coordinates for Central Vietnam (Miền Trung)
 const DEFAULT_LAT = 16.0544;
