@@ -4,6 +4,7 @@ import {
   getDepotById,
   getDepotStatuses,
   createDepot,
+  updateDepot,
   updateDepotStatus,
 } from "./api";
 import {
@@ -12,6 +13,7 @@ import {
   CreateDepotRequest,
   DepotEntity,
   DepotStatusMetadata,
+  UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
 } from "./type";
@@ -76,6 +78,24 @@ export function useCreateDepot() {
     onSuccess: () => {
       // Invalidate depots query to refetch the list
       queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Hook to update a depot
+ */
+export function useUpdateDepot() {
+  const queryClient = useQueryClient();
+
+  return useMutation<DepotEntity, Error, UpdateDepotRequest>({
+    mutationFn: updateDepot,
+    onSuccess: (data) => {
+      // Invalidate both list and detail queries
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOTS_QUERY_KEY, data.id],
+      });
     },
   });
 }

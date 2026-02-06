@@ -1,10 +1,5 @@
 // Depot Status
-export type DepotStatus =
-  | "Available"
-  | "Full"
-  | "Unavailable"
-  | "PendingAssignment"
-  | "Closed";
+export type DepotStatus = "Available" | "Full" | "PendingAssignment" | "Closed";
 
 // Depot Status Metadata (from /logistics/depot/metadata/depot-statuses)
 export interface DepotStatusMetadata {
@@ -45,6 +40,16 @@ export interface GetDepotsParams {
 
 // Create Depot Request
 export interface CreateDepotRequest {
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  capacity: number;
+}
+
+// Update Depot Request
+export interface UpdateDepotRequest {
+  id: number;
   name: string;
   address: string;
   latitude: number;
