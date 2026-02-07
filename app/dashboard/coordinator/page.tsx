@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, Suspense } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  Suspense,
+  useMemo,
+} from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -13,11 +20,14 @@ import {
 import {
   mockSOSRequests,
   mockRescuers,
-  mockDepots,
   mockSOSClusters,
   mockAIDecision,
   mockActiveMissions,
 } from "@/lib/mock-data";
+import { useDepots } from "@/services/depot/hooks";
+import { useAssemblyPoints } from "@/services/assembly_points/hooks";
+import type { DepotEntity } from "@/services/depot/type";
+import type { AssemblyPointEntity } from "@/services/assembly_points/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,8 +53,11 @@ import {
   MapTrifold,
   SignOut,
 } from "@phosphor-icons/react";
-import { ClusterDetailsPanel, SOSSidebar } from "@/components/coordinator";
-import RescuePlanPanel from "@/components/coordinator/RescuePlanPanel";
+import {
+  ClusterDetailsPanel,
+  RescuePlanPanel,
+  SOSSidebar,
+} from "@/components/coordinator";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 
@@ -129,6 +142,28 @@ const CoordinatorDashboardContent = () => {
 
   // Notification count (mock)
   const [notificationCount] = useState(3);
+
+  // Fetch depots from backend for map display
+  const { data: depotsData } = useDepots({
+    params: { pageSize: 100 }, // Get all depots for map display
+  });
+
+  // Use depot data directly from backend (no mapping needed)
+  const depots: DepotEntity[] = useMemo(() => {
+    if (!depotsData?.items) return [];
+    return depotsData.items;
+  }, [depotsData]);
+
+  // Fetch assembly points from backend for map display
+  const { data: assemblyPointsData } = useAssemblyPoints({
+    params: { pageSize: 100 }, // Get all assembly points for map display
+  });
+
+  // Use assembly points data directly from backend (no mapping needed)
+  const assemblyPoints: AssemblyPointEntity[] = useMemo(() => {
+    if (!assemblyPointsData?.items) return [];
+    return assemblyPointsData.items;
+  }, [assemblyPointsData]);
 
   // Logout hook
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -380,7 +415,7 @@ const CoordinatorDashboardContent = () => {
             <WindyLeafletMap
               clusters={mockSOSClusters}
               rescuers={mockRescuers}
-              depots={mockDepots}
+              depots={depots}
               selectedCluster={selectedCluster}
               selectedRescuer={selectedRescuer}
               onClusterSelect={handleClusterSelect}
@@ -392,7 +427,8 @@ const CoordinatorDashboardContent = () => {
               <CoordinatorMap
                 clusters={mockSOSClusters}
                 rescuers={mockRescuers}
-                depots={mockDepots}
+                depots={depots}
+                assemblyPoints={assemblyPoints}
                 selectedCluster={selectedCluster}
                 selectedRescuer={selectedRescuer}
                 aiDecision={currentAIDecision}
@@ -437,20 +473,6 @@ const CoordinatorDashboardContent = () => {
                   </div>
                 </div>
               )}
-
-              {/* Quick Action Floating Button */}
-              <div className="absolute bottom-4 right-4 z-[500]">
-                <Button
-                  size="lg"
-                  className="rounded-full h-14 w-14 shadow-lg bg-linear-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
-                  onClick={() => {
-                    // Quick add SOS functionality
-                    alert("Thêm SOS nhanh - Chức năng đang phát triển");
-                  }}
-                >
-                  <span className="text-2xl">+</span>
-                </Button>
-              </div>
 
               {/* Cluster Details Panel - Overlays on map from right */}
               <ClusterDetailsPanel
