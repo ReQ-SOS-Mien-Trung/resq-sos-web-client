@@ -439,7 +439,7 @@ const CoordinatorDashboardContent = () => {
 
               {/* Floating Stats Panel - Only show when cluster panel is closed */}
               {!clusterSheetOpen && (
-                <div className="absolute top-4 right-4 z-[500]">
+                <div className="absolute top-4 right-4 z-[40]">
                   <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
                     <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Thống kê thời gian thực
