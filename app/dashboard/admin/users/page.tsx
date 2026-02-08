@@ -9,7 +9,7 @@ import { UserFilters, UserStats, UserTable } from "@/components/admin/users";
 
 const UsersPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [filters, setFilters] = useState<UserFiltersType>({});
+  const [filters, setFilters] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

@@ -96,8 +96,16 @@ export function RoleGuard({
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Đang xác thực...</p>
+          <lord-icon
+            src="https://cdn.lordicon.com/qvxszfof.json"
+            trigger="loop"
+            delay="0"
+            colors="primary:#e83a30,secondary:#f28621"
+            style={{ width: "100px", height: "100px" }}
+          />
+          <p className="text-sm text-muted-foreground font-medium">
+            Đang xác thực...
+          </p>
         </div>
       </div>
     );

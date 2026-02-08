@@ -67,9 +67,15 @@ const CoordinatorMap = dynamic(
     ssr: false,
     loading: () => (
       <div className="w-full h-full bg-muted flex items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <ArrowsClockwise className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <lord-icon
+            src="https://cdn.lordicon.com/slkvcfos.json"
+            trigger="loop"
+            delay="0"
+            colors="primary:#e83a30,secondary:#f28621"
+            style={{ width: "80px", height: "80px" }}
+          />
+          <span className="text-sm text-muted-foreground font-medium">
             Đang tải bản đồ...
           </span>
         </div>
@@ -84,9 +90,15 @@ const WindyLeafletMap = dynamic(
     ssr: false,
     loading: () => (
       <div className="w-full h-full bg-muted flex items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <ArrowsClockwise className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <lord-icon
+            src="https://cdn.lordicon.com/fkaukecx.json"
+            trigger="loop"
+            delay="0"
+            colors="primary:#3b82f6,secondary:#22c55e"
+            style={{ width: "80px", height: "80px" }}
+          />
+          <span className="text-sm text-muted-foreground font-medium">
             Đang tải bản đồ thời tiết...
           </span>
         </div>
@@ -508,10 +520,18 @@ const CoordinatorDashboardPage = () => {
   return (
     <Suspense
       fallback={
-        <div className="flex-1 flex items-center justify-center bg-background">
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <span className="text-sm text-muted-foreground">Đang tải...</span>
+        <div className="flex-1 flex items-center justify-center bg-background min-h-screen">
+          <div className="flex flex-col items-center gap-4">
+            <lord-icon
+              src="https://cdn.lordicon.com/mhwzfwxu.json"
+              trigger="loop"
+              delay="0"
+              colors="primary:#e83a30,secondary:#f28621"
+              style={{ width: "100px", height: "100px" }}
+            />
+            <span className="text-sm text-muted-foreground font-medium">
+              Đang tải...
+            </span>
           </div>
         </div>
       }
