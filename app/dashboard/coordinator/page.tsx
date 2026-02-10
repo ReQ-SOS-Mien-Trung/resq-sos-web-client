@@ -60,25 +60,15 @@ import {
 } from "@/components/coordinator";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const CoordinatorMap = dynamic(
   () => import("@/components/coordinator/CoordinatorMap"),
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full bg-muted flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <lord-icon
-            src="https://cdn.lordicon.com/slkvcfos.json"
-            trigger="loop"
-            delay="0"
-            colors="primary:#e83a30,secondary:#f28621"
-            style={{ width: "80px", height: "80px" }}
-          />
-          <span className="text-sm text-muted-foreground font-medium">
-            Đang tải bản đồ...
-          </span>
-        </div>
+      <div className="w-full h-full bg-muted/30 animate-in fade-in duration-300">
+        <Skeleton className="w-full h-full rounded-none" />
       </div>
     ),
   },
@@ -89,19 +79,8 @@ const WindyLeafletMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full bg-muted flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <lord-icon
-            src="https://cdn.lordicon.com/fkaukecx.json"
-            trigger="loop"
-            delay="0"
-            colors="primary:#3b82f6,secondary:#22c55e"
-            style={{ width: "80px", height: "80px" }}
-          />
-          <span className="text-sm text-muted-foreground font-medium">
-            Đang tải bản đồ thời tiết...
-          </span>
-        </div>
+      <div className="w-full h-full bg-muted/30 animate-in fade-in duration-300">
+        <Skeleton className="w-full h-full rounded-none" />
       </div>
     ),
   },
@@ -520,18 +499,44 @@ const CoordinatorDashboardPage = () => {
   return (
     <Suspense
       fallback={
-        <div className="flex-1 flex items-center justify-center bg-background min-h-screen">
-          <div className="flex flex-col items-center gap-4">
-            <lord-icon
-              src="https://cdn.lordicon.com/mhwzfwxu.json"
-              trigger="loop"
-              delay="0"
-              colors="primary:#e83a30,secondary:#f28621"
-              style={{ width: "100px", height: "100px" }}
-            />
-            <span className="text-sm text-muted-foreground font-medium">
-              Đang tải...
-            </span>
+        <div className="h-screen flex flex-col overflow-hidden animate-in fade-in duration-300">
+          {/* Header Skeleton */}
+          <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-7 w-28 rounded-full" />
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-8 w-8 rounded-full" />
+            </div>
+          </header>
+          {/* Body Skeleton */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Sidebar Skeleton */}
+            <aside className="w-80 shrink-0 border-r bg-background p-4 space-y-4">
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                      <Skeleton className="h-4 w-12" />
+                    </div>
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                ))}
+              </div>
+            </aside>
+            {/* Map Area Skeleton */}
+            <main className="flex-1 relative">
+              <Skeleton className="w-full h-full rounded-none" />
+            </main>
           </div>
         </div>
       }

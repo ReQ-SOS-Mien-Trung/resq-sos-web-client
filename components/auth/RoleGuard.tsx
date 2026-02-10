@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/stores/auth.store";
 import { RoleId, getDashboardPathByRole } from "@/lib/roles";
 import { getAllowedRolesForPath, isPublicRoute } from "@/lib/route-config";
+import { PageLoading } from "@/components/admin";
 
 interface RoleGuardProps {
   children: React.ReactNode;
@@ -93,22 +94,7 @@ export function RoleGuard({
 
   // Show loading while checking
   if (isChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <lord-icon
-            src="https://cdn.lordicon.com/qvxszfof.json"
-            trigger="loop"
-            delay="0"
-            colors="primary:#e83a30,secondary:#f28621"
-            style={{ width: "100px", height: "100px" }}
-          />
-          <p className="text-sm text-muted-foreground font-medium">
-            Đang xác thực...
-          </p>
-        </div>
-      </div>
-    );
+    return <PageLoading />;
   }
 
   return <>{children}</>;

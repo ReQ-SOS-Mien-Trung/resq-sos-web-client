@@ -5,7 +5,7 @@ import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockRescuerRegistrations } from "@/lib/mock-data/admin-rescuer-registration";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";
-import { PageLoading } from "@/components/admin";
+import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
   RegistrationForm,
@@ -33,10 +33,13 @@ const RescuerRegistrationPage = () => {
 
   if (loading || !dashboardData) {
     return (
-      <PageLoading
-        title="Đang tải đăng ký"
-        subtitle="Đang lấy danh sách cứu hộ viên…"
-      />
+      <DashboardLayout
+        favorites={[]}
+        projects={[]}
+        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+      >
+        <DashboardSkeleton variant="table" />
+      </DashboardLayout>
     );
   }
 

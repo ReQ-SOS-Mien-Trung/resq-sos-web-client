@@ -8,7 +8,7 @@ import {
 } from "@/lib/mock-data/admin-ai-prompt";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";
-import { PageLoading } from "@/components/admin";
+import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
   PromptEditor,
@@ -38,10 +38,13 @@ const AIPromptPage = () => {
 
   if (loading || !dashboardData) {
     return (
-      <PageLoading
-        title="Đang tải cấu hình AI"
-        subtitle="Đang chuẩn bị trình chỉnh sửa prompt…"
-      />
+      <DashboardLayout
+        favorites={[]}
+        projects={[]}
+        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+      >
+        <DashboardSkeleton variant="editor" />
+      </DashboardLayout>
     );
   }
 

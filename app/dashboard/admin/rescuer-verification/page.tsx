@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockRescuerVerifications } from "@/lib/mock-data/admin-rescuer-verification";
-import { PageLoading } from "@/components/admin";
+import { DashboardSkeleton } from "@/components/admin";
 import { RescuerVerification } from "@/type";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
@@ -34,10 +34,13 @@ const RescuerVerificationPage = () => {
 
   if (loading || !dashboardData) {
     return (
-      <PageLoading
-        title="Đang tải xác minh"
-        subtitle="Đang chuẩn bị hồ sơ cứu hộ viên…"
-      />
+      <DashboardLayout
+        favorites={[]}
+        projects={[]}
+        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+      >
+        <DashboardSkeleton variant="table" />
+      </DashboardLayout>
     );
   }
 

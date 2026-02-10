@@ -125,17 +125,21 @@ export function useLogout() {
 }
 
 export function useRefreshToken() {
-  const { setAuth } = useAuthStore();
+  const { updateTokens, logout: clearAuth } = useAuthStore();
+  const router = useRouter();
 
   return useMutation<RefreshTokenResponse, Error, RefreshTokenPayload>({
     mutationKey: REFRESH_TOKEN_MUTATION_KEY,
     mutationFn: refreshToken,
     onSuccess: (data) => {
-      // Update tokens in store (partial update)
-      // You may need to update the store method to support partial updates
+      // Cập nhật token mới vào store
+      updateTokens(data);
       console.log("Token refreshed successfully");
     },
     onError: (error) => {
+      // Refresh thất bại → logout và redirect về trang đăng nhập
+      clearAuth();
+      router.push("/sign-in");
       console.error("Refresh token error:", error);
     },
   });
