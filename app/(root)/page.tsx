@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useShallow } from "zustand/shallow";
 import { useAuthStore } from "@/stores/auth.store";
+import { getDashboardPathByRole } from "@/lib/roles";
 import {
   HeaderHome,
   NetworkMapSection,
@@ -17,7 +19,12 @@ import {
 
 const Home = () => {
   const router = useRouter();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { isAuthenticated, user } = useAuthStore(
+    useShallow((state) => ({
+      isAuthenticated: state.isAuthenticated,
+      user: state.user,
+    })),
+  );
   const [hasHydrated, setHasHydrated] = useState(false);
 
   // Wait for Zustand to hydrate from localStorage
@@ -25,15 +32,24 @@ const Home = () => {
     setHasHydrated(true);
   }, []);
 
-  // Redirect to sign-in if not authenticated (after hydration)
+  // Redirect to dashboard if authenticated and has a role-specific dashboard
   useEffect(() => {
-    if (hasHydrated && !isAuthenticated) {
-      router.push("/sign-in");
+    if (hasHydrated && isAuthenticated && user) {
+      const dashboardPath = getDashboardPathByRole(user.roleId);
+      if (dashboardPath) {
+        router.push(dashboardPath);
+      }
     }
-  }, [hasHydrated, isAuthenticated, router]);
+  }, [hasHydrated, isAuthenticated, user, router]);
 
-  // Show nothing while hydrating or redirecting
-  if (!hasHydrated || !isAuthenticated) {
+  // Show nothing while hydrating or if redirecting
+  const shouldRedirect =
+    hasHydrated &&
+    isAuthenticated &&
+    user &&
+    getDashboardPathByRole(user.roleId);
+
+  if (!hasHydrated || shouldRedirect) {
     return null;
   }
 
