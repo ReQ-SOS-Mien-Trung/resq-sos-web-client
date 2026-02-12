@@ -74,15 +74,23 @@ export interface Rescuer {
   capabilities: string[];
 }
 
+// Depot type for map display (matches backend DepotEntity)
 export interface Depot {
-  id: string;
+  id: number;
   name: string;
-  location: Location;
-  inventory: {
-    lifeJackets: number;
-    foodPacks: number;
-    medKits: number;
-  };
+  address: string;
+  latitude: number;
+  longitude: number;
+  capacity: number;
+  currentUtilization: number;
+  status: "Available" | "Full" | "PendingAssignment" | "Closed";
+  manager: {
+    id: string;
+    fullName: string;
+    email: string | null;
+    phone: string;
+  } | null;
+  lastUpdatedAt: string;
 }
 
 export interface SOSCluster {
@@ -697,6 +705,19 @@ export interface RescuerVerification {
 }
 
 //Coordinator Dashboard Types
+export type LocationPanelData =
+  | { type: "depot"; data: import("@/services/depot/type").DepotEntity }
+  | {
+      type: "assemblyPoint";
+      data: import("@/services/assembly_points/type").AssemblyPointEntity;
+    };
+
+export interface LocationDetailsPanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  location: LocationPanelData | null;
+}
+
 export interface AIDispatchPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -718,15 +739,59 @@ export interface ClusterDetailsSheetProps {
 export interface CoordinatorMapProps {
   clusters: SOSCluster[];
   rescuers: Rescuer[];
-  depots: Depot[];
+  // DepotEntity from backend
+  depots: {
+    id: number;
+    name: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+    capacity: number;
+    currentUtilization: number;
+    status: "Available" | "Full" | "PendingAssignment" | "Closed";
+    manager: {
+      id: string;
+      fullName: string;
+      email: string | null;
+      phone: string;
+    } | null;
+    lastUpdatedAt: string;
+  }[];
+  // AssemblyPointEntity from backend
+  assemblyPoints?: {
+    id: number;
+    code: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    capacityTeams: number;
+    status: "Active" | "Overloaded" | "Unavailable";
+    lastUpdatedAt: string;
+  }[];
   selectedCluster?: SOSCluster | null;
   selectedRescuer?: Rescuer | null;
   aiDecision?: AIDispatchDecision | null;
   onClusterSelect: (cluster: SOSCluster) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
+  onDepotSelect?: (depot: CoordinatorMapProps["depots"][number]) => void;
+  onAssemblyPointSelect?: (
+    point: NonNullable<CoordinatorMapProps["assemblyPoints"]>[number],
+  ) => void;
   flyToLocation?: Location | null;
   /** Used to trigger map resize when side panel opens/closes */
   panelOpen?: boolean;
+}
+
+// Assembly Point type for map display (from backend AssemblyPointEntity)
+export interface AssemblyPoint {
+  id: number;
+  code: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  capacityTeams: number;
+  status: "Active" | "Overloaded" | "Unavailable";
+  lastUpdatedAt: string;
 }
 
 export interface SOSSidebarProps {
@@ -1045,7 +1110,24 @@ export interface MapViewState {
 export interface WindyLeafletMapProps {
   clusters: SOSCluster[];
   rescuers: Rescuer[];
-  depots: Depot[];
+  // DepotEntity from backend
+  depots: {
+    id: number;
+    name: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+    capacity: number;
+    currentUtilization: number;
+    status: "Available" | "Full" | "PendingAssignment" | "Closed";
+    manager: {
+      id: string;
+      fullName: string;
+      email: string | null;
+      phone: string;
+    } | null;
+    lastUpdatedAt: string;
+  }[];
   selectedCluster?: SOSCluster | null;
   selectedRescuer?: Rescuer | null;
   onClusterSelect: (cluster: SOSCluster) => void;

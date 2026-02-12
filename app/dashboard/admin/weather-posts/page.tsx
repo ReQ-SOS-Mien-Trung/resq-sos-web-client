@@ -5,7 +5,7 @@ import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockWeatherPosts } from "@/lib/mock-data/admin-weather-posts";
 import { Button } from "@/components/ui/button";
 import { Plus, SquaresFour, List } from "@phosphor-icons/react";
-import { PageLoading } from "@/components/admin";
+import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
   PostEditor,
@@ -37,10 +37,13 @@ const WeatherPostsPage = () => {
 
   if (loading || !dashboardData) {
     return (
-      <PageLoading
-        title="Đang tải bài đăng"
-        subtitle="Đang chuẩn bị nội dung thời tiết…"
-      />
+      <DashboardLayout
+        favorites={[]}
+        projects={[]}
+        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+      >
+        <DashboardSkeleton variant="cards" />
+      </DashboardLayout>
     );
   }
 

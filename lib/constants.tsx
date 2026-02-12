@@ -6,8 +6,10 @@ import {
   WeatherLayer,
 } from "@/type";
 import {
+  ArrowsCounterClockwise,
   ChartBar,
   ChatCircle,
+  CheckCircle,
   Clock,
   Cloud as CloudIcon,
   CloudSun,
@@ -24,6 +26,7 @@ import {
   Warning,
   WarningCircle,
   Wind,
+  XCircle,
 } from "@phosphor-icons/react";
 import {
   Bell,
@@ -435,3 +438,61 @@ export const WINDY_LAYERS: {
   },
   { id: "clouds", label: "Mây", icon: <CloudIcon className="h-4 w-4" /> },
 ];
+
+// ════════════════════════════════
+// Location Details Panel - Status Configs
+// ════════════════════════════════
+export const depotStatusConfig = {
+  Available: {
+    label: "Có sẵn",
+    color: "bg-green-500",
+    textColor: "text-green-700 dark:text-green-400",
+    bgColor: "bg-green-50 dark:bg-green-950/30",
+    icon: CheckCircle,
+  },
+  Full: {
+    label: "Đầy kho",
+    color: "bg-orange-500",
+    textColor: "text-orange-700 dark:text-orange-400",
+    bgColor: "bg-orange-50 dark:bg-orange-950/30",
+    icon: WarningCircle,
+  },
+  PendingAssignment: {
+    label: "Chờ phân công",
+    color: "bg-blue-500",
+    textColor: "text-blue-700 dark:text-blue-400",
+    bgColor: "bg-blue-50 dark:bg-blue-950/30",
+    icon: ArrowsCounterClockwise,
+  },
+  Closed: {
+    label: "Đóng cửa",
+    color: "bg-red-500",
+    textColor: "text-red-700 dark:text-red-400",
+    bgColor: "bg-red-50 dark:bg-red-950/30",
+    icon: XCircle,
+  },
+};
+
+export const assemblyPointStatusConfig = {
+  Active: {
+    label: "Hoạt động",
+    color: "bg-green-500",
+    textColor: "text-green-700 dark:text-green-400",
+    bgColor: "bg-green-50 dark:bg-green-950/30",
+    icon: CheckCircle,
+  },
+  Overloaded: {
+    label: "Quá tải",
+    color: "bg-orange-500",
+    textColor: "text-orange-700 dark:text-orange-400",
+    bgColor: "bg-orange-50 dark:bg-orange-950/30",
+    icon: WarningCircle,
+  },
+  Unavailable: {
+    label: "Không khả dụng",
+    color: "bg-red-500",
+    textColor: "text-red-700 dark:text-red-400",
+    bgColor: "bg-red-50 dark:bg-red-950/30",
+    icon: XCircle,
+  },
+};

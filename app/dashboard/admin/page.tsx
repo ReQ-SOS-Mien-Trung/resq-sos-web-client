@@ -13,7 +13,7 @@ import {
   TopCountries,
 } from "@/components/admin/dashboard";
 import { DashboardData } from "@/type";
-import { PageLoading } from "@/components/admin";
+import { DashboardSkeleton } from "@/components/admin";
 
 const AdminDashboardPage = () => {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -35,7 +35,15 @@ const AdminDashboardPage = () => {
   }, []);
 
   if (loading || !data) {
-    return <PageLoading />;
+    return (
+      <DashboardLayout
+        favorites={[]}
+        projects={[]}
+        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+      >
+        <DashboardSkeleton variant="dashboard" />
+      </DashboardLayout>
+    );
   }
 
   return (

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist, devtools } from "zustand/middleware";
-import { LoginResponse } from "@/services/auth/type";
+import { LoginResponse, RefreshTokenResponse } from "@/services/auth/type";
 
 interface User {
   userId: string;
@@ -19,6 +19,7 @@ interface AuthState {
 
   // Actions
   setAuth: (data: LoginResponse) => void;
+  updateTokens: (data: RefreshTokenResponse) => void;
   logout: () => void;
 }
 
@@ -50,6 +51,18 @@ export const useAuthStore = create<AuthState>()(
             },
             false,
             "auth/setAuth", // Action name hiển thị trong Redux DevTools
+          ),
+
+        updateTokens: (data: RefreshTokenResponse) =>
+          set(
+            {
+              accessToken: data.accessToken,
+              refreshToken: data.refreshToken,
+              expiresIn: data.expiresIn,
+              tokenType: data.tokenType,
+            },
+            false,
+            "auth/updateTokens",
           ),
 
         logout: () =>

@@ -5,7 +5,6 @@ import {
   mockInventoryItems,
   mockSupplyRequests,
   mockShipments,
-  mockDepotInfo,
   mockActivityLogs,
 } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -43,6 +42,7 @@ import {
   RecentActivity,
 } from "@/components/inventory";
 import {
+  DepotInfo,
   InventoryItem,
   IInventoryStats,
   ItemCategory,
@@ -51,80 +51,124 @@ import {
 } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import { useDepots } from "@/services/depot/hooks";
+import { DepotEntity } from "@/services/depot/type";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// --- Helpers ---
+
+/** Map DepotEntity from API to DepotInfo used by UI components */
+const mapDepotEntityToInfo = (
+  depot: DepotEntity,
+  managerName: string,
+): DepotInfo => ({
+  id: String(depot.id),
+  name: depot.name,
+  address: depot.address,
+  phone: "—",
+  manager: managerName,
+  totalItems: mockInventoryItems.length,
+  totalCategories: 6,
+  criticalAlerts: mockInventoryItems.filter((i) => i.stockLevel === "CRITICAL")
+    .length,
+  lowStockAlerts: mockInventoryItems.filter((i) => i.stockLevel === "LOW")
+    .length,
+  pendingRequests: mockSupplyRequests.filter((r) => r.status === "PENDING")
+    .length,
+  activeShipments: mockShipments.filter(
+    (s) => s.status === "PREPARING" || s.status === "IN_TRANSIT",
+  ).length,
+});
+
+/** Compute dashboard stats from inventory & supply data */
+const computeStats = (
+  items: InventoryItem[],
+  requests: SupplyRequest[],
+  shipments: Shipment[],
+): IInventoryStats => {
+  const now = new Date();
+  return {
+    totalItems: items.length,
+    totalCategories: new Set(items.map((i) => i.category)).size,
+    criticalStock: items.filter((i) => i.stockLevel === "CRITICAL").length,
+    lowStock: items.filter((i) => i.stockLevel === "LOW").length,
+    normalStock: items.filter(
+      (i) => i.stockLevel === "NORMAL" || i.stockLevel === "OVERSTOCKED",
+    ).length,
+    pendingInbound: requests.filter(
+      (r) => r.type === "INBOUND" && r.status === "PENDING",
+    ).length,
+    pendingOutbound: requests.filter(
+      (r) => r.type === "OUTBOUND" && r.status === "PENDING",
+    ).length,
+    activeShipments: shipments.filter(
+      (s) => s.status === "PREPARING" || s.status === "IN_TRANSIT",
+    ).length,
+    itemsExpiringSoon: items.filter((i) => {
+      if (!i.expiryDate) return false;
+      const days = Math.ceil(
+        (new Date(i.expiryDate).getTime() - now.getTime()) / 86_400_000,
+      );
+      return days > 0 && days <= 30;
+    }).length,
+  };
+};
+
+// --- Page Component ---
 
 const InventoryDashboardPage = () => {
-  // State management
+  // ── UI state ──
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<SupplyRequest | null>(
     null,
   );
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(
-    null,
-  );
   const [selectedCategory, setSelectedCategory] = useState<ItemCategory | null>(
     null,
   );
-  const [isConnected] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [itemSheetOpen, setItemSheetOpen] = useState(false);
 
-  // Notification count (mock)
-  const [notificationCount] = useState(5);
-
-  // Logout hook
+  // ── Auth ──
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
-
-  // User info from auth store
   const user = useAuthStore((state) => state.user);
 
-  // Get user initials for avatar
-  const userInitials = user?.fullName
-    ? user.fullName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "U";
+  const userInitials = useMemo(
+    () =>
+      user?.fullName
+        ? user.fullName
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase()
+        : "U",
+    [user],
+  );
 
-  // Calculate stats using useMemo
-  const stats: IInventoryStats = useMemo(() => {
-    const now = new Date("2026-01-15T10:00:00Z"); // Use fixed date for SSR
-    return {
-      totalItems: mockInventoryItems.length,
-      totalCategories: 6,
-      criticalStock: mockInventoryItems.filter(
-        (item) => item.stockLevel === "CRITICAL",
-      ).length,
-      lowStock: mockInventoryItems.filter((item) => item.stockLevel === "LOW")
-        .length,
-      normalStock: mockInventoryItems.filter(
-        (item) =>
-          item.stockLevel === "NORMAL" || item.stockLevel === "OVERSTOCKED",
-      ).length,
-      pendingInbound: mockSupplyRequests.filter(
-        (req) => req.type === "INBOUND" && req.status === "PENDING",
-      ).length,
-      pendingOutbound: mockSupplyRequests.filter(
-        (req) => req.type === "OUTBOUND" && req.status === "PENDING",
-      ).length,
-      activeShipments: mockShipments.filter(
-        (ship) => ship.status === "PREPARING" || ship.status === "IN_TRANSIT",
-      ).length,
-      itemsExpiringSoon: mockInventoryItems.filter((item) => {
-        if (!item.expiryDate) return false;
-        const daysUntilExpiry = Math.ceil(
-          (new Date(item.expiryDate).getTime() - now.getTime()) /
-            (1000 * 60 * 60 * 24),
-        );
-        return daysUntilExpiry <= 30 && daysUntilExpiry > 0;
-      }).length,
-    };
-  }, []);
+  // ── Fetch depot data from API ──
+  const {
+    data: depotsData,
+    isLoading: isDepotsLoading,
+    refetch: refetchDepots,
+  } = useDepots({ params: { pageNumber: 1, pageSize: 50 } });
 
-  // Handlers
+  // Use the first depot as the current managed depot
+  const currentDepot = depotsData?.items?.[0] ?? null;
+
+  // Map API depot to DepotInfo for sidebar
+  const depotInfo = useMemo<DepotInfo | null>(() => {
+    if (!currentDepot) return null;
+    return mapDepotEntityToInfo(currentDepot, user?.fullName ?? "Quản lý kho");
+  }, [currentDepot, user?.fullName]);
+
+  // ── Compute stats (will use real item APIs when available) ──
+  const stats = useMemo<IInventoryStats>(
+    () => computeStats(mockInventoryItems, mockSupplyRequests, mockShipments),
+    [],
+  );
+
+  // ── Handlers ──
   const handleItemSelect = useCallback((item: InventoryItem) => {
     setSelectedItem(item);
     setItemSheetOpen(true);
@@ -132,22 +176,90 @@ const InventoryDashboardPage = () => {
 
   const handleRequestSelect = useCallback((request: SupplyRequest) => {
     setSelectedRequest(request);
-    // Could open a request details sheet
   }, []);
 
-  const handleShipmentSelect = useCallback((shipment: Shipment) => {
-    setSelectedShipment(shipment);
-    // Could open a shipment tracking sheet
+  const handleShipmentSelect = useCallback(() => {
+    // Will be connected to shipment detail sheet when API is ready
   }, []);
 
   const handleCategorySelect = useCallback((category: ItemCategory | null) => {
     setSelectedCategory(category);
   }, []);
 
+  const handleRefresh = useCallback(() => {
+    refetchDepots();
+  }, [refetchDepots]);
+
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
+    setIsDarkMode((prev) => !prev);
     document.documentElement.classList.toggle("dark");
   };
+
+  // ── Loading state ──
+  if (isDepotsLoading) {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        {/* Header Skeleton */}
+        <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-9 w-9 rounded-md" />
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-6 w-24 rounded-full" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-9 w-24 rounded-md" />
+            <Skeleton className="h-9 w-28 rounded-md" />
+            <Skeleton className="h-9 w-9 rounded-md" />
+            <Skeleton className="h-8 w-8 rounded-full" />
+          </div>
+        </header>
+        {/* Body Skeleton */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Sidebar Skeleton */}
+          <aside className="w-80 shrink-0 border-r bg-background p-4 space-y-4">
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-8 w-full rounded-lg" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
+          </aside>
+          {/* Main Content Skeleton */}
+          <main className="flex-1 overflow-auto bg-muted/30 p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <Skeleton className="h-8 w-56 mb-2" />
+                <Skeleton className="h-4 w-80" />
+              </div>
+              <Skeleton className="h-9 w-24 rounded-md" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl border bg-card p-4 space-y-2"
+                >
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-7 w-12" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="h-48 w-full rounded-xl" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Skeleton className="h-64 w-full rounded-xl" />
+              <Skeleton className="h-64 w-full rounded-xl" />
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -178,15 +290,15 @@ const InventoryDashboardPage = () => {
             </span>
           </div>
           <Badge
-            variant={isConnected ? "success" : "destructive"}
+            variant={currentDepot ? "success" : "destructive"}
             className="hidden sm:flex items-center gap-1"
           >
-            {isConnected ? (
+            {currentDepot ? (
               <WifiHigh className="h-3 w-3" weight="bold" />
             ) : (
               <WifiSlash className="h-3 w-3" weight="bold" />
             )}
-            {isConnected ? "Đang kết nối" : "Mất kết nối"}
+            {currentDepot ? "Đang kết nối" : "Mất kết nối"}
           </Badge>
         </div>
 
@@ -204,9 +316,9 @@ const InventoryDashboardPage = () => {
           {/* Notifications */}
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
-            {notificationCount > 0 && (
+            {stats.criticalStock > 0 && (
               <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                {notificationCount}
+                {stats.criticalStock}
               </span>
             )}
           </Button>
@@ -229,7 +341,7 @@ const InventoryDashboardPage = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-red-400 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
+                <div className="h-8 w-8 rounded-full bg-linear-to-br from-red-400 to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
                   {userInitials}
                 </div>
               </Button>
@@ -286,19 +398,21 @@ const InventoryDashboardPage = () => {
             sidebarOpen ? "w-80" : "w-0",
           )}
         >
-          <DepotSidebar
-            depotInfo={mockDepotInfo}
-            inventoryItems={mockInventoryItems}
-            supplyRequests={mockSupplyRequests}
-            shipments={mockShipments}
-            onItemSelect={handleItemSelect}
-            onRequestSelect={handleRequestSelect}
-            onShipmentSelect={handleShipmentSelect}
-            selectedItem={selectedItem}
-            selectedRequest={selectedRequest}
-            selectedCategory={selectedCategory}
-            onCategorySelect={handleCategorySelect}
-          />
+          {depotInfo && (
+            <DepotSidebar
+              depotInfo={depotInfo}
+              inventoryItems={mockInventoryItems}
+              supplyRequests={mockSupplyRequests}
+              shipments={mockShipments}
+              onItemSelect={handleItemSelect}
+              onRequestSelect={handleRequestSelect}
+              onShipmentSelect={handleShipmentSelect}
+              selectedItem={selectedItem}
+              selectedRequest={selectedRequest}
+              selectedCategory={selectedCategory}
+              onCategorySelect={handleCategorySelect}
+            />
+          )}
         </aside>
 
         {/* Main Content */}
@@ -309,10 +423,16 @@ const InventoryDashboardPage = () => {
               <div>
                 <h1 className="text-2xl font-bold">Dashboard Kho Hàng</h1>
                 <p className="text-muted-foreground">
-                  {mockDepotInfo.name} • Quản lý bởi {mockDepotInfo.manager}
+                  {depotInfo?.name ?? "Đang tải..."} • Quản lý bởi{" "}
+                  {user?.fullName ?? "—"}
                 </p>
               </div>
-              <Button variant="outline" size="sm" className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleRefresh}
+              >
                 <ArrowsClockwise className="h-4 w-4" />
                 Làm mới
               </Button>
@@ -350,15 +470,12 @@ const InventoryDashboardPage = () => {
         open={itemSheetOpen}
         onOpenChange={setItemSheetOpen}
         onRequestInbound={() => {
-          // Handle inbound request
           console.log("Request inbound for:", selectedItem?.name);
         }}
         onRequestOutbound={() => {
-          // Handle outbound request
           console.log("Request outbound for:", selectedItem?.name);
         }}
         onEdit={() => {
-          // Handle edit
           console.log("Edit item:", selectedItem?.name);
         }}
       />

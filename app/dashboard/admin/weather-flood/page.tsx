@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockFloodAlerts } from "@/lib/mock-data/admin-weather-flood";
-import { PageLoading } from "@/components/admin";
+import { DashboardSkeleton } from "@/components/admin";
 import { FloodAlert, WeatherData } from "@/type";
 import { DashboardLayout } from "@/components/admin/dashboard";
 
@@ -119,7 +119,15 @@ const WeatherFloodPage = () => {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading />;
+    return (
+      <DashboardLayout
+        favorites={[]}
+        projects={[]}
+        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+      >
+        <DashboardSkeleton variant="dashboard" />
+      </DashboardLayout>
+    );
   }
 
   return (

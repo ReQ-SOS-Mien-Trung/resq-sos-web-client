@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/stores/auth.store";
 import { RoleId, getDashboardPathByRole } from "@/lib/roles";
 import { getAllowedRolesForPath, isPublicRoute } from "@/lib/route-config";
+import { PageLoading } from "@/components/admin";
 
 interface RoleGuardProps {
   children: React.ReactNode;
@@ -93,14 +94,7 @@ export function RoleGuard({
 
   // Show loading while checking
   if (isChecking) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Đang xác thực...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading />;
   }
 
   return <>{children}</>;

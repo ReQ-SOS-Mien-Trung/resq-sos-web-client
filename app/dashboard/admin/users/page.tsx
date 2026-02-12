@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockUsers, mockUserStats } from "@/lib/mock-data/admin-users";
-import { PageLoading } from "@/components/admin";
+import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import { UserFilters, UserStats, UserTable } from "@/components/admin/users";
 
 const UsersPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [filters, setFilters] = useState<UserFiltersType>({});
+  const [filters, setFilters] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,10 +28,13 @@ const UsersPage = () => {
 
   if (loading || !dashboardData) {
     return (
-      <PageLoading
-        title="Đang tải người dùng"
-        subtitle="Đang đồng bộ danh sách tài khoản…"
-      />
+      <DashboardLayout
+        favorites={[]}
+        projects={[]}
+        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+      >
+        <DashboardSkeleton variant="table" />
+      </DashboardLayout>
     );
   }
 

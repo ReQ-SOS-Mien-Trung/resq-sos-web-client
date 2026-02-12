@@ -6,7 +6,7 @@ import {
   mockChatRooms,
   mockMessageTemplates,
 } from "@/lib/mock-data/admin-chat-config";
-import { PageLoading } from "@/components/admin";
+import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
   ChatRoomList,
@@ -34,7 +34,15 @@ const ChatConfigPage = () => {
   }, []);
 
   if (loading || !dashboardData) {
-    return <PageLoading />;
+    return (
+      <DashboardLayout
+        favorites={[]}
+        projects={[]}
+        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+      >
+        <DashboardSkeleton variant="editor" />
+      </DashboardLayout>
+    );
   }
 
   return (

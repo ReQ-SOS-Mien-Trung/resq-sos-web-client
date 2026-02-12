@@ -5,6 +5,7 @@ import {
   CreateDepotRequest,
   DepotEntity,
   DepotStatusMetadata,
+  UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
 } from "./type";
@@ -51,6 +52,18 @@ export async function createDepot(
   request: CreateDepotRequest,
 ): Promise<DepotEntity> {
   const { data } = await api.post("/logistics/depot", request);
+  return data;
+}
+
+/**
+ * Update a depot
+ * PUT /logistics/depot/{id}
+ */
+export async function updateDepot(
+  request: UpdateDepotRequest,
+): Promise<DepotEntity> {
+  const { id, ...body } = request;
+  const { data } = await api.put(`/logistics/depot/${id}`, body);
   return data;
 }
 

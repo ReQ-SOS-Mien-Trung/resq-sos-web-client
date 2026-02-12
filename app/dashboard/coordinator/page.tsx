@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, Suspense } from "react";
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  Suspense,
+  useMemo,
+} from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -9,15 +16,19 @@ import {
   Rescuer,
   AIDispatchDecision,
   Location,
+  LocationPanelData,
 } from "@/type";
 import {
   mockSOSRequests,
   mockRescuers,
-  mockDepots,
   mockSOSClusters,
   mockAIDecision,
   mockActiveMissions,
 } from "@/lib/mock-data";
+import { useDepots } from "@/services/depot/hooks";
+import { useAssemblyPoints } from "@/services/assembly_points/hooks";
+import type { DepotEntity } from "@/services/depot/type";
+import type { AssemblyPointEntity } from "@/services/assembly_points/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,23 +54,23 @@ import {
   MapTrifold,
   SignOut,
 } from "@phosphor-icons/react";
-import { ClusterDetailsPanel, SOSSidebar } from "@/components/coordinator";
-import RescuePlanPanel from "@/components/coordinator/RescuePlanPanel";
+import {
+  ClusterDetailsPanel,
+  RescuePlanPanel,
+  SOSSidebar,
+  LocationDetailsPanel,
+} from "@/components/coordinator";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const CoordinatorMap = dynamic(
   () => import("@/components/coordinator/CoordinatorMap"),
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full bg-muted flex items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <ArrowsClockwise className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            Đang tải bản đồ...
-          </span>
-        </div>
+      <div className="w-full h-full bg-muted/30 animate-in fade-in duration-300">
+        <Skeleton className="w-full h-full rounded-none" />
       </div>
     ),
   },
@@ -70,13 +81,8 @@ const WindyLeafletMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full bg-muted flex items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <ArrowsClockwise className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
-            Đang tải bản đồ thời tiết...
-          </span>
-        </div>
+      <div className="w-full h-full bg-muted/30 animate-in fade-in duration-300">
+        <Skeleton className="w-full h-full rounded-none" />
       </div>
     ),
   },
@@ -105,6 +111,9 @@ const CoordinatorDashboardContent = () => {
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
   const [currentAIDecision, setCurrentAIDecision] =
     useState<AIDispatchDecision | null>(null);
+  const [locationPanelOpen, setLocationPanelOpen] = useState(false);
+  const [locationPanelData, setLocationPanelData] =
+    useState<LocationPanelData | null>(null);
 
   // Track if CoordinatorMap has been loaded (which loads Leaflet 1.9.4)
   const coordinatorMapLoadedRef = useRef(false);
@@ -129,6 +138,28 @@ const CoordinatorDashboardContent = () => {
 
   // Notification count (mock)
   const [notificationCount] = useState(3);
+
+  // Fetch depots from backend for map display
+  const { data: depotsData } = useDepots({
+    params: { pageSize: 100 }, // Get all depots for map display
+  });
+
+  // Use depot data directly from backend (no mapping needed)
+  const depots: DepotEntity[] = useMemo(() => {
+    if (!depotsData?.items) return [];
+    return depotsData.items;
+  }, [depotsData]);
+
+  // Fetch assembly points from backend for map display
+  const { data: assemblyPointsData } = useAssemblyPoints({
+    params: { pageSize: 100 }, // Get all assembly points for map display
+  });
+
+  // Use assembly points data directly from backend (no mapping needed)
+  const assemblyPoints: AssemblyPointEntity[] = useMemo(() => {
+    if (!assemblyPointsData?.items) return [];
+    return assemblyPointsData.items;
+  }, [assemblyPointsData]);
 
   // Logout hook
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -163,6 +194,25 @@ const CoordinatorDashboardContent = () => {
     setSelectedRescuer(rescuer);
     setFlyToLocation(rescuer.location);
   }, []);
+
+  const handleDepotSelect = useCallback((depot: DepotEntity) => {
+    setLocationPanelData({ type: "depot", data: depot });
+    setLocationPanelOpen(true);
+    setFlyToLocation({ lat: depot.latitude, lng: depot.longitude });
+    // Close other panels
+    setClusterSheetOpen(false);
+  }, []);
+
+  const handleAssemblyPointSelect = useCallback(
+    (point: AssemblyPointEntity) => {
+      setLocationPanelData({ type: "assemblyPoint", data: point });
+      setLocationPanelOpen(true);
+      setFlyToLocation({ lat: point.latitude, lng: point.longitude });
+      // Close other panels
+      setClusterSheetOpen(false);
+    },
+    [],
+  );
 
   const handleProcessCluster = useCallback(() => {
     // Simulate AI decision generation
@@ -380,7 +430,7 @@ const CoordinatorDashboardContent = () => {
             <WindyLeafletMap
               clusters={mockSOSClusters}
               rescuers={mockRescuers}
-              depots={mockDepots}
+              depots={depots}
               selectedCluster={selectedCluster}
               selectedRescuer={selectedRescuer}
               onClusterSelect={handleClusterSelect}
@@ -392,18 +442,21 @@ const CoordinatorDashboardContent = () => {
               <CoordinatorMap
                 clusters={mockSOSClusters}
                 rescuers={mockRescuers}
-                depots={mockDepots}
+                depots={depots}
+                assemblyPoints={assemblyPoints}
                 selectedCluster={selectedCluster}
                 selectedRescuer={selectedRescuer}
                 aiDecision={currentAIDecision}
                 onClusterSelect={handleClusterSelect}
                 onRescuerSelect={handleRescuerSelect}
+                onDepotSelect={handleDepotSelect}
+                onAssemblyPointSelect={handleAssemblyPointSelect}
                 flyToLocation={flyToLocation}
               />
 
               {/* Floating Stats Panel - Only show when cluster panel is closed */}
               {!clusterSheetOpen && (
-                <div className="absolute top-4 right-4 z-[500]">
+                <div className="absolute top-4 right-4 z-[40]">
                   <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
                     <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Thống kê thời gian thực
@@ -438,20 +491,6 @@ const CoordinatorDashboardContent = () => {
                 </div>
               )}
 
-              {/* Quick Action Floating Button */}
-              <div className="absolute bottom-4 right-4 z-[500]">
-                <Button
-                  size="lg"
-                  className="rounded-full h-14 w-14 shadow-lg bg-linear-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
-                  onClick={() => {
-                    // Quick add SOS functionality
-                    alert("Thêm SOS nhanh - Chức năng đang phát triển");
-                  }}
-                >
-                  <span className="text-2xl">+</span>
-                </Button>
-              </div>
-
               {/* Cluster Details Panel - Overlays on map from right */}
               <ClusterDetailsPanel
                 open={clusterSheetOpen}
@@ -473,6 +512,13 @@ const CoordinatorDashboardContent = () => {
                 onApprove={handleApproveDecision}
                 onOverride={handleOverrideDecision}
               />
+
+              {/* Location Details Panel - Depot / Assembly Point */}
+              <LocationDetailsPanel
+                open={locationPanelOpen}
+                onOpenChange={setLocationPanelOpen}
+                location={locationPanelData}
+              />
             </>
           )}
         </main>
@@ -486,10 +532,44 @@ const CoordinatorDashboardPage = () => {
   return (
     <Suspense
       fallback={
-        <div className="flex-1 flex items-center justify-center bg-background">
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <span className="text-sm text-muted-foreground">Đang tải...</span>
+        <div className="h-screen flex flex-col overflow-hidden animate-in fade-in duration-300">
+          {/* Header Skeleton */}
+          <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-7 w-28 rounded-full" />
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-9 w-9 rounded-md" />
+              <Skeleton className="h-8 w-8 rounded-full" />
+            </div>
+          </header>
+          {/* Body Skeleton */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Sidebar Skeleton */}
+            <aside className="w-80 shrink-0 border-r bg-background p-4 space-y-4">
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-5 w-16 rounded-full" />
+                      <Skeleton className="h-4 w-12" />
+                    </div>
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                ))}
+              </div>
+            </aside>
+            {/* Map Area Skeleton */}
+            <main className="flex-1 relative">
+              <Skeleton className="w-full h-full rounded-none" />
+            </main>
           </div>
         </div>
       }

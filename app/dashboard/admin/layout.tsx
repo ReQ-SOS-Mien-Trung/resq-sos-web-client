@@ -1,5 +1,3 @@
-"use client";
-
 import { RoleGuard } from "@/components/auth";
 
 export default function AdminLayout({

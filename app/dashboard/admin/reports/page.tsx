@@ -11,7 +11,7 @@ import {
   ReportFilters,
   ReportTable,
 } from "@/components/admin/reports";
-import { PageLoading } from "@/components/admin";
+import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
 
 const ReportsPage = () => {
@@ -35,10 +35,13 @@ const ReportsPage = () => {
 
   if (loading || !dashboardData) {
     return (
-      <PageLoading
-        title="Đang tải báo cáo"
-        subtitle="Đang tổng hợp dữ liệu cứu hộ…"
-      />
+      <DashboardLayout
+        favorites={[]}
+        projects={[]}
+        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+      >
+        <DashboardSkeleton variant="table" />
+      </DashboardLayout>
     );
   }
 
