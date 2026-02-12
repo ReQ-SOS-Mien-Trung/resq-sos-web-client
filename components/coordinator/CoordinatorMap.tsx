@@ -63,6 +63,8 @@ const CoordinatorMap = ({
   aiDecision,
   onClusterSelect,
   onRescuerSelect,
+  onDepotSelect,
+  onAssemblyPointSelect,
   flyToLocation,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
@@ -458,12 +460,20 @@ const CoordinatorMap = ({
 
         {/* Depot Markers */}
         {depots.map((depot) => (
-          <DepotMarker key={depot.id} depot={depot} />
+          <DepotMarker
+            key={depot.id}
+            depot={depot}
+            onClick={() => onDepotSelect?.(depot)}
+          />
         ))}
 
         {/* Assembly Point Markers */}
         {assemblyPoints.map((point) => (
-          <AssemblyPointMarker key={point.id} assemblyPoint={point} />
+          <AssemblyPointMarker
+            key={point.id}
+            assemblyPoint={point}
+            onClick={() => onAssemblyPointSelect?.(point)}
+          />
         ))}
 
         {/* Mission Route Polyline */}
@@ -568,7 +578,7 @@ function SOSClusterMarker({
     >
       <Popup>
         <div className="p-2 min-w-50">
-          <div className="font-bold text-sm mb-2">
+          <div className="font-bold text-sm mb-2 pr-5">
             Cụm SOS #{cluster.id.split("-")[1]}
           </div>
           <div className="space-y-1 text-xs">
@@ -649,7 +659,7 @@ function RescuerMarker({
     >
       <Popup>
         <div className="p-2 min-w-45">
-          <div className="font-bold text-sm mb-2">{rescuer.name}</div>
+          <div className="font-bold text-sm mb-2 pr-5">{rescuer.name}</div>
           <div className="space-y-1 text-xs">
             <div className="flex items-center gap-2">
               <span
@@ -673,7 +683,13 @@ function RescuerMarker({
 }
 
 // Depot Marker Component
-function DepotMarker({ depot }: { depot: DepotEntity }) {
+function DepotMarker({
+  depot,
+  onClick,
+}: {
+  depot: DepotEntity;
+  onClick?: () => void;
+}) {
   const statusColors = {
     Available: "#22c55e", // green-500
     Full: "#f97316", // orange-500
@@ -715,10 +731,14 @@ function DepotMarker({ depot }: { depot: DepotEntity }) {
   if (!iconEl) return null;
 
   return (
-    <Marker position={[depot.latitude, depot.longitude]} icon={iconEl}>
+    <Marker
+      position={[depot.latitude, depot.longitude]}
+      icon={iconEl}
+      eventHandlers={{ click: () => onClick?.() }}
+    >
       <Popup>
         <div className="p-2 min-w-50">
-          <div className="font-bold text-sm mb-1">{depot.name}</div>
+          <div className="font-bold text-sm mb-1 pr-5">{depot.name}</div>
           <div className="text-xs text-muted-foreground mb-2">
             📍 {depot.address}
           </div>
@@ -749,8 +769,10 @@ function DepotMarker({ depot }: { depot: DepotEntity }) {
 // Assembly Point Marker Component
 function AssemblyPointMarker({
   assemblyPoint,
+  onClick,
 }: {
   assemblyPoint: AssemblyPointEntity;
+  onClick?: () => void;
 }) {
   const statusColors = {
     Active: "#22c55e", // green-500
@@ -794,10 +816,13 @@ function AssemblyPointMarker({
     <Marker
       position={[assemblyPoint.latitude, assemblyPoint.longitude]}
       icon={iconEl}
+      eventHandlers={{ click: () => onClick?.() }}
     >
       <Popup>
         <div className="p-2 min-w-50">
-          <div className="font-bold text-sm mb-1">{assemblyPoint.name}</div>
+          <div className="font-bold text-sm mb-1 pr-5">
+            {assemblyPoint.name}
+          </div>
           <div className="text-xs text-muted-foreground mb-2">
             Mã: {assemblyPoint.code}
           </div>

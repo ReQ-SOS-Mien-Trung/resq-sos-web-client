@@ -16,6 +16,7 @@ import {
   Rescuer,
   AIDispatchDecision,
   Location,
+  LocationPanelData,
 } from "@/type";
 import {
   mockSOSRequests,
@@ -57,6 +58,7 @@ import {
   ClusterDetailsPanel,
   RescuePlanPanel,
   SOSSidebar,
+  LocationDetailsPanel,
 } from "@/components/coordinator";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
@@ -109,6 +111,9 @@ const CoordinatorDashboardContent = () => {
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
   const [currentAIDecision, setCurrentAIDecision] =
     useState<AIDispatchDecision | null>(null);
+  const [locationPanelOpen, setLocationPanelOpen] = useState(false);
+  const [locationPanelData, setLocationPanelData] =
+    useState<LocationPanelData | null>(null);
 
   // Track if CoordinatorMap has been loaded (which loads Leaflet 1.9.4)
   const coordinatorMapLoadedRef = useRef(false);
@@ -189,6 +194,25 @@ const CoordinatorDashboardContent = () => {
     setSelectedRescuer(rescuer);
     setFlyToLocation(rescuer.location);
   }, []);
+
+  const handleDepotSelect = useCallback((depot: DepotEntity) => {
+    setLocationPanelData({ type: "depot", data: depot });
+    setLocationPanelOpen(true);
+    setFlyToLocation({ lat: depot.latitude, lng: depot.longitude });
+    // Close other panels
+    setClusterSheetOpen(false);
+  }, []);
+
+  const handleAssemblyPointSelect = useCallback(
+    (point: AssemblyPointEntity) => {
+      setLocationPanelData({ type: "assemblyPoint", data: point });
+      setLocationPanelOpen(true);
+      setFlyToLocation({ lat: point.latitude, lng: point.longitude });
+      // Close other panels
+      setClusterSheetOpen(false);
+    },
+    [],
+  );
 
   const handleProcessCluster = useCallback(() => {
     // Simulate AI decision generation
@@ -425,6 +449,8 @@ const CoordinatorDashboardContent = () => {
                 aiDecision={currentAIDecision}
                 onClusterSelect={handleClusterSelect}
                 onRescuerSelect={handleRescuerSelect}
+                onDepotSelect={handleDepotSelect}
+                onAssemblyPointSelect={handleAssemblyPointSelect}
                 flyToLocation={flyToLocation}
               />
 
@@ -485,6 +511,13 @@ const CoordinatorDashboardContent = () => {
                 )}
                 onApprove={handleApproveDecision}
                 onOverride={handleOverrideDecision}
+              />
+
+              {/* Location Details Panel - Depot / Assembly Point */}
+              <LocationDetailsPanel
+                open={locationPanelOpen}
+                onOpenChange={setLocationPanelOpen}
+                location={locationPanelData}
               />
             </>
           )}

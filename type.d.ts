@@ -84,7 +84,12 @@ export interface Depot {
   capacity: number;
   currentUtilization: number;
   status: "Available" | "Full" | "PendingAssignment" | "Closed";
-  depotManagerId: string | null;
+  manager: {
+    id: string;
+    fullName: string;
+    email: string | null;
+    phone: string;
+  } | null;
   lastUpdatedAt: string;
 }
 
@@ -700,6 +705,19 @@ export interface RescuerVerification {
 }
 
 //Coordinator Dashboard Types
+export type LocationPanelData =
+  | { type: "depot"; data: import("@/services/depot/type").DepotEntity }
+  | {
+      type: "assemblyPoint";
+      data: import("@/services/assembly_points/type").AssemblyPointEntity;
+    };
+
+export interface LocationDetailsPanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  location: LocationPanelData | null;
+}
+
 export interface AIDispatchPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -731,7 +749,12 @@ export interface CoordinatorMapProps {
     capacity: number;
     currentUtilization: number;
     status: "Available" | "Full" | "PendingAssignment" | "Closed";
-    depotManagerId: string | null;
+    manager: {
+      id: string;
+      fullName: string;
+      email: string | null;
+      phone: string;
+    } | null;
     lastUpdatedAt: string;
   }[];
   // AssemblyPointEntity from backend
@@ -750,6 +773,10 @@ export interface CoordinatorMapProps {
   aiDecision?: AIDispatchDecision | null;
   onClusterSelect: (cluster: SOSCluster) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
+  onDepotSelect?: (depot: CoordinatorMapProps["depots"][number]) => void;
+  onAssemblyPointSelect?: (
+    point: NonNullable<CoordinatorMapProps["assemblyPoints"]>[number],
+  ) => void;
   flyToLocation?: Location | null;
   /** Used to trigger map resize when side panel opens/closes */
   panelOpen?: boolean;
@@ -1093,7 +1120,12 @@ export interface WindyLeafletMapProps {
     capacity: number;
     currentUtilization: number;
     status: "Available" | "Full" | "PendingAssignment" | "Closed";
-    depotManagerId: string | null;
+    manager: {
+      id: string;
+      fullName: string;
+      email: string | null;
+      phone: string;
+    } | null;
     lastUpdatedAt: string;
   }[];
   selectedCluster?: SOSCluster | null;
