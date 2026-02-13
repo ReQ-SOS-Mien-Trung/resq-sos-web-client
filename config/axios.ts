@@ -105,7 +105,7 @@ axiosInstance.interceptors.response.use(
       try {
         // Gọi API refresh token (dùng axios thường, không dùng axiosInstance để tránh lặp interceptor)
         const { data } = await axios.post<RefreshTokenResponse>(
-          `${API_URL}/api/auth/refresh-token`,
+          `${API_URL}/identity/auth/refresh-token`,
           { accessToken, refreshToken },
           {
             headers: { "Content-Type": "application/json" },
