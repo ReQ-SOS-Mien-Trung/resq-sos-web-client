@@ -317,8 +317,8 @@ export const navigationItems = [
   { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
   {
     icon: UserCheck,
-    label: "Đăng ký cứu hộ viên",
-    href: "/dashboard/admin/rescuer-registration",
+    label: "Quản lý cứu hộ viên",
+    href: "/dashboard/admin/rescuer-verification",
   },
   {
     icon: Robot,
@@ -329,11 +329,6 @@ export const navigationItems = [
     icon: ChatCircle,
     label: "Cấu hình phòng chat",
     href: "/dashboard/admin/chat-config",
-  },
-  {
-    icon: UserPlus,
-    label: "Xác nhận cứu hộ viên",
-    href: "/dashboard/admin/rescuer-verification",
   },
 ];
 

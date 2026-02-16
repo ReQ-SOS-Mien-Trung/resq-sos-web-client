@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import {
   SOSRequest,
   SOSCluster,
@@ -411,9 +412,13 @@ const CoordinatorDashboardContent = () => {
           </Button>
 
           <div className="flex items-center gap-2">
-            <div className="text-xl font-bold bg-linear-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
-              ReQ-SOS
-            </div>
+            <Image
+              src="/icons/resq_typo_logo.svg"
+              alt="ReQ-SOS Logo"
+              width={80}
+              height={32}
+              className="dark:invert h-8 w-auto object-contain"
+            />
             <Badge variant="secondary" className="text-xs">
               Miền Trung
             </Badge>

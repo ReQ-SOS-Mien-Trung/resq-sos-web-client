@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -31,40 +32,23 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
         <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-300">
           {/* Logo & Brand Section */}
           <div className="p-4 border-b border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-linear-to-br from-red-500 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-red-500/30">
-                <span className="text-lg font-bold">R</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-base font-bold text-sidebar-foreground">
-                  SOS ResQ
-                </div>
-                <div className="text-xs text-sidebar-foreground/50">
-                  Hệ thống cứu hộ miền Trung
-                </div>
-              </div>
-              <CaretDown
-                size={16}
-                className="text-sidebar-foreground/40 hover:text-sidebar-foreground transition-colors cursor-pointer"
+            <div className="flex items-center gap-2.5">
+              <Image
+                src="/icons/logo.svg"
+                alt="ResQ Logo"
+                width={36}
+                height={36}
+                className="shrink-0"
               />
-            </div>
-          </div>
-
-          {/* User Profile Section */}
-          <div className="px-4 py-3">
-            <div className="flex items-center gap-3 p-2 rounded-xl bg-sidebar-accent/50 hover:bg-sidebar-accent transition-colors cursor-pointer group">
-              <div className="h-8 w-8 rounded-full bg-linear-to-br from-red-400 to-orange-500 flex items-center justify-center text-white text-sm font-semibold ring-2 ring-background">
-                A
-              </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-sidebar-foreground truncate">
-                  admin@sosresq.vn
-                </div>
+                <Image
+                  src="/icons/resq_typo_logo.svg"
+                  alt="ResQ SOS"
+                  width={80}
+                  height={40}
+                  className="dark:invert"
+                />
               </div>
-              <CaretDown
-                size={16}
-                className="text-sidebar-foreground/40 group-hover:text-sidebar-foreground transition-colors"
-              />
             </div>
           </div>
 

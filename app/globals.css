@@ -554,6 +554,21 @@
   animation-name: zoom-in-95;
 }
 
+@keyframes zoom-in-95-static {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.zoom-in-95-static {
+  animation-name: zoom-in-95-static;
+}
+
 .slide-in-from-left-1\/2 {
   --tw-translate-x: -50%;
 }
