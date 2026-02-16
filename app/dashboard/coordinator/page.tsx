@@ -106,6 +106,9 @@ const CoordinatorDashboardContent = () => {
   const [isConnected] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // Geolocation: current device position
+  const [userLocation, setUserLocation] = useState<Location | null>(null);
+
   // Panel states
   const [clusterSheetOpen, setClusterSheetOpen] = useState(false);
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
@@ -135,6 +138,41 @@ const CoordinatorDashboardContent = () => {
       coordinatorMapLoadedRef.current = true;
     }
   }, [isWeatherMode]);
+
+  // Watch user's current geolocation
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    // Get initial position
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      (err) => {
+        console.warn("Geolocation error:", err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+
+    // Continuously watch position
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      (err) => {
+        console.warn("Geolocation watch error:", err.message);
+      },
+      { enableHighAccuracy: true },
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
 
   // Notification count (mock)
   const [notificationCount] = useState(3);
@@ -532,6 +570,7 @@ const CoordinatorDashboardContent = () => {
               onClusterSelect={handleClusterSelect}
               onRescuerSelect={handleRescuerSelect}
               flyToLocation={flyToLocation}
+              userLocation={userLocation}
             />
           ) : (
             <>
@@ -548,6 +587,7 @@ const CoordinatorDashboardContent = () => {
                 onDepotSelect={handleDepotSelect}
                 onAssemblyPointSelect={handleAssemblyPointSelect}
                 flyToLocation={flyToLocation}
+                userLocation={userLocation}
               />
 
               {/* Floating Stats Panel - Only show when cluster panel is closed */}

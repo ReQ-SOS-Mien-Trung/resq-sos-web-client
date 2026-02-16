@@ -45,7 +45,6 @@ import {
   DepotInfo,
   InventoryItem,
   IInventoryStats,
-  ItemCategory,
   Shipment,
   SupplyRequest,
 } from "@/type";
@@ -53,6 +52,7 @@ import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { useDepots } from "@/services/depot/hooks";
 import { DepotEntity } from "@/services/depot/type";
+import { useItemCategories } from "@/services/item_categories/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // --- Helpers ---
@@ -61,6 +61,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 const mapDepotEntityToInfo = (
   depot: DepotEntity,
   managerName: string,
+  totalCategories: number,
 ): DepotInfo => ({
   id: String(depot.id),
   name: depot.name,
@@ -68,7 +69,7 @@ const mapDepotEntityToInfo = (
   phone: "—",
   manager: managerName,
   totalItems: mockInventoryItems.length,
-  totalCategories: 6,
+  totalCategories,
   criticalAlerts: mockInventoryItems.filter((i) => i.stockLevel === "CRITICAL")
     .length,
   lowStockAlerts: mockInventoryItems.filter((i) => i.stockLevel === "LOW")
@@ -85,11 +86,12 @@ const computeStats = (
   items: InventoryItem[],
   requests: SupplyRequest[],
   shipments: Shipment[],
+  totalCategories: number,
 ): IInventoryStats => {
   const now = new Date();
   return {
     totalItems: items.length,
-    totalCategories: new Set(items.map((i) => i.category)).size,
+    totalCategories,
     criticalStock: items.filter((i) => i.stockLevel === "CRITICAL").length,
     lowStock: items.filter((i) => i.stockLevel === "LOW").length,
     normalStock: items.filter(
@@ -123,9 +125,7 @@ const InventoryDashboardPage = () => {
   const [selectedRequest, setSelectedRequest] = useState<SupplyRequest | null>(
     null,
   );
-  const [selectedCategory, setSelectedCategory] = useState<ItemCategory | null>(
-    null,
-  );
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [itemSheetOpen, setItemSheetOpen] = useState(false);
 
@@ -153,19 +153,39 @@ const InventoryDashboardPage = () => {
     refetch: refetchDepots,
   } = useDepots({ params: { pageNumber: 1, pageSize: 50 } });
 
+  // ── Fetch item categories from API ──
+  const {
+    data: categoriesData,
+    isLoading: isCategoriesLoading,
+    refetch: refetchCategories,
+  } = useItemCategories({ params: { pageNumber: 1, pageSize: 50 } });
+
   // Use the first depot as the current managed depot
   const currentDepot = depotsData?.items?.[0] ?? null;
+
+  // Real category count from API
+  const totalCategories = categoriesData?.totalCount ?? 0;
 
   // Map API depot to DepotInfo for sidebar
   const depotInfo = useMemo<DepotInfo | null>(() => {
     if (!currentDepot) return null;
-    return mapDepotEntityToInfo(currentDepot, user?.fullName ?? "Quản lý kho");
-  }, [currentDepot, user?.fullName]);
+    return mapDepotEntityToInfo(
+      currentDepot,
+      user?.fullName ?? "Quản lý kho",
+      totalCategories,
+    );
+  }, [currentDepot, user?.fullName, totalCategories]);
 
   // ── Compute stats (will use real item APIs when available) ──
   const stats = useMemo<IInventoryStats>(
-    () => computeStats(mockInventoryItems, mockSupplyRequests, mockShipments),
-    [],
+    () =>
+      computeStats(
+        mockInventoryItems,
+        mockSupplyRequests,
+        mockShipments,
+        totalCategories,
+      ),
+    [totalCategories],
   );
 
   // ── Handlers ──
@@ -182,13 +202,14 @@ const InventoryDashboardPage = () => {
     // Will be connected to shipment detail sheet when API is ready
   }, []);
 
-  const handleCategorySelect = useCallback((category: ItemCategory | null) => {
+  const handleCategorySelect = useCallback((category: string | null) => {
     setSelectedCategory(category);
   }, []);
 
   const handleRefresh = useCallback(() => {
     refetchDepots();
-  }, [refetchDepots]);
+    refetchCategories();
+  }, [refetchDepots, refetchCategories]);
 
   const toggleDarkMode = () => {
     setIsDarkMode((prev) => !prev);
@@ -196,7 +217,7 @@ const InventoryDashboardPage = () => {
   };
 
   // ── Loading state ──
-  if (isDepotsLoading) {
+  if (isDepotsLoading || isCategoriesLoading) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         {/* Header Skeleton */}
@@ -411,6 +432,7 @@ const InventoryDashboardPage = () => {
               selectedRequest={selectedRequest}
               selectedCategory={selectedCategory}
               onCategorySelect={handleCategorySelect}
+              apiCategories={categoriesData?.items}
             />
           )}
         </aside>
@@ -443,7 +465,7 @@ const InventoryDashboardPage = () => {
 
             {/* Category Overview */}
             <CategoryOverview
-              items={mockInventoryItems}
+              apiCategories={categoriesData?.items}
               onCategorySelect={handleCategorySelect}
               selectedCategory={selectedCategory}
             />

@@ -778,6 +778,8 @@ export interface CoordinatorMapProps {
     point: NonNullable<CoordinatorMapProps["assemblyPoints"]>[number],
   ) => void;
   flyToLocation?: Location | null;
+  /** Current user/device location from geolocation API */
+  userLocation?: Location | null;
   /** Used to trigger map resize when side panel opens/closes */
   panelOpen?: boolean;
 }
@@ -986,18 +988,34 @@ export interface DepotSidebarProps {
   onShipmentSelect: (shipment: Shipment) => void;
   selectedItem?: InventoryItem | null;
   selectedRequest?: SupplyRequest | null;
-  selectedCategory?: ItemCategory | null;
-  onCategorySelect?: (category: ItemCategory | null) => void;
+  selectedCategory?: string | null;
+  onCategorySelect?: (category: string | null) => void;
+  /** API item categories – when provided, drives the filter badges */
+  apiCategories?: {
+    id: number;
+    code: string;
+    name: string;
+    quantity: number;
+    description: string;
+  }[];
 }
 
 export interface CategoryOverviewProps {
-  items: InventoryItem[];
-  onCategorySelect?: (category: ItemCategory) => void;
-  selectedCategory?: ItemCategory | null;
+  items?: InventoryItem[];
+  /** API item categories – when provided, renders cards from real data */
+  apiCategories?: {
+    id: number;
+    code: string;
+    name: string;
+    quantity: number;
+    description: string;
+  }[];
+  onCategorySelect?: (category: string) => void;
+  selectedCategory?: string | null;
 }
 
 export interface CategorySummary {
-  category: ItemCategory;
+  category: string;
   totalItems: number;
   totalQuantity: number;
   criticalCount: number;
@@ -1133,4 +1151,6 @@ export interface WindyLeafletMapProps {
   onClusterSelect: (cluster: SOSCluster) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   flyToLocation?: Location | null;
+  /** Current user/device location from geolocation API */
+  userLocation?: Location | null;
 }

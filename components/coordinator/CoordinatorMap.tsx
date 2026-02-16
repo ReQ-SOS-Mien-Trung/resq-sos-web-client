@@ -15,6 +15,7 @@ import {
   Crosshair,
   FunnelSimple,
   Command,
+  NavigationArrow,
 } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +67,7 @@ const CoordinatorMap = ({
   onDepotSelect,
   onAssemblyPointSelect,
   flyToLocation,
+  userLocation,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -476,6 +478,9 @@ const CoordinatorMap = ({
           />
         ))}
 
+        {/* User Location Marker */}
+        {userLocation && <UserLocationMarker location={userLocation} />}
+
         {/* Mission Route Polyline */}
         {routePoints.length > 1 && (
           <Polyline
@@ -514,6 +519,18 @@ const CoordinatorMap = ({
         >
           <Crosshair size={18} weight="bold" />
         </button>
+        {userLocation && (
+          <>
+            <div className="h-px bg-border/40 mx-2" />
+            <button
+              onClick={() => setSearchFlyToLocation(userLocation)}
+              className="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 border border-blue-400/60 shadow-lg flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all duration-150"
+              title="Vị trí của tôi"
+            >
+              <NavigationArrow size={18} weight="fill" />
+            </button>
+          </>
+        )}
       </div>
 
       {/* Map Legend */}
@@ -848,6 +865,52 @@ function AssemblyPointMarker({
   );
 }
 
+// User Location Marker Component – pulsing blue dot
+function UserLocationMarker({
+  location,
+}: {
+  location: { lat: number; lng: number };
+}) {
+  const icon = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const L = require("leaflet");
+
+    return L.divIcon({
+      className: "custom-user-location-marker",
+      html: `
+        <div style="position:relative;width:28px;height:28px;display:flex;align-items:center;justify-content:center;">
+          <div style="position:absolute;inset:0;border-radius:50%;background:rgba(59,130,246,0.25);animation:userLocPulse 2s ease-out infinite;"></div>
+          <div style="width:14px;height:14px;border-radius:50%;background:#3b82f6;border:3px solid white;box-shadow:0 0 6px rgba(59,130,246,0.6);position:relative;z-index:1;"></div>
+        </div>
+        <style>
+          @keyframes userLocPulse {
+            0% { transform:scale(0.8); opacity:1; }
+            100% { transform:scale(2.2); opacity:0; }
+          }
+        </style>
+      `,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+  }, []);
+
+  if (!icon) return null;
+
+  return (
+    <Marker position={[location.lat, location.lng]} icon={icon}>
+      <Popup>
+        <div className="p-2 min-w-40">
+          <div className="font-bold text-sm mb-1 pr-5">📍 Vị trí của tôi</div>
+          <div className="text-xs text-muted-foreground">
+            {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
 // Map Legend Component
 function MapLegend() {
   return (
@@ -884,6 +947,12 @@ function MapLegend() {
           <div className="flex items-center gap-2">
             <span>📍</span>
             <span>Điểm tập kết</span>
+          </div>
+        </div>
+        <div className="border-t pt-1.5 mt-1.5">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-blue-500 ring-2 ring-blue-300"></div>
+            <span>Vị trí của tôi</span>
           </div>
         </div>
       </div>

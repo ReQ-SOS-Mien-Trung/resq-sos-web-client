@@ -416,6 +416,18 @@ export const categoryNames: Record<ItemCategory, string> = {
   CLOTHING: "Quần Áo",
 };
 
+/** Icon map keyed by API item-category code (ItemCategoryEntity.code) */
+export const categoryCodeIcons: Record<string, React.ReactNode> = {
+  Food: <ForkKnife className="h-5 w-5" />,
+  Water: <Drop className="h-5 w-5" weight="fill" />,
+  Medical: <Stethoscope className="h-5 w-5" />,
+  Hygiene: <Drop className="h-5 w-5" />,
+  Shelter: <Tent className="h-5 w-5" />,
+  Clothing: <TShirt className="h-5 w-5" weight="fill" />,
+  RescueEquipment: <Wrench className="h-5 w-5" />,
+  Others: <Package className="h-5 w-5" />,
+};
+
 export const stockLevelNames: Record<string, string> = {
   CRITICAL: "Thiếu",
   LOW: "Thấp",
