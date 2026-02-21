@@ -74,7 +74,7 @@ const RescuePlanPanel = ({
   return (
     <div
       className={cn(
-        "absolute inset-0 z-[900] transition-all duration-500 ease-out",
+        "absolute inset-0 z-[1100] transition-all duration-500 ease-out",
         open
           ? "opacity-100 translate-y-0"
           : "opacity-0 translate-y-full pointer-events-none",

@@ -46,7 +46,6 @@ import {
   Bell,
   Gear,
   User,
-  ArrowsClockwise,
   WifiHigh,
   WifiSlash,
   Sun,
@@ -119,6 +118,9 @@ const CoordinatorDashboardContent = () => {
   const [locationPanelData, setLocationPanelData] =
     useState<LocationPanelData | null>(null);
 
+  // Remember sidebar state before RescuePlanPanel opens
+  const sidebarBeforeRescuePlanRef = useRef(true);
+
   // Track if CoordinatorMap has been loaded (which loads Leaflet 1.9.4)
   const coordinatorMapLoadedRef = useRef(false);
 
@@ -174,6 +176,17 @@ const CoordinatorDashboardContent = () => {
 
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
+
+  // Auto-collapse sidebar when RescuePlanPanel opens, restore when it closes
+  useEffect(() => {
+    if (rescuePlanOpen) {
+      sidebarBeforeRescuePlanRef.current = sidebarOpen;
+      setSidebarOpen(false);
+    } else {
+      setSidebarOpen(sidebarBeforeRescuePlanRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rescuePlanOpen]);
 
   // Notification count (mock)
   const [notificationCount] = useState(3);
