@@ -317,8 +317,8 @@ export const navigationItems = [
   { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
   {
     icon: UserCheck,
-    label: "Đăng ký cứu hộ viên",
-    href: "/dashboard/admin/rescuer-registration",
+    label: "Quản lý cứu hộ viên",
+    href: "/dashboard/admin/rescuer-verification",
   },
   {
     icon: Robot,
@@ -329,11 +329,6 @@ export const navigationItems = [
     icon: ChatCircle,
     label: "Cấu hình phòng chat",
     href: "/dashboard/admin/chat-config",
-  },
-  {
-    icon: UserPlus,
-    label: "Xác nhận cứu hộ viên",
-    href: "/dashboard/admin/rescuer-verification",
   },
 ];
 
@@ -414,6 +409,18 @@ export const categoryNames: Record<ItemCategory, string> = {
   EQUIPMENT: "Thiết Bị",
   SHELTER: "Lều Trại",
   CLOTHING: "Quần Áo",
+};
+
+/** Icon map keyed by API item-category code (ItemCategoryEntity.code) */
+export const categoryCodeIcons: Record<string, React.ReactNode> = {
+  Food: <ForkKnife className="h-5 w-5" />,
+  Water: <Drop className="h-5 w-5" weight="fill" />,
+  Medical: <Stethoscope className="h-5 w-5" />,
+  Hygiene: <Drop className="h-5 w-5" />,
+  Shelter: <Tent className="h-5 w-5" />,
+  Clothing: <TShirt className="h-5 w-5" weight="fill" />,
+  RescueEquipment: <Wrench className="h-5 w-5" />,
+  Others: <Package className="h-5 w-5" />,
 };
 
 export const stockLevelNames: Record<string, string> = {

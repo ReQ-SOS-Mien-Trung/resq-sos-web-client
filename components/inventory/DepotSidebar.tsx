@@ -32,28 +32,28 @@ import { getStockLevelBadgeVariant } from "@/lib/mock-data";
 import {
   DepotSidebarProps,
   InventoryItem,
-  ItemCategory,
   Shipment,
   SupplyRequest,
 } from "@/type";
 
-// Category icon mapping
+// Category icon mapping (fallback for legacy keys + API codes)
 const categoryIcons: Record<string, React.ReactNode> = {
+  // Legacy UPPER_CASE keys (used by mock InventoryItem.category)
   MEDICAL: <Stethoscope className="h-4 w-4" weight="fill" />,
   FOOD: <ForkKnife className="h-4 w-4" weight="fill" />,
   WATER: <Drop className="h-4 w-4" weight="fill" />,
   EQUIPMENT: <Wrench className="h-4 w-4" weight="fill" />,
   SHELTER: <Tent className="h-4 w-4" weight="fill" />,
   CLOTHING: <TShirt className="h-4 w-4" weight="fill" />,
-};
-
-const categoryNames: Record<ItemCategory, string> = {
-  MEDICAL: "Y Tế",
-  FOOD: "Thực Phẩm",
-  WATER: "Nước Uống",
-  EQUIPMENT: "Thiết Bị",
-  SHELTER: "Lều Trại",
-  CLOTHING: "Quần Áo",
+  // API code keys (from ItemCategoryEntity.code)
+  Food: <ForkKnife className="h-4 w-4" weight="fill" />,
+  Water: <Drop className="h-4 w-4" weight="fill" />,
+  Medical: <Stethoscope className="h-4 w-4" weight="fill" />,
+  Hygiene: <Drop className="h-4 w-4" />,
+  Shelter: <Tent className="h-4 w-4" weight="fill" />,
+  Clothing: <TShirt className="h-4 w-4" weight="fill" />,
+  RescueEquipment: <Wrench className="h-4 w-4" weight="fill" />,
+  Others: <Package className="h-4 w-4" />,
 };
 
 const stockLevelNames: Record<string, string> = {
@@ -75,6 +75,7 @@ const DepotSidebar = ({
   selectedRequest,
   selectedCategory,
   onCategorySelect,
+  apiCategories,
 }: DepotSidebarProps) => {
   const [activeTab, setActiveTab] = useState("inventory");
   const [searchQuery, setSearchQuery] = useState("");
@@ -197,17 +198,21 @@ const DepotSidebar = ({
             >
               Tất cả
             </Badge>
-            {(Object.keys(categoryNames) as ItemCategory[]).map((cat) => (
-              <Badge
-                key={cat}
-                variant={selectedCategory === cat ? "default" : "outline"}
-                className="cursor-pointer text-xs"
-                onClick={() => onCategorySelect?.(cat)}
-              >
-                {categoryIcons[cat]}
-                <span className="ml-1">{categoryNames[cat]}</span>
-              </Badge>
-            ))}
+            {apiCategories && apiCategories.length > 0
+              ? apiCategories.map((cat) => (
+                  <Badge
+                    key={cat.id}
+                    variant={
+                      selectedCategory === cat.code ? "default" : "outline"
+                    }
+                    className="cursor-pointer text-xs"
+                    onClick={() => onCategorySelect?.(cat.code)}
+                  >
+                    {categoryIcons[cat.code] ?? <Package className="h-4 w-4" />}
+                    <span className="ml-1">{cat.name}</span>
+                  </Badge>
+                ))
+              : null}
           </div>
 
           <ScrollArea className="flex-1 h-full">

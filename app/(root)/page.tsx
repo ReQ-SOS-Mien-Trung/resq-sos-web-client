@@ -32,24 +32,32 @@ const Home = () => {
     setHasHydrated(true);
   }, []);
 
-  // Redirect to dashboard if authenticated and has a role-specific dashboard
+  // Redirect based on auth state
   useEffect(() => {
-    if (hasHydrated && isAuthenticated && user) {
+    if (!hasHydrated) return;
+
+    if (isAuthenticated && user) {
+      // Authenticated → redirect to dashboard by role
       const dashboardPath = getDashboardPathByRole(user.roleId);
       if (dashboardPath) {
         router.push(dashboardPath);
       }
+    } else {
+      // Not authenticated → redirect to sign-in
+      router.replace("/sign-in");
     }
   }, [hasHydrated, isAuthenticated, user, router]);
 
-  // Show nothing while hydrating or if redirecting
-  const shouldRedirect =
-    hasHydrated &&
-    isAuthenticated &&
-    user &&
-    getDashboardPathByRole(user.roleId);
+  // Show nothing while hydrating or redirecting
+  if (!hasHydrated) {
+    return null;
+  }
 
-  if (!hasHydrated || shouldRedirect) {
+  const shouldRedirect =
+    !isAuthenticated ||
+    (isAuthenticated && user && getDashboardPathByRole(user.roleId));
+
+  if (shouldRedirect) {
     return null;
   }
 

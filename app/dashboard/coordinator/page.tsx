@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import {
   SOSRequest,
   SOSCluster,
@@ -19,12 +20,12 @@ import {
   LocationPanelData,
 } from "@/type";
 import {
-  mockSOSRequests,
   mockRescuers,
-  mockSOSClusters,
   mockAIDecision,
   mockActiveMissions,
 } from "@/lib/mock-data";
+import { useSOSRequests } from "@/services/sos_request/hooks";
+import type { SOSRequestEntity } from "@/services/sos_request/type";
 import { useDepots } from "@/services/depot/hooks";
 import { useAssemblyPoints } from "@/services/assembly_points/hooks";
 import type { DepotEntity } from "@/services/depot/type";
@@ -45,7 +46,6 @@ import {
   Bell,
   Gear,
   User,
-  ArrowsClockwise,
   WifiHigh,
   WifiSlash,
   Sun,
@@ -106,6 +106,9 @@ const CoordinatorDashboardContent = () => {
   const [isConnected] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // Geolocation: current device position
+  const [userLocation, setUserLocation] = useState<Location | null>(null);
+
   // Panel states
   const [clusterSheetOpen, setClusterSheetOpen] = useState(false);
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
@@ -114,6 +117,9 @@ const CoordinatorDashboardContent = () => {
   const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [locationPanelData, setLocationPanelData] =
     useState<LocationPanelData | null>(null);
+
+  // Remember sidebar state before RescuePlanPanel opens
+  const sidebarBeforeRescuePlanRef = useRef(true);
 
   // Track if CoordinatorMap has been loaded (which loads Leaflet 1.9.4)
   const coordinatorMapLoadedRef = useRef(false);
@@ -136,15 +142,158 @@ const CoordinatorDashboardContent = () => {
     }
   }, [isWeatherMode]);
 
+  // Watch user's current geolocation
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    // Get initial position
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      (err) => {
+        console.warn("Geolocation error:", err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+
+    // Continuously watch position
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      (err) => {
+        console.warn("Geolocation watch error:", err.message);
+      },
+      { enableHighAccuracy: true },
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  // Auto-collapse sidebar when RescuePlanPanel opens, restore when it closes
+  useEffect(() => {
+    if (rescuePlanOpen) {
+      sidebarBeforeRescuePlanRef.current = sidebarOpen;
+      setSidebarOpen(false);
+    } else {
+      setSidebarOpen(sidebarBeforeRescuePlanRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rescuePlanOpen]);
+
   // Notification count (mock)
   const [notificationCount] = useState(3);
 
+  // Fetch SOS requests from backend
+  const { data: sosData } = useSOSRequests();
+
+  // Map SOSRequestEntity → SOSRequest (for sidebar/panels)
+  const sosRequests: SOSRequest[] = useMemo(() => {
+    if (!sosData?.sosRequests) return [];
+    return sosData.sosRequests.map(
+      (entity: SOSRequestEntity): SOSRequest => ({
+        id: String(entity.id),
+        groupId: entity.clusterId
+          ? String(entity.clusterId)
+          : String(entity.id),
+        location: { lat: entity.latitude, lng: entity.longitude },
+        priority:
+          entity.priorityLevel === "Critical"
+            ? "P1"
+            : entity.priorityLevel === "High"
+              ? "P1"
+              : entity.priorityLevel === "Medium"
+                ? "P2"
+                : "P3",
+        needs: { medical: false, food: false, boat: false },
+        status:
+          entity.status === "Pending"
+            ? "PENDING"
+            : entity.status === "InProgress"
+              ? "ASSIGNED"
+              : "RESCUED",
+        message: entity.rawMessage,
+        createdAt: new Date(entity.createdAt),
+      }),
+    );
+  }, [sosData]);
+
+  // Group SOS requests by clusterId → SOSCluster[]
+  const sosClusters: SOSCluster[] = useMemo(() => {
+    if (!sosData?.sosRequests) return [];
+    const clusterMap = new Map<number, SOSRequestEntity[]>();
+
+    sosData.sosRequests.forEach((entity: SOSRequestEntity) => {
+      const key = entity.clusterId ?? entity.id;
+      if (!clusterMap.has(key)) clusterMap.set(key, []);
+      clusterMap.get(key)!.push(entity);
+    });
+
+    return Array.from(clusterMap.entries()).map(([clusterId, entities]) => {
+      // Calculate center as average of all SOS in the cluster
+      const avgLat =
+        entities.reduce((s, e) => s + e.latitude, 0) / entities.length;
+      const avgLng =
+        entities.reduce((s, e) => s + e.longitude, 0) / entities.length;
+
+      // Map priority levels
+      const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+      const highest = entities.reduce((prev, curr) =>
+        priorityOrder[curr.priorityLevel] < priorityOrder[prev.priorityLevel]
+          ? curr
+          : prev,
+      );
+      const highestPriority =
+        highest.priorityLevel === "Critical" || highest.priorityLevel === "High"
+          ? "P1"
+          : highest.priorityLevel === "Medium"
+            ? "P2"
+            : "P3";
+
+      // Map entities to SOSRequest format
+      const requests: SOSRequest[] = entities.map((e) => ({
+        id: String(e.id),
+        groupId: String(clusterId),
+        location: { lat: e.latitude, lng: e.longitude },
+        priority:
+          e.priorityLevel === "Critical" || e.priorityLevel === "High"
+            ? "P1"
+            : e.priorityLevel === "Medium"
+              ? "P2"
+              : "P3",
+        needs: { medical: false, food: false, boat: false },
+        status:
+          e.status === "Pending"
+            ? "PENDING"
+            : e.status === "InProgress"
+              ? "ASSIGNED"
+              : "RESCUED",
+        message: e.rawMessage,
+        createdAt: new Date(e.createdAt),
+      }));
+
+      return {
+        id: String(clusterId),
+        center: { lat: avgLat, lng: avgLng },
+        sosRequests: requests,
+        highestPriority: highestPriority as "P1" | "P2" | "P3",
+        totalVictims: entities.length,
+      };
+    });
+  }, [sosData]);
+
   // Fetch depots from backend for map display
   const { data: depotsData } = useDepots({
-    params: { pageSize: 100 }, // Get all depots for map display
+    params: { pageSize: 100 },
   });
 
-  // Use depot data directly from backend (no mapping needed)
   const depots: DepotEntity[] = useMemo(() => {
     if (!depotsData?.items) return [];
     return depotsData.items;
@@ -152,10 +301,9 @@ const CoordinatorDashboardContent = () => {
 
   // Fetch assembly points from backend for map display
   const { data: assemblyPointsData } = useAssemblyPoints({
-    params: { pageSize: 100 }, // Get all assembly points for map display
+    params: { pageSize: 100 },
   });
 
-  // Use assembly points data directly from backend (no mapping needed)
   const assemblyPoints: AssemblyPointEntity[] = useMemo(() => {
     if (!assemblyPointsData?.items) return [];
     return assemblyPointsData.items;
@@ -277,9 +425,13 @@ const CoordinatorDashboardContent = () => {
           </Button>
 
           <div className="flex items-center gap-2">
-            <div className="text-xl font-bold bg-linear-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
-              ReQ-SOS
-            </div>
+            <Image
+              src="/icons/resq_typo_logo.svg"
+              alt="ReQ-SOS Logo"
+              width={80}
+              height={32}
+              className="dark:invert h-8 w-auto object-contain"
+            />
             <Badge variant="secondary" className="text-xs">
               Miền Trung
             </Badge>
@@ -411,8 +563,8 @@ const CoordinatorDashboardContent = () => {
         >
           {sidebarOpen && (
             <SOSSidebar
-              sosRequests={mockSOSRequests}
-              clusters={mockSOSClusters}
+              sosRequests={sosRequests}
+              clusters={sosClusters}
               rescuers={mockRescuers}
               missions={mockActiveMissions}
               onSOSSelect={handleSOSSelect}
@@ -428,7 +580,7 @@ const CoordinatorDashboardContent = () => {
         <main className="flex-1 relative overflow-hidden">
           {isWeatherMode ? (
             <WindyLeafletMap
-              clusters={mockSOSClusters}
+              clusters={sosClusters}
               rescuers={mockRescuers}
               depots={depots}
               selectedCluster={selectedCluster}
@@ -436,11 +588,12 @@ const CoordinatorDashboardContent = () => {
               onClusterSelect={handleClusterSelect}
               onRescuerSelect={handleRescuerSelect}
               flyToLocation={flyToLocation}
+              userLocation={userLocation}
             />
           ) : (
             <>
               <CoordinatorMap
-                clusters={mockSOSClusters}
+                clusters={sosClusters}
                 rescuers={mockRescuers}
                 depots={depots}
                 assemblyPoints={assemblyPoints}
@@ -452,6 +605,7 @@ const CoordinatorDashboardContent = () => {
                 onDepotSelect={handleDepotSelect}
                 onAssemblyPointSelect={handleAssemblyPointSelect}
                 flyToLocation={flyToLocation}
+                userLocation={userLocation}
               />
 
               {/* Floating Stats Panel - Only show when cluster panel is closed */}
@@ -465,7 +619,7 @@ const CoordinatorDashboardContent = () => {
                       <div>
                         <div className="text-2xl font-bold text-red-500">
                           {
-                            mockSOSRequests.filter(
+                            sosRequests.filter(
                               (s) =>
                                 s.priority === "P1" && s.status === "PENDING",
                             ).length

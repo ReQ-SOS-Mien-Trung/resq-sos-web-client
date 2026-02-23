@@ -1,19 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User, Lock, Eye, EyeSlash, ArrowRight } from "@phosphor-icons/react";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useLogin,
   useGoogleLogin as useGoogleLoginApi,
 } from "@/services/auth/hooks";
 import { useGoogleLogin as useGoogleOAuth } from "@react-oauth/google";
+import { useAuthStore } from "@/stores/auth.store";
+import { getDashboardPathByRole } from "@/lib/roles";
 
 const SignIn = () => {
+  const router = useRouter();
+  const { accessToken, user } = useAuthStore();
+
+  // Auto-redirect if already authenticated
+  useEffect(() => {
+    if (accessToken && user?.roleId) {
+      const dashboardPath = getDashboardPathByRole(user.roleId);
+      if (dashboardPath) {
+        router.replace(dashboardPath);
+      }
+    }
+  }, [accessToken, user, router]);
   const [formData, setFormData] = useState({
     username: "",
     password: "",

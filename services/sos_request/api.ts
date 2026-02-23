@@ -1,11 +1,22 @@
 import api from "@/config/axios";
-import { GetSOSRequestsResponse } from "./type";
+import { GetSOSRequestsResponse, GetSOSRequestByIdResponse } from "./type";
 
 /**
  * Get all SOS requests
- * GET /api/sos-requests
+ * GET /emergency/sos-requests
  */
 export async function getSOSRequests(): Promise<GetSOSRequestsResponse> {
-  const { data } = await api.get("/api/sos-requests");
+  const { data } = await api.get("/emergency/sos-requests");
+  return data;
+}
+
+/**
+ * Get a SOS request by ID
+ * GET /emergency/sos-requests/{id}
+ */
+export async function getSOSRequestById(
+  id: number,
+): Promise<GetSOSRequestByIdResponse> {
+  const { data } = await api.get(`/emergency/sos-requests/${id}`);
   return data;
 }
