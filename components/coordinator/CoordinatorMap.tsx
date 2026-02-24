@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { SOSCluster, Rescuer, CoordinatorMapProps } from "@/type";
+import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
 import type { AssemblyPointEntity } from "@/services/assembly_points/type";
 import {
@@ -55,14 +55,14 @@ const MapZoomHandler = dynamic(
 );
 
 const CoordinatorMap = ({
-  clusters,
+  sosRequests,
   rescuers,
   depots,
   assemblyPoints = [],
-  selectedCluster,
+  selectedSOS,
   selectedRescuer,
   aiDecision,
-  onClusterSelect,
+  onSOSSelect,
   onRescuerSelect,
   onDepotSelect,
   onAssemblyPointSelect,
@@ -440,13 +440,13 @@ const CoordinatorMap = ({
         {/* Map zoom handler - provides controls to parent */}
         <MapZoomHandler onMapReady={handleMapReady} />
 
-        {/* SOS Cluster Markers */}
-        {clusters.map((cluster) => (
-          <SOSClusterMarker
-            key={cluster.id}
-            cluster={cluster}
-            isSelected={selectedCluster?.id === cluster.id}
-            onClick={() => onClusterSelect(cluster)}
+        {/* SOS Request Markers */}
+        {sosRequests.map((sos) => (
+          <SOSRequestMarker
+            key={sos.id}
+            sos={sos}
+            isSelected={selectedSOS?.id === sos.id}
+            onClick={() => onSOSSelect(sos)}
           />
         ))}
 
@@ -541,13 +541,13 @@ const CoordinatorMap = ({
 
 export default CoordinatorMap;
 
-// SOS Cluster Marker Component
-function SOSClusterMarker({
-  cluster,
+// SOS Request Marker Component
+function SOSRequestMarker({
+  sos,
   isSelected,
   onClick,
 }: {
-  cluster: SOSCluster;
+  sos: SOSRequest;
   isSelected: boolean;
   onClick: () => void;
 }) {
@@ -557,8 +557,8 @@ function SOSClusterMarker({
     P3: "#eab308", // yellow-500
   };
 
-  const color = priorityColors[cluster.highestPriority];
-  const size = isSelected ? 40 : 30;
+  const color = priorityColors[sos.priority];
+  const size = isSelected ? 38 : 28;
 
   // Create custom icon using divIcon with useMemo
   const icon = useMemo(() => {
@@ -567,15 +567,15 @@ function SOSClusterMarker({
     const L = require("leaflet");
 
     return L.divIcon({
-      className: "custom-cluster-marker",
+      className: "custom-sos-marker",
       html: `
         <div class="relative flex items-center justify-center" style="width: ${size}px; height: ${size}px;">
-          <div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>
-          <div class="relative rounded-full flex items-center justify-center text-white font-bold text-xs" 
-               style="width: ${size - 8}px; height: ${
-                 size - 8
+          ${sos.status === "PENDING" ? `<div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>` : ""}
+          <div class="relative rounded-full flex items-center justify-center text-white font-bold text-[10px]" 
+               style="width: ${size - 6}px; height: ${
+                 size - 6
                }px; background-color: ${color}; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-            ${cluster.totalVictims}
+            SOS
           </div>
         </div>
       `,
@@ -583,33 +583,37 @@ function SOSClusterMarker({
       iconAnchor: [size / 2, size / 2],
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cluster.totalVictims, cluster.highestPriority, isSelected]);
+  }, [sos.priority, sos.status, isSelected]);
 
   if (!icon) return null;
 
   return (
     <Marker
-      position={[cluster.center.lat, cluster.center.lng]}
+      position={[sos.location.lat, sos.location.lng]}
       icon={icon}
       eventHandlers={{ click: onClick }}
     >
       <Popup>
         <div className="p-2 min-w-50">
-          <div className="font-bold text-sm mb-2 pr-5">
-            Cụm SOS #{cluster.id.split("-")[1]}
-          </div>
+          <div className="font-bold text-sm mb-2 pr-5">SOS #{sos.id}</div>
           <div className="space-y-1 text-xs">
             <div className="flex items-center gap-2">
               <span
                 className="px-2 py-0.5 rounded text-white font-semibold"
                 style={{ backgroundColor: color }}
               >
-                {cluster.highestPriority}
+                {sos.priority}
               </span>
-              <span>{cluster.totalVictims} nạn nhân</span>
+              <span>
+                {sos.status === "PENDING"
+                  ? "Chờ xử lý"
+                  : sos.status === "ASSIGNED"
+                    ? "Đã phân công"
+                    : "Đã cứu"}
+              </span>
             </div>
-            <div className="text-muted-foreground">
-              {cluster.sosRequests.length} yêu cầu SOS
+            <div className="text-muted-foreground line-clamp-2">
+              {sos.message}
             </div>
           </div>
         </div>

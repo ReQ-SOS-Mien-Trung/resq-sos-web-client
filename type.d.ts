@@ -736,8 +736,15 @@ export interface ClusterDetailsSheetProps {
   onSOSSelect: (sos: SOSRequest) => void;
 }
 
+export interface SOSDetailsPanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  sosRequest: SOSRequest | null;
+  onProcessSOS: () => void;
+}
+
 export interface CoordinatorMapProps {
-  clusters: SOSCluster[];
+  sosRequests: SOSRequest[];
   rescuers: Rescuer[];
   // DepotEntity from backend
   depots: {
@@ -768,10 +775,10 @@ export interface CoordinatorMapProps {
     status: "Active" | "Overloaded" | "Unavailable";
     lastUpdatedAt: string;
   }[];
-  selectedCluster?: SOSCluster | null;
+  selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
   aiDecision?: AIDispatchDecision | null;
-  onClusterSelect: (cluster: SOSCluster) => void;
+  onSOSSelect: (sos: SOSRequest) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   onDepotSelect?: (depot: CoordinatorMapProps["depots"][number]) => void;
   onAssemblyPointSelect?: (
@@ -798,14 +805,11 @@ export interface AssemblyPoint {
 
 export interface SOSSidebarProps {
   sosRequests: SOSRequest[];
-  clusters: SOSCluster[];
   rescuers: Rescuer[];
   missions: Mission[];
   onSOSSelect: (sos: SOSRequest) => void;
-  onClusterSelect: (cluster: SOSCluster) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   selectedSOS?: SOSRequest | null;
-  selectedCluster?: SOSCluster | null;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";
@@ -1126,10 +1130,10 @@ export interface MapViewState {
 }
 
 export interface WindyLeafletMapProps {
-  clusters: SOSCluster[];
-  rescuers: Rescuer[];
+  sosRequests?: SOSRequest[];
+  rescuers?: Rescuer[];
   // DepotEntity from backend
-  depots: {
+  depots?: {
     id: number;
     name: string;
     address: string;
@@ -1146,10 +1150,10 @@ export interface WindyLeafletMapProps {
     } | null;
     lastUpdatedAt: string;
   }[];
-  selectedCluster?: SOSCluster | null;
+  selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
-  onClusterSelect: (cluster: SOSCluster) => void;
-  onRescuerSelect: (rescuer: Rescuer) => void;
+  onSOSSelect?: (sos: SOSRequest) => void;
+  onRescuerSelect?: (rescuer: Rescuer) => void;
   flyToLocation?: Location | null;
   /** Current user/device location from geolocation API */
   userLocation?: Location | null;

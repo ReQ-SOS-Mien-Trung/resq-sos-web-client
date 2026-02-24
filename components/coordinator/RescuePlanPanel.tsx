@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SOSCluster, Rescuer, AIDispatchDecision } from "@/type";
+import { SOSRequest, Rescuer, AIDispatchDecision } from "@/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +35,7 @@ import {
 interface RescuePlanPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  cluster: SOSCluster | null;
+  sosRequest: SOSRequest | null;
   aiDecision: AIDispatchDecision | null;
   availableRescuers: Rescuer[];
   onApprove: () => void;
@@ -45,7 +45,7 @@ interface RescuePlanPanelProps {
 const RescuePlanPanel = ({
   open,
   onOpenChange,
-  cluster,
+  sosRequest,
   aiDecision,
   availableRescuers,
   onApprove,
@@ -54,7 +54,7 @@ const RescuePlanPanel = ({
   const [selectedRescuer, setSelectedRescuer] = useState<string>("");
   const [activeTab, setActiveTab] = useState("plan");
 
-  if (!cluster || !aiDecision) return null;
+  if (!sosRequest || !aiDecision) return null;
 
   const recommendedRescuer = aiDecision.recommendedRescuer;
 
@@ -95,8 +95,7 @@ const RescuePlanPanel = ({
               <div>
                 <h2 className="text-xl font-bold">Kế hoạch giải cứu</h2>
                 <p className="text-sm text-muted-foreground">
-                  Cụm SOS #{cluster.id.split("-")[1]} • {cluster.totalVictims}{" "}
-                  nạn nhân
+                  SOS #{sosRequest.id}
                 </p>
               </div>
             </div>
@@ -233,7 +232,7 @@ const RescuePlanPanel = ({
                           </div>
                           <div>
                             <div className="text-2xl font-bold text-blue-600">
-                              {cluster.totalVictims}
+                              1
                             </div>
                             <div className="text-xs text-muted-foreground">
                               Nạn nhân cần cứu

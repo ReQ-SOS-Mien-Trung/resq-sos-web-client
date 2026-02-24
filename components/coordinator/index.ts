@@ -3,6 +3,7 @@ export { default as SOSSidebar } from "./SOSSidebar";
 export { default as AIDispatchPanel } from "./AIDispatchPanel";
 export { default as ClusterDetailsSheet } from "./ClusterDetailsSheet";
 export { default as ClusterDetailsPanel } from "./ClusterDetailsPanel";
+export { default as SOSDetailsPanel } from "./SOSDetailsPanel";
 export { default as RescuePlanPanel } from "./RescuePlanPanel";
 export { default as LocationDetailsPanel } from "./LocationDetailsPanel";
 export { default as WindyWeatherMap } from "./WindyWeatherMap";
