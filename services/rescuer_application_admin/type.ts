@@ -1,8 +1,28 @@
+// Document attached to a rescuer application
+export interface RescuerApplicationDocument {
+  id: number;
+  fileUrl: string;
+  fileType: string;
+  uploadedAt: string;
+}
+
 // Rescuer Application Entity (item in paginated list)
 export interface RescuerApplicationEntity {
-  applicationId: number;
-  // Add more fields here when backend response structure is confirmed
-  [key: string]: unknown;
+  id: number;
+  userId: string;
+  status: string;
+  submittedAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  adminNote: string | null;
+  fullName: string;
+  email: string;
+  phone: string;
+  rescuerType: string;
+  address: string;
+  ward: string;
+  city: string;
+  documents: RescuerApplicationDocument[];
 }
 
 // Paginated Response for Rescuer Applications
@@ -32,6 +52,10 @@ export interface ReviewRescuerApplicationRequest {
 
 // Review Rescuer Application Response
 export interface ReviewRescuerApplicationResponse {
-  // Add fields when backend response structure is confirmed
-  [key: string]: unknown;
+  applicationId: number;
+  userId: string;
+  status: string;
+  reviewedAt: string;
+  reviewedBy: string;
+  message: string;
 }

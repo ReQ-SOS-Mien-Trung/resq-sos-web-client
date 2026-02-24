@@ -35,7 +35,7 @@ import {
   IdentificationCard,
   Briefcase,
   Certificate,
-  Star,
+  Download,
 } from "@phosphor-icons/react";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -46,6 +46,49 @@ import {
 import { RescuerApplicationEntity } from "@/services/rescuer_application/type";
 
 type StatusFilter = "all" | "Pending" | "Approved" | "Rejected";
+
+const getDocTypeLabel = (fileType: string) => {
+  const map: Record<string, string> = {
+    CCCD: "Căn cước công dân",
+    RescueCertificate: "Chứng chỉ cứu hộ",
+    HealthCertificate: "Giấy khám sức khỏe",
+    FirstAidCertificate: "Chứng chỉ sơ cấp cứu",
+    ExperienceLetter: "Thư xác nhận kinh nghiệm",
+  };
+  return map[fileType] ?? fileType;
+};
+
+const getDocIcon = (fileType: string) => {
+  switch (fileType) {
+    case "CCCD":
+      return <IdentificationCard size={18} weight="duotone" />;
+    case "RescueCertificate":
+    case "FirstAidCertificate":
+      return <Certificate size={18} weight="duotone" />;
+    case "HealthCertificate":
+      return <FirstAid size={18} weight="duotone" />;
+    case "ExperienceLetter":
+      return <Briefcase size={18} weight="duotone" />;
+    default:
+      return <FileText size={18} weight="duotone" />;
+  }
+};
+
+const getDocIconColor = (fileType: string) => {
+  switch (fileType) {
+    case "CCCD":
+      return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+    case "RescueCertificate":
+    case "FirstAidCertificate":
+      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    case "HealthCertificate":
+      return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
+    case "ExperienceLetter":
+      return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+    default:
+      return "bg-violet-500/10 text-violet-600 dark:text-violet-400";
+  }
+};
 
 const RescuerVerificationPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -534,30 +577,59 @@ const RescuerVerificationPage = () => {
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        {selectedItem.documents.map((doc, idx) => (
+                      <div className="space-y-3">
+                        {selectedItem.documents.map((doc) => (
                           <div
-                            key={idx}
-                            className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                            key={doc.id}
+                            className="flex items-center gap-3 p-3.5 rounded-xl border border-border/50 bg-muted/20 hover:bg-muted/40 hover:border-border transition-all duration-200 group/doc"
                           >
-                            <div className="p-2 rounded-lg bg-violet-500/10">
-                              <FileText
-                                size={16}
-                                className="text-violet-600 dark:text-violet-400"
-                              />
+                            <div
+                              className={`p-2.5 rounded-xl ${getDocIconColor(doc.fileType)} transition-transform duration-200 group-hover/doc:scale-110`}
+                            >
+                              {getDocIcon(doc.fileType)}
                             </div>
-                            <span className="text-sm text-foreground flex-1 truncate">
-                              {doc}
-                            </span>
-                            <Button variant="ghost" size="sm" asChild>
-                              <a
-                                href={doc}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {getDocTypeLabel(doc.fileType)}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Tải lên{" "}
+                                {new Date(doc.uploadedAt).toLocaleDateString(
+                                  "vi-VN",
+                                )}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 opacity-0 group-hover/doc:opacity-100 transition-opacity"
+                                asChild
                               >
-                                <Eye size={16} />
-                              </a>
-                            </Button>
+                                <a
+                                  href={doc.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="Xem tài liệu"
+                                >
+                                  <Eye size={16} />
+                                </a>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 opacity-0 group-hover/doc:opacity-100 transition-opacity"
+                                asChild
+                              >
+                                <a
+                                  href={doc.fileUrl}
+                                  download
+                                  title="Tải xuống"
+                                >
+                                  <Download size={16} />
+                                </a>
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
