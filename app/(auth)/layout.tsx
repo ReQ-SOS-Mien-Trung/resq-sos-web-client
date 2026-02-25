@@ -14,7 +14,6 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
           fill
           className="object-cover"
           priority
-          quality={90}
         />
 
         {/* Content Overlay - Logo and Text */}

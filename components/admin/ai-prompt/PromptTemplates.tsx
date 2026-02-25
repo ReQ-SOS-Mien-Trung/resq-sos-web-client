@@ -1,65 +1,68 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { PromptTemplate, PromptTemplatesProps } from "@/type";
-import { variantsCategory } from "@/lib/constants";
+import { Warning, CircleNotch } from "@phosphor-icons/react";
+import { PromptEntity } from "@/services/prompt/type";
 
-const PromptTemplates = ({
-  templates,
-  onUseTemplate,
-}: PromptTemplatesProps) => {
-  const getCategoryBadge = (category: PromptTemplate["category"]) => {
-    return variantsCategory[category];
-  };
+interface DeletePromptDialogProps {
+  prompt: PromptEntity | null;
+  open: boolean;
+  isDeleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}
+
+const DeletePromptDialog = ({
+  prompt,
+  open,
+  isDeleting,
+  onClose,
+  onConfirm,
+}: DeletePromptDialogProps) => {
+  if (!prompt) return null;
 
   return (
-    <Card className="border border-border/50">
-      <CardHeader>
-        <CardTitle>Templates</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {templates.map((template) => {
-            const categoryBadge = getCategoryBadge(template.category);
-            return (
-              <div
-                key={template.id}
-                className="p-4 border border-border/50 rounded-lg hover:bg-muted/30 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-foreground">
-                        {template.name}
-                      </h3>
-                      <Badge className={categoryBadge.className}>
-                        {categoryBadge.label}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-foreground/70 mb-2">
-                      {template.description}
-                    </p>
-                    <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">
-                      {template.template}
-                    </pre>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onUseTemplate?.(template)}
-                  >
-                    Sử dụng
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-destructive">
+            <Warning size={20} weight="fill" />
+            Xác nhận xóa Prompt
+          </DialogTitle>
+          <DialogDescription>
+            Bạn có chắc chắn muốn xóa prompt{" "}
+            <strong className="text-foreground">
+              &quot;{prompt.name}&quot;
+            </strong>
+            ? Hành động này không thể hoàn tác.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isDeleting}>
+            Hủy
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <CircleNotch size={16} className="mr-2 animate-spin" />
+            ) : null}
+            Xóa
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
-export default PromptTemplates;
+export default DeletePromptDialog;
