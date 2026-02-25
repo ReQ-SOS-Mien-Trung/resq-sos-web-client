@@ -12,7 +12,6 @@ import {
   ThermometerHot,
   Hash,
 } from "@phosphor-icons/react";
-import { PromptEntity } from "@/services/prompt/type";
 import type { PromptListProps } from "@/type";
 
 const PromptList = ({
