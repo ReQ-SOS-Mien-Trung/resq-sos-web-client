@@ -13,12 +13,7 @@ import {
   Globe,
   Eye,
 } from "@phosphor-icons/react";
-import { PromptDetailEntity } from "@/services/prompt/type";
-
-interface PromptDetailPanelProps {
-  prompt: PromptDetailEntity | null;
-  isLoading: boolean;
-}
+import type { PromptDetailPanelProps } from "@/type";
 
 const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
   if (isLoading) {
@@ -116,7 +111,7 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
             <Hash size={16} className="text-purple-500 shrink-0" />
             <div>
               <p className="text-[11px] text-muted-foreground">Version</p>
-              <p className="text-xs font-medium">v{prompt.version}</p>
+              <p className="text-xs font-medium">{prompt.version}</p>
             </div>
           </div>
         </div>

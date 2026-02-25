@@ -1,5 +1,6 @@
 import {
   ItemCategory,
+  PromptFormData,
   RescueReport,
   SOSItem,
   Testimonial,
@@ -230,6 +231,32 @@ export const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 export { CENTRAL_VN_LOCATIONS } from "./locations";
 
 //Admin Prompt
+export const PROMPT_VARIABLES = [
+  { label: "Tên nạn nhân", value: "victim_name" },
+  { label: "Tọa độ", value: "coordinates" },
+  { label: "Mức độ khẩn cấp", value: "urgency_level" },
+  { label: "Mô tả tình huống", value: "situation_description" },
+  { label: "Số người bị nạn", value: "victim_count" },
+  { label: "Loại thiên tai", value: "disaster_type" },
+  { label: "Khu vực", value: "region" },
+  { label: "Thời gian", value: "timestamp" },
+  { label: "Tài nguyên", value: "resources" },
+  { label: "Yêu cầu", value: "request" },
+] as const;
+
+export const INITIAL_FORM_DATA: PromptFormData = {
+  name: "",
+  purpose: "",
+  system_prompt: "",
+  user_prompt_template: "",
+  model: "",
+  temperature: 0,
+  max_tokens: 0,
+  version: "",
+  api_url: "",
+  is_active: true,
+};
+
 export const variantsCategory = {
   dispatch: {
     label: "Điều phối",

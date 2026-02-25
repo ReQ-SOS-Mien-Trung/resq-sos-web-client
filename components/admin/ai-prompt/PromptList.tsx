@@ -13,15 +13,7 @@ import {
   Hash,
 } from "@phosphor-icons/react";
 import { PromptEntity } from "@/services/prompt/type";
-
-interface PromptListProps {
-  prompts: PromptEntity[];
-  isLoading: boolean;
-  selectedId: number | null;
-  onSelect: (prompt: PromptEntity) => void;
-  onEdit: (prompt: PromptEntity) => void;
-  onDelete: (prompt: PromptEntity) => void;
-}
+import type { PromptListProps } from "@/type";
 
 const PromptList = ({
   prompts,

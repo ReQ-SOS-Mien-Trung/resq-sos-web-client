@@ -19,12 +19,13 @@ import {
   useUpdatePrompt,
   useDeletePrompt,
 } from "@/services/prompt/hooks";
-import {
+import type {
   PromptEntity,
   PromptDetailEntity,
   CreatePromptRequest,
   UpdatePromptRequest,
 } from "@/services/prompt/type";
+import type { EditorMode } from "@/type";
 
 const AIPromptPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -32,8 +33,7 @@ const AIPromptPage = () => {
 
   // Prompt state
   const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
-  const [showEditor, setShowEditor] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [editorMode, setEditorMode] = useState<EditorMode>("closed");
   const [editingPrompt, setEditingPrompt] = useState<PromptDetailEntity | null>(
     null,
   );
@@ -79,37 +79,42 @@ const AIPromptPage = () => {
     }
   }, [promptsData, selectedPromptId]);
 
-  const handleSelectPrompt = useCallback((prompt: PromptEntity) => {
-    setSelectedPromptId(prompt.id);
-    setShowEditor(false);
+  // --- Handlers ---
+
+  const closeEditor = useCallback(() => {
+    setEditorMode("closed");
     setEditingPrompt(null);
   }, []);
 
+  const handleSelectPrompt = useCallback(
+    (prompt: PromptEntity) => {
+      setSelectedPromptId(prompt.id);
+      closeEditor();
+    },
+    [closeEditor],
+  );
+
   const handleCreateNew = useCallback(() => {
     setEditingPrompt(null);
-    setIsCreating(true);
-    setShowEditor(true);
+    setEditorMode("creating");
   }, []);
 
   const handleEdit = useCallback((prompt: PromptEntity) => {
     setSelectedPromptId(prompt.id);
-    setIsCreating(false);
-    // We need the detail to populate the editor
-    setShowEditor(true);
+    setEditorMode("editing");
   }, []);
 
-  // When we want to edit, load detail into editor (skip if creating new)
+  // Populate editor with detail data when editing (skip when creating)
   useEffect(() => {
     if (
-      showEditor &&
-      !isCreating &&
+      editorMode === "editing" &&
       selectedPromptId &&
       promptDetail &&
       !editingPrompt
     ) {
       setEditingPrompt(promptDetail);
     }
-  }, [showEditor, isCreating, selectedPromptId, promptDetail, editingPrompt]);
+  }, [editorMode, selectedPromptId, promptDetail, editingPrompt]);
 
   const handleSave = useCallback(
     async (data: CreatePromptRequest | UpdatePromptRequest) => {
@@ -122,14 +127,12 @@ const AIPromptPage = () => {
         } else {
           await createMutation.mutateAsync(data as CreatePromptRequest);
         }
-        setShowEditor(false);
-        setEditingPrompt(null);
-        setIsCreating(false);
+        closeEditor();
       } catch (error) {
         console.error("Error saving prompt:", error);
       }
     },
-    [editingPrompt, updateMutation, createMutation],
+    [editingPrompt, updateMutation, createMutation, closeEditor],
   );
 
   const handleDelete = useCallback(async () => {
@@ -202,16 +205,12 @@ const AIPromptPage = () => {
         </div>
 
         {/* Editor (shown when creating/editing) */}
-        {showEditor && (
+        {editorMode !== "closed" && (
           <PromptEditor
             prompt={editingPrompt}
             isSubmitting={createMutation.isPending || updateMutation.isPending}
             onSave={handleSave}
-            onCancel={() => {
-              setShowEditor(false);
-              setEditingPrompt(null);
-              setIsCreating(false);
-            }}
+            onCancel={closeEditor}
           />
         )}
 

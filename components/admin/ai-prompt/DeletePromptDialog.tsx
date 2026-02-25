@@ -10,15 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Warning, CircleNotch } from "@phosphor-icons/react";
-import { PromptEntity } from "@/services/prompt/type";
-
-interface DeletePromptDialogProps {
-  prompt: PromptEntity | null;
-  open: boolean;
-  isDeleting: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}
+import type { DeletePromptDialogProps } from "@/type";
 
 const DeletePromptDialog = ({
   prompt,

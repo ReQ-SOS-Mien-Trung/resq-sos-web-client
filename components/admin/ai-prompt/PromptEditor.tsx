@@ -7,50 +7,63 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { FloppyDisk, X, CircleNotch, Gear, Plus } from "@phosphor-icons/react";
-import {
+import type {
+  PromptEditorProps,
+  PromptFormData,
+  PromptTextField,
+} from "@/type";
+import { PROMPT_VARIABLES, INITIAL_FORM_DATA } from "@/lib/constants";
+import type {
   PromptDetailEntity,
   CreatePromptRequest,
   UpdatePromptRequest,
 } from "@/services/prompt/type";
 
-interface PromptEditorProps {
-  prompt?: PromptDetailEntity | null;
-  isSubmitting?: boolean;
-  onSave: (data: CreatePromptRequest | UpdatePromptRequest) => void;
-  onCancel: () => void;
-}
+// --- Helpers ---
 
-interface FormData {
-  name: string;
-  purpose: string;
-  system_prompt: string;
-  user_prompt_template: string;
-  model: string;
-  temperature: number;
-  max_tokens: number;
-  version: string;
-  api_url: string;
-  is_active: boolean;
-}
+const stripVersionPrefix = (version: string): string =>
+  version.replace(/^v/i, "");
 
-const PROMPT_VARIABLES = [
-  { label: "Tên nạn nhân", value: "victim_name" },
-  { label: "Tọa độ", value: "coordinates" },
-  { label: "Mức độ khẩn cấp", value: "urgency_level" },
-  { label: "Mô tả tình huống", value: "situation_description" },
-  { label: "Số người bị nạn", value: "victim_count" },
-  { label: "Loại thiên tai", value: "disaster_type" },
-  { label: "Khu vực", value: "region" },
-  { label: "Thời gian", value: "timestamp" },
-  { label: "Tài nguyên", value: "resources" },
-  { label: "Yêu cầu", value: "request" },
-];
+const toVersionString = (version: string): string =>
+  `v${stripVersionPrefix(version)}`;
 
-const stripVersionPrefix = (version: string): string => {
-  return version.replace(/^v/i, "");
-};
+const mapDetailToForm = (detail: PromptDetailEntity): PromptFormData => ({
+  name: detail.name,
+  purpose: detail.purpose,
+  system_prompt: detail.systemPrompt,
+  user_prompt_template: detail.userPromptTemplate || "",
+  model: detail.model,
+  temperature: detail.temperature,
+  max_tokens: detail.maxTokens,
+  version: stripVersionPrefix(detail.version),
+  api_url: detail.apiUrl,
+  is_active: detail.isActive,
+});
+
+// --- Sub-components ---
+
+const VariableChips = ({
+  field,
+  onInsert,
+}: {
+  field: PromptTextField;
+  onInsert: (field: PromptTextField, variable: string) => void;
+}) => (
+  <div className="flex flex-wrap gap-1.5 pb-1">
+    {PROMPT_VARIABLES.map((v) => (
+      <button
+        key={`${field}-${v.value}`}
+        type="button"
+        onClick={() => onInsert(field, v.value)}
+        className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
+      >
+        <Plus size={10} weight="bold" />
+        {v.label}
+      </button>
+    ))}
+  </div>
+);
 
 const PromptEditor = ({
   prompt,
@@ -63,82 +76,62 @@ const PromptEditor = ({
   const systemPromptRef = useRef<HTMLTextAreaElement>(null);
   const userPromptRef = useRef<HTMLTextAreaElement>(null);
 
-  const [formData, setFormData] = useState<FormData>({
-    name: "",
-    purpose: "",
-    system_prompt: "",
-    user_prompt_template: "",
-    model: "",
-    temperature: 0,
-    max_tokens: 0,
-    version: "",
-    api_url: "",
-    is_active: true,
-  });
+  const textareaRefMap: Record<
+    PromptTextField,
+    React.RefObject<HTMLTextAreaElement | null>
+  > = {
+    system_prompt: systemPromptRef,
+    user_prompt_template: userPromptRef,
+  };
+
+  const [formData, setFormData] = useState<PromptFormData>(INITIAL_FORM_DATA);
 
   useEffect(() => {
-    if (prompt) {
-      setFormData({
-        name: prompt.name,
-        purpose: prompt.purpose,
-        system_prompt: prompt.systemPrompt,
-        user_prompt_template: prompt.userPromptTemplate || "",
-        model: prompt.model,
-        temperature: prompt.temperature,
-        max_tokens: prompt.maxTokens,
-        version: stripVersionPrefix(prompt.version),
-        api_url: prompt.apiUrl,
-        is_active: prompt.isActive,
-      });
-    }
+    if (prompt) setFormData(mapDetailToForm(prompt));
   }, [prompt]);
 
-  const insertVariable = useCallback(
-    (
-      ref: React.RefObject<HTMLTextAreaElement | null>,
-      field: "system_prompt" | "user_prompt_template",
-      variable: string,
-    ) => {
-      const textarea = ref.current;
+  const updateField = <K extends keyof PromptFormData>(
+    key: K,
+    value: PromptFormData[K],
+  ) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleInsertVariable = useCallback(
+    (field: PromptTextField, variable: string) => {
+      const textarea = textareaRefMap[field].current;
       if (!textarea) return;
 
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const text = formData[field];
+      const { selectionStart: start, selectionEnd: end } = textarea;
       const insertion = `{${variable}}`;
-      const newText = text.slice(0, start) + insertion + text.slice(end);
+      const newText =
+        formData[field].slice(0, start) +
+        insertion +
+        formData[field].slice(end);
 
       updateField(field, newText);
 
-      // Restore cursor position after insertion
       requestAnimationFrame(() => {
         textarea.focus();
-        const newPos = start + insertion.length;
-        textarea.setSelectionRange(newPos, newPos);
+        const pos = start + insertion.length;
+        textarea.setSelectionRange(pos, pos);
       });
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [formData],
   );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const dataWithVersion = {
-      ...formData,
-      version: `v${stripVersionPrefix(formData.version)}`,
-    };
+    const payload = { ...formData, version: toVersionString(formData.version) };
+
     if (isEditing) {
-      onSave(dataWithVersion as UpdatePromptRequest);
+      onSave(payload as UpdatePromptRequest);
     } else {
-      const { is_active, ...createData } = dataWithVersion;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { is_active, ...createData } = payload;
       onSave(createData as CreatePromptRequest);
     }
-  };
-
-  const updateField = <K extends keyof FormData>(
-    key: K,
-    value: FormData[K],
-  ) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -262,21 +255,10 @@ const PromptEditor = ({
           {/* Prompts */}
           <div className="space-y-2">
             <Label htmlFor="system_prompt">System Prompt *</Label>
-            <div className="flex flex-wrap gap-1.5 pb-1">
-              {PROMPT_VARIABLES.map((v) => (
-                <button
-                  key={`sys-${v.value}`}
-                  type="button"
-                  onClick={() =>
-                    insertVariable(systemPromptRef, "system_prompt", v.value)
-                  }
-                  className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
-                >
-                  <Plus size={10} weight="bold" />
-                  {v.label}
-                </button>
-              ))}
-            </div>
+            <VariableChips
+              field="system_prompt"
+              onInsert={handleInsertVariable}
+            />
             <Textarea
               id="system_prompt"
               ref={systemPromptRef}
@@ -291,25 +273,10 @@ const PromptEditor = ({
 
           <div className="space-y-2">
             <Label htmlFor="user_prompt_template">User Prompt Template</Label>
-            <div className="flex flex-wrap gap-1.5 pb-1">
-              {PROMPT_VARIABLES.map((v) => (
-                <button
-                  key={`usr-${v.value}`}
-                  type="button"
-                  onClick={() =>
-                    insertVariable(
-                      userPromptRef,
-                      "user_prompt_template",
-                      v.value,
-                    )
-                  }
-                  className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
-                >
-                  <Plus size={10} weight="bold" />
-                  {v.label}
-                </button>
-              ))}
-            </div>
+            <VariableChips
+              field="user_prompt_template"
+              onInsert={handleInsertVariable}
+            />
             <Textarea
               id="user_prompt_template"
               ref={userPromptRef}

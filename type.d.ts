@@ -1,3 +1,10 @@
+import type {
+  PromptEntity,
+  PromptDetailEntity,
+  CreatePromptRequest,
+  UpdatePromptRequest,
+} from "@/services/prompt/type";
+
 interface Ticker {
   market: {
     name: string;
@@ -236,21 +243,51 @@ export interface ReportFiltersProps {
   onExport?: () => void;
 }
 
+// AI Prompt Page Types
+export type EditorMode = "closed" | "creating" | "editing";
+
+export type PromptTextField = "system_prompt" | "user_prompt_template";
+
+export interface PromptFormData {
+  name: string;
+  purpose: string;
+  system_prompt: string;
+  user_prompt_template: string;
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  version: string;
+  api_url: string;
+  is_active: boolean;
+}
+
 export interface PromptEditorProps {
-  prompt?: AIPrompt;
-  onSave: (prompt: Partial<AIPrompt>) => void;
+  prompt?: PromptDetailEntity | null;
+  isSubmitting?: boolean;
+  onSave: (data: CreatePromptRequest | UpdatePromptRequest) => void;
   onCancel: () => void;
 }
 
-export interface PromptPreviewProps {
-  prompt: string;
-  variables: string[];
-  onTest?: (input: Record<string, string>) => void;
+export interface PromptListProps {
+  prompts: PromptEntity[];
+  isLoading: boolean;
+  selectedId: number | null;
+  onSelect: (prompt: PromptEntity) => void;
+  onEdit: (prompt: PromptEntity) => void;
+  onDelete: (prompt: PromptEntity) => void;
 }
 
-export interface PromptTemplatesProps {
-  templates: PromptTemplate[];
-  onUseTemplate?: (template: PromptTemplate) => void;
+export interface PromptDetailPanelProps {
+  prompt: PromptDetailEntity | null;
+  isLoading: boolean;
+}
+
+export interface DeletePromptDialogProps {
+  prompt: PromptEntity | null;
+  open: boolean;
+  isDeleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
 }
 
 export interface ChatRoomListProps {
@@ -609,7 +646,7 @@ export interface RescuerRegistration {
   notes?: string;
 }
 
-// AI Prompt Types
+// AI Prompt Legacy Types (mock data)
 export interface AIPrompt {
   id: string;
   name: string;
