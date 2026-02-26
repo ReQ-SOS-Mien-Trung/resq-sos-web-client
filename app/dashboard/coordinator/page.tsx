@@ -11,19 +11,11 @@ import {
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import {
-  SOSRequest,
-  Rescuer,
-  AIDispatchDecision,
-  Location,
-  LocationPanelData,
-} from "@/type";
-import {
-  mockRescuers,
-  mockAIDecision,
-  mockActiveMissions,
-} from "@/lib/mock-data";
+import { SOSRequest, Rescuer, Location, LocationPanelData } from "@/type";
+import { mockRescuers, mockActiveMissions } from "@/lib/mock-data";
 import { useSOSRequests } from "@/services/sos_request/hooks";
+import { useRescueSuggestion } from "@/services/sos_request/hooks";
+import type { RescueSuggestionResponse } from "@/services/sos_request/type";
 import type { SOSRequestEntity } from "@/services/sos_request/type";
 import { useDepots } from "@/services/depot/hooks";
 import { useAssemblyPoints } from "@/services/assembly_points/hooks";
@@ -108,8 +100,8 @@ const CoordinatorDashboardContent = () => {
   // Panel states
   const [sosDetailOpen, setSOSDetailOpen] = useState(false);
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
-  const [currentAIDecision, setCurrentAIDecision] =
-    useState<AIDispatchDecision | null>(null);
+  const [rescueSuggestion, setRescueSuggestion] =
+    useState<RescueSuggestionResponse | null>(null);
   const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [locationPanelData, setLocationPanelData] =
     useState<LocationPanelData | null>(null);
@@ -257,6 +249,10 @@ const CoordinatorDashboardContent = () => {
         .toUpperCase()
     : "U";
 
+  // Rescue suggestion mutation
+  const { mutate: fetchRescueSuggestion, isPending: isProcessingSOS } =
+    useRescueSuggestion();
+
   // Handlers
   const handleSOSSelect = useCallback((sos: SOSRequest) => {
     setSelectedSOS(sos);
@@ -289,38 +285,30 @@ const CoordinatorDashboardContent = () => {
   );
 
   const handleProcessSOS = useCallback(() => {
-    // Simulate AI decision generation
     if (selectedSOS) {
-      setCurrentAIDecision({
-        ...mockAIDecision,
-        clusterId: selectedSOS.id,
-      });
-      // Keep SOS panel open and open rescue plan panel
-      setRescuePlanOpen(true);
+      fetchRescueSuggestion(
+        { sosRequestIds: [Number(selectedSOS.id)] },
+        {
+          onSuccess: (data) => {
+            setRescueSuggestion(data);
+            setRescuePlanOpen(true);
+          },
+          onError: (error) => {
+            console.error("Failed to get rescue suggestion:", error);
+            alert("Không thể lấy đề xuất giải cứu. Vui lòng thử lại.");
+          },
+        },
+      );
     }
-  }, [selectedSOS]);
+  }, [selectedSOS, fetchRescueSuggestion]);
 
   const handleApproveDecision = useCallback(() => {
-    // Simulate mission approval
     alert("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
     setRescuePlanOpen(false);
     setSOSDetailOpen(false);
     setSelectedSOS(null);
-    setCurrentAIDecision(null);
+    setRescueSuggestion(null);
   }, []);
-
-  const handleOverrideDecision = useCallback(
-    (rescuerId: string) => {
-      const newRescuer = mockRescuers.find((r) => r.id === rescuerId);
-      if (newRescuer && currentAIDecision) {
-        setCurrentAIDecision({
-          ...currentAIDecision,
-          recommendedRescuer: newRescuer,
-        });
-      }
-    },
-    [currentAIDecision],
-  );
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
@@ -522,7 +510,7 @@ const CoordinatorDashboardContent = () => {
                 assemblyPoints={assemblyPoints}
                 selectedSOS={selectedSOS}
                 selectedRescuer={selectedRescuer}
-                aiDecision={currentAIDecision}
+                aiDecision={null}
                 onSOSSelect={handleSOSSelect}
                 onRescuerSelect={handleRescuerSelect}
                 onDepotSelect={handleDepotSelect}
@@ -574,6 +562,7 @@ const CoordinatorDashboardContent = () => {
                 onOpenChange={setSOSDetailOpen}
                 sosRequest={selectedSOS}
                 onProcessSOS={handleProcessSOS}
+                isProcessing={isProcessingSOS}
               />
 
               {/* Rescue Plan Panel - Slides up from bottom, overlays map and sidebar */}
@@ -581,12 +570,8 @@ const CoordinatorDashboardContent = () => {
                 open={rescuePlanOpen}
                 onOpenChange={setRescuePlanOpen}
                 sosRequest={selectedSOS}
-                aiDecision={currentAIDecision}
-                availableRescuers={mockRescuers.filter(
-                  (r) => r.status === "AVAILABLE",
-                )}
+                rescueSuggestion={rescueSuggestion}
                 onApprove={handleApproveDecision}
-                onOverride={handleOverrideDecision}
               />
 
               {/* Location Details Panel - Depot / Assembly Point */}

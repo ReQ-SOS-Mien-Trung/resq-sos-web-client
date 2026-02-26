@@ -1,75 +1,48 @@
 "use client";
 
 import { useState } from "react";
-import { SOSRequest, Rescuer, AIDispatchDecision } from "@/type";
+import { RescuePlanPanelProps } from "@/type";
+import {
+  activityTypeConfig,
+  resourceTypeIcons,
+  severityConfig,
+  priorityLabelMap,
+} from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 import {
   X,
   Rocket,
-  Truck,
-  Boat,
-  MapPin,
-  Users,
   Clock,
   CheckCircle,
   Lightning,
   Path,
   Package,
-  WarningCircle,
-  CaretRight,
-  ArrowRight,
+  Warning,
+  Star,
+  Info,
+  ShieldCheck,
 } from "@phosphor-icons/react";
-
-interface RescuePlanPanelProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  sosRequest: SOSRequest | null;
-  aiDecision: AIDispatchDecision | null;
-  availableRescuers: Rescuer[];
-  onApprove: () => void;
-  onOverride: (rescuerId: string) => void;
-}
 
 const RescuePlanPanel = ({
   open,
   onOpenChange,
   sosRequest,
-  aiDecision,
-  availableRescuers,
+  rescueSuggestion,
   onApprove,
-  onOverride,
 }: RescuePlanPanelProps) => {
-  const [selectedRescuer, setSelectedRescuer] = useState<string>("");
   const [activeTab, setActiveTab] = useState("plan");
 
-  if (!sosRequest || !aiDecision) return null;
+  if (!sosRequest || !rescueSuggestion) return null;
 
-  const recommendedRescuer = aiDecision.recommendedRescuer;
-
-  const handleApprove = () => {
-    if (selectedRescuer && selectedRescuer !== recommendedRescuer.id) {
-      onOverride(selectedRescuer);
-    }
-    onApprove();
-  };
-
-  const vehicleIcons = {
-    TRUCK: <Truck className="h-5 w-5" weight="fill" />,
-    MOTORBOAT: <Boat className="h-5 w-5" weight="fill" />,
-    SMALL_BOAT: <Boat className="h-4 w-4" weight="fill" />,
-  };
+  const severity =
+    severityConfig[rescueSuggestion.suggestedSeverityLevel] ||
+    severityConfig["Medium"];
 
   return (
     <div
@@ -79,7 +52,7 @@ const RescuePlanPanel = ({
           ? "opacity-100 translate-y-0"
           : "opacity-0 translate-y-full pointer-events-none",
       )}
-      style={{ right: 420 }} // Leave space for ClusterDetailsPanel
+      style={{ right: 420 }} // Leave space for SOSDetailsPanel
     >
       <div className="h-full bg-background/98 backdrop-blur-sm border-t border-r shadow-2xl flex flex-col">
         {/* Header */}
@@ -93,15 +66,26 @@ const RescuePlanPanel = ({
                 />
               </div>
               <div>
-                <h2 className="text-xl font-bold">Kế hoạch giải cứu</h2>
-                <p className="text-sm text-muted-foreground">
-                  SOS #{sosRequest.id}
-                </p>
+                <h2 className="text-lg font-bold leading-tight">
+                  {rescueSuggestion.suggestedMissionTitle}
+                </h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-sm text-muted-foreground">
+                    SOS #{sosRequest.id}
+                  </p>
+                  <Badge variant={severity.variant} className="text-xs">
+                    {severity.label}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {rescueSuggestion.suggestedMissionType}
+                  </Badge>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
-                AI Đề xuất
+              <Badge variant="outline" className="text-xs gap-1">
+                <Lightning className="h-3 w-3" weight="fill" />
+                {rescueSuggestion.modelName}
               </Badge>
               <Button
                 variant="ghost"
@@ -112,11 +96,42 @@ const RescuePlanPanel = ({
               </Button>
             </div>
           </div>
+
+          {/* Quick Stats Bar */}
+          <div className="grid grid-cols-4 gap-3 mt-4">
+            <div className="bg-background/80 rounded-lg p-2.5 text-center">
+              <div className="text-lg font-bold text-red-500">
+                {rescueSuggestion.suggestedPriorityScore.toFixed(1)}
+              </div>
+              <div className="text-[10px] text-muted-foreground">Ưu tiên</div>
+            </div>
+            <div className="bg-background/80 rounded-lg p-2.5 text-center">
+              <div className="text-lg font-bold text-blue-500">
+                {rescueSuggestion.sosRequestCount}
+              </div>
+              <div className="text-[10px] text-muted-foreground">SOS</div>
+            </div>
+            <div className="bg-background/80 rounded-lg p-2.5 text-center">
+              <div className="text-lg font-bold text-emerald-500">
+                {(rescueSuggestion.confidenceScore * 100).toFixed(0)}%
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                Độ tin cậy
+              </div>
+            </div>
+            <div className="bg-background/80 rounded-lg p-2.5 text-center">
+              <div className="text-lg font-bold text-orange-500">
+                {(rescueSuggestion.responseTimeMs / 1000).toFixed(1)}s
+              </div>
+              <div className="text-[10px] text-muted-foreground">
+                Thời gian AI
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 flex overflow-hidden min-h-0">
-          {/* Main Content */}
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             <Tabs
               value={activeTab}
@@ -127,24 +142,24 @@ const RescuePlanPanel = ({
                 <TabsList className="grid grid-cols-3 w-full max-w-md">
                   <TabsTrigger value="plan" className="gap-2">
                     <Path className="h-4 w-4" />
-                    Lộ trình
+                    Kế hoạch
                   </TabsTrigger>
                   <TabsTrigger value="resources" className="gap-2">
                     <Package className="h-4 w-4" />
                     Tài nguyên
                   </TabsTrigger>
-                  <TabsTrigger value="team" className="gap-2">
-                    <Users className="h-4 w-4" />
-                    Đội cứu hộ
+                  <TabsTrigger value="notes" className="gap-2">
+                    <Info className="h-4 w-4" />
+                    Ghi chú
                   </TabsTrigger>
                 </TabsList>
               </div>
 
               <ScrollArea className="flex-1 min-h-0">
-                {/* Route Plan Tab */}
+                {/* Plan Tab */}
                 <TabsContent value="plan" className="m-0 p-4">
                   <div className="space-y-4">
-                    {/* AI Reasoning */}
+                    {/* Overall Assessment */}
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
@@ -152,98 +167,122 @@ const RescuePlanPanel = ({
                             className="h-4 w-4 text-yellow-500"
                             weight="fill"
                           />
-                          Phân tích AI
+                          Đánh giá tổng quan
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="text-sm text-muted-foreground">
-                        {aiDecision.reasoning}
+                      <CardContent className="text-sm text-muted-foreground leading-relaxed">
+                        {rescueSuggestion.overallAssessment}
                       </CardContent>
                     </Card>
 
-                    {/* Route Steps */}
+                    {/* Activity Steps */}
                     <div>
                       <h3 className="text-sm font-semibold mb-3">
-                        Các bước thực hiện
+                        Các hoạt động đề xuất
                       </h3>
                       <div className="space-y-3">
-                        {aiDecision.proposedPlan.map((step, index) => (
-                          <div key={index} className="flex gap-3 items-start">
-                            <div className="flex flex-col items-center">
+                        {rescueSuggestion.suggestedActivities.map(
+                          (activity, index) => {
+                            const config =
+                              activityTypeConfig[activity.activityType] ||
+                              activityTypeConfig["ASSESS"];
+                            return (
                               <div
-                                className={cn(
-                                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white",
-                                  index === 0
-                                    ? "bg-emerald-500"
-                                    : "bg-blue-500",
-                                )}
+                                key={index}
+                                className="flex gap-3 items-start"
                               >
-                                {index + 1}
+                                <div className="flex flex-col items-center">
+                                  <div
+                                    className={cn(
+                                      "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white",
+                                      activity.priority === "Critical"
+                                        ? "bg-red-500"
+                                        : activity.priority === "High"
+                                          ? "bg-orange-500"
+                                          : "bg-blue-500",
+                                    )}
+                                  >
+                                    {activity.step}
+                                  </div>
+                                  {index <
+                                    rescueSuggestion.suggestedActivities
+                                      .length -
+                                      1 && (
+                                    <div className="w-0.5 h-12 bg-border mt-1" />
+                                  )}
+                                </div>
+                                <Card className="flex-1">
+                                  <CardContent className="p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "text-xs",
+                                          config.color,
+                                          config.bgColor,
+                                        )}
+                                      >
+                                        {config.label}
+                                      </Badge>
+                                      <div className="flex items-center gap-2">
+                                        <Badge
+                                          variant={
+                                            activity.priority === "Critical"
+                                              ? "p1"
+                                              : activity.priority === "High"
+                                                ? "p2"
+                                                : "p3"
+                                          }
+                                          className="text-[10px]"
+                                        >
+                                          {priorityLabelMap[
+                                            activity.priority
+                                          ] || activity.priority}
+                                        </Badge>
+                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                          <Clock className="h-3 w-3" />
+                                          {activity.estimatedTime}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <p className="text-sm leading-relaxed">
+                                      {activity.description}
+                                    </p>
+                                  </CardContent>
+                                </Card>
                               </div>
-                              {index < aiDecision.proposedPlan.length - 1 && (
-                                <div className="w-0.5 h-12 bg-border mt-1" />
-                              )}
-                            </div>
-                            <Card className="flex-1">
-                              <CardContent className="p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {step.action === "PICKUP_SUPPLIES"
-                                      ? "Lấy vật tư"
-                                      : step.action === "GO_TO_VICTIM"
-                                        ? "Đến nạn nhân"
-                                        : step.action === "TRANSPORT_TO_SAFETY"
-                                          ? "Vận chuyển"
-                                          : "Trở về"}
-                                  </Badge>
-                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {step.estimatedTime} phút
-                                  </span>
-                                </div>
-                                <p className="text-sm font-medium">
-                                  {step.details}
-                                </p>
-                                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  {step.location.lat.toFixed(4)},{" "}
-                                  {step.location.lng.toFixed(4)}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </div>
-                        ))}
+                            );
+                          },
+                        )}
                       </div>
                     </div>
 
-                    {/* Time Estimate */}
+                    {/* Summary Card */}
                     <Card className="bg-muted/50">
                       <CardContent className="p-4">
                         <div className="grid grid-cols-3 gap-4 text-center">
                           <div>
-                            <div className="text-2xl font-bold text-emerald-600">
-                              {aiDecision.proposedPlan.reduce(
-                                (acc, step) => acc + step.estimatedTime,
-                                0,
-                              )}
+                            <div className="text-xl font-bold text-emerald-600">
+                              {rescueSuggestion.estimatedDuration}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Phút di chuyển
+                              Thời gian ước tính
                             </div>
                           </div>
                           <div>
-                            <div className="text-2xl font-bold text-blue-600">
-                              1
+                            <div className="text-xl font-bold text-blue-600">
+                              {rescueSuggestion.suggestedActivities.length}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Nạn nhân cần cứu
+                              Hoạt động
                             </div>
                           </div>
                           <div>
-                            <div className="text-2xl font-bold text-orange-600">
-                              {aiDecision.proposedPlan.length}
+                            <div className="text-xl font-bold text-orange-600">
+                              {rescueSuggestion.suggestedResources.length}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Điểm dừng
+                              Tài nguyên cần
                             </div>
                           </div>
                         </div>
@@ -255,128 +294,181 @@ const RescuePlanPanel = ({
                 {/* Resources Tab */}
                 <TabsContent value="resources" className="m-0 p-4">
                   <div className="space-y-4">
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">
-                          Vật tư cần thiết
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 bg-muted rounded-lg">
-                            <div className="text-lg font-bold">5</div>
-                            <div className="text-xs text-muted-foreground">
-                              Áo phao
-                            </div>
-                          </div>
-                          <div className="p-3 bg-muted rounded-lg">
-                            <div className="text-lg font-bold">10</div>
-                            <div className="text-xs text-muted-foreground">
-                              Phần thực phẩm
-                            </div>
-                          </div>
-                          <div className="p-3 bg-muted rounded-lg">
-                            <div className="text-lg font-bold">2</div>
-                            <div className="text-xs text-muted-foreground">
-                              Kit y tế
-                            </div>
-                          </div>
-                          <div className="p-3 bg-muted rounded-lg">
-                            <div className="text-lg font-bold">15</div>
-                            <div className="text-xs text-muted-foreground">
-                              Lít nước
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">
-                          Nguồn cung cấp
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                          <Package className="h-8 w-8 text-blue-500" />
-                          <div>
-                            <div className="font-medium">Kho vật tư Huế</div>
-                            <div className="text-xs text-muted-foreground">
-                              Cách 2.5km • Đầy đủ vật tư
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    {rescueSuggestion.suggestedResources.map(
+                      (resource, index) => {
+                        const icon = resourceTypeIcons[
+                          resource.resourceType
+                        ] || <Package className="h-5 w-5" />;
+                        return (
+                          <Card key={index}>
+                            <CardContent className="p-4">
+                              <div className="flex items-start gap-4">
+                                <div
+                                  className={cn(
+                                    "p-3 rounded-lg shrink-0",
+                                    resource.priority === "Critical"
+                                      ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                                      : "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
+                                  )}
+                                >
+                                  {icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <h4 className="font-semibold text-sm">
+                                      {resource.resourceType}
+                                    </h4>
+                                    <div className="flex items-center gap-2">
+                                      <Badge
+                                        variant={
+                                          resource.priority === "Critical"
+                                            ? "p1"
+                                            : "p2"
+                                        }
+                                        className="text-[10px]"
+                                      >
+                                        {priorityLabelMap[resource.priority] ||
+                                          resource.priority}
+                                      </Badge>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        SL: {resource.quantity}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground leading-relaxed">
+                                    {resource.description}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      },
+                    )}
                   </div>
                 </TabsContent>
 
-                {/* Team Tab */}
-                <TabsContent value="team" className="m-0 p-4">
+                {/* Notes Tab */}
+                <TabsContent value="notes" className="m-0 p-4">
                   <div className="space-y-4">
-                    {/* Recommended Rescuer */}
-                    <Card className="border-emerald-200 dark:border-emerald-800">
+                    {/* Special Notes */}
+                    <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
-                          <CheckCircle
+                          <Warning
+                            className="h-4 w-4 text-orange-500"
+                            weight="fill"
+                          />
+                          Lưu ý đặc biệt
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-sm text-muted-foreground leading-relaxed">
+                        {rescueSuggestion.specialNotes}
+                      </CardContent>
+                    </Card>
+
+                    {/* AI Confidence */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <ShieldCheck
                             className="h-4 w-4 text-emerald-500"
                             weight="fill"
                           />
-                          Đội cứu hộ được đề xuất
+                          Độ tin cậy AI
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="flex items-center gap-4">
-                          <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                            {vehicleIcons[recommendedRescuer.type]}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">
+                              Điểm tin cậy
+                            </span>
+                            <span className="text-sm font-bold">
+                              {(rescueSuggestion.confidenceScore * 100).toFixed(
+                                0,
+                              )}
+                              %
+                            </span>
                           </div>
-                          <div className="flex-1">
-                            <div className="font-semibold">
-                              {recommendedRescuer.name}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {recommendedRescuer.capabilities.join(", ")}
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Tải: {recommendedRescuer.currentLoad}/
-                              {recommendedRescuer.capacity}
-                            </div>
+                          <Progress
+                            value={rescueSuggestion.confidenceScore * 100}
+                            className="h-2"
+                          />
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Model: {rescueSuggestion.modelName}</span>
+                            <span>
+                              Phản hồi:{" "}
+                              {(rescueSuggestion.responseTimeMs / 1000).toFixed(
+                                1,
+                              )}
+                              s
+                            </span>
                           </div>
-                          <Badge variant="success">Sẵn sàng</Badge>
                         </div>
                       </CardContent>
                     </Card>
 
-                    {/* Override Selection */}
+                    {/* Mission Info */}
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
-                          <WarningCircle className="h-4 w-4 text-orange-500" />
-                          Thay đổi đội cứu hộ (Tuỳ chọn)
+                          <Star
+                            className="h-4 w-4 text-yellow-500"
+                            weight="fill"
+                          />
+                          Thông tin nhiệm vụ
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <Select
-                          value={selectedRescuer}
-                          onValueChange={setSelectedRescuer}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn đội cứu hộ khác..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableRescuers
-                              .filter((r) => r.id !== recommendedRescuer.id)
-                              .map((rescuer) => (
-                                <SelectItem key={rescuer.id} value={rescuer.id}>
-                                  <div className="flex items-center gap-2">
-                                    {vehicleIcons[rescuer.type]}
-                                    <span>{rescuer.name}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Loại nhiệm vụ
+                            </span>
+                            <Badge variant="outline">
+                              {rescueSuggestion.suggestedMissionType}
+                            </Badge>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Mức độ nghiêm trọng
+                            </span>
+                            <Badge variant={severity.variant}>
+                              {severity.label}
+                            </Badge>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Điểm ưu tiên
+                            </span>
+                            <span className="font-semibold">
+                              {rescueSuggestion.suggestedPriorityScore.toFixed(
+                                1,
+                              )}
+                              /10
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Thời gian ước tính
+                            </span>
+                            <span className="font-semibold">
+                              {rescueSuggestion.estimatedDuration}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Số yêu cầu SOS
+                            </span>
+                            <span className="font-semibold">
+                              {rescueSuggestion.sosRequestCount}
+                            </span>
+                          </div>
+                        </div>
                       </CardContent>
                     </Card>
                   </div>
@@ -398,7 +490,7 @@ const RescuePlanPanel = ({
             </Button>
             <Button
               className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
-              onClick={handleApprove}
+              onClick={onApprove}
             >
               <CheckCircle className="h-5 w-5 mr-2" weight="fill" />
               Phê duyệt & Gửi nhiệm vụ

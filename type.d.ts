@@ -778,6 +778,28 @@ export interface SOSDetailsPanelProps {
   onOpenChange: (open: boolean) => void;
   sosRequest: SOSRequest | null;
   onProcessSOS: () => void;
+  isProcessing?: boolean;
+}
+
+export interface RescuePlanPanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  sosRequest: SOSRequest | null;
+  rescueSuggestion:
+    | import("@/services/sos_request/type").RescueSuggestionResponse
+    | null;
+  onApprove: () => void;
+}
+
+export interface ActivityTypeConfig {
+  label: string;
+  color: string;
+  bgColor: string;
+}
+
+export interface SeverityConfig {
+  variant: "p1" | "p2" | "p3" | "warning";
+  label: string;
 }
 
 export interface CoordinatorMapProps {

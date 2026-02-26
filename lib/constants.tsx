@@ -5,6 +5,8 @@ import {
   SOSItem,
   Testimonial,
   WeatherLayer,
+  ActivityTypeConfig,
+  SeverityConfig,
 } from "@/type";
 import {
   ArrowsCounterClockwise,
@@ -28,6 +30,11 @@ import {
   WarningCircle,
   Wind,
   XCircle,
+  Boat,
+  FirstAid,
+  Truck,
+  Wrench,
+  Users as UsersIcon,
 } from "@phosphor-icons/react";
 import {
   Bell,
@@ -529,4 +536,51 @@ export const assemblyPointStatusConfig = {
     bgColor: "bg-red-50 dark:bg-red-950/30",
     icon: XCircle,
   },
+};
+
+// ---- Rescue Plan Panel Constants ----
+
+export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
+  ASSESS: {
+    label: "Đánh giá",
+    color: "text-blue-700 dark:text-blue-400",
+    bgColor: "bg-blue-100 dark:bg-blue-900/30",
+  },
+  RESCUE: {
+    label: "Giải cứu",
+    color: "text-red-700 dark:text-red-400",
+    bgColor: "bg-red-100 dark:bg-red-900/30",
+  },
+  MEDICAL_AID: {
+    label: "Y tế",
+    color: "text-emerald-700 dark:text-emerald-400",
+    bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
+  },
+  EVACUATE: {
+    label: "Sơ tán",
+    color: "text-orange-700 dark:text-orange-400",
+    bgColor: "bg-orange-100 dark:bg-orange-900/30",
+  },
+};
+
+export const resourceTypeIcons: Record<string, React.ReactNode> = {
+  TEAM: <UsersIcon className="h-5 w-5" weight="fill" />,
+  BOAT: <Boat className="h-5 w-5" weight="fill" />,
+  MEDICAL_KIT: <FirstAid className="h-5 w-5" weight="fill" />,
+  EQUIPMENT: <Wrench className="h-5 w-5" weight="fill" />,
+  VEHICLE: <Truck className="h-5 w-5" weight="fill" />,
+};
+
+export const severityConfig: Record<string, SeverityConfig> = {
+  Critical: { variant: "p1", label: "Nguy cấp" },
+  High: { variant: "p1", label: "Cao" },
+  Medium: { variant: "p2", label: "Trung bình" },
+  Low: { variant: "p3", label: "Thấp" },
+};
+
+export const priorityLabelMap: Record<string, string> = {
+  Critical: "Nguy cấp",
+  High: "Cao",
+  Medium: "Trung bình",
+  Low: "Thấp",
 };
