@@ -25,7 +25,6 @@ import {
   Thermometer,
   TShirt,
   UserCheck,
-  UserPlus,
   Warning,
   WarningCircle,
   Wind,
@@ -48,7 +47,6 @@ import {
   BarChart3,
   Stethoscope,
   ForkKnife,
-  Wrench,
   Tent,
 } from "lucide-react";
 
