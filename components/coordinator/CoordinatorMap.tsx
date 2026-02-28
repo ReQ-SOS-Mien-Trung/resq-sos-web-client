@@ -80,6 +80,8 @@ const CoordinatorMap = ({
     "all" | "depot" | "assemblyPoint"
   >("all");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  // Track the last selected search result name to display in input
+  const [selectedSearchName, setSelectedSearchName] = useState<string | null>(null);
   const [mapControls, setMapControls] = useState<{
     zoomIn: () => void;
     zoomOut: () => void;
@@ -203,9 +205,11 @@ const CoordinatorMap = ({
   // Handle selecting a search result
   const handleSelectResult = (result: SearchResult) => {
     setSearchFlyToLocation({ lat: result.latitude, lng: result.longitude });
+    setSelectedSearchName(result.name);
     setSearchQuery("");
     setIsSearchOpen(false);
     setIsSearchFocused(false);
+    searchInputRef.current?.blur();
   };
 
   // Keyboard shortcut to focus search (Ctrl+K / Cmd+K)
@@ -271,33 +275,77 @@ const CoordinatorMap = ({
             <div className="absolute left-3.5 text-muted-foreground/70 pointer-events-none">
               <MagnifyingGlass size={18} weight="bold" />
             </div>
-            <Input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Tìm kho, điểm tập kết..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setIsSearchOpen(true);
-              }}
-              onFocus={() => {
-                setIsSearchOpen(true);
-                setIsSearchFocused(true);
-              }}
-              className="pl-10 pr-20 h-11 bg-transparent border-0 shadow-none focus-visible:ring-0 rounded-2xl text-sm"
-            />
-            <div className="absolute right-3 flex items-center gap-1.5">
-              {searchQuery ? (
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setIsSearchOpen(false);
+
+            {/* Selected search name display - shows when not actively searching */}
+            {selectedSearchName && !isSearchFocused ? (
+              <button
+                onClick={() => {
+                  setSearchQuery(selectedSearchName);
+                  setIsSearchFocused(true);
+                  setIsSearchOpen(true);
+                  setTimeout(() => {
                     searchInputRef.current?.focus();
-                  }}
-                  className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                >
-                  <X size={14} weight="bold" />
-                </button>
+                    searchInputRef.current?.select();
+                  }, 0);
+                }}
+                className="pl-10 pr-20 h-11 w-full text-left text-sm truncate text-foreground"
+              >
+                {selectedSearchName}
+              </button>
+            ) : (
+              <Input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Tìm kho, điểm tập kết..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsSearchOpen(true);
+                  if (e.target.value) {
+                    setSelectedSearchName(null);
+                  }
+                }}
+                onFocus={() => {
+                  setIsSearchOpen(true);
+                  setIsSearchFocused(true);
+                }}
+                className="pl-10 pr-20 h-11 bg-transparent border-0 shadow-none focus-visible:ring-0 rounded-2xl text-sm"
+              />
+            )}
+
+            <div className="absolute right-3 flex items-center gap-1.5">
+              {searchQuery || selectedSearchName ? (
+                <>
+                  {selectedSearchName && !isSearchFocused && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery(selectedSearchName);
+                        setIsSearchFocused(true);
+                        setIsSearchOpen(true);
+                        setTimeout(() => {
+                          searchInputRef.current?.focus();
+                          searchInputRef.current?.select();
+                        }, 0);
+                      }}
+                      className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                      title="Tìm kiếm"
+                    >
+                      <MagnifyingGlass size={14} weight="bold" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedSearchName(null);
+                      setIsSearchOpen(false);
+                      setIsSearchFocused(false);
+                      searchInputRef.current?.blur();
+                    }}
+                    className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  >
+                    <X size={14} weight="bold" />
+                  </button>
+                </>
               ) : (
                 <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/60 bg-muted/50 rounded-md border border-border/40">
                   <Command size={10} /> K
