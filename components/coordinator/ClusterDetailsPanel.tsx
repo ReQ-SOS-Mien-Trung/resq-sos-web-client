@@ -262,17 +262,19 @@ const ClusterDetailsPanel = ({
           </div>
         </ScrollArea>
 
-        {/* Footer */}
-        <div className="p-4 border-t shrink-0">
-          <Button
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
-            size="lg"
-            onClick={onProcessCluster}
-          >
-            <Rocket className="h-5 w-5 mr-2" weight="fill" />
-            Lên kế hoạch giải cứu
-          </Button>
-        </div>
+        {/* Footer - only show action button if cluster has pending requests */}
+        {cluster.sosRequests.some((s) => s.status === "PENDING") && (
+          <div className="p-4 border-t shrink-0">
+            <Button
+              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+              size="lg"
+              onClick={onProcessCluster}
+            >
+              <Rocket className="h-5 w-5 mr-2" weight="fill" />
+              Lên kế hoạch giải cứu
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
