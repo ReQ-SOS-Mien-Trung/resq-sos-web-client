@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import dynamic from "next/dynamic";
 import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
 import type { AssemblyPointEntity } from "@/services/assembly_points/type";
@@ -21,38 +20,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-// Dynamically import react-leaflet components to avoid SSR issues
-const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false },
-);
-const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false },
-);
-const Marker = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Marker),
-  { ssr: false },
-);
-const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
-  ssr: false,
-});
-const Polyline = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Polyline),
-  { ssr: false },
-);
-
-// FlyToHandler component - dynamically imported to use useMap hook
-const FlyToHandler = dynamic(
-  () => import("./FlyToHandler").then((mod) => mod.FlyToHandler),
-  { ssr: false },
-);
-
-// MapZoomHandler - provides zoom/recenter controls from inside MapContainer
-const MapZoomHandler = dynamic(
-  () => import("./MapZoomHandler").then((mod) => mod.MapZoomHandler),
-  { ssr: false },
-);
+// Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
+// and the isMounted guard inside this component.
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import { FlyToHandler } from "./FlyToHandler";
+import { MapZoomHandler } from "./MapZoomHandler";
 
 const CoordinatorMap = ({
   sosRequests,

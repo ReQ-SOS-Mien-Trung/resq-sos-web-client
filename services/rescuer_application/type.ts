@@ -2,7 +2,9 @@
 export interface RescuerApplicationDocument {
   id: number;
   fileUrl: string;
-  fileType: string;
+  fileTypeId: number;
+  fileTypeCode: string;
+  fileTypeName: string;
   uploadedAt: string;
 }
 
@@ -15,13 +17,14 @@ export interface RescuerApplicationEntity {
   reviewedAt: string | null;
   reviewedBy: string | null;
   adminNote: string | null;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   rescuerType: string;
   address: string;
   ward: string;
-  city: string;
+  province: string;
   documents: RescuerApplicationDocument[];
 }
 

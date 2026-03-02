@@ -47,44 +47,42 @@ import { RescuerApplicationEntity } from "@/services/rescuer_application/type";
 
 type StatusFilter = "all" | "Pending" | "Approved" | "Rejected";
 
-const getDocTypeLabel = (fileType: string) => {
+/** Build full name (Vietnamese: lastName firstName) */
+const getFullName = (item: RescuerApplicationEntity) =>
+  `${item.lastName} ${item.firstName}`;
+
+const getDocTypeLabel = (fileTypeCode: string, fileTypeName?: string) => {
+  if (fileTypeName) return fileTypeName;
   const map: Record<string, string> = {
+    OTHER: "Khác",
+    WATER_RESCUE_CERT: "Chứng chỉ cứu hộ dưới nước",
+    BASIC_MEDICAL_CERT: "Chứng chỉ y tế cơ bản",
     CCCD: "Căn cước công dân",
-    RescueCertificate: "Chứng chỉ cứu hộ",
-    HealthCertificate: "Giấy khám sức khỏe",
-    FirstAidCertificate: "Chứng chỉ sơ cấp cứu",
-    ExperienceLetter: "Thư xác nhận kinh nghiệm",
   };
-  return map[fileType] ?? fileType;
+  return map[fileTypeCode] ?? fileTypeCode;
 };
 
-const getDocIcon = (fileType: string) => {
-  switch (fileType) {
+const getDocIcon = (fileTypeCode: string) => {
+  switch (fileTypeCode) {
     case "CCCD":
       return <IdentificationCard size={18} weight="duotone" />;
-    case "RescueCertificate":
-    case "FirstAidCertificate":
+    case "WATER_RESCUE_CERT":
       return <Certificate size={18} weight="duotone" />;
-    case "HealthCertificate":
+    case "BASIC_MEDICAL_CERT":
       return <FirstAid size={18} weight="duotone" />;
-    case "ExperienceLetter":
-      return <Briefcase size={18} weight="duotone" />;
     default:
       return <FileText size={18} weight="duotone" />;
   }
 };
 
-const getDocIconColor = (fileType: string) => {
-  switch (fileType) {
+const getDocIconColor = (fileTypeCode: string) => {
+  switch (fileTypeCode) {
     case "CCCD":
       return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
-    case "RescueCertificate":
-    case "FirstAidCertificate":
+    case "WATER_RESCUE_CERT":
       return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
-    case "HealthCertificate":
+    case "BASIC_MEDICAL_CERT":
       return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
-    case "ExperienceLetter":
-      return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
     default:
       return "bg-violet-500/10 text-violet-600 dark:text-violet-400";
   }
@@ -163,7 +161,7 @@ const RescuerVerificationPage = () => {
                   : "Từ chối cứu hộ viên"}
               </DialogTitle>
               <DialogDescription>
-                {reviewDialog.item?.fullName}
+                {reviewDialog.item ? getFullName(reviewDialog.item) : ""}
               </DialogDescription>
             </div>
           </div>
@@ -270,10 +268,10 @@ const RescuerVerificationPage = () => {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (i) =>
-          i.fullName.toLowerCase().includes(q) ||
+          getFullName(i).toLowerCase().includes(q) ||
           i.email.toLowerCase().includes(q) ||
           i.phone.includes(q) ||
-          i.city.toLowerCase().includes(q),
+          i.province.toLowerCase().includes(q),
       );
     }
     return result;
@@ -355,12 +353,12 @@ const RescuerVerificationPage = () => {
                 <div className="px-6 pb-6">
                   <div className="flex items-end gap-4 -mt-10">
                     <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-3xl shadow-xl border-4 border-background">
-                      {selectedItem.fullName.charAt(0).toUpperCase()}
+                      {selectedItem.firstName.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 pb-1">
                       <div className="flex items-center gap-3 flex-wrap">
                         <h2 className="text-2xl font-bold text-foreground">
-                          {selectedItem.fullName}
+                          {getFullName(selectedItem)}
                         </h2>
                         <Badge
                           className={`${statusConfig.className} border text-xs gap-1`}
@@ -442,8 +440,8 @@ const RescuerVerificationPage = () => {
                       },
                       {
                         icon: <MapPin size={16} />,
-                        label: "Thành phố",
-                        value: selectedItem.city,
+                        label: "Tỉnh/Thành phố",
+                        value: selectedItem.province,
                       },
                     ].map((field, idx) => (
                       <div key={idx} className="flex items-start gap-3">
@@ -584,13 +582,13 @@ const RescuerVerificationPage = () => {
                             className="flex items-center gap-3 p-3.5 rounded-xl border border-border/50 bg-muted/20 hover:bg-muted/40 hover:border-border transition-all duration-200 group/doc"
                           >
                             <div
-                              className={`p-2.5 rounded-xl ${getDocIconColor(doc.fileType)} transition-transform duration-200 group-hover/doc:scale-110`}
+                              className={`p-2.5 rounded-xl ${getDocIconColor(doc.fileTypeCode)} transition-transform duration-200 group-hover/doc:scale-110`}
                             >
-                              {getDocIcon(doc.fileType)}
+                              {getDocIcon(doc.fileTypeCode)}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-foreground truncate">
-                                {getDocTypeLabel(doc.fileType)}
+                                {getDocTypeLabel(doc.fileTypeCode, doc.fileTypeName)}
                               </p>
                               <p className="text-xs text-muted-foreground mt-0.5">
                                 Tải lên{" "}
@@ -850,7 +848,7 @@ const RescuerVerificationPage = () => {
                             {/* Avatar */}
                             <div className="relative">
                               <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md group-hover:shadow-lg transition-shadow">
-                                {item.fullName.charAt(0).toUpperCase()}
+                                {item.firstName.charAt(0).toUpperCase()}
                               </div>
                               {/* Status dot */}
                               <div
@@ -866,7 +864,7 @@ const RescuerVerificationPage = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                 <h3 className="font-semibold text-foreground text-base group-hover:text-primary transition-colors">
-                                  {item.fullName}
+                                  {getFullName(item)}
                                 </h3>
                                 <Badge
                                   className={`${statusConfig.className} border text-[11px] gap-1`}
@@ -888,7 +886,7 @@ const RescuerVerificationPage = () => {
                                   <div className="flex items-center gap-1.5">
                                     <MapPin size={13} className="shrink-0" />
                                     <span className="truncate">
-                                      {item.city}
+                                      {item.province}
                                     </span>
                                   </div>
                                 </div>

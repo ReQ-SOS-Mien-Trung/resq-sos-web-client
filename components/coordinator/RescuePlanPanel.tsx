@@ -22,6 +22,9 @@ import {
   Package,
   Warning,
   ShieldCheck,
+  ArrowRight,
+  ListChecks,
+  Cube,
 } from "@phosphor-icons/react";
 
 const RescuePlanPanel = ({
@@ -49,219 +52,289 @@ const RescuePlanPanel = ({
     >
       <div className="h-full bg-background/98 backdrop-blur-sm border-t border-r shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b shrink-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10">
+        <div className="p-4 pb-3 border-b shrink-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+              <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 shadow-sm">
                 <Rocket
                   className="h-6 w-6 text-emerald-600 dark:text-emerald-400"
                   weight="fill"
                 />
               </div>
               <div>
-                <h2 className="text-lg font-bold leading-tight">
+                <h2 className="text-base font-bold leading-tight">
                   {rescueSuggestion.suggestedMissionTitle}
                 </h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex items-center gap-1.5 mt-1">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
                     SOS #{sosRequest.id}
-                  </p>
-                  <Badge variant={severity.variant} className="text-xs">
+                  </Badge>
+                  <Badge variant={severity.variant} className="text-[10px] px-1.5 py-0 h-5">
                     {severity.label}
                   </Badge>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
                     {rescueSuggestion.suggestedMissionType}
                   </Badge>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs gap-1">
+            <div className="flex items-center gap-1.5">
+              <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 h-5">
                 <Lightning className="h-3 w-3" weight="fill" />
                 {rescueSuggestion.modelName}
               </Badge>
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-8 w-8"
                 onClick={() => onOpenChange(false)}
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
           {/* Quick Stats Bar */}
-          <div className="grid grid-cols-4 gap-3 mt-4">
-            <div className="bg-background/80 rounded-lg p-2.5 text-center">
-              <div className="text-lg font-bold text-red-500">
-                {rescueSuggestion.suggestedPriorityScore.toFixed(1)}
+          <div className="grid grid-cols-4 gap-2 mt-3">
+            {[
+              {
+                value: rescueSuggestion.suggestedPriorityScore.toFixed(1),
+                label: "Ưu tiên",
+                color: "text-red-500",
+                bg: "bg-red-500/5 border-red-500/15",
+              },
+              {
+                value: rescueSuggestion.sosRequestCount,
+                label: "Yêu cầu SOS",
+                color: "text-blue-500",
+                bg: "bg-blue-500/5 border-blue-500/15",
+              },
+              {
+                value: `${(rescueSuggestion.confidenceScore * 100).toFixed(0)}%`,
+                label: "Độ tin cậy",
+                color: "text-emerald-500",
+                bg: "bg-emerald-500/5 border-emerald-500/15",
+              },
+              {
+                value: `${(rescueSuggestion.responseTimeMs / 1000).toFixed(1)}s`,
+                label: "Thời gian AI",
+                color: "text-orange-500",
+                bg: "bg-orange-500/5 border-orange-500/15",
+              },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className={cn(
+                  "rounded-lg p-2 text-center border",
+                  stat.bg,
+                )}
+              >
+                <div className={cn("text-base font-bold leading-none", stat.color)}>
+                  {stat.value}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1">
+                  {stat.label}
+                </div>
               </div>
-              <div className="text-[10px] text-muted-foreground">Ưu tiên</div>
-            </div>
-            <div className="bg-background/80 rounded-lg p-2.5 text-center">
-              <div className="text-lg font-bold text-blue-500">
-                {rescueSuggestion.sosRequestCount}
-              </div>
-              <div className="text-[10px] text-muted-foreground">SOS</div>
-            </div>
-            <div className="bg-background/80 rounded-lg p-2.5 text-center">
-              <div className="text-lg font-bold text-emerald-500">
-                {(rescueSuggestion.confidenceScore * 100).toFixed(0)}%
-              </div>
-              <div className="text-[10px] text-muted-foreground">
-                Độ tin cậy
-              </div>
-            </div>
-            <div className="bg-background/80 rounded-lg p-2.5 text-center">
-              <div className="text-lg font-bold text-orange-500">
-                {(rescueSuggestion.responseTimeMs / 1000).toFixed(1)}s
-              </div>
-              <div className="text-[10px] text-muted-foreground">
-                Thời gian AI
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Scrollable Content - single layout, no tabs */}
+        {/* Scrollable Content */}
         <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 space-y-5">
             {/* Overall Assessment */}
-            <div>
-              <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-2">
                 <Lightning
-                  className="h-4 w-4 text-yellow-500"
+                  className="h-3.5 w-3.5 text-yellow-500"
                   weight="fill"
                 />
                 Đánh giá tổng quan
               </h3>
-              <div className="bg-muted/50 rounded-lg p-4">
-                <p className="text-sm text-muted-foreground leading-relaxed">
+              <div className="bg-muted/40 rounded-xl p-3.5 border border-border/50">
+                <p className="text-sm text-foreground/80 leading-relaxed">
                   {rescueSuggestion.overallAssessment}
                 </p>
               </div>
-            </div>
+            </section>
 
             <Separator />
 
-            {/* Activity Steps */}
-            <div>
-              <h3 className="text-sm font-semibold mb-3">
-                Các bước thực hiện
-              </h3>
-              <div className="space-y-0">
-                {rescueSuggestion.suggestedActivities.map(
-                  (activity, index) => {
-                    const config =
-                      activityTypeConfig[activity.activityType] ||
-                      activityTypeConfig["ASSESS"];
-                    return (
-                      <div key={index} className="flex gap-3 items-stretch">
-                        {/* Timeline */}
-                        <div className="flex flex-col items-center w-8 shrink-0">
-                          <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+            {/* Activity Steps — redesigned as cards with clear numbering */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <ListChecks className="h-3.5 w-3.5" weight="bold" />
+                  Kế hoạch thực hiện
+                </h3>
+                <Badge variant="secondary" className="text-[10px] h-5 px-2">
+                  {rescueSuggestion.suggestedActivities.length} bước
+                </Badge>
+              </div>
+
+              <div className="space-y-2.5">
+                {rescueSuggestion.suggestedActivities.map((activity, index) => {
+                  const config =
+                    activityTypeConfig[activity.activityType] ||
+                    activityTypeConfig["ASSESS"];
+                  const isLast =
+                    index === rescueSuggestion.suggestedActivities.length - 1;
+
+                  return (
+                    <div
+                      key={index}
+                      className="group relative rounded-xl border bg-card hover:bg-accent/30 transition-colors duration-150"
+                    >
+                      <div className="flex items-start gap-3 p-3.5">
+                        {/* Step number circle */}
+                        <div className="relative shrink-0">
+                          <div
+                            className={cn(
+                              "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ring-2 ring-offset-2 ring-offset-card",
+                              config.bgColor,
+                              config.color,
+                              config.color.includes("blue")
+                                ? "ring-blue-400/40"
+                                : config.color.includes("red")
+                                  ? "ring-red-400/40"
+                                  : config.color.includes("emerald")
+                                    ? "ring-emerald-400/40"
+                                    : "ring-orange-400/40",
+                            )}
+                          >
                             {activity.step}
                           </div>
-                          {index <
-                            rescueSuggestion.suggestedActivities.length -
-                              1 && (
-                            <div className="w-px flex-1 bg-border" />
+                          {/* Connector line */}
+                          {!isLast && (
+                            <div className="absolute top-10 left-1/2 -translate-x-1/2 w-px h-[calc(100%+0.625rem)] bg-border" />
                           )}
                         </div>
-                        {/* Content */}
-                        <div className="flex-1 pb-4">
-                          <div className="flex items-center gap-2 mb-1">
+
+                        {/* Step content */}
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <Badge
                               variant="outline"
                               className={cn(
-                                "text-[11px] px-2 py-0",
+                                "text-[11px] font-semibold px-2 py-0 h-5",
                                 config.color,
                                 config.bgColor,
+                                "border-transparent",
                               )}
                             >
                               {config.label}
                             </Badge>
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-1 bg-muted/60 px-1.5 py-0.5 rounded-md">
                               <Clock className="h-3 w-3" />
                               {activity.estimatedTime}
                             </span>
+                            {activity.priority && (
+                              <span className="text-[11px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md">
+                                {activity.priority}
+                              </span>
+                            )}
                           </div>
-                          <p className="text-sm leading-relaxed text-muted-foreground">
+                          <p className="text-sm leading-relaxed text-foreground/75">
                             {activity.description}
                           </p>
                         </div>
+
+                        {/* Arrow indicator */}
+                        {!isLast && (
+                          <ArrowRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        )}
                       </div>
-                    );
-                  },
-                )}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            </section>
 
             <Separator />
 
-            {/* Resources */}
-            <div>
-              <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                <Package className="h-4 w-4" />
-                Tài nguyên cần thiết
-                <Badge variant="secondary" className="text-[10px] ml-auto">
+            {/* Resources — redesigned as a grid */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Cube className="h-3.5 w-3.5" weight="bold" />
+                  Tài nguyên cần thiết
+                </h3>
+                <Badge variant="secondary" className="text-[10px] h-5 px-2">
                   {rescueSuggestion.suggestedResources.length} loại
                 </Badge>
-              </h3>
-              <div className="grid gap-2">
-                {rescueSuggestion.suggestedResources.map(
-                  (resource, index) => {
-                    const icon = resourceTypeIcons[
-                      resource.resourceType
-                    ] || <Package className="h-5 w-5" />;
-                    return (
-                      <div
-                        key={index}
-                        className="flex items-center gap-3 p-3 rounded-lg border bg-card"
-                      >
-                        <div className="p-2 rounded-lg shrink-0 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
-                          {icon}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium">
-                            {resource.resourceType}
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {resource.description}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="text-xs shrink-0">
-                          x{resource.quantity}
-                        </Badge>
-                      </div>
-                    );
-                  },
-                )}
               </div>
-            </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {rescueSuggestion.suggestedResources.map((resource, index) => {
+                  const icon =
+                    resourceTypeIcons[resource.resourceType] || (
+                      <Package className="h-5 w-5" />
+                    );
+                  return (
+                    <Card
+                      key={index}
+                      className="overflow-hidden border hover:shadow-md transition-shadow duration-150"
+                    >
+                      <CardContent className="p-3">
+                        <div className="flex items-start gap-2.5">
+                          <div className="p-2 rounded-lg shrink-0 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400">
+                            {icon}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-sm font-semibold truncate">
+                                {resource.resourceType}
+                              </span>
+                              <span className="text-base font-bold text-primary shrink-0">
+                                x{resource.quantity}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
+                              {resource.description}
+                            </p>
+                            {resource.priority && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] h-4 px-1.5 mt-1.5"
+                              >
+                                {resource.priority}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </section>
 
             <Separator />
 
             {/* Special Notes */}
             {rescueSuggestion.specialNotes && (
-              <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2 mb-2">
-                  <Warning
-                    className="h-4 w-4 text-orange-500"
-                    weight="fill"
-                  />
-                  Lưu ý đặc biệt
-                </h3>
-                <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-lg p-3">
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {rescueSuggestion.specialNotes}
-                  </p>
-                </div>
-              </div>
+              <>
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-2">
+                    <Warning
+                      className="h-3.5 w-3.5 text-orange-500"
+                      weight="fill"
+                    />
+                    Lưu ý đặc biệt
+                  </h3>
+                  <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-xl p-3.5">
+                    <p className="text-sm text-foreground/75 leading-relaxed">
+                      {rescueSuggestion.specialNotes}
+                    </p>
+                  </div>
+                </section>
+                <Separator />
+              </>
             )}
 
             {/* AI Confidence Footer */}
-            <Card className="bg-muted/30">
+            <Card className="bg-muted/30 border-dashed">
               <CardContent className="p-3">
                 <div className="flex items-center gap-2 mb-2">
                   <ShieldCheck
@@ -300,7 +373,7 @@ const RescuePlanPanel = ({
               Huỷ bỏ
             </Button>
             <Button
-              className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+              className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/20"
               onClick={onApprove}
             >
               <CheckCircle className="h-5 w-5 mr-2" weight="fill" />

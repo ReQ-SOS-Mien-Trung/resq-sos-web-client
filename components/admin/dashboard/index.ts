@@ -7,3 +7,4 @@ export { default as CalendarWidget } from "./CalendarWidget";
 export { default as LeadsManagement } from "./LeadsManagement";
 export { default as TopCountries } from "./TopCountries";
 export { default as RetentionRate } from "./RetentionRate";
+export { default as SOSOverview } from "./SOSOverview";
