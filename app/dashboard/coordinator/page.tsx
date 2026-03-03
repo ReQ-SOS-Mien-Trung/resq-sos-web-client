@@ -272,12 +272,14 @@ const CoordinatorDashboardContent = () => {
     setSelectedSOS(sos);
     setFlyToLocation(sos.location);
     setSOSDetailOpen(true);
-    // Auto-add to selection when clicking
-    setSelectedSOSIds((prev) => {
-      const next = new Set(prev);
-      next.add(sos.id);
-      return next;
-    });
+    // Auto-add to selection when clicking — only for PENDING requests
+    if (sos.status === "PENDING") {
+      setSelectedSOSIds((prev) => {
+        const next = new Set(prev);
+        next.add(sos.id);
+        return next;
+      });
+    }
   }, []);
 
   const handleRescuerSelect = useCallback((rescuer: Rescuer) => {
@@ -304,8 +306,10 @@ const CoordinatorDashboardContent = () => {
     [],
   );
 
-  // Toggle individual SOS in/out of selection
+  // Toggle individual SOS in/out of selection (only allow PENDING)
   const handleToggleSOSSelect = useCallback((sosId: string) => {
+    const sos = sosRequests.find((s) => s.id === sosId);
+    if (sos && sos.status !== "PENDING") return;
     setSelectedSOSIds((prev) => {
       const next = new Set(prev);
       if (next.has(sosId)) {
@@ -315,11 +319,16 @@ const CoordinatorDashboardContent = () => {
       }
       return next;
     });
-  }, []);
+  }, [sosRequests]);
 
-  // Create cluster → then trigger AI suggestion
+  // Create cluster → then trigger AI suggestion (only PENDING requests)
   const handleProcessSOS = useCallback(() => {
-    const ids = Array.from(selectedSOSIds).map(Number).filter(Boolean);
+    // Filter to only include PENDING SOS requests
+    const pendingIds = Array.from(selectedSOSIds).filter((id) => {
+      const sos = sosRequests.find((s) => s.id === id);
+      return sos?.status === "PENDING";
+    });
+    const ids = pendingIds.map(Number).filter(Boolean);
     if (ids.length === 0) return;
 
     createCluster(
@@ -344,7 +353,7 @@ const CoordinatorDashboardContent = () => {
         },
       },
     );
-  }, [selectedSOSIds, createCluster, fetchClusterRescueSuggestion]);
+  }, [selectedSOSIds, sosRequests, createCluster, fetchClusterRescueSuggestion]);
 
   const handleApproveDecision = useCallback(() => {
     alert("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
