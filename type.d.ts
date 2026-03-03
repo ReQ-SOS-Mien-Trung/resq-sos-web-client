@@ -779,14 +779,17 @@ export interface SOSDetailsPanelProps {
   sosRequest: SOSRequest | null;
   onProcessSOS: () => void;
   isProcessing?: boolean;
+  selectedSOSIds: Set<string>;
+  onToggleSOSSelect: (sosId: string) => void;
+  allSOSRequests: SOSRequest[];
 }
 
 export interface RescuePlanPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sosRequest: SOSRequest | null;
+  clusterSOSRequests: SOSRequest[];
   rescueSuggestion:
-    | import("@/services/sos_request/type").RescueSuggestionResponse
+    | import("@/services/sos_cluster/type").ClusterRescueSuggestionResponse
     | null;
   onApprove: () => void;
 }
@@ -869,6 +872,10 @@ export interface SOSSidebarProps {
   onSOSSelect: (sos: SOSRequest) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   selectedSOS?: SOSRequest | null;
+  selectedSOSIds: Set<string>;
+  onToggleSOSSelect: (sosId: string) => void;
+  onCreateCluster: () => void;
+  isCreatingCluster?: boolean;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";

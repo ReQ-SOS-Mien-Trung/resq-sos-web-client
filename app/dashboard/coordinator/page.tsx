@@ -14,9 +14,12 @@ import Image from "next/image";
 import { SOSRequest, Rescuer, Location, LocationPanelData } from "@/type";
 import { mockRescuers, mockActiveMissions } from "@/lib/mock-data";
 import { useSOSRequests } from "@/services/sos_request/hooks";
-import { useRescueSuggestion } from "@/services/sos_request/hooks";
-import type { RescueSuggestionResponse } from "@/services/sos_request/type";
 import type { SOSRequestEntity } from "@/services/sos_request/type";
+import {
+  useCreateSOSCluster,
+  useClusterRescueSuggestion,
+} from "@/services/sos_cluster/hooks";
+import type { ClusterRescueSuggestionResponse } from "@/services/sos_cluster/type";
 import { useDepots } from "@/services/depot/hooks";
 import { useAssemblyPoints } from "@/services/assembly_points/hooks";
 import type { DepotEntity } from "@/services/depot/type";
@@ -101,10 +104,13 @@ const CoordinatorDashboardContent = () => {
   const [sosDetailOpen, setSOSDetailOpen] = useState(false);
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
   const [rescueSuggestion, setRescueSuggestion] =
-    useState<RescueSuggestionResponse | null>(null);
+    useState<ClusterRescueSuggestionResponse | null>(null);
   const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [locationPanelData, setLocationPanelData] =
     useState<LocationPanelData | null>(null);
+
+  // Multi-select SOS for clustering
+  const [selectedSOSIds, setSelectedSOSIds] = useState<Set<string>>(new Set());
 
   // Remember sidebar state before RescuePlanPanel opens
   const sidebarBeforeRescuePlanRef = useRef(true);
@@ -249,15 +255,29 @@ const CoordinatorDashboardContent = () => {
         .toUpperCase()
     : "U";
 
-  // Rescue suggestion mutation
-  const { mutate: fetchRescueSuggestion, isPending: isProcessingSOS } =
-    useRescueSuggestion();
+  // Cluster creation mutation
+  const { mutate: createCluster, isPending: isCreatingCluster } =
+    useCreateSOSCluster();
+
+  // Rescue suggestion mutation (cluster-based)
+  const {
+    mutate: fetchClusterRescueSuggestion,
+    isPending: isFetchingSuggestion,
+  } = useClusterRescueSuggestion();
+
+  const isProcessingSOS = isCreatingCluster || isFetchingSuggestion;
 
   // Handlers
   const handleSOSSelect = useCallback((sos: SOSRequest) => {
     setSelectedSOS(sos);
     setFlyToLocation(sos.location);
     setSOSDetailOpen(true);
+    // Auto-add to selection when clicking
+    setSelectedSOSIds((prev) => {
+      const next = new Set(prev);
+      next.add(sos.id);
+      return next;
+    });
   }, []);
 
   const handleRescuerSelect = useCallback((rescuer: Rescuer) => {
@@ -284,23 +304,47 @@ const CoordinatorDashboardContent = () => {
     [],
   );
 
+  // Toggle individual SOS in/out of selection
+  const handleToggleSOSSelect = useCallback((sosId: string) => {
+    setSelectedSOSIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sosId)) {
+        next.delete(sosId);
+      } else {
+        next.add(sosId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Create cluster → then trigger AI suggestion
   const handleProcessSOS = useCallback(() => {
-    if (selectedSOS) {
-      fetchRescueSuggestion(
-        { sosRequestIds: [Number(selectedSOS.id)] },
-        {
-          onSuccess: (data) => {
-            setRescueSuggestion(data);
-            setRescuePlanOpen(true);
-          },
-          onError: (error) => {
-            console.error("Failed to get rescue suggestion:", error);
-            alert("Không thể lấy đề xuất giải cứu. Vui lòng thử lại.");
-          },
+    const ids = Array.from(selectedSOSIds).map(Number).filter(Boolean);
+    if (ids.length === 0) return;
+
+    createCluster(
+      { sosRequestIds: ids },
+      {
+        onSuccess: (clusterData) => {
+          // Now trigger AI rescue suggestion with the created cluster
+          fetchClusterRescueSuggestion(clusterData.clusterId, {
+            onSuccess: (suggestion) => {
+              setRescueSuggestion(suggestion);
+              setRescuePlanOpen(true);
+            },
+            onError: (error) => {
+              console.error("Failed to get rescue suggestion:", error);
+              alert("Đã gom cụm thành công nhưng không thể lấy đề xuất AI. Vui lòng thử lại.");
+            },
+          });
         },
-      );
-    }
-  }, [selectedSOS, fetchRescueSuggestion]);
+        onError: (error) => {
+          console.error("Failed to create cluster:", error);
+          alert("Không thể gom cụm SOS. Vui lòng thử lại.");
+        },
+      },
+    );
+  }, [selectedSOSIds, createCluster, fetchClusterRescueSuggestion]);
 
   const handleApproveDecision = useCallback(() => {
     alert("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
@@ -308,6 +352,7 @@ const CoordinatorDashboardContent = () => {
     setSOSDetailOpen(false);
     setSelectedSOS(null);
     setRescueSuggestion(null);
+    setSelectedSOSIds(new Set());
   }, []);
 
   const toggleDarkMode = () => {
@@ -483,6 +528,10 @@ const CoordinatorDashboardContent = () => {
               onSOSSelect={handleSOSSelect}
               onRescuerSelect={handleRescuerSelect}
               selectedSOS={selectedSOS}
+              selectedSOSIds={selectedSOSIds}
+              onToggleSOSSelect={handleToggleSOSSelect}
+              onCreateCluster={handleProcessSOS}
+              isCreatingCluster={isProcessingSOS}
             />
           )}
         </aside>
@@ -563,13 +612,18 @@ const CoordinatorDashboardContent = () => {
                 sosRequest={selectedSOS}
                 onProcessSOS={handleProcessSOS}
                 isProcessing={isProcessingSOS}
+                selectedSOSIds={selectedSOSIds}
+                onToggleSOSSelect={handleToggleSOSSelect}
+                allSOSRequests={sosRequests}
               />
 
               {/* Rescue Plan Panel - Slides up from bottom, overlays map and sidebar */}
               <RescuePlanPanel
                 open={rescuePlanOpen}
                 onOpenChange={setRescuePlanOpen}
-                sosRequest={selectedSOS}
+                clusterSOSRequests={sosRequests.filter((s) =>
+                  selectedSOSIds.has(s.id),
+                )}
                 rescueSuggestion={rescueSuggestion}
                 onApprove={handleApproveDecision}
               />

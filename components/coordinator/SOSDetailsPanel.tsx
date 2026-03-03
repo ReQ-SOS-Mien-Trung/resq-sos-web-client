@@ -15,6 +15,9 @@ import {
   Lightning,
   X,
   Rocket,
+  CheckSquare,
+  Square,
+  TreeStructure,
 } from "@phosphor-icons/react";
 
 // Panel width
@@ -55,6 +58,9 @@ const SOSDetailsPanel = ({
   sosRequest,
   onProcessSOS,
   isProcessing = false,
+  selectedSOSIds,
+  onToggleSOSSelect,
+  allSOSRequests,
 }: SOSDetailsPanelProps) => {
   if (!sosRequest && !open) return null;
 
@@ -232,17 +238,95 @@ const SOSDetailsPanel = ({
                 <div>Lng: {sosRequest.location.lng.toFixed(6)}</div>
               </div>
             </div>
+
+            {/* Same-group SOS requests for cluster selection */}
+            {(() => {
+              const groupRequests = allSOSRequests.filter(
+                (s) =>
+                  s.groupId === sosRequest.groupId &&
+                  s.id !== sosRequest.id &&
+                  s.status === "PENDING",
+              );
+              if (groupRequests.length === 0) return null;
+              return (
+                <div>
+                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <TreeStructure className="h-4 w-4 text-violet-500" weight="fill" />
+                    SOS cùng khu vực ({groupRequests.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {groupRequests.map((sos) => (
+                      <div
+                        key={sos.id}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50",
+                          selectedSOSIds.has(sos.id) && "bg-violet-50 dark:bg-violet-900/10 border-violet-300 dark:border-violet-700",
+                        )}
+                        onClick={() => onToggleSOSSelect(sos.id)}
+                      >
+                        {selectedSOSIds.has(sos.id) ? (
+                          <CheckSquare className="h-5 w-5 text-violet-500 shrink-0" weight="fill" />
+                        ) : (
+                          <Square className="h-5 w-5 text-muted-foreground shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={
+                                sos.priority === "P1"
+                                  ? "p1"
+                                  : sos.priority === "P2"
+                                    ? "p2"
+                                    : "p3"
+                              }
+                              className="text-[10px] px-1.5 py-0 h-5"
+                            >
+                              {sos.priority}
+                            </Badge>
+                            <span className="text-xs font-mono text-muted-foreground">
+                              SOS #{sos.id}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                            {sos.message}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </ScrollArea>
 
         {/* Footer - only show action button for PENDING requests */}
         {sosRequest.status === "PENDING" && (
-          <div className="p-4 border-t shrink-0">
+          <div className="p-4 border-t shrink-0 space-y-2">
+            {/* Toggle current SOS selection */}
+            <button
+              type="button"
+              className={cn(
+                "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors",
+                selectedSOSIds.has(sosRequest.id)
+                  ? "bg-violet-50 dark:bg-violet-900/20 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300"
+                  : "bg-muted/50 border-border text-muted-foreground hover:bg-muted",
+              )}
+              onClick={() => onToggleSOSSelect(sosRequest.id)}
+            >
+              {selectedSOSIds.has(sosRequest.id) ? (
+                <CheckSquare className="h-4 w-4" weight="fill" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+              {selectedSOSIds.has(sosRequest.id) ? "Đã chọn vào cụm" : "Chọn vào cụm gom"}
+            </button>
+
             <Button
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700"
+              className="w-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-lg shadow-violet-500/20"
               size="lg"
               onClick={onProcessSOS}
-              disabled={isProcessing}
+              disabled={isProcessing || selectedSOSIds.size < 1}
             >
               {isProcessing ? (
                 <>
@@ -266,12 +350,12 @@ const SOSDetailsPanel = ({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  AI đang phân tích...
+                  Đang gom cụm & AI phân tích...
                 </>
               ) : (
                 <>
-                  <Rocket className="h-5 w-5 mr-2" weight="fill" />
-                  Lên kế hoạch giải cứu
+                  <TreeStructure className="h-5 w-5 mr-2" weight="fill" />
+                  Gom cụm & AI phân tích ({selectedSOSIds.size} SOS)
                 </>
               )}
             </Button>

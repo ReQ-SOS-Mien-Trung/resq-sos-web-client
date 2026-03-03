@@ -25,16 +25,18 @@ import {
   ArrowRight,
   ListChecks,
   Cube,
+  MapPin,
+  TreeStructure,
 } from "@phosphor-icons/react";
 
 const RescuePlanPanel = ({
   open,
   onOpenChange,
-  sosRequest,
+  clusterSOSRequests,
   rescueSuggestion,
   onApprove,
 }: RescuePlanPanelProps) => {
-  if (!sosRequest || !rescueSuggestion) return null;
+  if (!rescueSuggestion || clusterSOSRequests.length === 0) return null;
 
   const severity =
     severityConfig[rescueSuggestion.suggestedSeverityLevel] ||
@@ -66,8 +68,9 @@ const RescuePlanPanel = ({
                   {rescueSuggestion.suggestedMissionTitle}
                 </h2>
                 <div className="flex items-center gap-1.5 mt-1">
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
-                    SOS #{sosRequest.id}
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 gap-1">
+                    <TreeStructure className="h-3 w-3" weight="fill" />
+                    {clusterSOSRequests.length} SOS
                   </Badge>
                   <Badge variant={severity.variant} className="text-[10px] px-1.5 py-0 h-5">
                     {severity.label}
@@ -156,6 +159,61 @@ const RescuePlanPanel = ({
                 <p className="text-sm text-foreground/80 leading-relaxed">
                   {rescueSuggestion.overallAssessment}
                 </p>
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* SOS Requests in this cluster */}
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-2">
+                <TreeStructure
+                  className="h-3.5 w-3.5 text-violet-500"
+                  weight="fill"
+                />
+                Yêu cầu SOS trong cụm
+              </h3>
+              <div className="grid grid-cols-1 gap-2">
+                {clusterSOSRequests.map((sos) => (
+                  <div
+                    key={sos.id}
+                    className="flex items-start gap-3 p-3 rounded-lg border bg-card"
+                  >
+                    <div className="shrink-0 mt-0.5">
+                      <MapPin
+                        className={cn(
+                          "h-4 w-4",
+                          sos.priority === "P1"
+                            ? "text-red-500"
+                            : sos.priority === "P2"
+                              ? "text-orange-500"
+                              : "text-yellow-500",
+                        )}
+                        weight="fill"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">SOS #{sos.id}</span>
+                        <Badge
+                          variant={
+                            sos.priority === "P1"
+                              ? "p1"
+                              : sos.priority === "P2"
+                                ? "p2"
+                                : "p3"
+                          }
+                          className="text-[10px] px-1.5 py-0 h-4"
+                        >
+                          {sos.priority}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                        {sos.message}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
 

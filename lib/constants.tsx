@@ -559,6 +559,16 @@ export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
     color: "text-orange-700 dark:text-orange-400",
     bgColor: "bg-orange-100 dark:bg-orange-900/30",
   },
+  DELIVER_SUPPLIES: {
+    label: "Tiếp tế",
+    color: "text-purple-700 dark:text-purple-400",
+    bgColor: "bg-purple-100 dark:bg-purple-900/30",
+  },
+  MIXED: {
+    label: "Hỗn hợp",
+    color: "text-indigo-700 dark:text-indigo-400",
+    bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
+  },
 };
 
 export const resourceTypeIcons: Record<string, React.ReactNode> = {
@@ -567,6 +577,9 @@ export const resourceTypeIcons: Record<string, React.ReactNode> = {
   MEDICAL_KIT: <FirstAid className="h-5 w-5" weight="fill" />,
   EQUIPMENT: <Wrench className="h-5 w-5" weight="fill" />,
   VEHICLE: <Truck className="h-5 w-5" weight="fill" />,
+  FOOD: <Package className="h-5 w-5" weight="fill" />,
+  WATER: <Drop className="h-5 w-5" weight="fill" />,
+  FUEL: <Truck className="h-5 w-5" weight="fill" />,
 };
 
 export const severityConfig: Record<string, SeverityConfig> = {

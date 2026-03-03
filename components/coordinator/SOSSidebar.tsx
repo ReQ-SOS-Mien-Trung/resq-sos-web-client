@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Warning,
@@ -15,6 +16,10 @@ import {
   Stethoscope,
   ForkKnife,
   Anchor,
+  CheckSquare,
+  Square,
+  TreeStructure,
+  Spinner,
 } from "@phosphor-icons/react";
 
 // Client-side time elapsed hook
@@ -59,6 +64,10 @@ const SOSSidebar = ({
   onSOSSelect,
   onRescuerSelect,
   selectedSOS,
+  selectedSOSIds,
+  onToggleSOSSelect,
+  onCreateCluster,
+  isCreatingCluster = false,
 }: SOSSidebarProps) => {
   const [activeTab, setActiveTab] = useState("incoming");
 
@@ -129,12 +138,40 @@ const SOSSidebar = ({
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                 Chờ xử lý ({pendingRequests.length})
               </div>
+
+              {/* Create Cluster Action Bar */}
+              {pendingRequests.length > 0 && (
+                <div className="flex items-center gap-2 mb-3">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="flex-1 bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-md shadow-violet-500/20 text-xs h-8"
+                    onClick={onCreateCluster}
+                    disabled={selectedSOSIds.size < 2 || isCreatingCluster}
+                  >
+                    {isCreatingCluster ? (
+                      <>
+                        <Spinner className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        Đang gom cụm...
+                      </>
+                    ) : (
+                      <>
+                        <TreeStructure className="h-3.5 w-3.5 mr-1.5" weight="fill" />
+                        Gom cụm & AI phân tích ({selectedSOSIds.size})
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
               {pendingRequests.length > 0 ? (
                 pendingRequests.map((sos) => (
                   <SOSCard
                     key={sos.id}
                     sos={sos}
                     isSelected={selectedSOS?.id === sos.id}
+                    isChecked={selectedSOSIds.has(sos.id)}
+                    onToggleCheck={() => onToggleSOSSelect(sos.id)}
                     onClick={() => onSOSSelect(sos)}
                   />
                 ))
@@ -240,10 +277,14 @@ export default SOSSidebar;
 function SOSCard({
   sos,
   isSelected,
+  isChecked = false,
+  onToggleCheck,
   onClick,
 }: {
   sos: SOSRequest;
   isSelected: boolean;
+  isChecked?: boolean;
+  onToggleCheck?: () => void;
   onClick: () => void;
 }) {
   const priorityVariant = {
@@ -257,6 +298,7 @@ function SOSCard({
       className={cn(
         "cursor-pointer transition-all hover:shadow-md py-3",
         isSelected && "ring-2 ring-primary",
+        isChecked && "ring-2 ring-violet-500 bg-violet-50/50 dark:bg-violet-900/10",
         sos.priority === "P1" && "border-l-4 border-l-red-500",
       )}
       onClick={onClick}
@@ -264,11 +306,28 @@ function SOSCard({
       <CardContent className="p-3">
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
+            {/* Checkbox for multi-select */}
+            {onToggleCheck && (
+              <button
+                type="button"
+                className="shrink-0 focus:outline-none"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleCheck();
+                }}
+              >
+                {isChecked ? (
+                  <CheckSquare className="h-5 w-5 text-violet-500" weight="fill" />
+                ) : (
+                  <Square className="h-5 w-5 text-muted-foreground hover:text-violet-400 transition-colors" />
+                )}
+              </button>
+            )}
             <Badge variant={priorityVariant[sos.priority]}>
               {sos.priority}
             </Badge>
             <span className="text-xs font-mono text-muted-foreground">
-              #{sos.id.split("-")[1]}
+              #{sos.id}
             </span>
           </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
