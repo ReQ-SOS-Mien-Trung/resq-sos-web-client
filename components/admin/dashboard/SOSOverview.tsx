@@ -185,7 +185,7 @@ function SOSRow({ sos }: { sos: SOSRequestEntity }) {
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-          {sos.rawMessage || "Không có nội dung"}
+          {sos.msg || "Không có nội dung"}
         </p>
       </div>
 
@@ -217,8 +217,8 @@ const SOSOverview = () => {
   const { data, isLoading, isError } = useSOSRequests();
 
   const stats = useMemo(() => {
-    if (!data?.sosRequests) return { total: 0, pending: 0, inProgress: 0, completed: 0, cancelled: 0, byPriority: {} as Record<string, number> };
-    const list = data.sosRequests;
+    if (!data?.items) return { total: 0, pending: 0, inProgress: 0, completed: 0, cancelled: 0, byPriority: {} as Record<string, number> };
+    const list = data.items;
     return {
       total: list.length,
       pending: list.filter((s) => s.status === "Pending").length,
@@ -237,14 +237,14 @@ const SOSOverview = () => {
 
   // Active SOS = Pending + InProgress, sorted by priority then date
   const activeRequests = useMemo(() => {
-    if (!data?.sosRequests) return [];
+    if (!data?.items) return [];
     const priorityOrder: Record<string, number> = {
       Critical: 0,
       High: 1,
       Medium: 2,
       Low: 3,
     };
-    return data.sosRequests
+    return data.items
       .filter((s) => s.status === "Pending" || s.status === "InProgress")
       .sort((a, b) => {
         const pDiff =

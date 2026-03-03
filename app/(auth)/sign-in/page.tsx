@@ -28,8 +28,7 @@ const SignIn = () => {
         router.replace(dashboardPath);
       }
     }
-  }, [accessToken, user, router]);
-  const [formData, setFormData] = useState({
+  }, [accessToken, user, router]); const [formData, setFormData] = useState({
     username: "",
     password: "",
   });

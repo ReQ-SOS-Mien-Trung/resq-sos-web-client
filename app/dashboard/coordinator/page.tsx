@@ -184,8 +184,8 @@ const CoordinatorDashboardContent = () => {
 
   // Map SOSRequestEntity → SOSRequest (for sidebar/panels)
   const sosRequests: SOSRequest[] = useMemo(() => {
-    if (!sosData?.sosRequests) return [];
-    return sosData.sosRequests.map(
+    if (!sosData?.items) return [];
+    return sosData.items.map(
       (entity: SOSRequestEntity): SOSRequest => ({
         id: String(entity.id),
         groupId: entity.clusterId
@@ -207,7 +207,7 @@ const CoordinatorDashboardContent = () => {
             : entity.status === "InProgress"
               ? "ASSIGNED"
               : "RESCUED",
-        message: entity.rawMessage,
+        message: entity.msg,
         createdAt: new Date(entity.createdAt),
       }),
     );

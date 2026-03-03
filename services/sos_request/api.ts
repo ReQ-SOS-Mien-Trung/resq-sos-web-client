@@ -1,6 +1,7 @@
 import api from "@/config/axios";
 import {
   GetSOSRequestsResponse,
+  GetSOSRequestsParams,
   GetSOSRequestByIdResponse,
   RescueSuggestionRequest,
   RescueSuggestionResponse,
@@ -10,8 +11,15 @@ import {
  * Get all SOS requests
  * GET /emergency/sos-requests
  */
-export async function getSOSRequests(): Promise<GetSOSRequestsResponse> {
-  const { data } = await api.get("/emergency/sos-requests");
+export async function getSOSRequests(
+  params?: GetSOSRequestsParams,
+): Promise<GetSOSRequestsResponse> {
+  const { data } = await api.get("/emergency/sos-requests", {
+    params: {
+      pageNumber: params?.pageNumber ?? 1,
+      pageSize: params?.pageSize ?? 10,
+    },
+  });
   return data;
 }
 

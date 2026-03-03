@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { getSOSRequests, getSOSRequestById, getRescueSuggestion } from "./api";
 import {
   GetSOSRequestsResponse,
+  GetSOSRequestsParams,
   GetSOSRequestByIdResponse,
   RescueSuggestionRequest,
   RescueSuggestionResponse,
@@ -9,17 +10,22 @@ import {
 
 export const SOS_REQUESTS_QUERY_KEY = ["sos-requests"] as const;
 
+export interface UseSOSRequestsOptions {
+  params?: GetSOSRequestsParams;
+}
+
 export interface UseSOSRequestByIdOptions {
   enabled?: boolean;
 }
 
 /**
- * Hook to fetch all SOS requests
+ * Hook to fetch all SOS requests (paginated)
  */
-export function useSOSRequests() {
+export function useSOSRequests(options?: UseSOSRequestsOptions) {
+  const params = options?.params;
   return useQuery<GetSOSRequestsResponse>({
-    queryKey: SOS_REQUESTS_QUERY_KEY,
-    queryFn: getSOSRequests,
+    queryKey: [...SOS_REQUESTS_QUERY_KEY, params?.pageNumber ?? 1, params?.pageSize ?? 10],
+    queryFn: () => getSOSRequests(params),
   });
 }
 

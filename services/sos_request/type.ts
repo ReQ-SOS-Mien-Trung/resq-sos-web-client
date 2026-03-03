@@ -15,9 +15,11 @@ export interface SOSRequestEntity {
   clusterId: number | null;
   userId: string;
   sosType: string | null;
-  rawMessage: string;
+  msg: string;
   structuredData: string | null;
   networkMetadata: string | null;
+  senderInfo: string | null;
+  originId: string | null;
   status: SOSRequestStatus;
   priorityLevel: SOSPriorityLevel;
   waitTimeMinutes: number;
@@ -31,9 +33,21 @@ export interface SOSRequestEntity {
   reviewedById: string | null;
 }
 
-// Get All SOS Requests Response
+// Paginated Response
 export interface GetSOSRequestsResponse {
-  sosRequests: SOSRequestEntity[];
+  items: SOSRequestEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+// Request params for fetching SOS requests
+export interface GetSOSRequestsParams {
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 // Get SOS Request By ID Response
