@@ -1,3 +1,13 @@
+// Document attached to a rescuer application
+export interface RescuerApplicationDocument {
+  id: number;
+  fileUrl: string;
+  fileTypeId: number;
+  fileTypeCode: string;
+  fileTypeName: string;
+  uploadedAt: string;
+}
+
 // Rescuer Application Entity (item in paginated list)
 export interface RescuerApplicationEntity {
   id: number;
@@ -7,14 +17,15 @@ export interface RescuerApplicationEntity {
   reviewedAt: string | null;
   reviewedBy: string | null;
   adminNote: string | null;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   rescuerType: string;
   address: string;
   ward: string;
-  city: string;
-  documents: string[];
+  province: string;
+  documents: RescuerApplicationDocument[];
 }
 
 // Paginated Response for Rescuer Applications

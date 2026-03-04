@@ -1,3 +1,10 @@
+import type {
+  PromptEntity,
+  PromptDetailEntity,
+  CreatePromptRequest,
+  UpdatePromptRequest,
+} from "@/services/prompt/type";
+
 interface Ticker {
   market: {
     name: string;
@@ -236,21 +243,51 @@ export interface ReportFiltersProps {
   onExport?: () => void;
 }
 
+// AI Prompt Page Types
+export type EditorMode = "closed" | "creating" | "editing";
+
+export type PromptTextField = "system_prompt" | "user_prompt_template";
+
+export interface PromptFormData {
+  name: string;
+  purpose: string;
+  system_prompt: string;
+  user_prompt_template: string;
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  version: string;
+  api_url: string;
+  is_active: boolean;
+}
+
 export interface PromptEditorProps {
-  prompt?: AIPrompt;
-  onSave: (prompt: Partial<AIPrompt>) => void;
+  prompt?: PromptDetailEntity | null;
+  isSubmitting?: boolean;
+  onSave: (data: CreatePromptRequest | UpdatePromptRequest) => void;
   onCancel: () => void;
 }
 
-export interface PromptPreviewProps {
-  prompt: string;
-  variables: string[];
-  onTest?: (input: Record<string, string>) => void;
+export interface PromptListProps {
+  prompts: PromptEntity[];
+  isLoading: boolean;
+  selectedId: number | null;
+  onSelect: (prompt: PromptEntity) => void;
+  onEdit: (prompt: PromptEntity) => void;
+  onDelete: (prompt: PromptEntity) => void;
 }
 
-export interface PromptTemplatesProps {
-  templates: PromptTemplate[];
-  onUseTemplate?: (template: PromptTemplate) => void;
+export interface PromptDetailPanelProps {
+  prompt: PromptDetailEntity | null;
+  isLoading: boolean;
+}
+
+export interface DeletePromptDialogProps {
+  prompt: PromptEntity | null;
+  open: boolean;
+  isDeleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
 }
 
 export interface ChatRoomListProps {
@@ -609,7 +646,7 @@ export interface RescuerRegistration {
   notes?: string;
 }
 
-// AI Prompt Types
+// AI Prompt Legacy Types (mock data)
 export interface AIPrompt {
   id: string;
   name: string;
@@ -736,8 +773,40 @@ export interface ClusterDetailsSheetProps {
   onSOSSelect: (sos: SOSRequest) => void;
 }
 
+export interface SOSDetailsPanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  sosRequest: SOSRequest | null;
+  onProcessSOS: () => void;
+  isProcessing?: boolean;
+  selectedSOSIds: Set<string>;
+  onToggleSOSSelect: (sosId: string) => void;
+  allSOSRequests: SOSRequest[];
+}
+
+export interface RescuePlanPanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clusterSOSRequests: SOSRequest[];
+  rescueSuggestion:
+    | import("@/services/sos_cluster/type").ClusterRescueSuggestionResponse
+    | null;
+  onApprove: () => void;
+}
+
+export interface ActivityTypeConfig {
+  label: string;
+  color: string;
+  bgColor: string;
+}
+
+export interface SeverityConfig {
+  variant: "p1" | "p2" | "p3" | "warning";
+  label: string;
+}
+
 export interface CoordinatorMapProps {
-  clusters: SOSCluster[];
+  sosRequests: SOSRequest[];
   rescuers: Rescuer[];
   // DepotEntity from backend
   depots: {
@@ -768,10 +837,10 @@ export interface CoordinatorMapProps {
     status: "Active" | "Overloaded" | "Unavailable";
     lastUpdatedAt: string;
   }[];
-  selectedCluster?: SOSCluster | null;
+  selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
   aiDecision?: AIDispatchDecision | null;
-  onClusterSelect: (cluster: SOSCluster) => void;
+  onSOSSelect: (sos: SOSRequest) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   onDepotSelect?: (depot: CoordinatorMapProps["depots"][number]) => void;
   onAssemblyPointSelect?: (
@@ -798,14 +867,15 @@ export interface AssemblyPoint {
 
 export interface SOSSidebarProps {
   sosRequests: SOSRequest[];
-  clusters: SOSCluster[];
   rescuers: Rescuer[];
   missions: Mission[];
   onSOSSelect: (sos: SOSRequest) => void;
-  onClusterSelect: (cluster: SOSCluster) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   selectedSOS?: SOSRequest | null;
-  selectedCluster?: SOSCluster | null;
+  selectedSOSIds: Set<string>;
+  onToggleSOSSelect: (sosId: string) => void;
+  onCreateCluster: () => void;
+  isCreatingCluster?: boolean;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";
@@ -1126,10 +1196,10 @@ export interface MapViewState {
 }
 
 export interface WindyLeafletMapProps {
-  clusters: SOSCluster[];
-  rescuers: Rescuer[];
+  sosRequests?: SOSRequest[];
+  rescuers?: Rescuer[];
   // DepotEntity from backend
-  depots: {
+  depots?: {
     id: number;
     name: string;
     address: string;
@@ -1146,10 +1216,10 @@ export interface WindyLeafletMapProps {
     } | null;
     lastUpdatedAt: string;
   }[];
-  selectedCluster?: SOSCluster | null;
+  selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
-  onClusterSelect: (cluster: SOSCluster) => void;
-  onRescuerSelect: (rescuer: Rescuer) => void;
+  onSOSSelect?: (sos: SOSRequest) => void;
+  onRescuerSelect?: (rescuer: Rescuer) => void;
   flyToLocation?: Location | null;
   /** Current user/device location from geolocation API */
   userLocation?: Location | null;

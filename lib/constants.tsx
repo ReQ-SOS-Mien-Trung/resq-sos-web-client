@@ -1,9 +1,12 @@
 import {
   ItemCategory,
+  PromptFormData,
   RescueReport,
   SOSItem,
   Testimonial,
   WeatherLayer,
+  ActivityTypeConfig,
+  SeverityConfig,
 } from "@/type";
 import {
   ArrowsCounterClockwise,
@@ -22,11 +25,15 @@ import {
   Thermometer,
   TShirt,
   UserCheck,
-  UserPlus,
   Warning,
   WarningCircle,
   Wind,
   XCircle,
+  Boat,
+  FirstAid,
+  Truck,
+  Wrench,
+  Users as UsersIcon,
 } from "@phosphor-icons/react";
 import {
   Bell,
@@ -40,7 +47,6 @@ import {
   BarChart3,
   Stethoscope,
   ForkKnife,
-  Wrench,
   Tent,
 } from "lucide-react";
 
@@ -230,6 +236,32 @@ export const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 export { CENTRAL_VN_LOCATIONS } from "./locations";
 
 //Admin Prompt
+export const PROMPT_VARIABLES = [
+  { label: "Tên nạn nhân", value: "victim_name" },
+  { label: "Tọa độ", value: "coordinates" },
+  { label: "Mức độ khẩn cấp", value: "urgency_level" },
+  { label: "Mô tả tình huống", value: "situation_description" },
+  { label: "Số người bị nạn", value: "victim_count" },
+  { label: "Loại thiên tai", value: "disaster_type" },
+  { label: "Khu vực", value: "region" },
+  { label: "Thời gian", value: "timestamp" },
+  { label: "Tài nguyên", value: "resources" },
+  { label: "Yêu cầu", value: "request" },
+] as const;
+
+export const INITIAL_FORM_DATA: PromptFormData = {
+  name: "",
+  purpose: "",
+  system_prompt: "",
+  user_prompt_template: "",
+  model: "",
+  temperature: 0,
+  max_tokens: 0,
+  version: "",
+  api_url: "",
+  is_active: true,
+};
+
 export const variantsCategory = {
   dispatch: {
     label: "Điều phối",
@@ -502,4 +534,64 @@ export const assemblyPointStatusConfig = {
     bgColor: "bg-red-50 dark:bg-red-950/30",
     icon: XCircle,
   },
+};
+
+// ---- Rescue Plan Panel Constants ----
+
+export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
+  ASSESS: {
+    label: "Đánh giá",
+    color: "text-blue-700 dark:text-blue-400",
+    bgColor: "bg-blue-100 dark:bg-blue-900/30",
+  },
+  RESCUE: {
+    label: "Giải cứu",
+    color: "text-red-700 dark:text-red-400",
+    bgColor: "bg-red-100 dark:bg-red-900/30",
+  },
+  MEDICAL_AID: {
+    label: "Y tế",
+    color: "text-emerald-700 dark:text-emerald-400",
+    bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
+  },
+  EVACUATE: {
+    label: "Sơ tán",
+    color: "text-orange-700 dark:text-orange-400",
+    bgColor: "bg-orange-100 dark:bg-orange-900/30",
+  },
+  DELIVER_SUPPLIES: {
+    label: "Tiếp tế",
+    color: "text-purple-700 dark:text-purple-400",
+    bgColor: "bg-purple-100 dark:bg-purple-900/30",
+  },
+  MIXED: {
+    label: "Hỗn hợp",
+    color: "text-indigo-700 dark:text-indigo-400",
+    bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
+  },
+};
+
+export const resourceTypeIcons: Record<string, React.ReactNode> = {
+  TEAM: <UsersIcon className="h-5 w-5" weight="fill" />,
+  BOAT: <Boat className="h-5 w-5" weight="fill" />,
+  MEDICAL_KIT: <FirstAid className="h-5 w-5" weight="fill" />,
+  EQUIPMENT: <Wrench className="h-5 w-5" weight="fill" />,
+  VEHICLE: <Truck className="h-5 w-5" weight="fill" />,
+  FOOD: <Package className="h-5 w-5" weight="fill" />,
+  WATER: <Drop className="h-5 w-5" weight="fill" />,
+  FUEL: <Truck className="h-5 w-5" weight="fill" />,
+};
+
+export const severityConfig: Record<string, SeverityConfig> = {
+  Critical: { variant: "p1", label: "Nguy cấp" },
+  High: { variant: "p1", label: "Cao" },
+  Medium: { variant: "p2", label: "Trung bình" },
+  Low: { variant: "p3", label: "Thấp" },
+};
+
+export const priorityLabelMap: Record<string, string> = {
+  Critical: "Nguy cấp",
+  High: "Cao",
+  Medium: "Trung bình",
+  Low: "Thấp",
 };

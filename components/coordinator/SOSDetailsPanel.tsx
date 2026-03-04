@@ -1,0 +1,369 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { SOSDetailsPanelProps } from "@/type";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  MapPin,
+  Clock,
+  Stethoscope,
+  ForkKnife,
+  Anchor,
+  Lightning,
+  X,
+  Rocket,
+  CheckSquare,
+  Square,
+  TreeStructure,
+} from "@phosphor-icons/react";
+
+// Panel width
+const PANEL_WIDTH = 420;
+
+// Time elapsed display component
+function TimeElapsed({ date }: { date: Date }) {
+  const [elapsed, setElapsed] = useState("");
+
+  useEffect(() => {
+    const updateElapsed = () => {
+      const now = Date.now();
+      const minutes = Math.floor((now - date.getTime()) / 60000);
+      if (minutes < 60) {
+        setElapsed(`${minutes} phút trước`);
+      } else {
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) {
+          setElapsed(`${hours} giờ trước`);
+        } else {
+          const days = Math.floor(hours / 24);
+          setElapsed(`${days} ngày trước`);
+        }
+      }
+    };
+
+    updateElapsed();
+    const interval = setInterval(updateElapsed, 60000);
+    return () => clearInterval(interval);
+  }, [date]);
+
+  return <span>{elapsed}</span>;
+}
+
+const SOSDetailsPanel = ({
+  open,
+  onOpenChange,
+  sosRequest,
+  onProcessSOS,
+  isProcessing = false,
+  selectedSOSIds,
+  onToggleSOSSelect,
+  allSOSRequests,
+}: SOSDetailsPanelProps) => {
+  if (!sosRequest && !open) return null;
+
+  const priorityColors = {
+    P1: "bg-red-500",
+    P2: "bg-orange-500",
+    P3: "bg-yellow-500",
+  };
+
+  const statusLabels = {
+    PENDING: { text: "Chờ xử lý", variant: "warning" as const },
+    ASSIGNED: { text: "Đã phân công", variant: "info" as const },
+    RESCUED: { text: "Đã cứu", variant: "success" as const },
+  };
+
+  // Handle case when sosRequest is null but panel is open (during close animation)
+  if (!sosRequest) {
+    return (
+      <div
+        className={cn(
+          "absolute top-0 right-0 h-full z-[1000] transition-all duration-300 ease-in-out",
+          open ? "opacity-100" : "opacity-0 pointer-events-none",
+        )}
+        style={{ width: PANEL_WIDTH }}
+      />
+    );
+  }
+
+  // Get risk factors from AI analysis
+  const riskFactors = sosRequest.aiAnalysis?.riskFactors || [];
+
+  return (
+    <div
+      className={cn(
+        "absolute top-0 right-0 h-full z-[1000] transition-all duration-300 ease-in-out",
+        open
+          ? "opacity-100 translate-x-0"
+          : "opacity-0 translate-x-full pointer-events-none",
+      )}
+      style={{ width: PANEL_WIDTH }}
+    >
+      <div className="h-full bg-background border-l shadow-2xl flex flex-col">
+        {/* Header */}
+        <div className="p-5 pb-4 border-b shrink-0">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <div
+                  className={cn(
+                    "w-3 h-3 rounded-full animate-pulse",
+                    priorityColors[sosRequest.priority],
+                  )}
+                />
+                SOS #{sosRequest.id}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Chi tiết yêu cầu cứu hộ
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant={
+                  sosRequest.priority === "P1"
+                    ? "p1"
+                    : sosRequest.priority === "P2"
+                      ? "p2"
+                      : "p3"
+                }
+                className="text-sm px-3"
+              >
+                {sosRequest.priority}
+              </Badge>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0"
+                onClick={() => onOpenChange(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-3 gap-3 mt-4">
+            <div className="bg-muted rounded-lg p-3 text-center">
+              <Badge variant={statusLabels[sosRequest.status].variant}>
+                {statusLabels[sosRequest.status].text}
+              </Badge>
+            </div>
+            <div className="bg-muted rounded-lg p-3 text-center">
+              <MapPin className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+              <div className="text-xs text-muted-foreground">Vị trí</div>
+            </div>
+            <div className="bg-muted rounded-lg p-3 text-center">
+              <Clock className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+              <div className="text-xs text-muted-foreground">
+                <TimeElapsed date={sosRequest.createdAt} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <ScrollArea className="flex-1">
+          <div className="p-5 space-y-5">
+            {/* Message */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2">Nội dung cầu cứu</h4>
+              <div className="bg-muted/50 rounded-lg p-4">
+                <p className="text-sm">{sosRequest.message}</p>
+              </div>
+            </div>
+
+            {/* Required Resources */}
+            <div>
+              <h4 className="text-sm font-semibold mb-3">Yêu cầu hỗ trợ</h4>
+              <div className="flex flex-wrap gap-2">
+                {sosRequest.needs.medical && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg">
+                    <Stethoscope className="h-4 w-4" weight="fill" />
+                    <span className="text-sm font-medium">Y tế khẩn cấp</span>
+                  </div>
+                )}
+                {sosRequest.needs.boat && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg">
+                    <Anchor className="h-4 w-4" weight="fill" />
+                    <span className="text-sm font-medium">Cần thuyền</span>
+                  </div>
+                )}
+                {sosRequest.needs.food && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg">
+                    <ForkKnife className="h-4 w-4" weight="fill" />
+                    <span className="text-sm font-medium">Cần thực phẩm</span>
+                  </div>
+                )}
+                {!sosRequest.needs.medical &&
+                  !sosRequest.needs.boat &&
+                  !sosRequest.needs.food && (
+                    <div className="text-sm text-muted-foreground">
+                      Không có yêu cầu cụ thể
+                    </div>
+                  )}
+              </div>
+            </div>
+
+            {/* AI Risk Analysis */}
+            {riskFactors.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Lightning
+                    className="h-4 w-4 text-yellow-500"
+                    weight="fill"
+                  />
+                  Phân tích AI
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {riskFactors.map((factor, idx) => (
+                    <Badge key={idx} variant="outline" className="text-xs">
+                      {factor}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Location Info */}
+            <div className="bg-muted/50 rounded-lg p-4">
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Vị trí
+              </h4>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div>Lat: {sosRequest.location.lat.toFixed(6)}</div>
+                <div>Lng: {sosRequest.location.lng.toFixed(6)}</div>
+              </div>
+            </div>
+
+            {/* Same-group SOS requests for cluster selection */}
+            {(() => {
+              const groupRequests = allSOSRequests.filter(
+                (s) =>
+                  s.groupId === sosRequest.groupId &&
+                  s.id !== sosRequest.id &&
+                  s.status === "PENDING",
+              );
+              if (groupRequests.length === 0) return null;
+              return (
+                <div>
+                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <TreeStructure className="h-4 w-4 text-violet-500" weight="fill" />
+                    SOS cùng khu vực ({groupRequests.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {groupRequests.map((sos) => (
+                      <div
+                        key={sos.id}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50",
+                          selectedSOSIds.has(sos.id) && "bg-violet-50 dark:bg-violet-900/10 border-violet-300 dark:border-violet-700",
+                        )}
+                        onClick={() => onToggleSOSSelect(sos.id)}
+                      >
+                        {selectedSOSIds.has(sos.id) ? (
+                          <CheckSquare className="h-5 w-5 text-violet-500 shrink-0" weight="fill" />
+                        ) : (
+                          <Square className="h-5 w-5 text-muted-foreground shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={
+                                sos.priority === "P1"
+                                  ? "p1"
+                                  : sos.priority === "P2"
+                                    ? "p2"
+                                    : "p3"
+                              }
+                              className="text-[10px] px-1.5 py-0 h-5"
+                            >
+                              {sos.priority}
+                            </Badge>
+                            <span className="text-xs font-mono text-muted-foreground">
+                              SOS #{sos.id}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                            {sos.message}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </ScrollArea>
+
+        {/* Footer - only show action button for PENDING requests */}
+        {sosRequest.status === "PENDING" && (
+          <div className="p-4 border-t shrink-0 space-y-2">
+            {/* Toggle current SOS selection */}
+            <button
+              type="button"
+              className={cn(
+                "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors",
+                selectedSOSIds.has(sosRequest.id)
+                  ? "bg-violet-50 dark:bg-violet-900/20 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300"
+                  : "bg-muted/50 border-border text-muted-foreground hover:bg-muted",
+              )}
+              onClick={() => onToggleSOSSelect(sosRequest.id)}
+            >
+              {selectedSOSIds.has(sosRequest.id) ? (
+                <CheckSquare className="h-4 w-4" weight="fill" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+              {selectedSOSIds.has(sosRequest.id) ? "Đã chọn vào cụm" : "Chọn vào cụm gom"}
+            </button>
+
+            <Button
+              className="w-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-lg shadow-violet-500/20"
+              size="lg"
+              onClick={onProcessSOS}
+              disabled={isProcessing || selectedSOSIds.size < 1}
+            >
+              {isProcessing ? (
+                <>
+                  <svg
+                    className="animate-spin h-5 w-5 mr-2"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  Đang gom cụm & AI phân tích...
+                </>
+              ) : (
+                <>
+                  <TreeStructure className="h-5 w-5 mr-2" weight="fill" />
+                  Gom cụm & AI phân tích ({selectedSOSIds.size} SOS)
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default SOSDetailsPanel;

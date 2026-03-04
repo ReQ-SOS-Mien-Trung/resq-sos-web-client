@@ -9,6 +9,7 @@ import {
   LeadsManagement,
   RetentionRate,
   RevenueChart,
+  SOSOverview,
   SummaryCards,
   TopCountries,
 } from "@/components/admin/dashboard";
@@ -83,6 +84,14 @@ const AdminDashboardPage = () => {
           style={{ animationDelay: "100ms" }}
         >
           <SummaryCards metrics={data.summaryMetrics} />
+        </div>
+
+        {/* SOS Overview - Full Width */}
+        <div
+          className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+          style={{ animationDelay: "150ms" }}
+        >
+          <SOSOverview />
         </div>
 
         {/* Main Grid */}

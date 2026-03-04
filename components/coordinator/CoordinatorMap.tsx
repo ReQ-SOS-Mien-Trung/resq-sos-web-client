@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import dynamic from "next/dynamic";
-import { SOSCluster, Rescuer, CoordinatorMapProps } from "@/type";
+import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
 import type { AssemblyPointEntity } from "@/services/assembly_points/type";
 import {
@@ -21,48 +20,21 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-// Dynamically import react-leaflet components to avoid SSR issues
-const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false },
-);
-const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false },
-);
-const Marker = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Marker),
-  { ssr: false },
-);
-const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), {
-  ssr: false,
-});
-const Polyline = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Polyline),
-  { ssr: false },
-);
-
-// FlyToHandler component - dynamically imported to use useMap hook
-const FlyToHandler = dynamic(
-  () => import("./FlyToHandler").then((mod) => mod.FlyToHandler),
-  { ssr: false },
-);
-
-// MapZoomHandler - provides zoom/recenter controls from inside MapContainer
-const MapZoomHandler = dynamic(
-  () => import("./MapZoomHandler").then((mod) => mod.MapZoomHandler),
-  { ssr: false },
-);
+// Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
+// and the isMounted guard inside this component.
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import { FlyToHandler } from "./FlyToHandler";
+import { MapZoomHandler } from "./MapZoomHandler";
 
 const CoordinatorMap = ({
-  clusters,
+  sosRequests,
   rescuers,
   depots,
   assemblyPoints = [],
-  selectedCluster,
+  selectedSOS,
   selectedRescuer,
   aiDecision,
-  onClusterSelect,
+  onSOSSelect,
   onRescuerSelect,
   onDepotSelect,
   onAssemblyPointSelect,
@@ -80,6 +52,8 @@ const CoordinatorMap = ({
     "all" | "depot" | "assemblyPoint"
   >("all");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  // Track the last selected search result name to display in input
+  const [selectedSearchName, setSelectedSearchName] = useState<string | null>(null);
   const [mapControls, setMapControls] = useState<{
     zoomIn: () => void;
     zoomOut: () => void;
@@ -203,9 +177,11 @@ const CoordinatorMap = ({
   // Handle selecting a search result
   const handleSelectResult = (result: SearchResult) => {
     setSearchFlyToLocation({ lat: result.latitude, lng: result.longitude });
+    setSelectedSearchName(result.name);
     setSearchQuery("");
     setIsSearchOpen(false);
     setIsSearchFocused(false);
+    searchInputRef.current?.blur();
   };
 
   // Keyboard shortcut to focus search (Ctrl+K / Cmd+K)
@@ -271,33 +247,77 @@ const CoordinatorMap = ({
             <div className="absolute left-3.5 text-muted-foreground/70 pointer-events-none">
               <MagnifyingGlass size={18} weight="bold" />
             </div>
-            <Input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Tìm kho, điểm tập kết..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setIsSearchOpen(true);
-              }}
-              onFocus={() => {
-                setIsSearchOpen(true);
-                setIsSearchFocused(true);
-              }}
-              className="pl-10 pr-20 h-11 bg-transparent border-0 shadow-none focus-visible:ring-0 rounded-2xl text-sm"
-            />
-            <div className="absolute right-3 flex items-center gap-1.5">
-              {searchQuery ? (
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setIsSearchOpen(false);
+
+            {/* Selected search name display - shows when not actively searching */}
+            {selectedSearchName && !isSearchFocused ? (
+              <button
+                onClick={() => {
+                  setSearchQuery(selectedSearchName);
+                  setIsSearchFocused(true);
+                  setIsSearchOpen(true);
+                  setTimeout(() => {
                     searchInputRef.current?.focus();
-                  }}
-                  className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                >
-                  <X size={14} weight="bold" />
-                </button>
+                    searchInputRef.current?.select();
+                  }, 0);
+                }}
+                className="pl-10 pr-20 h-11 w-full text-left text-sm truncate text-foreground"
+              >
+                {selectedSearchName}
+              </button>
+            ) : (
+              <Input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Tìm kho, điểm tập kết..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsSearchOpen(true);
+                  if (e.target.value) {
+                    setSelectedSearchName(null);
+                  }
+                }}
+                onFocus={() => {
+                  setIsSearchOpen(true);
+                  setIsSearchFocused(true);
+                }}
+                className="pl-10 pr-20 h-11 bg-transparent border-0 shadow-none focus-visible:ring-0 rounded-2xl text-sm"
+              />
+            )}
+
+            <div className="absolute right-3 flex items-center gap-1.5">
+              {searchQuery || selectedSearchName ? (
+                <>
+                  {selectedSearchName && !isSearchFocused && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery(selectedSearchName);
+                        setIsSearchFocused(true);
+                        setIsSearchOpen(true);
+                        setTimeout(() => {
+                          searchInputRef.current?.focus();
+                          searchInputRef.current?.select();
+                        }, 0);
+                      }}
+                      className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                      title="Tìm kiếm"
+                    >
+                      <MagnifyingGlass size={14} weight="bold" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedSearchName(null);
+                      setIsSearchOpen(false);
+                      setIsSearchFocused(false);
+                      searchInputRef.current?.blur();
+                    }}
+                    className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  >
+                    <X size={14} weight="bold" />
+                  </button>
+                </>
               ) : (
                 <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/60 bg-muted/50 rounded-md border border-border/40">
                   <Command size={10} /> K
@@ -440,13 +460,13 @@ const CoordinatorMap = ({
         {/* Map zoom handler - provides controls to parent */}
         <MapZoomHandler onMapReady={handleMapReady} />
 
-        {/* SOS Cluster Markers */}
-        {clusters.map((cluster) => (
-          <SOSClusterMarker
-            key={cluster.id}
-            cluster={cluster}
-            isSelected={selectedCluster?.id === cluster.id}
-            onClick={() => onClusterSelect(cluster)}
+        {/* SOS Request Markers */}
+        {sosRequests.map((sos) => (
+          <SOSRequestMarker
+            key={sos.id}
+            sos={sos}
+            isSelected={selectedSOS?.id === sos.id}
+            onClick={() => onSOSSelect(sos)}
           />
         ))}
 
@@ -541,13 +561,13 @@ const CoordinatorMap = ({
 
 export default CoordinatorMap;
 
-// SOS Cluster Marker Component
-function SOSClusterMarker({
-  cluster,
+// SOS Request Marker Component
+function SOSRequestMarker({
+  sos,
   isSelected,
   onClick,
 }: {
-  cluster: SOSCluster;
+  sos: SOSRequest;
   isSelected: boolean;
   onClick: () => void;
 }) {
@@ -557,8 +577,8 @@ function SOSClusterMarker({
     P3: "#eab308", // yellow-500
   };
 
-  const color = priorityColors[cluster.highestPriority];
-  const size = isSelected ? 40 : 30;
+  const color = priorityColors[sos.priority];
+  const size = isSelected ? 38 : 28;
 
   // Create custom icon using divIcon with useMemo
   const icon = useMemo(() => {
@@ -567,15 +587,15 @@ function SOSClusterMarker({
     const L = require("leaflet");
 
     return L.divIcon({
-      className: "custom-cluster-marker",
+      className: "custom-sos-marker",
       html: `
         <div class="relative flex items-center justify-center" style="width: ${size}px; height: ${size}px;">
-          <div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>
-          <div class="relative rounded-full flex items-center justify-center text-white font-bold text-xs" 
-               style="width: ${size - 8}px; height: ${
-                 size - 8
+          ${sos.status === "PENDING" ? `<div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>` : ""}
+          <div class="relative rounded-full flex items-center justify-center text-white font-bold text-[10px]" 
+               style="width: ${size - 6}px; height: ${
+                 size - 6
                }px; background-color: ${color}; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-            ${cluster.totalVictims}
+            SOS
           </div>
         </div>
       `,
@@ -583,33 +603,37 @@ function SOSClusterMarker({
       iconAnchor: [size / 2, size / 2],
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cluster.totalVictims, cluster.highestPriority, isSelected]);
+  }, [sos.priority, sos.status, isSelected]);
 
   if (!icon) return null;
 
   return (
     <Marker
-      position={[cluster.center.lat, cluster.center.lng]}
+      position={[sos.location.lat, sos.location.lng]}
       icon={icon}
       eventHandlers={{ click: onClick }}
     >
       <Popup>
         <div className="p-2 min-w-50">
-          <div className="font-bold text-sm mb-2 pr-5">
-            Cụm SOS #{cluster.id.split("-")[1]}
-          </div>
+          <div className="font-bold text-sm mb-2 pr-5">SOS #{sos.id}</div>
           <div className="space-y-1 text-xs">
             <div className="flex items-center gap-2">
               <span
                 className="px-2 py-0.5 rounded text-white font-semibold"
                 style={{ backgroundColor: color }}
               >
-                {cluster.highestPriority}
+                {sos.priority}
               </span>
-              <span>{cluster.totalVictims} nạn nhân</span>
+              <span>
+                {sos.status === "PENDING"
+                  ? "Chờ xử lý"
+                  : sos.status === "ASSIGNED"
+                    ? "Đã phân công"
+                    : "Đã cứu"}
+              </span>
             </div>
-            <div className="text-muted-foreground">
-              {cluster.sosRequests.length} yêu cầu SOS
+            <div className="text-muted-foreground line-clamp-2">
+              {sos.message}
             </div>
           </div>
         </div>

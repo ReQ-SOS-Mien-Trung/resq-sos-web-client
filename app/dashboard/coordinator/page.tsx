@@ -11,21 +11,15 @@ import {
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import {
-  SOSRequest,
-  SOSCluster,
-  Rescuer,
-  AIDispatchDecision,
-  Location,
-  LocationPanelData,
-} from "@/type";
-import {
-  mockRescuers,
-  mockAIDecision,
-  mockActiveMissions,
-} from "@/lib/mock-data";
+import { SOSRequest, Rescuer, Location, LocationPanelData } from "@/type";
+import { mockRescuers, mockActiveMissions } from "@/lib/mock-data";
 import { useSOSRequests } from "@/services/sos_request/hooks";
 import type { SOSRequestEntity } from "@/services/sos_request/type";
+import {
+  useCreateSOSCluster,
+  useClusterRescueSuggestion,
+} from "@/services/sos_cluster/hooks";
+import type { ClusterRescueSuggestionResponse } from "@/services/sos_cluster/type";
 import { useDepots } from "@/services/depot/hooks";
 import { useAssemblyPoints } from "@/services/assembly_points/hooks";
 import type { DepotEntity } from "@/services/depot/type";
@@ -55,7 +49,7 @@ import {
   SignOut,
 } from "@phosphor-icons/react";
 import {
-  ClusterDetailsPanel,
+  SOSDetailsPanel,
   RescuePlanPanel,
   SOSSidebar,
   LocationDetailsPanel,
@@ -98,9 +92,6 @@ const CoordinatorDashboardContent = () => {
   // State management
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedSOS, setSelectedSOS] = useState<SOSRequest | null>(null);
-  const [selectedCluster, setSelectedCluster] = useState<SOSCluster | null>(
-    null,
-  );
   const [selectedRescuer, setSelectedRescuer] = useState<Rescuer | null>(null);
   const [flyToLocation, setFlyToLocation] = useState<Location | null>(null);
   const [isConnected] = useState(true);
@@ -110,13 +101,16 @@ const CoordinatorDashboardContent = () => {
   const [userLocation, setUserLocation] = useState<Location | null>(null);
 
   // Panel states
-  const [clusterSheetOpen, setClusterSheetOpen] = useState(false);
+  const [sosDetailOpen, setSOSDetailOpen] = useState(false);
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
-  const [currentAIDecision, setCurrentAIDecision] =
-    useState<AIDispatchDecision | null>(null);
+  const [rescueSuggestion, setRescueSuggestion] =
+    useState<ClusterRescueSuggestionResponse | null>(null);
   const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [locationPanelData, setLocationPanelData] =
     useState<LocationPanelData | null>(null);
+
+  // Multi-select SOS for clustering
+  const [selectedSOSIds, setSelectedSOSIds] = useState<Set<string>>(new Set());
 
   // Remember sidebar state before RescuePlanPanel opens
   const sidebarBeforeRescuePlanRef = useRef(true);
@@ -196,8 +190,8 @@ const CoordinatorDashboardContent = () => {
 
   // Map SOSRequestEntity → SOSRequest (for sidebar/panels)
   const sosRequests: SOSRequest[] = useMemo(() => {
-    if (!sosData?.sosRequests) return [];
-    return sosData.sosRequests.map(
+    if (!sosData?.items) return [];
+    return sosData.items.map(
       (entity: SOSRequestEntity): SOSRequest => ({
         id: String(entity.id),
         groupId: entity.clusterId
@@ -219,74 +213,10 @@ const CoordinatorDashboardContent = () => {
             : entity.status === "InProgress"
               ? "ASSIGNED"
               : "RESCUED",
-        message: entity.rawMessage,
+        message: entity.msg,
         createdAt: new Date(entity.createdAt),
       }),
     );
-  }, [sosData]);
-
-  // Group SOS requests by clusterId → SOSCluster[]
-  const sosClusters: SOSCluster[] = useMemo(() => {
-    if (!sosData?.sosRequests) return [];
-    const clusterMap = new Map<number, SOSRequestEntity[]>();
-
-    sosData.sosRequests.forEach((entity: SOSRequestEntity) => {
-      const key = entity.clusterId ?? entity.id;
-      if (!clusterMap.has(key)) clusterMap.set(key, []);
-      clusterMap.get(key)!.push(entity);
-    });
-
-    return Array.from(clusterMap.entries()).map(([clusterId, entities]) => {
-      // Calculate center as average of all SOS in the cluster
-      const avgLat =
-        entities.reduce((s, e) => s + e.latitude, 0) / entities.length;
-      const avgLng =
-        entities.reduce((s, e) => s + e.longitude, 0) / entities.length;
-
-      // Map priority levels
-      const priorityOrder = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-      const highest = entities.reduce((prev, curr) =>
-        priorityOrder[curr.priorityLevel] < priorityOrder[prev.priorityLevel]
-          ? curr
-          : prev,
-      );
-      const highestPriority =
-        highest.priorityLevel === "Critical" || highest.priorityLevel === "High"
-          ? "P1"
-          : highest.priorityLevel === "Medium"
-            ? "P2"
-            : "P3";
-
-      // Map entities to SOSRequest format
-      const requests: SOSRequest[] = entities.map((e) => ({
-        id: String(e.id),
-        groupId: String(clusterId),
-        location: { lat: e.latitude, lng: e.longitude },
-        priority:
-          e.priorityLevel === "Critical" || e.priorityLevel === "High"
-            ? "P1"
-            : e.priorityLevel === "Medium"
-              ? "P2"
-              : "P3",
-        needs: { medical: false, food: false, boat: false },
-        status:
-          e.status === "Pending"
-            ? "PENDING"
-            : e.status === "InProgress"
-              ? "ASSIGNED"
-              : "RESCUED",
-        message: e.rawMessage,
-        createdAt: new Date(e.createdAt),
-      }));
-
-      return {
-        id: String(clusterId),
-        center: { lat: avgLat, lng: avgLng },
-        sosRequests: requests,
-        highestPriority: highestPriority as "P1" | "P2" | "P3",
-        totalVictims: entities.length,
-      };
-    });
   }, [sosData]);
 
   // Fetch depots from backend for map display
@@ -325,17 +255,31 @@ const CoordinatorDashboardContent = () => {
         .toUpperCase()
     : "U";
 
+  // Cluster creation mutation
+  const { mutate: createCluster, isPending: isCreatingCluster } =
+    useCreateSOSCluster();
+
+  // Rescue suggestion mutation (cluster-based)
+  const {
+    mutate: fetchClusterRescueSuggestion,
+    isPending: isFetchingSuggestion,
+  } = useClusterRescueSuggestion();
+
+  const isProcessingSOS = isCreatingCluster || isFetchingSuggestion;
+
   // Handlers
   const handleSOSSelect = useCallback((sos: SOSRequest) => {
     setSelectedSOS(sos);
     setFlyToLocation(sos.location);
-  }, []);
-
-  const handleClusterSelect = useCallback((cluster: SOSCluster) => {
-    setSelectedCluster(cluster);
-    setSelectedSOS(null);
-    setFlyToLocation(cluster.center);
-    setClusterSheetOpen(true);
+    setSOSDetailOpen(true);
+    // Auto-add to selection when clicking — only for PENDING requests
+    if (sos.status === "PENDING") {
+      setSelectedSOSIds((prev) => {
+        const next = new Set(prev);
+        next.add(sos.id);
+        return next;
+      });
+    }
   }, []);
 
   const handleRescuerSelect = useCallback((rescuer: Rescuer) => {
@@ -348,7 +292,7 @@ const CoordinatorDashboardContent = () => {
     setLocationPanelOpen(true);
     setFlyToLocation({ lat: depot.latitude, lng: depot.longitude });
     // Close other panels
-    setClusterSheetOpen(false);
+    setSOSDetailOpen(false);
   }, []);
 
   const handleAssemblyPointSelect = useCallback(
@@ -357,44 +301,68 @@ const CoordinatorDashboardContent = () => {
       setLocationPanelOpen(true);
       setFlyToLocation({ lat: point.latitude, lng: point.longitude });
       // Close other panels
-      setClusterSheetOpen(false);
+      setSOSDetailOpen(false);
     },
     [],
   );
 
-  const handleProcessCluster = useCallback(() => {
-    // Simulate AI decision generation
-    if (selectedCluster) {
-      setCurrentAIDecision({
-        ...mockAIDecision,
-        clusterId: selectedCluster.id,
-      });
-      // Keep cluster panel open and open rescue plan panel
-      setRescuePlanOpen(true);
-    }
-  }, [selectedCluster]);
+  // Toggle individual SOS in/out of selection (only allow PENDING)
+  const handleToggleSOSSelect = useCallback((sosId: string) => {
+    const sos = sosRequests.find((s) => s.id === sosId);
+    if (sos && sos.status !== "PENDING") return;
+    setSelectedSOSIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sosId)) {
+        next.delete(sosId);
+      } else {
+        next.add(sosId);
+      }
+      return next;
+    });
+  }, [sosRequests]);
+
+  // Create cluster → then trigger AI suggestion (only PENDING requests)
+  const handleProcessSOS = useCallback(() => {
+    // Filter to only include PENDING SOS requests
+    const pendingIds = Array.from(selectedSOSIds).filter((id) => {
+      const sos = sosRequests.find((s) => s.id === id);
+      return sos?.status === "PENDING";
+    });
+    const ids = pendingIds.map(Number).filter(Boolean);
+    if (ids.length === 0) return;
+
+    createCluster(
+      { sosRequestIds: ids },
+      {
+        onSuccess: (clusterData) => {
+          // Now trigger AI rescue suggestion with the created cluster
+          fetchClusterRescueSuggestion(clusterData.clusterId, {
+            onSuccess: (suggestion) => {
+              setRescueSuggestion(suggestion);
+              setRescuePlanOpen(true);
+            },
+            onError: (error) => {
+              console.error("Failed to get rescue suggestion:", error);
+              alert("Đã gom cụm thành công nhưng không thể lấy đề xuất AI. Vui lòng thử lại.");
+            },
+          });
+        },
+        onError: (error) => {
+          console.error("Failed to create cluster:", error);
+          alert("Không thể gom cụm SOS. Vui lòng thử lại.");
+        },
+      },
+    );
+  }, [selectedSOSIds, sosRequests, createCluster, fetchClusterRescueSuggestion]);
 
   const handleApproveDecision = useCallback(() => {
-    // Simulate mission approval
     alert("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
     setRescuePlanOpen(false);
-    setClusterSheetOpen(false);
-    setSelectedCluster(null);
-    setCurrentAIDecision(null);
+    setSOSDetailOpen(false);
+    setSelectedSOS(null);
+    setRescueSuggestion(null);
+    setSelectedSOSIds(new Set());
   }, []);
-
-  const handleOverrideDecision = useCallback(
-    (rescuerId: string) => {
-      const newRescuer = mockRescuers.find((r) => r.id === rescuerId);
-      if (newRescuer && currentAIDecision) {
-        setCurrentAIDecision({
-          ...currentAIDecision,
-          recommendedRescuer: newRescuer,
-        });
-      }
-    },
-    [currentAIDecision],
-  );
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
@@ -564,14 +532,15 @@ const CoordinatorDashboardContent = () => {
           {sidebarOpen && (
             <SOSSidebar
               sosRequests={sosRequests}
-              clusters={sosClusters}
               rescuers={mockRescuers}
               missions={mockActiveMissions}
               onSOSSelect={handleSOSSelect}
-              onClusterSelect={handleClusterSelect}
               onRescuerSelect={handleRescuerSelect}
               selectedSOS={selectedSOS}
-              selectedCluster={selectedCluster}
+              selectedSOSIds={selectedSOSIds}
+              onToggleSOSSelect={handleToggleSOSSelect}
+              onCreateCluster={handleProcessSOS}
+              isCreatingCluster={isProcessingSOS}
             />
           )}
         </aside>
@@ -580,12 +549,12 @@ const CoordinatorDashboardContent = () => {
         <main className="flex-1 relative overflow-hidden">
           {isWeatherMode ? (
             <WindyLeafletMap
-              clusters={sosClusters}
+              sosRequests={sosRequests}
               rescuers={mockRescuers}
               depots={depots}
-              selectedCluster={selectedCluster}
+              selectedSOS={selectedSOS}
               selectedRescuer={selectedRescuer}
-              onClusterSelect={handleClusterSelect}
+              onSOSSelect={handleSOSSelect}
               onRescuerSelect={handleRescuerSelect}
               flyToLocation={flyToLocation}
               userLocation={userLocation}
@@ -593,14 +562,14 @@ const CoordinatorDashboardContent = () => {
           ) : (
             <>
               <CoordinatorMap
-                clusters={sosClusters}
+                sosRequests={sosRequests}
                 rescuers={mockRescuers}
                 depots={depots}
                 assemblyPoints={assemblyPoints}
-                selectedCluster={selectedCluster}
+                selectedSOS={selectedSOS}
                 selectedRescuer={selectedRescuer}
-                aiDecision={currentAIDecision}
-                onClusterSelect={handleClusterSelect}
+                aiDecision={null}
+                onSOSSelect={handleSOSSelect}
                 onRescuerSelect={handleRescuerSelect}
                 onDepotSelect={handleDepotSelect}
                 onAssemblyPointSelect={handleAssemblyPointSelect}
@@ -608,8 +577,8 @@ const CoordinatorDashboardContent = () => {
                 userLocation={userLocation}
               />
 
-              {/* Floating Stats Panel - Only show when cluster panel is closed */}
-              {!clusterSheetOpen && (
+              {/* Floating Stats Panel - Only show when SOS detail panel is closed */}
+              {!sosDetailOpen && (
                 <div className="absolute top-4 right-4 z-[40]">
                   <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
                     <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
@@ -645,26 +614,27 @@ const CoordinatorDashboardContent = () => {
                 </div>
               )}
 
-              {/* Cluster Details Panel - Overlays on map from right */}
-              <ClusterDetailsPanel
-                open={clusterSheetOpen}
-                onOpenChange={setClusterSheetOpen}
-                cluster={selectedCluster}
-                onProcessCluster={handleProcessCluster}
-                onSOSSelect={handleSOSSelect}
+              {/* SOS Details Panel - Overlays on map from right */}
+              <SOSDetailsPanel
+                open={sosDetailOpen}
+                onOpenChange={setSOSDetailOpen}
+                sosRequest={selectedSOS}
+                onProcessSOS={handleProcessSOS}
+                isProcessing={isProcessingSOS}
+                selectedSOSIds={selectedSOSIds}
+                onToggleSOSSelect={handleToggleSOSSelect}
+                allSOSRequests={sosRequests}
               />
 
               {/* Rescue Plan Panel - Slides up from bottom, overlays map and sidebar */}
               <RescuePlanPanel
                 open={rescuePlanOpen}
                 onOpenChange={setRescuePlanOpen}
-                cluster={selectedCluster}
-                aiDecision={currentAIDecision}
-                availableRescuers={mockRescuers.filter(
-                  (r) => r.status === "AVAILABLE",
+                clusterSOSRequests={sosRequests.filter((s) =>
+                  selectedSOSIds.has(s.id),
                 )}
+                rescueSuggestion={rescueSuggestion}
                 onApprove={handleApproveDecision}
-                onOverride={handleOverrideDecision}
               />
 
               {/* Location Details Panel - Depot / Assembly Point */}
