@@ -42,6 +42,7 @@ const CoordinatorMap = ({
   userLocation,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchFlyToLocation, setSearchFlyToLocation] = useState<{
@@ -65,7 +66,11 @@ const CoordinatorMap = ({
   useEffect(() => {
     // Use setTimeout to avoid React 19 strict mode warning
     const timer = setTimeout(() => setIsMounted(true), 0);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Bump key so the next mount creates a fresh MapContainer
+      setMapKey((k) => k + 1);
+    };
   }, []);
 
   // Load Leaflet CSS in the document head
@@ -439,6 +444,7 @@ const CoordinatorMap = ({
       </div>
 
       <MapContainer
+        key={mapKey}
         center={
           activeFlyToLocation
             ? [activeFlyToLocation.lat, activeFlyToLocation.lng]
