@@ -119,15 +119,20 @@ const CoordinatorDashboardContent = () => {
 
   // Manual mission builder
   const [manualMissionOpen, setManualMissionOpen] = useState(false);
-  const [manualMissionClusterId, setManualMissionClusterId] = useState<number | null>(null);
+  const [manualMissionClusterId, setManualMissionClusterId] = useState<
+    number | null
+  >(null);
 
   // Multi-select SOS for clustering
   const [processingClusterIndex, setProcessingClusterIndex] = useState<
     number | null
   >(null);
+  const [processingSosId, setProcessingSosId] = useState<string | null>(null);
 
   // Track which backend cluster is being analyzed
-  const [analyzingClusterId, setAnalyzingClusterId] = useState<number | null>(null);
+  const [analyzingClusterId, setAnalyzingClusterId] = useState<number | null>(
+    null,
+  );
 
   // Remember sidebar state before RescuePlanPanel opens
   const sidebarBeforeRescuePlanRef = useRef(true);
@@ -208,58 +213,58 @@ const CoordinatorDashboardContent = () => {
   // Map SOSRequestEntity → SOSRequest (for sidebar/panels)
   const sosRequests: SOSRequest[] = useMemo(() => {
     if (!sosData?.items) return [];
-    return sosData.items.map(
-      (entity: SOSRequestEntity): SOSRequest => {
-        const sd = entity.structuredData;
-        const si = entity.senderInfo;
-        const nm = entity.networkMetadata;
-        const supplies = sd?.supplies ?? [];
+    return sosData.items.map((entity: SOSRequestEntity): SOSRequest => {
+      const sd = entity.structuredData;
+      const si = entity.senderInfo;
+      const nm = entity.networkMetadata;
+      const supplies = sd?.supplies ?? [];
 
-        return {
-          id: String(entity.id),
-          groupId: entity.clusterId
-            ? String(entity.clusterId)
-            : String(entity.id),
-          location: { lat: entity.latitude, lng: entity.longitude },
-          priority:
-            entity.priorityLevel === "Critical"
+      return {
+        id: String(entity.id),
+        groupId: entity.clusterId
+          ? String(entity.clusterId)
+          : String(entity.id),
+        location: { lat: entity.latitude, lng: entity.longitude },
+        priority:
+          entity.priorityLevel === "Critical"
+            ? "P1"
+            : entity.priorityLevel === "High"
               ? "P1"
-              : entity.priorityLevel === "High"
-                ? "P1"
-                : entity.priorityLevel === "Medium"
-                  ? "P2"
-                  : "P3",
-          needs: {
-            medical: sd?.need_medical ?? supplies.includes("MEDICINE"),
-            food: supplies.includes("FOOD") || supplies.includes("WATER"),
-            boat: supplies.includes("RESCUE_EQUIPMENT") || supplies.includes("TRANSPORTATION"),
-          },
-          status:
-            entity.status === "Pending"
-              ? "PENDING"
-              : entity.status === "InProgress" || entity.status === "Assigned"
-                ? "ASSIGNED"
-                : "RESCUED",
-          message: entity.msg,
-          createdAt: new Date(entity.createdAt),
-          // Extended fields
-          peopleCount: sd?.people_count,
-          waitTimeMinutes: entity.waitTimeMinutes,
-          situation: sd?.situation,
-          medicalIssues: sd?.medical_issues,
-          supplies: sd?.supplies,
-          canMove: sd?.can_move,
-          hasInjured: sd?.has_injured,
-          othersAreStable: sd?.others_are_stable,
-          additionalDescription: sd?.additional_description,
-          senderPhone: si?.user_phone,
-          senderName: si?.user_name,
-          isOnline: si?.is_online,
-          hopCount: nm?.hop_count,
-          locationAccuracy: entity.locationAccuracy,
-        };
-      },
-    );
+              : entity.priorityLevel === "Medium"
+                ? "P2"
+                : "P3",
+        needs: {
+          medical: sd?.need_medical ?? supplies.includes("MEDICINE"),
+          food: supplies.includes("FOOD") || supplies.includes("WATER"),
+          boat:
+            supplies.includes("RESCUE_EQUIPMENT") ||
+            supplies.includes("TRANSPORTATION"),
+        },
+        status:
+          entity.status === "Pending"
+            ? "PENDING"
+            : entity.status === "InProgress" || entity.status === "Assigned"
+              ? "ASSIGNED"
+              : "RESCUED",
+        message: entity.msg,
+        createdAt: new Date(entity.createdAt),
+        // Extended fields
+        peopleCount: sd?.people_count,
+        waitTimeMinutes: entity.waitTimeMinutes,
+        situation: sd?.situation,
+        medicalIssues: sd?.medical_issues,
+        supplies: sd?.supplies,
+        canMove: sd?.can_move,
+        hasInjured: sd?.has_injured,
+        othersAreStable: sd?.others_are_stable,
+        additionalDescription: sd?.additional_description,
+        senderPhone: si?.user_phone,
+        senderName: si?.user_name,
+        isOnline: si?.is_online,
+        hopCount: nm?.hop_count,
+        locationAccuracy: entity.locationAccuracy,
+      };
+    });
   }, [sosData]);
 
   // Fetch depots from backend for map display
@@ -419,17 +424,14 @@ const CoordinatorDashboardContent = () => {
   );
 
   // Click on existing cluster → zoom into cluster to reveal individual SOS markers
-  const handleClusterSelect = useCallback(
-    (cluster: SOSClusterEntity) => {
-      // Zoom to level 13 (past CLUSTER_ZOOM_THRESHOLD=12) to show individual SOS markers
-      setFlyToZoom(13);
-      setFlyToLocation({
-        lat: cluster.centerLatitude,
-        lng: cluster.centerLongitude,
-      });
-    },
-    [],
-  );
+  const handleClusterSelect = useCallback((cluster: SOSClusterEntity) => {
+    // Zoom to level 13 (past CLUSTER_ZOOM_THRESHOLD=12) to show individual SOS markers
+    setFlyToZoom(13);
+    setFlyToLocation({
+      lat: cluster.centerLatitude,
+      lng: cluster.centerLongitude,
+    });
+  }, []);
 
   // View rescue plan history for a cluster (triggered from sidebar)
   const handleViewClusterPlan = useCallback(
@@ -472,9 +474,7 @@ const CoordinatorDashboardContent = () => {
               created++;
               setActiveClusterId(clusterData.clusterId);
               if (created + failed === total) {
-                toast.success(
-                  `Đã gom thành công ${created} cụm SOS`,
-                );
+                toast.success(`Đã gom thành công ${created} cụm SOS`);
               }
             },
             onError: (error) => {
@@ -514,6 +514,11 @@ const CoordinatorDashboardContent = () => {
       );
       setProcessingClusterIndex(clusterIdx >= 0 ? clusterIdx : null);
 
+      // Track standalone SOS processing (single SOS cluster)
+      if (sosIds.length === 1 && clusterIdx < 0) {
+        setProcessingSosId(sosIds[0]);
+      }
+
       createCluster(
         { sosRequestIds: ids },
         {
@@ -532,11 +537,13 @@ const CoordinatorDashboardContent = () => {
                       "Đề xuất AI không thành công. Vui lòng thử lại.",
                   );
                   setProcessingClusterIndex(null);
+                  setProcessingSosId(null);
                   return;
                 }
                 setRescueSuggestion(suggestion);
                 setRescuePlanOpen(true);
                 setProcessingClusterIndex(null);
+                setProcessingSosId(null);
               },
               onError: (error) => {
                 console.error("Failed to get rescue suggestion:", error);
@@ -544,6 +551,7 @@ const CoordinatorDashboardContent = () => {
                   "Đã gom cụm thành công nhưng không thể lấy đề xuất AI. Vui lòng thử lại.",
                 );
                 setProcessingClusterIndex(null);
+                setProcessingSosId(null);
               },
             });
           },
@@ -551,16 +559,12 @@ const CoordinatorDashboardContent = () => {
             console.error("Failed to create cluster:", error);
             toast.error("Không thể gom cụm SOS. Vui lòng thử lại.");
             setProcessingClusterIndex(null);
+            setProcessingSosId(null);
           },
         },
       );
     },
-    [
-      sosRequests,
-      autoClusters,
-      createCluster,
-      fetchClusterRescueSuggestion,
-    ],
+    [sosRequests, autoClusters, createCluster, fetchClusterRescueSuggestion],
   );
 
   // Analyze an existing backend cluster with AI
@@ -602,17 +606,14 @@ const CoordinatorDashboardContent = () => {
   }, []);
 
   // Open manual mission builder for a cluster
-  const handleOpenManualMission = useCallback(
-    (clusterId: number) => {
-      setManualMissionClusterId(clusterId);
-      setManualMissionOpen(true);
-      // Close other panels
-      setSOSDetailOpen(false);
-      setRescuePlanOpen(false);
-      setLocationPanelOpen(false);
-    },
-    [],
-  );
+  const handleOpenManualMission = useCallback((clusterId: number) => {
+    setManualMissionClusterId(clusterId);
+    setManualMissionOpen(true);
+    // Close other panels
+    setSOSDetailOpen(false);
+    setRescuePlanOpen(false);
+    setLocationPanelOpen(false);
+  }, []);
 
   const handleManualMissionCreated = useCallback(() => {
     setManualMissionOpen(false);
@@ -797,6 +798,7 @@ const CoordinatorDashboardContent = () => {
               onClusterOnly={handleClusterOnly}
               isCreatingCluster={isProcessingSOS}
               processingClusterIndex={processingClusterIndex}
+              processingSosId={processingSosId}
               backendClusters={clusters}
               onAnalyzeCluster={handleAnalyzeCluster}
               isAnalyzingCluster={isFetchingSuggestion}
@@ -951,7 +953,8 @@ const CoordinatorDashboardContent = () => {
                 clusterId={manualMissionClusterId}
                 cluster={
                   manualMissionClusterId
-                    ? clusters.find((c) => c.id === manualMissionClusterId) ?? null
+                    ? (clusters.find((c) => c.id === manualMissionClusterId) ??
+                      null)
                     : null
                 }
                 clusterSOSRequests={

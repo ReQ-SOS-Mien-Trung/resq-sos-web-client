@@ -866,7 +866,9 @@ export interface CoordinatorMapProps {
   onAssemblyPointSelect?: (
     point: NonNullable<CoordinatorMapProps["assemblyPoints"]>[number],
   ) => void;
-  onClusterSelect?: (cluster: import("@/services/sos_cluster/type").SOSClusterEntity) => void;
+  onClusterSelect?: (
+    cluster: import("@/services/sos_cluster/type").SOSClusterEntity,
+  ) => void;
   flyToLocation?: Location | null;
   /** Zoom level to use when flying to location (default: 16) */
   flyToZoom?: number;
@@ -902,6 +904,8 @@ export interface SOSSidebarProps {
   isCreatingCluster?: boolean;
   /** Which cluster index is currently being processed */
   processingClusterIndex?: number | null;
+  /** Which standalone SOS ID is currently being processed */
+  processingSosId?: string | null;
   /** Backend SOS clusters */
   backendClusters: import("@/services/sos_cluster/type").SOSClusterEntity[];
   /** Trigger AI analysis for an existing backend cluster */

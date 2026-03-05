@@ -23,7 +23,13 @@ import { cn } from "@/lib/utils";
 
 // Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
 // and the isMounted guard inside this component.
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+} from "react-leaflet";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
 
@@ -58,7 +64,9 @@ const CoordinatorMap = ({
   >("all");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   // Track the last selected search result name to display in input
-  const [selectedSearchName, setSelectedSearchName] = useState<string | null>(null);
+  const [selectedSearchName, setSelectedSearchName] = useState<string | null>(
+    null,
+  );
   const [mapControls, setMapControls] = useState<{
     zoomIn: () => void;
     zoomOut: () => void;
@@ -149,7 +157,9 @@ const CoordinatorMap = ({
   // Build a set of SOS IDs that belong to a backend cluster
   const clusteredSOSIds = useMemo(() => {
     const ids = new Set<string>();
-    clusters.forEach((c) => c.sosRequestIds.forEach((id) => ids.add(String(id))));
+    clusters.forEach((c) =>
+      c.sosRequestIds.forEach((id) => ids.add(String(id))),
+    );
     return ids;
   }, [clusters]);
 
@@ -166,9 +176,15 @@ const CoordinatorMap = ({
 
     // Merge radius grows as zoom decreases (further out = bigger merge radius)
     // zoom 11 → ~15km, zoom 10 → ~30km, zoom 9 → ~60km, zoom 8 → ~120km ...
-    const mergeRadiusKm = 10 * Math.pow(2, CLUSTER_ZOOM_THRESHOLD - 1 - currentZoom);
+    const mergeRadiusKm =
+      10 * Math.pow(2, CLUSTER_ZOOM_THRESHOLD - 1 - currentZoom);
 
-    const haversine = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const haversine = (
+      lat1: number,
+      lng1: number,
+      lat2: number,
+      lng2: number,
+    ) => {
       const R = 6371;
       const dLat = ((lat2 - lat1) * Math.PI) / 180;
       const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -191,8 +207,10 @@ const CoordinatorMap = ({
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
         const d = haversine(
-          clusters[i].centerLatitude, clusters[i].centerLongitude,
-          clusters[j].centerLatitude, clusters[j].centerLongitude,
+          clusters[i].centerLatitude,
+          clusters[i].centerLongitude,
+          clusters[j].centerLatitude,
+          clusters[j].centerLongitude,
         );
         if (d <= mergeRadiusKm) union(i, j);
       }
@@ -214,7 +232,12 @@ const CoordinatorMap = ({
       let lngSum = 0;
       let allIds: number[] = [];
       let highestSeverity = "Low";
-      const severityOrder: Record<string, number> = { Low: 0, Medium: 1, High: 2, Critical: 3 };
+      const severityOrder: Record<string, number> = {
+        Low: 0,
+        Medium: 1,
+        High: 2,
+        Critical: 3,
+      };
       let totalVictims = 0;
 
       for (const idx of indices) {
@@ -225,7 +248,10 @@ const CoordinatorMap = ({
         lngSum += c.centerLongitude * count;
         allIds = allIds.concat(c.sosRequestIds);
         totalVictims += c.victimEstimated ?? 0;
-        if ((severityOrder[c.severityLevel] ?? 0) > (severityOrder[highestSeverity] ?? 0)) {
+        if (
+          (severityOrder[c.severityLevel] ?? 0) >
+          (severityOrder[highestSeverity] ?? 0)
+        ) {
           highestSeverity = c.severityLevel;
         }
       }
@@ -233,11 +259,17 @@ const CoordinatorMap = ({
       // Return a merged virtual cluster (uses first cluster's id as base)
       return {
         ...clusters[indices[0]],
-        centerLatitude: totalSOS > 0 ? latSum / totalSOS : clusters[indices[0]].centerLatitude,
-        centerLongitude: totalSOS > 0 ? lngSum / totalSOS : clusters[indices[0]].centerLongitude,
+        centerLatitude:
+          totalSOS > 0
+            ? latSum / totalSOS
+            : clusters[indices[0]].centerLatitude,
+        centerLongitude:
+          totalSOS > 0
+            ? lngSum / totalSOS
+            : clusters[indices[0]].centerLongitude,
         sosRequestCount: totalSOS,
         sosRequestIds: allIds,
-        severityLevel: highestSeverity as typeof clusters[0]["severityLevel"],
+        severityLevel: highestSeverity as (typeof clusters)[0]["severityLevel"],
         victimEstimated: totalVictims || null,
       };
     });
@@ -574,7 +606,10 @@ const CoordinatorMap = ({
         <FlyToHandler location={activeFlyToLocation} zoom={flyToZoom} />
 
         {/* Map zoom handler - provides controls to parent */}
-        <MapZoomHandler onMapReady={handleMapReady} onZoomChange={handleZoomChange} />
+        <MapZoomHandler
+          onMapReady={handleMapReady}
+          onZoomChange={handleZoomChange}
+        />
 
         {/* SOS Request Markers */}
         {visibleSOSRequests.map((sos) => (
@@ -1037,28 +1072,44 @@ function ClusterMarker({
   };
 
   const color = severityColors[cluster.severityLevel] || "#14b8a6";
-  const size = 42;
+  const label = severityLabels[cluster.severityLevel] || cluster.severityLevel;
+  // Scale size based on SOS count for visual weight
+  const baseSize = 56;
+  const size = Math.min(baseSize + cluster.sosRequestCount * 4, 80);
 
   const iconEl = useMemo(() => {
     if (typeof window === "undefined") return undefined;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const L = require("leaflet");
 
+    // Outer ring width for the pulsing effect
+    const ringSize = size + 20;
+
     return L.divIcon({
       className: "custom-cluster-marker",
       html: `
-        <div class="relative flex items-center justify-center" style="width: ${size}px; height: ${size}px;">
-          <div class="absolute inset-0 rounded-full opacity-30 animate-ping" style="background-color: ${color};"></div>
-          <div class="relative rounded-full flex items-center justify-center text-white font-bold text-xs" 
-               style="width: ${size - 6}px; height: ${size - 6}px; background: linear-gradient(135deg, ${color}, ${color}dd); border: 3px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.35);">
-            ${cluster.sosRequestCount}
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${ringSize}px;height:${ringSize}px;">
+          <div style="position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.18;animation:clusterPulse 2s ease-out infinite;"></div>
+          <div style="position:absolute;inset:${(ringSize - size) / 2}px;border-radius:50%;background:${color}22;border:2px solid ${color}55;"></div>
+          <div style="position:relative;width:${size - 4}px;height:${size - 4}px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+                      background:linear-gradient(145deg, ${color}, ${color}cc);border:3px solid white;
+                      box-shadow:0 3px 14px rgba(0,0,0,0.35), 0 0 0 2px ${color}44;">
+            <span style="font-size:18px;font-weight:800;color:white;line-height:1;">${cluster.sosRequestCount}</span>
+            <span style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.9);line-height:1;margin-top:1px;">SOS</span>
           </div>
         </div>
+        <style>
+          @keyframes clusterPulse {
+            0% { transform:scale(0.85); opacity:0.25; }
+            70% { transform:scale(1.15); opacity:0; }
+            100% { transform:scale(1.15); opacity:0; }
+          }
+        </style>
       `,
-      iconSize: [size, size],
-      iconAnchor: [size / 2, size / 2],
+      iconSize: [ringSize, ringSize],
+      iconAnchor: [ringSize / 2, ringSize / 2],
     });
-  }, [cluster.severityLevel, cluster.sosRequestCount, color]);
+  }, [cluster.severityLevel, cluster.sosRequestCount, color, size]);
 
   if (!iconEl) return null;
 
@@ -1066,6 +1117,7 @@ function ClusterMarker({
     <Marker
       position={[cluster.centerLatitude, cluster.centerLongitude]}
       icon={iconEl}
+      zIndexOffset={1000}
       eventHandlers={{ click: () => onClick?.() }}
     />
   );
