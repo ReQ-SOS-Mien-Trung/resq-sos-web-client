@@ -68,6 +68,21 @@ export interface SOSRequest {
   aiAnalysis?: {
     riskFactors: string[];
   };
+  // Extended fields from backend structuredData / senderInfo
+  peopleCount?: { adult: number; child: number; elderly: number };
+  waitTimeMinutes?: number;
+  situation?: string;
+  medicalIssues?: string[];
+  supplies?: string[];
+  canMove?: boolean;
+  hasInjured?: boolean;
+  othersAreStable?: boolean;
+  additionalDescription?: string;
+  senderPhone?: string;
+  senderName?: string;
+  isOnline?: boolean;
+  hopCount?: number;
+  locationAccuracy?: number | null;
 }
 
 export interface Rescuer {
@@ -853,6 +868,8 @@ export interface CoordinatorMapProps {
   ) => void;
   onClusterSelect?: (cluster: import("@/services/sos_cluster/type").SOSClusterEntity) => void;
   flyToLocation?: Location | null;
+  /** Zoom level to use when flying to location (default: 16) */
+  flyToZoom?: number;
   /** Current user/device location from geolocation API */
   userLocation?: Location | null;
   /** Used to trigger map resize when side panel opens/closes */
@@ -894,6 +911,8 @@ export interface SOSSidebarProps {
   analyzingClusterId?: number | null;
   /** Open manual mission builder for a cluster */
   onManualMission?: (clusterId: number) => void;
+  /** View rescue plan history for a cluster */
+  onViewClusterPlan?: (clusterId: number) => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";

@@ -100,6 +100,7 @@ const CoordinatorDashboardContent = () => {
   const [selectedSOS, setSelectedSOS] = useState<SOSRequest | null>(null);
   const [selectedRescuer, setSelectedRescuer] = useState<Rescuer | null>(null);
   const [flyToLocation, setFlyToLocation] = useState<Location | null>(null);
+  const [flyToZoom, setFlyToZoom] = useState<number | undefined>(undefined);
   const [isConnected] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -208,30 +209,56 @@ const CoordinatorDashboardContent = () => {
   const sosRequests: SOSRequest[] = useMemo(() => {
     if (!sosData?.items) return [];
     return sosData.items.map(
-      (entity: SOSRequestEntity): SOSRequest => ({
-        id: String(entity.id),
-        groupId: entity.clusterId
-          ? String(entity.clusterId)
-          : String(entity.id),
-        location: { lat: entity.latitude, lng: entity.longitude },
-        priority:
-          entity.priorityLevel === "Critical"
-            ? "P1"
-            : entity.priorityLevel === "High"
+      (entity: SOSRequestEntity): SOSRequest => {
+        const sd = entity.structuredData;
+        const si = entity.senderInfo;
+        const nm = entity.networkMetadata;
+        const supplies = sd?.supplies ?? [];
+
+        return {
+          id: String(entity.id),
+          groupId: entity.clusterId
+            ? String(entity.clusterId)
+            : String(entity.id),
+          location: { lat: entity.latitude, lng: entity.longitude },
+          priority:
+            entity.priorityLevel === "Critical"
               ? "P1"
-              : entity.priorityLevel === "Medium"
-                ? "P2"
-                : "P3",
-        needs: { medical: false, food: false, boat: false },
-        status:
-          entity.status === "Pending"
-            ? "PENDING"
-            : entity.status === "InProgress"
-              ? "ASSIGNED"
-              : "RESCUED",
-        message: entity.msg,
-        createdAt: new Date(entity.createdAt),
-      }),
+              : entity.priorityLevel === "High"
+                ? "P1"
+                : entity.priorityLevel === "Medium"
+                  ? "P2"
+                  : "P3",
+          needs: {
+            medical: sd?.need_medical ?? supplies.includes("MEDICINE"),
+            food: supplies.includes("FOOD") || supplies.includes("WATER"),
+            boat: supplies.includes("RESCUE_EQUIPMENT") || supplies.includes("TRANSPORTATION"),
+          },
+          status:
+            entity.status === "Pending"
+              ? "PENDING"
+              : entity.status === "InProgress" || entity.status === "Assigned"
+                ? "ASSIGNED"
+                : "RESCUED",
+          message: entity.msg,
+          createdAt: new Date(entity.createdAt),
+          // Extended fields
+          peopleCount: sd?.people_count,
+          waitTimeMinutes: entity.waitTimeMinutes,
+          situation: sd?.situation,
+          medicalIssues: sd?.medical_issues,
+          supplies: sd?.supplies,
+          canMove: sd?.can_move,
+          hasInjured: sd?.has_injured,
+          othersAreStable: sd?.others_are_stable,
+          additionalDescription: sd?.additional_description,
+          senderPhone: si?.user_phone,
+          senderName: si?.user_name,
+          isOnline: si?.is_online,
+          hopCount: nm?.hop_count,
+          locationAccuracy: entity.locationAccuracy,
+        };
+      },
     );
   }, [sosData]);
 
@@ -359,18 +386,21 @@ const CoordinatorDashboardContent = () => {
   // Handlers
   const handleSOSSelect = useCallback((sos: SOSRequest) => {
     setSelectedSOS(sos);
+    setFlyToZoom(undefined);
     setFlyToLocation(sos.location);
     setSOSDetailOpen(true);
   }, []);
 
   const handleRescuerSelect = useCallback((rescuer: Rescuer) => {
     setSelectedRescuer(rescuer);
+    setFlyToZoom(undefined);
     setFlyToLocation(rescuer.location);
   }, []);
 
   const handleDepotSelect = useCallback((depot: DepotEntity) => {
     setLocationPanelData({ type: "depot", data: depot });
     setLocationPanelOpen(true);
+    setFlyToZoom(undefined);
     setFlyToLocation({ lat: depot.latitude, lng: depot.longitude });
     // Close other panels
     setSOSDetailOpen(false);
@@ -380,6 +410,7 @@ const CoordinatorDashboardContent = () => {
     (point: AssemblyPointEntity) => {
       setLocationPanelData({ type: "assemblyPoint", data: point });
       setLocationPanelOpen(true);
+      setFlyToZoom(undefined);
       setFlyToLocation({ lat: point.latitude, lng: point.longitude });
       // Close other panels
       setSOSDetailOpen(false);
@@ -387,20 +418,37 @@ const CoordinatorDashboardContent = () => {
     [],
   );
 
-  // Click on existing cluster → open RescuePlanPanel in history mode
+  // Click on existing cluster → zoom into cluster to reveal individual SOS markers
   const handleClusterSelect = useCallback(
     (cluster: SOSClusterEntity) => {
-      setActiveClusterId(cluster.id);
-      setRescueSuggestion(null); // No live suggestion, will load from history
+      // Zoom to level 13 (past CLUSTER_ZOOM_THRESHOLD=12) to show individual SOS markers
+      setFlyToZoom(13);
       setFlyToLocation({
         lat: cluster.centerLatitude,
         lng: cluster.centerLongitude,
       });
+    },
+    [],
+  );
+
+  // View rescue plan history for a cluster (triggered from sidebar)
+  const handleViewClusterPlan = useCallback(
+    (clusterId: number) => {
+      setActiveClusterId(clusterId);
+      setRescueSuggestion(null);
+      const cluster = clusters.find((c) => c.id === clusterId);
+      if (cluster) {
+        setFlyToZoom(undefined);
+        setFlyToLocation({
+          lat: cluster.centerLatitude,
+          lng: cluster.centerLongitude,
+        });
+      }
       setRescuePlanOpen(true);
       setSOSDetailOpen(false);
       setLocationPanelOpen(false);
     },
-    [],
+    [clusters],
   );
 
   // Create clusters only (no AI suggestion) — one API call per auto-cluster group
@@ -754,6 +802,7 @@ const CoordinatorDashboardContent = () => {
               isAnalyzingCluster={isFetchingSuggestion}
               analyzingClusterId={analyzingClusterId}
               onManualMission={handleOpenManualMission}
+              onViewClusterPlan={handleViewClusterPlan}
             />
           )}
         </aside>
@@ -789,6 +838,7 @@ const CoordinatorDashboardContent = () => {
                 onAssemblyPointSelect={handleAssemblyPointSelect}
                 onClusterSelect={handleClusterSelect}
                 flyToLocation={flyToLocation}
+                flyToZoom={flyToZoom}
                 userLocation={userLocation}
               />
 

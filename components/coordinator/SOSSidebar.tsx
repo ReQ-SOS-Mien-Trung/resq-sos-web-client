@@ -24,6 +24,7 @@ import {
   CaretDown,
   CaretUp,
   PencilSimpleLine,
+  Eye,
 } from "@phosphor-icons/react";
 
 // Client-side time elapsed hook
@@ -78,9 +79,12 @@ const SOSSidebar = ({
   isAnalyzingCluster = false,
   analyzingClusterId = null,
   onManualMission,
+  onViewClusterPlan,
 }: SOSSidebarProps) => {
   const [activeTab, setActiveTab] = useState("incoming");
-  const [expandedClusters, setExpandedClusters] = useState<Set<number>>(new Set());
+  const [expandedClusters, setExpandedClusters] = useState<Set<number>>(
+    new Set(),
+  );
 
   const pendingRequests = sosRequests.filter((s) => s.status === "PENDING");
   const assignedRequests = sosRequests.filter((s) => s.status === "ASSIGNED");
@@ -97,10 +101,13 @@ const SOSSidebar = ({
     (s) => !clusteredIds.has(s.id) && !backendClusteredIds.has(s.id),
   );
 
-  // Backend clusters with SOS requests (non-empty)
-  const activeClusters = backendClusters.filter(
-    (c) => c.sosRequestCount > 0 || c.sosRequestIds.length > 0,
-  );
+  // Backend clusters that have at least one PENDING SOS request
+  const activeClusters = backendClusters.filter((c) => {
+    const clusterSOS = sosRequests.filter((s) =>
+      c.sosRequestIds.includes(Number(s.id)),
+    );
+    return clusterSOS.some((s) => s.status === "PENDING");
+  });
 
   return (
     <div className="h-full flex flex-col bg-background border-r">
@@ -195,15 +202,19 @@ const SOSSidebar = ({
                   </div>
                   {activeClusters.map((cluster) => {
                     const severityColors: Record<string, string> = {
-                      Critical: "border-red-400 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10",
+                      Critical:
+                        "border-red-400 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10",
                       High: "border-orange-400 bg-orange-50/50 dark:border-orange-800/40 dark:bg-orange-900/10",
-                      Medium: "border-yellow-400 bg-yellow-50/50 dark:border-yellow-800/40 dark:bg-yellow-900/10",
+                      Medium:
+                        "border-yellow-400 bg-yellow-50/50 dark:border-yellow-800/40 dark:bg-yellow-900/10",
                       Low: "border-teal-400 bg-teal-50/50 dark:border-teal-800/40 dark:bg-teal-900/10",
                     };
                     const severityBadge: Record<string, string> = {
-                      Critical: "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30",
+                      Critical:
+                        "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30",
                       High: "text-orange-700 bg-orange-100 dark:text-orange-300 dark:bg-orange-900/30",
-                      Medium: "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/30",
+                      Medium:
+                        "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/30",
                       Low: "text-teal-700 bg-teal-100 dark:text-teal-300 dark:bg-teal-900/30",
                     };
                     const severityLabels: Record<string, string> = {
@@ -212,11 +223,19 @@ const SOSSidebar = ({
                       Medium: "Trung bình",
                       Low: "Thấp",
                     };
-                    const isAnalyzing = isAnalyzingCluster && analyzingClusterId === cluster.id;
-                    const sosCount = cluster.sosRequestCount || cluster.sosRequestIds.length;
+                    const isAnalyzing =
+                      isAnalyzingCluster && analyzingClusterId === cluster.id;
+                    const sosCount =
+                      cluster.sosRequestCount || cluster.sosRequestIds.length;
                     const isExpanded = expandedClusters.has(cluster.id);
                     const clusterSOS = sosRequests.filter((s) =>
                       cluster.sosRequestIds.includes(Number(s.id)),
+                    );
+                    const pendingClusterSOS = clusterSOS.filter(
+                      (s) => s.status === "PENDING",
+                    );
+                    const assignedClusterSOS = clusterSOS.filter(
+                      (s) => s.status === "ASSIGNED",
                     );
 
                     return (
@@ -224,7 +243,8 @@ const SOSSidebar = ({
                         key={cluster.id}
                         className={cn(
                           "rounded-xl border overflow-hidden",
-                          severityColors[cluster.severityLevel] || severityColors.Low,
+                          severityColors[cluster.severityLevel] ||
+                            severityColors.Low,
                         )}
                       >
                         {/* Cluster header - clickable to expand */}
@@ -254,15 +274,17 @@ const SOSSidebar = ({
                               <span
                                 className={cn(
                                   "text-[10px] font-semibold px-1.5 py-0.5 rounded",
-                                  severityBadge[cluster.severityLevel] || severityBadge.Low,
+                                  severityBadge[cluster.severityLevel] ||
+                                    severityBadge.Low,
                                 )}
                               >
-                                {severityLabels[cluster.severityLevel] || cluster.severityLevel}
+                                {severityLabels[cluster.severityLevel] ||
+                                  cluster.severityLevel}
                               </span>
                             </div>
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] text-muted-foreground">
-                                {sosCount} SOS
+                                {pendingClusterSOS.length} chờ xử lý
                               </span>
                               {isExpanded ? (
                                 <CaretUp className="h-3.5 w-3.5 text-muted-foreground" />
@@ -276,8 +298,8 @@ const SOSSidebar = ({
                           <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground mt-1.5">
                             {cluster.victimEstimated && (
                               <span className="flex items-center gap-1">
-                                <Users className="h-3 w-3" weight="fill" />
-                                ~{cluster.victimEstimated} nạn nhân
+                                <Users className="h-3 w-3" weight="fill" />~
+                                {cluster.victimEstimated} nạn nhân
                               </span>
                             )}
                             {cluster.waterLevel && (
@@ -290,8 +312,8 @@ const SOSSidebar = ({
                         {isExpanded && (
                           <>
                             <div className="border-t border-inherit divide-y divide-inherit">
-                              {clusterSOS.length > 0 ? (
-                                clusterSOS.map((sos) => (
+                              {pendingClusterSOS.length > 0 ? (
+                                pendingClusterSOS.map((sos) => (
                                   <div
                                     key={sos.id}
                                     className={cn(
@@ -329,6 +351,12 @@ const SOSSidebar = ({
                                         <span className="text-xs font-mono text-muted-foreground">
                                           #{sos.id}
                                         </span>
+                                        <Badge
+                                          variant="warning"
+                                          className="text-[9px] h-3.5 px-1"
+                                        >
+                                          Chờ
+                                        </Badge>
                                       </div>
                                       <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                                         <Clock className="h-3 w-3" />
@@ -347,12 +375,12 @@ const SOSSidebar = ({
                               )}
                             </div>
 
-                            {/* Action buttons: AI Analyze + Manual */}
+                            {/* Action buttons: AI Analyze + View Plan + Manual */}
                             <div className="px-3 py-2 border-t border-inherit space-y-1.5">
                               <Button
                                 variant="default"
                                 size="sm"
-                                className="w-full h-7 text-[11px] bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-sm"
+                                className="w-full h-7 text-[11px] bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onAnalyzeCluster(cluster.id);
@@ -366,22 +394,42 @@ const SOSSidebar = ({
                                   </>
                                 ) : (
                                   <>
-                                    <Lightning className="h-3 w-3 mr-1" weight="fill" />
+                                    <Lightning
+                                      className="h-3 w-3 mr-1"
+                                      weight="fill"
+                                    />
                                     AI Phân tích Rescue Plan
                                   </>
                                 )}
                               </Button>
+                              {onViewClusterPlan && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full h-7 text-[11px] border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onViewClusterPlan(cluster.id);
+                                  }}
+                                >
+                                  <Eye className="h-3 w-3 mr-1" weight="fill" />
+                                  Xem kế hoạch AI đã gợi ý
+                                </Button>
+                              )}
                               {onManualMission && (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="w-full h-7 text-[11px] border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                  className="w-full h-7 text-[11px] border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     onManualMission(cluster.id);
                                   }}
                                 >
-                                  <PencilSimpleLine className="h-3 w-3 mr-1" weight="fill" />
+                                  <PencilSimpleLine
+                                    className="h-3 w-3 mr-1"
+                                    weight="fill"
+                                  />
                                   Tạo nhiệm vụ thủ công
                                 </Button>
                               )}
@@ -411,7 +459,8 @@ const SOSSidebar = ({
                       "P3" as "P1" | "P2" | "P3",
                     );
                     const isProcessing =
-                      isCreatingCluster && processingClusterIndex === clusterIdx;
+                      isCreatingCluster &&
+                      processingClusterIndex === clusterIdx;
 
                     return (
                       <div
@@ -444,7 +493,7 @@ const SOSSidebar = ({
                           <Button
                             variant="default"
                             size="sm"
-                            className="h-7 text-[11px] px-2.5 bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-sm"
+                            className="h-7 text-[11px] px-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
                             onClick={() =>
                               onCreateCluster(cluster.map((s) => s.id))
                             }

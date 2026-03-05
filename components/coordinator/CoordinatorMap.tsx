@@ -42,6 +42,7 @@ const CoordinatorMap = ({
   onAssemblyPointSelect,
   onClusterSelect,
   flyToLocation,
+  flyToZoom,
   userLocation,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
@@ -570,7 +571,7 @@ const CoordinatorMap = ({
         />
 
         {/* Fly to location handler */}
-        <FlyToHandler location={activeFlyToLocation} />
+        <FlyToHandler location={activeFlyToLocation} zoom={flyToZoom} />
 
         {/* Map zoom handler - provides controls to parent */}
         <MapZoomHandler onMapReady={handleMapReady} onZoomChange={handleZoomChange} />
@@ -1066,39 +1067,7 @@ function ClusterMarker({
       position={[cluster.centerLatitude, cluster.centerLongitude]}
       icon={iconEl}
       eventHandlers={{ click: () => onClick?.() }}
-    >
-      <Popup>
-        <div className="p-2 min-w-50">
-          <div className="font-bold text-sm mb-1 pr-5">Cụm SOS #{cluster.id}</div>
-          <div className="space-y-1 text-xs">
-            <div className="flex items-center gap-2 mb-2">
-              <span
-                className="px-2 py-0.5 rounded text-white font-semibold"
-                style={{ backgroundColor: color }}
-              >
-                {severityLabels[cluster.severityLevel] || cluster.severityLevel}
-              </span>
-              <span>{cluster.sosRequestCount} yêu cầu SOS</span>
-            </div>
-            {cluster.victimEstimated && (
-              <div className="flex justify-between">
-                <span>👥 Nạn nhân ước tính:</span>
-                <span className="font-semibold">{cluster.victimEstimated}</span>
-              </div>
-            )}
-            {cluster.waterLevel && (
-              <div className="flex justify-between">
-                <span>🌊 Mực nước:</span>
-                <span className="font-semibold">{cluster.waterLevel}</span>
-              </div>
-            )}
-            <div className="text-muted-foreground pt-1">
-              Nhấn để xem kế hoạch AI
-            </div>
-          </div>
-        </div>
-      </Popup>
-    </Marker>
+    />
   );
 }
 
