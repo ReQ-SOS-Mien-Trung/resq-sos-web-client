@@ -1,17 +1,19 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { useMap } from "react-leaflet";
+import { useMap, useMapEvents } from "react-leaflet";
 
 // This component provides zoom/recenter functions to the parent via a ref-like callback
 export function MapZoomHandler({
   onMapReady,
+  onZoomChange,
 }: {
   onMapReady: (controls: {
     zoomIn: () => void;
     zoomOut: () => void;
     recenter: () => void;
   }) => void;
+  onZoomChange?: (zoom: number) => void;
 }) {
   const map = useMap();
 
@@ -22,11 +24,18 @@ export function MapZoomHandler({
     [map],
   );
 
+  useMapEvents({
+    zoomend: () => {
+      onZoomChange?.(map.getZoom());
+    },
+  });
+
   useEffect(() => {
     if (map) {
       onMapReady({ zoomIn, zoomOut, recenter });
+      onZoomChange?.(map.getZoom());
     }
-  }, [map, onMapReady, zoomIn, zoomOut, recenter]);
+  }, [map, onMapReady, zoomIn, zoomOut, recenter, onZoomChange]);
 
   return null;
 }

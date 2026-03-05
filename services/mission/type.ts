@@ -68,6 +68,35 @@ export interface UpdateMissionStatusResponse {
   isCompleted: boolean;
 }
 
+export interface CreateMissionActivityRequest {
+  step: number;
+  activityCode: string;
+  activityType: string;
+  description: string;
+  target: string;
+  items: string;
+  targetLatitude: number;
+  targetLongitude: number;
+}
+
+export interface CreateMissionRequest {
+  clusterId: number;
+  missionType: MissionType;
+  priorityScore: number;
+  startTime: string;
+  expectedEndTime: string;
+  activities: CreateMissionActivityRequest[];
+}
+
+export interface CreateMissionResponse {
+  missionId: number;
+  clusterId: number;
+  missionType: MissionType;
+  status: string;
+  activityCount: number;
+  createdAt: string;
+}
+
 export interface UpdateActivityStatusRequest {
   status: ActivityStatus;
 }

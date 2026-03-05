@@ -19,6 +19,11 @@ import {
   TreeStructure,
   Spinner,
   MapPin,
+  Lightning,
+  Users,
+  CaretDown,
+  CaretUp,
+  PencilSimpleLine,
 } from "@phosphor-icons/react";
 
 // Client-side time elapsed hook
@@ -65,10 +70,17 @@ const SOSSidebar = ({
   selectedSOS,
   autoClusters,
   onCreateCluster,
+  onClusterOnly,
   isCreatingCluster = false,
   processingClusterIndex = null,
+  backendClusters,
+  onAnalyzeCluster,
+  isAnalyzingCluster = false,
+  analyzingClusterId = null,
+  onManualMission,
 }: SOSSidebarProps) => {
   const [activeTab, setActiveTab] = useState("incoming");
+  const [expandedClusters, setExpandedClusters] = useState<Set<number>>(new Set());
 
   const pendingRequests = sosRequests.filter((s) => s.status === "PENDING");
   const assignedRequests = sosRequests.filter((s) => s.status === "ASSIGNED");
@@ -77,8 +89,17 @@ const SOSSidebar = ({
 
   // IDs that belong to any auto-cluster (to identify standalone requests)
   const clusteredIds = new Set(autoClusters.flat().map((s) => s.id));
+  // Also exclude SOS that are already in a backend cluster
+  const backendClusteredIds = new Set(
+    backendClusters.flatMap((c) => c.sosRequestIds.map(String)),
+  );
   const standaloneRequests = pendingRequests.filter(
-    (s) => !clusteredIds.has(s.id),
+    (s) => !clusteredIds.has(s.id) && !backendClusteredIds.has(s.id),
+  );
+
+  // Backend clusters with SOS requests (non-empty)
+  const activeClusters = backendClusters.filter(
+    (c) => c.sosRequestCount > 0 || c.sosRequestIds.length > 0,
   );
 
   return (
@@ -139,6 +160,240 @@ const SOSSidebar = ({
         >
           <ScrollArea className="h-full">
             <div className="p-3 space-y-3">
+              {/* Auto-cluster all nearby groups button */}
+              {autoClusters.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-9 text-xs font-semibold border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                  onClick={() => onClusterOnly(autoClusters)}
+                  disabled={isCreatingCluster}
+                >
+                  {isCreatingCluster ? (
+                    <>
+                      <Spinner className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <TreeStructure
+                        className="h-3.5 w-3.5 mr-1.5"
+                        weight="fill"
+                      />
+                      Gom cụm tự động ({autoClusters.length} cụm •{" "}
+                      {autoClusters.reduce((sum, c) => sum + c.length, 0)} SOS)
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* Existing backend clusters */}
+              {activeClusters.length > 0 && (
+                <>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Cụm đã gom ({activeClusters.length})
+                  </div>
+                  {activeClusters.map((cluster) => {
+                    const severityColors: Record<string, string> = {
+                      Critical: "border-red-400 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10",
+                      High: "border-orange-400 bg-orange-50/50 dark:border-orange-800/40 dark:bg-orange-900/10",
+                      Medium: "border-yellow-400 bg-yellow-50/50 dark:border-yellow-800/40 dark:bg-yellow-900/10",
+                      Low: "border-teal-400 bg-teal-50/50 dark:border-teal-800/40 dark:bg-teal-900/10",
+                    };
+                    const severityBadge: Record<string, string> = {
+                      Critical: "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30",
+                      High: "text-orange-700 bg-orange-100 dark:text-orange-300 dark:bg-orange-900/30",
+                      Medium: "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/30",
+                      Low: "text-teal-700 bg-teal-100 dark:text-teal-300 dark:bg-teal-900/30",
+                    };
+                    const severityLabels: Record<string, string> = {
+                      Critical: "Nghiêm trọng",
+                      High: "Cao",
+                      Medium: "Trung bình",
+                      Low: "Thấp",
+                    };
+                    const isAnalyzing = isAnalyzingCluster && analyzingClusterId === cluster.id;
+                    const sosCount = cluster.sosRequestCount || cluster.sosRequestIds.length;
+                    const isExpanded = expandedClusters.has(cluster.id);
+                    const clusterSOS = sosRequests.filter((s) =>
+                      cluster.sosRequestIds.includes(Number(s.id)),
+                    );
+
+                    return (
+                      <div
+                        key={cluster.id}
+                        className={cn(
+                          "rounded-xl border overflow-hidden",
+                          severityColors[cluster.severityLevel] || severityColors.Low,
+                        )}
+                      >
+                        {/* Cluster header - clickable to expand */}
+                        <div
+                          className="px-3 py-2.5 cursor-pointer"
+                          onClick={() => {
+                            setExpandedClusters((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(cluster.id)) {
+                                next.delete(cluster.id);
+                              } else {
+                                next.add(cluster.id);
+                              }
+                              return next;
+                            });
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <TreeStructure
+                                className="h-4 w-4 text-violet-600 dark:text-violet-400"
+                                weight="fill"
+                              />
+                              <span className="text-xs font-semibold">
+                                Cụm #{cluster.id}
+                              </span>
+                              <span
+                                className={cn(
+                                  "text-[10px] font-semibold px-1.5 py-0.5 rounded",
+                                  severityBadge[cluster.severityLevel] || severityBadge.Low,
+                                )}
+                              >
+                                {severityLabels[cluster.severityLevel] || cluster.severityLevel}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-muted-foreground">
+                                {sosCount} SOS
+                              </span>
+                              {isExpanded ? (
+                                <CaretUp className="h-3.5 w-3.5 text-muted-foreground" />
+                              ) : (
+                                <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Cluster info */}
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground mt-1.5">
+                            {cluster.victimEstimated && (
+                              <span className="flex items-center gap-1">
+                                <Users className="h-3 w-3" weight="fill" />
+                                ~{cluster.victimEstimated} nạn nhân
+                              </span>
+                            )}
+                            {cluster.waterLevel && (
+                              <span>🌊 {cluster.waterLevel}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Expandable SOS list */}
+                        {isExpanded && (
+                          <>
+                            <div className="border-t border-inherit divide-y divide-inherit">
+                              {clusterSOS.length > 0 ? (
+                                clusterSOS.map((sos) => (
+                                  <div
+                                    key={sos.id}
+                                    className={cn(
+                                      "px-3 py-2 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5",
+                                      selectedSOS?.id === sos.id &&
+                                        "bg-black/10 dark:bg-white/10",
+                                    )}
+                                    onClick={() => onSOSSelect(sos)}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin
+                                          className={cn(
+                                            "h-3.5 w-3.5",
+                                            sos.priority === "P1"
+                                              ? "text-red-500"
+                                              : sos.priority === "P2"
+                                                ? "text-orange-500"
+                                                : "text-yellow-500",
+                                          )}
+                                          weight="fill"
+                                        />
+                                        <Badge
+                                          variant={
+                                            sos.priority === "P1"
+                                              ? "p1"
+                                              : sos.priority === "P2"
+                                                ? "p2"
+                                                : "p3"
+                                          }
+                                          className="text-[10px] h-4 px-1.5"
+                                        >
+                                          {sos.priority}
+                                        </Badge>
+                                        <span className="text-xs font-mono text-muted-foreground">
+                                          #{sos.id}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                        <Clock className="h-3 w-3" />
+                                        <TimeElapsed date={sos.createdAt} />
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                                      {sos.message}
+                                    </p>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="px-3 py-2 text-[11px] text-muted-foreground italic">
+                                  SOS IDs: [{cluster.sosRequestIds.join(", ")}]
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action buttons: AI Analyze + Manual */}
+                            <div className="px-3 py-2 border-t border-inherit space-y-1.5">
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="w-full h-7 text-[11px] bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onAnalyzeCluster(cluster.id);
+                                }}
+                                disabled={isAnalyzingCluster}
+                              >
+                                {isAnalyzing ? (
+                                  <>
+                                    <Spinner className="h-3 w-3 mr-1 animate-spin" />
+                                    AI đang phân tích...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Lightning className="h-3 w-3 mr-1" weight="fill" />
+                                    AI Phân tích Rescue Plan
+                                  </>
+                                )}
+                              </Button>
+                              {onManualMission && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full h-7 text-[11px] border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onManualMission(cluster.id);
+                                  }}
+                                >
+                                  <PencilSimpleLine className="h-3 w-3 mr-1" weight="fill" />
+                                  Tạo nhiệm vụ thủ công
+                                </Button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+
               {/* Auto-detected clusters */}
               {autoClusters.length > 0 && (
                 <>

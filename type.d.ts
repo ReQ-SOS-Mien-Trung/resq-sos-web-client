@@ -878,12 +878,22 @@ export interface SOSSidebarProps {
   onSOSSelect: (sos: SOSRequest) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   selectedSOS?: SOSRequest | null;
-  /** Auto-detected clusters of nearby PENDING SOS requests (within 1 km) */
+  /** Auto-detected clusters of nearby PENDING SOS requests (within 10 km) */
   autoClusters: SOSRequest[][];
   onCreateCluster: (sosIds: string[]) => void;
+  onClusterOnly: (clusterGroups: SOSRequest[][]) => void;
   isCreatingCluster?: boolean;
   /** Which cluster index is currently being processed */
   processingClusterIndex?: number | null;
+  /** Backend SOS clusters */
+  backendClusters: import("@/services/sos_cluster/type").SOSClusterEntity[];
+  /** Trigger AI analysis for an existing backend cluster */
+  onAnalyzeCluster: (clusterId: number) => void;
+  isAnalyzingCluster?: boolean;
+  /** Which backend cluster ID is being analyzed */
+  analyzingClusterId?: number | null;
+  /** Open manual mission builder for a cluster */
+  onManualMission?: (clusterId: number) => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";

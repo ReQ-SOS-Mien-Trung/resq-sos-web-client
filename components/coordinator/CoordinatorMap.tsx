@@ -65,6 +65,7 @@ const CoordinatorMap = ({
   } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const [currentZoom, setCurrentZoom] = useState(13);
 
   useEffect(() => {
     // Use setTimeout to avoid React 19 strict mode warning
@@ -135,6 +136,111 @@ const CoordinatorMap = ({
     },
     [],
   );
+
+  const handleZoomChange = useCallback((zoom: number) => {
+    setCurrentZoom(zoom);
+  }, []);
+
+  // Zoom threshold: >= 12 = zoomed in (show individual SOS), < 12 = zoomed out (show clusters)
+  const CLUSTER_ZOOM_THRESHOLD = 12;
+  const isZoomedIn = currentZoom >= CLUSTER_ZOOM_THRESHOLD;
+
+  // Build a set of SOS IDs that belong to a backend cluster
+  const clusteredSOSIds = useMemo(() => {
+    const ids = new Set<string>();
+    clusters.forEach((c) => c.sosRequestIds.forEach((id) => ids.add(String(id))));
+    return ids;
+  }, [clusters]);
+
+  // When zoomed in: show all SOS. When zoomed out: hide SOS that belong to a cluster.
+  const visibleSOSRequests = useMemo(() => {
+    if (isZoomedIn) return sosRequests;
+    return sosRequests.filter((s) => !clusteredSOSIds.has(s.id));
+  }, [sosRequests, isZoomedIn, clusteredSOSIds]);
+
+  // When zoomed in: hide clusters. When zoomed out: merge nearby clusters based on zoom.
+  const visibleClusters = useMemo(() => {
+    if (isZoomedIn) return [];
+    if (clusters.length <= 1) return clusters;
+
+    // Merge radius grows as zoom decreases (further out = bigger merge radius)
+    // zoom 11 → ~15km, zoom 10 → ~30km, zoom 9 → ~60km, zoom 8 → ~120km ...
+    const mergeRadiusKm = 10 * Math.pow(2, CLUSTER_ZOOM_THRESHOLD - 1 - currentZoom);
+
+    const haversine = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+      const R = 6371;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLng = ((lng2 - lng1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const n = clusters.length;
+    const parent = Array.from({ length: n }, (_, i) => i);
+    const find = (x: number): number =>
+      parent[x] === x ? x : (parent[x] = find(parent[x]));
+    const union = (a: number, b: number) => {
+      parent[find(a)] = find(b);
+    };
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const d = haversine(
+          clusters[i].centerLatitude, clusters[i].centerLongitude,
+          clusters[j].centerLatitude, clusters[j].centerLongitude,
+        );
+        if (d <= mergeRadiusKm) union(i, j);
+      }
+    }
+
+    const groups = new Map<number, number[]>();
+    for (let i = 0; i < n; i++) {
+      const root = find(i);
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root)!.push(i);
+    }
+
+    // Merge groups into virtual clusters
+    return Array.from(groups.values()).map((indices) => {
+      if (indices.length === 1) return clusters[indices[0]];
+      // Weighted center by SOS count
+      let totalSOS = 0;
+      let latSum = 0;
+      let lngSum = 0;
+      let allIds: number[] = [];
+      let highestSeverity = "Low";
+      const severityOrder: Record<string, number> = { Low: 0, Medium: 1, High: 2, Critical: 3 };
+      let totalVictims = 0;
+
+      for (const idx of indices) {
+        const c = clusters[idx];
+        const count = c.sosRequestCount || c.sosRequestIds.length;
+        totalSOS += count;
+        latSum += c.centerLatitude * count;
+        lngSum += c.centerLongitude * count;
+        allIds = allIds.concat(c.sosRequestIds);
+        totalVictims += c.victimEstimated ?? 0;
+        if ((severityOrder[c.severityLevel] ?? 0) > (severityOrder[highestSeverity] ?? 0)) {
+          highestSeverity = c.severityLevel;
+        }
+      }
+
+      // Return a merged virtual cluster (uses first cluster's id as base)
+      return {
+        ...clusters[indices[0]],
+        centerLatitude: totalSOS > 0 ? latSum / totalSOS : clusters[indices[0]].centerLatitude,
+        centerLongitude: totalSOS > 0 ? lngSum / totalSOS : clusters[indices[0]].centerLongitude,
+        sosRequestCount: totalSOS,
+        sosRequestIds: allIds,
+        severityLevel: highestSeverity as typeof clusters[0]["severityLevel"],
+        victimEstimated: totalVictims || null,
+      };
+    });
+  }, [clusters, isZoomedIn, currentZoom, CLUSTER_ZOOM_THRESHOLD]);
 
   // Total counts for search categories
   const depotCount = depots.length;
@@ -467,10 +573,10 @@ const CoordinatorMap = ({
         <FlyToHandler location={activeFlyToLocation} />
 
         {/* Map zoom handler - provides controls to parent */}
-        <MapZoomHandler onMapReady={handleMapReady} />
+        <MapZoomHandler onMapReady={handleMapReady} onZoomChange={handleZoomChange} />
 
         {/* SOS Request Markers */}
-        {sosRequests.map((sos) => (
+        {visibleSOSRequests.map((sos) => (
           <SOSRequestMarker
             key={sos.id}
             sos={sos}
@@ -508,7 +614,7 @@ const CoordinatorMap = ({
         ))}
 
         {/* Cluster Markers */}
-        {clusters.map((cluster) => (
+        {visibleClusters.map((cluster) => (
           <ClusterMarker
             key={`cluster-${cluster.id}`}
             cluster={cluster}

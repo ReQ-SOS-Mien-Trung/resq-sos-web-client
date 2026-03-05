@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  createMission,
   getMissionActivities,
   getMissionById,
   getMissions,
@@ -8,6 +9,8 @@ import {
   updateMissionStatus,
 } from "./api";
 import {
+  CreateMissionRequest,
+  CreateMissionResponse,
   GetMissionsResponse,
   MissionActivity,
   MissionEntity,
@@ -66,6 +69,17 @@ export function useUpdateMission() {
       queryClient.invalidateQueries({
         queryKey: [...MISSIONS_QUERY_KEY, data.missionId],
       });
+    },
+  });
+}
+
+export function useCreateMission() {
+  const queryClient = useQueryClient();
+
+  return useMutation<CreateMissionResponse, Error, CreateMissionRequest>({
+    mutationFn: (request) => createMission(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: MISSIONS_QUERY_KEY });
     },
   });
 }
