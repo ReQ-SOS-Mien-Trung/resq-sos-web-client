@@ -56,7 +56,7 @@ const VariableChips = ({
         key={`${field}-${v.value}`}
         type="button"
         onClick={() => onInsert(field, v.value)}
-        className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
       >
         <Plus size={10} weight="bold" />
         {v.label}
@@ -169,7 +169,7 @@ const PromptEditor = ({
             <div className="space-y-1.5">
               <Label htmlFor="version">Phiên bản</Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground/70 select-none pointer-events-none">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base text-muted-foreground/70 select-none pointer-events-none">
                   v
                 </span>
                 <Input
@@ -266,7 +266,7 @@ const PromptEditor = ({
               onChange={(e) => updateField("system_prompt", e.target.value)}
               required
               rows={6}
-              className="font-mono text-sm"
+              className="font-mono text-base"
               placeholder="Nhập system prompt..."
             />
           </div>
@@ -285,7 +285,7 @@ const PromptEditor = ({
                 updateField("user_prompt_template", e.target.value)
               }
               rows={4}
-              className="font-mono text-sm"
+              className="font-mono text-base"
               placeholder="Nhập user prompt template với biến {variable}..."
             />
           </div>
@@ -300,7 +300,7 @@ const PromptEditor = ({
                 onChange={(e) => updateField("is_active", e.target.checked)}
                 className="rounded border-border"
               />
-              <Label htmlFor="is_active" className="cursor-pointer text-sm">
+              <Label htmlFor="is_active" className="cursor-pointer text-base">
                 Kích hoạt prompt này
               </Label>
             </div>

@@ -11,6 +11,7 @@ import {
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import { toast } from "sonner";
 import { SOSRequest, Rescuer, Location, LocationPanelData } from "@/type";
 import { mockRescuers, mockActiveMissions } from "@/lib/mock-data";
 import { useSOSRequests } from "@/services/sos_request/hooks";
@@ -338,25 +339,33 @@ const CoordinatorDashboardContent = () => {
           // Now trigger AI rescue suggestion with the created cluster
           fetchClusterRescueSuggestion(clusterData.clusterId, {
             onSuccess: (suggestion) => {
+              if (!suggestion.isSuccess) {
+                console.error("AI suggestion failed:", suggestion.errorMessage);
+                toast.error(
+                  suggestion.errorMessage ||
+                    "Đề xuất AI không thành công. Vui lòng thử lại.",
+                );
+                return;
+              }
               setRescueSuggestion(suggestion);
               setRescuePlanOpen(true);
             },
             onError: (error) => {
               console.error("Failed to get rescue suggestion:", error);
-              alert("Đã gom cụm thành công nhưng không thể lấy đề xuất AI. Vui lòng thử lại.");
+              toast.error("Đã gom cụm thành công nhưng không thể lấy đề xuất AI. Vui lòng thử lại.");
             },
           });
         },
         onError: (error) => {
           console.error("Failed to create cluster:", error);
-          alert("Không thể gom cụm SOS. Vui lòng thử lại.");
+          toast.error("Không thể gom cụm SOS. Vui lòng thử lại.");
         },
       },
     );
   }, [selectedSOSIds, sosRequests, createCluster, fetchClusterRescueSuggestion]);
 
   const handleApproveDecision = useCallback(() => {
-    alert("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
+    toast.success("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
     setRescuePlanOpen(false);
     setSOSDetailOpen(false);
     setSelectedSOS(null);

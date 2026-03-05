@@ -172,10 +172,10 @@ const AIPromptPage = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground mb-1">
+            <h1 className="text-3xl font-bold text-foreground mb-1">
               Cấu hình AI Prompt
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               Quản lý và chỉnh sửa AI prompts cho hệ thống cứu hộ
               {promptsData && (
                 <span className="ml-1 text-foreground/60">
