@@ -16,10 +16,9 @@ import {
   Stethoscope,
   ForkKnife,
   Anchor,
-  CheckSquare,
-  Square,
   TreeStructure,
   Spinner,
+  MapPin,
 } from "@phosphor-icons/react";
 
 // Client-side time elapsed hook
@@ -64,10 +63,10 @@ const SOSSidebar = ({
   onSOSSelect,
   onRescuerSelect,
   selectedSOS,
-  selectedSOSIds,
-  onToggleSOSSelect,
+  autoClusters,
   onCreateCluster,
   isCreatingCluster = false,
+  processingClusterIndex = null,
 }: SOSSidebarProps) => {
   const [activeTab, setActiveTab] = useState("incoming");
 
@@ -75,6 +74,12 @@ const SOSSidebar = ({
   const assignedRequests = sosRequests.filter((s) => s.status === "ASSIGNED");
   const availableRescuers = rescuers.filter((r) => r.status === "AVAILABLE");
   const busyRescuers = rescuers.filter((r) => r.status === "BUSY");
+
+  // IDs that belong to any auto-cluster (to identify standalone requests)
+  const clusteredIds = new Set(autoClusters.flat().map((s) => s.id));
+  const standaloneRequests = pendingRequests.filter(
+    (s) => !clusteredIds.has(s.id),
+  );
 
   return (
     <div className="h-full flex flex-col bg-background border-r">
@@ -134,51 +139,152 @@ const SOSSidebar = ({
         >
           <ScrollArea className="h-full">
             <div className="p-3 space-y-3">
-              {/* Pending SOS Requests */}
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                Chờ xử lý ({pendingRequests.length})
-              </div>
+              {/* Auto-detected clusters */}
+              {autoClusters.length > 0 && (
+                <>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Cụm tự động phát hiện ({autoClusters.length})
+                  </div>
+                  {autoClusters.map((cluster, clusterIdx) => {
+                    const highestPriority = cluster.reduce(
+                      (best, s) => {
+                        const order = { P1: 0, P2: 1, P3: 2 };
+                        return order[s.priority] < order[best]
+                          ? s.priority
+                          : best;
+                      },
+                      "P3" as "P1" | "P2" | "P3",
+                    );
+                    const isProcessing =
+                      isCreatingCluster && processingClusterIndex === clusterIdx;
 
-              {/* Create Cluster Action Bar */}
-              {pendingRequests.length > 0 && (
-                <div className="flex items-center gap-2 mb-3">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="flex-1 bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-md shadow-violet-500/20 text-xs h-8"
-                    onClick={onCreateCluster}
-                    disabled={selectedSOSIds.size < 2 || isCreatingCluster}
-                  >
-                    {isCreatingCluster ? (
-                      <>
-                        <Spinner className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                        Đang gom cụm...
-                      </>
-                    ) : (
-                      <>
-                        <TreeStructure className="h-3.5 w-3.5 mr-1.5" weight="fill" />
-                        Gom cụm & AI phân tích ({selectedSOSIds.size})
-                      </>
-                    )}
-                  </Button>
-                </div>
+                    return (
+                      <div
+                        key={clusterIdx}
+                        className="rounded-xl border border-violet-200 dark:border-violet-800/40 bg-violet-50/50 dark:bg-violet-900/10 overflow-hidden"
+                      >
+                        {/* Cluster header */}
+                        <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-violet-100/60 dark:bg-violet-900/20 border-b border-violet-200 dark:border-violet-800/30">
+                          <div className="flex items-center gap-2">
+                            <TreeStructure
+                              className="h-4 w-4 text-violet-600 dark:text-violet-400"
+                              weight="fill"
+                            />
+                            <span className="text-xs font-semibold text-violet-700 dark:text-violet-300">
+                              Cụm {clusterIdx + 1} • {cluster.length} SOS
+                            </span>
+                            <Badge
+                              variant={
+                                highestPriority === "P1"
+                                  ? "p1"
+                                  : highestPriority === "P2"
+                                    ? "p2"
+                                    : "p3"
+                              }
+                              className="text-[10px] h-4 px-1.5"
+                            >
+                              {highestPriority}
+                            </Badge>
+                          </div>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="h-7 text-[11px] px-2.5 bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white shadow-sm"
+                            onClick={() =>
+                              onCreateCluster(cluster.map((s) => s.id))
+                            }
+                            disabled={isCreatingCluster}
+                          >
+                            {isProcessing ? (
+                              <>
+                                <Spinner className="h-3 w-3 mr-1 animate-spin" />
+                                Đang xử lý...
+                              </>
+                            ) : (
+                              <>
+                                <TreeStructure
+                                  className="h-3 w-3 mr-1"
+                                  weight="fill"
+                                />
+                                Gom & AI
+                              </>
+                            )}
+                          </Button>
+                        </div>
+
+                        {/* Cluster SOS items */}
+                        <div className="divide-y divide-violet-100 dark:divide-violet-800/20">
+                          {cluster.map((sos) => (
+                            <div
+                              key={sos.id}
+                              className={cn(
+                                "px-3 py-2 cursor-pointer transition-colors hover:bg-violet-100/60 dark:hover:bg-violet-900/20",
+                                selectedSOS?.id === sos.id &&
+                                  "bg-violet-100 dark:bg-violet-900/30",
+                              )}
+                              onClick={() => onSOSSelect(sos)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <MapPin
+                                    className={cn(
+                                      "h-3.5 w-3.5",
+                                      sos.priority === "P1"
+                                        ? "text-red-500"
+                                        : sos.priority === "P2"
+                                          ? "text-orange-500"
+                                          : "text-yellow-500",
+                                    )}
+                                    weight="fill"
+                                  />
+                                  <Badge
+                                    variant={
+                                      sos.priority === "P1"
+                                        ? "p1"
+                                        : sos.priority === "P2"
+                                          ? "p2"
+                                          : "p3"
+                                    }
+                                    className="text-[10px] h-4 px-1.5"
+                                  >
+                                    {sos.priority}
+                                  </Badge>
+                                  <span className="text-xs font-mono text-muted-foreground">
+                                    #{sos.id}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  <TimeElapsed date={sos.createdAt} />
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                                {sos.message}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
               )}
 
-              {pendingRequests.length > 0 ? (
-                pendingRequests.map((sos) => (
-                  <SOSCard
-                    key={sos.id}
-                    sos={sos}
-                    isSelected={selectedSOS?.id === sos.id}
-                    isChecked={selectedSOSIds.has(sos.id)}
-                    onToggleCheck={() => onToggleSOSSelect(sos.id)}
-                    onClick={() => onSOSSelect(sos)}
-                  />
-                ))
-              ) : (
-                <div className="text-center text-muted-foreground py-4">
-                  <p className="text-sm">Không có yêu cầu SOS chờ xử lý</p>
-                </div>
+              {/* Standalone pending requests (not in any cluster) */}
+              {standaloneRequests.length > 0 && (
+                <>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-1">
+                    Đơn lẻ ({standaloneRequests.length})
+                  </div>
+                  {standaloneRequests.map((sos) => (
+                    <SOSCard
+                      key={sos.id}
+                      sos={sos}
+                      isSelected={selectedSOS?.id === sos.id}
+                      onClick={() => onSOSSelect(sos)}
+                    />
+                  ))}
+                </>
               )}
 
               {/* Assigned / In-progress SOS Requests */}
@@ -277,14 +383,10 @@ export default SOSSidebar;
 function SOSCard({
   sos,
   isSelected,
-  isChecked = false,
-  onToggleCheck,
   onClick,
 }: {
   sos: SOSRequest;
   isSelected: boolean;
-  isChecked?: boolean;
-  onToggleCheck?: () => void;
   onClick: () => void;
 }) {
   const priorityVariant = {
@@ -298,7 +400,6 @@ function SOSCard({
       className={cn(
         "cursor-pointer transition-all hover:shadow-md py-3",
         isSelected && "ring-2 ring-primary",
-        isChecked && "ring-2 ring-violet-500 bg-violet-50/50 dark:bg-violet-900/10",
         sos.priority === "P1" && "border-l-4 border-l-red-500",
       )}
       onClick={onClick}
@@ -306,23 +407,6 @@ function SOSCard({
       <CardContent className="p-3">
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
-            {/* Checkbox for multi-select */}
-            {onToggleCheck && (
-              <button
-                type="button"
-                className="shrink-0 focus:outline-none"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleCheck();
-                }}
-              >
-                {isChecked ? (
-                  <CheckSquare className="h-5 w-5 text-violet-500" weight="fill" />
-                ) : (
-                  <Square className="h-5 w-5 text-muted-foreground hover:text-violet-400 transition-colors" />
-                )}
-              </button>
-            )}
             <Badge variant={priorityVariant[sos.priority]}>
               {sos.priority}
             </Badge>

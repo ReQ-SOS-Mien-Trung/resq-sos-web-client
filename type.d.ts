@@ -777,10 +777,10 @@ export interface SOSDetailsPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sosRequest: SOSRequest | null;
-  onProcessSOS: () => void;
+  onProcessSOS: (sosIds: string[]) => void;
   isProcessing?: boolean;
-  selectedSOSIds: Set<string>;
-  onToggleSOSSelect: (sosId: string) => void;
+  /** SOS requests in the same auto-cluster (within 1 km) */
+  nearbySOSRequests: SOSRequest[];
   allSOSRequests: SOSRequest[];
 }
 
@@ -878,10 +878,12 @@ export interface SOSSidebarProps {
   onSOSSelect: (sos: SOSRequest) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   selectedSOS?: SOSRequest | null;
-  selectedSOSIds: Set<string>;
-  onToggleSOSSelect: (sosId: string) => void;
-  onCreateCluster: () => void;
+  /** Auto-detected clusters of nearby PENDING SOS requests (within 1 km) */
+  autoClusters: SOSRequest[][];
+  onCreateCluster: (sosIds: string[]) => void;
   isCreatingCluster?: boolean;
+  /** Which cluster index is currently being processed */
+  processingClusterIndex?: number | null;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";

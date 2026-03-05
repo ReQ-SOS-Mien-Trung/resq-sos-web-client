@@ -116,7 +116,9 @@ const CoordinatorDashboardContent = () => {
     useState<LocationPanelData | null>(null);
 
   // Multi-select SOS for clustering
-  const [selectedSOSIds, setSelectedSOSIds] = useState<Set<string>>(new Set());
+  const [processingClusterIndex, setProcessingClusterIndex] = useState<
+    number | null
+  >(null);
 
   // Remember sidebar state before RescuePlanPanel opens
   const sidebarBeforeRescuePlanRef = useRef(true);
@@ -269,6 +271,68 @@ const CoordinatorDashboardContent = () => {
         .toUpperCase()
     : "U";
 
+  // ── Auto-cluster PENDING SOS by 1 km proximity ──
+  const autoClusters: SOSRequest[][] = useMemo(() => {
+    const pending = sosRequests.filter((s) => s.status === "PENDING");
+    const n = pending.length;
+    if (n < 2) return [];
+
+    // Haversine distance in km
+    const haversine = (
+      lat1: number,
+      lng1: number,
+      lat2: number,
+      lng2: number,
+    ) => {
+      const R = 6371;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLng = ((lng2 - lng1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    // Union-Find for connected-component grouping
+    const parent = Array.from({ length: n }, (_, i) => i);
+    const find = (x: number): number =>
+      parent[x] === x ? x : (parent[x] = find(parent[x]));
+    const union = (a: number, b: number) => {
+      parent[find(a)] = find(b);
+    };
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const d = haversine(
+          pending[i].location.lat,
+          pending[i].location.lng,
+          pending[j].location.lat,
+          pending[j].location.lng,
+        );
+        if (d <= 1) union(i, j); // ≤ 1 km
+      }
+    }
+
+    const groups = new Map<number, SOSRequest[]>();
+    for (let i = 0; i < n; i++) {
+      const root = find(i);
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root)!.push(pending[i]);
+    }
+
+    // Only keep groups with ≥ 2 requests, sorted by highest priority
+    const priorityOrder = { P1: 0, P2: 1, P3: 2 };
+    return Array.from(groups.values())
+      .filter((g) => g.length >= 2)
+      .sort(
+        (a, b) =>
+          Math.min(...a.map((s) => priorityOrder[s.priority])) -
+          Math.min(...b.map((s) => priorityOrder[s.priority])),
+      );
+  }, [sosRequests]);
+
   // Cluster creation mutation
   const { mutate: createCluster, isPending: isCreatingCluster } =
     useCreateSOSCluster();
@@ -286,14 +350,6 @@ const CoordinatorDashboardContent = () => {
     setSelectedSOS(sos);
     setFlyToLocation(sos.location);
     setSOSDetailOpen(true);
-    // Auto-add to selection when clicking — only for PENDING requests
-    if (sos.status === "PENDING") {
-      setSelectedSOSIds((prev) => {
-        const next = new Set(prev);
-        next.add(sos.id);
-        return next;
-      });
-    }
   }, []);
 
   const handleRescuerSelect = useCallback((rescuer: Rescuer) => {
@@ -325,10 +381,6 @@ const CoordinatorDashboardContent = () => {
     (cluster: SOSClusterEntity) => {
       setActiveClusterId(cluster.id);
       setRescueSuggestion(null); // No live suggestion, will load from history
-      // Select the SOS IDs from this cluster so panel shows them
-      setSelectedSOSIds(
-        new Set(cluster.sosRequestIds.map(String)),
-      );
       setFlyToLocation({
         lat: cluster.centerLatitude,
         lng: cluster.centerLongitude,
@@ -340,63 +392,71 @@ const CoordinatorDashboardContent = () => {
     [],
   );
 
-  // Toggle individual SOS in/out of selection (only allow PENDING)
-  const handleToggleSOSSelect = useCallback((sosId: string) => {
-    const sos = sosRequests.find((s) => s.id === sosId);
-    if (sos && sos.status !== "PENDING") return;
-    setSelectedSOSIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(sosId)) {
-        next.delete(sosId);
-      } else {
-        next.add(sosId);
-      }
-      return next;
-    });
-  }, [sosRequests]);
+  // Create cluster → then trigger AI suggestion (accepts SOS IDs from auto-cluster)
+  const handleProcessSOS = useCallback(
+    (sosIds: string[]) => {
+      // Filter to only include PENDING SOS requests
+      const pendingIds = sosIds.filter((id) => {
+        const sos = sosRequests.find((s) => s.id === id);
+        return sos?.status === "PENDING";
+      });
+      const ids = pendingIds.map(Number).filter(Boolean);
+      if (ids.length === 0) return;
 
-  // Create cluster → then trigger AI suggestion (only PENDING requests)
-  const handleProcessSOS = useCallback(() => {
-    // Filter to only include PENDING SOS requests
-    const pendingIds = Array.from(selectedSOSIds).filter((id) => {
-      const sos = sosRequests.find((s) => s.id === id);
-      return sos?.status === "PENDING";
-    });
-    const ids = pendingIds.map(Number).filter(Boolean);
-    if (ids.length === 0) return;
+      // Determine which auto-cluster index is being processed (for UI spinner)
+      const clusterIdx = autoClusters.findIndex((cluster) =>
+        sosIds.every((id) => cluster.some((s) => s.id === id)),
+      );
+      setProcessingClusterIndex(clusterIdx >= 0 ? clusterIdx : null);
 
-    createCluster(
-      { sosRequestIds: ids },
-      {
-        onSuccess: (clusterData) => {
-          setActiveClusterId(clusterData.clusterId);
-          // Now trigger AI rescue suggestion with the created cluster
-          fetchClusterRescueSuggestion(clusterData.clusterId, {
-            onSuccess: (suggestion) => {
-              if (!suggestion.isSuccess) {
-                console.error("AI suggestion failed:", suggestion.errorMessage);
+      createCluster(
+        { sosRequestIds: ids },
+        {
+          onSuccess: (clusterData) => {
+            setActiveClusterId(clusterData.clusterId);
+            // Now trigger AI rescue suggestion with the created cluster
+            fetchClusterRescueSuggestion(clusterData.clusterId, {
+              onSuccess: (suggestion) => {
+                if (!suggestion.isSuccess) {
+                  console.error(
+                    "AI suggestion failed:",
+                    suggestion.errorMessage,
+                  );
+                  toast.error(
+                    suggestion.errorMessage ||
+                      "Đề xuất AI không thành công. Vui lòng thử lại.",
+                  );
+                  setProcessingClusterIndex(null);
+                  return;
+                }
+                setRescueSuggestion(suggestion);
+                setRescuePlanOpen(true);
+                setProcessingClusterIndex(null);
+              },
+              onError: (error) => {
+                console.error("Failed to get rescue suggestion:", error);
                 toast.error(
-                  suggestion.errorMessage ||
-                    "Đề xuất AI không thành công. Vui lòng thử lại.",
+                  "Đã gom cụm thành công nhưng không thể lấy đề xuất AI. Vui lòng thử lại.",
                 );
-                return;
-              }
-              setRescueSuggestion(suggestion);
-              setRescuePlanOpen(true);
-            },
-            onError: (error) => {
-              console.error("Failed to get rescue suggestion:", error);
-              toast.error("Đã gom cụm thành công nhưng không thể lấy đề xuất AI. Vui lòng thử lại.");
-            },
-          });
+                setProcessingClusterIndex(null);
+              },
+            });
+          },
+          onError: (error) => {
+            console.error("Failed to create cluster:", error);
+            toast.error("Không thể gom cụm SOS. Vui lòng thử lại.");
+            setProcessingClusterIndex(null);
+          },
         },
-        onError: (error) => {
-          console.error("Failed to create cluster:", error);
-          toast.error("Không thể gom cụm SOS. Vui lòng thử lại.");
-        },
-      },
-    );
-  }, [selectedSOSIds, sosRequests, createCluster, fetchClusterRescueSuggestion]);
+      );
+    },
+    [
+      sosRequests,
+      autoClusters,
+      createCluster,
+      fetchClusterRescueSuggestion,
+    ],
+  );
 
   const handleApproveDecision = useCallback(() => {
     toast.success("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
@@ -405,7 +465,6 @@ const CoordinatorDashboardContent = () => {
     setSelectedSOS(null);
     setRescueSuggestion(null);
     setActiveClusterId(null);
-    setSelectedSOSIds(new Set());
   }, []);
 
   const toggleDarkMode = () => {
@@ -581,10 +640,10 @@ const CoordinatorDashboardContent = () => {
               onSOSSelect={handleSOSSelect}
               onRescuerSelect={handleRescuerSelect}
               selectedSOS={selectedSOS}
-              selectedSOSIds={selectedSOSIds}
-              onToggleSOSSelect={handleToggleSOSSelect}
+              autoClusters={autoClusters}
               onCreateCluster={handleProcessSOS}
               isCreatingCluster={isProcessingSOS}
+              processingClusterIndex={processingClusterIndex}
             />
           )}
         </aside>
@@ -667,8 +726,13 @@ const CoordinatorDashboardContent = () => {
                 sosRequest={selectedSOS}
                 onProcessSOS={handleProcessSOS}
                 isProcessing={isProcessingSOS}
-                selectedSOSIds={selectedSOSIds}
-                onToggleSOSSelect={handleToggleSOSSelect}
+                nearbySOSRequests={
+                  selectedSOS
+                    ? (autoClusters
+                        .find((c) => c.some((s) => s.id === selectedSOS.id))
+                        ?.filter((s) => s.id !== selectedSOS.id) ?? [])
+                    : []
+                }
                 allSOSRequests={sosRequests}
               />
 
@@ -676,9 +740,18 @@ const CoordinatorDashboardContent = () => {
               <RescuePlanPanel
                 open={rescuePlanOpen}
                 onOpenChange={setRescuePlanOpen}
-                clusterSOSRequests={sosRequests.filter((s) =>
-                  selectedSOSIds.has(s.id),
-                )}
+                clusterSOSRequests={
+                  activeClusterId
+                    ? sosRequests.filter((s) => {
+                        const cluster = clusters.find(
+                          (c) => c.id === activeClusterId,
+                        );
+                        return cluster?.sosRequestIds
+                          .map(String)
+                          .includes(s.id);
+                      })
+                    : []
+                }
                 clusterId={activeClusterId}
                 rescueSuggestion={rescueSuggestion}
                 onApprove={handleApproveDecision}
