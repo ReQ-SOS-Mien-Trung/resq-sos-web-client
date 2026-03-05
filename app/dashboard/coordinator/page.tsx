@@ -19,8 +19,12 @@ import type { SOSRequestEntity } from "@/services/sos_request/type";
 import {
   useCreateSOSCluster,
   useClusterRescueSuggestion,
+  useSOSClusters,
 } from "@/services/sos_cluster/hooks";
-import type { ClusterRescueSuggestionResponse } from "@/services/sos_cluster/type";
+import type {
+  ClusterRescueSuggestionResponse,
+  SOSClusterEntity,
+} from "@/services/sos_cluster/type";
 import { useDepots } from "@/services/depot/hooks";
 import { useAssemblyPoints } from "@/services/assembly_points/hooks";
 import type { DepotEntity } from "@/services/depot/type";
@@ -106,6 +110,7 @@ const CoordinatorDashboardContent = () => {
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
   const [rescueSuggestion, setRescueSuggestion] =
     useState<ClusterRescueSuggestionResponse | null>(null);
+  const [activeClusterId, setActiveClusterId] = useState<number | null>(null);
   const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [locationPanelData, setLocationPanelData] =
     useState<LocationPanelData | null>(null);
@@ -240,6 +245,14 @@ const CoordinatorDashboardContent = () => {
     return assemblyPointsData.items;
   }, [assemblyPointsData]);
 
+  // Fetch SOS clusters for map display
+  const { data: clustersData } = useSOSClusters();
+
+  const clusters: SOSClusterEntity[] = useMemo(() => {
+    if (!clustersData?.clusters) return [];
+    return clustersData.clusters;
+  }, [clustersData]);
+
   // Logout hook
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
 
@@ -307,6 +320,26 @@ const CoordinatorDashboardContent = () => {
     [],
   );
 
+  // Click on existing cluster → open RescuePlanPanel in history mode
+  const handleClusterSelect = useCallback(
+    (cluster: SOSClusterEntity) => {
+      setActiveClusterId(cluster.id);
+      setRescueSuggestion(null); // No live suggestion, will load from history
+      // Select the SOS IDs from this cluster so panel shows them
+      setSelectedSOSIds(
+        new Set(cluster.sosRequestIds.map(String)),
+      );
+      setFlyToLocation({
+        lat: cluster.centerLatitude,
+        lng: cluster.centerLongitude,
+      });
+      setRescuePlanOpen(true);
+      setSOSDetailOpen(false);
+      setLocationPanelOpen(false);
+    },
+    [],
+  );
+
   // Toggle individual SOS in/out of selection (only allow PENDING)
   const handleToggleSOSSelect = useCallback((sosId: string) => {
     const sos = sosRequests.find((s) => s.id === sosId);
@@ -336,6 +369,7 @@ const CoordinatorDashboardContent = () => {
       { sosRequestIds: ids },
       {
         onSuccess: (clusterData) => {
+          setActiveClusterId(clusterData.clusterId);
           // Now trigger AI rescue suggestion with the created cluster
           fetchClusterRescueSuggestion(clusterData.clusterId, {
             onSuccess: (suggestion) => {
@@ -370,6 +404,7 @@ const CoordinatorDashboardContent = () => {
     setSOSDetailOpen(false);
     setSelectedSOS(null);
     setRescueSuggestion(null);
+    setActiveClusterId(null);
     setSelectedSOSIds(new Set());
   }, []);
 
@@ -575,6 +610,7 @@ const CoordinatorDashboardContent = () => {
                 rescuers={mockRescuers}
                 depots={depots}
                 assemblyPoints={assemblyPoints}
+                clusters={clusters}
                 selectedSOS={selectedSOS}
                 selectedRescuer={selectedRescuer}
                 aiDecision={null}
@@ -582,6 +618,7 @@ const CoordinatorDashboardContent = () => {
                 onRescuerSelect={handleRescuerSelect}
                 onDepotSelect={handleDepotSelect}
                 onAssemblyPointSelect={handleAssemblyPointSelect}
+                onClusterSelect={handleClusterSelect}
                 flyToLocation={flyToLocation}
                 userLocation={userLocation}
               />
@@ -642,8 +679,29 @@ const CoordinatorDashboardContent = () => {
                 clusterSOSRequests={sosRequests.filter((s) =>
                   selectedSOSIds.has(s.id),
                 )}
+                clusterId={activeClusterId}
                 rescueSuggestion={rescueSuggestion}
                 onApprove={handleApproveDecision}
+                onReAnalyze={() => {
+                  if (!activeClusterId) return;
+                  fetchClusterRescueSuggestion(activeClusterId, {
+                    onSuccess: (suggestion) => {
+                      if (!suggestion.isSuccess) {
+                        toast.error(
+                          suggestion.errorMessage ||
+                            "Phân tích lại không thành công. Vui lòng thử lại.",
+                        );
+                        return;
+                      }
+                      setRescueSuggestion(suggestion);
+                      toast.success("Đã phân tích lại thành công!");
+                    },
+                    onError: () => {
+                      toast.error("Không thể phân tích lại. Vui lòng thử lại.");
+                    },
+                  });
+                }}
+                isReAnalyzing={isFetchingSuggestion}
               />
 
               {/* Location Details Panel - Depot / Assembly Point */}

@@ -788,10 +788,13 @@ export interface RescuePlanPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clusterSOSRequests: SOSRequest[];
+  clusterId: number | null;
   rescueSuggestion:
     | import("@/services/sos_cluster/type").ClusterRescueSuggestionResponse
     | null;
   onApprove: () => void;
+  onReAnalyze: () => void;
+  isReAnalyzing: boolean;
 }
 
 export interface ActivityTypeConfig {
@@ -837,6 +840,8 @@ export interface CoordinatorMapProps {
     status: "Active" | "Overloaded" | "Unavailable";
     lastUpdatedAt: string;
   }[];
+  // SOS Clusters from backend
+  clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
   selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
   aiDecision?: AIDispatchDecision | null;
@@ -846,6 +851,7 @@ export interface CoordinatorMapProps {
   onAssemblyPointSelect?: (
     point: NonNullable<CoordinatorMapProps["assemblyPoints"]>[number],
   ) => void;
+  onClusterSelect?: (cluster: import("@/services/sos_cluster/type").SOSClusterEntity) => void;
   flyToLocation?: Location | null;
   /** Current user/device location from geolocation API */
   userLocation?: Location | null;

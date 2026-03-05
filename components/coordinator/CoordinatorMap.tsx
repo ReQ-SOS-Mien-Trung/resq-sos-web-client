@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
 import type { AssemblyPointEntity } from "@/services/assembly_points/type";
+import type { SOSClusterEntity } from "@/services/sos_cluster/type";
 import {
   MagnifyingGlass,
   X,
@@ -31,6 +32,7 @@ const CoordinatorMap = ({
   rescuers,
   depots,
   assemblyPoints = [],
+  clusters = [],
   selectedSOS,
   selectedRescuer,
   aiDecision,
@@ -38,6 +40,7 @@ const CoordinatorMap = ({
   onRescuerSelect,
   onDepotSelect,
   onAssemblyPointSelect,
+  onClusterSelect,
   flyToLocation,
   userLocation,
 }: CoordinatorMapProps) => {
@@ -504,6 +507,15 @@ const CoordinatorMap = ({
           />
         ))}
 
+        {/* Cluster Markers */}
+        {clusters.map((cluster) => (
+          <ClusterMarker
+            key={`cluster-${cluster.id}`}
+            cluster={cluster}
+            onClick={() => onClusterSelect?.(cluster)}
+          />
+        ))}
+
         {/* User Location Marker */}
         {userLocation && <UserLocationMarker location={userLocation} />}
 
@@ -895,6 +907,95 @@ function AssemblyPointMarker({
   );
 }
 
+// Cluster Marker Component – shows grouped SOS clusters on the map
+function ClusterMarker({
+  cluster,
+  onClick,
+}: {
+  cluster: SOSClusterEntity;
+  onClick?: () => void;
+}) {
+  const severityColors: Record<string, string> = {
+    Critical: "#ef4444",
+    High: "#f97316",
+    Medium: "#eab308",
+    Low: "#14b8a6",
+  };
+
+  const severityLabels: Record<string, string> = {
+    Critical: "Nghiêm trọng",
+    High: "Cao",
+    Medium: "Trung bình",
+    Low: "Thấp",
+  };
+
+  const color = severityColors[cluster.severityLevel] || "#14b8a6";
+  const size = 42;
+
+  const iconEl = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const L = require("leaflet");
+
+    return L.divIcon({
+      className: "custom-cluster-marker",
+      html: `
+        <div class="relative flex items-center justify-center" style="width: ${size}px; height: ${size}px;">
+          <div class="absolute inset-0 rounded-full opacity-30 animate-ping" style="background-color: ${color};"></div>
+          <div class="relative rounded-full flex items-center justify-center text-white font-bold text-xs" 
+               style="width: ${size - 6}px; height: ${size - 6}px; background: linear-gradient(135deg, ${color}, ${color}dd); border: 3px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.35);">
+            ${cluster.sosRequestCount}
+          </div>
+        </div>
+      `,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+    });
+  }, [cluster.severityLevel, cluster.sosRequestCount, color]);
+
+  if (!iconEl) return null;
+
+  return (
+    <Marker
+      position={[cluster.centerLatitude, cluster.centerLongitude]}
+      icon={iconEl}
+      eventHandlers={{ click: () => onClick?.() }}
+    >
+      <Popup>
+        <div className="p-2 min-w-50">
+          <div className="font-bold text-sm mb-1 pr-5">Cụm SOS #{cluster.id}</div>
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className="px-2 py-0.5 rounded text-white font-semibold"
+                style={{ backgroundColor: color }}
+              >
+                {severityLabels[cluster.severityLevel] || cluster.severityLevel}
+              </span>
+              <span>{cluster.sosRequestCount} yêu cầu SOS</span>
+            </div>
+            {cluster.victimEstimated && (
+              <div className="flex justify-between">
+                <span>👥 Nạn nhân ước tính:</span>
+                <span className="font-semibold">{cluster.victimEstimated}</span>
+              </div>
+            )}
+            {cluster.waterLevel && (
+              <div className="flex justify-between">
+                <span>🌊 Mực nước:</span>
+                <span className="font-semibold">{cluster.waterLevel}</span>
+              </div>
+            )}
+            <div className="text-muted-foreground pt-1">
+              Nhấn để xem kế hoạch AI
+            </div>
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
 // User Location Marker Component – pulsing blue dot
 function UserLocationMarker({
   location,
@@ -977,6 +1078,10 @@ function MapLegend() {
           <div className="flex items-center gap-2">
             <span>📍</span>
             <span>Điểm tập kết</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-teal-500 ring-2 ring-teal-300"></div>
+            <span>Cụm SOS đã gom</span>
           </div>
         </div>
         <div className="border-t pt-1.5 mt-1.5">
