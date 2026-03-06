@@ -125,7 +125,9 @@ const SOSSidebar = ({
           <Warning className="h-5 w-5 text-red-500" weight="fill" />
           Trung Tâm Điều Phối
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">ReQ-SOS Miền Trung</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          ResQ-SOS Miền Trung
+        </p>
       </div>
 
       {/* Stats Bar */}
