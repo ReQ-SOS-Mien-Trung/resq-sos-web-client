@@ -49,7 +49,16 @@ export type ClusterActivityType =
   | "MEDICAL_AID"
   | "EVACUATE"
   | "DELIVER_SUPPLIES"
+  | "COLLECT_SUPPLIES"
   | "MIXED";
+
+// Supply collection details
+export interface ClusterSupplyCollection {
+  itemId: number;
+  itemName: string;
+  quantity: number;
+  unit: string;
+}
 
 // Suggested activity step
 export interface ClusterSuggestedActivity {
@@ -58,6 +67,11 @@ export interface ClusterSuggestedActivity {
   description: string;
   priority: string;
   estimatedTime: string;
+  sosRequestId: number | null;
+  depotId: number | null;
+  depotName: string | null;
+  depotAddress: string | null;
+  suppliesToCollect: ClusterSupplyCollection[] | null;
 }
 
 // Activity group (wraps suggested activities)
@@ -136,6 +150,9 @@ export interface ClusterRescueSuggestionResponse {
   suggestedActivities: ClusterSuggestedActivity[];
   suggestedResources: ClusterSuggestedResource[];
   estimatedDuration: string;
-  specialNotes: string;
+  specialNotes: string | null;
   confidenceScore: number;
+  needsManualReview: boolean;
+  lowConfidenceWarning: string | null;
+  multiDepotRecommended: boolean;
 }

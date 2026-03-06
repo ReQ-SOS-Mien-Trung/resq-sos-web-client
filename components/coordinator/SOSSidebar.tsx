@@ -281,16 +281,6 @@ const SOSSidebar = ({
                               <span className="text-xs font-semibold">
                                 Cụm #{cluster.id}
                               </span>
-                              <span
-                                className={cn(
-                                  "text-[10px] font-semibold px-1.5 py-0.5 rounded",
-                                  severityBadge[cluster.severityLevel] ||
-                                    severityBadge.Low,
-                                )}
-                              >
-                                {severityLabels[cluster.severityLevel] ||
-                                  cluster.severityLevel}
-                              </span>
                             </div>
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] text-muted-foreground">
@@ -490,18 +480,6 @@ const SOSSidebar = ({
                             <span className="text-xs font-semibold text-violet-700 dark:text-violet-300">
                               Cụm {clusterIdx + 1} • {cluster.length} SOS
                             </span>
-                            <Badge
-                              variant={
-                                highestPriority === "P1"
-                                  ? "p1"
-                                  : highestPriority === "P2"
-                                    ? "p2"
-                                    : "p3"
-                              }
-                              className="text-[10px] h-4 px-1.5"
-                            >
-                              {highestPriority}
-                            </Badge>
                           </div>
                           <Button
                             variant="default"

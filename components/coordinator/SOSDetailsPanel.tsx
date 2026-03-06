@@ -56,6 +56,121 @@ function TimeElapsed({ date }: { date: Date }) {
   return <span>{elapsed}</span>;
 }
 
+function ParsedMessage({ text }: { text?: string | null }) {
+  if (!text) return null;
+  
+  if (!text.includes('|')) {
+    return <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>;
+  }
+
+  const parts = text.split('|').map(p => p.trim()).filter(Boolean);
+
+  return (
+    <div className="space-y-2">
+      {parts.map((part, index) => {
+        if (part.startsWith('[') && part.endsWith(']')) {
+          return (
+            <div key={index} className="mb-1">
+              <Badge variant="destructive" className="font-bold text-[10px] px-2 py-0 uppercase tracking-wider rounded">
+                {part.replace(/[\[\]]/g, '')}
+              </Badge>
+            </div>
+          );
+        }
+
+        const colonIndex = part.indexOf(':');
+        if (colonIndex > -1) {
+          const title = part.slice(0, colonIndex).trim();
+          const content = part.slice(colonIndex + 1).trim();
+          
+          if (title.toLowerCase() === 'bị thương' && content.includes('(') && content.includes(')')) {
+            const injuries = content.includes(';') 
+              ? content.split(';').map(i => i.trim()).filter(Boolean)
+              : [content.trim()];
+            
+            return (
+              <div key={index} className="space-y-2 py-1">
+                <span className="font-semibold text-foreground text-sm flex items-center gap-1.5">
+                  <FirstAid className="w-4 h-4 text-red-500" /> 
+                  {title}:
+                </span>
+                <div className="flex flex-col gap-2">
+                  {injuries.map((injury, i) => {
+                    const match = injury.match(/(.*?)\s*\((.*?)\)$/);
+                    if (match) {
+                      const [, text, severity] = match;
+                      let severityColor = "bg-muted text-muted-foreground border-border";
+                      const lowerSeverity = severity.toLowerCase();
+                      
+                      if (lowerSeverity.includes("nghiêm trọng") || lowerSeverity.includes("nặng")) {
+                        severityColor = "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
+                      } else if (lowerSeverity.includes("trung bình")) {
+                        severityColor = "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
+                      } else if (lowerSeverity.includes("nhẹ")) {
+                        severityColor = "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50";
+                      }
+                      
+                      const infoParts = text.split(':');
+                      
+                      return (
+                        <div key={i} className="flex items-start justify-between gap-3 text-sm bg-background p-2.5 rounded-md border shadow-sm">
+                          <div className="flex-1 min-w-0">
+                            {infoParts.length > 1 ? (
+                              <p className="leading-snug">
+                                <span className="font-medium text-foreground">{infoParts[0].trim()}:</span>
+                                <span className="text-muted-foreground ml-1.5">{infoParts.slice(1).join(':').trim()}</span>
+                              </p>
+                            ) : (
+                              <p className="leading-snug text-muted-foreground">{text}</p>
+                            )}
+                          </div>
+                          <Badge variant="outline" className={`shrink-0 text-[10.5px] px-2 py-0.5 h-6 font-medium ${severityColor}`}>
+                            {severity}
+                          </Badge>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div key={i} className="text-sm text-muted-foreground bg-background p-2.5 rounded-md border shadow-sm">
+                        {injury}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
+          
+          if (title.toLowerCase() === 'ghi chú') {
+            return (
+              <div key={index} className="bg-muted/30 rounded-lg p-3.5 mt-2 border border-dashed flex gap-2 items-start">
+                <span className="text-[13px] font-semibold text-foreground shrink-0 mt-0.5">{title}:</span>
+                <p className="text-[13px] text-muted-foreground italic leading-relaxed">
+                  {content}
+                </p>
+              </div>
+            );
+          }
+          
+          return (
+            <div key={index} className="text-sm leading-relaxed">
+              <span className="font-semibold text-foreground mr-1.5">{title}:</span>
+              <span className="text-muted-foreground">{content}</span>
+            </div>
+          );
+        }
+
+        return (
+          <div key={index} className="text-sm text-foreground leading-relaxed">
+            {part}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const SOSDetailsPanel = ({
   open,
   onOpenChange,
@@ -199,25 +314,25 @@ const SOSDetailsPanel = ({
                   </div>
                   <div className="flex items-center gap-1.5">
                     {sosRequest.isOnline ? (
-                      <>
+                      <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-md border border-green-200 dark:border-green-800">
                         <WifiHigh
-                          className="h-4 w-4 text-green-500"
+                          className="h-3.5 w-3.5 text-green-600 dark:text-green-400"
                           weight="fill"
                         />
-                        <span className="text-xs text-green-600 dark:text-green-400">
-                          Online
+                        <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                          Gửi qua Internet
                         </span>
-                      </>
+                      </div>
                     ) : (
-                      <>
+                      <div className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-md border border-orange-200 dark:border-orange-800">
                         <WifiSlash
-                          className="h-4 w-4 text-red-500"
+                          className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400"
                           weight="fill"
                         />
-                        <span className="text-xs text-red-600 dark:text-red-400">
-                          Offline
+                        <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
+                          Gửi ngoại tuyến (Mesh)
                         </span>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -272,7 +387,7 @@ const SOSDetailsPanel = ({
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {sosRequest.situation && (
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="secondary" className="text-xs">
                       {sosRequest.situation === "TRAPPED"
                         ? "Bị mắc kẹt"
                         : sosRequest.situation === "ISOLATED"
@@ -283,20 +398,17 @@ const SOSDetailsPanel = ({
                     </Badge>
                   )}
                   {sosRequest.canMove === false && (
-                    <Badge variant="destructive" className="text-xs">
+                    <Badge variant="secondary" className="text-xs">
                       Không thể di chuyển
                     </Badge>
                   )}
                   {sosRequest.hasInjured && (
-                    <Badge variant="destructive" className="text-xs">
+                    <Badge variant="secondary" className="text-xs">
                       Có người bị thương
                     </Badge>
                   )}
                   {sosRequest.othersAreStable === false && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs border-orange-300 text-orange-600 dark:text-orange-400"
-                    >
+                    <Badge variant="secondary" className="text-xs">
                       Tình trạng không ổn định
                     </Badge>
                   )}
@@ -341,12 +453,13 @@ const SOSDetailsPanel = ({
             {/* Message */}
             <div>
               <h4 className="text-sm font-semibold mb-2">Nội dung cầu cứu</h4>
-              <div className="bg-muted/50 rounded-lg p-4">
-                <p className="text-sm">{sosRequest.message}</p>
+              <div className="bg-muted/30 rounded-lg p-4 border shadow-sm">
+                <ParsedMessage text={sosRequest.message} />
               </div>
               {sosRequest.additionalDescription && (
-                <div className="bg-muted/50 rounded-lg p-4 mt-2">
-                  <p className="text-xs text-muted-foreground italic">
+                <div className="bg-muted/30 rounded-lg p-3.5 mt-2 border border-dashed flex gap-2 items-start">
+                  <span className="text-[13px] font-semibold text-foreground shrink-0 mt-0.5">Ghi chú thêm:</span>
+                  <p className="text-[13px] text-muted-foreground italic leading-relaxed">
                     {sosRequest.additionalDescription}
                   </p>
                 </div>

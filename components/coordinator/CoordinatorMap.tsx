@@ -27,7 +27,6 @@ import {
   MapContainer,
   TileLayer,
   Marker,
-  Popup,
   Polyline,
 } from "react-leaflet";
 import { FlyToHandler } from "./FlyToHandler";
@@ -772,33 +771,7 @@ function SOSRequestMarker({
       position={[sos.location.lat, sos.location.lng]}
       icon={icon}
       eventHandlers={{ click: onClick }}
-    >
-      <Popup>
-        <div className="p-2 min-w-50">
-          <div className="font-bold text-sm mb-2 pr-5">SOS #{sos.id}</div>
-          <div className="space-y-1 text-xs">
-            <div className="flex items-center gap-2">
-              <span
-                className="px-2 py-0.5 rounded text-white font-semibold"
-                style={{ backgroundColor: color }}
-              >
-                {sos.priority}
-              </span>
-              <span>
-                {sos.status === "PENDING"
-                  ? "Chờ xử lý"
-                  : sos.status === "ASSIGNED"
-                    ? "Đã phân công"
-                    : "Đã cứu"}
-              </span>
-            </div>
-            <div className="text-muted-foreground line-clamp-2">
-              {sos.message}
-            </div>
-          </div>
-        </div>
-      </Popup>
-    </Marker>
+    />
   );
 }
 
@@ -857,29 +830,7 @@ function RescuerMarker({
       position={[rescuer.location.lat, rescuer.location.lng]}
       icon={iconEl}
       eventHandlers={{ click: onClick }}
-    >
-      <Popup>
-        <div className="p-2 min-w-45">
-          <div className="font-bold text-sm mb-2 pr-5">{rescuer.name}</div>
-          <div className="space-y-1 text-xs">
-            <div className="flex items-center gap-2">
-              <span
-                className="px-2 py-0.5 rounded text-white font-semibold"
-                style={{ backgroundColor: color }}
-              >
-                {rescuer.status === "AVAILABLE" ? "Sẵn sàng" : "Đang bận"}
-              </span>
-            </div>
-            <div>
-              Tải: {rescuer.currentLoad}/{rescuer.capacity}
-            </div>
-            <div className="text-muted-foreground">
-              {rescuer.capabilities.join(", ")}
-            </div>
-          </div>
-        </div>
-      </Popup>
-    </Marker>
+    />
   );
 }
 
@@ -936,34 +887,7 @@ function DepotMarker({
       position={[depot.latitude, depot.longitude]}
       icon={iconEl}
       eventHandlers={{ click: () => onClick?.() }}
-    >
-      <Popup>
-        <div className="p-2 min-w-50">
-          <div className="font-bold text-sm mb-1 pr-5">{depot.name}</div>
-          <div className="text-xs text-muted-foreground mb-2">
-            📍 {depot.address}
-          </div>
-          <div className="space-y-1 text-xs">
-            <div className="flex items-center gap-2 mb-2">
-              <span
-                className="px-2 py-0.5 rounded text-white font-semibold"
-                style={{ backgroundColor: color }}
-              >
-                {statusLabels[depot.status]}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>📦 Sức chứa:</span>
-              <span className="font-semibold">{depot.capacity}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>📊 Sử dụng:</span>
-              <span className="font-semibold">{depot.currentUtilization}%</span>
-            </div>
-          </div>
-        </div>
-      </Popup>
-    </Marker>
+    />
   );
 }
 
@@ -1018,34 +942,7 @@ function AssemblyPointMarker({
       position={[assemblyPoint.latitude, assemblyPoint.longitude]}
       icon={iconEl}
       eventHandlers={{ click: () => onClick?.() }}
-    >
-      <Popup>
-        <div className="p-2 min-w-50">
-          <div className="font-bold text-sm mb-1 pr-5">
-            {assemblyPoint.name}
-          </div>
-          <div className="text-xs text-muted-foreground mb-2">
-            Mã: {assemblyPoint.code}
-          </div>
-          <div className="space-y-1 text-xs">
-            <div className="flex items-center gap-2 mb-2">
-              <span
-                className="px-2 py-0.5 rounded text-white font-semibold"
-                style={{ backgroundColor: color }}
-              >
-                {statusLabels[assemblyPoint.status]}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>👥 Sức chứa đội:</span>
-              <span className="font-semibold">
-                {assemblyPoint.capacityTeams} đội
-              </span>
-            </div>
-          </div>
-        </div>
-      </Popup>
-    </Marker>
+    />
   );
 }
 
@@ -1156,16 +1053,7 @@ function UserLocationMarker({
   if (!icon) return null;
 
   return (
-    <Marker position={[location.lat, location.lng]} icon={icon}>
-      <Popup>
-        <div className="p-2 min-w-40">
-          <div className="font-bold text-sm mb-1 pr-5">📍 Vị trí của tôi</div>
-          <div className="text-xs text-muted-foreground">
-            {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-          </div>
-        </div>
-      </Popup>
-    </Marker>
+    <Marker position={[location.lat, location.lng]} icon={icon} />
   );
 }
 

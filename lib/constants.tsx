@@ -564,6 +564,11 @@ export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
     color: "text-purple-700 dark:text-purple-400",
     bgColor: "bg-purple-100 dark:bg-purple-900/30",
   },
+  COLLECT_SUPPLIES: {
+    label: "Lấy vật tư",
+    color: "text-amber-700 dark:text-amber-400",
+    bgColor: "bg-amber-100 dark:bg-amber-900/30",
+  },
   MIXED: {
     label: "Hỗn hợp",
     color: "text-indigo-700 dark:text-indigo-400",
