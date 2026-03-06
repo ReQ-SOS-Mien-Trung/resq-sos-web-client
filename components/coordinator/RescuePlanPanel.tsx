@@ -337,20 +337,20 @@ const RescuePlanPanel = ({
                             >
                               {group.type === "depot" ? (
                                 <>
-                                  <div className="p-1.5 rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-                                    <Storefront className="h-4 w-4" weight="fill" />
+                                  <div className="p-2 rounded-lg bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300 ring-1 ring-amber-400/40">
+                                    <Storefront className="h-5 w-5" weight="fill" />
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold text-amber-800 dark:text-amber-300 truncate">
-                                      📦 Kho: {group.depotName}
+                                    <p className="text-sm font-extrabold text-amber-900 dark:text-amber-200 truncate tracking-tight">
+                                      📦 Kho: <span className="underline decoration-amber-400 decoration-2 underline-offset-2">{group.depotName}</span>
                                     </p>
                                     {group.depotAddress && (
-                                      <p className="text-[11px] text-muted-foreground truncate">
+                                      <p className="text-[11px] text-amber-700/70 dark:text-amber-400/60 truncate mt-0.5">
                                         {group.depotAddress}
                                       </p>
                                     )}
                                   </div>
-                                  <Badge variant="outline" className="text-[10px] h-5 px-1.5 shrink-0">
+                                  <Badge variant="outline" className="text-[10px] h-5 px-1.5 shrink-0 border-amber-400/60 text-amber-700 dark:text-amber-300 font-semibold">
                                     {group.activities.length} bước
                                   </Badge>
                                 </>

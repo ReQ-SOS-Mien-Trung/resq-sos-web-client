@@ -661,10 +661,10 @@ const ManualMissionBuilder = ({
   return (
     <div
       className={cn(
-        "absolute inset-0 z-[1100] transition-all duration-500 ease-out",
+        "absolute inset-0 z-[1100] transition-opacity duration-500 ease-out",
         open
-          ? "opacity-100 translate-y-0"
-          : "opacity-0 translate-y-full pointer-events-none",
+          ? "opacity-100 visible"
+          : "opacity-0 invisible pointer-events-none",
       )}
     >
       <div className="h-full bg-background/98 backdrop-blur-sm border-t shadow-2xl flex flex-col">
