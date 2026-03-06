@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
 import type { AssemblyPointEntity } from "@/services/assembly_points/type";
+import type { SOSClusterEntity } from "@/services/sos_cluster/type";
 import {
   MagnifyingGlass,
   X,
@@ -22,7 +23,13 @@ import { cn } from "@/lib/utils";
 
 // Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
 // and the isMounted guard inside this component.
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+} from "react-leaflet";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
 
@@ -31,6 +38,7 @@ const CoordinatorMap = ({
   rescuers,
   depots,
   assemblyPoints = [],
+  clusters = [],
   selectedSOS,
   selectedRescuer,
   aiDecision,
@@ -38,10 +46,13 @@ const CoordinatorMap = ({
   onRescuerSelect,
   onDepotSelect,
   onAssemblyPointSelect,
+  onClusterSelect,
   flyToLocation,
+  flyToZoom,
   userLocation,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchFlyToLocation, setSearchFlyToLocation] = useState<{
@@ -53,7 +64,9 @@ const CoordinatorMap = ({
   >("all");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   // Track the last selected search result name to display in input
-  const [selectedSearchName, setSelectedSearchName] = useState<string | null>(null);
+  const [selectedSearchName, setSelectedSearchName] = useState<string | null>(
+    null,
+  );
   const [mapControls, setMapControls] = useState<{
     zoomIn: () => void;
     zoomOut: () => void;
@@ -61,11 +74,16 @@ const CoordinatorMap = ({
   } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const [currentZoom, setCurrentZoom] = useState(13);
 
   useEffect(() => {
     // Use setTimeout to avoid React 19 strict mode warning
     const timer = setTimeout(() => setIsMounted(true), 0);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      // Bump key so the next mount creates a fresh MapContainer
+      setMapKey((k) => k + 1);
+    };
   }, []);
 
   // Load Leaflet CSS in the document head
@@ -127,6 +145,135 @@ const CoordinatorMap = ({
     },
     [],
   );
+
+  const handleZoomChange = useCallback((zoom: number) => {
+    setCurrentZoom(zoom);
+  }, []);
+
+  // Zoom threshold: >= 12 = zoomed in (show individual SOS), < 12 = zoomed out (show clusters)
+  const CLUSTER_ZOOM_THRESHOLD = 12;
+  const isZoomedIn = currentZoom >= CLUSTER_ZOOM_THRESHOLD;
+
+  // Build a set of SOS IDs that belong to a backend cluster
+  const clusteredSOSIds = useMemo(() => {
+    const ids = new Set<string>();
+    clusters.forEach((c) =>
+      c.sosRequestIds.forEach((id) => ids.add(String(id))),
+    );
+    return ids;
+  }, [clusters]);
+
+  // When zoomed in: show all SOS. When zoomed out: hide SOS that belong to a cluster.
+  const visibleSOSRequests = useMemo(() => {
+    if (isZoomedIn) return sosRequests;
+    return sosRequests.filter((s) => !clusteredSOSIds.has(s.id));
+  }, [sosRequests, isZoomedIn, clusteredSOSIds]);
+
+  // When zoomed in: hide clusters. When zoomed out: merge nearby clusters based on zoom.
+  const visibleClusters = useMemo(() => {
+    if (isZoomedIn) return [];
+    if (clusters.length <= 1) return clusters;
+
+    // Merge radius grows as zoom decreases (further out = bigger merge radius)
+    // zoom 11 → ~15km, zoom 10 → ~30km, zoom 9 → ~60km, zoom 8 → ~120km ...
+    const mergeRadiusKm =
+      10 * Math.pow(2, CLUSTER_ZOOM_THRESHOLD - 1 - currentZoom);
+
+    const haversine = (
+      lat1: number,
+      lng1: number,
+      lat2: number,
+      lng2: number,
+    ) => {
+      const R = 6371;
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLng = ((lng2 - lng1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const n = clusters.length;
+    const parent = Array.from({ length: n }, (_, i) => i);
+    const find = (x: number): number =>
+      parent[x] === x ? x : (parent[x] = find(parent[x]));
+    const union = (a: number, b: number) => {
+      parent[find(a)] = find(b);
+    };
+
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const d = haversine(
+          clusters[i].centerLatitude,
+          clusters[i].centerLongitude,
+          clusters[j].centerLatitude,
+          clusters[j].centerLongitude,
+        );
+        if (d <= mergeRadiusKm) union(i, j);
+      }
+    }
+
+    const groups = new Map<number, number[]>();
+    for (let i = 0; i < n; i++) {
+      const root = find(i);
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root)!.push(i);
+    }
+
+    // Merge groups into virtual clusters
+    return Array.from(groups.values()).map((indices) => {
+      if (indices.length === 1) return clusters[indices[0]];
+      // Weighted center by SOS count
+      let totalSOS = 0;
+      let latSum = 0;
+      let lngSum = 0;
+      let allIds: number[] = [];
+      let highestSeverity = "Low";
+      const severityOrder: Record<string, number> = {
+        Low: 0,
+        Medium: 1,
+        High: 2,
+        Critical: 3,
+      };
+      let totalVictims = 0;
+
+      for (const idx of indices) {
+        const c = clusters[idx];
+        const count = c.sosRequestCount || c.sosRequestIds.length;
+        totalSOS += count;
+        latSum += c.centerLatitude * count;
+        lngSum += c.centerLongitude * count;
+        allIds = allIds.concat(c.sosRequestIds);
+        totalVictims += c.victimEstimated ?? 0;
+        if (
+          (severityOrder[c.severityLevel] ?? 0) >
+          (severityOrder[highestSeverity] ?? 0)
+        ) {
+          highestSeverity = c.severityLevel;
+        }
+      }
+
+      // Return a merged virtual cluster (uses first cluster's id as base)
+      return {
+        ...clusters[indices[0]],
+        centerLatitude:
+          totalSOS > 0
+            ? latSum / totalSOS
+            : clusters[indices[0]].centerLatitude,
+        centerLongitude:
+          totalSOS > 0
+            ? lngSum / totalSOS
+            : clusters[indices[0]].centerLongitude,
+        sosRequestCount: totalSOS,
+        sosRequestIds: allIds,
+        severityLevel: highestSeverity as (typeof clusters)[0]["severityLevel"],
+        victimEstimated: totalVictims || null,
+      };
+    });
+  }, [clusters, isZoomedIn, currentZoom, CLUSTER_ZOOM_THRESHOLD]);
 
   // Total counts for search categories
   const depotCount = depots.length;
@@ -439,6 +586,7 @@ const CoordinatorMap = ({
       </div>
 
       <MapContainer
+        key={mapKey}
         center={
           activeFlyToLocation
             ? [activeFlyToLocation.lat, activeFlyToLocation.lng]
@@ -455,13 +603,16 @@ const CoordinatorMap = ({
         />
 
         {/* Fly to location handler */}
-        <FlyToHandler location={activeFlyToLocation} />
+        <FlyToHandler location={activeFlyToLocation} zoom={flyToZoom} />
 
         {/* Map zoom handler - provides controls to parent */}
-        <MapZoomHandler onMapReady={handleMapReady} />
+        <MapZoomHandler
+          onMapReady={handleMapReady}
+          onZoomChange={handleZoomChange}
+        />
 
         {/* SOS Request Markers */}
-        {sosRequests.map((sos) => (
+        {visibleSOSRequests.map((sos) => (
           <SOSRequestMarker
             key={sos.id}
             sos={sos}
@@ -495,6 +646,15 @@ const CoordinatorMap = ({
             key={point.id}
             assemblyPoint={point}
             onClick={() => onAssemblyPointSelect?.(point)}
+          />
+        ))}
+
+        {/* Cluster Markers */}
+        {visibleClusters.map((cluster) => (
+          <ClusterMarker
+            key={`cluster-${cluster.id}`}
+            cluster={cluster}
+            onClick={() => onClusterSelect?.(cluster)}
           />
         ))}
 
@@ -889,6 +1049,80 @@ function AssemblyPointMarker({
   );
 }
 
+// Cluster Marker Component – shows grouped SOS clusters on the map
+function ClusterMarker({
+  cluster,
+  onClick,
+}: {
+  cluster: SOSClusterEntity;
+  onClick?: () => void;
+}) {
+  const severityColors: Record<string, string> = {
+    Critical: "#ef4444",
+    High: "#f97316",
+    Medium: "#eab308",
+    Low: "#14b8a6",
+  };
+
+  const severityLabels: Record<string, string> = {
+    Critical: "Nghiêm trọng",
+    High: "Cao",
+    Medium: "Trung bình",
+    Low: "Thấp",
+  };
+
+  const color = severityColors[cluster.severityLevel] || "#14b8a6";
+  const label = severityLabels[cluster.severityLevel] || cluster.severityLevel;
+  // Scale size based on SOS count for visual weight
+  const baseSize = 56;
+  const size = Math.min(baseSize + cluster.sosRequestCount * 4, 80);
+
+  const iconEl = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const L = require("leaflet");
+
+    // Outer ring width for the pulsing effect
+    const ringSize = size + 20;
+
+    return L.divIcon({
+      className: "custom-cluster-marker",
+      html: `
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${ringSize}px;height:${ringSize}px;">
+          <div style="position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.18;animation:clusterPulse 2s ease-out infinite;"></div>
+          <div style="position:absolute;inset:${(ringSize - size) / 2}px;border-radius:50%;background:${color}22;border:2px solid ${color}55;"></div>
+          <div style="position:relative;width:${size - 4}px;height:${size - 4}px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+                      background:linear-gradient(145deg, ${color}, ${color}cc);border:3px solid white;
+                      box-shadow:0 3px 14px rgba(0,0,0,0.35), 0 0 0 2px ${color}44;">
+            <span style="font-size:18px;font-weight:800;color:white;line-height:1;">${cluster.sosRequestCount}</span>
+            <span style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.9);line-height:1;margin-top:1px;">SOS</span>
+          </div>
+        </div>
+        <style>
+          @keyframes clusterPulse {
+            0% { transform:scale(0.85); opacity:0.25; }
+            70% { transform:scale(1.15); opacity:0; }
+            100% { transform:scale(1.15); opacity:0; }
+          }
+        </style>
+      `,
+      iconSize: [ringSize, ringSize],
+      iconAnchor: [ringSize / 2, ringSize / 2],
+    });
+  }, [cluster.severityLevel, cluster.sosRequestCount, color, size]);
+
+  if (!iconEl) return null;
+
+  return (
+    <Marker
+      position={[cluster.centerLatitude, cluster.centerLongitude]}
+      icon={iconEl}
+      zIndexOffset={1000}
+      eventHandlers={{ click: () => onClick?.() }}
+    />
+  );
+}
+
 // User Location Marker Component – pulsing blue dot
 function UserLocationMarker({
   location,
@@ -971,6 +1205,10 @@ function MapLegend() {
           <div className="flex items-center gap-2">
             <span>📍</span>
             <span>Điểm tập kết</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-teal-500 ring-2 ring-teal-300"></div>
+            <span>Cụm SOS đã gom</span>
           </div>
         </div>
         <div className="border-t pt-1.5 mt-1.5">

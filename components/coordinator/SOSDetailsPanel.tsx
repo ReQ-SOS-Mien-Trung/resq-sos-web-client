@@ -14,10 +14,14 @@ import {
   Anchor,
   Lightning,
   X,
-  Rocket,
-  CheckSquare,
-  Square,
   TreeStructure,
+  Users,
+  Phone,
+  FirstAid,
+  Warning,
+  WifiHigh,
+  WifiSlash,
+  Timer,
 } from "@phosphor-icons/react";
 
 // Panel width
@@ -58,8 +62,7 @@ const SOSDetailsPanel = ({
   sosRequest,
   onProcessSOS,
   isProcessing = false,
-  selectedSOSIds,
-  onToggleSOSSelect,
+  nearbySOSRequests,
   allSOSRequests,
 }: SOSDetailsPanelProps) => {
   if (!sosRequest && !open) return null;
@@ -152,13 +155,22 @@ const SOSDetailsPanel = ({
               </Badge>
             </div>
             <div className="bg-muted rounded-lg p-3 text-center">
-              <MapPin className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-              <div className="text-xs text-muted-foreground">Vị trí</div>
+              <Users className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+              <div className="text-xs text-muted-foreground">
+                {sosRequest.peopleCount
+                  ? `${sosRequest.peopleCount.adult + sosRequest.peopleCount.child + sosRequest.peopleCount.elderly} người`
+                  : "N/A"}
+              </div>
             </div>
             <div className="bg-muted rounded-lg p-3 text-center">
-              <Clock className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+              <Timer className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
               <div className="text-xs text-muted-foreground">
-                <TimeElapsed date={sosRequest.createdAt} />
+                {sosRequest.waitTimeMinutes != null &&
+                sosRequest.waitTimeMinutes > 0 ? (
+                  `Chờ ${sosRequest.waitTimeMinutes} phút`
+                ) : (
+                  <TimeElapsed date={sosRequest.createdAt} />
+                )}
               </div>
             </div>
           </div>
@@ -167,12 +179,178 @@ const SOSDetailsPanel = ({
         {/* Content */}
         <ScrollArea className="flex-1">
           <div className="p-5 space-y-5">
+            {/* Sender Info */}
+            {(sosRequest.senderPhone || sosRequest.senderName) && (
+              <div className="bg-muted/50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  Người gửi
+                </h4>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm space-y-1">
+                    {sosRequest.senderName && (
+                      <div className="font-medium">{sosRequest.senderName}</div>
+                    )}
+                    {sosRequest.senderPhone && (
+                      <div className="text-muted-foreground">
+                        {sosRequest.senderPhone}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {sosRequest.isOnline ? (
+                      <>
+                        <WifiHigh
+                          className="h-4 w-4 text-green-500"
+                          weight="fill"
+                        />
+                        <span className="text-xs text-green-600 dark:text-green-400">
+                          Online
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <WifiSlash
+                          className="h-4 w-4 text-red-500"
+                          weight="fill"
+                        />
+                        <span className="text-xs text-red-600 dark:text-red-400">
+                          Offline
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {sosRequest.hopCount != null && sosRequest.hopCount > 0 && (
+                  <div className="text-xs text-muted-foreground mt-2">
+                    Tin nhắn qua {sosRequest.hopCount} hop relay
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* People Count Details */}
+            {sosRequest.peopleCount && (
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-500" weight="fill" />
+                  Số người cần cứu
+                </h4>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                      {sosRequest.peopleCount.adult}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Người lớn
+                    </div>
+                  </div>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-amber-700 dark:text-amber-300">
+                      {sosRequest.peopleCount.child}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Trẻ em</div>
+                  </div>
+                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-purple-700 dark:text-purple-300">
+                      {sosRequest.peopleCount.elderly}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Người già
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Situation & Conditions */}
+            {(sosRequest.situation || sosRequest.canMove !== undefined) && (
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Warning className="h-4 w-4 text-orange-500" weight="fill" />
+                  Tình trạng
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {sosRequest.situation && (
+                    <Badge variant="outline" className="text-xs">
+                      {sosRequest.situation === "TRAPPED"
+                        ? "Bị mắc kẹt"
+                        : sosRequest.situation === "ISOLATED"
+                          ? "Bị cô lập"
+                          : sosRequest.situation === "STRANDED"
+                            ? "Mắc cạn"
+                            : sosRequest.situation}
+                    </Badge>
+                  )}
+                  {sosRequest.canMove === false && (
+                    <Badge variant="destructive" className="text-xs">
+                      Không thể di chuyển
+                    </Badge>
+                  )}
+                  {sosRequest.hasInjured && (
+                    <Badge variant="destructive" className="text-xs">
+                      Có người bị thương
+                    </Badge>
+                  )}
+                  {sosRequest.othersAreStable === false && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-orange-300 text-orange-600 dark:text-orange-400"
+                    >
+                      Tình trạng không ổn định
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Medical Issues */}
+            {sosRequest.medicalIssues &&
+              sosRequest.medicalIssues.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <FirstAid className="h-4 w-4 text-red-500" weight="fill" />
+                    Vấn đề y tế
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {sosRequest.medicalIssues.map((issue, idx) => {
+                      const issueLabels: Record<string, string> = {
+                        FRACTURE: "Gãy xương",
+                        BLEEDING: "Chảy máu",
+                        CHRONIC_DISEASE: "Bệnh nền",
+                        PREGNANCY: "Thai kỳ",
+                        BREATHING_DIFFICULTY: "Khó thở",
+                        MOBILITY_IMPAIRMENT: "Khó di chuyển",
+                      };
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg"
+                        >
+                          <Stethoscope className="h-4 w-4" weight="fill" />
+                          <span className="text-sm font-medium">
+                            {issueLabels[issue] || issue}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
             {/* Message */}
             <div>
               <h4 className="text-sm font-semibold mb-2">Nội dung cầu cứu</h4>
               <div className="bg-muted/50 rounded-lg p-4">
                 <p className="text-sm">{sosRequest.message}</p>
               </div>
+              {sosRequest.additionalDescription && (
+                <div className="bg-muted/50 rounded-lg p-4 mt-2">
+                  <p className="text-xs text-muted-foreground italic">
+                    {sosRequest.additionalDescription}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Required Resources */}
@@ -188,13 +366,15 @@ const SOSDetailsPanel = ({
                 {sosRequest.needs.boat && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg">
                     <Anchor className="h-4 w-4" weight="fill" />
-                    <span className="text-sm font-medium">Cần thuyền</span>
+                    <span className="text-sm font-medium">Cần phương tiện</span>
                   </div>
                 )}
                 {sosRequest.needs.food && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-lg">
                     <ForkKnife className="h-4 w-4" weight="fill" />
-                    <span className="text-sm font-medium">Cần thực phẩm</span>
+                    <span className="text-sm font-medium">
+                      Cần thực phẩm/nước
+                    </span>
                   </div>
                 )}
                 {!sosRequest.needs.medical &&
@@ -227,48 +407,35 @@ const SOSDetailsPanel = ({
               </div>
             )}
 
-            {/* Location Info */}
-            <div className="bg-muted/50 rounded-lg p-4">
-              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Vị trí
-              </h4>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <div>Lat: {sosRequest.location.lat.toFixed(6)}</div>
-                <div>Lng: {sosRequest.location.lng.toFixed(6)}</div>
-              </div>
-            </div>
-
             {/* Same-group SOS requests for cluster selection */}
             {(() => {
-              const groupRequests = allSOSRequests.filter(
-                (s) =>
-                  s.groupId === sosRequest.groupId &&
-                  s.id !== sosRequest.id &&
-                  s.status === "PENDING",
-              );
-              if (groupRequests.length === 0) return null;
+              if (nearbySOSRequests.length === 0) return null;
               return (
                 <div>
                   <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <TreeStructure className="h-4 w-4 text-violet-500" weight="fill" />
-                    SOS cùng khu vực ({groupRequests.length})
+                    <TreeStructure
+                      className="h-4 w-4 text-violet-500"
+                      weight="fill"
+                    />
+                    SOS gần đây trong bán kính 1 km ({nearbySOSRequests.length})
                   </h4>
                   <div className="space-y-2">
-                    {groupRequests.map((sos) => (
+                    {nearbySOSRequests.map((sos) => (
                       <div
                         key={sos.id}
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-muted/50",
-                          selectedSOSIds.has(sos.id) && "bg-violet-50 dark:bg-violet-900/10 border-violet-300 dark:border-violet-700",
-                        )}
-                        onClick={() => onToggleSOSSelect(sos.id)}
+                        className="flex items-center gap-3 p-3 rounded-lg border bg-violet-50/50 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800/30"
                       >
-                        {selectedSOSIds.has(sos.id) ? (
-                          <CheckSquare className="h-5 w-5 text-violet-500 shrink-0" weight="fill" />
-                        ) : (
-                          <Square className="h-5 w-5 text-muted-foreground shrink-0" />
-                        )}
+                        <MapPin
+                          className={cn(
+                            "h-4 w-4 shrink-0",
+                            sos.priority === "P1"
+                              ? "text-red-500"
+                              : sos.priority === "P2"
+                                ? "text-orange-500"
+                                : "text-yellow-500",
+                          )}
+                          weight="fill"
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <Badge
@@ -301,32 +468,18 @@ const SOSDetailsPanel = ({
         </ScrollArea>
 
         {/* Footer - only show action button for PENDING requests */}
-        {sosRequest.status === "PENDING" && (
-          <div className="p-4 border-t shrink-0 space-y-2">
-            {/* Toggle current SOS selection */}
-            <button
-              type="button"
-              className={cn(
-                "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors",
-                selectedSOSIds.has(sosRequest.id)
-                  ? "bg-violet-50 dark:bg-violet-900/20 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300"
-                  : "bg-muted/50 border-border text-muted-foreground hover:bg-muted",
-              )}
-              onClick={() => onToggleSOSSelect(sosRequest.id)}
-            >
-              {selectedSOSIds.has(sosRequest.id) ? (
-                <CheckSquare className="h-4 w-4" weight="fill" />
-              ) : (
-                <Square className="h-4 w-4" />
-              )}
-              {selectedSOSIds.has(sosRequest.id) ? "Đã chọn vào cụm" : "Chọn vào cụm gom"}
-            </button>
-
+        {sosRequest.status === "PENDING" && nearbySOSRequests.length > 0 && (
+          <div className="p-4 border-t shrink-0">
             <Button
               className="w-full bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-lg shadow-violet-500/20"
               size="lg"
-              onClick={onProcessSOS}
-              disabled={isProcessing || selectedSOSIds.size < 1}
+              onClick={() =>
+                onProcessSOS([
+                  sosRequest.id,
+                  ...nearbySOSRequests.map((s) => s.id),
+                ])
+              }
+              disabled={isProcessing}
             >
               {isProcessing ? (
                 <>
@@ -355,7 +508,7 @@ const SOSDetailsPanel = ({
               ) : (
                 <>
                   <TreeStructure className="h-5 w-5 mr-2" weight="fill" />
-                  Gom cụm & AI phân tích ({selectedSOSIds.size} SOS)
+                  Gom cụm & AI phân tích ({nearbySOSRequests.length + 1} SOS)
                 </>
               )}
             </Button>

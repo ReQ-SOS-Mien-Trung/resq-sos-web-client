@@ -540,7 +540,7 @@ export const assemblyPointStatusConfig = {
 
 export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
   ASSESS: {
-    label: "Đánh giá",
+    label: "Chuẩn bị",
     color: "text-blue-700 dark:text-blue-400",
     bgColor: "bg-blue-100 dark:bg-blue-900/30",
   },

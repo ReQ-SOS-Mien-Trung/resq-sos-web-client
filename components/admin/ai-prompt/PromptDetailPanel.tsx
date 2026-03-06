@@ -41,10 +41,10 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
             className="mx-auto text-muted-foreground/40 mb-3"
             weight="duotone"
           />
-          <p className="text-muted-foreground font-medium">
+          <p className="text-base text-muted-foreground font-medium">
             Chọn một prompt để xem chi tiết
           </p>
-          <p className="text-sm text-muted-foreground/70 mt-1">
+          <p className="text-base text-muted-foreground/70 mt-1">
             Nhấn vào prompt trong danh sách bên trái
           </p>
         </CardContent>
@@ -68,8 +68,8 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-lg">{prompt.name}</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
+            <CardTitle className="text-xl">{prompt.name}</CardTitle>
+            <p className="text-base text-muted-foreground mt-1">
               {prompt.purpose}
             </p>
           </div>
@@ -84,44 +84,44 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
       <CardContent className="space-y-4">
         {/* Model Info Grid */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
-            <Robot size={16} className="text-blue-500 shrink-0" />
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+            <Robot size={18} className="text-blue-500 shrink-0" />
             <div>
-              <p className="text-[11px] text-muted-foreground">Model</p>
-              <p className="text-xs font-medium">{prompt.model}</p>
+              <p className="text-xs text-muted-foreground">Model</p>
+              <p className="text-sm font-medium">{prompt.model}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
-            <ThermometerHot size={16} className="text-orange-500 shrink-0" />
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+            <ThermometerHot size={18} className="text-orange-500 shrink-0" />
             <div>
-              <p className="text-[11px] text-muted-foreground">Temperature</p>
-              <p className="text-xs font-medium">{prompt.temperature}</p>
+              <p className="text-xs text-muted-foreground">Temperature</p>
+              <p className="text-sm font-medium">{prompt.temperature}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
-            <Lightning size={16} className="text-amber-500 shrink-0" />
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+            <Lightning size={18} className="text-amber-500 shrink-0" />
             <div>
-              <p className="text-[11px] text-muted-foreground">Max Tokens</p>
-              <p className="text-xs font-medium">
+              <p className="text-xs text-muted-foreground">Max Tokens</p>
+              <p className="text-sm font-medium">
                 {prompt.maxTokens.toLocaleString()}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
-            <Hash size={16} className="text-purple-500 shrink-0" />
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+            <Hash size={18} className="text-purple-500 shrink-0" />
             <div>
-              <p className="text-[11px] text-muted-foreground">Version</p>
-              <p className="text-xs font-medium">{prompt.version}</p>
+              <p className="text-xs text-muted-foreground">Version</p>
+              <p className="text-sm font-medium">{prompt.version}</p>
             </div>
           </div>
         </div>
 
         {/* API URL */}
-        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-muted/50">
-          <Globe size={16} className="text-emerald-500 shrink-0" />
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+          <Globe size={18} className="text-emerald-500 shrink-0" />
           <div className="min-w-0">
-            <p className="text-[11px] text-muted-foreground">API URL</p>
-            <p className="text-xs font-mono truncate">{prompt.apiUrl}</p>
+            <p className="text-xs text-muted-foreground">API URL</p>
+            <p className="text-sm font-mono truncate">{prompt.apiUrl}</p>
           </div>
         </div>
 
@@ -129,12 +129,12 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
 
         {/* System Prompt */}
         <div>
-          <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+          <h4 className="text-base font-semibold mb-2 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-blue-500" />
             System Prompt
           </h4>
           <div className="relative">
-            <pre className="text-xs font-mono bg-muted/70 p-3 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap wrap-break-word leading-relaxed border border-border/30">
+            <pre className="text-sm font-mono bg-muted/70 p-3 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap wrap-break-word leading-relaxed border border-border/30">
               {prompt.systemPrompt}
             </pre>
           </div>
@@ -143,11 +143,11 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
         {/* User Prompt Template */}
         {prompt.userPromptTemplate && (
           <div>
-            <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+            <h4 className="text-base font-semibold mb-2 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               User Prompt Template
             </h4>
-            <pre className="text-xs font-mono bg-muted/70 p-3 rounded-lg overflow-auto max-h-36 whitespace-pre-wrap wrap-break-word leading-relaxed border border-border/30">
+            <pre className="text-sm font-mono bg-muted/70 p-3 rounded-lg overflow-auto max-h-36 whitespace-pre-wrap wrap-break-word leading-relaxed border border-border/30">
               {prompt.userPromptTemplate}
             </pre>
           </div>
@@ -156,13 +156,13 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
         <Separator />
 
         {/* Timestamps */}
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <Clock size={12} />
+            <Clock size={14} />
             Tạo: {formatDate(prompt.createdAt)}
           </span>
           <span className="flex items-center gap-1">
-            <Clock size={12} />
+            <Clock size={14} />
             Cập nhật: {formatDate(prompt.updatedAt)}
           </span>
         </div>

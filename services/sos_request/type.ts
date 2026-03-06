@@ -2,23 +2,76 @@
 export type SOSRequestStatus =
   | "Pending"
   | "InProgress"
+  | "Assigned"
   | "Completed"
   | "Cancelled";
 
 // SOS Request Priority Level
 export type SOSPriorityLevel = "Low" | "Medium" | "High" | "Critical";
 
+// SOS Situation Type
+export type SOSSituation = "TRAPPED" | "ISOLATED" | "STRANDED" | "OTHER";
+
+// Supply types
+export type SupplyType =
+  | "MEDICINE"
+  | "FOOD"
+  | "WATER"
+  | "RESCUE_EQUIPMENT"
+  | "TRANSPORTATION";
+
+// Medical issue types
+export type MedicalIssueType =
+  | "FRACTURE"
+  | "BLEEDING"
+  | "CHRONIC_DISEASE"
+  | "PREGNANCY"
+  | "BREATHING_DIFFICULTY"
+  | "MOBILITY_IMPAIRMENT";
+
+// Structured data from SOS request
+export interface SOSStructuredData {
+  can_move: boolean;
+  supplies: SupplyType[];
+  situation: SOSSituation;
+  has_injured: boolean;
+  need_medical: boolean;
+  people_count: {
+    adult: number;
+    child: number;
+    elderly: number;
+  };
+  medical_issues: MedicalIssueType[];
+  others_are_stable: boolean;
+  additional_description: string;
+}
+
+// Network metadata from mesh relay
+export interface SOSNetworkMetadata {
+  path: string[];
+  hop_count: number;
+}
+
+// Sender information
+export interface SOSSenderInfo {
+  user_id: string;
+  device_id: string;
+  is_online: boolean;
+  user_name: string;
+  user_phone: string;
+}
+
 // SOS Request Entity
 export interface SOSRequestEntity {
   id: number;
-  packetId: number | null;
+  packetId: string | null;
   clusterId: number | null;
   userId: string;
   sosType: string | null;
   msg: string;
-  structuredData: string | null;
-  networkMetadata: string | null;
-  senderInfo: string | null;
+  structuredData: SOSStructuredData | null;
+  networkMetadata: SOSNetworkMetadata | null;
+  senderInfo: SOSSenderInfo | null;
   originId: string | null;
   status: SOSRequestStatus;
   priorityLevel: SOSPriorityLevel;
@@ -26,7 +79,7 @@ export interface SOSRequestEntity {
   latitude: number;
   longitude: number;
   locationAccuracy: number | null;
-  timestamp: string | null;
+  timestamp: number | null;
   createdAt: string;
   lastUpdatedAt: string | null;
   reviewedAt: string | null;

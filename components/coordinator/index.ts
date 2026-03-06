@@ -9,3 +9,4 @@ export { default as LocationDetailsPanel } from "./LocationDetailsPanel";
 export { default as WindyWeatherMap } from "./WindyWeatherMap";
 export { default as WindyMapEmbed } from "./WindyMapEmbed";
 export { default as WindyLeafletMap } from "./WindyLeafletMap";
+export { default as ManualMissionBuilder } from "./ManualMissionBuilder";

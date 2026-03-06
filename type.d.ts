@@ -68,6 +68,21 @@ export interface SOSRequest {
   aiAnalysis?: {
     riskFactors: string[];
   };
+  // Extended fields from backend structuredData / senderInfo
+  peopleCount?: { adult: number; child: number; elderly: number };
+  waitTimeMinutes?: number;
+  situation?: string;
+  medicalIssues?: string[];
+  supplies?: string[];
+  canMove?: boolean;
+  hasInjured?: boolean;
+  othersAreStable?: boolean;
+  additionalDescription?: string;
+  senderPhone?: string;
+  senderName?: string;
+  isOnline?: boolean;
+  hopCount?: number;
+  locationAccuracy?: number | null;
 }
 
 export interface Rescuer {
@@ -777,10 +792,10 @@ export interface SOSDetailsPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sosRequest: SOSRequest | null;
-  onProcessSOS: () => void;
+  onProcessSOS: (sosIds: string[]) => void;
   isProcessing?: boolean;
-  selectedSOSIds: Set<string>;
-  onToggleSOSSelect: (sosId: string) => void;
+  /** SOS requests in the same auto-cluster (within 1 km) */
+  nearbySOSRequests: SOSRequest[];
   allSOSRequests: SOSRequest[];
 }
 
@@ -788,10 +803,13 @@ export interface RescuePlanPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clusterSOSRequests: SOSRequest[];
+  clusterId: number | null;
   rescueSuggestion:
     | import("@/services/sos_cluster/type").ClusterRescueSuggestionResponse
     | null;
   onApprove: () => void;
+  onReAnalyze: () => void;
+  isReAnalyzing: boolean;
 }
 
 export interface ActivityTypeConfig {
@@ -837,6 +855,8 @@ export interface CoordinatorMapProps {
     status: "Active" | "Overloaded" | "Unavailable";
     lastUpdatedAt: string;
   }[];
+  // SOS Clusters from backend
+  clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
   selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
   aiDecision?: AIDispatchDecision | null;
@@ -846,7 +866,12 @@ export interface CoordinatorMapProps {
   onAssemblyPointSelect?: (
     point: NonNullable<CoordinatorMapProps["assemblyPoints"]>[number],
   ) => void;
+  onClusterSelect?: (
+    cluster: import("@/services/sos_cluster/type").SOSClusterEntity,
+  ) => void;
   flyToLocation?: Location | null;
+  /** Zoom level to use when flying to location (default: 16) */
+  flyToZoom?: number;
   /** Current user/device location from geolocation API */
   userLocation?: Location | null;
   /** Used to trigger map resize when side panel opens/closes */
@@ -872,10 +897,26 @@ export interface SOSSidebarProps {
   onSOSSelect: (sos: SOSRequest) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
   selectedSOS?: SOSRequest | null;
-  selectedSOSIds: Set<string>;
-  onToggleSOSSelect: (sosId: string) => void;
-  onCreateCluster: () => void;
+  /** Auto-detected clusters of nearby PENDING SOS requests (within 10 km) */
+  autoClusters: SOSRequest[][];
+  onCreateCluster: (sosIds: string[]) => void;
+  onClusterOnly: (clusterGroups: SOSRequest[][]) => void;
   isCreatingCluster?: boolean;
+  /** Which cluster index is currently being processed */
+  processingClusterIndex?: number | null;
+  /** Which standalone SOS ID is currently being processed */
+  processingSosId?: string | null;
+  /** Backend SOS clusters */
+  backendClusters: import("@/services/sos_cluster/type").SOSClusterEntity[];
+  /** Trigger AI analysis for an existing backend cluster */
+  onAnalyzeCluster: (clusterId: number) => void;
+  isAnalyzingCluster?: boolean;
+  /** Which backend cluster ID is being analyzed */
+  analyzingClusterId?: number | null;
+  /** Open manual mission builder for a cluster */
+  onManualMission?: (clusterId: number) => void;
+  /** View rescue plan history for a cluster */
+  onViewClusterPlan?: (clusterId: number) => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";
