@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getSOSRequests, getSOSRequestById, getRescueSuggestion } from "./api";
+import { getSOSRequests, getSOSRequestById } from "./api";
 import {
   GetSOSRequestsResponse,
   GetSOSRequestsParams,
@@ -24,7 +24,11 @@ export interface UseSOSRequestByIdOptions {
 export function useSOSRequests(options?: UseSOSRequestsOptions) {
   const params = options?.params;
   return useQuery<GetSOSRequestsResponse>({
-    queryKey: [...SOS_REQUESTS_QUERY_KEY, params?.pageNumber ?? 1, params?.pageSize ?? 10],
+    queryKey: [
+      ...SOS_REQUESTS_QUERY_KEY,
+      params?.pageNumber ?? 1,
+      params?.pageSize ?? 10,
+    ],
     queryFn: () => getSOSRequests(params),
   });
 }
@@ -40,14 +44,5 @@ export function useSOSRequestById(
     queryKey: [...SOS_REQUESTS_QUERY_KEY, id],
     queryFn: () => getSOSRequestById(id),
     enabled: options?.enabled ?? true,
-  });
-}
-
-/**
- * Hook to get AI rescue suggestion for SOS requests (mutation)
- */
-export function useRescueSuggestion() {
-  return useMutation<RescueSuggestionResponse, Error, RescueSuggestionRequest>({
-    mutationFn: getRescueSuggestion,
   });
 }

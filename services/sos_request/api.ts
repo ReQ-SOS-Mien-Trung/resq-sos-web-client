@@ -33,18 +33,3 @@ export async function getSOSRequestById(
   const { data } = await api.get(`/emergency/sos-requests/${id}`);
   return data;
 }
-
-/**
- * Get AI rescue suggestion for SOS requests
- * POST /emergency/sos-requests/rescue-suggestion
- */
-export async function getRescueSuggestion(
-  request: RescueSuggestionRequest,
-): Promise<RescueSuggestionResponse> {
-  const { data } = await api.post(
-    "/emergency/sos-requests/rescue-suggestion",
-    request,
-    { timeout: 60000 }, // AI processing can take 15-30s
-  );
-  return data;
-}
