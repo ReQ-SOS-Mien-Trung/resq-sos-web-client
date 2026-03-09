@@ -57,42 +57,9 @@ type StatusFilter = "all" | "Pending" | "Approved" | "Rejected";
 const getFullName = (item: RescuerApplicationEntity) =>
   `${item.lastName} ${item.firstName}`;
 
-const getDocTypeLabel = (fileTypeCode: string, fileTypeName?: string) => {
-  if (fileTypeName) return fileTypeName;
-  const map: Record<string, string> = {
-    OTHER: "Khác",
-    WATER_RESCUE_CERT: "Chứng chỉ cứu hộ dưới nước",
-    BASIC_MEDICAL_CERT: "Chứng chỉ y tế cơ bản",
-    CCCD: "Căn cước công dân",
-  };
-  return map[fileTypeCode] ?? fileTypeCode;
-};
 
-const getDocIcon = (fileTypeCode: string) => {
-  switch (fileTypeCode) {
-    case "CCCD":
-      return <IdentificationCard size={18} weight="duotone" />;
-    case "WATER_RESCUE_CERT":
-      return <Certificate size={18} weight="duotone" />;
-    case "BASIC_MEDICAL_CERT":
-      return <FirstAid size={18} weight="duotone" />;
-    default:
-      return <FileText size={18} weight="duotone" />;
-  }
-};
 
-const getDocIconColor = (fileTypeCode: string) => {
-  switch (fileTypeCode) {
-    case "CCCD":
-      return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
-    case "WATER_RESCUE_CERT":
-      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
-    case "BASIC_MEDICAL_CERT":
-      return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
-    default:
-      return "bg-violet-500/10 text-violet-600 dark:text-violet-400";
-  }
-};
+
 
 const RescuerVerificationPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -695,10 +662,7 @@ const RescuerVerificationPage = () => {
                       onClick={() =>
                         setPreviewDoc({
                           url: doc.fileUrl,
-                          name: getDocTypeLabel(
-                            doc.fileTypeCode,
-                            doc.fileTypeName,
-                          ),
+                          name: doc.fileTypeName || doc.fileTypeCode,
                         })
                       }
                     >
@@ -747,7 +711,7 @@ const RescuerVerificationPage = () => {
                           Tài liệu {String(idx + 1).padStart(2, "0")}
                         </p>
                         <h4 className="text-base font-bold text-foreground mb-1 leading-tight line-clamp-2">
-                          {getDocTypeLabel(doc.fileTypeCode, doc.fileTypeName)}
+                          {doc.fileTypeName || doc.fileTypeCode}
                         </h4>
 
                         <div className="mt-auto pt-4">

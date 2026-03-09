@@ -51,8 +51,8 @@ const UserFilters = ({ filters, onFiltersChange }: UserFiltersProps) => {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Tất cả vai trò</SelectItem>
-          <SelectItem value="admin">Admin</SelectItem>
-          <SelectItem value="coordinator">Điều phối</SelectItem>
+          <SelectItem value="admin">Quản trị viên</SelectItem>
+          <SelectItem value="coordinator">Điều phối viên</SelectItem>
           <SelectItem value="rescuer">Cứu hộ viên</SelectItem>
           <SelectItem value="citizen">Công dân</SelectItem>
         </SelectContent>
@@ -75,10 +75,8 @@ const UserFilters = ({ filters, onFiltersChange }: UserFiltersProps) => {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Tất cả trạng thái</SelectItem>
-          <SelectItem value="active">Đang hoạt động</SelectItem>
-          <SelectItem value="pending">Đang chờ</SelectItem>
+          <SelectItem value="active">Hoạt động</SelectItem>
           <SelectItem value="banned">Bị cấm</SelectItem>
-          <SelectItem value="inactive">Không hoạt động</SelectItem>
         </SelectContent>
       </Select>
 
