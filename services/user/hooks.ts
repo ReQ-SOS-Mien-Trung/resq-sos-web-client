@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { getUserMe } from "./api";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getUserMe, updateUserAvatar } from "./api";
 import { UserMeResponse } from "./type";
 
 export const USER_ME_QUERY_KEY = ["user", "me"] as const;
@@ -15,5 +15,12 @@ export function useUserMe(options?: UseUserMeOptions) {
     queryKey: USER_ME_QUERY_KEY,
     queryFn: getUserMe,
     enabled: options?.enabled ?? true,
+  });
+}
+
+export function useUpdateUserAvatar() {
+  return useMutation({
+    mutationFn: ({ userId, avatarUrl }: { userId: string; avatarUrl: string }) =>
+      updateUserAvatar(userId, avatarUrl),
   });
 }
