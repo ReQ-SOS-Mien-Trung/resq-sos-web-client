@@ -876,6 +876,8 @@ export interface CoordinatorMapProps {
   userLocation?: Location | null;
   /** Used to trigger map resize when side panel opens/closes */
   panelOpen?: boolean;
+  /** Called when map view changes (pan/zoom) with center + zoom */
+  onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
 }
 
 // Assembly Point type for map display (from backend AssemblyPointEntity)

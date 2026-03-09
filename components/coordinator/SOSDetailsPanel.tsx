@@ -58,40 +58,73 @@ function TimeElapsed({ date }: { date: Date }) {
 
 function ParsedMessage({ text }: { text?: string | null }) {
   if (!text) return null;
-  
-  if (!text.includes('|')) {
-    return <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>;
+
+  if (!text.includes("|")) {
+    return (
+      <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
+    );
   }
 
-  const parts = text.split('|').map(p => p.trim()).filter(Boolean);
+  const parts = text
+    .split("|")
+    .map((p) => p.trim())
+    .filter(Boolean);
 
   return (
     <div className="space-y-2">
       {parts.map((part, index) => {
-        if (part.startsWith('[') && part.endsWith(']')) {
+        if (part.startsWith("[") && part.endsWith("]")) {
           return (
             <div key={index} className="mb-1">
-              <Badge variant="destructive" className="font-bold text-[10px] px-2 py-0 uppercase tracking-wider rounded">
-                {part.replace(/[\[\]]/g, '')}
+              <Badge
+                variant="destructive"
+                className="font-bold text-[10px] px-2 py-0 uppercase tracking-wider rounded"
+              >
+                {part.replace(/[\[\]]/g, "")}
               </Badge>
             </div>
           );
         }
 
-        const colonIndex = part.indexOf(':');
+        const colonIndex = part.indexOf(":");
         if (colonIndex > -1) {
           const title = part.slice(0, colonIndex).trim();
           const content = part.slice(colonIndex + 1).trim();
-          
-          if (title.toLowerCase() === 'bị thương' && content.includes('(') && content.includes(')')) {
-            const injuries = content.includes(';') 
-              ? content.split(';').map(i => i.trim()).filter(Boolean)
+
+          if (
+            title.toLowerCase() === "bị thương" &&
+            content.includes("(") &&
+            content.includes(")")
+          ) {
+            let injuries = content.includes(";")
+              ? content
+                  .split(";")
+                  .map((i) => i.trim())
+                  .filter(Boolean)
               : [content.trim()];
-            
+
+            // Sort injuries by severity: Nghiêm trọng/Nặng > Trung bình > Nhẹ > Unknown
+            const getSeverityScore = (injury: string) => {
+              const match = injury.match(/(.*?)\s*\((.*?)\)$/);
+              if (match) {
+                const lowerSeverity = match[2].toLowerCase();
+                if (
+                  lowerSeverity.includes("nghiêm trọng") ||
+                  lowerSeverity.includes("nặng")
+                )
+                  return 3;
+                if (lowerSeverity.includes("trung bình")) return 2;
+                if (lowerSeverity.includes("nhẹ")) return 1;
+              }
+              return 0;
+            };
+
+            injuries.sort((a, b) => getSeverityScore(b) - getSeverityScore(a));
+
             return (
               <div key={index} className="space-y-2 py-1">
                 <span className="font-semibold text-foreground text-sm flex items-center gap-1.5">
-                  <FirstAid className="w-4 h-4 text-red-500" /> 
+                  <FirstAid className="w-4 h-4 text-red-500" />
                   {title}:
                 </span>
                 <div className="flex flex-col gap-2">
@@ -99,40 +132,62 @@ function ParsedMessage({ text }: { text?: string | null }) {
                     const match = injury.match(/(.*?)\s*\((.*?)\)$/);
                     if (match) {
                       const [, text, severity] = match;
-                      let severityColor = "bg-muted text-muted-foreground border-border";
+                      let severityColor =
+                        "bg-muted text-muted-foreground border-border";
                       const lowerSeverity = severity.toLowerCase();
-                      
-                      if (lowerSeverity.includes("nghiêm trọng") || lowerSeverity.includes("nặng")) {
-                        severityColor = "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
+
+                      if (
+                        lowerSeverity.includes("nghiêm trọng") ||
+                        lowerSeverity.includes("nặng")
+                      ) {
+                        severityColor =
+                          "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
                       } else if (lowerSeverity.includes("trung bình")) {
-                        severityColor = "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
+                        severityColor =
+                          "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
                       } else if (lowerSeverity.includes("nhẹ")) {
-                        severityColor = "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50";
+                        severityColor =
+                          "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50";
                       }
-                      
-                      const infoParts = text.split(':');
-                      
+
+                      const infoParts = text.split(":");
+
                       return (
-                        <div key={i} className="flex items-start justify-between gap-3 text-sm bg-background p-2.5 rounded-md border shadow-sm">
+                        <div
+                          key={i}
+                          className="flex items-start justify-between gap-3 text-sm bg-background p-2.5 rounded-md border shadow-sm"
+                        >
                           <div className="flex-1 min-w-0">
                             {infoParts.length > 1 ? (
                               <p className="leading-snug">
-                                <span className="font-medium text-foreground">{infoParts[0].trim()}:</span>
-                                <span className="text-muted-foreground ml-1.5">{infoParts.slice(1).join(':').trim()}</span>
+                                <span className="font-medium text-foreground">
+                                  {infoParts[0].trim()}:
+                                </span>
+                                <span className="text-muted-foreground ml-1.5">
+                                  {infoParts.slice(1).join(":").trim()}
+                                </span>
                               </p>
                             ) : (
-                              <p className="leading-snug text-muted-foreground">{text}</p>
+                              <p className="leading-snug text-muted-foreground">
+                                {text}
+                              </p>
                             )}
                           </div>
-                          <Badge variant="outline" className={`shrink-0 text-[10.5px] px-2 py-0.5 h-6 font-medium ${severityColor}`}>
+                          <Badge
+                            variant="outline"
+                            className={`shrink-0 text-[10.5px] px-2 py-0.5 h-6 font-medium ${severityColor}`}
+                          >
                             {severity}
                           </Badge>
                         </div>
                       );
                     }
-                    
+
                     return (
-                      <div key={i} className="text-sm text-muted-foreground bg-background p-2.5 rounded-md border shadow-sm">
+                      <div
+                        key={i}
+                        className="text-sm text-muted-foreground bg-background p-2.5 rounded-md border shadow-sm"
+                      >
                         {injury}
                       </div>
                     );
@@ -141,21 +196,28 @@ function ParsedMessage({ text }: { text?: string | null }) {
               </div>
             );
           }
-          
-          if (title.toLowerCase() === 'ghi chú') {
+
+          if (title.toLowerCase() === "ghi chú") {
             return (
-              <div key={index} className="bg-muted/30 rounded-lg p-3.5 mt-2 border border-dashed flex gap-2 items-start">
-                <span className="text-[13px] font-semibold text-foreground shrink-0 mt-0.5">{title}:</span>
+              <div
+                key={index}
+                className="bg-muted/30 rounded-lg p-3.5 mt-2 border border-dashed flex gap-2 items-start"
+              >
+                <span className="text-[13px] font-semibold text-foreground shrink-0 mt-0.5">
+                  {title}:
+                </span>
                 <p className="text-[13px] text-muted-foreground italic leading-relaxed">
                   {content}
                 </p>
               </div>
             );
           }
-          
+
           return (
             <div key={index} className="text-sm leading-relaxed">
-              <span className="font-semibold text-foreground mr-1.5">{title}:</span>
+              <span className="font-semibold text-foreground mr-1.5">
+                {title}:
+              </span>
               <span className="text-muted-foreground">{content}</span>
             </div>
           );
@@ -388,13 +450,21 @@ const SOSDetailsPanel = ({
                 <div className="flex flex-wrap gap-2">
                   {sosRequest.situation && (
                     <Badge variant="secondary" className="text-xs">
-                      {sosRequest.situation === "TRAPPED"
-                        ? "Bị mắc kẹt"
-                        : sosRequest.situation === "ISOLATED"
-                          ? "Bị cô lập"
-                          : sosRequest.situation === "STRANDED"
-                            ? "Mắc cạn"
-                            : sosRequest.situation}
+                      {(() => {
+                        const sit = sosRequest.situation.toLowerCase();
+                        const situationLabels: Record<string, string> = {
+                          trapped: "Bị mắc kẹt",
+                          isolated: "Bị cô lập",
+                          stranded: "Mắc cạn",
+                          flood: "Lũ lụt",
+                          landslide: "Sạt lở đất",
+                          storm: "Mưa bão",
+                          fire: "Hỏa hoạn",
+                          earthquake: "Động đất",
+                          other: "Khác",
+                        };
+                        return situationLabels[sit] || sosRequest.situation;
+                      })()}
                     </Badge>
                   )}
                   {sosRequest.canMove === false && (
@@ -426,13 +496,25 @@ const SOSDetailsPanel = ({
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {sosRequest.medicalIssues.map((issue, idx) => {
+                      const issueLower = issue.toLowerCase();
                       const issueLabels: Record<string, string> = {
-                        FRACTURE: "Gãy xương",
-                        BLEEDING: "Chảy máu",
-                        CHRONIC_DISEASE: "Bệnh nền",
-                        PREGNANCY: "Thai kỳ",
-                        BREATHING_DIFFICULTY: "Khó thở",
-                        MOBILITY_IMPAIRMENT: "Khó di chuyển",
+                        fracture: "Gãy xương",
+                        bleeding: "Chảy máu",
+                        chronic_disease: "Bệnh nền",
+                        pregnancy: "Thai kỳ",
+                        breathing_difficulty: "Khó thở",
+                        mobility_impairment: "Khó di chuyển",
+                        minor_wound: "Vết thương nhẹ",
+                        severe_wound: "Vết thương nặng",
+                        burn: "Bỏng",
+                        infection: "Nhiễm trùng",
+                        head_injury: "Chấn thương đầu",
+                        shock: "Sốc/Ngất",
+                        fever: "Sốt cao",
+                        hypothermia: "Hạ thân nhiệt",
+                        starvation: "Đói lả",
+                        dehydration: "Mất nước",
+                        other: "Vấn đề khác",
                       };
                       return (
                         <div
@@ -441,7 +523,7 @@ const SOSDetailsPanel = ({
                         >
                           <Stethoscope className="h-4 w-4" weight="fill" />
                           <span className="text-sm font-medium">
-                            {issueLabels[issue] || issue}
+                            {issueLabels[issueLower] || issue}
                           </span>
                         </div>
                       );
@@ -458,7 +540,9 @@ const SOSDetailsPanel = ({
               </div>
               {sosRequest.additionalDescription && (
                 <div className="bg-muted/30 rounded-lg p-3.5 mt-2 border border-dashed flex gap-2 items-start">
-                  <span className="text-[13px] font-semibold text-foreground shrink-0 mt-0.5">Ghi chú thêm:</span>
+                  <span className="text-[13px] font-semibold text-foreground shrink-0 mt-0.5">
+                    Ghi chú thêm:
+                  </span>
                   <p className="text-[13px] text-muted-foreground italic leading-relaxed">
                     {sosRequest.additionalDescription}
                   </p>

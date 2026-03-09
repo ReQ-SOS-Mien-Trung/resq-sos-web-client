@@ -44,6 +44,7 @@ const CoordinatorMap = ({
   flyToLocation,
   flyToZoom,
   userLocation,
+  onViewChange,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0);
@@ -607,6 +608,7 @@ const CoordinatorMap = ({
         <MapZoomHandler
           onMapReady={handleMapReady}
           onZoomChange={handleZoomChange}
+          onViewChange={onViewChange}
         />
 
         {/* SOS Request Markers */}
