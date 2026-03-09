@@ -137,11 +137,11 @@ const InventoryDashboardPage = () => {
     () =>
       user?.fullName
         ? user.fullName
-            .split(" ")
-            .map((n) => n[0])
-            .join("")
-            .slice(0, 2)
-            .toUpperCase()
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase()
         : "U",
     [user],
   );
@@ -307,7 +307,7 @@ const InventoryDashboardPage = () => {
           <div className="flex items-center gap-2">
             <Warehouse className="h-6 w-6 text-primary" />
             <span className="font-bold text-lg hidden sm:inline">
-              ReQ-SOS | Quản Lý Kho
+              ResQ-SOS | Quản Lý Kho
             </span>
           </div>
           <Badge
