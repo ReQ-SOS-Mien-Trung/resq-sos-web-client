@@ -23,12 +23,7 @@ import { cn } from "@/lib/utils";
 
 // Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
 // and the isMounted guard inside this component.
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Polyline,
-} from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
 
@@ -169,9 +164,11 @@ const CoordinatorMap = ({
   }, [sosRequests, isZoomedIn, clusteredSOSIds]);
 
   // When zoomed in: hide clusters. When zoomed out: merge nearby clusters based on zoom.
-  const visibleClusters = useMemo(() => {
+  type ClusterWithMergeFlag = SOSClusterEntity & { _isMerged: boolean };
+  const visibleClusters = useMemo((): ClusterWithMergeFlag[] => {
     if (isZoomedIn) return [];
-    if (clusters.length <= 1) return clusters;
+    if (clusters.length <= 1)
+      return clusters.map((c) => ({ ...c, _isMerged: false }));
 
     // Merge radius grows as zoom decreases (further out = bigger merge radius)
     // zoom 11 → ~15km, zoom 10 → ~30km, zoom 9 → ~60km, zoom 8 → ~120km ...
@@ -224,7 +221,8 @@ const CoordinatorMap = ({
 
     // Merge groups into virtual clusters
     return Array.from(groups.values()).map((indices) => {
-      if (indices.length === 1) return clusters[indices[0]];
+      if (indices.length === 1)
+        return { ...clusters[indices[0]], _isMerged: false as const };
       // Weighted center by SOS count
       let totalSOS = 0;
       let latSum = 0;
@@ -270,6 +268,7 @@ const CoordinatorMap = ({
         sosRequestIds: allIds,
         severityLevel: highestSeverity as (typeof clusters)[0]["severityLevel"],
         victimEstimated: totalVictims || null,
+        _isMerged: true as const,
       };
     });
   }, [clusters, isZoomedIn, currentZoom, CLUSTER_ZOOM_THRESHOLD]);
@@ -651,8 +650,9 @@ const CoordinatorMap = ({
         {/* Cluster Markers */}
         {visibleClusters.map((cluster) => (
           <ClusterMarker
-            key={`cluster-${cluster.id}`}
+            key={`cluster-${cluster.id}-${cluster._isMerged}`}
             cluster={cluster}
+            isMerged={cluster._isMerged}
             onClick={() => onClusterSelect?.(cluster)}
           />
         ))}
@@ -949,9 +949,11 @@ function AssemblyPointMarker({
 // Cluster Marker Component – shows grouped SOS clusters on the map
 function ClusterMarker({
   cluster,
+  isMerged = false,
   onClick,
 }: {
   cluster: SOSClusterEntity;
+  isMerged?: boolean;
   onClick?: () => void;
 }) {
   const severityColors: Record<string, string> = {
@@ -991,8 +993,8 @@ function ClusterMarker({
           <div style="position:relative;width:${size - 4}px;height:${size - 4}px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
                       background:linear-gradient(145deg, ${color}, ${color}cc);border:3px solid white;
                       box-shadow:0 3px 14px rgba(0,0,0,0.35), 0 0 0 2px ${color}44;">
-            <span style="font-size:18px;font-weight:800;color:white;line-height:1;">${cluster.sosRequestCount}</span>
-            <span style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.9);line-height:1;margin-top:1px;">SOS</span>
+            <span style="font-size:${isMerged ? 18 : 15}px;font-weight:800;color:white;line-height:1;">${isMerged ? cluster.sosRequestCount : `#${cluster.id}`}</span>
+            <span style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.9);line-height:1;margin-top:1px;">${isMerged ? "SOS" : `${cluster.sosRequestCount} SOS`}</span>
           </div>
         </div>
         <style>
@@ -1006,7 +1008,14 @@ function ClusterMarker({
       iconSize: [ringSize, ringSize],
       iconAnchor: [ringSize / 2, ringSize / 2],
     });
-  }, [cluster.severityLevel, cluster.sosRequestCount, color, size]);
+  }, [
+    cluster.severityLevel,
+    cluster.sosRequestCount,
+    cluster.id,
+    isMerged,
+    color,
+    size,
+  ]);
 
   if (!iconEl) return null;
 
@@ -1052,9 +1061,7 @@ function UserLocationMarker({
 
   if (!icon) return null;
 
-  return (
-    <Marker position={[location.lat, location.lng]} icon={icon} />
-  );
+  return <Marker position={[location.lat, location.lng]} icon={icon} />;
 }
 
 // Map Legend Component

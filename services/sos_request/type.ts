@@ -167,3 +167,75 @@ export interface RescueSuggestionResponse {
   specialNotes: string;
   confidenceScore: number;
 }
+
+// ---- Analysis ----
+
+export interface PriorityThresholds {
+  critical: string;
+  high: string;
+  medium: string;
+  low: string;
+}
+
+export interface ScoreWeights {
+  medical: string;
+  injury: string;
+  mobility: string;
+  environment: string;
+  food: string;
+}
+
+export interface RuleEvaluation {
+  id: number;
+  medicalScore: number;
+  injuryScore: number;
+  mobilityScore: number;
+  environmentScore: number;
+  foodScore: number;
+  totalScore: number;
+  priorityLevel: SOSPriorityLevel;
+  ruleVersion: string;
+  itemsNeeded: string[];
+  createdAt: string;
+  priorityThresholds: PriorityThresholds;
+  scoreWeights: ScoreWeights;
+}
+
+export interface AiAnalysisResult {
+  priority: string;
+  severity_level: string;
+  explanation: string;
+  confidence_score: number;
+}
+
+export interface AiAnalysisMetadata {
+  promptId: number;
+  rawResponse: string;
+  promptVersion: string;
+  analysisResult: AiAnalysisResult;
+}
+
+export interface AiAnalysis {
+  id: number;
+  modelName: string;
+  modelVersion: string;
+  analysisType: string;
+  suggestedSeverityLevel: SeverityLevel;
+  suggestedPriority: SOSPriorityLevel;
+  explanation: string;
+  confidenceScore: number;
+  suggestionScope: string;
+  metadata: AiAnalysisMetadata;
+  createdAt: string;
+  adoptedAt: string | null;
+}
+
+export interface GetSOSRequestAnalysisResponse {
+  sosRequestId: number;
+  sosType: string;
+  status: SOSRequestStatus;
+  currentPriorityLevel: SOSPriorityLevel;
+  ruleEvaluation: RuleEvaluation;
+  aiAnalyses: AiAnalysis[];
+  hasAiAnalysis: boolean;
+}

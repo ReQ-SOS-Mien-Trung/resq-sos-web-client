@@ -5,6 +5,7 @@ import {
   GetSOSRequestByIdResponse,
   RescueSuggestionRequest,
   RescueSuggestionResponse,
+  GetSOSRequestAnalysisResponse,
 } from "./type";
 
 /**
@@ -31,5 +32,16 @@ export async function getSOSRequestById(
   id: number,
 ): Promise<GetSOSRequestByIdResponse> {
   const { data } = await api.get(`/emergency/sos-requests/${id}`);
+  return data;
+}
+
+/**
+ * Get analysis for a SOS request by ID
+ * GET /emergency/sos-requests/{id}/analysis
+ */
+export async function getSOSRequestAnalysis(
+  id: number,
+): Promise<GetSOSRequestAnalysisResponse> {
+  const { data } = await api.get(`/emergency/sos-requests/${id}/evaluation`);
   return data;
 }

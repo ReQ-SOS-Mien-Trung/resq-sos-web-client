@@ -1,11 +1,16 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getSOSRequests, getSOSRequestById } from "./api";
+import {
+  getSOSRequests,
+  getSOSRequestById,
+  getSOSRequestAnalysis,
+} from "./api";
 import {
   GetSOSRequestsResponse,
   GetSOSRequestsParams,
   GetSOSRequestByIdResponse,
   RescueSuggestionRequest,
   RescueSuggestionResponse,
+  GetSOSRequestAnalysisResponse,
 } from "./type";
 
 export const SOS_REQUESTS_QUERY_KEY = ["sos-requests"] as const;
@@ -43,6 +48,20 @@ export function useSOSRequestById(
   return useQuery<GetSOSRequestByIdResponse>({
     queryKey: [...SOS_REQUESTS_QUERY_KEY, id],
     queryFn: () => getSOSRequestById(id),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Hook to fetch analysis for a SOS request by ID
+ */
+export function useSOSRequestAnalysis(
+  id: number,
+  options?: UseSOSRequestByIdOptions,
+) {
+  return useQuery<GetSOSRequestAnalysisResponse>({
+    queryKey: [...SOS_REQUESTS_QUERY_KEY, id, "analysis"],
+    queryFn: () => getSOSRequestAnalysis(id),
     enabled: options?.enabled ?? true,
   });
 }
