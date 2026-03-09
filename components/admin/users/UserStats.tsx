@@ -20,13 +20,7 @@ const UserStats = ({ stats }: UserStatsProps) => {
       color: "text-emerald-600 dark:text-emerald-400",
       bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
     },
-    {
-      label: "Đang chờ",
-      value: stats.pending,
-      icon: Clock,
-      color: "text-amber-600 dark:text-amber-400",
-      bgColor: "bg-amber-50 dark:bg-amber-950/30",
-    },
+
     {
       label: "Bị cấm",
       value: stats.banned,
@@ -37,7 +31,7 @@ const UserStats = ({ stats }: UserStatsProps) => {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {statItems.map((item) => {
         const Icon = item.icon;
         return (
