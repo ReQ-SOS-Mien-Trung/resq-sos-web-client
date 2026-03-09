@@ -919,6 +919,8 @@ export interface SOSSidebarProps {
   onManualMission?: (clusterId: number) => void;
   /** View rescue plan history for a cluster */
   onViewClusterPlan?: (clusterId: number) => void;
+  /** View/edit an existing mission in the builder */
+  onViewMission?: (clusterId: number, missionId: number) => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";

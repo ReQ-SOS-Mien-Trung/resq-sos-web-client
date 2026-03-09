@@ -22,7 +22,11 @@ import {
   WifiHigh,
   WifiSlash,
   Timer,
+  Brain,
+  ChartBar,
+  Info,
 } from "@phosphor-icons/react";
+import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
 
 // Panel width
 const PANEL_WIDTH = 420;
@@ -244,6 +248,14 @@ const SOSDetailsPanel = ({
 }: SOSDetailsPanelProps) => {
   if (!sosRequest && !open) return null;
 
+  const { data: analysisResponse, isLoading: isLoadingAnalysis } =
+    useSOSRequestAnalysis(Number(sosRequest?.id) || 0, {
+      enabled: !!sosRequest?.id && open,
+    });
+
+  const ruleEvaluation = analysisResponse?.ruleEvaluation;
+  const aiAnalyses = analysisResponse?.aiAnalyses || [];
+
   const priorityColors = {
     P1: "bg-red-500",
     P2: "bg-orange-500",
@@ -368,11 +380,6 @@ const SOSDetailsPanel = ({
                     {sosRequest.senderName && (
                       <div className="font-medium">{sosRequest.senderName}</div>
                     )}
-                    {sosRequest.senderPhone && (
-                      <div className="text-muted-foreground">
-                        {sosRequest.senderPhone}
-                      </div>
-                    )}
                   </div>
                   <div className="flex items-center gap-1.5">
                     {sosRequest.isOnline ? (
@@ -496,32 +503,43 @@ const SOSDetailsPanel = ({
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {sosRequest.medicalIssues.map((issue, idx) => {
-                      const issueLower = issue.toLowerCase();
+                      const issueLower = issue
+                        .toLowerCase()
+                        .replace(/[_\-]/g, "");
                       const issueLabels: Record<string, string> = {
-                        fracture: "Gãy xương",
-                        bleeding: "Chảy máu",
-                        chronic_disease: "Bệnh nền",
-                        pregnancy: "Thai kỳ",
-                        breathing_difficulty: "Khó thở",
-                        mobility_impairment: "Khó di chuyển",
+                        bleeding: "🩸 Chảy máu",
+                        severelybleeding: "🩸 Chảy máu nặng",
+                        fracture: "🦴 Gãy xương",
+                        headinjury: "🤕 Chấn thương đầu",
+                        burn: "🔥 Bỏng",
+                        burns: "🔥 Bỏng",
+                        unconscious: "😵 Bất tỉnh",
+                        breathingdifficulty: "😮💨 Khó thở",
+                        chestpainstroke: "💔 Đau ngực/nghi đột quỵ",
+                        cannotmove: "🚶 Không thể di chuyển",
+                        drowning: "🌊 Đuối nước",
+                        highfever: "🤒 Sốt cao",
+                        dehydration: "💧 Mất nước",
+                        infantneedsmilk: "🍼 Trẻ sơ sinh cần sữa",
+                        lostparent: "🧸 Lạc cha mẹ",
+                        chronicdisease: "💊 Cần thuốc bệnh nền",
+                        confusion: "🧠 Lú lẫn/mất phương hướng",
+                        needsmedicaldevice: "🩺 Cần thiết bị y tế",
+                        other: "🏥 Khác",
+                        // Fallback for older data tags
                         minor_wound: "Vết thương nhẹ",
-                        severe_wound: "Vết thương nặng",
-                        burn: "Bỏng",
+                        severe_wound: "🩸 Vết thương nặng",
                         infection: "Nhiễm trùng",
-                        head_injury: "Chấn thương đầu",
                         shock: "Sốc/Ngất",
-                        fever: "Sốt cao",
+                        fever: "🤒 Sốt cao",
                         hypothermia: "Hạ thân nhiệt",
                         starvation: "Đói lả",
-                        dehydration: "Mất nước",
-                        other: "Vấn đề khác",
                       };
                       return (
                         <div
                           key={idx}
                           className="flex items-center gap-2 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg"
                         >
-                          <Stethoscope className="h-4 w-4" weight="fill" />
                           <span className="text-sm font-medium">
                             {issueLabels[issueLower] || issue}
                           </span>
@@ -584,23 +602,166 @@ const SOSDetailsPanel = ({
               </div>
             </div>
 
-            {/* AI Risk Analysis */}
-            {riskFactors.length > 0 && (
-              <div>
-                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <Lightning
-                    className="h-4 w-4 text-yellow-500"
-                    weight="fill"
-                  />
-                  Phân tích AI
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {riskFactors.map((factor, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs">
-                      {factor}
-                    </Badge>
-                  ))}
-                </div>
+            {/* System Analysis & AI Scores */}
+            {(ruleEvaluation ||
+              isLoadingAnalysis ||
+              aiAnalyses.length > 0 ||
+              riskFactors.length > 0) && (
+              <div className="space-y-4 pt-4 border-t">
+                {isLoadingAnalysis ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
+                    <Brain className="h-4 w-4" weight="fill" />
+                    Đang tải đánh giá hệ thống...
+                  </div>
+                ) : (
+                  <>
+                    {ruleEvaluation && (
+                      <div>
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                          <ChartBar
+                            className="h-4 w-4 text-indigo-500"
+                            weight="fill"
+                          />
+                          Đánh giá độ nguy cấp (Hệ thống)
+                        </h4>
+                        <div className="bg-muted/30 rounded-lg p-3.5 border shadow-sm">
+                          <div className="flex items-center justify-between mb-3 pb-3 border-b border-border/50">
+                            <span className="text-sm font-medium">
+                              Điểm rủi ro tổng hợp:
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {ruleEvaluation.priorityLevel && (
+                                <Badge
+                                  variant={
+                                    ruleEvaluation.priorityLevel === "Critical"
+                                      ? "destructive"
+                                      : ruleEvaluation.priorityLevel === "High"
+                                        ? "warning"
+                                        : "secondary"
+                                  }
+                                  className="text-xs px-2 h-6"
+                                >
+                                  {ruleEvaluation.priorityLevel}
+                                </Badge>
+                              )}
+                              <Badge
+                                variant={
+                                  ruleEvaluation.totalScore > 80
+                                    ? "destructive"
+                                    : ruleEvaluation.totalScore > 50
+                                      ? "warning"
+                                      : "secondary"
+                                }
+                                className="text-sm px-2.5"
+                              >
+                                {ruleEvaluation.totalScore.toFixed(1)} đ
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-[13px]">
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground flex items-center gap-1.5">
+                                <FirstAid className="w-3.5 h-3.5" /> Y tế:
+                              </span>
+                              <span className="font-semibold text-red-600 dark:text-red-400">
+                                {ruleEvaluation.medicalScore?.toFixed(1) ||
+                                  "0.0"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground flex items-center gap-1.5">
+                                <Warning className="w-3.5 h-3.5" /> Chấn thương:
+                              </span>
+                              <span className="font-semibold text-orange-600 dark:text-orange-400">
+                                {ruleEvaluation.injuryScore?.toFixed(1) ||
+                                  "0.0"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground flex items-center gap-1.5">
+                                <Lightning className="w-3.5 h-3.5" /> Môi
+                                trường:
+                              </span>
+                              <span className="font-semibold text-blue-600 dark:text-blue-400">
+                                {ruleEvaluation.environmentScore?.toFixed(1) ||
+                                  "0.0"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5" /> Di chuyển:
+                              </span>
+                              <span className="font-semibold text-amber-600 dark:text-amber-400">
+                                {ruleEvaluation.mobilityScore?.toFixed(1) ||
+                                  "0.0"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground flex items-center gap-1.5">
+                                <ForkKnife className="w-3.5 h-3.5" /> Thực phẩm:
+                              </span>
+                              <span className="font-semibold text-green-600 dark:text-green-400">
+                                {ruleEvaluation.foodScore?.toFixed(1) || "0.0"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {(aiAnalyses.length > 0 || riskFactors.length > 0) && (
+                      <div>
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                          <Brain
+                            className="h-4 w-4 text-violet-500"
+                            weight="fill"
+                          />
+                          Phân tích AI
+                        </h4>
+
+                        {riskFactors.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {riskFactors.map((factor, idx) => (
+                              <Badge
+                                key={idx}
+                                variant="outline"
+                                className="text-xs bg-violet-50/30 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800"
+                              >
+                                {factor}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+
+                        {aiAnalyses.length > 0 && (
+                          <div className="bg-violet-50/50 dark:bg-violet-900/10 rounded-lg p-3.5 border border-violet-200 dark:border-violet-800/30 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full pointer-events-none" />
+                            <div className="flex items-center justify-between mb-2 relative z-10">
+                              <span className="text-[13px] font-semibold text-violet-900 dark:text-violet-300">
+                                Nhận định tình hình
+                              </span>
+                              {aiAnalyses[0].confidenceScore && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] bg-white/60 dark:bg-black/40 text-violet-700 dark:text-violet-300 hover:bg-white/80 border border-violet-200/50 dark:border-violet-800/50"
+                                >
+                                  Tin cậy:{" "}
+                                  {(
+                                    aiAnalyses[0].confidenceScore * 100
+                                  ).toFixed(0)}
+                                  %
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[13px] text-violet-800/80 dark:text-violet-300/80 leading-relaxed italic relative z-10">
+                              "{aiAnalyses[0].explanation}"
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -60,7 +60,13 @@ import {
 import type { SOSRequest } from "@/type";
 import type { SOSClusterEntity } from "@/services/sos_cluster/type";
 import type { ClusterActivityType } from "@/services/sos_cluster/type";
-import { useCreateMission } from "@/services/mission/hooks";
+import {
+  useCreateMission,
+  useMission,
+  useMissionActivities,
+  useUpdateMission,
+} from "@/services/mission/hooks";
+import type { MissionActivity } from "@/services/mission/type";
 
 // ── Types ──
 
@@ -81,6 +87,8 @@ interface ManualMissionBuilderProps {
   cluster: SOSClusterEntity | null;
   clusterSOSRequests: SOSRequest[];
   onCreated: () => void;
+  /** When provided, load an existing mission for viewing/editing */
+  existingMissionId?: number | null;
 }
 
 // ── Activity type palette items ──
@@ -162,7 +170,11 @@ function SortableActivityCard({
   activity: ManualActivity;
   index: number;
   isLast: boolean;
-  onUpdate: (id: string, field: keyof ManualActivity, value: string | number) => void;
+  onUpdate: (
+    id: string,
+    field: keyof ManualActivity,
+    value: string | number,
+  ) => void;
   onRemove: (id: string) => void;
   onCopyLocation: (lat: number, lng: number) => void;
 }) {
@@ -274,9 +286,7 @@ function SortableActivityCard({
             <Input
               placeholder="Tên địa điểm / mục tiêu..."
               value={activity.target}
-              onChange={(e) =>
-                onUpdate(activity.id, "target", e.target.value)
-              }
+              onChange={(e) => onUpdate(activity.id, "target", e.target.value)}
               className="h-8 text-xs mt-0.5"
             />
           </div>
@@ -331,9 +341,7 @@ function SortableActivityCard({
             <Input
               placeholder="VD: Áo phao x5, Lương khô x10..."
               value={activity.items}
-              onChange={(e) =>
-                onUpdate(activity.id, "items", e.target.value)
-              }
+              onChange={(e) => onUpdate(activity.id, "items", e.target.value)}
               className="h-8 text-xs mt-0.5"
             />
           </div>
@@ -345,11 +353,7 @@ function SortableActivityCard({
 
 // ── Drag Overlay Item (preview while dragging) ──
 
-function DragOverlayContent({
-  type,
-}: {
-  type: ClusterActivityType;
-}) {
+function DragOverlayContent({ type }: { type: ClusterActivityType }) {
   const config = activityTypeConfig[type] || activityTypeConfig["ASSESS"];
   return (
     <div
@@ -376,7 +380,13 @@ function DragOverlayContent({
 
 // ── Timeline Drop Zone ──
 
-function TimelineDropZone({ children, isEmpty }: { children: React.ReactNode; isEmpty: boolean }) {
+function TimelineDropZone({
+  children,
+  isEmpty,
+}: {
+  children: React.ReactNode;
+  isEmpty: boolean;
+}) {
   const { isOver, setNodeRef } = useDroppable({ id: DROPPABLE_ID });
 
   return (
@@ -384,9 +394,7 @@ function TimelineDropZone({ children, isEmpty }: { children: React.ReactNode; is
       ref={setNodeRef}
       className={cn(
         "min-h-[200px] rounded-xl border-2 border-dashed transition-all duration-200 p-3",
-        isEmpty
-          ? "flex flex-col items-center justify-center"
-          : "space-y-3",
+        isEmpty ? "flex flex-col items-center justify-center" : "space-y-3",
         isOver
           ? "border-primary/60 bg-primary/5"
           : "border-border/50 bg-muted/10",
@@ -418,27 +426,79 @@ const ManualMissionBuilder = ({
   cluster,
   clusterSOSRequests,
   onCreated,
+  existingMissionId,
 }: ManualMissionBuilderProps) => {
   // ── State ──
   const [activities, setActivities] = useState<ManualActivity[]>([]);
-  const [missionType, setMissionType] = useState<"RESCUE" | "RESCUER">("RESCUE");
+  const [missionType, setMissionType] = useState<"RESCUE" | "RESCUER">(
+    "RESCUE",
+  );
   const [priorityScore, setPriorityScore] = useState(5);
   const [startTime, setStartTime] = useState("");
   const [expectedEndTime, setExpectedEndTime] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [activeDragType, setActiveDragType] = useState<ClusterActivityType | null>(null);
+  const [activeDragType, setActiveDragType] =
+    useState<ClusterActivityType | null>(null);
+  const [hasLoadedExisting, setHasLoadedExisting] = useState(false);
 
   const { mutate: createMission, isPending } = useCreateMission();
+  const { mutate: updateMission, isPending: isUpdating } = useUpdateMission();
+
+  // ── Fetch existing mission ──
+  const { data: existingMission } = useMission(existingMissionId ?? 0, {
+    enabled: !!existingMissionId && open,
+  });
+  const { data: existingActivities } = useMissionActivities(
+    existingMissionId ?? 0,
+    {
+      enabled: !!existingMissionId && open,
+    },
+  );
+
+  const isEditingExisting = !!existingMissionId;
+
+  // ── Pre-fill from existing mission ──
+  useEffect(() => {
+    if (!existingMission || !open || hasLoadedExisting) return;
+    setMissionType(existingMission.missionType);
+    setPriorityScore(existingMission.priorityScore);
+    setStartTime(existingMission.startTime?.slice(0, 16) || "");
+    setExpectedEndTime(existingMission.expectedEndTime?.slice(0, 16) || "");
+
+    const acts = existingMission.activities ?? existingActivities ?? [];
+    if (acts.length > 0) {
+      setActivities(
+        acts.map((a: MissionActivity) => ({
+          id: `${TIMELINE_PREFIX}existing-${a.id}-${Date.now()}`,
+          activityType: (a.activityType || "ASSESS") as ClusterActivityType,
+          description: a.description || "",
+          target: a.target || "",
+          items: typeof a.items === "string" ? a.items : "",
+          targetLatitude: a.targetLatitude || 0,
+          targetLongitude: a.targetLongitude || 0,
+        })),
+      );
+    }
+    setHasLoadedExisting(true);
+  }, [existingMission, existingActivities, open, hasLoadedExisting]);
+
+  // Reset loaded flag when closing or changing mission
+  useEffect(() => {
+    if (!open) setHasLoadedExisting(false);
+  }, [open]);
 
   // ── DnD sensors ──
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   // ── Generate unique ID ──
   const genId = useCallback(
-    () => `${TIMELINE_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    () =>
+      `${TIMELINE_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     [],
   );
 
@@ -457,17 +517,20 @@ const ManualMissionBuilder = ({
   );
 
   // ── DnD handlers ──
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const { active } = event;
-    setActiveId(String(active.id));
-    const data = active.data.current;
-    if (data?.source === "palette") {
-      setActiveDragType(data.type as ClusterActivityType);
-    } else {
-      const act = activities.find((a) => a.id === String(active.id));
-      if (act) setActiveDragType(act.activityType);
-    }
-  }, [activities]);
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const { active } = event;
+      setActiveId(String(active.id));
+      const data = active.data.current;
+      if (data?.source === "palette") {
+        setActiveDragType(data.type as ClusterActivityType);
+      } else {
+        const act = activities.find((a) => a.id === String(active.id));
+        if (act) setActiveDragType(act.activityType);
+      }
+    },
+    [activities],
+  );
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -603,43 +666,71 @@ const ManualMissionBuilder = ({
   const handleSubmit = useCallback(() => {
     if (!clusterId || !validate()) return;
 
-    createMission(
-      {
-        clusterId,
-        missionType,
-        priorityScore,
-        startTime: new Date(startTime).toISOString(),
-        expectedEndTime: new Date(expectedEndTime).toISOString(),
-        activities: activities.map((a, i) => ({
-          step: i + 1,
-          activityCode: `${a.activityType}_${i + 1}`,
-          activityType: a.activityType,
-          description: a.description,
-          target: a.target,
-          items: a.items || "",
-          targetLatitude: a.targetLatitude,
-          targetLongitude: a.targetLongitude,
-        })),
-      },
-      {
-        onSuccess: () => {
-          toast.success("Đã tạo nhiệm vụ thành công!");
-          setActivities([]);
-          setStartTime("");
-          setExpectedEndTime("");
-          setPriorityScore(5);
-          onOpenChange(false);
-          onCreated();
+    if (isEditingExisting && existingMissionId) {
+      updateMission(
+        {
+          missionId: existingMissionId,
+          request: {
+            missionType,
+            priorityScore,
+            startTime: new Date(startTime).toISOString(),
+            expectedEndTime: new Date(expectedEndTime).toISOString(),
+          },
         },
-        onError: (error) => {
-          console.error("Failed to create mission:", error);
-          toast.error("Không thể tạo nhiệm vụ. Vui lòng thử lại.");
+        {
+          onSuccess: () => {
+            toast.success("Đã cập nhật nhiệm vụ thành công!");
+            onOpenChange(false);
+            onCreated();
+          },
+          onError: (error) => {
+            console.error("Failed to update mission:", error);
+            toast.error("Không thể cập nhật nhiệm vụ. Vui lòng thử lại.");
+          },
         },
-      },
-    );
+      );
+    } else {
+      createMission(
+        {
+          clusterId,
+          missionType,
+          priorityScore,
+          startTime: new Date(startTime).toISOString(),
+          expectedEndTime: new Date(expectedEndTime).toISOString(),
+          activities: activities.map((a, i) => ({
+            step: i + 1,
+            activityCode: `${a.activityType}_${i + 1}`,
+            activityType: a.activityType,
+            description: a.description,
+            target: a.target,
+            items: a.items || "",
+            targetLatitude: a.targetLatitude,
+            targetLongitude: a.targetLongitude,
+          })),
+        },
+        {
+          onSuccess: () => {
+            toast.success("Đã tạo nhiệm vụ thành công!");
+            setActivities([]);
+            setStartTime("");
+            setExpectedEndTime("");
+            setPriorityScore(5);
+            onOpenChange(false);
+            onCreated();
+          },
+          onError: (error) => {
+            console.error("Failed to create mission:", error);
+            toast.error("Không thể tạo nhiệm vụ. Vui lòng thử lại.");
+          },
+        },
+      );
+    }
   }, [
     clusterId,
     validate,
+    isEditingExisting,
+    existingMissionId,
+    updateMission,
     createMission,
     missionType,
     priorityScore,
@@ -651,10 +742,7 @@ const ManualMissionBuilder = ({
   ]);
 
   // ── Sortable IDs ──
-  const sortableIds = useMemo(
-    () => activities.map((a) => a.id),
-    [activities],
-  );
+  const sortableIds = useMemo(() => activities.map((a) => a.id), [activities]);
 
   if (!clusterId) return null;
 
@@ -680,7 +768,9 @@ const ManualMissionBuilder = ({
               </div>
               <div>
                 <h2 className="text-base font-bold leading-tight">
-                  Tạo nhiệm vụ thủ công — Cụm #{clusterId}
+                  {isEditingExisting
+                    ? `Xem / Sửa nhiệm vụ #${existingMissionId} — Cụm #${clusterId}`
+                    : `Tạo nhiệm vụ thủ công — Cụm #${clusterId}`}
                 </h2>
                 <div className="flex items-center gap-1.5 mt-1">
                   <Badge
@@ -765,10 +855,7 @@ const ManualMissionBuilder = ({
                             <div className="font-semibold">{tpl.label}</div>
                             <div className="text-[10px] text-muted-foreground mt-0.5">
                               {tpl.types
-                                .map(
-                                  (t) =>
-                                    activityTypeConfig[t]?.label || t,
-                                )
+                                .map((t) => activityTypeConfig[t]?.label || t)
                                 .join(" → ")}
                             </div>
                           </div>
@@ -852,10 +939,7 @@ const ManualMissionBuilder = ({
                       <ListChecks className="h-3.5 w-3.5" weight="bold" />
                       Kế hoạch thực hiện
                     </h3>
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] h-5 px-2"
-                    >
+                    <Badge variant="secondary" className="text-[10px] h-5 px-2">
                       {activities.length} bước
                     </Badge>
                   </div>
@@ -915,9 +999,7 @@ const ManualMissionBuilder = ({
 
                       {/* Priority Score */}
                       <div>
-                        <Label className="text-xs">
-                          Điểm ưu tiên (1-10)
-                        </Label>
+                        <Label className="text-xs">Điểm ưu tiên (1-10)</Label>
                         <Input
                           type="number"
                           min={1}
@@ -981,17 +1063,21 @@ const ManualMissionBuilder = ({
                     size="sm"
                     className="h-9 gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-sm"
                     onClick={handleSubmit}
-                    disabled={isPending || activities.length === 0}
+                    disabled={
+                      isPending || isUpdating || activities.length === 0
+                    }
                   >
-                    {isPending ? (
+                    {isPending || isUpdating ? (
                       <>
                         <CircleNotch className="h-4 w-4 animate-spin" />
-                        Đang tạo...
+                        {isEditingExisting ? "Đang cập nhật..." : "Đang tạo..."}
                       </>
                     ) : (
                       <>
                         <CheckCircle className="h-4 w-4" weight="fill" />
-                        Tạo nhiệm vụ
+                        {isEditingExisting
+                          ? "Cập nhật nhiệm vụ"
+                          : "Tạo nhiệm vụ"}
                       </>
                     )}
                   </Button>

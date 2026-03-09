@@ -88,6 +88,7 @@ const SOSSidebar = ({
   analyzingClusterId = null,
   onManualMission,
   onViewClusterPlan,
+  onViewMission,
 }: SOSSidebarProps) => {
   const [activeTab, setActiveTab] = useState("incoming");
   const [expandedClusters, setExpandedClusters] = useState<Set<number>>(
@@ -375,68 +376,16 @@ const SOSSidebar = ({
                               )}
                             </div>
 
-                            {/* Action buttons: AI Analyze + View Plan + Manual */}
-                            <div className="px-3 py-2 border-t border-inherit space-y-1.5">
-                              <Button
-                                variant="default"
-                                size="sm"
-                                className="w-full h-7 text-[11px] bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onAnalyzeCluster(cluster.id);
-                                }}
-                                disabled={isAnalyzingCluster}
-                              >
-                                {isAnalyzing ? (
-                                  <>
-                                    <Spinner className="h-3 w-3 mr-1 animate-spin" />
-                                    AI đang phân tích...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Lightning
-                                      className="h-3 w-3 mr-1"
-                                      weight="fill"
-                                    />
-                                    AI Phân tích Rescue Plan
-                                  </>
-                                )}
-                              </Button>
-                              {onViewClusterPlan && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full h-7 text-[11px] border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onViewClusterPlan(cluster.id);
-                                  }}
-                                >
-                                  <Eye className="h-3 w-3 mr-1" weight="fill" />
-                                  Xem kế hoạch AI đã gợi ý
-                                </Button>
-                              )}
-                              {onManualMission && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full h-7 text-[11px] border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onManualMission(cluster.id);
-                                  }}
-                                >
-                                  <PencilSimpleLine
-                                    className="h-3 w-3 mr-1"
-                                    weight="fill"
-                                  />
-                                  Tạo nhiệm vụ thủ công
-                                </Button>
-                              )}
-                            </div>
-
-                            {/* Missions created for this cluster */}
-                            <ClusterMissions clusterId={cluster.id} />
+                            {/* Action buttons + Missions (uses hook inside) */}
+                            <ClusterActionButtons
+                              clusterId={cluster.id}
+                              isAnalyzing={!!isAnalyzing}
+                              isAnalyzingCluster={isAnalyzingCluster}
+                              onAnalyzeCluster={onAnalyzeCluster}
+                              onViewClusterPlan={onViewClusterPlan}
+                              onManualMission={onManualMission}
+                              onViewMission={onViewMission}
+                            />
                           </>
                         )}
                       </div>
@@ -665,17 +614,6 @@ const SOSSidebar = ({
                             </>
                           )}
                         </Button>
-                        {onViewClusterPlan && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-7 text-[11px] border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                            disabled
-                          >
-                            <Eye className="h-3 w-3 mr-1" weight="fill" />
-                            Xem kế hoạch AI đã gợi ý
-                          </Button>
-                        )}
                         {onManualMission && (
                           <Button
                             variant="outline"
@@ -1007,9 +945,139 @@ const missionStatusConfig: Record<
   },
 };
 
+// ── ClusterActionButtons: action buttons + missions, hides create buttons if missions exist ──
+
+function ClusterActionButtons({
+  clusterId,
+  isAnalyzing,
+  isAnalyzingCluster,
+  onAnalyzeCluster,
+  onViewClusterPlan,
+  onManualMission,
+  onViewMission,
+}: {
+  clusterId: number;
+  isAnalyzing: boolean;
+  isAnalyzingCluster: boolean;
+  onAnalyzeCluster: (clusterId: number) => void;
+  onViewClusterPlan?: (clusterId: number) => void;
+  onViewMission?: (clusterId: number, missionId: number) => void;
+  onManualMission?: (clusterId: number) => void;
+}) {
+  const { data: missionsData, isLoading: isMissionsLoading } =
+    useMissions(clusterId);
+  const [expandedMissionId, setExpandedMissionId] = useState<number | null>(
+    null,
+  );
+
+  const missions = missionsData?.missions ?? [];
+  const hasMissions = missions.length > 0;
+
+  return (
+    <>
+      {/* Action buttons */}
+      <div className="px-3 py-2 border-t border-inherit space-y-1.5">
+        {hasMissions ? (
+          // Missions already created — show success state
+          <div className="flex flex-col gap-2 py-1">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-emerald-500" weight="fill" />
+              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+                Đã tạo {missions.length} nhiệm vụ
+              </span>
+            </div>
+          </div>
+        ) : (
+          // No missions yet — show action buttons
+          <>
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full h-7 text-[11px] bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAnalyzeCluster(clusterId);
+              }}
+              disabled={isAnalyzingCluster}
+            >
+              {isAnalyzing ? (
+                <>
+                  <Spinner className="h-3 w-3 mr-1 animate-spin" />
+                  AI đang phân tích...
+                </>
+              ) : (
+                <>
+                  <Lightning className="h-3 w-3 mr-1" weight="fill" />
+                  AI Phân tích Rescue Plan
+                </>
+              )}
+            </Button>
+            {onManualMission && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-7 text-[11px] border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onManualMission(clusterId);
+                }}
+              >
+                <PencilSimpleLine className="h-3 w-3 mr-1" weight="fill" />
+                Tạo nhiệm vụ thủ công
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Mission list */}
+      {isMissionsLoading && (
+        <div className="px-3 py-2 border-t border-inherit">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Spinner className="h-3 w-3 animate-spin" />
+            Đang tải nhiệm vụ...
+          </div>
+        </div>
+      )}
+      {hasMissions && (
+        <div className="border-t border-inherit">
+          <div className="px-3 pt-2 pb-1">
+            <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Rocket className="h-3 w-3" weight="fill" />
+              Nhiệm vụ đã tạo ({missions.length})
+            </div>
+          </div>
+          <div className="px-3 pb-2 space-y-1.5">
+            {missions.map((mission) => (
+              <MissionEntityCard
+                key={mission.id}
+                mission={mission}
+                clusterId={clusterId}
+                isExpanded={expandedMissionId === mission.id}
+                onToggle={() =>
+                  setExpandedMissionId(
+                    expandedMissionId === mission.id ? null : mission.id,
+                  )
+                }
+                onViewMission={onViewMission}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── ClusterMissions: compact mission list shown inside expanded cluster cards ──
 
-function ClusterMissions({ clusterId }: { clusterId: number }) {
+function ClusterMissions({
+  clusterId,
+  onViewMission,
+}: {
+  clusterId: number;
+  onViewMission?: (missionId: number) => void;
+}) {
   const { data: missionsData, isLoading } = useMissions(clusterId);
   const [expandedMissionId, setExpandedMissionId] = useState<number | null>(
     null,
@@ -1049,6 +1117,7 @@ function ClusterMissions({ clusterId }: { clusterId: number }) {
                 expandedMissionId === mission.id ? null : mission.id,
               )
             }
+            onViewMission={onViewMission}
           />
         ))}
       </div>
@@ -1060,12 +1129,16 @@ function ClusterMissions({ clusterId }: { clusterId: number }) {
 
 function MissionEntityCard({
   mission,
+  clusterId,
   isExpanded,
   onToggle,
+  onViewMission,
 }: {
   mission: MissionEntity;
+  clusterId?: number;
   isExpanded: boolean;
   onToggle: () => void;
+  onViewMission?: (clusterId: number, missionId: number) => void;
 }) {
   const status =
     missionStatusConfig[mission.status] ?? missionStatusConfig.Pending;
@@ -1173,6 +1246,23 @@ function MissionEntityCard({
                     </div>
                   );
                 })}
+            </div>
+          )}
+
+          {onViewMission && clusterId && (
+            <div className="mt-3 pt-2 border-t border-border/40">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-7 text-[10px] bg-orange-50/50 hover:bg-orange-100 border-orange-200 text-orange-700 dark:bg-orange-900/10 dark:hover:bg-orange-900/30 dark:border-orange-800 dark:text-orange-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewMission(clusterId, mission.id);
+                }}
+              >
+                <PencilSimpleLine className="h-3 w-3 mr-1.5" weight="fill" />
+                Xem / Sửa nhiệm vụ
+              </Button>
             </div>
           )}
         </div>

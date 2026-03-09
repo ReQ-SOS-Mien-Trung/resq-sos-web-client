@@ -264,6 +264,9 @@ const CoordinatorDashboardContent = () => {
   const [manualMissionClusterId, setManualMissionClusterId] = useState<
     number | null
   >(null);
+  const [existingMissionId, setExistingMissionId] = useState<number | null>(
+    null,
+  );
 
   // ─── Processing State ───
   const [processingClusterIndex, setProcessingClusterIndex] = useState<
@@ -660,15 +663,29 @@ const CoordinatorDashboardContent = () => {
 
   const handleOpenManualMission = useCallback((clusterId: number) => {
     setManualMissionClusterId(clusterId);
+    setExistingMissionId(null);
     setManualMissionOpen(true);
     setSOSDetailOpen(false);
     setRescuePlanOpen(false);
     setLocationPanelOpen(false);
   }, []);
 
+  const handleViewMission = useCallback(
+    (clusterId: number, missionId: number) => {
+      setManualMissionClusterId(clusterId);
+      setExistingMissionId(missionId);
+      setManualMissionOpen(true);
+      setSOSDetailOpen(false);
+      setRescuePlanOpen(false);
+      setLocationPanelOpen(false);
+    },
+    [],
+  );
+
   const handleManualMissionCreated = useCallback(() => {
     setManualMissionOpen(false);
     setManualMissionClusterId(null);
+    setExistingMissionId(null);
   }, []);
 
   const handleReAnalyze = useCallback(() => {
@@ -737,7 +754,7 @@ const CoordinatorDashboardContent = () => {
       )}
     >
       {/* ━━━ Top Header Bar ━━━ */}
-      <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0 z-20">
+      <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0 relative z-[1200]">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -836,7 +853,7 @@ const CoordinatorDashboardContent = () => {
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 z-[1200]">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
                   <span className="font-semibold">
@@ -908,6 +925,7 @@ const CoordinatorDashboardContent = () => {
               analyzingClusterId={analyzingClusterId}
               onManualMission={handleOpenManualMission}
               onViewClusterPlan={handleViewClusterPlan}
+              onViewMission={handleViewMission}
             />
           )}
         </aside>
@@ -1023,6 +1041,7 @@ const CoordinatorDashboardContent = () => {
                 cluster={activeManualCluster}
                 clusterSOSRequests={manualMissionSOSRequests}
                 onCreated={handleManualMissionCreated}
+                existingMissionId={existingMissionId}
               />
             </>
           )}
