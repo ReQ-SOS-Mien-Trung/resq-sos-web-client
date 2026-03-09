@@ -8,6 +8,13 @@ export interface RescuerApplicationDocument {
   uploadedAt: string;
 }
 
+export interface RescuerAbility {
+  abilityId: number;
+  code: string;
+  description: string;
+  level: number;
+}
+
 // Rescuer Application Entity (item in paginated list)
 export interface RescuerApplicationEntity {
   id: number;
@@ -26,6 +33,7 @@ export interface RescuerApplicationEntity {
   ward: string;
   province: string;
   documents: RescuerApplicationDocument[];
+  abilities: RescuerAbility[];
 }
 
 // Paginated Response for Rescuer Applications
