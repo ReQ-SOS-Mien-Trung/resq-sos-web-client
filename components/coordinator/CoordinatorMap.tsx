@@ -54,6 +54,9 @@ const CoordinatorMap = ({
     lat: number;
     lng: number;
   } | null>(null);
+  const [searchFlyToZoom, setSearchFlyToZoom] = useState<number | undefined>(
+    undefined,
+  );
   const [searchFilter, setSearchFilter] = useState<
     "all" | "depot" | "assemblyPoint"
   >("all");
@@ -323,6 +326,7 @@ const CoordinatorMap = ({
   // Handle selecting a search result
   const handleSelectResult = (result: SearchResult) => {
     setSearchFlyToLocation({ lat: result.latitude, lng: result.longitude });
+    setSearchFlyToZoom(16); // Default search zoom
     setSelectedSearchName(result.name);
     setSearchQuery("");
     setIsSearchOpen(false);
@@ -602,7 +606,10 @@ const CoordinatorMap = ({
         />
 
         {/* Fly to location handler */}
-        <FlyToHandler location={activeFlyToLocation} zoom={flyToZoom} />
+        <FlyToHandler
+          location={activeFlyToLocation}
+          zoom={searchFlyToLocation ? searchFlyToZoom : flyToZoom}
+        />
 
         {/* Map zoom handler - provides controls to parent */}
         <MapZoomHandler
@@ -655,7 +662,22 @@ const CoordinatorMap = ({
             key={`cluster-${cluster.id}-${cluster._isMerged}`}
             cluster={cluster}
             isMerged={cluster._isMerged}
-            onClick={() => onClusterSelect?.(cluster)}
+            onClick={() => {
+              if (cluster._isMerged) {
+                // For virtual merged clusters, just fly/zoom in to break them apart
+                const targetZoom = Math.max(
+                  currentZoom + 2,
+                  CLUSTER_ZOOM_THRESHOLD,
+                );
+                setSearchFlyToLocation({
+                  lat: Number(cluster.centerLatitude),
+                  lng: Number(cluster.centerLongitude),
+                });
+                setSearchFlyToZoom(targetZoom);
+              } else {
+                onClusterSelect?.(cluster);
+              }
+            }}
           />
         ))}
 
@@ -704,7 +726,10 @@ const CoordinatorMap = ({
           <>
             <div className="h-px bg-border/40 mx-2" />
             <button
-              onClick={() => setSearchFlyToLocation(userLocation)}
+              onClick={() => {
+                setSearchFlyToLocation(userLocation);
+                setSearchFlyToZoom(15);
+              }}
               className="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 border border-blue-400/60 shadow-lg flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all duration-150"
               title="Vị trí của tôi"
             >

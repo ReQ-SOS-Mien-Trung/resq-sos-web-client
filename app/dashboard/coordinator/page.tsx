@@ -493,8 +493,8 @@ const CoordinatorDashboardContent = () => {
     (cluster: SOSClusterEntity) => {
       setFlyToZoom(13);
       setFlyToLocation({
-        lat: cluster.centerLatitude,
-        lng: cluster.centerLongitude,
+        lat: Number(cluster.centerLatitude),
+        lng: Number(cluster.centerLongitude),
       });
       handleEntitySelect({ type: "cluster", id: cluster.id });
     },
@@ -509,8 +509,8 @@ const CoordinatorDashboardContent = () => {
       if (cluster) {
         setFlyToZoom(undefined);
         setFlyToLocation({
-          lat: cluster.centerLatitude,
-          lng: cluster.centerLongitude,
+          lat: Number(cluster.centerLatitude),
+          lng: Number(cluster.centerLongitude),
         });
       }
       setRescuePlanOpen(true);
