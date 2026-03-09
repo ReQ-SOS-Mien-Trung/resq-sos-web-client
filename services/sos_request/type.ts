@@ -108,6 +108,17 @@ export interface GetSOSRequestByIdResponse {
   sosRequest: SOSRequestEntity;
 }
 
+// Create SOS Request Payload
+export interface CreateSOSRequestPayload {
+  msg: string;
+  latitude: number;
+  longitude: number;
+  senderInfo?: {
+    user_name?: string;
+    user_phone?: string;
+  };
+}
+
 // ---- Rescue Suggestion ----
 
 // Request body for rescue suggestion

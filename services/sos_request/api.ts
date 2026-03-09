@@ -3,9 +3,10 @@ import {
   GetSOSRequestsResponse,
   GetSOSRequestsParams,
   GetSOSRequestByIdResponse,
-  RescueSuggestionRequest,
   RescueSuggestionResponse,
   GetSOSRequestAnalysisResponse,
+  CreateSOSRequestPayload,
+  SOSRequestEntity,
 } from "./type";
 
 /**
@@ -43,5 +44,16 @@ export async function getSOSRequestAnalysis(
   id: number,
 ): Promise<GetSOSRequestAnalysisResponse> {
   const { data } = await api.get(`/emergency/sos-requests/${id}/evaluation`);
+  return data;
+}
+
+/**
+ * Manually create a SOS request (e.g. from call center)
+ * POST /emergency/sos-requests
+ */
+export async function createSOSRequest(
+  payload: CreateSOSRequestPayload,
+): Promise<SOSRequestEntity> {
+  const { data } = await api.post("/emergency/sos-requests", payload);
   return data;
 }

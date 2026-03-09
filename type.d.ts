@@ -878,6 +878,10 @@ export interface CoordinatorMapProps {
   panelOpen?: boolean;
   /** Called when map view changes (pan/zoom) with center + zoom */
   onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
+  /** Whether the map is in a mode where the user is allowed to pick a location */
+  isPickingLocation?: boolean;
+  /** Callback when the user clicks on the map */
+  onMapClick?: (lat: number, lng: number) => void;
 }
 
 // Assembly Point type for map display (from backend AssemblyPointEntity)

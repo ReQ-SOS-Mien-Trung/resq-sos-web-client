@@ -1,8 +1,9 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSOSRequests,
   getSOSRequestById,
   getSOSRequestAnalysis,
+  createSOSRequest,
 } from "./api";
 import {
   GetSOSRequestsResponse,
@@ -11,6 +12,8 @@ import {
   RescueSuggestionRequest,
   RescueSuggestionResponse,
   GetSOSRequestAnalysisResponse,
+  CreateSOSRequestPayload,
+  SOSRequestEntity,
 } from "./type";
 
 export const SOS_REQUESTS_QUERY_KEY = ["sos-requests"] as const;
@@ -63,5 +66,19 @@ export function useSOSRequestAnalysis(
     queryKey: [...SOS_REQUESTS_QUERY_KEY, id, "analysis"],
     queryFn: () => getSOSRequestAnalysis(id),
     enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Hook to manually create an SOS request
+ */
+export function useCreateSOSRequest() {
+  const queryClient = useQueryClient();
+
+  return useMutation<SOSRequestEntity, Error, CreateSOSRequestPayload>({
+    mutationFn: (payload) => createSOSRequest(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SOS_REQUESTS_QUERY_KEY });
+    },
   });
 }

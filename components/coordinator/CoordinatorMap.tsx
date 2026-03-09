@@ -23,7 +23,13 @@ import { cn } from "@/lib/utils";
 
 // Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
 // and the isMounted guard inside this component.
-import { MapContainer, TileLayer, Marker, Polyline } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Polyline,
+  useMapEvents,
+} from "react-leaflet";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
 
@@ -45,6 +51,8 @@ const CoordinatorMap = ({
   flyToZoom,
   userLocation,
   onViewChange,
+  isPickingLocation,
+  onMapClick,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0);
@@ -618,6 +626,12 @@ const CoordinatorMap = ({
           onViewChange={onViewChange}
         />
 
+        {/* Map click handler for picking location */}
+        <MapClickHandler
+          isPickingLocation={isPickingLocation}
+          onMapClick={onMapClick}
+        />
+
         {/* SOS Request Markers */}
         {visibleSOSRequests.map((sos) => (
           <SOSRequestMarker
@@ -1142,4 +1156,31 @@ function MapLegend() {
       </div>
     </div>
   );
+}
+
+// Map Click Handler Component for location picking
+function MapClickHandler({
+  isPickingLocation,
+  onMapClick,
+}: {
+  isPickingLocation?: boolean;
+  onMapClick?: (lat: number, lng: number) => void;
+}) {
+  const map = useMapEvents({
+    click: (e) => {
+      if (isPickingLocation && onMapClick) {
+        onMapClick(e.latlng.lat, e.latlng.lng);
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (isPickingLocation) {
+      map.getContainer().style.cursor = "crosshair";
+    } else {
+      map.getContainer().style.cursor = "";
+    }
+  }, [isPickingLocation, map]);
+
+  return null;
 }

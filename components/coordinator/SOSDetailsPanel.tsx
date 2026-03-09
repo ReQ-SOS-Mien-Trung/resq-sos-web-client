@@ -246,12 +246,12 @@ const SOSDetailsPanel = ({
   nearbySOSRequests,
   allSOSRequests,
 }: SOSDetailsPanelProps) => {
-  if (!sosRequest && !open) return null;
-
   const { data: analysisResponse, isLoading: isLoadingAnalysis } =
     useSOSRequestAnalysis(Number(sosRequest?.id) || 0, {
       enabled: !!sosRequest?.id && open,
     });
+
+  if (!sosRequest && !open) return null;
 
   const ruleEvaluation = analysisResponse?.ruleEvaluation;
   const aiAnalyses = analysisResponse?.aiAnalyses || [];
