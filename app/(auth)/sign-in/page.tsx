@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { User, Lock, Eye, EyeSlash, ArrowRight } from "@phosphor-icons/react";
+import { useState, useEffect, useRef } from "react";
+import {
+  User,
+  Lock,
+  Eye,
+  EyeSlash,
+  ArrowRight,
+
+  EnvelopeSimple,
+  X,
+} from "@phosphor-icons/react";
 import Image from "next/image";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +22,8 @@ import {
 import { useGoogleLogin as useGoogleOAuth } from "@react-oauth/google";
 import { useAuthStore } from "@/stores/auth.store";
 import { getDashboardPathByRole } from "@/lib/roles";
+import gsap from "gsap";
+import { motion, AnimatePresence } from "framer-motion";
 
 const SignIn = () => {
   const router = useRouter();
@@ -28,12 +37,30 @@ const SignIn = () => {
         router.replace(dashboardPath);
       }
     }
-  }, [accessToken, user, router]); const [formData, setFormData] = useState({
+  }, [accessToken, user, router]);
+
+  const [formData, setFormData] = useState({
     username: "",
     password: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [usernameTouched, setUsernameTouched] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // GSAP animation on authMethod change
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        formRef.current,
+        { y: 30, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.6, ease: "power2.out" }
+      );
+    }, containerRef);
+    return () => ctx.revert();
+  }, []);
 
   // Login hook with error callbacks
   const { mutate: login, isPending: isLoading } = useLogin({
@@ -108,136 +135,212 @@ const SignIn = () => {
     }
   };
 
+  // Handle username blur for touched state
+  const handleUsernameBlur = () => {
+    setUsernameTouched(true);
+    if (formData.username && formData.username.length < 3) {
+      setErrors((prev) => ({
+        ...prev,
+        username: "Tên đăng nhập phải có ít nhất 3 ký tự",
+      }));
+    }
+  };
+
   return (
-    <div className="w-full space-y-6">
-      <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold font-sans">Chào mừng trở lại</h1>
-        <p className="text-base text-muted-foreground font-sans">
-          Đăng nhập vào tài khoản của bạn để tiếp tục
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* General Error */}
-        {errors.general && (
-          <div className="p-3 rounded-md bg-destructive/10 border border-destructive">
-            <p className="text-sm text-destructive font-sans">
-              {errors.general}
-            </p>
-          </div>
-        )}
-
-        {/* Username Input */}
-        <div className="space-y-2">
-          <label
-            htmlFor="username"
-            className="text-sm font-medium text-foreground font-sans"
-          >
-            Tên đăng nhập
-          </label>
-          <Input
-            id="username"
-            type="text"
-            placeholder="Nhập tên đăng nhập"
-            value={formData.username}
-            onChange={(e) => handleChange("username", e.target.value)}
-            leftIcon={<User size={16} />}
-            variant={errors.username ? "error" : "default"}
-            className={cn("h-11", errors.username && "border-destructive")}
-          />
-          {errors.username && (
-            <p className="text-sm text-destructive font-sans animate-in fade-in-0 slide-in-from-top-1 duration-200">
-              {errors.username}
-            </p>
-          )}
+    <div ref={containerRef} className="w-full space-y-6">
+      <div ref={formRef}>
+        {/* Header */}
+        <div className="space-y-2 mb-8">
+          <p className="text-xs sm:text-sm font-bold uppercase tracking-wider text-[#FF5722]">
+            Chào mừng trở lại
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-[1.1]">
+            ĐĂNG NHẬP
+            <br />
+            <span className="text-black/30">RESQ SOS</span>
+          </h1>
+          <p className="text-sm sm:text-base text-black/60">
+            Đăng nhập vào tài khoản của bạn để tiếp tục
+          </p>
         </div>
 
-        {/* Password Input */}
-        <div className="space-y-2">
-          <label
-            htmlFor="password"
-            className="text-sm font-medium text-foreground font-sans"
-          >
-            Mật khẩu
-          </label>
-          <Input
-            id="password"
-            type={showPassword ? "text" : "password"}
-            placeholder="Nhập mật khẩu của bạn"
-            value={formData.password}
-            onChange={(e) => handleChange("password", e.target.value)}
-            leftIcon={<Lock size={16} />}
-            rightIcon={
+        {/* General Error */}
+        <AnimatePresence mode="wait">
+          {errors.general && (
+            <motion.div
+              initial={{ opacity: 0, y: -10, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: "auto" }}
+              exit={{ opacity: 0, y: -10, height: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="p-3 rounded-lg bg-red-50 border-2 border-red-200 mb-6"
+            >
+              <p className="text-sm text-red-600 font-medium flex items-center gap-2">
+                <X className="w-4 h-4" weight="bold" />
+                {errors.general}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Credentials Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Username */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-black/60 mb-2">
+              Tên đăng nhập
+            </label>
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black/40" />
+              <input
+                id="username"
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={(e) => handleChange("username", e.target.value)}
+                onBlur={handleUsernameBlur}
+                placeholder="Nhập tên đăng nhập"
+                required
+                className={cn(
+                  "w-full pl-12 pr-12 py-4 border-2 focus:border-black outline-none text-sm transition-all rounded-lg",
+                  errors.username && usernameTouched
+                    ? "border-red-500 focus:border-red-500"
+                    : formData.username &&
+                      !errors.username &&
+                      usernameTouched
+                      ? "border-green-500"
+                      : "border-black/20"
+                )}
+              />
+              <AnimatePresence>
+                {formData.username && (
+                  <motion.button
+                    type="button"
+                    onClick={() => {
+                      handleChange("username", "");
+                      setUsernameTouched(false);
+                    }}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 hover:bg-black/5 rounded-full p-1 transition-colors group"
+                  >
+                    <X
+                      className="w-4 h-4 text-black/40 group-hover:text-red-500 transition-colors"
+                      weight="bold"
+                    />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
+            <AnimatePresence mode="wait">
+              {errors.username && usernameTouched && (
+                <motion.p
+                  initial={{ opacity: 0, y: -10, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, y: -10, height: 0 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="text-sm text-red-500 flex items-center gap-1 mt-2"
+                >
+                  <X className="w-4 h-4" /> {errors.username}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Password */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-black/60">
+                Mật khẩu
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-[#FF5722] hover:underline"
+              >
+                Quên mật khẩu?
+              </Link>
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black/40" />
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                name="password"
+                value={formData.password}
+                onChange={(e) => handleChange("password", e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full pl-12 pr-12 py-4 border-2 border-black/20 focus:border-black outline-none text-sm transition-colors rounded-lg"
+              />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="hover:text-foreground transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors"
               >
-                {showPassword ? <EyeSlash size={16} /> : <Eye size={16} />}
+                {showPassword ? (
+                  <EyeSlash className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
               </button>
+            </div>
+            <AnimatePresence mode="wait">
+              {errors.password && (
+                <motion.p
+                  initial={{ opacity: 0, y: -10, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, y: -10, height: 0 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="text-sm text-red-500 flex items-center gap-1 mt-2"
+                >
+                  <X className="w-4 h-4" /> {errors.password}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={
+              isLoading || !formData.username || !formData.password
             }
-            variant={errors.password ? "error" : "default"}
-            className={cn("h-11", errors.password && "border-destructive")}
-          />
-          {errors.password && (
-            <p className="text-sm text-destructive font-sans animate-in fade-in-0 slide-in-from-top-1 duration-200">
-              {errors.password}
-            </p>
-          )}
-        </div>
-
-        {/* Forgot Password Link */}
-        <div className="flex items-center justify-end">
-          <Link
-            href="/forgot-password"
-            className="text-sm text-primary hover:underline font-sans transition-colors"
+            className="w-full px-6 py-4 bg-black text-white text-sm font-bold uppercase tracking-wider hover:bg-[#FF5722] transition-colors flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
           >
-            Quên mật khẩu?
-          </Link>
-        </div>
-
-        {/* Submit Button */}
-        <Button
-          type="submit"
-          className="w-full h-12 text-base font-semibold font-sans transition-all hover:scale-[1.02] active:scale-[0.98]"
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-              Đang đăng nhập...
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              Đăng nhập
-              <ArrowRight size={16} />
-            </span>
-          )}
-        </Button>
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Đang xử lý...
+              </>
+            ) : (
+              <>
+                Đăng nhập
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </>
+            )}
+          </button>
+        </form>
 
         {/* Divider */}
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground font-sans">
-              Hoặc tiếp tục với
-            </span>
-          </div>
+        <div className="flex items-center gap-4 my-6">
+          <div className="flex-1 h-px bg-black/10" />
+          <span className="text-xs text-black/40 uppercase tracking-wider">
+            Hoặc tiếp tục với
+          </span>
+          <div className="flex-1 h-px bg-black/10" />
         </div>
 
         {/* Google Login Button */}
-        <Button
+        <button
           type="button"
-          variant="outline"
-          className="w-full h-12 text-base font-medium font-sans transition-all hover:scale-[1.02] active:scale-[0.98] gap-3"
+          className="w-full px-6 py-4 bg-white border-2 border-black/20 text-sm font-bold uppercase tracking-wider hover:border-black transition-all flex items-center justify-center gap-3 group rounded-lg"
           onClick={() => handleGoogleLogin()}
           disabled={isGoogleLoading || isLoading}
         >
           {isGoogleLoading ? (
             <span className="flex items-center gap-2">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />
               Đang xử lý...
             </span>
           ) : (
@@ -251,8 +354,8 @@ const SignIn = () => {
               Đăng nhập với Google
             </>
           )}
-        </Button>
-      </form>
+        </button>
+      </div>
     </div>
   );
 };

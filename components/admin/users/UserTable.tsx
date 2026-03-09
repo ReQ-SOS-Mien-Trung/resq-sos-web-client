@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   DotsThreeVertical,
   PencilSimple,
-  Trash,
   Prohibit,
   CheckCircle,
 } from "@phosphor-icons/react";
@@ -23,7 +22,6 @@ const UserTable = ({
   users,
   filters,
   onEdit,
-  onDelete,
   onBan,
   onActivate,
 }: UserTableProps) => {
@@ -53,50 +51,39 @@ const UserTable = ({
 
   const getRoleBadge = (role: User["role"]) => {
     const variants: Record<User["role"], { label: string; className: string }> =
-      {
-        admin: {
-          label: "Admin",
-          className: "bg-red-500/10 text-red-700 dark:text-red-400",
-        },
-        coordinator: {
-          label: "Điều phối",
-          className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-        },
-        rescuer: {
-          label: "Cứu hộ viên",
-          className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-        },
-        citizen: {
-          label: "Công dân",
-          className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
-        },
-      };
+    {
+      admin: {
+        label: "Quản trị viên",
+        className: "bg-red-500/10 text-red-700 dark:text-red-400",
+      },
+      coordinator: {
+        label: "Điều phối viên",
+        className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+      },
+      rescuer: {
+        label: "Cứu hộ viên",
+        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      },
+      citizen: {
+        label: "Công dân",
+        className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+      },
+    };
     return variants[role];
   };
 
   const getStatusBadge = (status: User["status"]) => {
-    const variants: Record<
-      User["status"],
-      { label: string; className: string }
-    > = {
-      active: {
-        label: "Hoạt động",
-        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-      },
-      pending: {
-        label: "Đang chờ",
-        className: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-      },
-      banned: {
+    if (status === "banned") {
+      return {
         label: "Bị cấm",
         className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
-      },
-      inactive: {
-        label: "Không hoạt động",
-        className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
-      },
+      };
+    }
+
+    return {
+      label: "Hoạt động",
+      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     };
-    return variants[status];
   };
 
   return (
@@ -113,7 +100,7 @@ const UserTable = ({
                   Tên
                 </th>
                 <th className="text-left p-3 text-sm font-semibold text-foreground">
-                  Email
+                  Số điện thoại
                 </th>
                 <th className="text-left p-3 text-sm font-semibold text-foreground">
                   Vai trò
@@ -157,7 +144,7 @@ const UserTable = ({
                         </div>
                       </td>
                       <td className="p-3 text-sm text-foreground/80">
-                        {user.email}
+                        {user.phone}
                       </td>
                       <td className="p-3">
                         <Badge className={roleBadge.className}>
@@ -203,13 +190,7 @@ const UserTable = ({
                                   Kích hoạt
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem
-                                onClick={() => onDelete?.(user)}
-                                className="text-destructive"
-                              >
-                                <Trash size={16} className="mr-2" />
-                                Xóa
-                              </DropdownMenuItem>
+
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>

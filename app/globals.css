@@ -54,7 +54,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.65 0.15 50);
+  --primary: #FF5722;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -65,7 +65,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.65 0.15 50);
+  --ring: #2563eb;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -88,7 +88,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.7 0.15 50);
+  --primary: #FF5722;
   --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -99,7 +99,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.7 0.15 50);
+  --ring: #2563eb;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -163,6 +163,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -174,6 +175,7 @@
     opacity: 0;
     transform: translateX(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -185,6 +187,7 @@
     opacity: 0;
     transform: translateX(20px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -195,6 +198,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -205,6 +209,7 @@
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -215,18 +220,17 @@
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
 }
 
 .animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    oklch(1 0 0 / 10%) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      oklch(1 0 0 / 10%) 50%,
+      transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
 }
@@ -253,6 +257,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -260,21 +265,17 @@
 
 /* Auth page gradient backgrounds */
 .auth-gradient {
-  background: linear-gradient(
-    135deg,
-    oklch(0.98 0.02 50) 0%,
-    oklch(0.95 0.05 50) 50%,
-    oklch(0.9 0.08 50) 100%
-  );
+  background: linear-gradient(135deg,
+      oklch(0.98 0.02 50) 0%,
+      oklch(0.95 0.05 50) 50%,
+      oklch(0.9 0.08 50) 100%);
 }
 
 .auth-gradient-dark {
-  background: linear-gradient(
-    135deg,
-    oklch(0.2 0.05 50) 0%,
-    oklch(0.15 0.08 50) 50%,
-    oklch(0.1 0.1 50) 100%
-  );
+  background: linear-gradient(135deg,
+      oklch(0.2 0.05 50) 0%,
+      oklch(0.15 0.08 50) 50%,
+      oklch(0.1 0.1 50) 100%);
 }
 
 @layer components {
@@ -285,7 +286,7 @@
   }
 
   #explore-btn {
-    @apply flex w-fit cursor-pointer  rounded-full border px-8 py-3.5 max-sm:w-full text-center;
+    @apply flex w-fit cursor-pointer rounded-full border px-8 py-3.5 max-sm:w-full text-center;
 
     a {
       @apply flex-center gap-2 text-center w-full;
@@ -424,10 +425,12 @@
     transform: scale(0.8);
     opacity: 0.8;
   }
+
   50% {
     transform: scale(1.2);
     opacity: 0.4;
   }
+
   100% {
     transform: scale(0.8);
     opacity: 0.8;
@@ -472,6 +475,7 @@
   from {
     transform: translateX(100%);
   }
+
   to {
     transform: translateX(0);
   }
@@ -481,6 +485,7 @@
   from {
     transform: translateX(-100%);
   }
+
   to {
     transform: translateX(0);
   }
@@ -490,6 +495,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -525,6 +531,7 @@
   from {
     transform: translateY(-100%);
   }
+
   to {
     transform: translateY(0);
   }
@@ -534,6 +541,7 @@
   from {
     transform: translateY(100%);
   }
+
   to {
     transform: translateY(0);
   }
@@ -544,6 +552,7 @@
     transform: translate(-50%, -50%) scale(0.95);
     opacity: 0;
   }
+
   to {
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
@@ -559,6 +568,7 @@
     transform: scale(0.95);
     opacity: 0;
   }
+
   to {
     transform: scale(1);
     opacity: 1;
@@ -583,6 +593,7 @@
     transform: translateY(-0.25rem);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -598,6 +609,7 @@
     transform: scale(0.95);
     opacity: 0;
   }
+
   to {
     transform: scale(1);
     opacity: 1;
@@ -612,6 +624,7 @@
   0% {
     background-position: -1000px 0;
   }
+
   100% {
     background-position: 1000px 0;
   }
@@ -619,12 +632,10 @@
 
 .shimmer {
   animation: shimmer 2s infinite linear;
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(255, 255, 255, 0.1) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(to right,
+      transparent 0%,
+      rgba(255, 255, 255, 0.1) 50%,
+      transparent 100%);
   background-size: 1000px 100%;
 }
 
@@ -640,11 +651,13 @@ button {
 
 /* 404 Page Animations */
 @keyframes bubbleFloat {
+
   0%,
   100% {
     transform: translateY(0) translateX(0);
     opacity: 0.4;
   }
+
   50% {
     transform: translateY(-30px) translateX(15px);
     opacity: 0.7;
@@ -652,10 +665,12 @@ button {
 }
 
 @keyframes lifebuoyFloat {
+
   0%,
   100% {
     transform: translateY(0) rotate(0deg);
   }
+
   50% {
     transform: translateY(-5px) rotate(2deg);
   }
