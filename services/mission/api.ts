@@ -1,5 +1,7 @@
 import api from "@/config/axios";
 import {
+  CreateActivityResponse,
+  CreateMissionActivityRequest,
   CreateMissionRequest,
   CreateMissionResponse,
   GetMissionsParams,
@@ -61,6 +63,17 @@ export async function getMissionActivities(
 ): Promise<MissionActivity[]> {
   const { data } = await api.get(
     `/operations/missions/${missionId}/activities`,
+  );
+  return data;
+}
+
+export async function createActivity(
+  missionId: number,
+  request: CreateMissionActivityRequest,
+): Promise<CreateActivityResponse> {
+  const { data } = await api.post(
+    `/operations/missions/${missionId}/activities`,
+    request,
   );
   return data;
 }

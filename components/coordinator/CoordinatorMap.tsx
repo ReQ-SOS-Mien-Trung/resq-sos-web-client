@@ -871,7 +871,7 @@ function DepotMarker({
         <div class="relative flex items-center justify-center" style="width: 36px; height: 36px;">
           <div class="rounded-lg flex items-center justify-center text-lg bg-blue-100 border-2 border-blue-500" 
                style="width: 36px; height: 36px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
-            🏭
+            📦
           </div>
           <div class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white"
                style="background-color: ${color};"></div>
@@ -1096,7 +1096,7 @@ function MapLegend() {
         </div>
         <div className="border-t pt-1.5 mt-1.5">
           <div className="flex items-center gap-2">
-            <span>🏭</span>
+            <span>📦</span>
             <span>Kho vật tư (Depot)</span>
           </div>
           <div className="flex items-center gap-2">

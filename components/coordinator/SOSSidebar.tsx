@@ -26,6 +26,7 @@ import {
   Users,
   CaretDown,
   CaretUp,
+  CaretRight,
   PencilSimpleLine,
   Eye,
   Rocket,
@@ -1130,8 +1131,8 @@ function ClusterMissions({
 function MissionEntityCard({
   mission,
   clusterId,
-  isExpanded,
-  onToggle,
+  isExpanded: _isExpanded,
+  onToggle: _onToggle,
   onViewMission,
 }: {
   mission: MissionEntity;
@@ -1144,11 +1145,18 @@ function MissionEntityCard({
     missionStatusConfig[mission.status] ?? missionStatusConfig.Pending;
 
   return (
-    <div className="rounded-lg border bg-background/60 overflow-hidden">
-      <div
-        className="flex items-center justify-between px-2.5 py-1.5 cursor-pointer hover:bg-muted/40 transition-colors"
-        onClick={onToggle}
-      >
+    <div
+      className={cn(
+        "rounded-lg border bg-background/60 overflow-hidden transition-colors",
+        onViewMission && clusterId && "cursor-pointer hover:bg-muted/40",
+      )}
+      onClick={() => {
+        if (onViewMission && clusterId) {
+          onViewMission(clusterId, mission.id);
+        }
+      }}
+    >
+      <div className="flex items-center justify-between px-2.5 py-2">
         <div className="flex items-center gap-1.5">
           <Rocket className="h-3 w-3 text-orange-500" weight="fill" />
           <span className="text-[11px] font-semibold">NV #{mission.id}</span>
@@ -1161,112 +1169,31 @@ function MissionEntityCard({
             {status.label}
           </span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-muted-foreground">
             {mission.activityCount} bước
           </span>
-          {isExpanded ? (
-            <CaretUp className="h-3 w-3 text-muted-foreground" />
-          ) : (
-            <CaretDown className="h-3 w-3 text-muted-foreground" />
+          {onViewMission && clusterId && (
+            <CaretRight className="h-3 w-3 text-muted-foreground" />
           )}
         </div>
       </div>
 
-      {isExpanded && (
-        <div className="px-2.5 pb-2 border-t border-border/50">
-          {/* Priority & timing */}
-          <div className="flex items-center gap-3 text-[10px] text-muted-foreground py-1.5">
-            <span>Ưu tiên: {mission.priorityScore}</span>
-            <span>
-              {new Date(mission.startTime).toLocaleTimeString("vi-VN", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}{" "}
-              →{" "}
-              {new Date(mission.expectedEndTime).toLocaleTimeString("vi-VN", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
-
-          {/* Activities timeline */}
-          {mission.activities && mission.activities.length > 0 && (
-            <div className="space-y-1">
-              {[...mission.activities]
-                .sort((a, b) => a.step - b.step)
-                .map((activity, idx) => {
-                  const config = activityTypeConfig[activity.activityType];
-                  return (
-                    <div key={activity.id} className="flex items-start gap-2">
-                      <div
-                        className={cn(
-                          "w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5",
-                          config?.bgColor || "bg-muted",
-                          config?.color || "text-muted-foreground",
-                        )}
-                      >
-                        {idx + 1}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "text-[10px] font-semibold",
-                              config?.color || "text-foreground",
-                            )}
-                          >
-                            {config?.label || activity.activityType}
-                          </span>
-                          {activity.status === "Completed" ? (
-                            <CheckCircle
-                              className="h-3 w-3 text-green-500"
-                              weight="fill"
-                            />
-                          ) : activity.status === "InProgress" ? (
-                            <Play
-                              className="h-3 w-3 text-blue-500"
-                              weight="fill"
-                            />
-                          ) : null}
-                        </div>
-                        {activity.description && (
-                          <p className="text-[10px] text-muted-foreground line-clamp-2">
-                            {activity.description}
-                          </p>
-                        )}
-                        {activity.target && (
-                          <p className="text-[10px] text-muted-foreground/70 flex items-center gap-0.5">
-                            <MapPin className="h-2.5 w-2.5" weight="fill" />
-                            {activity.target}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-
-          {onViewMission && clusterId && (
-            <div className="mt-3 pt-2 border-t border-border/40">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-7 text-[10px] bg-orange-50/50 hover:bg-orange-100 border-orange-200 text-orange-700 dark:bg-orange-900/10 dark:hover:bg-orange-900/30 dark:border-orange-800 dark:text-orange-400"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onViewMission(clusterId, mission.id);
-                }}
-              >
-                <PencilSimpleLine className="h-3 w-3 mr-1.5" weight="fill" />
-                Xem / Sửa nhiệm vụ
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Compact info row */}
+      <div className="flex items-center gap-3 px-2.5 pb-2 text-[10px] text-muted-foreground">
+        <span>Ưu tiên: {mission.priorityScore}</span>
+        <span>
+          {new Date(mission.startTime).toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}{" "}
+          →{" "}
+          {new Date(mission.expectedEndTime).toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+      </div>
     </div>
   );
 }

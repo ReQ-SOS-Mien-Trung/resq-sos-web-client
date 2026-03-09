@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  createActivity,
   createMission,
   getMissionActivities,
   getMissionById,
@@ -9,6 +10,8 @@ import {
   updateMissionStatus,
 } from "./api";
 import {
+  CreateActivityResponse,
+  CreateMissionActivityRequest,
   CreateMissionRequest,
   CreateMissionResponse,
   GetMissionsResponse,
@@ -29,10 +32,7 @@ export interface UseMissionsOptions {
   enabled?: boolean;
 }
 
-export function useMissions(
-  clusterId: number,
-  options?: UseMissionsOptions,
-) {
+export function useMissions(clusterId: number, options?: UseMissionsOptions) {
   return useQuery<GetMissionsResponse>({
     queryKey: [...MISSIONS_QUERY_KEY, clusterId],
     queryFn: () => getMissions({ clusterId }),
@@ -44,10 +44,7 @@ export interface UseMissionOptions {
   enabled?: boolean;
 }
 
-export function useMission(
-  missionId: number,
-  options?: UseMissionOptions,
-) {
+export function useMission(missionId: number, options?: UseMissionOptions) {
   return useQuery<MissionEntity>({
     queryKey: [...MISSIONS_QUERY_KEY, missionId],
     queryFn: () => getMissionById(missionId),
@@ -118,13 +115,35 @@ export function useMissionActivities(
   });
 }
 
+export function useCreateActivity() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    CreateActivityResponse,
+    Error,
+    { missionId: number; request: CreateMissionActivityRequest }
+  >({
+    mutationFn: ({ missionId, request }) => createActivity(missionId, request),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: MISSIONS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...MISSION_ACTIVITIES_QUERY_KEY, variables.missionId],
+      });
+    },
+  });
+}
+
 export function useUpdateActivityStatus() {
   const queryClient = useQueryClient();
 
   return useMutation<
     UpdateActivityStatusResponse,
     Error,
-    { missionId: number; activityId: number; request: UpdateActivityStatusRequest }
+    {
+      missionId: number;
+      activityId: number;
+      request: UpdateActivityStatusRequest;
+    }
   >({
     mutationFn: ({ missionId, activityId, request }) =>
       updateActivityStatus(missionId, activityId, request),

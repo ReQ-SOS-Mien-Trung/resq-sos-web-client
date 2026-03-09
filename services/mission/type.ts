@@ -1,8 +1,16 @@
 export type MissionType = "RESCUE" | "RESCUER";
 
-export type MissionStatus = "Pending" | "InProgress" | "Completed" | "Cancelled";
+export type MissionStatus =
+  | "Pending"
+  | "InProgress"
+  | "Completed"
+  | "Cancelled";
 
-export type ActivityStatus = "Pending" | "InProgress" | "Completed" | "Cancelled";
+export type ActivityStatus =
+  | "Pending"
+  | "InProgress"
+  | "Completed"
+  | "Cancelled";
 
 export interface MissionActivity {
   id: number;
@@ -78,6 +86,8 @@ export interface CreateMissionActivityRequest {
   targetLatitude: number;
   targetLongitude: number;
 }
+
+export type CreateActivityResponse = MissionActivity;
 
 export interface CreateMissionRequest {
   clusterId: number;
