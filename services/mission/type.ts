@@ -116,3 +116,23 @@ export interface UpdateActivityStatusResponse {
   status: ActivityStatus;
   decisionBy: string;
 }
+
+export interface UpdateActivityRequest {
+  step: number;
+  activityCode: string;
+  activityType: string;
+  description: string;
+  target: string;
+  items: string;
+  targetLatitude: number;
+  targetLongitude: number;
+}
+
+export interface UpdateActivityResponse {
+  activityId: number;
+  missionId: number;
+  step: number;
+  activityType: string;
+  description: string;
+  status: ActivityStatus;
+}

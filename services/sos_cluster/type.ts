@@ -17,6 +17,7 @@ export interface SOSClusterEntity {
   medicalUrgencyScore: number | null;
   sosRequestCount: number;
   sosRequestIds: number[];
+  isMissionCreated: boolean;
   createdAt: string;
   lastUpdatedAt: string;
 }

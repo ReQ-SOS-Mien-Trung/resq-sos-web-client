@@ -6,6 +6,7 @@ import {
   getMissionById,
   getMissions,
   updateActivityStatus,
+  updateActivity,
   updateMission,
   updateMissionStatus,
 } from "./api";
@@ -19,6 +20,8 @@ import {
   MissionEntity,
   UpdateActivityStatusRequest,
   UpdateActivityStatusResponse,
+  UpdateActivityRequest,
+  UpdateActivityResponse,
   UpdateMissionRequest,
   UpdateMissionResponse,
   UpdateMissionStatusRequest,
@@ -147,6 +150,29 @@ export function useUpdateActivityStatus() {
   >({
     mutationFn: ({ missionId, activityId, request }) =>
       updateActivityStatus(missionId, activityId, request),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: MISSIONS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...MISSION_ACTIVITIES_QUERY_KEY, variables.missionId],
+      });
+    },
+  });
+}
+
+export function useUpdateActivity() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    UpdateActivityResponse,
+    Error,
+    {
+      missionId: number;
+      activityId: number;
+      request: UpdateActivityRequest;
+    }
+  >({
+    mutationFn: ({ missionId, activityId, request }) =>
+      updateActivity(missionId, activityId, request),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: MISSIONS_QUERY_KEY });
       queryClient.invalidateQueries({

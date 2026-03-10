@@ -380,6 +380,7 @@ const SOSSidebar = ({
                             {/* Action buttons + Missions (uses hook inside) */}
                             <ClusterActionButtons
                               clusterId={cluster.id}
+                              isMissionCreated={cluster.isMissionCreated}
                               isAnalyzing={!!isAnalyzing}
                               isAnalyzingCluster={isAnalyzingCluster}
                               onAnalyzeCluster={onAnalyzeCluster}
@@ -671,10 +672,12 @@ const SOSSidebar = ({
         >
           <ScrollArea className="h-full">
             <div className="p-3 space-y-3">
-              {backendClusters.length > 0 ? (
-                backendClusters.map((cluster) => (
-                  <ClusterMissionsGroup key={cluster.id} cluster={cluster} />
-                ))
+              {backendClusters.some((c) => c.isMissionCreated) ? (
+                backendClusters
+                  .filter((c) => c.isMissionCreated)
+                  .map((cluster) => (
+                    <ClusterMissionsGroup key={cluster.id} cluster={cluster} />
+                  ))
               ) : (
                 <div className="text-center text-muted-foreground py-8">
                   <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -950,6 +953,7 @@ const missionStatusConfig: Record<
 
 function ClusterActionButtons({
   clusterId,
+  isMissionCreated,
   isAnalyzing,
   isAnalyzingCluster,
   onAnalyzeCluster,
@@ -958,6 +962,7 @@ function ClusterActionButtons({
   onViewMission,
 }: {
   clusterId: number;
+  isMissionCreated: boolean;
   isAnalyzing: boolean;
   isAnalyzingCluster: boolean;
   onAnalyzeCluster: (clusterId: number) => void;
@@ -965,26 +970,28 @@ function ClusterActionButtons({
   onViewMission?: (clusterId: number, missionId: number) => void;
   onManualMission?: (clusterId: number) => void;
 }) {
-  const { data: missionsData, isLoading: isMissionsLoading } =
-    useMissions(clusterId);
+  // Only fetch missions when backend confirms they exist — avoids unnecessary API calls
+  const { data: missionsData, isLoading: isMissionsLoading } = useMissions(
+    clusterId,
+    { enabled: isMissionCreated },
+  );
   const [expandedMissionId, setExpandedMissionId] = useState<number | null>(
     null,
   );
 
   const missions = missionsData?.missions ?? [];
-  const hasMissions = missions.length > 0;
 
   return (
     <>
       {/* Action buttons */}
       <div className="px-3 py-2 border-t border-inherit space-y-1.5">
-        {hasMissions ? (
-          // Missions already created — show success state
+        {isMissionCreated ? (
+          // Backend confirms missions exist — show success state immediately (no fetch needed)
           <div className="flex flex-col gap-2 py-1">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-500" weight="fill" />
               <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                Đã tạo {missions.length} nhiệm vụ
+                Đã tạo {missions.length > 0 ? missions.length : ""} nhiệm vụ
               </span>
             </div>
           </div>
@@ -1032,7 +1039,7 @@ function ClusterActionButtons({
       </div>
 
       {/* Mission list */}
-      {isMissionsLoading && (
+      {isMissionCreated && isMissionsLoading && (
         <div className="px-3 py-2 border-t border-inherit">
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Spinner className="h-3 w-3 animate-spin" />
@@ -1040,7 +1047,7 @@ function ClusterActionButtons({
           </div>
         </div>
       )}
-      {hasMissions && (
+      {isMissionCreated && missions.length > 0 && (
         <div className="border-t border-inherit">
           <div className="px-3 pt-2 pb-1">
             <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">

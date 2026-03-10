@@ -682,7 +682,7 @@ const CoordinatorDashboardContent = () => {
   }, []);
 
   const handleViewMission = useCallback(
-    (clusterId: number, missionId: number) => {
+    (clusterId: number | null, missionId: number) => {
       setManualMissionClusterId(clusterId);
       setExistingMissionId(missionId);
       setManualMissionOpen(true);
@@ -785,7 +785,7 @@ const CoordinatorDashboardContent = () => {
               alt="ReQ-SOS Logo"
               width={80}
               height={32}
-              className="dark:invert h-8 w-auto object-contain"
+              className="dark:invert h-auto w-auto object-contain"
             />
             <Badge variant="secondary" className="text-xs">
               Miền Trung

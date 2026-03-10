@@ -8,6 +8,8 @@ import {
   GetMissionsResponse,
   MissionActivity,
   MissionEntity,
+  UpdateActivityRequest,
+  UpdateActivityResponse,
   UpdateActivityStatusRequest,
   UpdateActivityStatusResponse,
   UpdateMissionRequest,
@@ -85,6 +87,18 @@ export async function updateActivityStatus(
 ): Promise<UpdateActivityStatusResponse> {
   const { data } = await api.patch(
     `/operations/missions/${missionId}/activities/${activityId}/status`,
+    request,
+  );
+  return data;
+}
+
+export async function updateActivity(
+  missionId: number,
+  activityId: number,
+  request: UpdateActivityRequest,
+): Promise<UpdateActivityResponse> {
+  const { data } = await api.put(
+    `/operations/missions/${missionId}/activities/${activityId}`,
     request,
   );
   return data;
