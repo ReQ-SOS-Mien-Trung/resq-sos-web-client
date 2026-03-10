@@ -418,25 +418,25 @@ const RescuerVerificationPage = () => {
             <div className="border border-border/60 rounded-2xl overflow-hidden bg-card">
               {/* Minimal top bar */}
               <div className="h-1.5 bg-gradient-to-r from-black/80 via-black/60 to-black/30 dark:from-white/30 dark:via-white/20 dark:to-white/5" />
-              <div className="p-6 sm:p-8">
-                <div className="flex items-start gap-5">
+              <div className="p-4 sm:p-6">
+                <div className="flex items-start gap-4">
                   {/* Avatar thumbnail */}
                   {selectedItem.avatarUrl ? (
                     <img
                       src={selectedItem.avatarUrl}
                       alt="Current avatar"
-                      className="w-16 h-16 rounded-xl object-cover shrink-0 border border-border/60 cursor-pointer hover:opacity-80 transition-opacity"
+                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-border/60 cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={() => setPreviewDoc({ url: selectedItem.avatarUrl!, name: "Ảnh đại diện hiện tại" })}
                     />
                   ) : avatarPreview ? (
                     <img
                       src={avatarPreview}
                       alt="Avatar preview"
-                      className="w-16 h-16 rounded-xl object-cover shrink-0 border border-border/60 cursor-pointer hover:opacity-80 transition-opacity"
+                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-border/60 cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={() => setPreviewDoc({ url: avatarPreview, name: "Ảnh đại diện mới" })}
                     />
                   ) : (
-                    <div className="w-16 h-16 rounded-xl bg-black dark:bg-white/10 flex items-center justify-center text-white dark:text-white font-black text-2xl shrink-0">
+                    <div className="w-20 h-20 rounded-xl bg-black dark:bg-white/10 flex items-center justify-center text-white dark:text-white font-black text-2xl shrink-0">
                       {selectedItem.firstName.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -643,11 +643,14 @@ const RescuerVerificationPage = () => {
                         <img
                           src={selectedItem.avatarUrl}
                           alt="User Avatar"
-                          className="w-32 h-32 rounded-full object-cover border-4 border-muted"
+                          className="w-64 sm:w-80 h-auto aspect-[3/4] object-cover shadow-sm border border-border/60 cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setPreviewDoc({ url: selectedItem.avatarUrl!, name: "Ảnh đại diện" })}
+                          title="Phóng to"
                         />
                       ) : (
-                        <div className="w-32 h-32 rounded-full bg-muted flex items-center justify-center text-muted-foreground italic text-xs">
-                          Chưa có ảnh
+                        <div className="w-64 sm:w-80 aspect-[3/4] bg-muted/40 flex flex-col items-center justify-center border border-dashed border-border/60 text-muted-foreground">
+                          <ImageIcon size={48} weight="duotone" className="mb-3 opacity-50" />
+                          <span className="text-sm font-medium uppercase tracking-wider">Chưa có ảnh</span>
                         </div>
                       )}
                     </div>
@@ -659,41 +662,13 @@ const RescuerVerificationPage = () => {
             {/* MỤC III: NĂNG LỰC CỨU HỘ */}
             {(() => {
               // Categorize abilities by group
-              const rescueCodes = [
-                "BASIC_SWIMMING", "ADVANCED_SWIMMING", "FLOOD_SWIMMING",
-                "FLOODED_HOUSE_RESCUE", "LIFE_JACKET_USE", "HAZARDOUS_RESCUE",
-                "BOAT_OPERATION", "KAYAK_OPERATION", "ROPE_RESCUE",
-                "SWIFT_WATER_RESCUE", "NIGHT_RESCUE", "UNDERWATER_RESCUE",
-                "HIGH_GROUND_RESCUE", "DEBRIS_REMOVAL", "SEARCH_AND_RESCUE",
-                "ANIMAL_RESCUE",
-              ];
-              const medicalCodes = [
-                "BASIC_FIRST_AID", "OPEN_WOUND_CARE", "BLEEDING_CONTROL",
-                "WOUND_BANDAGING", "MINOR_INJURY_CARE", "MINOR_BURN_CARE",
-                "CPR", "VITAL_SIGNS_MONITORING", "FRACTURE_SPLINTING",
-                "HYPOTHERMIA_CARE", "DROWNING_RESCUE_AID", "SNAKE_BITE_CARE",
-                "SAFE_PATIENT_TRANSPORT", "NURSE", "DOCTOR",
-                "PARAMEDIC", "PHARMACIST", "DENTIST", "MIDWIFE",
-              ];
-              const transportCodes = [
-                "MOTORCYCLE_DRIVING", "CAR_DRIVING", "TRUCK_DRIVING",
-                "BOAT_DRIVING", "AMBULANCE_DRIVING", "FORKLIFT_OPERATION",
-                "HEAVY_VEHICLE_OPERATION", "NIGHT_VEHICLE_OPERATION",
-                "OFF_ROAD_DRIVING", "WATERCRAFT_OPERATION",
-                "HELICOPTER_SUPPORT", "DRONE_OPERATION",
-              ];
-              const experienceCodes = [
-                "DISASTER_RESPONSE", "COMMUNITY_RESCUE", "MILITARY_EXPERIENCE",
-                "FIREFIGHTING", "FLOOD_EXPERIENCE",
-              ];
-
               const abilities = selectedItem.abilities || [];
-              const rescueAbilities = abilities.filter(a => rescueCodes.includes(a.code));
-              const medicalAbilities = abilities.filter(a => medicalCodes.includes(a.code));
-              const transportAbilities = abilities.filter(a => transportCodes.includes(a.code));
+              const rescueAbilities = abilities.filter(a => a.categoryCode === "RESCUE");
+              const medicalAbilities = abilities.filter(a => a.categoryCode === "MEDICAL");
+              const transportAbilities = abilities.filter(a => a.categoryCode === "TRANSPORTATION");
               const experienceAbilities = abilities.filter(a =>
-                experienceCodes.includes(a.code) ||
-                (!rescueCodes.includes(a.code) && !medicalCodes.includes(a.code) && !transportCodes.includes(a.code))
+                a.categoryCode === "EXPERIENCE" ||
+                (!["RESCUE", "MEDICAL", "TRANSPORTATION", "EXPERIENCE"].includes(a.categoryCode))
               );
 
               const totalAbilities = abilities.length;
@@ -706,7 +681,7 @@ const RescuerVerificationPage = () => {
                   iconBg: "bg-[#FF5722] text-white",
                   dotColor: "text-[#FF5722]",
                   items: rescueAbilities,
-                  total: rescueCodes.length,
+                  total: 16,
                   number: "01",
                 },
                 {
@@ -715,7 +690,7 @@ const RescuerVerificationPage = () => {
                   iconBg: "bg-[#FF5722] text-white",
                   dotColor: "text-[#FF5722]",
                   items: medicalAbilities,
-                  total: medicalCodes.length,
+                  total: 19,
                   number: "02",
                 },
                 {
@@ -724,16 +699,16 @@ const RescuerVerificationPage = () => {
                   iconBg: "bg-[#FF5722] text-white",
                   dotColor: "text-[#FF5722]",
                   items: transportAbilities,
-                  total: transportCodes.length,
+                  total: 12,
                   number: "03",
                 },
                 {
                   label: "Kinh nghiệm thực tiễn",
                   icon: <Certificate size={22} weight="duotone" />,
-                  iconBg: "bg-muted text-muted-foreground",
+                  iconBg: "bg-[#FF5722] text-white",
                   dotColor: "text-[#FF5722]",
                   items: experienceAbilities,
-                  total: experienceCodes.length,
+                  total: 5,
                   number: "04",
                 },
               ];
@@ -1059,13 +1034,21 @@ const RescuerVerificationPage = () => {
                 return (
                   <div
                     key={item.id}
-                    className="group border border-border/50 rounded-2xl p-5 sm:p-6 bg-card hover:bg-muted/10 transition-all duration-300 cursor-pointer flex flex-col sm:flex-row items-start sm:items-center gap-5 sm:gap-6"
+                    className="group border border-border/50 rounded-2xl px-4 sm:px-5 py-2 sm:py-3 bg-card hover:bg-muted/10 transition-all duration-300 cursor-pointer flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4"
                     onClick={() => setSelectedItem(item)}
                   >
                     {/* User initial/avatar */}
-                    <div className="w-12 h-12 rounded-xl bg-black dark:bg-white/10 flex items-center justify-center text-white dark:text-white font-black text-lg shrink-0 group-hover:scale-105 transition-transform duration-300">
-                      {item.firstName.charAt(0).toUpperCase()}
-                    </div>
+                    {item.avatarUrl ? (
+                      <img
+                        src={item.avatarUrl}
+                        alt="User Avatar"
+                        className="w-12 h-12 rounded-xl object-cover shrink-0 group-hover:scale-105 transition-transform duration-300 border border-border/40"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-black dark:bg-white/10 flex items-center justify-center text-white dark:text-white font-black text-lg shrink-0 group-hover:scale-105 transition-transform duration-300">
+                        {item.firstName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
 
                     <div className="flex-1 min-w-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
                       <div>

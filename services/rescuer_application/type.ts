@@ -13,6 +13,12 @@ export interface RescuerAbility {
   code: string;
   description: string;
   level: number;
+  subgroupId: number;
+  subgroupCode: string;
+  subgroupDescription: string;
+  categoryId: number;
+  categoryCode: string;
+  categoryDescription: string;
 }
 
 // Rescuer Application Entity (item in paginated list)
@@ -28,6 +34,7 @@ export interface RescuerApplicationEntity {
   lastName: string;
   email: string;
   phone: string;
+  avatarUrl: string | null;
   rescuerType: string;
   address: string;
   ward: string;
