@@ -39,6 +39,7 @@ const CoordinatorMap = ({
   depots,
   assemblyPoints = [],
   clusters = [],
+  autoClusters = [],
   selectedSOS,
   selectedRescuer,
   aiDecision,
@@ -169,11 +170,20 @@ const CoordinatorMap = ({
     return ids;
   }, [clusters]);
 
-  // When zoomed in: show all SOS. When zoomed out: hide SOS that belong to a cluster.
+  // Build a set of SOS IDs that belong to an auto-cluster
+  const autoClusteredSOSIds = useMemo(() => {
+    const ids = new Set<string>();
+    autoClusters.forEach((group) => group.forEach((s) => ids.add(s.id)));
+    return ids;
+  }, [autoClusters]);
+
+  // When zoomed in: show all SOS. When zoomed out: hide SOS that belong to a backend or auto cluster.
   const visibleSOSRequests = useMemo(() => {
     if (isZoomedIn) return sosRequests;
-    return sosRequests.filter((s) => !clusteredSOSIds.has(s.id));
-  }, [sosRequests, isZoomedIn, clusteredSOSIds]);
+    return sosRequests.filter(
+      (s) => !clusteredSOSIds.has(s.id) && !autoClusteredSOSIds.has(s.id),
+    );
+  }, [sosRequests, isZoomedIn, clusteredSOSIds, autoClusteredSOSIds]);
 
   // When zoomed in: hide clusters. When zoomed out: merge nearby clusters based on zoom.
   type ClusterWithMergeFlag = SOSClusterEntity & { _isMerged: boolean };
@@ -670,6 +680,29 @@ const CoordinatorMap = ({
           />
         ))}
 
+        {/* Auto-Cluster Markers (client-side suggested clusters) */}
+        {!isZoomedIn &&
+          autoClusters.map((group, idx) => (
+            <AutoClusterMarker
+              key={`auto-cluster-${idx}`}
+              group={group}
+              index={idx}
+              onClick={() => {
+                // Fly to the auto-cluster center on click
+                const lat =
+                  group.reduce((sum, s) => sum + s.location.lat, 0) /
+                  group.length;
+                const lng =
+                  group.reduce((sum, s) => sum + s.location.lng, 0) /
+                  group.length;
+                setSearchFlyToLocation({ lat, lng });
+                setSearchFlyToZoom(
+                  Math.max(currentZoom + 2, CLUSTER_ZOOM_THRESHOLD),
+                );
+              }}
+            />
+          ))}
+
         {/* Cluster Markers */}
         {visibleClusters.map((cluster) => (
           <ClusterMarker
@@ -982,6 +1015,73 @@ function AssemblyPointMarker({
     <Marker
       position={[assemblyPoint.latitude, assemblyPoint.longitude]}
       icon={iconEl}
+      eventHandlers={{ click: () => onClick?.() }}
+    />
+  );
+}
+
+// Auto-Cluster Marker – shows client-side suggested clusters (dashed border, muted)
+function AutoClusterMarker({
+  group,
+  index,
+  onClick,
+}: {
+  group: SOSRequest[];
+  index: number;
+  onClick?: () => void;
+}) {
+  const count = group.length;
+  const lat = group.reduce((sum, s) => sum + s.location.lat, 0) / count;
+  const lng = group.reduce((sum, s) => sum + s.location.lng, 0) / count;
+
+  // Use highest priority in group for color
+  const priorityOrder = { P1: 0, P2: 1, P3: 2 };
+  const highestPriority = group.reduce(
+    (best, s) =>
+      priorityOrder[s.priority] < priorityOrder[best] ? s.priority : best,
+    group[0].priority,
+  );
+  const colors: Record<string, string> = {
+    P1: "#ef4444",
+    P2: "#f97316",
+    P3: "#eab308",
+  };
+  const color = colors[highestPriority] || "#f97316";
+
+  const size = Math.min(52 + count * 4, 72);
+  const ringSize = size + 20;
+
+  const iconEl = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const L = require("leaflet");
+
+    return L.divIcon({
+      className: "custom-auto-cluster-marker",
+      html: `
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${ringSize}px;height:${ringSize}px;">
+          <div style="position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.12;animation:clusterPulse 2.5s ease-out infinite;"></div>
+          <div style="position:absolute;inset:${(ringSize - size) / 2}px;border-radius:50%;background:${color}11;border:2px dashed ${color}66;"></div>
+          <div style="position:relative;width:${size - 4}px;height:${size - 4}px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+                      background:linear-gradient(145deg, ${color}dd, ${color}99);border:2px dashed white;
+                      box-shadow:0 2px 10px rgba(0,0,0,0.25), 0 0 0 2px ${color}33;">
+            <span style="font-size:15px;font-weight:800;color:white;line-height:1;">#${index + 1}</span>
+            <span style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.9);line-height:1;margin-top:1px;">${count} SOS</span>
+          </div>
+        </div>
+      `,
+      iconSize: [ringSize, ringSize],
+      iconAnchor: [ringSize / 2, ringSize / 2],
+    });
+  }, [count, index, color, size, ringSize]);
+
+  if (!iconEl) return null;
+
+  return (
+    <Marker
+      position={[lat, lng]}
+      icon={iconEl}
+      zIndexOffset={900}
       eventHandlers={{ click: () => onClick?.() }}
     />
   );

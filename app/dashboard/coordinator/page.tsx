@@ -52,7 +52,6 @@ import {
   CloudSun,
   MapTrifold,
   SignOut,
-  Crosshair,
   Phone,
 } from "@phosphor-icons/react";
 import {
@@ -62,7 +61,7 @@ import {
 } from "@/components/coordinator";
 import RescuePlanPanel from "@/components/coordinator/RescuePlanPanel";
 import ManualMissionBuilder from "@/components/coordinator/ManualMissionBuilder";
-import { ManualSOSBuilder } from "@/components/coordinator/ManualSOSBuilder";
+
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -275,14 +274,6 @@ const CoordinatorDashboardContent = () => {
     null,
   );
 
-  // ─── Create SOS State ───
-  const [createSOSOpen, setCreateSOSOpen] = useState(false);
-  const [isPickingLocation, setIsPickingLocation] = useState(false);
-  const [createSOSDraftLocation, setCreateSOSDraftLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-
   // ─── Processing State ───
   const [processingClusterIndex, setProcessingClusterIndex] = useState<
     number | null
@@ -298,7 +289,9 @@ const CoordinatorDashboardContent = () => {
   const [notificationCount] = useState(3);
 
   // ─── Data Fetching ───
-  const { data: sosData } = useSOSRequests();
+  const { data: sosData } = useSOSRequests({
+    params: { pageSize: 200 },
+  });
   const { data: depotsData } = useDepots({ params: { pageSize: 100 } });
   const { data: assemblyPointsData } = useAssemblyPoints({
     params: { pageSize: 100 },
@@ -976,6 +969,7 @@ const CoordinatorDashboardContent = () => {
                 depots={depots}
                 assemblyPoints={assemblyPoints}
                 clusters={clusters}
+                autoClusters={autoClusters}
                 selectedSOS={selectedSOS}
                 selectedRescuer={selectedRescuer}
                 aiDecision={null}
@@ -988,66 +982,22 @@ const CoordinatorDashboardContent = () => {
                 flyToZoom={flyToZoom}
                 userLocation={userLocation}
                 onViewChange={handleMapViewChange}
-                isPickingLocation={isPickingLocation}
-                onMapClick={(lat, lng) => {
-                  setCreateSOSDraftLocation({ lat, lng });
-                  setIsPickingLocation(false);
-                  setCreateSOSOpen(true);
-                }}
               />
 
               {/* Floating Create SOS Button */}
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[40]">
-                {isPickingLocation ? (
-                  <div className="bg-background/95 backdrop-blur-sm rounded-full border border-indigo-200 dark:border-indigo-800 shadow-lg px-5 py-2.5 flex items-center gap-4 animate-in slide-in-from-bottom-5">
-                    <span className="text-sm font-medium animate-pulse text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
-                      <Crosshair className="w-4 h-4" />
-                      Click chọn vị trí trên bản đồ...
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 rounded-full border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-                      onClick={() => {
-                        setIsPickingLocation(false);
-                        setCreateSOSOpen(true);
-                      }}
-                    >
-                      Huỷ chọn
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    size="lg"
-                    className="rounded-full shadow-[0_0_30px_rgba(220,38,38,0.4)] bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold gap-2.5 px-8 h-14 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105"
-                    onClick={() => {
-                      setCreateSOSDraftLocation(null);
-                      setCreateSOSOpen(true);
-                    }}
-                  >
-                    <span className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-                    <Phone className="w-5 h-5 animate-bounce" weight="fill" />
-                    <span className="tracking-wide">TẠO YÊU CẦU SOS</span>
-                  </Button>
-                )}
+                <Button
+                  size="lg"
+                  className="rounded-full shadow-[0_0_30px_rgba(220,38,38,0.4)] bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold gap-2.5 px-8 h-14 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105"
+                  onClick={() => {
+                    router.push("/dashboard/coordinator/create-sos");
+                  }}
+                >
+                  <span className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                  <Phone className="w-5 h-5 animate-bounce" weight="fill" />
+                  <span className="tracking-wide">TẠO YÊU CẦU SOS</span>
+                </Button>
               </div>
-
-              {/* Manual SOS Builder Dialog */}
-              <ManualSOSBuilder
-                open={createSOSOpen}
-                onOpenChange={(v) => {
-                  setCreateSOSOpen(v);
-                  if (!v) setCreateSOSDraftLocation(null);
-                }}
-                pickedLocation={createSOSDraftLocation}
-                onPickLocationMode={() => {
-                  setCreateSOSOpen(false);
-                  setIsPickingLocation(true);
-                }}
-                onSuccess={() => {
-                  setCreateSOSDraftLocation(null);
-                }}
-              />
 
               {/* Floating Stats Panel */}
               {!sosDetailOpen && (

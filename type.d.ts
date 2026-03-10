@@ -857,6 +857,8 @@ export interface CoordinatorMapProps {
   }[];
   // SOS Clusters from backend
   clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
+  /** Client-side auto-clusters (groups of nearby PENDING SOS) */
+  autoClusters?: SOSRequest[][];
   selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
   aiDecision?: AIDispatchDecision | null;

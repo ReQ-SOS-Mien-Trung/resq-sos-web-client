@@ -380,6 +380,11 @@ const SOSDetailsPanel = ({
                     {sosRequest.senderName && (
                       <div className="font-medium">{sosRequest.senderName}</div>
                     )}
+                    {sosRequest.senderPhone && (
+                      <div className="text-muted-foreground">
+                        {sosRequest.senderPhone}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5">
                     {sosRequest.isOnline ? (

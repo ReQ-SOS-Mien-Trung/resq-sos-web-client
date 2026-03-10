@@ -13,9 +13,52 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { MapPin, Phone, User, WarningCircle } from "@phosphor-icons/react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import {
+  MapPin,
+  Phone,
+  User,
+  WarningCircle,
+  FirstAid,
+  Users,
+  Package,
+  X,
+} from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useCreateSOSRequest } from "@/services/sos_request/hooks";
+import type { CreateSOSRequestPayload } from "@/services/sos_request/type";
+
+const SITUATION_OPTIONS = [
+  { value: "TRAPPED", label: "Mắc kẹt" },
+  { value: "ISOLATED", label: "Bị cô lập" },
+  { value: "STRANDED", label: "Mắc cạn" },
+  { value: "OTHER", label: "Khác" },
+] as const;
+
+const MEDICAL_ISSUE_OPTIONS = [
+  { value: "FRACTURE", label: "Gãy xương" },
+  { value: "BLEEDING", label: "Chảy máu" },
+  { value: "CHRONIC_DISEASE", label: "Bệnh mãn tính" },
+  { value: "PREGNANCY", label: "Thai phụ" },
+  { value: "BREATHING_DIFFICULTY", label: "Khó thở" },
+  { value: "MOBILITY_IMPAIRMENT", label: "Hạn chế vận động" },
+] as const;
+
+const SUPPLY_OPTIONS = [
+  { value: "MEDICINE", label: "Thuốc" },
+  { value: "FOOD", label: "Thực phẩm" },
+  { value: "WATER", label: "Nước uống" },
+  { value: "RESCUE_EQUIPMENT", label: "Thiết bị cứu hộ" },
+  { value: "TRANSPORTATION", label: "Phương tiện" },
+] as const;
 
 interface ManualSOSBuilderProps {
   open: boolean;
@@ -25,6 +68,27 @@ interface ManualSOSBuilderProps {
   onSuccess?: () => void;
 }
 
+function ToggleChip({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Badge
+      variant={selected ? "default" : "outline"}
+      className="cursor-pointer select-none transition-colors"
+      onClick={onClick}
+    >
+      {label}
+      {selected && <X size={10} className="ml-1" />}
+    </Badge>
+  );
+}
+
 export function ManualSOSBuilder({
   open,
   onOpenChange,
@@ -32,13 +96,38 @@ export function ManualSOSBuilder({
   onPickLocationMode,
   onSuccess,
 }: ManualSOSBuilderProps) {
+  // ── Sender info ──
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+
+  // ── Core ──
   const [msg, setMsg] = useState("");
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
 
+  // ── Structured data ──
+  const [situation, setSituation] = useState("");
+  const [otherSituation, setOtherSituation] = useState("");
+  const [adultCount, setAdultCount] = useState("1");
+  const [childCount, setChildCount] = useState("0");
+  const [elderlyCount, setElderlyCount] = useState("0");
+  const [hasInjured, setHasInjured] = useState(false);
+  const [needMedical, setNeedMedical] = useState(false);
+  const [canMove, setCanMove] = useState(true);
+  const [othersAreStable, setOthersAreStable] = useState(true);
+  const [medicalIssues, setMedicalIssues] = useState<string[]>([]);
+  const [supplies, setSupplies] = useState<string[]>([]);
+  const [additionalDescription, setAdditionalDescription] = useState("");
+
   const { mutate: createSOS, isPending } = useCreateSOSRequest();
+
+  const toggleItem = (
+    arr: string[],
+    setArr: (v: string[]) => void,
+    val: string,
+  ) => {
+    setArr(arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]);
+  };
 
   // Update loc if new one picked
   useEffect(() => {
@@ -48,14 +137,30 @@ export function ManualSOSBuilder({
     }
   }, [pickedLocation]);
 
-  // Reset form when opened fresh (no picked location)
+  const resetForm = () => {
+    setName("");
+    setPhone("");
+    setMsg("");
+    setLat("");
+    setLng("");
+    setSituation("");
+    setOtherSituation("");
+    setAdultCount("1");
+    setChildCount("0");
+    setElderlyCount("0");
+    setHasInjured(false);
+    setNeedMedical(false);
+    setCanMove(true);
+    setOthersAreStable(true);
+    setMedicalIssues([]);
+    setSupplies([]);
+    setAdditionalDescription("");
+  };
+
+  // Reset form when opened fresh
   useEffect(() => {
     if (open && !pickedLocation && !name && !phone && !msg && !lat && !lng) {
-      setName("");
-      setPhone("");
-      setMsg("");
-      setLat("");
-      setLng("");
+      resetForm();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -73,38 +178,60 @@ export function ManualSOSBuilder({
       return;
     }
 
-    createSOS(
-      {
-        msg: msg.trim(),
-        latitude: Number(lat),
-        longitude: Number(lng),
-        senderInfo: {
-          user_name: name.trim() || undefined,
-          user_phone: phone.trim() || undefined,
-        },
+    if (!situation) {
+      toast.error("Vui lòng chọn tình huống");
+      return;
+    }
+
+    const payload: CreateSOSRequestPayload = {
+      msg: msg.trim(),
+      location: {
+        lat: Number(lat),
+        lng: Number(lng),
       },
-      {
-        onSuccess: () => {
-          toast.success("Tạo yêu cầu SOS thành công!");
-          setName("");
-          setPhone("");
-          setMsg("");
-          setLat("");
-          setLng("");
-          onOpenChange(false);
-          onSuccess?.();
+      structured_data: {
+        situation,
+        other_situation_description:
+          situation === "OTHER" ? otherSituation.trim() : "",
+        has_injured: hasInjured,
+        medical_issues: medicalIssues,
+        other_medical_description: "",
+        others_are_stable: othersAreStable,
+        people_count: {
+          adult: Math.max(0, parseInt(adultCount) || 0),
+          child: Math.max(0, parseInt(childCount) || 0),
+          elderly: Math.max(0, parseInt(elderlyCount) || 0),
         },
-        onError: (err) => {
-          console.error(err);
-          toast.error("Tạo SOS thất bại, vui lòng thử lại.");
-        },
+        can_move: canMove,
+        need_medical: needMedical,
+        supplies,
+        other_supply_description: "",
+        additional_description: additionalDescription.trim(),
+        injured_persons: [],
       },
-    );
+      sender_info: {
+        user_name: name.trim() || undefined,
+        user_phone: phone.trim() || undefined,
+      },
+    };
+
+    createSOS(payload, {
+      onSuccess: () => {
+        toast.success("Tạo yêu cầu SOS thành công!");
+        resetForm();
+        onOpenChange(false);
+        onSuccess?.();
+      },
+      onError: (err) => {
+        console.error(err);
+        toast.error("Tạo SOS thất bại, vui lòng thử lại.");
+      },
+    });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[520px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Tạo SOS theo yêu cầu</DialogTitle>
           <DialogDescription>
@@ -113,51 +240,46 @@ export function ManualSOSBuilder({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-          <div className="space-y-4 text-sm">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <User size={14} /> Tên người gọi
-                </Label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Nguyễn Văn A"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Phone size={14} /> Số điện thoại
-                </Label>
-                <Input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="099..."
-                />
+        <ScrollArea className="flex-1 -mx-6 px-6">
+          <form
+            id="manual-sos-form"
+            onSubmit={handleSubmit}
+            className="space-y-5 pb-2"
+          >
+            {/* ── Sender Info ── */}
+            <div className="space-y-3 text-sm">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <User size={12} /> Thông tin người gọi
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Tên</Label>
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Nguyễn Văn A"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1">
+                    <Phone size={12} /> Số điện thoại
+                  </Label>
+                  <Input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="099..."
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <WarningCircle size={14} /> Tình trạng / Lời gọi cứu{" "}
-                <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                value={msg}
-                onChange={(e) => setMsg(e.target.value)}
-                placeholder="Nước ngập ngang ngực, cần thuyền..."
-                rows={3}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
+            {/* ── Location ── */}
+            <div className="space-y-3 text-sm">
               <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-2">
-                  <MapPin size={14} /> Toạ độ (Lat, Lng){" "}
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <MapPin size={12} /> Toạ độ{" "}
                   <span className="text-red-500">*</span>
-                </Label>
+                </p>
                 <Button
                   type="button"
                   variant="outline"
@@ -169,7 +291,7 @@ export function ManualSOSBuilder({
                   Chọn trên bản đồ
                 </Button>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <Input
                   value={lat}
                   onChange={(e) => setLat(e.target.value)}
@@ -184,22 +306,174 @@ export function ManualSOSBuilder({
                 />
               </div>
             </div>
-          </div>
 
-          <DialogFooter className="pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isPending}
-            >
-              Huỷ bỏ
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Đang tạo..." : "Xác nhận tạo SOS"}
-            </Button>
-          </DialogFooter>
-        </form>
+            {/* ── Message ── */}
+            <div className="space-y-1.5 text-sm">
+              <Label className="flex items-center gap-1.5">
+                <WarningCircle size={14} /> Lời gọi cứu{" "}
+                <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                value={msg}
+                onChange={(e) => setMsg(e.target.value)}
+                placeholder="Nước ngập ngang ngực, cần thuyền..."
+                rows={2}
+                required
+              />
+            </div>
+
+            {/* ── Situation ── */}
+            <div className="space-y-3 text-sm">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Tình huống <span className="text-red-500">*</span>
+              </p>
+              <Select value={situation} onValueChange={setSituation}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn tình huống" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SITUATION_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {situation === "OTHER" && (
+                <Input
+                  value={otherSituation}
+                  onChange={(e) => setOtherSituation(e.target.value)}
+                  placeholder="Mô tả tình huống khác..."
+                />
+              )}
+            </div>
+
+            {/* ── People Count ── */}
+            <div className="space-y-3 text-sm">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <Users size={12} /> Số người
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Người lớn</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={adultCount}
+                    onChange={(e) => setAdultCount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Trẻ em</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={childCount}
+                    onChange={(e) => setChildCount(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Người già</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={elderlyCount}
+                    onChange={(e) => setElderlyCount(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* ── Medical / Injury Status ── */}
+            <div className="space-y-3 text-sm">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <FirstAid size={12} /> Tình trạng y tế
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <ToggleChip
+                  label="Có người bị thương"
+                  selected={hasInjured}
+                  onClick={() => setHasInjured(!hasInjured)}
+                />
+                <ToggleChip
+                  label="Cần hỗ trợ y tế"
+                  selected={needMedical}
+                  onClick={() => setNeedMedical(!needMedical)}
+                />
+                <ToggleChip
+                  label="Có thể di chuyển"
+                  selected={canMove}
+                  onClick={() => setCanMove(!canMove)}
+                />
+                <ToggleChip
+                  label="Người khác ổn định"
+                  selected={othersAreStable}
+                  onClick={() => setOthersAreStable(!othersAreStable)}
+                />
+              </div>
+
+              {hasInjured && (
+                <div className="space-y-1.5">
+                  <Label>Vấn đề y tế</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MEDICAL_ISSUE_OPTIONS.map((opt) => (
+                      <ToggleChip
+                        key={opt.value}
+                        label={opt.label}
+                        selected={medicalIssues.includes(opt.value)}
+                        onClick={() =>
+                          toggleItem(medicalIssues, setMedicalIssues, opt.value)
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Supplies Needed ── */}
+            <div className="space-y-3 text-sm">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <Package size={12} /> Nhu yếu phẩm cần thiết
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {SUPPLY_OPTIONS.map((opt) => (
+                  <ToggleChip
+                    key={opt.value}
+                    label={opt.label}
+                    selected={supplies.includes(opt.value)}
+                    onClick={() => toggleItem(supplies, setSupplies, opt.value)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* ── Additional Description ── */}
+            <div className="space-y-1.5 text-sm">
+              <Label>Ghi chú thêm</Label>
+              <Textarea
+                value={additionalDescription}
+                onChange={(e) => setAdditionalDescription(e.target.value)}
+                placeholder="Thông tin bổ sung (nếu có)..."
+                rows={2}
+              />
+            </div>
+          </form>
+        </ScrollArea>
+
+        <DialogFooter className="pt-4 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
+            Huỷ bỏ
+          </Button>
+          <Button type="submit" form="manual-sos-form" disabled={isPending}>
+            {isPending ? "Đang tạo..." : "Xác nhận tạo SOS"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
