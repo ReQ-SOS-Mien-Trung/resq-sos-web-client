@@ -72,4 +72,8 @@ export interface AdminCreateUserRequest {
   username: string;
   password?: string;
   roleId: number;
+  avatarUrl?: string;
+  address?: string;
+  ward?: string;
+  province?: string;
 }
