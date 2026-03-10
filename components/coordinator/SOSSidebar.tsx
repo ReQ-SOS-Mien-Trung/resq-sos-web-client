@@ -986,13 +986,51 @@ function ClusterActionButtons({
       {/* Action buttons */}
       <div className="px-3 py-2 border-t border-inherit space-y-1.5">
         {isMissionCreated ? (
-          // Backend confirms missions exist — show success state immediately (no fetch needed)
+          // Backend confirms missions exist — show success state + view plan button
           <div className="flex flex-col gap-2 py-1">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-500" weight="fill" />
               <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
                 Đã tạo {missions.length > 0 ? missions.length : ""} nhiệm vụ
               </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {onViewClusterPlan && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-7 text-[11px] border-emerald-300/60 dark:border-emerald-700/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewClusterPlan(clusterId);
+                  }}
+                >
+                  <Rocket className="h-3 w-3 mr-1" weight="fill" />
+                  Xem kế hoạch
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-7 text-[11px] border-blue-300/60 dark:border-blue-700/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAnalyzeCluster(clusterId);
+                }}
+                disabled={isAnalyzingCluster}
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Spinner className="h-3 w-3 mr-1 animate-spin" />
+                    Đang phân tích...
+                  </>
+                ) : (
+                  <>
+                    <Lightning className="h-3 w-3 mr-1" weight="fill" />
+                    Phân tích lại
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         ) : (

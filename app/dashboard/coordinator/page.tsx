@@ -258,6 +258,10 @@ const CoordinatorDashboardContent = () => {
   const [rescueSuggestion, setRescueSuggestion] =
     useState<ClusterRescueSuggestionResponse | null>(null);
   const [activeClusterId, setActiveClusterId] = useState<number | null>(null);
+  // Cache of rescue suggestions per cluster ID
+  const suggestionCacheRef = useRef<
+    Map<number, ClusterRescueSuggestionResponse>
+  >(new Map());
   const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [locationPanelData, setLocationPanelData] =
     useState<LocationPanelData | null>(null);
@@ -515,7 +519,6 @@ const CoordinatorDashboardContent = () => {
   const handleViewClusterPlan = useCallback(
     (clusterId: number) => {
       setActiveClusterId(clusterId);
-      setRescueSuggestion(null);
       const cluster = clusters.find((c) => c.id === clusterId);
       if (cluster) {
         setFlyToZoom(undefined);
@@ -524,6 +527,10 @@ const CoordinatorDashboardContent = () => {
           lng: Number(cluster.centerLongitude),
         });
       }
+      // Use cached suggestion if available, otherwise open in history mode
+      // (RescuePlanPanel will auto-display the latest from useMissionSuggestions)
+      const cached = suggestionCacheRef.current.get(clusterId);
+      setRescueSuggestion(cached ?? null);
       setRescuePlanOpen(true);
       setSOSDetailOpen(false);
       setLocationPanelOpen(false);
@@ -609,6 +616,10 @@ const CoordinatorDashboardContent = () => {
                   return;
                 }
                 setRescueSuggestion(suggestion);
+                suggestionCacheRef.current.set(
+                  clusterData.clusterId,
+                  suggestion,
+                );
                 setRescuePlanOpen(true);
                 setProcessingClusterIndex(null);
                 setProcessingSosId(null);
@@ -650,6 +661,7 @@ const CoordinatorDashboardContent = () => {
             return;
           }
           setRescueSuggestion(suggestion);
+          suggestionCacheRef.current.set(clusterId, suggestion);
           setRescuePlanOpen(true);
         },
         onError: (error) => {
@@ -711,6 +723,7 @@ const CoordinatorDashboardContent = () => {
           return;
         }
         setRescueSuggestion(suggestion);
+        suggestionCacheRef.current.set(activeClusterId, suggestion);
         toast.success("Đã phân tích lại thành công!");
       },
       onError: () => {
