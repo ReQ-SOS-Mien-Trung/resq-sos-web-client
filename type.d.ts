@@ -137,10 +137,10 @@ export interface AIDispatchDecision {
 export interface MissionStep {
   stepNumber: number;
   action:
-    | "PICKUP_SUPPLIES"
-    | "GO_TO_VICTIM"
-    | "TRANSPORT_TO_SAFETY"
-    | "RETURN_TO_BASE";
+  | "PICKUP_SUPPLIES"
+  | "GO_TO_VICTIM"
+  | "TRANSPORT_TO_SAFETY"
+  | "RETURN_TO_BASE";
   location: Location;
   locationName: string;
   details: string;
@@ -509,25 +509,25 @@ export interface WeatherMapProps {
 
 export type WeatherApiCurrentPoint =
   | {
-      name: string;
-      lat: number;
-      lon: number;
-      localtime: string;
-      last_updated: string;
-      temp_c: number;
-      humidity: number;
-      wind_degree: number;
-      wind_dir: string;
-      wind_kph: number;
-      precip_mm: number;
-      condition_text: string;
-      condition_icon: string;
-    }
+    name: string;
+    lat: number;
+    lon: number;
+    localtime: string;
+    last_updated: string;
+    temp_c: number;
+    humidity: number;
+    wind_degree: number;
+    wind_dir: string;
+    wind_kph: number;
+    precip_mm: number;
+    condition_text: string;
+    condition_icon: string;
+  }
   | {
-      name: string;
-      q: string;
-      error: string;
-    };
+    name: string;
+    q: string;
+    error: string;
+  };
 
 export interface WeatherChartProps {
   data: WeatherData[];
@@ -760,9 +760,9 @@ export interface RescuerVerification {
 export type LocationPanelData =
   | { type: "depot"; data: import("@/services/depot/type").DepotEntity }
   | {
-      type: "assemblyPoint";
-      data: import("@/services/assembly_points/type").AssemblyPointEntity;
-    };
+    type: "assemblyPoint";
+    data: import("@/services/assembly_points/type").AssemblyPointEntity;
+  };
 
 export interface LocationDetailsPanelProps {
   open: boolean;
@@ -805,8 +805,8 @@ export interface RescuePlanPanelProps {
   clusterSOSRequests: SOSRequest[];
   clusterId: number | null;
   rescueSuggestion:
-    | import("@/services/sos_cluster/type").ClusterRescueSuggestionResponse
-    | null;
+  | import("@/services/sos_cluster/type").ClusterRescueSuggestionResponse
+  | null;
   onApprove: () => void;
   onReAnalyze: () => void;
   isReAnalyzing: boolean;
@@ -1049,13 +1049,13 @@ export interface IInventoryStats {
 export interface ActivityLog {
   id: string;
   action:
-    | "STOCK_IN"
-    | "STOCK_OUT"
-    | "ADJUSTMENT"
-    | "REQUEST_CREATED"
-    | "REQUEST_APPROVED"
-    | "SHIPMENT_SENT"
-    | "SHIPMENT_RECEIVED";
+  | "STOCK_IN"
+  | "STOCK_OUT"
+  | "ADJUSTMENT"
+  | "REQUEST_CREATED"
+  | "REQUEST_APPROVED"
+  | "SHIPMENT_SENT"
+  | "SHIPMENT_RECEIVED";
   itemId?: string;
   itemName?: string;
   quantity?: number;
@@ -1091,6 +1091,8 @@ export interface InventoryStatsProps {
 
 export interface DepotSidebarProps {
   depotInfo: DepotInfo;
+  activeTab: string;
+  onActiveTabChange: (tab: string) => void;
   inventoryItems: InventoryItem[];
   supplyRequests: SupplyRequest[];
   shipments: Shipment[];
@@ -1208,10 +1210,10 @@ export interface AIDispatchDecision {
 export interface MissionStep {
   stepNumber: number;
   action:
-    | "PICKUP_SUPPLIES"
-    | "GO_TO_VICTIM"
-    | "TRANSPORT_TO_SAFETY"
-    | "RETURN_TO_BASE";
+  | "PICKUP_SUPPLIES"
+  | "GO_TO_VICTIM"
+  | "TRANSPORT_TO_SAFETY"
+  | "RETURN_TO_BASE";
   location: Location;
   locationName: string;
   details: string;

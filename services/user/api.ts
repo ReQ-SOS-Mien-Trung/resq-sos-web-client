@@ -23,3 +23,8 @@ export async function banUser(userId: string, data: BanUserRequest): Promise<voi
 export async function unbanUser(userId: string): Promise<void> {
   await api.post(`/identity/admin/users/${userId}/unban`);
 }
+
+export async function adminCreateUser(data: import("./type").AdminCreateUserRequest): Promise<any> {
+  const response = await api.post("/identity/admin/users", data);
+  return response.data;
+}

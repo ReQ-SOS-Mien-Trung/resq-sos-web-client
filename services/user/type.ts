@@ -63,3 +63,13 @@ export interface GetUsersParams {
 export interface BanUserRequest {
   reason: string;
 }
+
+export interface AdminCreateUserRequest {
+  phone: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  password?: string;
+  roleId: number;
+}

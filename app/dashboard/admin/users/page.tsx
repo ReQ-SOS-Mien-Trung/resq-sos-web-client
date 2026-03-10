@@ -138,19 +138,27 @@ const UsersPage = () => {
       cloudStorage={dashboardData.cloudStorage}
     >
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <ShieldCheck size={20} className="text-foreground" />
-            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Quản lý hồ sơ
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5 mb-1">
+              <ShieldCheck size={20} className="text-foreground" />
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Quản lý hồ sơ
+              </p>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-tight">
+              Quản lý người dùng
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Xem xét và quản lý tài khoản của người dùng
             </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-tight">
-            Quản lý người dùng
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Xem xét và phê duyệt hồ sơ của người dùng
-          </p>
+          <Button
+            onClick={() => window.location.href = "/dashboard/admin/users/create"}
+            className="bg-black hover:bg-black/80 dark:bg-white dark:hover:bg-white/80 dark:text-black text-white h-10 px-6 rounded-none border-b-2 border-[#FF5722] transition-all uppercase font-black tracking-widest text-[10px]"
+          >
+            + Tạo người dùng
+          </Button>
         </div>
 
         <UserStats stats={dynamicStats} />

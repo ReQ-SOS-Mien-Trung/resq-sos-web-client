@@ -41,6 +41,9 @@ import {
   LowStockAlerts,
   RecentActivity,
 } from "@/components/inventory";
+import { VatTuSection } from "@/components/inventory/VatTuTabContent";
+import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
+import { InventoryItemEntity } from "@/services/inventory/type";
 import {
   DepotInfo,
   InventoryItem,
@@ -128,6 +131,9 @@ const InventoryDashboardPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [itemSheetOpen, setItemSheetOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("inventory");
+  const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
+  const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
 
   // ── Auth ──
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -433,6 +439,8 @@ const InventoryDashboardPage = () => {
               selectedCategory={selectedCategory}
               onCategorySelect={handleCategorySelect}
               apiCategories={categoriesData?.items}
+              activeTab={activeTab}
+              onActiveTabChange={setActiveTab}
             />
           )}
         </aside>
@@ -460,28 +468,37 @@ const InventoryDashboardPage = () => {
               </Button>
             </div>
 
-            {/* Stats Overview */}
-            <InventoryStats stats={stats} />
+            {activeTab === "vattu" ? (
+              <VatTuSection onItemSelect={(item) => {
+                setVatTuSelectedItem(item);
+                setVatTuSheetOpen(true);
+              }} />
+            ) : (
+              <>
+                {/* Stats Overview */}
+                <InventoryStats stats={stats} />
 
-            {/* Category Overview */}
-            <CategoryOverview
-              apiCategories={categoriesData?.items}
-              onCategorySelect={handleCategorySelect}
-              selectedCategory={selectedCategory}
-            />
+                {/* Category Overview */}
+                <CategoryOverview
+                  apiCategories={categoriesData?.items}
+                  onCategorySelect={handleCategorySelect}
+                  selectedCategory={selectedCategory}
+                />
 
-            {/* Two Column Layout: Alerts + Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Low Stock Alerts */}
-              <LowStockAlerts
-                items={mockInventoryItems}
-                onItemClick={handleItemSelect}
-                onViewAll={() => setSelectedCategory(null)}
-              />
+                {/* Two Column Layout: Alerts + Activity */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Low Stock Alerts */}
+                  <LowStockAlerts
+                    items={mockInventoryItems}
+                    onItemClick={handleItemSelect}
+                    onViewAll={() => setSelectedCategory(null)}
+                  />
 
-              {/* Recent Activity */}
-              <RecentActivity activities={mockActivityLogs} maxItems={8} />
-            </div>
+                  {/* Recent Activity */}
+                  <RecentActivity activities={mockActivityLogs} maxItems={8} />
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -500,6 +517,13 @@ const InventoryDashboardPage = () => {
         onEdit={() => {
           console.log("Edit item:", selectedItem?.name);
         }}
+      />
+
+      {/* Vat Tu Details Sheet - rendered at page level for full overlay */}
+      <VatTuDetailsSheet
+        item={vatTuSelectedItem}
+        open={vatTuSheetOpen}
+        onOpenChange={setVatTuSheetOpen}
       />
     </div>
   );

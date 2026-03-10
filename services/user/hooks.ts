@@ -49,3 +49,9 @@ export function useUnbanUser() {
     mutationFn: (userId: string) => unbanUser(userId),
   });
 }
+
+export function useAdminCreateUser() {
+  return useMutation({
+    mutationFn: (data: import("./type").AdminCreateUserRequest) => import("./api").then(m => m.adminCreateUser(data)),
+  });
+}
