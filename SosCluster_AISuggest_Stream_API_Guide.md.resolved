@@ -1,0 +1,507 @@
+# 📡 Hướng dẫn Frontend – SOS Cluster AI Mission Suggestion API
+
+> **Base URL:** `/emergency/sos-clusters`  
+> **Auth:** Bearer JWT (header `Authorization: Bearer <token>`)  
+> **Roles được phép:** `1`, `2`, `4` (Coordinator, Admin, Manager)
+
+---
+
+## Tổng quan các API
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| `POST` | `/emergency/sos-clusters` | Tạo cluster từ danh sách SOS request |
+| `GET` | `/emergency/sos-clusters` | Lấy danh sách tất cả cluster |
+| `POST` | `/emergency/sos-clusters/{clusterId}/rescue-suggestion` | Gọi AI đề xuất nhiệm vụ **(blocking)** |
+| `GET` | `/emergency/sos-clusters/{clusterId}/rescue-suggestion/stream` | Gọi AI đề xuất nhiệm vụ **(SSE realtime)** ⭐ |
+| `GET` | `/emergency/sos-clusters/{clusterId}/mission-suggestions` | Xem lại các đề xuất đã lưu |
+
+---
+
+## API 1 – Tạo Cluster
+
+### `POST /emergency/sos-clusters`
+
+**Request Body:**
+```json
+{
+  "sosRequestIds": [1, 2, 3]
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "clusterId": 7,
+  "sosRequestCount": 3,
+  "createdAt": "2026-03-11T05:58:00Z"
+}
+```
+
+---
+
+## API 2 – Lấy danh sách Cluster
+
+### `GET /emergency/sos-clusters`
+
+**Response:** `200 OK` – mảng các cluster.
+
+---
+
+## API 3 – AI Suggest (Blocking)
+
+### `POST /emergency/sos-clusters/{clusterId}/rescue-suggestion`
+
+Gọi AI và **chờ đến khi có kết quả hoàn chỉnh** (có thể mất 30–90 giây).
+
+**Response:** cùng cấu trúc với event `result` trong SSE (xem bên dưới).
+
+> [!WARNING]
+> API này có thể timeout nếu kết nối yếu. Khuyến nghị dùng **SSE stream** thay thế.
+
+---
+
+## API 4 – AI Suggest Stream (SSE) ⭐ Chính
+
+### `GET /emergency/sos-clusters/{clusterId}/rescue-suggestion/stream`
+
+Trả về **Server-Sent Events (SSE)** — AI suy nghĩ và trả từng chunk về realtime.
+
+**Response Headers:**
+```
+Content-Type: text/event-stream; charset=utf-8
+Cache-Control: no-cache, no-store
+Connection: keep-alive
+```
+
+---
+
+## Cấu trúc SSE Event
+
+Mỗi event frontend nhận được là 1 dòng dữ liệu:
+```
+data: {"eventType":"...","data":"...","result":null}\n\n
+```
+
+Tất cả event đều có cấu trúc JSON:
+
+```typescript
+interface SseMissionEvent {
+  eventType: "status" | "chunk" | "result" | "error";
+  data: string | null;    // có giá trị với status / chunk / error
+  result: MissionResult | null; // chỉ có giá trị với eventType = "result"
+}
+```
+
+---
+
+## Các loại Event và ý nghĩa
+
+### 🔵 `status` – Tiến trình xử lý
+
+```json
+{ "eventType": "status", "data": "Đang tải dữ liệu cluster...", "result": null }
+{ "eventType": "status", "data": "Đã tải 3 SOS request, 2 kho tiếp tế.", "result": null }
+{ "eventType": "status", "data": "Đang gọi AI (gemini-2.5-flash)...", "result": null }
+{ "eventType": "status", "data": "Đang xử lý kết quả...", "result": null }
+{ "eventType": "status", "data": "Đã lưu đề xuất vào hệ thống (ID: 42).", "result": null }
+{ "eventType": "status", "data": "done", "result": null }
+```
+
+> `"data": "done"` là **tín hiệu kết thúc stream**. Sau khi nhận event này, đóng kết nối.
+
+**Frontend dùng để:** hiển thị thanh tiến trình / loading step.
+
+---
+
+### 🟡 `chunk` – Raw text AI đang gõ
+
+```json
+{ "eventType": "chunk", "data": "```json\n{\n  \"mission_title\":", "result": null }
+{ "eventType": "chunk", "data": " \"Phối hợp cứu trợ lũ lụt", "result": null }
+{ "eventType": "chunk", "data": " Phường Phú Hậu\"", "result": null }
+```
+
+> Đây là **raw JSON text** mà AI đang sinh ra từng phần. Chưa parse được, chỉ dùng để tạo hiệu ứng "AI đang suy nghĩ".
+
+**Frontend dùng để:** append vào textarea/pre để tạo hiệu ứng typing animation.
+
+---
+
+### 🟢 `result` – Kết quả cuối hoàn chỉnh
+
+```json
+{
+  "eventType": "result",
+  "data": null,
+  "result": {
+    "isSuccess": true,
+    "errorMessage": null,
+    "modelName": "gemini-2.5-flash",
+    "responseTimeMs": 12450,
+    "suggestedMissionTitle": "Phối hợp cứu trợ lũ lụt – Phường Phú Hậu",
+    "suggestedMissionType": "rescue",
+    "suggestedPriorityScore": 87.5,
+    "suggestedSeverityLevel": "Critical",
+    "overallAssessment": "Tình huống khẩn cấp với 3 nạn nhân cần cứu hộ ngay...",
+    "suggestedActivities": [
+      {
+        "step": 1,
+        "activityType": "COLLECT_SUPPLIES",
+        "description": "Thu thập vật tư cứu hộ từ Kho Phú Hậu (cách 2.3 km)",
+        "priority": "Critical",
+        "estimatedTime": "15 phút",
+        "sosRequestId": 12,
+        "depotId": 3,
+        "depotName": "Kho Tiếp Tế Phú Hậu",
+        "depotAddress": "123 Lê Lợi, Phường Phú Hậu",
+        "suppliesToCollect": [
+          { "itemId": 5, "itemName": "Áo phao", "quantity": 10, "unit": "cái" },
+          { "itemId": 8, "itemName": "Dây thừng", "quantity": 50, "unit": "mét" }
+        ]
+      },
+      {
+        "step": 2,
+        "activityType": "RESCUE",
+        "description": "Tiến hành cứu hộ tại tọa độ 16.4637, 107.5909",
+        "priority": "Critical",
+        "estimatedTime": "30 phút",
+        "sosRequestId": 12,
+        "depotId": null,
+        "depotName": null,
+        "depotAddress": null,
+        "suppliesToCollect": null
+      }
+    ],
+    "suggestedResources": [
+      {
+        "resourceType": "VEHICLE",
+        "description": "Xuồng máy cứu hộ",
+        "quantity": 2,
+        "priority": "High"
+      }
+    ],
+    "estimatedDuration": "2-3 giờ",
+    "specialNotes": "Cần phối hợp với lực lượng biên phòng tại địa phương.",
+    "confidenceScore": 0.88,
+    "needsManualReview": false,
+    "lowConfidenceWarning": null,
+    "multiDepotRecommended": false
+  }
+}
+```
+
+**Frontend dùng để:** render toàn bộ kế hoạch nhiệm vụ.
+
+---
+
+### 🔴 `error` – Lỗi xảy ra
+
+```json
+{ "eventType": "error", "data": "Không tìm thấy cluster với ID: 99", "result": null }
+{ "eventType": "error", "data": "Không có kho nào trong bán kính 20 km.", "result": null }
+{ "eventType": "error", "data": "AI không phản hồi. Vui lòng thử lại sau.", "result": null }
+```
+
+**Frontend dùng để:** hiển thị thông báo lỗi và dừng stream.
+
+---
+
+## Luồng Event theo thứ tự thời gian
+
+```
+[connect]
+  → status: "Đang tải dữ liệu cluster..."
+  → status: "Đã tải X SOS request, Y kho tiếp tế."
+  → status: "Đang gọi AI (gemini-2.5-flash)..."
+  → chunk: "```json\n{\n  \"mission_title\":"
+  → chunk: " \"Phối hợp cứu trợ..."
+  → chunk: (... nhiều chunk ...)
+  → chunk: "}\n```"
+  → status: "Đang xử lý kết quả..."
+  → result: { isSuccess: true, suggestedActivities: [...], ... }
+  → status: "Đã lưu đề xuất vào hệ thống (ID: 42)."
+  → status: "done"  ← ĐÓNG KẾT NỐI TẠI ĐÂY
+[disconnect]
+```
+
+**Luồng lỗi:**
+```
+[connect]
+  → status: "Đang tải dữ liệu cluster..."
+  → error: "Không có kho nào trong bán kính 20 km."
+[disconnect] ← backend đã ngắt stream
+```
+
+---
+
+## Các loại `activityType` trong `suggestedActivities`
+
+| `activityType` | Ý nghĩa | Có `depotId`? | Có `suppliesToCollect`? |
+|---|---|---|---|
+| `COLLECT_SUPPLIES` | Đến kho lấy vật tư | ✅ | ✅ |
+| `DELIVER_SUPPLIES` | Vận chuyển vật tư đến nạn nhân | ✅ hoặc ❌ | ✅ hoặc ❌ |
+| `RESCUE` | Cứu hộ trực tiếp | ❌ | ❌ |
+| `MEDICAL_AID` | Sơ cứu y tế | ❌ | ❌ |
+| `EVACUATION` | Di tản nạn nhân | ❌ | ❌ |
+| `ASSESSMENT` | Đánh giá tình hình | ❌ | ❌ |
+| `COORDINATE` | Phối hợp lực lượng | ❌ | ❌ |
+
+---
+
+## Các trường cần lưu ý trong `result`
+
+| Trường | Kiểu | Giải thích |
+|---|---|---|
+| `confidenceScore` | `number` (0–1) | Độ tự tin AI. < 0.65 → cần review thủ công |
+| `needsManualReview` | `boolean` | `true` → hiện cảnh báo vàng cho coordinator |
+| `lowConfidenceWarning` | `string?` | Nội dung cảnh báo (chỉ có khi `needsManualReview = true`) |
+| `multiDepotRecommended` | `boolean` | `true` → AI lấy từ nhiều kho, cần phối hợp |
+| `suggestedPriorityScore` | `number?` | Điểm ưu tiên tổng hợp (85 = rất cao) |
+| `suggestedSeverityLevel` | `string?` | `"Critical"` / `"High"` / `"Medium"` / `"Low"` |
+| `rawAiResponse` | `string?` | Text raw AI trả về (debug only, không hiển thị cho user) |
+
+---
+
+## Code mẫu – JavaScript thuần (fetch + ReadableStream)
+
+```javascript
+async function streamMissionSuggestion(clusterId, token, callbacks) {
+  const { onStatus, onChunk, onResult, onError, onDone } = callbacks;
+
+  const response = await fetch(
+    `/emergency/sos-clusters/${clusterId}/rescue-suggestion/stream`,
+    {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'text/event-stream',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    onError(`HTTP ${response.status}: ${response.statusText}`);
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n\n');
+    buffer = lines.pop(); // giữ lại phần chưa hoàn chỉnh
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const jsonStr = line.slice('data: '.length).trim();
+      if (!jsonStr) continue;
+
+      let event;
+      try {
+        event = JSON.parse(jsonStr);
+      } catch {
+        continue;
+      }
+
+      switch (event.eventType) {
+        case 'status':
+          if (event.data === 'done') {
+            onDone();
+            return;
+          }
+          onStatus(event.data);
+          break;
+        case 'chunk':
+          onChunk(event.data);
+          break;
+        case 'result':
+          onResult(event.result);
+          break;
+        case 'error':
+          onError(event.data);
+          return;
+      }
+    }
+  }
+}
+
+// Cách dùng:
+streamMissionSuggestion(7, accessToken, {
+  onStatus: (msg) => console.log('[Status]', msg),
+  onChunk:  (text) => setThinkingText(prev => prev + text),
+  onResult: (result) => setMissionPlan(result),
+  onError:  (err) => showError(err),
+  onDone:   () => setLoading(false),
+});
+```
+
+---
+
+## Code mẫu – React Hook
+
+```jsx
+import { useState, useCallback, useRef } from 'react';
+
+export function useAiMissionStream(token) {
+  const [status, setStatus]       = useState('');
+  const [thinkingText, setThinking] = useState('');
+  const [result, setResult]       = useState(null);
+  const [error, setError]         = useState(null);
+  const [loading, setLoading]     = useState(false);
+  const abortRef = useRef(null);
+
+  const startStream = useCallback(async (clusterId) => {
+    // Reset state
+    setStatus(''); setThinking(''); setResult(null); setError(null);
+    setLoading(true);
+
+    abortRef.current = new AbortController();
+
+    try {
+      const response = await fetch(
+        `/emergency/sos-clusters/${clusterId}/rescue-suggestion/stream`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: abortRef.current.signal,
+        }
+      );
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const reader  = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer    = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const event = JSON.parse(line.slice(6).trim());
+
+          if (event.eventType === 'status') {
+            if (event.data === 'done') { setLoading(false); return; }
+            setStatus(event.data);
+          } else if (event.eventType === 'chunk') {
+            setThinking(prev => prev + event.data);
+          } else if (event.eventType === 'result') {
+            setResult(event.result);
+          } else if (event.eventType === 'error') {
+            setError(event.data);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    setLoading(false);
+  }, []);
+
+  return { status, thinkingText, result, error, loading, startStream, stop };
+}
+
+// Component dùng hook:
+function MissionSuggestionPanel({ clusterId, token }) {
+  const { status, thinkingText, result, error, loading, startStream, stop }
+    = useAiMissionStream(token);
+
+  return (
+    <div>
+      <button onClick={() => startStream(clusterId)} disabled={loading}>
+        {loading ? '⏳ AI đang suy nghĩ...' : '🤖 Gọi AI đề xuất nhiệm vụ'}
+      </button>
+      {loading && <button onClick={stop}>⏹ Dừng</button>}
+
+      {/* Thanh tiến trình */}
+      {status && <p className="text-blue-500">📌 {status}</p>}
+
+      {/* AI Thinking Box */}
+      {thinkingText && (
+        <pre className="text-xs text-gray-400 max-h-40 overflow-auto">
+          {thinkingText}
+        </pre>
+      )}
+
+      {/* Cảnh báo review thủ công */}
+      {result?.needsManualReview && (
+        <div className="bg-yellow-100 border border-yellow-400 p-3 rounded">
+          ⚠️ {result.lowConfidenceWarning}
+        </div>
+      )}
+
+      {/* Multi-depot notice */}
+      {result?.multiDepotRecommended && (
+        <div className="bg-blue-100 p-2 rounded">
+          🏪 Kế hoạch yêu cầu phối hợp nhiều kho tiếp tế.
+        </div>
+      )}
+
+      {/* Kết quả */}
+      {result && (
+        <div>
+          <h2>{result.suggestedMissionTitle}</h2>
+          <p>Loại: {result.suggestedMissionType}</p>
+          <p>Thời gian dự kiến: {result.estimatedDuration}</p>
+          <p>Độ phức tạp: {(result.confidenceScore * 100).toFixed(0)}% tự tin</p>
+          <h3>Hoạt động:</h3>
+          {result.suggestedActivities.map(act => (
+            <div key={act.step}>
+              <b>Bước {act.step}: {act.activityType}</b>
+              <p>{act.description}</p>
+              {act.depotName && <p>📦 Kho: {act.depotName} – {act.depotAddress}</p>}
+              {act.suppliesToCollect?.map(s => (
+                <span key={s.itemId}>{s.itemName} ×{s.quantity} {s.unit}</span>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-red-500">❌ {error}</p>}
+    </div>
+  );
+}
+```
+
+---
+
+## Xem lại các đề xuất đã lưu
+
+### `GET /emergency/sos-clusters/{clusterId}/mission-suggestions`
+
+Trả về danh sách các lần AI đã đề xuất cho cluster này (lịch sử).
+
+---
+
+## Lưu ý quan trọng
+
+> [!IMPORTANT]
+> - **Authorization phải có** trong mọi request. Stream SSE qua `EventSource` không hỗ trợ custom header nên phải dùng **`fetch` + `ReadableStream`** thay vì `new EventSource(...)`.
+> - Stream kết thúc khi nhận `eventType: "status"` với `data: "done"`. Sau đó **phải đóng kết nối**.
+> - `eventType: "error"` → backend đã **ngắt stream**, không cần đợi thêm.
+> - Event `result` chỉ xuất hiện **1 lần duy nhất**, sau các chunk và trước status "done".
+> - `rawAiResponse` trong result chứa raw JSON text từ AI — **không hiển thị cho user**, chỉ dùng để debug.
+
+> [!WARNING]
+> - Timeout mặc định của backend là **120 giây**. Nếu AI không trả lời trong thời gian này, stream sẽ bị ngắt với `error`.
+> - Không được gửi nhiều stream request cùng lúc cho cùng 1 cluster.
+> - Nếu mất kết nối giữa chừng (chưa nhận được `result`), cần gọi lại từ đầu.

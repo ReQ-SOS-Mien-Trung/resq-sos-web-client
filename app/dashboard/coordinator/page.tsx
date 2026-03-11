@@ -20,6 +20,7 @@ import {
   useCreateSOSCluster,
   useClusterRescueSuggestion,
   useSOSClusters,
+  useAiMissionStream,
 } from "@/services/sos_cluster/hooks";
 import type {
   ClusterRescueSuggestionResponse,
@@ -61,6 +62,7 @@ import {
 } from "@/components/coordinator";
 import RescuePlanPanel from "@/components/coordinator/RescuePlanPanel";
 import ManualMissionBuilder from "@/components/coordinator/ManualMissionBuilder";
+import AiStreamPanel from "@/components/coordinator/AiStreamPanel";
 
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
@@ -340,6 +342,13 @@ const CoordinatorDashboardContent = () => {
     isPending: isFetchingSuggestion,
   } = useClusterRescueSuggestion();
   const isProcessingSOS = isCreatingCluster || isFetchingSuggestion;
+
+  // ─── AI Stream ───
+  const aiStream = useAiMissionStream();
+  const [aiStreamOpen, setAiStreamOpen] = useState(false);
+  const [aiStreamClusterId, setAiStreamClusterId] = useState<number | null>(
+    null,
+  );
 
   // ─── Geolocation ───
   useEffect(() => {
@@ -643,29 +652,35 @@ const CoordinatorDashboardContent = () => {
     (clusterId: number) => {
       setAnalyzingClusterId(clusterId);
       setActiveClusterId(clusterId);
-      fetchClusterRescueSuggestion(clusterId, {
-        onSuccess: (suggestion) => {
-          setAnalyzingClusterId(null);
-          if (!suggestion.isSuccess) {
-            toast.error(
-              suggestion.errorMessage ||
-                "Đề xuất AI không thành công. Vui lòng thử lại.",
-            );
-            return;
-          }
-          setRescueSuggestion(suggestion);
-          suggestionCacheRef.current.set(clusterId, suggestion);
-          setRescuePlanOpen(true);
-        },
-        onError: (error) => {
-          console.error("Failed to get rescue suggestion:", error);
-          toast.error("Không thể lấy đề xuất AI. Vui lòng thử lại.");
-          setAnalyzingClusterId(null);
-        },
-      });
+      setAiStreamClusterId(clusterId);
+      setAiStreamOpen(true);
+      aiStream.startStream(clusterId);
     },
-    [fetchClusterRescueSuggestion],
+    [aiStream],
   );
+
+  // When stream produces a result, cache it and update sidebar state
+  useEffect(() => {
+    if (aiStream.result && aiStreamClusterId) {
+      setRescueSuggestion(aiStream.result);
+      suggestionCacheRef.current.set(aiStreamClusterId, aiStream.result);
+      setAnalyzingClusterId(null);
+    }
+  }, [aiStream.result, aiStreamClusterId]);
+
+  // When stream errors or stops, clear analyzing state
+  useEffect(() => {
+    if (aiStream.error) {
+      setAnalyzingClusterId(null);
+    }
+  }, [aiStream.error]);
+
+  // When stream finishes loading, clear analyzing state
+  useEffect(() => {
+    if (!aiStream.loading && aiStreamClusterId) {
+      setAnalyzingClusterId(null);
+    }
+  }, [aiStream.loading, aiStreamClusterId]);
 
   const handleApproveDecision = useCallback(() => {
     toast.success("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
@@ -706,24 +721,11 @@ const CoordinatorDashboardContent = () => {
 
   const handleReAnalyze = useCallback(() => {
     if (!activeClusterId) return;
-    fetchClusterRescueSuggestion(activeClusterId, {
-      onSuccess: (suggestion) => {
-        if (!suggestion.isSuccess) {
-          toast.error(
-            suggestion.errorMessage ||
-              "Phân tích lại không thành công. Vui lòng thử lại.",
-          );
-          return;
-        }
-        setRescueSuggestion(suggestion);
-        suggestionCacheRef.current.set(activeClusterId, suggestion);
-        toast.success("Đã phân tích lại thành công!");
-      },
-      onError: () => {
-        toast.error("Không thể phân tích lại. Vui lòng thử lại.");
-      },
-    });
-  }, [activeClusterId, fetchClusterRescueSuggestion]);
+    setAiStreamClusterId(activeClusterId);
+    setAiStreamOpen(true);
+    setRescuePlanOpen(false);
+    aiStream.startStream(activeClusterId);
+  }, [activeClusterId, aiStream]);
 
   const toggleDarkMode = useCallback(() => {
     setIsDarkMode((prev) => {
@@ -1056,7 +1058,34 @@ const CoordinatorDashboardContent = () => {
                 rescueSuggestion={rescueSuggestion}
                 onApprove={handleApproveDecision}
                 onReAnalyze={handleReAnalyze}
-                isReAnalyzing={isFetchingSuggestion}
+                isReAnalyzing={isFetchingSuggestion || aiStream.loading}
+              />
+
+              {/* AI Stream Panel */}
+              <AiStreamPanel
+                open={aiStreamOpen}
+                onClose={() => {
+                  setAiStreamOpen(false);
+                  aiStream.stopStream();
+                }}
+                clusterId={aiStreamClusterId}
+                status={aiStream.status}
+                statusLog={aiStream.statusLog}
+                thinkingText={aiStream.thinkingText}
+                result={aiStream.result}
+                error={aiStream.error}
+                loading={aiStream.loading}
+                phase={aiStream.phase}
+                onStop={() => aiStream.stopStream()}
+                onRetry={() => {
+                  if (aiStreamClusterId) {
+                    aiStream.startStream(aiStreamClusterId);
+                  }
+                }}
+                onViewPlan={() => {
+                  setAiStreamOpen(false);
+                  setRescuePlanOpen(true);
+                }}
               />
 
               {/* Location Details Panel */}
