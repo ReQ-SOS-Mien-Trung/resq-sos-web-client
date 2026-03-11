@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, UserPlus, CheckCircle, CaretDown, MapPin, X, Image as ImageIcon, UploadSimple, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useAdminCreateUser } from "@/services/user/hooks";
+import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 
 export default function CreateUserPage() {
     const router = useRouter();
@@ -174,10 +175,10 @@ export default function CreateUserPage() {
                 <div>
                     <button
                         onClick={() => router.push("/dashboard/admin/users")}
-                        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group mb-6"
+                        className="inline-flex items-center gap-2 text-sm text-black/60 hover:text-black transition-colors mb-4"
                     >
-                        <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                        Quay lại danh sách
+                        <ArrowLeft className="w-4 h-4" />
+                        Quay lại
                     </button>
                     <div className="pb-1 mb-2">
                         <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground leading-tight flex items-center gap-3">
@@ -195,74 +196,99 @@ export default function CreateUserPage() {
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-10">
                         {/* THÔNG TIN CÁ NHÂN */}
                         <div className="col-span-1 md:col-span-4 border-t border-black/10 dark:border-white/10 pt-4">
-                            <p className="text-xs font-semibold text-[#FF5722] mb-1">Mục 01</p>
+                            <p className="text-sm font-semibold text-[#FF5722] mb-1">Mục I</p>
                             <h2 className="text-lg font-bold text-foreground">Thông tin cá nhân</h2>
-                            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                                 Họ tên và thông tin cơ bản liên lạc của người dùng mới.
                             </p>
                         </div>
 
-                        <div className="col-span-1 md:col-span-8 border-t border-black/10 dark:border-white/10 pt-4 space-y-5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-semibold text-foreground">Họ <span className="text-[#FF5722]">*</span></label>
-                                    <Input
-                                        name="lastName"
-                                        value={formData.lastName}
-                                        onChange={handleChange}
-                                        placeholder="Nguyễn Văn"
-                                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-semibold text-foreground">Tên <span className="text-[#FF5722]">*</span></label>
-                                    <Input
-                                        name="firstName"
-                                        value={formData.firstName}
-                                        onChange={handleChange}
-                                        placeholder="A"
-                                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold text-foreground">Ảnh đại diện (Avatar)</label>
-                                <div className="flex items-center gap-4">
-                                    {/* Preview Block */}
-                                    <div className="flex-shrink-0 h-16 w-16 border-2 border-border/60 bg-muted overflow-hidden flex items-center justify-center">
-                                        {avatarPreview ? (
-                                            <img src={avatarPreview} alt="Avatar Preview" className="h-full w-full object-cover" />
-                                        ) : (
-                                            <ImageIcon className="w-6 h-6 text-muted-foreground/30" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1 space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => fileInputRef.current?.click()}
-                                                className="h-9 px-4 rounded-none border-border/60 text-sm font-medium bg-transparent hover:bg-muted"
-                                            >
-                                                <UploadSimple className="w-4 h-4 mr-2" />
-                                                Chọn ảnh
-                                            </Button>
-                                            {avatarFile && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={handleRemoveFile}
-                                                    className="h-9 px-3 text-destructive hover:text-destructive/80 hover:bg-destructive/10"
-                                                >
-                                                    <Trash className="w-4 h-4" />
-                                                </Button>
-                                            )}
+                        <div className="col-span-1 md:col-span-8 border-t border-black/10 dark:border-white/10 pt-4">
+                            <div className="flex flex-col xl:flex-row gap-8">
+                                {/* Left Column: Info Fields */}
+                                <div className="flex-1 max-w-lg space-y-5">
+                                    <div className="flex flex-col gap-5">
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-semibold text-foreground">Họ <span className="text-[#FF5722]">*</span></label>
+                                            <Input
+                                                name="lastName"
+                                                value={formData.lastName}
+                                                onChange={handleChange}
+                                                placeholder="Nguyễn Văn"
+                                                className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
+                                            />
                                         </div>
-                                        <div className="text-[10px] text-muted-foreground">
-                                            Hỗ trợ định dạng: JPG, PNG. Khuyên dùng thiết kế vuông 1:1.
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-semibold text-foreground">Tên <span className="text-[#FF5722]">*</span></label>
+                                            <Input
+                                                name="firstName"
+                                                value={formData.firstName}
+                                                onChange={handleChange}
+                                                placeholder="A"
+                                                className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-semibold text-foreground">Số điện thoại <span className="text-[#FF5722]">*</span></label>
+                                            <Input
+                                                name="phone"
+                                                value={formData.phone}
+                                                onChange={handleChange}
+                                                placeholder="0912345678"
+                                                className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-semibold text-foreground">Email <span className="text-[#FF5722]">*</span></label>
+                                            <Input
+                                                name="email"
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={handleChange}
+                                                placeholder="example@resq.com"
+                                                className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Column: Avatar */}
+                                <div className="shrink-0 space-y-2 w-full max-w-[160px] sm:max-w-[200px]">
+                                    <label className="text-sm font-semibold text-foreground">Ảnh đại diện (Avatar)</label>
+                                    <div className="flex flex-col gap-3">
+                                        {/* Preview Block 3:4 */}
+                                        <div className="w-full aspect-[3/4] max-w-[160px] border border-border/60 bg-muted overflow-hidden flex items-center justify-center relative group sm:max-w-[200px]">
+                                            {avatarPreview ? (
+                                                <img src={avatarPreview} alt="Avatar Preview" className="h-full w-full object-cover" />
+                                            ) : (
+                                                <div className="text-center flex flex-col items-center">
+                                                    <ImageIcon className="w-8 h-8 text-muted-foreground/30 mb-2" weight="duotone" />
+                                                    <span className="text-xs text-muted-foreground/60 font-medium uppercase tracking-wider">Trống</span>
+                                                </div>
+                                            )}
+
+                                            {/* Overlay actions */}
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 backdrop-blur-[2px]">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    className="px-3 py-1.5 bg-white text-black text-[10px] font-bold uppercase tracking-wider hover:bg-white/90 transition-colors inline-flex items-center gap-1.5"
+                                                >
+                                                    <UploadSimple className="w-3.5 h-3.5" /> Thêm ảnh
+                                                </button>
+                                                {avatarFile && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleRemoveFile}
+                                                        className="px-3 py-1.5 bg-red-500 text-white text-[10px] font-bold uppercase tracking-wider hover:bg-red-600 transition-colors inline-flex items-center gap-1.5"
+                                                    >
+                                                        <Trash className="w-3.5 h-3.5" /> Xóa ảnh
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="text-[12px] text-muted-foreground leading-relaxed w-full">
+                                            Khuyên dùng ảnh chân dung tỷ lệ 3:4. Hỗ trợ định dạng JPG, JPEG, PNG.
                                         </div>
                                         <input
                                             ref={fileInputRef}
@@ -274,44 +300,20 @@ export default function CreateUserPage() {
                                     </div>
                                 </div>
                             </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-semibold text-foreground">Email <span className="text-[#FF5722]">*</span></label>
-                                    <Input
-                                        name="email"
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={handleChange}
-                                        placeholder="example@resq.com"
-                                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-semibold text-foreground">Số điện thoại <span className="text-[#FF5722]">*</span></label>
-                                    <Input
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={handleChange}
-                                        placeholder="0912345678"
-                                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
-                                    />
-                                </div>
-                            </div>
                         </div>
 
                         {/* HO KHẨU & ĐỊA CHỈ */}
                         <div className="col-span-1 md:col-span-4 border-t border-black/10 dark:border-white/10 pt-4">
-                            <p className="text-xs font-semibold text-[#FF5722] mb-1">Mục 02</p>
+                            <p className="text-sm font-semibold text-[#FF5722] mb-1">Mục II</p>
                             <h2 className="text-lg font-bold text-foreground">Vị trí & Địa chỉ</h2>
-                            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                                 Thông tin nơi cư trú và địa chỉ liên lạc của người dùng.
                             </p>
                         </div>
 
                         <div className="col-span-1 md:col-span-8 border-t border-black/10 dark:border-white/10 pt-4 space-y-5">
                             {/* Address Layout */}
-                            <div className="space-y-4">
+                            <div className="space-y-4 max-w-lg">
                                 <div className="flex items-center justify-between">
                                     <label className="text-sm font-semibold text-foreground">
                                         Địa chỉ
@@ -439,58 +441,60 @@ export default function CreateUserPage() {
 
                         {/* THÔNG TIN TÀI KHOẢN */}
                         <div className="col-span-1 md:col-span-4 border-t border-black/10 dark:border-white/10 pt-4">
-                            <p className="text-xs font-semibold text-[#FF5722] mb-1">Mục 03</p>
+                            <p className="text-sm font-semibold text-[#FF5722] mb-1">Mục III</p>
                             <h2 className="text-lg font-bold text-foreground">Tài khoản & Phân quyền</h2>
-                            <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                                 Tài khoản đăng nhập và cấp quyền hạn sử dụng trong hệ thống ResQ.
                             </p>
                         </div>
 
-                        <div className="col-span-1 md:col-span-8 border-t border-black/10 dark:border-white/10 pt-4 space-y-5">
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold text-foreground">Tên đăng nhập (Username) <span className="text-[#FF5722]">*</span></label>
-                                <Input
-                                    name="username"
-                                    value={formData.username}
-                                    onChange={handleChange}
-                                    placeholder="nguyenvana123"
-                                    className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
-                                />
-                            </div>
+                        <div className="col-span-1 md:col-span-8 border-t border-black/10 dark:border-white/10 pt-4">
+                            <div className="space-y-5 max-w-lg">
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-semibold text-foreground">Tên đăng nhập (Username) <span className="text-[#FF5722]">*</span></label>
+                                    <Input
+                                        name="username"
+                                        value={formData.username}
+                                        onChange={handleChange}
+                                        placeholder="nguyenvana123"
+                                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
+                                    />
+                                </div>
 
-                            <div className="space-y-1.5">
-                                <label className="text-sm font-semibold text-foreground">Mật khẩu <span className="text-[#FF5722]">*</span></label>
-                                <Input
-                                    name="password"
-                                    type="password"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    placeholder="••••••••"
-                                    className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
-                                />
-                            </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-semibold text-foreground">Mật khẩu <span className="text-[#FF5722]">*</span></label>
+                                    <Input
+                                        name="password"
+                                        type="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        placeholder="••••••••"
+                                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
+                                    />
+                                </div>
 
-                            <div className="space-y-1.5 pt-2">
-                                <label className="text-sm font-semibold text-foreground">Vai trò (Role) <span className="text-[#FF5722]">*</span></label>
-                                <Select value={formData.roleId} onValueChange={handleRoleChange}>
-                                    <SelectTrigger className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus:ring-0 focus:border-foreground text-sm font-medium">
-                                        <SelectValue placeholder="Chọn vai trò..." />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-none border border-border/60">
-                                        <SelectItem value="1" className="cursor-pointer font-medium text-sm focus:bg-black/5 focus:text-foreground">Quản trị viên (Admin)</SelectItem>
-                                        <SelectItem value="2" className="cursor-pointer font-medium text-sm focus:bg-black/5 focus:text-foreground">Điều phối viên (Coordinator)</SelectItem>
-                                        <SelectItem value="3" className="cursor-pointer font-medium text-sm focus:bg-black/5 focus:text-foreground">Cứu hộ viên (Rescuer)</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <div className="space-y-1.5 pt-2">
+                                    <label className="text-sm font-semibold text-foreground">Vai trò (Role) <span className="text-[#FF5722]">*</span></label>
+                                    <Select value={formData.roleId} onValueChange={handleRoleChange}>
+                                        <SelectTrigger className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus:ring-0 focus:border-foreground text-sm font-medium">
+                                            <SelectValue placeholder="Chọn vai trò..." />
+                                        </SelectTrigger>
+                                        <SelectContent className="rounded-none border border-border/60">
+                                            <SelectItem value="1" className="cursor-pointer font-medium text-sm focus:bg-black/5 focus:text-foreground">Quản trị viên (Admin)</SelectItem>
+                                            <SelectItem value="2" className="cursor-pointer font-medium text-sm focus:bg-black/5 focus:text-foreground">Điều phối viên (Coordinator)</SelectItem>
+                                            <SelectItem value="3" className="cursor-pointer font-medium text-sm focus:bg-black/5 focus:text-foreground">Cứu hộ viên (Rescuer)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="pt-10 border-t border-border/60 flex justify-end">
-                        <Button
+                    <div className="pt-4 border-t border-border/60 flex justify-end">
+                        <button
                             type="submit"
                             disabled={createUserMutation.isPending || isUploading}
-                            className="bg-black hover:bg-black/80 dark:bg-white dark:hover:bg-white/80 dark:text-black text-white h-12 px-8 rounded-none border-b-4 border-[#FF5722] hover:translate-y-px transition-all font-bold text-sm"
+                            className="inline-flex items-center gap-2 px-6 py-3 border border-black text-xs font-bold uppercase tracking-wider hover:bg-black hover:text-white transition-colors"
                         >
                             {createUserMutation.isPending || isUploading ? (
                                 <span className="flex items-center gap-2">
@@ -499,11 +503,11 @@ export default function CreateUserPage() {
                                 </span>
                             ) : (
                                 <span className="flex items-center gap-2">
-                                    <CheckCircle size={16} weight="bold" />
                                     Xác nhận khởi tạo
+                                    <ArrowRight className="w-4 h-4" />
                                 </span>
                             )}
-                        </Button>
+                        </button>
                     </div>
                 </form>
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,8 @@ import {
 import { toast } from "sonner";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
+import { gsap } from "gsap";
+import { useGSAP } from "@gsap/react";
 import {
   useRescuerApplications,
   useReviewRescuerApplication,
@@ -59,10 +61,24 @@ const getFullName = (item: RescuerApplicationEntity) =>
 
 
 const RescuerVerificationPage = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [selectedItem, setSelectedItem] =
     useState<RescuerApplicationEntity | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useGSAP(
+    () => {
+      if (selectedItem) {
+        gsap.fromTo(
+          ".gsap-item",
+          { opacity: 0, y: 30 },
+          { opacity: 1, y: 0, stagger: 0.1, duration: 0.5, ease: "power2.out", clearProps: "all" }
+        );
+      }
+    },
+    { scope: containerRef, dependencies: [selectedItem] }
+  );
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [reviewDialog, setReviewDialog] = useState<{
@@ -395,7 +411,7 @@ const RescuerVerificationPage = () => {
           projects={dashboardData.projects}
           cloudStorage={dashboardData.cloudStorage}
         >
-          <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-400">
+          <div ref={containerRef} className="space-y-8">
             {/* Back */}
             <button
               onClick={() => {
@@ -403,7 +419,7 @@ const RescuerVerificationPage = () => {
                 setAvatarFile(null);
                 setAvatarPreview(null);
               }}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-6"
+              className="gsap-item flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-6"
             >
               <ArrowLeft
                 size={16}
@@ -415,7 +431,7 @@ const RescuerVerificationPage = () => {
             </button>
 
             {/* Profile Header */}
-            <div className="border border-border/60 rounded-2xl overflow-hidden bg-card">
+            <div className="gsap-item border border-border/60 rounded-2xl overflow-hidden bg-card">
               {/* Minimal top bar */}
               <div className="h-1.5 bg-gradient-to-r from-black/80 via-black/60 to-black/30 dark:from-white/30 dark:via-white/20 dark:to-white/5" />
               <div className="p-4 sm:p-6">
@@ -481,7 +497,7 @@ const RescuerVerificationPage = () => {
             {/* Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Personal Info */}
-              <div className="border border-border/60 rounded-2xl bg-card p-6">
+              <div className="gsap-item border border-border/60 rounded-2xl bg-card p-6">
                 <div className="border-b border-border/60 mb-8 pb-4">
                   <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
                     Mục I
@@ -562,7 +578,7 @@ const RescuerVerificationPage = () => {
               </div>
 
               {/* MỤC II: ẢNH ĐẠI DIỆN */}
-              <div className="space-y-6">
+              <div className="gsap-item space-y-6">
                 {selectedItem.status === "Pending" ? (
                   <div className="border border-emerald-500/30 rounded-2xl bg-emerald-500/5 p-6 h-full flex flex-col">
                     <div className="border-b border-emerald-500/20 mb-6 pb-4">
@@ -714,7 +730,7 @@ const RescuerVerificationPage = () => {
               ];
 
               return (
-                <div className="mt-12 pt-12 border-t border-border/40 w-full">
+                <div className="gsap-item mt-12 pt-12 border-t border-border/40 w-full">
                   <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/60 mb-8 pb-4">
                     <div>
                       <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
@@ -782,7 +798,7 @@ const RescuerVerificationPage = () => {
             })()}
 
             {/* FULL WIDTH DOCUMENTS SECTION (MỤC IV) */}
-            <div className="mt-12 pt-12 border-t border-border/40">
+            <div className="gsap-item mt-12 pt-12 border-t border-border/40">
               <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/60 mb-8 pb-4">
                 <div>
                   <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
@@ -966,7 +982,7 @@ const RescuerVerificationPage = () => {
           </div>
 
           {/* Filters & Search — Flat editorial toolbar */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/60 pb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-border/60 pb-4">
             {/* Tab filters */}
             <div className="flex items-center gap-0">
               {(
@@ -980,13 +996,13 @@ const RescuerVerificationPage = () => {
                 <button
                   key={tab.key}
                   onClick={() => setStatusFilter(tab.key === "Từ chối" ? "Rejected" : tab.key)}
-                  className={`relative px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors duration-150 ${(tab.key === "Từ chối" ? statusFilter === "Rejected" : statusFilter === tab.key)
+                  className={`relative px-4 py-2 text-sm font-medium transition-colors duration-150 ${(tab.key === "Từ chối" ? statusFilter === "Rejected" : statusFilter === tab.key)
                     ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   {tab.label}
-                  <span className="ml-1.5 font-bold">{tab.count}</span>
+                  <span className="ml-1.5 text-primary font-medium">{tab.count}</span>
                   {(tab.key === "Từ chối" ? statusFilter === "Rejected" : statusFilter === tab.key) && (
                     <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-full" />
                   )}
@@ -1017,7 +1033,7 @@ const RescuerVerificationPage = () => {
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-foreground/20 border-t-foreground" />
             </div>
           ) : filteredItems.length === 0 ? (
-            <div className="py-20 text-center border border-dashed border-border/60 rounded-3xl bg-muted/5">
+            <div className="py-10 text-center border border-dashed border-border/60 rounded-3xl bg-muted/5">
               <Users
                 size={40}
                 className="mx-auto text-muted-foreground/30 mb-3"
@@ -1028,7 +1044,7 @@ const RescuerVerificationPage = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2">
+            <div key={`${statusFilter}-${searchQuery}`} className="grid grid-cols-1 gap-2 animate-in fade-in slide-in-from-top-4 duration-500 ease-out fill-mode-both">
               {filteredItems.map((item) => {
                 const status = getStatusConfig(item.status);
                 return (

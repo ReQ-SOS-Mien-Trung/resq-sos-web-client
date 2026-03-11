@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ShieldCheck } from "lucide-react";
+import { ArrowRight } from "@phosphor-icons/react";
 
 function mapUserEntityToUser(entity: UserEntity): User {
   let role: User["role"] = "citizen";
@@ -153,12 +154,13 @@ const UsersPage = () => {
               Xem xét và quản lý tài khoản của người dùng
             </p>
           </div>
-          <Button
+          <button
             onClick={() => window.location.href = "/dashboard/admin/users/create"}
-            className="bg-black hover:bg-black/80 dark:bg-white dark:hover:bg-white/80 dark:text-black text-white h-10 px-6 rounded-none border-b-2 border-[#FF5722] transition-all uppercase font-black tracking-widest text-[10px]"
+            className="px-4 sm:px-6 py-4 bg-black text-white text-[10px] sm:text-[12px] font-bold uppercase tracking-wider hover:bg-[#FF5722] transition-colors flex items-center justify-center gap-2 group"
           >
-            + Tạo người dùng
-          </Button>
+            Tạo tài khoản
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </button>
         </div>
 
         <UserStats stats={dynamicStats} />
