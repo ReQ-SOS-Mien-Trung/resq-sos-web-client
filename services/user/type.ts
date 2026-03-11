@@ -36,8 +36,17 @@ export interface UserEntity {
   bannedBy: string | null;
   bannedAt: string | null;
   banReason: string | null;
+  address: string | null;
+  ward: string | null;
+  province: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  abilities: unknown[];
+  rescuerApplicationDocuments: unknown[];
 }
 
 // Paginated Response for Users
@@ -72,8 +81,16 @@ export interface AdminCreateUserRequest {
   username: string;
   password?: string;
   roleId: number;
+  rescuerType?: string;
   avatarUrl?: string;
   address?: string;
   ward?: string;
   province?: string;
+  latitude?: number;
+  longitude?: number;
+  isEmailVerified?: boolean;
+  isOnboarded?: boolean;
+  isEligibleRescuer?: boolean;
+  approvedBy?: string;
+  approvedAt?: string;
 }

@@ -3,17 +3,18 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, UserPlus, CheckCircle, CaretDown, MapPin, X, Image as ImageIcon, UploadSimple, Trash } from "@phosphor-icons/react";
+import { ArrowLeft, UserPlus, CheckCircle, CaretDown, MapPin, X, Image as ImageIcon, UploadSimple, Trash, Eye, EyeSlash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useAdminCreateUser } from "@/services/user/hooks";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
+import { useAuthStore } from "@/stores/auth.store";
 
 export default function CreateUserPage() {
     const router = useRouter();
     const createUserMutation = useAdminCreateUser();
+    const { user } = useAuthStore();
 
     const [formData, setFormData] = useState({
         firstName: "",
@@ -27,6 +28,10 @@ export default function CreateUserPage() {
         ward: "",
         city: "",
     });
+
+    const [phoneError, setPhoneError] = useState("");
+    const [emailError, setEmailError] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
 
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -83,7 +88,32 @@ export default function CreateUserPage() {
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+        const { name, value } = e.target;
+        if (name === "phone") {
+            const val = value.replace(/\D/g, "").slice(0, 10);
+            setFormData((prev) => ({ ...prev, phone: val }));
+            if (val.length > 0) {
+                if (val[0] !== "0") {
+                    setPhoneError("Số điện thoại phải bắt đầu bằng số 0.");
+                } else if (val.length < 10) {
+                    setPhoneError("Số điện thoại phải đủ 10 số.");
+                } else {
+                    setPhoneError("");
+                }
+            } else {
+                setPhoneError("");
+            }
+        } else if (name === "email") {
+            setFormData((prev) => ({ ...prev, email: value }));
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (value.length > 0 && !emailRegex.test(value)) {
+                setEmailError("Email không đúng định dạng.");
+            } else {
+                setEmailError("");
+            }
+        } else {
+            setFormData((prev) => ({ ...prev, [name]: value }));
+        }
     };
 
     const handleRoleChange = (value: string) => {
@@ -113,15 +143,44 @@ export default function CreateUserPage() {
             return;
         }
 
+        if (formData.phone.length < 10 || formData.phone[0] !== "0") {
+            toast.error("Số điện thoại không hợp lệ");
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+            toast.error("Email không hợp lệ");
+            return;
+        }
+
         const proceedWithCreation = (uploadedUrl?: string) => {
             toast.loading("Đang tạo tài khoản...");
+
+            const payload: any = {
+                ...formData,
+                roleId: parseInt(formData.roleId, 10),
+                province: formData.city,
+                avatarUrl: uploadedUrl || undefined,
+            };
+
+            // If Rescuer, append specific values
+            if (formData.roleId === "3") {
+                payload.rescuerType = "core";
+                payload.latitude = 0;
+                payload.longitude = 0;
+                payload.isEmailVerified = true;
+                payload.isOnboarded = true;
+                payload.isEligibleRescuer = true;
+
+                if (user?.userId) {
+                    payload.approvedBy = user.userId;
+                    payload.approvedAt = new Date().toISOString();
+                }
+            }
+
             createUserMutation.mutate(
-                {
-                    ...formData,
-                    roleId: parseInt(formData.roleId, 10),
-                    province: formData.city,
-                    avatarUrl: uploadedUrl || undefined,
-                },
+                payload,
                 {
                     onSuccess: () => {
                         toast.dismiss();
@@ -228,17 +287,20 @@ export default function CreateUserPage() {
                                                 className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
                                             />
                                         </div>
-                                        <div className="space-y-1.5">
+                                        <div className="space-y-1.5 flex flex-col justify-start">
                                             <label className="text-sm font-semibold text-foreground">Số điện thoại <span className="text-[#FF5722]">*</span></label>
                                             <Input
                                                 name="phone"
                                                 value={formData.phone}
                                                 onChange={handleChange}
                                                 placeholder="0912345678"
-                                                className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
+                                                className={`h-11 rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 focus-visible:ring-0 ${phoneError ? 'border-red-500 focus-visible:border-red-500 text-red-500' : 'border-border/60 focus-visible:border-foreground'}`}
                                             />
+                                            {phoneError && (
+                                                <span className="text-[12px] text-red-500 font-medium leading-none mt-1">{phoneError}</span>
+                                            )}
                                         </div>
-                                        <div className="space-y-1.5">
+                                        <div className="space-y-1.5 flex flex-col justify-start">
                                             <label className="text-sm font-semibold text-foreground">Email <span className="text-[#FF5722]">*</span></label>
                                             <Input
                                                 name="email"
@@ -246,8 +308,11 @@ export default function CreateUserPage() {
                                                 value={formData.email}
                                                 onChange={handleChange}
                                                 placeholder="example@resq.com"
-                                                className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
+                                                className={`h-11 rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 focus-visible:ring-0 ${emailError ? 'border-red-500 focus-visible:border-red-500 text-red-500' : 'border-border/60 focus-visible:border-foreground'}`}
                                             />
+                                            {emailError && (
+                                                <span className="text-[12px] text-red-500 font-medium leading-none mt-1">{emailError}</span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -463,14 +528,24 @@ export default function CreateUserPage() {
 
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-semibold text-foreground">Mật khẩu <span className="text-[#FF5722]">*</span></label>
-                                    <Input
-                                        name="password"
-                                        type="password"
-                                        value={formData.password}
-                                        onChange={handleChange}
-                                        placeholder="••••••••"
-                                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground"
-                                    />
+                                    <div className="relative">
+                                        <Input
+                                            name="password"
+                                            type={showPassword ? "text" : "password"}
+                                            value={formData.password}
+                                            onChange={handleChange}
+                                            placeholder="••••••••"
+                                            className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            tabIndex={-1}
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-2"
+                                        >
+                                            {showPassword ? <EyeSlash className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1.5 pt-2">
@@ -494,7 +569,7 @@ export default function CreateUserPage() {
                         <button
                             type="submit"
                             disabled={createUserMutation.isPending || isUploading}
-                            className="inline-flex items-center gap-2 px-6 py-3 border border-black text-xs font-bold uppercase tracking-wider hover:bg-black hover:text-white transition-colors"
+                            className="inline-flex items-center gap-2 px-6 py-3 border border-black text-xs font-bold uppercase tracking-wider bg-black text-white transition-colors"
                         >
                             {createUserMutation.isPending || isUploading ? (
                                 <span className="flex items-center gap-2">

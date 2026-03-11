@@ -1,22 +1,39 @@
 import api from "@/config/axios";
-import { UserMeResponse, GetUsersParams, GetUsersResponse, BanUserRequest } from "./type";
+import {
+  UserMeResponse,
+  GetUsersParams,
+  GetUsersResponse,
+  BanUserRequest,
+  AdminCreateUserRequest,
+  UserEntity,
+} from "./type";
 
 export async function getUserMe(): Promise<UserMeResponse> {
   const { data } = await api.get("/identity/user/me");
   return data;
 }
 
-export async function updateUserAvatar(userId: string, avatarUrl: string): Promise<any> {
-  const { data } = await api.put(`/identity/admin/users/${userId}/avatar`, { avatarUrl });
+export async function updateUserAvatar(
+  userId: string,
+  avatarUrl: string,
+): Promise<any> {
+  const { data } = await api.put(`/identity/admin/users/${userId}/avatar`, {
+    avatarUrl,
+  });
   return data;
 }
 
-export async function getAdminUsers(params?: GetUsersParams): Promise<GetUsersResponse> {
+export async function getAdminUsers(
+  params?: GetUsersParams,
+): Promise<GetUsersResponse> {
   const { data } = await api.get("/identity/admin/users", { params });
   return data;
 }
 
-export async function banUser(userId: string, data: BanUserRequest): Promise<void> {
+export async function banUser(
+  userId: string,
+  data: BanUserRequest,
+): Promise<void> {
   await api.post(`/identity/admin/users/${userId}/ban`, data);
 }
 
@@ -24,7 +41,14 @@ export async function unbanUser(userId: string): Promise<void> {
   await api.post(`/identity/admin/users/${userId}/unban`);
 }
 
-export async function adminCreateUser(data: import("./type").AdminCreateUserRequest): Promise<any> {
+export async function getAdminUserById(userId: string): Promise<UserEntity> {
+  const { data } = await api.get(`/identity/admin/users/${userId}`);
+  return data;
+}
+
+export async function adminCreateUser(
+  data: AdminCreateUserRequest,
+): Promise<any> {
   const response = await api.post("/identity/admin/users", data);
   return response.data;
 }

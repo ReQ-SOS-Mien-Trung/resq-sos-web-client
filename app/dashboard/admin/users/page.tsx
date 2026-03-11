@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import { UserFilters, UserStats, UserTable } from "@/components/admin/users";
+import { UserStats, UserTable, UserDetailSheet } from "@/components/admin/users";
 import { useAdminUsers, useBanUser, useUnbanUser, ADMIN_USERS_QUERY_KEY } from "@/services/user/hooks";
 import { UserEntity } from "@/services/user/type";
 import { User } from "@/type";
@@ -17,14 +17,12 @@ import { ShieldCheck } from "lucide-react";
 import { ArrowRight } from "@phosphor-icons/react";
 
 function mapUserEntityToUser(entity: UserEntity): User {
-  let role: User["role"] = "citizen";
+  let role: User["role"] = "victim";
   if (entity.roleId === 1 || entity.roleId === 4) role = "admin";
   else if (entity.roleId === 2) role = "coordinator";
   else if (entity.roleId === 3) role = "rescuer";
 
-  let status: User["status"] = "pending";
-  if (entity.isBanned) status = "banned";
-  else if (entity.isOnboarded) status = "active";
+  const status: User["status"] = entity.isBanned ? "banned" : "active";
 
   return {
     id: entity.id,
@@ -32,7 +30,7 @@ function mapUserEntityToUser(entity: UserEntity): User {
     name: `${entity.lastName} ${entity.firstName}`,
     role,
     status,
-    region: "Chưa cập nhật", // Region not in UserEntity
+    region: entity.province || "Chưa cập nhật",
     phone: entity.phone,
     avatar: entity.avatarUrl || undefined,
     createdAt: entity.createdAt,
@@ -42,7 +40,7 @@ function mapUserEntityToUser(entity: UserEntity): User {
 
 const UsersPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [filters, setFilters] = useState({});
+  const [filters, setFilters] = useState<UserFiltersType>({});
   const [loading, setLoading] = useState(true);
 
   const queryClient = useQueryClient();
@@ -52,16 +50,23 @@ const UsersPage = () => {
   const [banModalOpen, setBanModalOpen] = useState(false);
   const [userToBan, setUserToBan] = useState<User | null>(null);
   const [banReason, setBanReason] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
 
-  const { data: usersData, isLoading: isLoadingUsers } = useAdminUsers({
+  // Fetch all users; search & filtering are done client-side inside UserTable
+  const apiParams = {
     pageNumber: 1,
     pageSize: 1000,
-  });
+  };
+
+  const { data: usersData, isLoading: isLoadingUsers } = useAdminUsers(apiParams);
+
+  const handleFiltersChange = (_: unknown) => {}; // unused, kept for safety
 
   const dynamicStats = {
-    total: usersData?.items?.length || 0,
-    active: usersData?.items?.filter(u => !u.isBanned).length || 0,
-    pending: 0, // no longer in UI
+    total: usersData?.totalCount || 0,
+    active: (usersData?.totalCount || 0) - (usersData?.items?.filter(u => u.isBanned).length || 0),
+    pending: 0,
     banned: usersData?.items?.filter(u => u.isBanned).length || 0,
   };
 
@@ -165,15 +170,24 @@ const UsersPage = () => {
 
         <UserStats stats={dynamicStats} />
 
-        <UserFilters filters={filters} onFiltersChange={setFilters} />
-
         <UserTable
-          users={usersData?.items ? usersData.items.map(mapUserEntityToUser) : []}
-          filters={filters}
+          users={usersData?.items?.map(mapUserEntityToUser) ?? []}
           onBan={handleBanClick}
           onActivate={handleActivateClick}
+          onViewDetail={(userId) => {
+            setSelectedUserId(userId);
+            setDetailSheetOpen(true);
+          }}
+          totalCount={usersData?.totalCount}
+          isLoading={isLoadingUsers}
         />
       </div>
+
+      <UserDetailSheet
+        userId={selectedUserId}
+        open={detailSheetOpen}
+        onOpenChange={setDetailSheetOpen}
+      />
 
       <Dialog open={banModalOpen} onOpenChange={setBanModalOpen}>
         <DialogContent className="sm:max-w-md border border-border/60">
@@ -213,3 +227,4 @@ const UsersPage = () => {
 };
 
 export default UsersPage;
+

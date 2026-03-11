@@ -176,7 +176,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
               ))}
             </div>
           ) : isError ? (
-            <div className="text-center text-red-500 py-8 text-xs font-mono uppercase">
+            <div className="text-center text-red-500 py-8 text-xs font-regular uppercase">
               LỖI TẢI DỮ LIỆU
             </div>
           ) : inventoryData?.items.length === 0 ? (
