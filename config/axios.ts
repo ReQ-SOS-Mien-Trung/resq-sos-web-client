@@ -64,7 +64,7 @@ axiosInstance.interceptors.response.use(
 
     // Chỉ xử lý lỗi 401 (Unauthorized) và chưa retry
     // Bỏ qua nếu request là refresh-token hoặc login (tránh vòng lặp vô tận)
-    const isAuthEndpoint =
+const isAuthEndpoint =
       originalRequest?.url?.includes("/auth/refresh-token") ||
       originalRequest?.url?.includes("/auth/login") ||
       originalRequest?.url?.includes("/auth/google-login");
@@ -79,6 +79,7 @@ axiosInstance.interceptors.response.use(
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
+          originalRequest._retry = true;
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${token}`;
           }
@@ -103,9 +104,12 @@ axiosInstance.interceptors.response.use(
       }
 
       try {
+        // Loại bỏ slash ở cuối nếu có để tránh // trong URL
+        const secureApiUrl = API_URL?.replace(/\/+$/, "") || "";
+        
         // Gọi API refresh token (dùng axios thường, không dùng axiosInstance để tránh lặp interceptor)
         const { data } = await axios.post<RefreshTokenResponse>(
-          `${API_URL}/identity/auth/refresh-token`,
+          `${secureApiUrl}/identity/auth/refresh-token`,
           { accessToken, refreshToken },
           {
             headers: { "Content-Type": "application/json" },

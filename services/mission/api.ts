@@ -1,17 +1,23 @@
 import api from "@/config/axios";
 import {
+  CreateActivityResponse,
+  CreateMissionActivityRequest,
   CreateMissionRequest,
   CreateMissionResponse,
   GetMissionsParams,
   GetMissionsResponse,
   MissionActivity,
   MissionEntity,
+  UpdateActivityRequest,
+  UpdateActivityResponse,
   UpdateActivityStatusRequest,
   UpdateActivityStatusResponse,
   UpdateMissionRequest,
   UpdateMissionResponse,
   UpdateMissionStatusRequest,
   UpdateMissionStatusResponse,
+  ActivityRouteResponse,
+  GetActivityRouteParams,
 } from "./type";
 
 export async function getMissions(
@@ -65,6 +71,17 @@ export async function getMissionActivities(
   return data;
 }
 
+export async function createActivity(
+  missionId: number,
+  request: CreateMissionActivityRequest,
+): Promise<CreateActivityResponse> {
+  const { data } = await api.post(
+    `/operations/missions/${missionId}/activities`,
+    request,
+  );
+  return data;
+}
+
 export async function updateActivityStatus(
   missionId: number,
   activityId: number,
@@ -73,6 +90,35 @@ export async function updateActivityStatus(
   const { data } = await api.patch(
     `/operations/missions/${missionId}/activities/${activityId}/status`,
     request,
+  );
+  return data;
+}
+
+export async function updateActivity(
+  missionId: number,
+  activityId: number,
+  request: UpdateActivityRequest,
+): Promise<UpdateActivityResponse> {
+  const { data } = await api.put(
+    `/operations/missions/${missionId}/activities/${activityId}`,
+    request,
+  );
+  return data;
+}
+
+export async function getActivityRoute(
+  params: GetActivityRouteParams,
+): Promise<ActivityRouteResponse> {
+  const { missionId, activityId, ...query } = params;
+  const { data } = await api.get(
+    `/operations/missions/${missionId}/activities/${activityId}/route`,
+    {
+      params: {
+        originLat: query.originLat,
+        originLng: query.originLng,
+        vehicle: query.vehicle ?? "car",
+      },
+    },
   );
   return data;
 }

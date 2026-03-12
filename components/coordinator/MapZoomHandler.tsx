@@ -4,9 +4,11 @@ import { useCallback, useEffect } from "react";
 import { useMap, useMapEvents } from "react-leaflet";
 
 // This component provides zoom/recenter functions to the parent via a ref-like callback
+// and reports map view changes (zoom + pan) for URL synchronization.
 export function MapZoomHandler({
   onMapReady,
   onZoomChange,
+  onViewChange,
 }: {
   onMapReady: (controls: {
     zoomIn: () => void;
@@ -14,6 +16,8 @@ export function MapZoomHandler({
     recenter: () => void;
   }) => void;
   onZoomChange?: (zoom: number) => void;
+  /** Called on moveend/zoomend with the current center + zoom */
+  onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
 }) {
   const map = useMap();
 
@@ -24,18 +28,25 @@ export function MapZoomHandler({
     [map],
   );
 
+  const reportView = useCallback(() => {
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+    onZoomChange?.(zoom);
+    onViewChange?.({ lat: center.lat, lng: center.lng, zoom });
+  }, [map, onZoomChange, onViewChange]);
+
   useMapEvents({
-    zoomend: () => {
-      onZoomChange?.(map.getZoom());
-    },
+    zoomend: reportView,
+    moveend: reportView,
   });
 
   useEffect(() => {
     if (map) {
       onMapReady({ zoomIn, zoomOut, recenter });
-      onZoomChange?.(map.getZoom());
+      // Report initial view state
+      reportView();
     }
-  }, [map, onMapReady, zoomIn, zoomOut, recenter, onZoomChange]);
+  }, [map, onMapReady, zoomIn, zoomOut, recenter, reportView]);
 
   return null;
 }

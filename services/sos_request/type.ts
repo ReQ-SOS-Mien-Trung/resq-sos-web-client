@@ -29,21 +29,35 @@ export type MedicalIssueType =
   | "BREATHING_DIFFICULTY"
   | "MOBILITY_IMPAIRMENT";
 
+// Injured person in SOS request
+export interface InjuredPerson {
+  index: number;
+  name: string;
+  custom_name: string;
+  person_type: string;
+  medical_issues: string[];
+  severity: string;
+}
+
 // Structured data from SOS request
 export interface SOSStructuredData {
-  can_move: boolean;
-  supplies: SupplyType[];
-  situation: SOSSituation;
+  situation: string;
+  other_situation_description: string;
   has_injured: boolean;
-  need_medical: boolean;
+  medical_issues: string[];
+  other_medical_description: string;
+  others_are_stable: boolean;
   people_count: {
     adult: number;
     child: number;
     elderly: number;
   };
-  medical_issues: MedicalIssueType[];
-  others_are_stable: boolean;
+  can_move: boolean;
+  need_medical: boolean;
+  supplies: string[];
+  other_supply_description: string;
   additional_description: string;
+  injured_persons: InjuredPerson[];
 }
 
 // Network metadata from mesh relay
@@ -54,11 +68,12 @@ export interface SOSNetworkMetadata {
 
 // Sender information
 export interface SOSSenderInfo {
-  user_id: string;
   device_id: string;
-  is_online: boolean;
+  user_id: string;
   user_name: string;
   user_phone: string;
+  battery_level: number;
+  is_online: boolean;
 }
 
 // SOS Request Entity
@@ -106,6 +121,23 @@ export interface GetSOSRequestsParams {
 // Get SOS Request By ID Response
 export interface GetSOSRequestByIdResponse {
   sosRequest: SOSRequestEntity;
+}
+
+// Create SOS Request Payload
+export interface CreateSOSRequestPayload {
+  packet_id?: string;
+  origin_id?: string;
+  ts?: number;
+  location: {
+    lat: number;
+    lng: number;
+    accuracy?: number;
+  };
+  sos_type?: string;
+  msg: string;
+  structured_data?: Partial<SOSStructuredData>;
+  network_metadata?: Partial<SOSNetworkMetadata>;
+  sender_info?: Partial<SOSSenderInfo>;
 }
 
 // ---- Rescue Suggestion ----
@@ -166,4 +198,76 @@ export interface RescueSuggestionResponse {
   estimatedDuration: string;
   specialNotes: string;
   confidenceScore: number;
+}
+
+// ---- Analysis ----
+
+export interface PriorityThresholds {
+  critical: string;
+  high: string;
+  medium: string;
+  low: string;
+}
+
+export interface ScoreWeights {
+  medical: string;
+  injury: string;
+  mobility: string;
+  environment: string;
+  food: string;
+}
+
+export interface RuleEvaluation {
+  id: number;
+  medicalScore: number;
+  injuryScore: number;
+  mobilityScore: number;
+  environmentScore: number;
+  foodScore: number;
+  totalScore: number;
+  priorityLevel: SOSPriorityLevel;
+  ruleVersion: string;
+  itemsNeeded: string[];
+  createdAt: string;
+  priorityThresholds: PriorityThresholds;
+  scoreWeights: ScoreWeights;
+}
+
+export interface AiAnalysisResult {
+  priority: string;
+  severity_level: string;
+  explanation: string;
+  confidence_score: number;
+}
+
+export interface AiAnalysisMetadata {
+  promptId: number;
+  rawResponse: string;
+  promptVersion: string;
+  analysisResult: AiAnalysisResult;
+}
+
+export interface AiAnalysis {
+  id: number;
+  modelName: string;
+  modelVersion: string;
+  analysisType: string;
+  suggestedSeverityLevel: SeverityLevel;
+  suggestedPriority: SOSPriorityLevel;
+  explanation: string;
+  confidenceScore: number;
+  suggestionScope: string;
+  metadata: AiAnalysisMetadata;
+  createdAt: string;
+  adoptedAt: string | null;
+}
+
+export interface GetSOSRequestAnalysisResponse {
+  sosRequestId: number;
+  sosType: string;
+  status: SOSRequestStatus;
+  currentPriorityLevel: SOSPriorityLevel;
+  ruleEvaluation: RuleEvaluation;
+  aiAnalyses: AiAnalysis[];
+  hasAiAnalysis: boolean;
 }
