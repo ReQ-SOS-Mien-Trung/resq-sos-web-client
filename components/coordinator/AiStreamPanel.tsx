@@ -303,7 +303,7 @@ function SonarRadar({
     const chars = "░▒▓█▄▀■□◤◥◈◇⬡⬢⊕⊗";
     const el = textRef.current;
     glitchIntervalRef.current = setInterval(() => {
-      frame++;
+      frame += 3;
       const revealed = Math.min(frame, target.length);
       let display = target.slice(0, revealed);
       if (revealed < target.length) {
@@ -317,7 +317,7 @@ function SonarRadar({
         el.textContent = target;
         if (glitchIntervalRef.current) clearInterval(glitchIntervalRef.current);
       }
-    }, 35);
+    }, 20);
     return () => {
       if (glitchIntervalRef.current) clearInterval(glitchIntervalRef.current);
     };

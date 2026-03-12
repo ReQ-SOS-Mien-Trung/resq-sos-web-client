@@ -31,6 +31,7 @@ import {
   Users,
   Package,
   X,
+  MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { useCreateSOSRequest } from "@/services/sos_request/hooks";
@@ -105,6 +106,10 @@ export function ManualSOSBuilder({
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
 
+  // ── Address geocoding ──
+  const [address, setAddress] = useState("");
+  const [isGeocoding, setIsGeocoding] = useState(false);
+
   // ── Structured data ──
   const [situation, setSituation] = useState("");
   const [otherSituation, setOtherSituation] = useState("");
@@ -120,6 +125,46 @@ export function ManualSOSBuilder({
   const [additionalDescription, setAdditionalDescription] = useState("");
 
   const { mutate: createSOS, isPending } = useCreateSOSRequest();
+
+  const geocodeAddress = async () => {
+    const query = address.trim();
+    if (!query) {
+      toast.error("Vui lòng nhập địa chỉ cần tìm");
+      return;
+    }
+    setIsGeocoding(true);
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        format: "json",
+        limit: "1",
+        addressdetails: "1",
+      });
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?${params}`,
+        {
+          headers: {
+            "Accept-Language": "vi,en",
+            "User-Agent": "ResQ-SOS-WebClient/1.0",
+          },
+        },
+      );
+      if (!res.ok) throw new Error("Nominatim request failed");
+      const data = await res.json();
+      if (!data.length) {
+        toast.error("Không tìm thấy địa chỉ, hãy thử từ khoá khác");
+        return;
+      }
+      const { lat: resLat, lon: resLon, display_name } = data[0];
+      setLat(parseFloat(resLat).toFixed(6));
+      setLng(parseFloat(resLon).toFixed(6));
+      toast.success(`Đã xác định: ${display_name}`);
+    } catch {
+      toast.error("Lỗi tra cứu địa chỉ, vui lòng thử lại");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
 
   const toggleItem = (
     arr: string[],
@@ -155,6 +200,7 @@ export function ManualSOSBuilder({
     setMedicalIssues([]);
     setSupplies([]);
     setAdditionalDescription("");
+    setAddress("");
   };
 
   // Reset form when opened fresh
@@ -291,6 +337,38 @@ export function ManualSOSBuilder({
                   Chọn trên bản đồ
                 </Button>
               </div>
+
+              {/* Address → geocode */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  Tra địa chỉ
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="VD: 123 Nguyễn Trãi, Q.1, TP.HCM"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        geocodeAddress();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={geocodeAddress}
+                    disabled={isGeocoding}
+                  >
+                    <MagnifyingGlass size={14} className="mr-1" />
+                    {isGeocoding ? "Đang tìm..." : "Tìm"}
+                  </Button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <Input
                   value={lat}

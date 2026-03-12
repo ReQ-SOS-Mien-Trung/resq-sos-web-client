@@ -921,6 +921,8 @@ export interface SOSSidebarProps {
   isAnalyzingCluster?: boolean;
   /** Which backend cluster ID is being analyzed */
   analyzingClusterId?: number | null;
+  /** Real-time AI status */
+  analyzingStatus?: string;
   /** Open manual mission builder for a cluster */
   onManualMission?: (clusterId: number) => void;
   /** View rescue plan history for a cluster */

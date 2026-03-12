@@ -103,18 +103,28 @@ export function streamClusterRescueSuggestion(
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice("data: ".length).trim();
-          if (!jsonStr) continue;
+        
+        let nlIdx = buffer.indexOf("\n");
+        while (nlIdx !== -1) {
+          const line = buffer.slice(0, nlIdx).trim();
+          buffer = buffer.slice(nlIdx + 1);
+          
+          if (!line.startsWith("data: ")) {
+            nlIdx = buffer.indexOf("\n");
+            continue;
+          }
+          
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) {
+            nlIdx = buffer.indexOf("\n");
+            continue;
+          }
 
           let event: SseMissionEvent;
           try {
             event = JSON.parse(jsonStr);
           } catch {
+            nlIdx = buffer.indexOf("\n");
             continue;
           }
 
@@ -138,7 +148,22 @@ export function streamClusterRescueSuggestion(
               callbacks.onError(event.data || "Đã xảy ra lỗi không xác định");
               return;
           }
+          
+          nlIdx = buffer.indexOf("\n");
         }
+      }
+
+      // Process any remaining buffer when done
+      if (buffer.trim().startsWith("data: ")) {
+        try {
+          const jsonStr = buffer.trim().slice(6).trim();
+          if (jsonStr) {
+            const event: SseMissionEvent = JSON.parse(jsonStr);
+            if (event.eventType === "result" && event.result) {
+              callbacks.onResult(event.result);
+            }
+          }
+        } catch {}
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;

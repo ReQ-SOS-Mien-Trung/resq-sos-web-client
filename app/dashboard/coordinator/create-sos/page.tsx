@@ -23,6 +23,7 @@ import {
   X,
   PaperPlaneTilt,
   Crosshair,
+  MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { useCreateSOSRequest } from "@/services/sos_request/hooks";
 import type { CreateSOSRequestPayload } from "@/services/sos_request/type";
@@ -132,6 +133,46 @@ function CreateSOSContent() {
   const [msg, setMsg] = useState("");
   const [lat, setLat] = useState(searchParams.get("lat") ?? "");
   const [lng, setLng] = useState(searchParams.get("lng") ?? "");
+
+  // ── Address geocoding ──
+  const [address, setAddress] = useState("");
+  const [isGeocoding, setIsGeocoding] = useState(false);
+
+  const geocodeAddress = async () => {
+    const query = address.trim();
+    if (!query) {
+      toast.error("Vui lòng nhập địa chỉ cần tìm");
+      return;
+    }
+    setIsGeocoding(true);
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        format: "json",
+        limit: "1",
+        addressdetails: "1",
+        countrycodes: "vn",
+      });
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?${params}`,
+        { headers: { "Accept-Language": "vi,en" } },
+      );
+      if (!res.ok) throw new Error("Nominatim request failed");
+      const data = await res.json();
+      if (!data.length) {
+        toast.error("Không tìm thấy địa chỉ, hãy thử từ khoá khác");
+        return;
+      }
+      const { lat: resLat, lon: resLon, display_name } = data[0];
+      setLat(parseFloat(resLat).toFixed(6));
+      setLng(parseFloat(resLon).toFixed(6));
+      toast.success(`Đã xác định: ${display_name}`);
+    } catch {
+      toast.error("Lỗi tra cứu địa chỉ, vui lòng thử lại");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
 
   // ── Structured data ──
   const [situation, setSituation] = useState("");
@@ -315,6 +356,36 @@ function CreateSOSContent() {
               <MapPin size={16} /> Toạ độ vị trí{" "}
               <span className="text-red-500">*</span>
             </p>
+
+            {/* Address → geocode */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <MagnifyingGlass size={14} /> Tra địa chỉ
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="VD: 123 Nguyễn Trãi"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      geocodeAddress();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="shrink-0"
+                  onClick={geocodeAddress}
+                  disabled={isGeocoding}
+                >
+                  <MagnifyingGlass size={14} className="mr-1" />
+                  {isGeocoding ? "Đang tìm..." : "Tìm"}
+                </Button>
+              </div>
+            </div>
 
             {/* Mini Map Picker */}
             <div className="rounded-lg overflow-hidden border">

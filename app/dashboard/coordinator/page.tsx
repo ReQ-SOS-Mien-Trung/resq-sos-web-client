@@ -606,35 +606,12 @@ const CoordinatorDashboardContent = () => {
         {
           onSuccess: (clusterData) => {
             setActiveClusterId(clusterData.clusterId);
-            fetchClusterRescueSuggestion(clusterData.clusterId, {
-              onSuccess: (suggestion) => {
-                if (!suggestion.isSuccess) {
-                  toast.error(
-                    suggestion.errorMessage ||
-                      "Đề xuất AI không thành công. Vui lòng thử lại.",
-                  );
-                  setProcessingClusterIndex(null);
-                  setProcessingSosId(null);
-                  return;
-                }
-                setRescueSuggestion(suggestion);
-                suggestionCacheRef.current.set(
-                  clusterData.clusterId,
-                  suggestion,
-                );
-                setRescuePlanOpen(true);
-                setProcessingClusterIndex(null);
-                setProcessingSosId(null);
-              },
-              onError: (error) => {
-                console.error("Failed to get rescue suggestion:", error);
-                toast.error(
-                  "Đã gom cụm thành công nhưng không thể lấy đề xuất AI. Vui lòng thử lại.",
-                );
-                setProcessingClusterIndex(null);
-                setProcessingSosId(null);
-              },
-            });
+            setAnalyzingClusterId(clusterData.clusterId);
+            setAiStreamClusterId(clusterData.clusterId);
+            setAiStreamOpen(true);
+            aiStream.startStream(clusterData.clusterId);
+            setProcessingClusterIndex(null);
+            setProcessingSosId(null);
           },
           onError: (error) => {
             console.error("Failed to create cluster:", error);
@@ -940,8 +917,9 @@ const CoordinatorDashboardContent = () => {
               processingSosId={processingSosId}
               backendClusters={clusters}
               onAnalyzeCluster={handleAnalyzeCluster}
-              isAnalyzingCluster={isFetchingSuggestion}
+              isAnalyzingCluster={aiStream.loading || isFetchingSuggestion}
               analyzingClusterId={analyzingClusterId}
+              analyzingStatus={aiStream.status}
               onManualMission={handleOpenManualMission}
               onViewClusterPlan={handleViewClusterPlan}
               onViewMission={handleViewMission}

@@ -280,22 +280,6 @@ const RescuePlanPanel = ({
   const { mutate: createMission, isPending: isCreatingMission } =
     useCreateMission();
 
-  const enterEditMode = useCallback(() => {
-    if (!rescueSuggestion) return;
-    setEditActivities(
-      rescueSuggestion.suggestedActivities.map((a, i) => ({
-        ...a,
-        _id: `edit-${i}-${Date.now()}`,
-      })),
-    );
-    setEditPriorityScore(rescueSuggestion.suggestedPriorityScore || 5);
-    const now = new Date();
-    setEditStartTime(now.toISOString().slice(0, 16));
-    const end = new Date(now.getTime() + 4 * 60 * 60 * 1000);
-    setEditExpectedEndTime(end.toISOString().slice(0, 16));
-    setIsEditMode(true);
-  }, [rescueSuggestion]);
-
   const exitEditMode = useCallback(() => {
     setIsEditMode(false);
     setEditActivities([]);
@@ -436,6 +420,38 @@ const RescuePlanPanel = ({
     return latestSuggestion.activities.flatMap((g) => g.suggestedActivities);
   }, [latestSuggestion]);
 
+  const enterEditMode = useCallback(() => {
+    if (rescueSuggestion) {
+      // Pre-fill from live AI suggestion
+      setEditActivities(
+        rescueSuggestion.suggestedActivities.map((a, i) => ({
+          ...a,
+          _id: `edit-${i}-${Date.now()}`,
+        })),
+      );
+      setEditPriorityScore(rescueSuggestion.suggestedPriorityScore || 5);
+    } else if (latestActivities.length > 0) {
+      // Pre-fill from history suggestion
+      setEditActivities(
+        latestActivities.map((a, i) => ({
+          ...a,
+          _id: `edit-${i}-${Date.now()}`,
+        })),
+      );
+      setEditPriorityScore(latestSuggestion?.suggestedPriorityScore || 5);
+    } else {
+      // Start with empty manual plan
+      setEditActivities([]);
+      setEditPriorityScore(5);
+    }
+    setEditMissionType("RESCUE");
+    const now = new Date();
+    setEditStartTime(now.toISOString().slice(0, 16));
+    const end = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+    setEditExpectedEndTime(end.toISOString().slice(0, 16));
+    setIsEditMode(true);
+  }, [rescueSuggestion, latestActivities, latestSuggestion]);
+
   const hasSidebar = !!(rescueSuggestion || latestSuggestion);
 
   const severity = rescueSuggestion
@@ -487,7 +503,7 @@ const RescuePlanPanel = ({
   }, [rescueSuggestion, latestActivities]);
 
   // Early returns AFTER all hooks
-  if (!isHistoryMode && (!rescueSuggestion || clusterSOSRequests.length === 0))
+  if (!isHistoryMode && !rescueSuggestion && clusterSOSRequests.length === 0)
     return null;
   if (isHistoryMode && !clusterId) return null;
 
@@ -593,7 +609,7 @@ const RescuePlanPanel = ({
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              {rescueSuggestion && !isEditMode && (
+              {!isEditMode && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -601,7 +617,9 @@ const RescuePlanPanel = ({
                   onClick={enterEditMode}
                 >
                   <PencilSimpleLine className="h-3.5 w-3.5" />
-                  Chỉnh sửa kế hoạch
+                  {rescueSuggestion
+                    ? "Chỉnh sửa kế hoạch"
+                    : "Tạo kế hoạch thủ công"}
                 </Button>
               )}
               {isEditMode && (
@@ -730,7 +748,7 @@ const RescuePlanPanel = ({
             <ScrollArea className="h-full">
               <div className="p-4 space-y-4">
                 {/* === Edit mode content === */}
-                {isEditMode && rescueSuggestion && (
+                {isEditMode && (
                   <>
                     {/* Edit mode banner */}
                     <div className="rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-900/10 p-3">
@@ -740,12 +758,23 @@ const RescuePlanPanel = ({
                           weight="fill"
                         />
                         <span className="text-sm font-bold text-amber-800 dark:text-amber-300">
-                          Chế độ chỉnh sửa kế hoạch
+                          {rescueSuggestion
+                            ? "Chế độ chỉnh sửa kế hoạch"
+                            : "Tạo kế hoạch cứu hộ thủ công"}
                         </span>
                       </div>
                       <p className="text-[11px] text-amber-700/70 dark:text-amber-400/70">
-                        Chỉnh sửa các bước, sau đó nhấn &quot;Xác nhận &amp; Tạo
-                        nhiệm vụ&quot; để gửi kế hoạch đã chỉnh sửa.
+                        {rescueSuggestion ? (
+                          <>
+                            Chỉnh sửa các bước, sau đó nhấn &quot;Xác nhận &amp;
+                            Tạo nhiệm vụ&quot; để gửi kế hoạch đã chỉnh sửa.
+                          </>
+                        ) : (
+                          <>
+                            Thêm các bước thực hiện, sau đó nhấn &quot;Xác nhận
+                            &amp; Tạo nhiệm vụ&quot; để gửi kế hoạch.
+                          </>
+                        )}
                       </p>
                     </div>
 
@@ -1690,7 +1719,15 @@ const RescuePlanPanel = ({
                 )}
                 {isReAnalyzing ? "Đang phân tích..." : "Phân tích lại"}
               </Button>
-            ) : null}
+            ) : (
+              <Button
+                className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg shadow-amber-500/20"
+                onClick={enterEditMode}
+              >
+                <PencilSimpleLine className="h-5 w-5 mr-2" weight="fill" />
+                Tạo kế hoạch thủ công
+              </Button>
+            )}
           </div>
         </div>
       </div>
