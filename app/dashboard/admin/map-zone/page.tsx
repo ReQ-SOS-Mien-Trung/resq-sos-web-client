@@ -66,6 +66,7 @@ const MapZonePage = () => {
   const [selectedZone, setSelectedZone] = useState<ServiceZoneEntity | null>(null);
   const [drawnCoordinates, setDrawnCoordinates] = useState<Coordinate[] | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [hoveredZoneId, setHoveredZoneId] = useState<number | null>(null);
 
   const handleCoordinatesChange = useCallback((coords: Coordinate[] | null) => {
     setDrawnCoordinates(coords);
@@ -282,12 +283,14 @@ const MapZonePage = () => {
                       <div
                         key={zone.id}
                         className="group relative flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card hover:border-[#FF5722]/30 hover:bg-[#FF5722]/3 transition-all duration-150 cursor-default"
+                        onMouseEnter={() => setHoveredZoneId(zone.id)}
+                        onMouseLeave={() => setHoveredZoneId(null)}
                       >
                         {/* Status dot */}
                         <div
                           className={cn(
                             "shrink-0 w-2 h-2 rounded-full mt-0.5",
-                            zone.isActive ? "bg-[#FF5722]" : "bg-gray-300 dark:bg-gray-600",
+                            zone.isActive ? "bg-[#22C55E]" : "bg-gray-300 dark:bg-gray-600",
                           )}
                         />
 
@@ -304,7 +307,7 @@ const MapZonePage = () => {
                             <span
                               className={cn(
                                 "text-[12px] tracking-tighter font-medium",
-                                zone.isActive ? "text-[#FF5722]" : "text-muted-foreground",
+                                zone.isActive ? "text-[#22C55E]" : "text-muted-foreground",
                               )}
                             >
                               {zone.isActive ? "Hoạt động" : "Tạm tắt"}
@@ -360,6 +363,7 @@ const MapZonePage = () => {
             onCoordinatesChange={handleCoordinatesChange}
             sidebarOpen={sidebarOpen}
             allZones={backgroundZones}
+            highlightedZoneId={hoveredZoneId}
           />
         </div>
       </div>

@@ -154,11 +154,11 @@ export default function ServiceZonePanel({
             <div className="border border-[#FF5722]/30 bg-[#FF5722]/5 p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-4 w-4 text-[#FF5722]" weight="fill" />
-                <span className="text-sm font-semibold text-[#FF5722]">
+                <span className="text-sm tracking-tighter font-semibold text-[#FF5722]">
                   Đã xác định vùng
                 </span>
               </div>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-4 tracking-tighter text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <PolygonIcon className="h-3.5 w-3.5" />
                   {coordCount} điểm
@@ -170,7 +170,7 @@ export default function ServiceZonePanel({
               </div>
 
               {/* Coordinate list (scrollable) */}
-              <div className="max-h-48 overflow-y-auto space-y-1 text-[11px] font-mono">
+              <div className="max-h-65 overflow-y-auto space-y-1 text-[11px] font-mono">
                 {drawnCoordinates?.map((c, i) => (
                   <div
                     key={i}
