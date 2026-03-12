@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMyDepotInventory, useInventoryCategories } from "@/services/inventory/hooks";
+import { useMyDepotInventory, useInventoryCategories, useInventoryItemTypes, useInventoryTargetGroups } from "@/services/inventory/hooks";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,9 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<string>("name_asc");
 
-  const { data: categories, isLoading: isCategoriesLoading } = useInventoryCategories();
+  const { data: categories } = useInventoryCategories();
+  const { data: itemTypesData } = useInventoryItemTypes();
+  const { data: targetGroupsData } = useInventoryTargetGroups();
 
   const { data: inventoryData, isLoading, isError } = useMyDepotInventory({
     pageNumber: page,
@@ -30,9 +32,6 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
     itemTypes: selectedItemTypes.length > 0 ? selectedItemTypes : undefined,
     targetGroups: selectedTargetGroups.length > 0 ? selectedTargetGroups : undefined,
   });
-
-  const itemTypes = ["Consumable", "Reusable", "Equipment"];
-  const targetGroups = ["Children", "Elderly", "Pregnant", "General", "Rescuer"];
 
   const toggleCategory = (id: number) => {
     setSelectedCategoryIds(prev =>
@@ -74,14 +73,14 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
         <div className="space-y-2">
           {/* Category chips */}
           <div className="flex flex-wrap gap-0">
-            <span className="text-[12px] text-muted-foreground font-medium mr-2 self-center">Danh mục:</span>
+            <span className="text-[14px] text-primary font-semibold mr-2 self-center">Danh mục:</span>
             {categories?.map((cat) => {
               const isActive = selectedCategoryIds.includes(parseInt(cat.key));
               return (
                 <button
                   key={cat.key}
                   onClick={() => toggleCategory(parseInt(cat.key))}
-                  className={`px-3 py-1 text-xs border transition-all ${isActive
+                  className={`px-3 py-2 text-sm border transition-all ${isActive
                     ? "bg-[#FF5722] text-white border-[#FF5722]"
                     : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
                     }`}
@@ -94,19 +93,19 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
           {/* Item type chips */}
           <div className="flex flex-wrap gap-0">
-            <span className="text-[12px] text-muted-foreground font-medium mr-2 self-center">Loại:</span>
-            {itemTypes.map((type) => {
-              const isActive = selectedItemTypes.includes(type);
+            <span className="text-[14px] text-primary font-semibold mr-2 self-center">Loại:</span>
+            {itemTypesData?.map((type) => {
+              const isActive = selectedItemTypes.includes(type.key);
               return (
                 <button
-                  key={type}
-                  onClick={() => toggleItemType(type)}
-                  className={`px-3 py-1 text-xs border transition-all ${isActive
+                  key={type.key}
+                  onClick={() => toggleItemType(type.key)}
+                  className={`px-3 py-2 text-sm border transition-all ${isActive
                     ? "bg-[#FF5722] text-white border-[#FF5722]"
                     : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
                     }`}
                 >
-                  {type}
+                  {type.value}
                 </button>
               );
             })}
@@ -114,19 +113,19 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
           {/* Target group chips */}
           <div className="flex flex-wrap gap-0">
-            <span className="text-[12px] text-muted-foreground font-medium mr-2 self-center">Đối tượng:</span>
-            {targetGroups.map((group) => {
-              const isActive = selectedTargetGroups.includes(group);
+            <span className="text-[14px] text-primary font-semibold mr-2 self-center">Đối tượng:</span>
+            {targetGroupsData?.map((group) => {
+              const isActive = selectedTargetGroups.includes(group.key);
               return (
                 <button
-                  key={group}
-                  onClick={() => toggleTargetGroup(group)}
-                  className={`px-3 py-1 text-xs border transition-all ${isActive
+                  key={group.key}
+                  onClick={() => toggleTargetGroup(group.key)}
+                  className={`px-3 py-2 text-sm border transition-all ${isActive
                     ? "bg-[#FF5722] text-white border-[#FF5722]"
                     : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
                     }`}
                 >
-                  {group}
+                  {group.value}
                 </button>
               );
             })}
@@ -135,7 +134,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
         {/* Sort & Pagination Header */}
         <div className="flex items-center justify-between pt-2">
-          <span className="text-[12px] font-medium text-muted-foreground">
+          <span className="text-[14px] font-medium text-muted-foreground">
             {inventoryData?.totalCount || 0} Kết quả
           </span>
 
@@ -219,8 +218,8 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
                       {/* Bottom Quantity Section */}
                       <div className="mt-auto border-t border-black/5 dark:border-white/5 pt-2 flex flex-col">
-                        <span className="text-[12px] text-muted-foreground uppercase mb-0.5 max-w-[100%] truncate">
-                          {item.itemType}
+                        <span className="text-[12px] text-muted-foreground uppercase mb-0.5 max-w-full truncate">
+                          {itemTypesData?.find((t) => t.key === item.itemType)?.value ?? item.itemType}
                         </span>
                         <div className="flex items-end justify-between">
                           <span className="text-md font-black tracking-tighter">

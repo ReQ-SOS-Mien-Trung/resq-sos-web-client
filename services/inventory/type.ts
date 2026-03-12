@@ -3,6 +3,10 @@ export interface InventoryCategory {
   value: string;
 }
 
+export type InventoryItemType = InventoryCategory;
+
+export type InventoryTargetGroup = InventoryCategory;
+
 export interface InventoryItemEntity {
   reliefItemId: number;
   reliefItemName: string;

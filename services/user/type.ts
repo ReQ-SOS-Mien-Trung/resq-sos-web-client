@@ -2,11 +2,13 @@
 export interface UserMeResponse {
   id: string;
   roleId: number;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   username: string;
   phone: string;
   rescuerType: string | null;
   email: string | null;
+  avatarUrl: string | null;
   isEmailVerified: boolean;
   isOnboarded: boolean;
   isEligibleRescuer: boolean;
@@ -16,6 +18,7 @@ export interface UserMeResponse {
   updatedAt: string;
   approvedBy: string | null;
   approvedAt: string | null;
+  rescuerApplicationDocuments: unknown[];
 }
 
 // User Entity

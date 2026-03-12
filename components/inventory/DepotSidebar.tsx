@@ -120,13 +120,11 @@ const DepotSidebar = ({
     <div className="h-full flex flex-col bg-background border-r">
       {/* Header */}
       <div className="p-4 border-b">
-        <h2 className="font-bold text-lg flex items-center gap-2">
+        <h2 className="font-regular tracking-tighter text-lg flex items-center gap-2">
           <Warehouse className="h-5 w-5 text-primary" />
           {depotInfo.name}
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Quản lý kho cứu trợ
-        </p>
+       
       </div>
 
       {/* Stats Bar */}

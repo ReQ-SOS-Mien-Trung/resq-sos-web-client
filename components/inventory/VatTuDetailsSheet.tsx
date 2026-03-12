@@ -11,20 +11,16 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   Package,
-  MapPin,
   Calendar,
-  TrendUp,
-  TrendDown,
   PencilSimple,
   ArrowLineUp,
   ArrowLineDown,
   ClockCounterClockwise,
-  Warning,
-  CheckCircle,
   HandHeart,
   Tag
 } from "@phosphor-icons/react";
 import { InventoryItemEntity } from "@/services/inventory/type";
+import { useInventoryItemTypes, useInventoryTargetGroups } from "@/services/inventory/hooks";
 
 interface VatTuDetailsSheetProps {
   item: InventoryItemEntity | null;
@@ -33,6 +29,14 @@ interface VatTuDetailsSheetProps {
 }
 
 export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsSheetProps) {
+  const { data: itemTypesData } = useInventoryItemTypes();
+  const { data: targetGroupsData } = useInventoryTargetGroups();
+
+  const itemTypeLabel = (key: string) =>
+    itemTypesData?.find((t) => t.key === key)?.value ?? key;
+  const targetGroupLabel = (key: string) =>
+    targetGroupsData?.find((g) => g.key === key)?.value ?? key;
+
   if (!item) return null;
 
   const formatDate = (dateString?: string) => {
@@ -51,7 +55,7 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto h-[100dvh] bg-background p-6">
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto h-dvh bg-background p-6">
         <SheetHeader className="space-y-4">
           <div className="flex items-start gap-4">
             <div className="p-3 rounded-xl bg-orange-500/10 text-[#FF5722]">
@@ -62,12 +66,12 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
               <SheetDescription className="flex items-center gap-2 mt-1">
                 <span className="font-medium text-sm text-black dark:text-white uppercase tracking-wider">{item.categoryName}</span>
                 <span>•</span>
-                <span>{item.itemType}</span>
+                <span>{itemTypeLabel(item.itemType)}</span>
               </SheetDescription>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 text-left">
-            <Badge variant="outline" className="rounded-none border-black/20 text-xs">{item.targetGroup}</Badge>
+            <Badge variant="outline" className="rounded-none border-black/20 text-xs">{targetGroupLabel(item.targetGroup)}</Badge>
             <Badge className={cn("rounded-none text-xs text-white", item.availableQuantity > 0 ? "bg-[#FF5722] hover:bg-[#FF5722]/90 border-transparent" : "bg-red-500 hover:bg-red-500/90 border-transparent")}>
               {item.availableQuantity > 0 ? "Còn Hàng" : "Hết Hàng"}
             </Badge>
@@ -121,12 +125,12 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
               <div className="flex items-center gap-3 text-sm">
                 <Tag className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Phân loại:</span>
-                <span className="font-medium">{item.itemType}</span>
+                <span className="font-medium">{itemTypeLabel(item.itemType)}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <HandHeart className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Đối tượng:</span>
-                <span className="font-medium">{item.targetGroup}</span>
+                <span className="font-medium">{targetGroupLabel(item.targetGroup)}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Calendar className="h-4 w-4 text-muted-foreground" />

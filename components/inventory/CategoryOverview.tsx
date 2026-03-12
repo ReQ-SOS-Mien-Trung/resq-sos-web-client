@@ -16,9 +16,9 @@ const CategoryOverview = ({
   if (!apiCategories || apiCategories.length === 0) {
     return (
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
+            <Package className="h-5 w-5 text-primary " />
             Tổng Quan Danh Mục
           </CardTitle>
         </CardHeader>
@@ -34,7 +34,7 @@ const CategoryOverview = ({
 
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2">
         <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Package className="h-5 w-5 text-primary" />
           Tổng Quan Danh Mục

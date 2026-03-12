@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -40,7 +40,6 @@ function mapUserEntityToUser(entity: UserEntity): User {
 
 const UsersPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [filters, setFilters] = useState<UserFiltersType>({});
   const [loading, setLoading] = useState(true);
 
   const queryClient = useQueryClient();
@@ -61,8 +60,6 @@ const UsersPage = () => {
   };
 
   const { data: usersData, isLoading: isLoadingUsers } = useAdminUsers(apiParams);
-
-  const handleFiltersChange = (_: unknown) => {}; // unused, kept for safety
 
   const dynamicStats = {
     total: usersData?.totalCount || 0,
@@ -155,20 +152,20 @@ const UsersPage = () => {
           <div>
             <div className="flex items-center gap-2.5 mb-1">
               <ShieldCheck size={20} className="text-foreground" />
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-tighter text-muted-foreground">
                 Quản lý hồ sơ
               </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-tight">
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tighter text-foreground leading-tight">
               Quản lý người dùng
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm tracking-tighter text-muted-foreground mt-1">
               Xem xét và quản lý tài khoản của người dùng
             </p>
           </div>
           <button
             onClick={() => window.location.href = "/dashboard/admin/users/create"}
-            className="px-4 sm:px-6 py-4 bg-black text-white text-[10px] sm:text-[12px] font-bold uppercase tracking-wider hover:bg-[#FF5722] transition-colors flex items-center justify-center gap-2 group"
+            className="px-2 sm:px-4 py-4 bg-black text-white text-[12px] sm:text-[14px] font-bold uppercase tracking-tighter hover:bg-[#FF5722] transition-colors flex items-center justify-center gap-2 group"
           >
             Tạo tài khoản
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

@@ -3,6 +3,8 @@ import {
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
   InventoryCategory,
+  InventoryItemType,
+  InventoryTargetGroup,
 } from "./type";
 
 /**
@@ -10,7 +12,7 @@ import {
  * GET /logistics/inventory/my-depot
  */
 export async function getMyDepotInventory(
-  params: GetMyDepotInventoryParams
+  params: GetMyDepotInventoryParams,
 ): Promise<GetMyDepotInventoryResponse> {
   const { data } = await api.get("/logistics/inventory/my-depot", {
     params,
@@ -27,5 +29,25 @@ export async function getMyDepotInventory(
  */
 export async function getInventoryCategories(): Promise<InventoryCategory[]> {
   const { data } = await api.get("/logistics/inventory/metadata/categories");
+  return data;
+}
+
+/**
+ * Get list of item types
+ * GET /logistics/inventory/metadata/item-types
+ */
+export async function getInventoryItemTypes(): Promise<InventoryItemType[]> {
+  const { data } = await api.get("/logistics/inventory/metadata/item-types");
+  return data;
+}
+
+/**
+ * Get list of target groups
+ * GET /logistics/inventory/metadata/target-groups
+ */
+export async function getInventoryTargetGroups(): Promise<
+  InventoryTargetGroup[]
+> {
+  const { data } = await api.get("/logistics/inventory/metadata/target-groups");
   return data;
 }
