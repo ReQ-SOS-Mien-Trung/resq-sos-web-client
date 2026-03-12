@@ -24,3 +24,26 @@ export interface RescueTeamStatusOption {
   key: RescueTeamStatusKey;
   value: string;
 }
+
+export interface RescueTeamMember {
+  userId: string;
+  isLeader: boolean;
+}
+
+export interface CreateRescueTeamRequest {
+  name: string;
+  type: RescueTeamTypeKey;
+  assemblyPointId: number;
+  maxMembers: number;
+  members: RescueTeamMember[];
+}
+
+export interface CreateRescueTeamResponse {
+  id: number;
+  name: string;
+  type: RescueTeamTypeKey;
+  assemblyPointId: number;
+  maxMembers: number;
+  status: RescueTeamStatusKey;
+  createdAt: string;
+}

@@ -1,5 +1,10 @@
 import api from "@/config/axios";
-import type { RescueTeamTypeOption, RescueTeamStatusOption } from "./type";
+import type {
+  RescueTeamTypeOption,
+  RescueTeamStatusOption,
+  CreateRescueTeamRequest,
+  CreateRescueTeamResponse,
+} from "./type";
 
 /**
  * Get rescue team metadata types.
@@ -18,5 +23,16 @@ export async function getRescueTeamStatuses(): Promise<
   RescueTeamStatusOption[]
 > {
   const { data } = await api.get("/personnel/rescue-teams/metadata/status");
+  return data;
+}
+
+/**
+ * Create a new rescue team.
+ * POST /personnel/rescue-teams
+ */
+export async function createRescueTeam(
+  request: CreateRescueTeamRequest,
+): Promise<CreateRescueTeamResponse> {
+  const { data } = await api.post("/personnel/rescue-teams", request);
   return data;
 }

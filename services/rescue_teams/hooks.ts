@@ -1,6 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
-import { getRescueTeamTypes, getRescueTeamStatuses } from "./api";
-import type { RescueTeamTypeOption, RescueTeamStatusOption } from "./type";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  getRescueTeamTypes,
+  getRescueTeamStatuses,
+  createRescueTeam,
+} from "./api";
+import type {
+  RescueTeamTypeOption,
+  RescueTeamStatusOption,
+  CreateRescueTeamRequest,
+  CreateRescueTeamResponse,
+} from "./type";
 
 export const RESCUE_TEAM_TYPES_QUERY_KEY = ["rescue-team-types"] as const;
 export const RESCUE_TEAM_STATUSES_QUERY_KEY = ["rescue-team-statuses"] as const;
@@ -26,5 +35,18 @@ export function useRescueTeamStatuses(options?: UseRescueTeamStatusesOptions) {
     queryKey: RESCUE_TEAM_STATUSES_QUERY_KEY,
     queryFn: getRescueTeamStatuses,
     enabled: options?.enabled ?? true,
+  });
+}
+
+export const RESCUE_TEAMS_QUERY_KEY = ["rescue-teams"] as const;
+
+export function useCreateRescueTeam() {
+  const queryClient = useQueryClient();
+
+  return useMutation<CreateRescueTeamResponse, Error, CreateRescueTeamRequest>({
+    mutationFn: createRescueTeam,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: RESCUE_TEAMS_QUERY_KEY });
+    },
   });
 }

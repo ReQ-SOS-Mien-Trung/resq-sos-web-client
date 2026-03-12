@@ -54,6 +54,7 @@ import {
   MapTrifold,
   SignOut,
   Phone,
+  UsersThree,
 } from "@phosphor-icons/react";
 import {
   SOSDetailsPanel,
@@ -971,8 +972,22 @@ const CoordinatorDashboardContent = () => {
                 routeOverlay={routeOverlay}
               />
 
-              {/* Floating Create SOS Button */}
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[40]">
+              {/* Floating Action Buttons */}
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[40] flex items-center gap-3">
+                {/* Create Rescue Team Button */}
+                <Button
+                  size="lg"
+                  className="rounded-full shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold gap-2 px-6 h-12 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105"
+                  onClick={() => {
+                    router.push("/dashboard/coordinator/rescue-teams/create");
+                  }}
+                >
+                  <span className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                  <UsersThree className="w-5 h-5" weight="fill" />
+                  <span className="tracking-wide">TẠO ĐỘI CỨU HỘ</span>
+                </Button>
+
+                {/* Create SOS Button */}
                 <Button
                   size="lg"
                   className="rounded-full shadow-[0_0_30px_rgba(220,38,38,0.4)] bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold gap-2.5 px-8 h-14 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105"
