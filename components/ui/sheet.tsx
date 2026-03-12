@@ -149,6 +149,8 @@ function SheetContent({
         style={{
           transform: panelTransform[side],
           transition: "transform 300ms cubic-bezier(0.32, 0.72, 0, 1)",
+          willChange: isEntered ? "auto" : "transform",
+          contain: "layout style paint",
         }}
         {...props}
       >

@@ -69,6 +69,27 @@ export interface GetUsersParams {
   search?: string;
 }
 
+export interface AdminUpdateUserRequest {
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  phone?: string;
+  email?: string;
+  rescuerType?: string;
+  roleId?: number;
+  avatarUrl?: string;
+  address?: string;
+  ward?: string;
+  province?: string;
+  latitude?: number;
+  longitude?: number;
+  isEmailVerified?: boolean;
+  isOnboarded?: boolean;
+  isEligibleRescuer?: boolean;
+  approvedBy?: string;
+  approvedAt?: string;
+}
+
 export interface BanUserRequest {
   reason: string;
 }

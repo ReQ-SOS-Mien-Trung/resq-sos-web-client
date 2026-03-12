@@ -5,6 +5,7 @@ import {
   GetUsersResponse,
   BanUserRequest,
   AdminCreateUserRequest,
+  AdminUpdateUserRequest,
   UserEntity,
 } from "./type";
 
@@ -50,5 +51,13 @@ export async function adminCreateUser(
   data: AdminCreateUserRequest,
 ): Promise<any> {
   const response = await api.post("/identity/admin/users", data);
+  return response.data;
+}
+
+export async function updateAdminUser(
+  userId: string,
+  data: AdminUpdateUserRequest,
+): Promise<UserEntity> {
+  const response = await api.put(`/identity/admin/users/${userId}`, data);
   return response.data;
 }

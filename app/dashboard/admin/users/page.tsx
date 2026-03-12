@@ -52,6 +52,7 @@ const UsersPage = () => {
   const [banReason, setBanReason] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [detailSheetMode, setDetailSheetMode] = useState<"view" | "edit">("view");
 
   // Fetch all users; search & filtering are done client-side inside UserTable
   const apiParams = {
@@ -83,6 +84,12 @@ const UsersPage = () => {
     };
     fetchData();
   }, []);
+
+  const handleEditClick = (user: User) => {
+    setSelectedUserId(user.id);
+    setDetailSheetMode("edit");
+    setDetailSheetOpen(true);
+  };
 
   const handleBanClick = (user: User) => {
     setUserToBan(user);
@@ -172,10 +179,13 @@ const UsersPage = () => {
 
         <UserTable
           users={usersData?.items?.map(mapUserEntityToUser) ?? []}
+          onEdit={handleEditClick}
           onBan={handleBanClick}
           onActivate={handleActivateClick}
+          onPrefetch={(userId) => setSelectedUserId(userId)}
           onViewDetail={(userId) => {
             setSelectedUserId(userId);
+            setDetailSheetMode("view");
             setDetailSheetOpen(true);
           }}
           totalCount={usersData?.totalCount}
@@ -187,6 +197,7 @@ const UsersPage = () => {
         userId={selectedUserId}
         open={detailSheetOpen}
         onOpenChange={setDetailSheetOpen}
+        initialMode={detailSheetMode}
       />
 
       <Dialog open={banModalOpen} onOpenChange={setBanModalOpen}>

@@ -548,6 +548,7 @@ export interface UserTableProps {
   onBan?: (user: User) => void;
   onActivate?: (user: User) => void;
   onViewDetail?: (userId: string) => void;
+  onPrefetch?: (userId: string) => void;
   // server-side pagination
   page?: number;
   totalPages?: number;

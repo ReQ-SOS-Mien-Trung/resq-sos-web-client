@@ -92,6 +92,7 @@ const UserTable = ({
   onBan,
   onActivate,
   onViewDetail,
+  onPrefetch,
   isLoading,
   totalCount,
 }: UserTableProps) => {
@@ -207,15 +208,13 @@ const UserTable = ({
         {/* Toolbar: search + filters */}
         <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-border/40">
           <div className="relative flex-1 min-w-52">
-            <MagnifyingGlass
-              size={15}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
+            
             <Input
               placeholder="Tìm theo tên hoặc email..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="pl-9 h-9 text-sm"
+              autoComplete="off"
             />
           </div>
 
@@ -332,6 +331,7 @@ const UserTable = ({
                     <tr
                       key={user.id}
                       onClick={() => onViewDetail?.(user.id)}
+                      onMouseEnter={() => onPrefetch?.(user.id)}
                       className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
                     >
                       <td className="p-3">

@@ -7,6 +7,7 @@ import {
   banUser,
   unbanUser,
   adminCreateUser,
+  updateAdminUser,
 } from "./api";
 import {
   UserMeResponse,
@@ -14,6 +15,7 @@ import {
   GetUsersResponse,
   BanUserRequest,
   AdminCreateUserRequest,
+  AdminUpdateUserRequest,
   UserEntity,
 } from "./type";
 
@@ -88,5 +90,17 @@ export function useUnbanUser() {
 export function useAdminCreateUser() {
   return useMutation({
     mutationFn: (data: AdminCreateUserRequest) => adminCreateUser(data),
+  });
+}
+
+export function useUpdateAdminUser() {
+  return useMutation({
+    mutationFn: ({
+      userId,
+      data,
+    }: {
+      userId: string;
+      data: AdminUpdateUserRequest;
+    }) => updateAdminUser(userId, data),
   });
 }
