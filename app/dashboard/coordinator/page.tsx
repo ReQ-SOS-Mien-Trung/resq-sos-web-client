@@ -252,10 +252,15 @@ const CoordinatorDashboardContent = () => {
   const [isConnected] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
+  /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
+  const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
 
   // ─── Panel State ───
   const [sosDetailOpen, setSOSDetailOpen] = useState(false);
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
+  const [rescuePlanDefaultTab, setRescuePlanDefaultTab] = useState<
+    "plan" | "missions" | undefined
+  >(undefined);
   const [rescueSuggestion, setRescueSuggestion] =
     useState<ClusterRescueSuggestionResponse | null>(null);
   const [activeClusterId, setActiveClusterId] = useState<number | null>(null);
@@ -533,6 +538,7 @@ const CoordinatorDashboardContent = () => {
       // (RescuePlanPanel will auto-display the latest from useMissionSuggestions)
       const cached = suggestionCacheRef.current.get(clusterId);
       setRescueSuggestion(cached ?? null);
+      setRescuePlanDefaultTab(undefined);
       setRescuePlanOpen(true);
       setSOSDetailOpen(false);
       setLocationPanelOpen(false);
@@ -660,7 +666,7 @@ const CoordinatorDashboardContent = () => {
   }, [aiStream.loading, aiStreamClusterId]);
 
   const handleApproveDecision = useCallback(() => {
-    toast.success("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
+    toast.success("Đã tạo nhiệm vụ thành công!");
     setRescuePlanOpen(false);
     setSOSDetailOpen(false);
     setSelectedSOS(null);
@@ -962,6 +968,7 @@ const CoordinatorDashboardContent = () => {
                 flyToZoom={flyToZoom}
                 userLocation={userLocation}
                 onViewChange={handleMapViewChange}
+                routeOverlay={routeOverlay}
               />
 
               {/* Floating Create SOS Button */}
@@ -1037,6 +1044,8 @@ const CoordinatorDashboardContent = () => {
                 onApprove={handleApproveDecision}
                 onReAnalyze={handleReAnalyze}
                 isReAnalyzing={isFetchingSuggestion || aiStream.loading}
+                onShowRoute={setRouteOverlay}
+                defaultTab={rescuePlanDefaultTab}
               />
 
               {/* AI Stream Panel */}
@@ -1062,6 +1071,7 @@ const CoordinatorDashboardContent = () => {
                 }}
                 onViewPlan={() => {
                   setAiStreamOpen(false);
+                  setRescuePlanDefaultTab("plan");
                   setRescuePlanOpen(true);
                 }}
               />

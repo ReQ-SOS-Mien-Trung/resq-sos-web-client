@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { SOS_CLUSTERS_QUERY_KEY } from "@/services/sos_cluster/hooks";
 import {
   createActivity,
   createMission,
@@ -9,6 +10,7 @@ import {
   updateActivity,
   updateMission,
   updateMissionStatus,
+  getActivityRoute,
 } from "./api";
 import {
   CreateActivityResponse,
@@ -26,6 +28,8 @@ import {
   UpdateMissionResponse,
   UpdateMissionStatusRequest,
   UpdateMissionStatusResponse,
+  ActivityRouteResponse,
+  GetActivityRouteParams,
 } from "./type";
 
 export const MISSIONS_QUERY_KEY = ["missions"] as const;
@@ -80,6 +84,7 @@ export function useCreateMission() {
     mutationFn: (request) => createMission(request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: MISSIONS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: SOS_CLUSTERS_QUERY_KEY });
     },
   });
 }
@@ -179,5 +184,25 @@ export function useUpdateActivity() {
         queryKey: [...MISSION_ACTIVITIES_QUERY_KEY, variables.missionId],
       });
     },
+  });
+}
+
+export const ACTIVITY_ROUTE_QUERY_KEY = ["activity-route"] as const;
+
+export function useActivityRoute(
+  params: GetActivityRouteParams | null,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<ActivityRouteResponse>({
+    queryKey: [
+      ...ACTIVITY_ROUTE_QUERY_KEY,
+      params?.missionId,
+      params?.activityId,
+      params?.originLat,
+      params?.originLng,
+      params?.vehicle,
+    ],
+    queryFn: () => getActivityRoute(params!),
+    enabled: (options?.enabled ?? true) && !!params,
   });
 }

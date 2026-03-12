@@ -16,6 +16,8 @@ import {
   UpdateMissionResponse,
   UpdateMissionStatusRequest,
   UpdateMissionStatusResponse,
+  ActivityRouteResponse,
+  GetActivityRouteParams,
 } from "./type";
 
 export async function getMissions(
@@ -100,6 +102,23 @@ export async function updateActivity(
   const { data } = await api.put(
     `/operations/missions/${missionId}/activities/${activityId}`,
     request,
+  );
+  return data;
+}
+
+export async function getActivityRoute(
+  params: GetActivityRouteParams,
+): Promise<ActivityRouteResponse> {
+  const { missionId, activityId, ...query } = params;
+  const { data } = await api.get(
+    `/operations/missions/${missionId}/activities/${activityId}/route`,
+    {
+      params: {
+        originLat: query.originLat,
+        originLng: query.originLng,
+        vehicle: query.vehicle ?? "car",
+      },
+    },
   );
   return data;
 }

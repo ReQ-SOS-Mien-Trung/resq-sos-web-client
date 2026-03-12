@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -133,12 +133,12 @@ export default function AiStreamPanel({
       style={{ opacity: 0 }}
     >
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
       <div
         ref={panelRef}
-        className="relative w-full max-w-5xl max-h-[92vh] mx-4 rounded-2xl overflow-hidden flex flex-col bg-zinc-950 border border-orange-500/20 shadow-[0_0_80px_rgba(249,115,22,0.12)]"
+        className="relative w-full max-w-5xl max-h-[92vh] mx-4 rounded-2xl overflow-hidden flex flex-col bg-background border shadow-2xl"
         style={{ opacity: 0 }}
       >
         <TopBar
@@ -150,7 +150,7 @@ export default function AiStreamPanel({
           onStop={onStop}
           onClose={onClose}
         />
-        <div className="relative flex-1 min-h-0 overflow-hidden">
+        <div className="relative flex-1 min-h-0 overflow-auto">
           {showSonar && (
             <SonarRadar status={status} statusLog={statusLog} phase={phase} />
           )}
@@ -184,31 +184,31 @@ function TopBar({
   onClose: () => void;
 }) {
   return (
-    <div className="relative flex items-center justify-between px-5 py-3 border-b border-orange-500/10 bg-zinc-950">
+    <div className="relative flex items-center justify-between px-5 py-3 border-b bg-background shrink-0">
       <div className="flex items-center gap-3">
         <div className="relative">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-lg shadow-orange-500/30">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-orange-500 flex items-center justify-center shadow-md">
             <Brain className="h-4.5 w-4.5 text-white" weight="fill" />
           </div>
           {loading && (
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-orange-500 rounded-full animate-pulse" />
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-primary rounded-full animate-pulse" />
           )}
           {result && (
-            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-zinc-950 flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-background flex items-center justify-center">
               <CheckCircle className="h-2 w-2 text-white" weight="fill" />
             </span>
           )}
         </div>
         <div>
-          <h3 className="text-sm font-bold text-orange-50 flex items-center gap-2">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
             AI Mission Suggestion
             {clusterId && (
-              <Badge className="text-[9px] font-mono px-1.5 bg-orange-500/15 text-orange-400 border-orange-500/25 hover:bg-orange-500/20">
+              <Badge variant="outline" className="text-[9px] font-mono px-1.5">
                 Cụm #{clusterId}
               </Badge>
             )}
           </h3>
-          <p className="text-[10px] text-zinc-500 font-mono">
+          <p className="text-[10px] text-muted-foreground font-mono">
             {loading
               ? phaseLabel(phase)
               : result
@@ -222,9 +222,9 @@ function TopBar({
       <div className="flex items-center gap-2">
         {loading && (
           <Button
-            variant="outline"
+            variant="destructive"
             size="sm"
-            className="h-7 text-[10px] bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+            className="h-7 text-[10px]"
             onClick={onStop}
           >
             <Stop className="h-3 w-3 mr-1" weight="fill" />
@@ -234,7 +234,7 @@ function TopBar({
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 rounded-md text-zinc-600 hover:text-orange-300 hover:bg-orange-500/10"
+          className="h-7 w-7 rounded-md"
           onClick={onClose}
         >
           <X className="h-4 w-4" />
@@ -253,7 +253,7 @@ function phaseLabel(phase: string): string {
     case "calling-ai":
       return "AI ĐANG SUY NGHĨ...";
     case "processing":
-      return "ĐANG XỎ LÝ KẾT QUẢ...";
+      return "ĐANG XỬ LÝ KẾT QUẢ...";
     case "done":
       return "HOÀN TẤT";
     default:
@@ -324,7 +324,7 @@ function SonarRadar({
   }, [status]);
 
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center">
+    <div className="flex flex-col items-center justify-center py-16">
       <div className="relative w-72 h-72">
         <svg viewBox="0 0 300 300" className="w-full h-full">
           {[60, 100, 140].map((r) => (
@@ -334,7 +334,7 @@ function SonarRadar({
               cy="150"
               r={r}
               fill="none"
-              stroke="rgba(249,115,22,0.06)"
+              className="stroke-primary/10"
               strokeWidth="0.5"
             />
           ))}
@@ -343,7 +343,7 @@ function SonarRadar({
             y1="30"
             x2="150"
             y2="270"
-            stroke="rgba(249,115,22,0.08)"
+            className="stroke-primary/10"
             strokeWidth="0.5"
           />
           <line
@@ -351,7 +351,7 @@ function SonarRadar({
             y1="150"
             x2="270"
             y2="150"
-            stroke="rgba(249,115,22,0.08)"
+            className="stroke-primary/10"
             strokeWidth="0.5"
           />
           {[0, 1, 2, 3].map((i) => (
@@ -373,11 +373,10 @@ function SonarRadar({
             cx="150"
             cy="150"
             r="18"
-            fill="rgba(249,115,22,0.15)"
-            stroke="rgba(249,115,22,0.6)"
+            className="fill-primary/15 stroke-primary/60"
             strokeWidth="2"
           />
-          <circle cx="150" cy="150" r="8" fill="rgba(249,115,22,0.5)">
+          <circle cx="150" cy="150" r="8" className="fill-primary/50">
             <animate
               attributeName="r"
               values="6;10;6"
@@ -399,15 +398,12 @@ function SonarRadar({
           </defs>
         </svg>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <Brain
-            className="h-6 w-6 text-orange-500 animate-pulse"
-            weight="fill"
-          />
+          <Brain className="h-6 w-6 text-primary animate-pulse" weight="fill" />
         </div>
       </div>
       <div
         ref={textRef}
-        className="mt-6 text-sm font-mono text-orange-400/90 text-center tracking-wide max-w-md px-4"
+        className="mt-6 text-sm font-mono text-primary/80 text-center tracking-wide max-w-md px-4"
       />
       {statusLog.length > 0 && (
         <div className="mt-4 space-y-1 max-w-sm">
@@ -416,16 +412,14 @@ function SonarRadar({
               key={entry.id}
               className={cn(
                 "flex items-center gap-2 text-[10px] font-mono",
-                entry.type === "status" && "text-zinc-600",
+                entry.type === "status" && "text-muted-foreground",
                 entry.type === "error" && "text-red-500/70",
               )}
             >
               <span
                 className={cn(
                   "w-1 h-1 rounded-full shrink-0",
-                  entry.type === "status"
-                    ? "bg-orange-500/50"
-                    : "bg-red-500/50",
+                  entry.type === "status" ? "bg-primary/50" : "bg-red-500/50",
                 )}
               />
               <span className="truncate">{entry.message}</span>
@@ -459,18 +453,18 @@ function MatrixStream({ text }: { text: string }) {
   return (
     <div className="absolute bottom-3 right-3 w-64 max-h-32 z-10">
       <div className="flex items-center gap-1.5 mb-1">
-        <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
-        <span className="text-[9px] font-mono text-orange-500/60 uppercase tracking-widest">
+        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+        <span className="text-[9px] font-mono text-primary/60 uppercase tracking-widest">
           AI Processing
         </span>
       </div>
       <div
         ref={containerRef}
-        className="overflow-hidden rounded-lg bg-zinc-900/80 border border-orange-500/10 p-2 max-h-24 overflow-y-auto scrollbar-none"
+        className="overflow-hidden rounded-lg bg-muted border p-2 max-h-24 overflow-y-auto scrollbar-none"
       >
-        <div className="text-[8px] font-mono text-orange-500/40 leading-tight break-all whitespace-pre-wrap">
+        <div className="text-[8px] font-mono text-primary/40 leading-tight break-all whitespace-pre-wrap">
           {text.slice(-600)}
-          <span className="inline-block w-1.5 h-3 bg-orange-500/60 animate-pulse ml-0.5 align-text-bottom" />
+          <span className="inline-block w-1.5 h-3 bg-primary/60 animate-pulse ml-0.5 align-text-bottom" />
         </div>
       </div>
     </div>
@@ -521,9 +515,9 @@ function ActionMapView({
             ))}
           </div>
           {revealedCount < activities.length && (
-            <div className="ml-12 pl-4 border-l-2 border-dashed border-orange-500/20 py-3">
-              <div className="flex items-center gap-2 text-[10px] font-mono text-orange-500/40">
-                <span className="w-2 h-2 rounded-full bg-orange-500/30 animate-pulse" />
+            <div className="ml-12 pl-4 border-l-2 border-dashed border-primary/20 py-3">
+              <div className="flex items-center gap-2 text-[10px] font-mono text-primary/40">
+                <span className="w-2 h-2 rounded-full bg-primary/30 animate-pulse" />
                 Đang tải bước {revealedCount + 1}/{activities.length}...
               </div>
             </div>
@@ -561,7 +555,7 @@ function MissionBanner({
   return (
     <div
       ref={ref}
-      className="relative overflow-hidden rounded-xl border border-orange-500/20 bg-gradient-to-r from-orange-500/10 via-amber-500/5 to-transparent p-4"
+      className="relative overflow-hidden rounded-xl border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4"
     >
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.03]"
@@ -572,19 +566,19 @@ function MissionBanner({
         }}
       />
       <div className="relative flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shrink-0 shadow-lg shadow-orange-500/20">
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-orange-500 flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
           <CheckCircle className="h-5 w-5 text-white" weight="fill" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-orange-100 truncate mb-1">
+          <p className="text-sm font-bold text-foreground truncate mb-1">
             {result.suggestedMissionTitle}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge className="text-[9px] bg-orange-500 text-white border-orange-600 hover:bg-orange-600">
+            <Badge className="text-[9px] bg-primary text-white border-primary hover:bg-primary/90">
               {severityConfig[result.suggestedSeverityLevel]?.label ||
                 result.suggestedSeverityLevel}
             </Badge>
-            <span className="text-[10px] font-mono text-zinc-500">
+            <span className="text-[10px] font-mono text-muted-foreground">
               {result.modelName} • {result.responseTimeMs}ms
             </span>
           </div>
@@ -652,13 +646,13 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
         return (
           <div
             key={s.label}
-            className="stat-hex flex flex-col items-center gap-1 p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/80 hover:border-orange-500/20 transition-colors"
+            className="stat-hex flex flex-col items-center gap-1 p-3 rounded-xl bg-card border hover:border-primary/20 transition-colors"
           >
             <Icon className={cn("h-4 w-4", s.color)} weight="fill" />
             <span className={cn("text-sm font-bold font-mono", s.color)}>
               {s.value}
             </span>
-            <span className="text-[9px] text-zinc-600 uppercase tracking-wider">
+            <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
               {s.label}
             </span>
           </div>
@@ -683,22 +677,12 @@ function AiOriginNode() {
 
   return (
     <div ref={ref} className="flex items-center gap-3 mb-0">
-      <div className="relative w-10 h-10 shrink-0">
-        <svg viewBox="0 0 40 40" className="w-full h-full">
-          <polygon
-            points="20,2 37,11 37,29 20,38 3,29 3,11"
-            fill="rgba(249,115,22,0.15)"
-            stroke="rgba(249,115,22,0.6)"
-            strokeWidth="1.5"
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Brain className="h-4 w-4 text-orange-400" weight="fill" />
-        </div>
+      <div className="w-10 h-10 shrink-0 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
+        <Brain className="h-4 w-4 text-primary" weight="fill" />
       </div>
       <div>
-        <span className="text-xs font-bold text-orange-300">AI Engine</span>
-        <p className="text-[10px] text-zinc-600 font-mono">
+        <span className="text-xs font-bold text-primary">AI Engine</span>
+        <p className="text-[10px] text-muted-foreground font-mono">
           Bắt đầu thực thi kế hoạch
         </p>
       </div>
@@ -793,7 +777,7 @@ function ActivityFlowNode({
           strokeDasharray="100"
           strokeDashoffset="100"
         />
-        <circle r="3" fill="rgba(249,115,22,0.8)">
+        <circle r="3" className="fill-primary/80">
           <animateMotion path="M12,0 L12,100" dur="1.5s" repeatCount="1" />
           <animate
             attributeName="opacity"
@@ -808,9 +792,10 @@ function ActivityFlowNode({
         ref={nodeRef}
         className={cn(
           "relative border rounded-xl p-3 mb-3 transition-all",
-          isDepotStep && "border-amber-500/25 bg-amber-500/[0.04]",
-          isSosStep && "border-red-500/20 bg-red-500/[0.03]",
-          !isDepotStep && !isSosStep && "border-zinc-800 bg-zinc-900/50",
+          isDepotStep &&
+            "border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/[0.04]",
+          isSosStep && "border-red-500/20 bg-red-50/50 dark:bg-red-500/[0.03]",
+          !isDepotStep && !isSosStep && "border bg-card",
         )}
       >
         <div className="flex items-center gap-2 mb-2">
@@ -835,7 +820,7 @@ function ActivityFlowNode({
                 strokeWidth="1"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-orange-300">
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-primary">
               {activity.step}
             </span>
           </div>
@@ -850,22 +835,22 @@ function ActivityFlowNode({
             <Icon className="h-3 w-3 mr-0.5" weight="fill" />
             {config.label}
           </Badge>
-          <Badge className="text-[9px] px-1.5 h-5 bg-orange-500/10 text-orange-400 border-orange-500/20 hover:bg-orange-500/15">
+          <Badge className="text-[9px] px-1.5 h-5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
             {severityConfig[activity.priority]?.label || activity.priority}
           </Badge>
           {activity.estimatedTime && (
-            <span className="text-[10px] font-mono text-zinc-600 flex items-center gap-0.5 ml-auto">
+            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-0.5 ml-auto">
               <Clock className="h-3 w-3" />
               {activity.estimatedTime}
             </span>
           )}
         </div>
-        <p className="text-xs leading-relaxed text-zinc-400 mb-2 pl-9">
+        <p className="text-xs leading-relaxed text-muted-foreground mb-2 pl-9">
           {activity.description}
         </p>
 
         {activity.depotName && (
-          <div className="ml-9 flex items-center gap-2 p-2 rounded-lg bg-amber-500/[0.06] border border-amber-500/15 mb-2">
+          <div className="ml-9 flex items-center gap-2 p-2 rounded-lg bg-amber-50/50 dark:bg-amber-500/[0.06] border border-amber-500/15 mb-2">
             <div className="relative w-6 h-6 shrink-0">
               <svg viewBox="0 0 24 24" className="w-full h-full">
                 <polygon
@@ -880,11 +865,11 @@ function ActivityFlowNode({
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-amber-400 truncate">
+              <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400 truncate">
                 {activity.depotName}
               </p>
               {activity.depotAddress && (
-                <p className="text-[10px] text-amber-500/50 truncate">
+                <p className="text-[10px] text-amber-600/50 dark:text-amber-500/50 truncate">
                   {activity.depotAddress}
                 </p>
               )}
@@ -907,7 +892,7 @@ function ActivityFlowNode({
               className="h-3.5 w-3.5 text-red-500 shrink-0"
               weight="fill"
             />
-            <span className="text-[10px] font-mono text-red-400/70">
+            <span className="text-[10px] font-mono text-red-500/70">
               SOS #{activity.sosRequestId}
             </span>
           </div>
@@ -919,17 +904,14 @@ function ActivityFlowNode({
               {activity.suppliesToCollect.map((supply) => (
                 <div
                   key={supply.itemId}
-                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/15 text-[10px]"
+                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-[10px]"
                 >
-                  <Package
-                    className="h-2.5 w-2.5 text-orange-400"
-                    weight="fill"
-                  />
-                  <span className="text-orange-300">{supply.itemName}</span>
-                  <span className="text-orange-500 font-bold">
+                  <Package className="h-2.5 w-2.5 text-primary" weight="fill" />
+                  <span className="text-primary">{supply.itemName}</span>
+                  <span className="text-primary font-bold">
                     ×{supply.quantity}
                   </span>
-                  <span className="text-orange-500/40">{supply.unit}</span>
+                  <span className="text-primary/40">{supply.unit}</span>
                 </div>
               ))}
             </div>
@@ -957,14 +939,17 @@ function AssessmentBlock({ text }: { text: string }) {
       ref={ref}
       className="rounded-xl border border-violet-500/15 overflow-hidden"
     >
-      <div className="px-3 py-2 bg-violet-500/[0.06] border-b border-violet-500/10 flex items-center gap-2">
-        <Brain className="h-3.5 w-3.5 text-violet-400" weight="fill" />
-        <span className="text-[10px] font-bold text-violet-400 uppercase tracking-wider">
+      <div className="px-3 py-2 bg-violet-50 dark:bg-violet-500/[0.06] border-b border-violet-500/10 flex items-center gap-2">
+        <Brain
+          className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400"
+          weight="fill"
+        />
+        <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
           Đánh giá tổng thể
         </span>
       </div>
       <div className="p-3">
-        <p className="text-xs leading-relaxed text-zinc-400">{text}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{text}</p>
       </div>
     </div>
   );
@@ -1002,9 +987,12 @@ function ResourcesBlock({
       ref={ref}
       className="rounded-xl border border-blue-500/15 overflow-hidden"
     >
-      <div className="px-3 py-2 bg-blue-500/[0.06] border-b border-blue-500/10 flex items-center gap-2">
-        <Cube className="h-3.5 w-3.5 text-blue-400" weight="fill" />
-        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">
+      <div className="px-3 py-2 bg-blue-50 dark:bg-blue-500/[0.06] border-b border-blue-500/10 flex items-center gap-2">
+        <Cube
+          className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400"
+          weight="fill"
+        />
+        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
           Tài nguyên cần thiết
         </span>
       </div>
@@ -1012,22 +1000,22 @@ function ResourcesBlock({
         {resources.map((res, idx) => (
           <div
             key={idx}
-            className="resource-card flex items-center gap-2.5 p-2.5 rounded-lg border border-zinc-800 bg-zinc-900/50"
+            className="resource-card flex items-center gap-2.5 p-2.5 rounded-lg border bg-card"
           >
-            <div className="text-blue-400 shrink-0">
+            <div className="text-blue-500 dark:text-blue-400 shrink-0">
               {resourceTypeIcons[res.resourceType] || (
                 <Package className="h-5 w-5" weight="fill" />
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-zinc-300 truncate">
+              <p className="text-xs font-semibold text-foreground truncate">
                 {res.description}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-[10px] font-mono text-blue-400">
+                <span className="text-[10px] font-mono text-blue-500 dark:text-blue-400">
                   SL: {res.quantity}
                 </span>
-                <Badge className="text-[9px] px-1 h-3.5 bg-zinc-800 text-zinc-500 border-zinc-700 hover:bg-zinc-700">
+                <Badge variant="outline" className="text-[9px] px-1 h-3.5">
                   {res.priority}
                 </Badge>
               </div>
@@ -1056,36 +1044,36 @@ function WarningsBlock({
   return (
     <div className="space-y-2">
       {result.needsManualReview && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-500/[0.06] border border-yellow-500/15">
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/[0.06] border border-yellow-500/15">
           <Warning className="h-4 w-4 text-yellow-500 shrink-0" weight="fill" />
-          <p className="text-xs text-yellow-400/80">
+          <p className="text-xs text-yellow-600 dark:text-yellow-400/80">
             {result.lowConfidenceWarning ||
               "Cần kiểm tra thủ công trước khi phê duyệt."}
           </p>
         </div>
       )}
       {result.multiDepotRecommended && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-500/[0.06] border border-blue-500/15">
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-50 dark:bg-blue-500/[0.06] border border-blue-500/15">
           <Storefront
-            className="h-4 w-4 text-blue-400 shrink-0"
+            className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0"
             weight="fill"
           />
-          <p className="text-xs text-blue-400/80">
+          <p className="text-xs text-blue-600 dark:text-blue-400/80">
             Kế hoạch yêu cầu phối hợp nhiều kho tiếp tế.
           </p>
         </div>
       )}
       {result.specialNotes && (
-        <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/15">
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/[0.06] border border-amber-500/15">
           <Warning
             className="h-4 w-4 text-amber-500 shrink-0 mt-0.5"
             weight="fill"
           />
           <div>
-            <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-0.5">
+            <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
               Lưu ý đặc biệt
             </p>
-            <p className="text-xs text-amber-400/70 leading-relaxed">
+            <p className="text-xs text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
               {result.specialNotes}
             </p>
           </div>
@@ -1117,17 +1105,17 @@ function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
     <div className="absolute inset-0 flex items-center justify-center p-8">
       <div
         ref={ref}
-        className="max-w-sm p-5 rounded-xl bg-red-500/[0.06] border border-red-500/20 text-center"
+        className="max-w-sm p-5 rounded-xl bg-red-50 dark:bg-red-500/[0.06] border border-red-500/20 text-center"
       >
         <Warning className="h-8 w-8 text-red-500 mx-auto mb-3" weight="fill" />
-        <p className="text-sm font-bold text-red-400 mb-1">
+        <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">
           Phân tích thất bại
         </p>
-        <p className="text-xs text-red-400/60 mb-4">{error}</p>
+        <p className="text-xs text-red-500/60 mb-4">{error}</p>
         <Button
-          variant="outline"
+          variant="destructive"
           size="sm"
-          className="h-8 text-xs bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/15"
+          className="h-8 text-xs"
           onClick={onRetry}
         >
           <ArrowsClockwise className="h-3.5 w-3.5 mr-1.5" />
@@ -1160,12 +1148,12 @@ function FooterBar({
   return (
     <div
       ref={ref}
-      className="px-5 py-3 border-t border-orange-500/10 bg-zinc-950 flex items-center gap-2"
+      className="px-5 py-3 border-t bg-background flex items-center gap-2"
     >
       <Button
         variant="outline"
         size="sm"
-        className="h-9 text-xs bg-zinc-900 border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-orange-300"
+        className="h-9 text-xs"
         onClick={onRetry}
       >
         <ArrowsClockwise className="h-3.5 w-3.5 mr-1.5" />

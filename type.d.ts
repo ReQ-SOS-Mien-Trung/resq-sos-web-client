@@ -810,6 +810,10 @@ export interface RescuePlanPanelProps {
   onApprove: () => void;
   onReAnalyze: () => void;
   isReAnalyzing: boolean;
+  /** Called with decoded [lat,lng][] coords to draw a route on the map */
+  onShowRoute?: (coords: [number, number][]) => void;
+  /** Which tab to show when the panel opens */
+  defaultTab?: "plan" | "missions";
 }
 
 export interface ActivityTypeConfig {
@@ -884,6 +888,10 @@ export interface CoordinatorMapProps {
   isPickingLocation?: boolean;
   /** Callback when the user clicks on the map */
   onMapClick?: (lat: number, lng: number) => void;
+  /** Decoded polyline coords [lat, lng][] to draw as a rescue route overlay */
+  routeOverlay?: [number, number][];
+  /** Called when route overlay should be cleared */
+  onClearRouteOverlay?: () => void;
 }
 
 // Assembly Point type for map display (from backend AssemblyPointEntity)

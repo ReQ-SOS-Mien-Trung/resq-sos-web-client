@@ -28,10 +28,25 @@ import {
   TileLayer,
   Marker,
   Polyline,
+  useMap,
   useMapEvents,
 } from "react-leaflet";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
+
+const RouteOverlayFitBounds = ({ points }: { points: [number, number][] }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || points.length < 2) return;
+    map.fitBounds(points, {
+      padding: [60, 60],
+      maxZoom: 12,
+    });
+  }, [map, points]);
+
+  return null;
+};
 
 const CoordinatorMap = ({
   sosRequests,
@@ -54,6 +69,7 @@ const CoordinatorMap = ({
   onViewChange,
   isPickingLocation,
   onMapClick,
+  routeOverlay,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0);
@@ -742,6 +758,23 @@ const CoordinatorMap = ({
               dashArray: "10, 10",
             }}
           />
+        )}
+
+        {/* Rescue Route Overlay (from ActivityRoutePreview) */}
+        {routeOverlay && routeOverlay.length > 1 && (
+          <>
+            <RouteOverlayFitBounds points={routeOverlay} />
+            <Polyline
+              positions={routeOverlay}
+              pathOptions={{
+                color: "#FF6B35",
+                weight: 5,
+                opacity: 0.9,
+                lineJoin: "round",
+                lineCap: "round",
+              }}
+            />
+          </>
         )}
       </MapContainer>
 
