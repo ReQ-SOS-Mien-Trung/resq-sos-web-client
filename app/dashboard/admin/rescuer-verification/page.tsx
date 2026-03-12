@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,8 @@ import {
 import { toast } from "sonner";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
+import { gsap } from "gsap";
+import { useGSAP } from "@gsap/react";
 import {
   useRescuerApplications,
   useReviewRescuerApplication,
@@ -58,14 +60,25 @@ const getFullName = (item: RescuerApplicationEntity) =>
   `${item.lastName} ${item.firstName}`;
 
 
-
-
-
 const RescuerVerificationPage = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [selectedItem, setSelectedItem] =
     useState<RescuerApplicationEntity | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useGSAP(
+    () => {
+      if (selectedItem) {
+        gsap.fromTo(
+          ".gsap-item",
+          { opacity: 0, y: 30 },
+          { opacity: 1, y: 0, stagger: 0.1, duration: 0.5, ease: "power2.out", clearProps: "all" }
+        );
+      }
+    },
+    { scope: containerRef, dependencies: [selectedItem] }
+  );
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [reviewDialog, setReviewDialog] = useState<{
@@ -398,7 +411,7 @@ const RescuerVerificationPage = () => {
           projects={dashboardData.projects}
           cloudStorage={dashboardData.cloudStorage}
         >
-          <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-400">
+          <div ref={containerRef} className="space-y-8">
             {/* Back */}
             <button
               onClick={() => {
@@ -406,7 +419,7 @@ const RescuerVerificationPage = () => {
                 setAvatarFile(null);
                 setAvatarPreview(null);
               }}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-6"
+              className="gsap-item flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-6"
             >
               <ArrowLeft
                 size={16}
@@ -418,21 +431,28 @@ const RescuerVerificationPage = () => {
             </button>
 
             {/* Profile Header */}
-            <div className="border border-border/60 rounded-2xl overflow-hidden bg-card">
+            <div className="gsap-item border border-border/60 rounded-2xl overflow-hidden bg-card">
               {/* Minimal top bar */}
               <div className="h-1.5 bg-gradient-to-r from-black/80 via-black/60 to-black/30 dark:from-white/30 dark:via-white/20 dark:to-white/5" />
-              <div className="p-6 sm:p-8">
-                <div className="flex items-start gap-5">
-                  {/* Avatar */}
-                  {avatarPreview ? (
+              <div className="p-4 sm:p-6">
+                <div className="flex items-start gap-4">
+                  {/* Avatar thumbnail */}
+                  {selectedItem.avatarUrl ? (
+                    <img
+                      src={selectedItem.avatarUrl}
+                      alt="Current avatar"
+                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-border/60 cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => setPreviewDoc({ url: selectedItem.avatarUrl!, name: "Ảnh đại diện hiện tại" })}
+                    />
+                  ) : avatarPreview ? (
                     <img
                       src={avatarPreview}
                       alt="Avatar preview"
-                      className="w-16 h-16 rounded-xl object-cover shrink-0 border border-border/60 cursor-pointer hover:opacity-80 transition-opacity"
+                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-border/60 cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={() => setPreviewDoc({ url: avatarPreview, name: "Ảnh đại diện mới" })}
                     />
                   ) : (
-                    <div className="w-16 h-16 rounded-xl bg-black dark:bg-white/10 flex items-center justify-center text-white dark:text-white font-black text-2xl shrink-0">
+                    <div className="w-20 h-20 rounded-xl bg-black dark:bg-white/10 flex items-center justify-center text-white dark:text-white font-black text-2xl shrink-0">
                       {selectedItem.firstName.charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -477,7 +497,7 @@ const RescuerVerificationPage = () => {
             {/* Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Personal Info */}
-              <div className="border border-border/60 rounded-2xl bg-card p-6">
+              <div className="gsap-item border border-border/60 rounded-2xl bg-card p-6">
                 <div className="border-b border-border/60 mb-8 pb-4">
                   <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
                     Mục I
@@ -557,10 +577,10 @@ const RescuerVerificationPage = () => {
                 </div>
               </div>
 
-              {/* Avatar Upload (Only show when Pending to allow upload on Approval) */}
-              <div className="space-y-6">
-                {selectedItem.status === "Pending" && (
-                  <div className="border border-emerald-500/30 rounded-2xl bg-emerald-500/5 p-6 animate-in fade-in slide-in-from-top-2 duration-300">
+              {/* MỤC II: ẢNH ĐẠI DIỆN */}
+              <div className="gsap-item space-y-6">
+                {selectedItem.status === "Pending" ? (
+                  <div className="border border-emerald-500/30 rounded-2xl bg-emerald-500/5 p-6 h-full flex flex-col">
                     <div className="border-b border-emerald-500/20 mb-6 pb-4">
                       <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-emerald-600 mb-2 sm:mb-1">
                         Mục II
@@ -573,65 +593,216 @@ const RescuerVerificationPage = () => {
                       Tải lên ảnh 3x4 hoặc ảnh rõ mặt.
                     </p>
 
-                    {!avatarPreview ? (
-                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-emerald-500/40 rounded-xl cursor-pointer hover:bg-emerald-500/10 hover:border-emerald-500/60 transition-colors">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <UploadSimple size={24} className="text-emerald-600 mb-2" weight="duotone" />
-                          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                            Ấn để chọn ảnh
-                          </p>
+                    <div className="flex-1 flex flex-col justify-center">
+                      {!avatarPreview ? (
+                        <label className="flex flex-col items-center justify-center w-full h-full min-h-[160px] border-2 border-dashed border-emerald-500/40 rounded-xl cursor-pointer hover:bg-emerald-500/10 hover:border-emerald-500/60 transition-colors">
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <UploadSimple size={24} className="text-emerald-600 mb-2" weight="duotone" />
+                            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                              Ấn để chọn ảnh
+                            </p>
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setAvatarFile(file);
+                                const objectUrl = URL.createObjectURL(file);
+                                setAvatarPreview(objectUrl);
+                              }
+                            }}
+                          />
+                        </label>
+                      ) : (
+                        <div className="flex items-start gap-4 p-4 border border-emerald-500/40 rounded-xl bg-background">
+                          <img
+                            src={avatarPreview}
+                            alt="Avatar preview"
+                            className="w-16 h-16 rounded-xl object-cover border border-border cursor-pointer hover:opacity-80 transition-opacity hover:border-emerald-500"
+                            onClick={() => setPreviewDoc({ url: avatarPreview, name: "Ảnh đại diện mới" })}
+                            title="Phóng to"
+                          />
+                          <div className="flex-1 min-w-0 pt-1">
+                            <p className="text-sm font-bold text-foreground truncate">{avatarFile?.name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {(avatarFile!.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                            <button
+                              onClick={() => {
+                                setAvatarFile(null);
+                                setAvatarPreview(null);
+                              }}
+                              className="text-xs font-bold text-rose-500 hover:text-rose-600 uppercase tracking-wider mt-2 flex items-center gap-1"
+                            >
+                              <Trash size={12} /> Hủy ảnh này
+                            </button>
+                          </div>
                         </div>
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              setAvatarFile(file);
-                              const objectUrl = URL.createObjectURL(file);
-                              setAvatarPreview(objectUrl);
-                            }
-                          }}
-                        />
-                      </label>
-                    ) : (
-                      <div className="flex items-start gap-4 p-4 border border-emerald-500/40 rounded-xl bg-background mt-4">
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border border-border/60 rounded-2xl bg-card p-6 h-full flex flex-col">
+                    <div className="border-b border-border/60 mb-8 pb-4">
+                      <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 sm:mb-1">
+                        Mục II
+                      </p>
+                      <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mt-1">
+                        Ảnh đại diện
+                      </h2>
+                    </div>
+                    <div className="flex-1 flex flex-col items-center justify-center">
+                      {selectedItem.avatarUrl ? (
                         <img
-                          src={avatarPreview}
-                          alt="Avatar preview"
-                          className="w-16 h-16 rounded-xl object-cover border border-border cursor-pointer hover:opacity-80 transition-opacity hover:border-emerald-500"
-                          onClick={() => setPreviewDoc({ url: avatarPreview, name: "Ảnh đại diện mới" })}
+                          src={selectedItem.avatarUrl}
+                          alt="User Avatar"
+                          className="w-64 sm:w-80 h-auto aspect-[3/4] object-cover shadow-sm border border-border/60 cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setPreviewDoc({ url: selectedItem.avatarUrl!, name: "Ảnh đại diện" })}
                           title="Phóng to"
                         />
-                        <div className="flex-1 min-w-0 pt-1">
-                          <p className="text-sm font-bold text-foreground truncate">{avatarFile?.name}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {(avatarFile!.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                          <button
-                            onClick={() => {
-                              setAvatarFile(null);
-                              setAvatarPreview(null);
-                            }}
-                            className="text-xs font-bold text-rose-500 hover:text-rose-600 uppercase tracking-wider mt-2 flex items-center gap-1"
-                          >
-                            <Trash size={12} /> Hủy ảnh này
-                          </button>
+                      ) : (
+                        <div className="w-64 sm:w-80 aspect-[3/4] bg-muted/40 flex flex-col items-center justify-center border border-dashed border-border/60 text-muted-foreground">
+                          <ImageIcon size={48} weight="duotone" className="mb-3 opacity-50" />
+                          <span className="text-sm font-medium uppercase tracking-wider">Chưa có ảnh</span>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* FULL WIDTH DOCUMENTS SECTION (MỤC III) */}
-            <div className="mt-12 pt-12 border-t border-border/40">
+            {/* MỤC III: NĂNG LỰC CỨU HỘ */}
+            {(() => {
+              // Categorize abilities by group
+              const abilities = selectedItem.abilities || [];
+              const rescueAbilities = abilities.filter(a => a.categoryCode === "RESCUE");
+              const medicalAbilities = abilities.filter(a => a.categoryCode === "MEDICAL");
+              const transportAbilities = abilities.filter(a => a.categoryCode === "TRANSPORTATION");
+              const experienceAbilities = abilities.filter(a =>
+                a.categoryCode === "EXPERIENCE" ||
+                (!["RESCUE", "MEDICAL", "TRANSPORTATION", "EXPERIENCE"].includes(a.categoryCode))
+              );
+
+              const totalAbilities = abilities.length;
+              const totalPossible = 52;
+
+              const categories = [
+                {
+                  label: "Kỹ năng cứu hộ",
+                  icon: <ShieldCheck size={22} weight="duotone" />,
+                  iconBg: "bg-[#FF5722] text-white",
+                  dotColor: "text-[#FF5722]",
+                  items: rescueAbilities,
+                  total: 16,
+                  number: "01",
+                },
+                {
+                  label: "Kỹ năng y tế",
+                  icon: <FirstAid size={22} weight="duotone" />,
+                  iconBg: "bg-[#FF5722] text-white",
+                  dotColor: "text-[#FF5722]",
+                  items: medicalAbilities,
+                  total: 19,
+                  number: "02",
+                },
+                {
+                  label: "Kỹ năng vận chuyển",
+                  icon: <Briefcase size={22} weight="duotone" />,
+                  iconBg: "bg-[#FF5722] text-white",
+                  dotColor: "text-[#FF5722]",
+                  items: transportAbilities,
+                  total: 12,
+                  number: "03",
+                },
+                {
+                  label: "Kinh nghiệm thực tiễn",
+                  icon: <Certificate size={22} weight="duotone" />,
+                  iconBg: "bg-[#FF5722] text-white",
+                  dotColor: "text-[#FF5722]",
+                  items: experienceAbilities,
+                  total: 5,
+                  number: "04",
+                },
+              ];
+
+              return (
+                <div className="gsap-item mt-12 pt-12 border-t border-border/40 w-full">
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/60 mb-8 pb-4">
+                    <div>
+                      <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
+                        Mục III
+                      </p>
+                      <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                        Năng lực cứu hộ
+                      </h2>
+                    </div>
+                    <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-muted-foreground mt-4 sm:mt-0">
+                      {totalAbilities} / {totalPossible} kỹ năng
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {categories.map((cat, catIdx) => (
+                      <div key={catIdx} className="border border-border/50 rounded-2xl p-6 bg-card">
+                        {/* Category Header */}
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className={`p-2.5 rounded-xl ${cat.iconBg}`}>
+                            {cat.icon}
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                              {cat.number}
+                            </p>
+                            <p className="text-sm font-bold text-foreground">
+                              {cat.label}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Count */}
+                        <div className="mb-5">
+                          <span className="text-3xl font-black tracking-tight text-foreground">
+                            {cat.items.length}
+                          </span>
+                          <span className="text-lg text-muted-foreground font-medium">
+                            /{cat.total}
+                          </span>
+                        </div>
+
+                        {/* Abilities List */}
+                        {cat.items.length > 0 ? (
+                          <div className="space-y-2.5">
+                            {cat.items.map((ability, aIdx) => (
+                              <div key={aIdx} className="flex items-start gap-2">
+                                <span className={`text-sm mt-0.5 ${cat.dotColor} font-bold`}>✦</span>
+                                <p className="text-sm text-foreground leading-snug">
+                                  {ability.description}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground/60 italic">
+                            Không có kỹ năng đã đăng ký
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* FULL WIDTH DOCUMENTS SECTION (MỤC IV) */}
+            <div className="gsap-item mt-12 pt-12 border-t border-border/40">
               <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/60 mb-8 pb-4">
                 <div>
                   <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
-                    Mục III
+                    Mục IV
                   </p>
                   <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
                     Chứng chỉ & Tài liệu
@@ -811,7 +982,7 @@ const RescuerVerificationPage = () => {
           </div>
 
           {/* Filters & Search — Flat editorial toolbar */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/60 pb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-border/60 pb-4">
             {/* Tab filters */}
             <div className="flex items-center gap-0">
               {(
@@ -825,13 +996,13 @@ const RescuerVerificationPage = () => {
                 <button
                   key={tab.key}
                   onClick={() => setStatusFilter(tab.key === "Từ chối" ? "Rejected" : tab.key)}
-                  className={`relative px-4 py-2 text-xs font-bold uppercase tracking-wider transition-colors duration-150 ${(tab.key === "Từ chối" ? statusFilter === "Rejected" : statusFilter === tab.key)
+                  className={`relative px-4 py-2 text-sm font-medium transition-colors duration-150 ${(tab.key === "Từ chối" ? statusFilter === "Rejected" : statusFilter === tab.key)
                     ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
                   {tab.label}
-                  <span className="ml-1.5 font-bold">{tab.count}</span>
+                  <span className="ml-1.5 text-primary font-medium">{tab.count}</span>
                   {(tab.key === "Từ chối" ? statusFilter === "Rejected" : statusFilter === tab.key) && (
                     <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground rounded-full" />
                   )}
@@ -847,226 +1018,92 @@ const RescuerVerificationPage = () => {
                 />
                 <input
                   type="text"
-                  placeholder="Tìm kiếm theo tên, email, SĐT..."
+                  placeholder="Tìm kiếm..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-border/60 rounded-xl bg-background outline-none focus:border-foreground/40 transition-colors placeholder:text-muted-foreground/60"
+                  className="w-full pl-9 pr-3 py-2 bg-transparent border-0 ring-1 ring-border/60 focus:ring-foreground transition-all rounded-md text-xs font-medium placeholder:text-muted-foreground/60"
                 />
               </div>
             </div>
           </div>
 
-          {/* Verification List */}
-          <div>
-            {isLoadingApplications ? (
-              <DashboardSkeleton variant="table" />
-            ) : filteredItems.length === 0 ? (
-              <div className="py-20 text-center">
-                <div className="mx-auto w-14 h-14 rounded-xl border border-border/60 flex items-center justify-center mb-4">
-                  <ShieldCheck size={26} className="text-muted-foreground" weight="duotone" />
-                </div>
-                <p className="text-sm font-bold uppercase tracking-wider text-foreground">
-                  Không có hồ sơ nào
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {searchQuery ? "Thử tìm kiếm với từ khóa khác" : "Chưa có hồ sơ cứu hộ viên cần xác nhận"}
-                </p>
-              </div>
-            ) : (
-              <div className="border border-border/60 rounded-2xl overflow-hidden bg-card">
-                {/* Table header */}
-                <div className="hidden sm:grid sm:grid-cols-[1.5fr_2fr_1fr_1fr_1fr_auto] items-center px-5 py-2.5 border-b border-border/60 bg-muted/30">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Họ và tên</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Liên hệ</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Khu vực</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Loại</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Trạng thái</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-20 text-right">Thao tác</span>
-                </div>
+          {/* Table — Clean minimal rows */}
+          {isLoadingApplications ? (
+            <div className="py-10 flex items-center justify-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-foreground/20 border-t-foreground" />
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="py-10 text-center border border-dashed border-border/60 rounded-3xl bg-muted/5">
+              <Users
+                size={40}
+                className="mx-auto text-muted-foreground/30 mb-3"
+                weight="duotone"
+              />
+              <p className="text-sm text-muted-foreground font-medium uppercase tracking-wider">
+                Không tìm thấy hồ sơ nào
+              </p>
+            </div>
+          ) : (
+            <div key={`${statusFilter}-${searchQuery}`} className="grid grid-cols-1 gap-2 animate-in fade-in slide-in-from-top-4 duration-500 ease-out fill-mode-both">
+              {filteredItems.map((item) => {
+                const status = getStatusConfig(item.status);
+                return (
+                  <div
+                    key={item.id}
+                    className="group border border-border/50 rounded-2xl px-4 sm:px-5 py-2 sm:py-3 bg-card hover:bg-muted/10 transition-all duration-300 cursor-pointer flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4"
+                    onClick={() => setSelectedItem(item)}
+                  >
+                    {/* User initial/avatar */}
+                    {item.avatarUrl ? (
+                      <img
+                        src={item.avatarUrl}
+                        alt="User Avatar"
+                        className="w-12 h-12 rounded-xl object-cover shrink-0 group-hover:scale-105 transition-transform duration-300 border border-border/40"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-black dark:bg-white/10 flex items-center justify-center text-white dark:text-white font-black text-lg shrink-0 group-hover:scale-105 transition-transform duration-300">
+                        {item.firstName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
 
-                {/* Rows */}
-                <div className="divide-y divide-border/40">
-                  {filteredItems.map((item, idx) => {
-                    const statusConfig = getStatusConfig(item.status);
-                    const accentColor =
-                      item.status === "Pending"
-                        ? "border-l-amber-400"
-                        : item.status === "Approved"
-                          ? "border-l-emerald-400"
-                          : "border-l-rose-400";
-                    return (
-                      <div
-                        key={item.id}
-                        className={`group cursor-pointer hover:bg-muted/30 transition-colors duration-150 border-l-[3px] ${accentColor} animate-in fade-in slide-in-from-bottom-1`}
-                        style={{ animationDelay: `${idx * 40}ms` }}
-                        onClick={() => setSelectedItem(item)}
-                      >
-                        {/* Desktop row */}
-                        <div className="hidden sm:grid sm:grid-cols-[1.5fr_2fr_1fr_1fr_1fr_auto] items-center px-5 py-3.5">
-                          {/* Name col */}
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="relative shrink-0">
-                              <div className="w-9 h-9 rounded-lg bg-foreground flex items-center justify-center text-background font-black text-sm">
-                                {item.firstName.charAt(0).toUpperCase()}
-                              </div>
-                              <div
-                                className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-[1.5px] border-card ${statusConfig.dotColor}`}
-                              />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm text-foreground truncate tracking-tight">
-                                {getFullName(item)}
-                              </p>
-                              <p className="text-[11px] text-muted-foreground/60 mt-0.5">
-                                {new Date(item.submittedAt).toLocaleDateString("vi-VN")}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Contact col */}
-                          <div className="min-w-0 space-y-0.5">
-                            <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                              <Envelope size={11} className="shrink-0" />
-                              <span className="truncate">{item.email}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                              <Phone size={11} className="shrink-0" />
-                              <span>{item.phone}</span>
-                            </div>
-                          </div>
-
-                          {/* Province col */}
-                          <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                            <MapPin size={11} className="shrink-0" />
-                            <span className="truncate">{item.province}</span>
-                          </div>
-
-                          {/* Type col */}
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground border border-border/60 rounded-md px-1.5 py-0.5 w-fit flex items-center gap-1">
-                            <FirstAid size={10} weight="fill" />
-                            {item.rescuerType}
+                    <div className="flex-1 min-w-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+                      <div>
+                        <h3 className="font-bold text-foreground text-sm uppercase tracking-wide">
+                          {getFullName(item)}
+                        </h3>
+                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground/80 font-medium">
+                            <MapPin size={13} />
+                            {item.province}
                           </span>
-
-                          {/* Status col */}
-                          <Badge
-                            className={`${statusConfig.className} border text-[10px] gap-1 font-semibold px-1.5 py-0.5 w-fit`}
-                          >
-                            {statusConfig.icon}
-                            {statusConfig.label}
-                          </Badge>
-
-                          {/* Actions col */}
-                          <div className="flex items-center justify-end gap-1.5 w-20">
-                            {item.status === "Pending" ? (
-                              <>
-                                <button
-                                  disabled={isReviewing}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openReviewDialog(item, true);
-                                  }}
-                                  className="w-7 h-7 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center transition-colors disabled:opacity-50"
-                                >
-                                  <CheckCircle size={14} weight="bold" />
-                                </button>
-                                <button
-                                  disabled={isReviewing}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openReviewDialog(item, false);
-                                  }}
-                                  className="w-7 h-7 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center transition-colors disabled:opacity-50"
-                                >
-                                  <XCircle size={14} weight="bold" />
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedItem(item);
-                                }}
-                                className="w-7 h-7 rounded-lg border border-border/60 text-muted-foreground hover:text-foreground hover:border-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                              >
-                                <Eye size={13} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Mobile card fallback */}
-                        <div className="sm:hidden px-4 py-3.5">
-                          <div className="flex items-start gap-3">
-                            <div className="relative shrink-0">
-                              <div className="w-9 h-9 rounded-lg bg-foreground flex items-center justify-center text-background font-black text-sm">
-                                {item.firstName.charAt(0).toUpperCase()}
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-semibold text-sm text-foreground">{getFullName(item)}</h3>
-                                <Badge className={`${statusConfig.className} border text-[10px] gap-1 font-semibold px-1.5 py-0`}>
-                                  {statusConfig.icon}
-                                  {statusConfig.label}
-                                </Badge>
-                              </div>
-                              <div className="mt-1 text-[12px] text-muted-foreground space-y-0.5">
-                                <div className="flex items-center gap-1.5">
-                                  <Envelope size={11} className="shrink-0" />
-                                  <span className="truncate">{item.email}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="flex items-center gap-1"><Phone size={11} />{item.phone}</span>
-                                  <span className="flex items-center gap-1"><MapPin size={11} />{item.province}</span>
-                                </div>
-                              </div>
-                            </div>
-                            {item.status === "Pending" && (
-                              <div className="flex gap-1.5 shrink-0">
-                                <button
-                                  disabled={isReviewing}
-                                  onClick={(e) => { e.stopPropagation(); openReviewDialog(item, true); }}
-                                  className="w-7 h-7 rounded-lg bg-emerald-500 text-white flex items-center justify-center"
-                                >
-                                  <CheckCircle size={14} weight="bold" />
-                                </button>
-                                <button
-                                  disabled={isReviewing}
-                                  onClick={(e) => { e.stopPropagation(); openReviewDialog(item, false); }}
-                                  className="w-7 h-7 rounded-lg border border-rose-200 text-rose-500 flex items-center justify-center"
-                                >
-                                  <XCircle size={14} weight="bold" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground/80 font-medium pb-px">
+                            <IdentificationCard size={13} />
+                            Mã hồ sơ: #{item.id}
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
 
-          {/* Pagination info */}
-          {applicationsData && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground uppercase tracking-wider font-medium pt-2 border-t border-border/40">
-              <p>
-                Hiển thị{" "}
-                <span className="font-bold text-foreground">
-                  {filteredItems.length}
-                </span>{" "}
-                trong tổng số{" "}
-                <span className="font-bold text-foreground">
-                  {applicationsData.totalCount}
-                </span>{" "}
-                hồ sơ
-              </p>
-              <p>
-                Trang {applicationsData.pageNumber}/
-                {applicationsData.totalPages}
-              </p>
+                      <div className="flex flex-row sm:flex-col items-center sm:items-end gap-3 w-full sm:w-auto mt-2 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-0 border-border/40">
+                        <Badge
+                          className={`${status.className} border text-[10px] gap-1 font-bold uppercase tracking-widest px-2 pb-px`}
+                        >
+                          <span
+                            className={`w-1 h-1 rounded-full ${status.dotColor}`}
+                          />
+                          {status.label}
+                        </Badge>
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest sm:mt-1 ml-auto sm:ml-0">
+                          {new Date(item.submittedAt).toLocaleDateString("vi-VN")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="hidden sm:flex items-center justify-center p-2 rounded-lg bg-black/5 dark:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity translate-x-1 group-hover:translate-x-0">
+                      <Eye size={16} weight="bold" />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

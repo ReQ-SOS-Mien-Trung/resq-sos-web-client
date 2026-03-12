@@ -17,14 +17,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <Script
           src="https://cdn.lordicon.com/lordicon.js"
           strategy="beforeInteractive"
         />
       </head>
-      <body className={`${sfUIDisplay.variable} antialiased`}>
+      <body className={`${sfUIDisplay.variable} antialiased`} suppressHydrationWarning>
         <Providers>{children}</Providers>
         <Toaster richColors position="top-right" />
       </body>

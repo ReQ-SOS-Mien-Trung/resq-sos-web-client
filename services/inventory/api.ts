@@ -1,22 +1,53 @@
 import api from "@/config/axios";
-import { GetInventoryResponse, GetInventoryParams } from "./type";
+import {
+  GetMyDepotInventoryParams,
+  GetMyDepotInventoryResponse,
+  InventoryCategory,
+  InventoryItemType,
+  InventoryTargetGroup,
+} from "./type";
 
 /**
- * Get inventory items for a depot with filtering and pagination
- * GET /logistics/inventory/depot/{depotId}
+ * Get depot inventory by passing multiple optional filters
+ * GET /logistics/inventory/my-depot
  */
-export async function getDepotInventory(
-  params: GetInventoryParams,
-): Promise<GetInventoryResponse> {
-  const { depotId, ...query } = params;
-  const { data } = await api.get(`/logistics/inventory/depot/${depotId}`, {
-    params: {
-      categoryIds: query.categoryIds,
-      itemTypes: query.itemTypes,
-      targetGroups: query.targetGroups,
-      pageNumber: query.pageNumber ?? 1,
-      pageSize: query.pageSize ?? 10,
+export async function getMyDepotInventory(
+  params: GetMyDepotInventoryParams,
+): Promise<GetMyDepotInventoryResponse> {
+  const { data } = await api.get("/logistics/inventory/my-depot", {
+    params,
+    paramsSerializer: {
+      indexes: null,
     },
   });
+  return data;
+}
+
+/**
+ * Get list of available item categories
+ * GET /logistics/inventory/metadata/categories
+ */
+export async function getInventoryCategories(): Promise<InventoryCategory[]> {
+  const { data } = await api.get("/logistics/inventory/metadata/categories");
+  return data;
+}
+
+/**
+ * Get list of item types
+ * GET /logistics/inventory/metadata/item-types
+ */
+export async function getInventoryItemTypes(): Promise<InventoryItemType[]> {
+  const { data } = await api.get("/logistics/inventory/metadata/item-types");
+  return data;
+}
+
+/**
+ * Get list of target groups
+ * GET /logistics/inventory/metadata/target-groups
+ */
+export async function getInventoryTargetGroups(): Promise<
+  InventoryTargetGroup[]
+> {
+  const { data } = await api.get("/logistics/inventory/metadata/target-groups");
   return data;
 }

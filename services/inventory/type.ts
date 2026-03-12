@@ -1,40 +1,39 @@
-// Item Type
-export type ItemType = "Consumable" | "Reusable" | "Equipment";
+export interface InventoryCategory {
+  key: string;
+  value: string;
+}
 
-// Target Group
-export type TargetGroup = "General" | "Children" | "Elderly" | "Pregnant";
+export type InventoryItemType = InventoryCategory;
 
-// Inventory Item Entity
-export interface InventoryItem {
+export type InventoryTargetGroup = InventoryCategory;
+
+export interface InventoryItemEntity {
   reliefItemId: number;
   reliefItemName: string;
   categoryId: number;
   categoryName: string;
-  itemType: ItemType;
-  targetGroup: TargetGroup;
+  itemType: string;
+  targetGroup: string;
   quantity: number;
   reservedQuantity: number;
   availableQuantity: number;
   lastStockedAt: string;
 }
 
-// Paginated Response for Inventory
-export interface GetInventoryResponse {
-  items: InventoryItem[];
+export interface GetMyDepotInventoryParams {
+  categoryIds?: number[];
+  itemTypes?: string[];
+  targetGroups?: string[];
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetMyDepotInventoryResponse {
+  items: InventoryItemEntity[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
   totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
-}
-
-// Query params for fetching inventory by depot
-export interface GetInventoryParams {
-  depotId: number;
-  categoryIds?: number[];
-  itemTypes?: ItemType[];
-  targetGroups?: TargetGroup[];
-  pageNumber?: number;
-  pageSize?: number;
 }
