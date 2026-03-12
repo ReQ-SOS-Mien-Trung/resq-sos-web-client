@@ -54,7 +54,7 @@ import {
   ClusterActivityType,
   MissionSuggestionEntity,
 } from "@/services/sos_cluster/type";
-import { useDepotInventory } from "@/services/inventory/hooks";
+import { useMyDepotInventory } from "@/services/inventory/hooks";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
 import { SOSRequest } from "@/type";
 import {
@@ -338,8 +338,8 @@ const DepotInventoryCard = ({
   depotAddress: string | null;
   isDraggable: boolean;
 }) => {
-  const { data, isLoading } = useDepotInventory({
-    params: { depotId, pageSize: 50 },
+  const { data, isLoading } = useMyDepotInventory({
+    pageSize: 50,
   });
 
   return (
