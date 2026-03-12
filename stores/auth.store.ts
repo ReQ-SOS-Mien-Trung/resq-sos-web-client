@@ -5,6 +5,8 @@ import { LoginResponse, RefreshTokenResponse } from "@/services/auth/type";
 interface User {
   userId: string;
   username: string;
+  firstName: string;
+  lastName: string;
   fullName: string;
   roleId: number;
 }
@@ -44,6 +46,8 @@ export const useAuthStore = create<AuthState>()(
               user: {
                 userId: data.userId,
                 username: data.username,
+                firstName: data.firstName,
+                lastName: data.lastName,
                 fullName: data.fullName,
                 roleId: data.roleId,
               },

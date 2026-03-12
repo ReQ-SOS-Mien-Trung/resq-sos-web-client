@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { UserStatsProps } from "@/type";
-import { Users, UserCheck, UserMinus, Clock } from "@phosphor-icons/react";
+import { Users, UserCheck, UserMinus } from "@phosphor-icons/react";
 
 const UserStats = ({ stats }: UserStatsProps) => {
   const statItems = [

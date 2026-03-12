@@ -41,6 +41,9 @@ import {
   LowStockAlerts,
   RecentActivity,
 } from "@/components/inventory";
+import { VatTuSection } from "@/components/inventory/VatTuTabContent";
+import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
+import { InventoryItemEntity } from "@/services/inventory/type";
 import {
   DepotInfo,
   InventoryItem,
@@ -50,6 +53,7 @@ import {
 } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import { useUserMe } from "@/services/user/hooks";
 import { useDepots } from "@/services/depot/hooks";
 import { DepotEntity } from "@/services/depot/type";
 import { useItemCategories } from "@/services/item_categories/hooks";
@@ -128,22 +132,26 @@ const InventoryDashboardPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [itemSheetOpen, setItemSheetOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("inventory");
+  const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
+  const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
 
   // ── Auth ──
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
+  const { data: userMe } = useUserMe();
+
+  // Prefer fresh API data, fallback to auth store
+  const displayName = userMe?.firstName
+    ? `${userMe.lastName ?? ""} ${userMe.firstName}`.trim()
+    : (user?.fullName ?? "—");
 
   const userInitials = useMemo(
     () =>
-      user?.fullName
-        ? user.fullName
-          .split(" ")
-          .map((n) => n[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase()
+      displayName && displayName !== "—"
+        ? displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
         : "U",
-    [user],
+    [displayName],
   );
 
   // ── Fetch depot data from API ──
@@ -171,10 +179,10 @@ const InventoryDashboardPage = () => {
     if (!currentDepot) return null;
     return mapDepotEntityToInfo(
       currentDepot,
-      user?.fullName ?? "Quản lý kho",
+      displayName,
       totalCategories,
     );
-  }, [currentDepot, user?.fullName, totalCategories]);
+  }, [currentDepot, displayName, totalCategories]);
 
   // ── Compute stats (will use real item APIs when available) ──
   const stats = useMemo<IInventoryStats>(
@@ -304,9 +312,9 @@ const InventoryDashboardPage = () => {
               <SidebarSimple className="h-5 w-5" />
             )}
           </Button>
-          <div className="flex items-center gap-2">
-            <Warehouse className="h-6 w-6 text-primary" />
-            <span className="font-bold text-lg hidden sm:inline">
+          <div className="flex items-center">
+            
+            <span className="font-semibold tracking-tighter text-lg hidden sm:inline">
               ResQ-SOS | Quản Lý Kho
             </span>
           </div>
@@ -371,7 +379,7 @@ const InventoryDashboardPage = () => {
               <DropdownMenuLabel>
                 <div className="flex flex-col">
                   <span className="font-semibold">
-                    {user?.fullName || "Người dùng"}
+                    {displayName !== "—" ? displayName : "Người dùng"}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     Quản lý kho
@@ -433,6 +441,8 @@ const InventoryDashboardPage = () => {
               selectedCategory={selectedCategory}
               onCategorySelect={handleCategorySelect}
               apiCategories={categoriesData?.items}
+              activeTab={activeTab}
+              onActiveTabChange={setActiveTab}
             />
           )}
         </aside>
@@ -443,10 +453,9 @@ const InventoryDashboardPage = () => {
             {/* Page Title */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">Dashboard Kho Hàng</h1>
-                <p className="text-muted-foreground">
-                  {depotInfo?.name ?? "Đang tải..."} • Quản lý bởi{" "}
-                  {user?.fullName ?? "—"}
+                <h1 className="text-2xl font-semibold tracking-tighter">Dashboard Kho Hàng</h1>
+                <p className="text-muted-foreground tracking-tighter">
+                  {depotInfo?.name ?? "Đang tải..."} • Quản lý bởi {displayName}
                 </p>
               </div>
               <Button
@@ -454,34 +463,44 @@ const InventoryDashboardPage = () => {
                 size="sm"
                 className="gap-2"
                 onClick={handleRefresh}
+               
               >
                 <ArrowsClockwise className="h-4 w-4" />
                 Làm mới
               </Button>
             </div>
 
-            {/* Stats Overview */}
-            <InventoryStats stats={stats} />
+            {activeTab === "vattu" ? (
+              <VatTuSection onItemSelect={(item) => {
+                setVatTuSelectedItem(item);
+                setVatTuSheetOpen(true);
+              }} />
+            ) : (
+              <>
+                {/* Stats Overview */}
+                <InventoryStats stats={stats} />
 
-            {/* Category Overview */}
-            <CategoryOverview
-              apiCategories={categoriesData?.items}
-              onCategorySelect={handleCategorySelect}
-              selectedCategory={selectedCategory}
-            />
+                {/* Category Overview */}
+                <CategoryOverview
+                  apiCategories={categoriesData?.items}
+                  onCategorySelect={handleCategorySelect}
+                  selectedCategory={selectedCategory}
+                />
 
-            {/* Two Column Layout: Alerts + Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Low Stock Alerts */}
-              <LowStockAlerts
-                items={mockInventoryItems}
-                onItemClick={handleItemSelect}
-                onViewAll={() => setSelectedCategory(null)}
-              />
+                {/* Two Column Layout: Alerts + Activity */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Low Stock Alerts */}
+                  <LowStockAlerts
+                    items={mockInventoryItems}
+                    onItemClick={handleItemSelect}
+                    onViewAll={() => setSelectedCategory(null)}
+                  />
 
-              {/* Recent Activity */}
-              <RecentActivity activities={mockActivityLogs} maxItems={8} />
-            </div>
+                  {/* Recent Activity */}
+                  <RecentActivity activities={mockActivityLogs} maxItems={8} />
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -500,6 +519,13 @@ const InventoryDashboardPage = () => {
         onEdit={() => {
           console.log("Edit item:", selectedItem?.name);
         }}
+      />
+
+      {/* Vat Tu Details Sheet - rendered at page level for full overlay */}
+      <VatTuDetailsSheet
+        item={vatTuSelectedItem}
+        open={vatTuSheetOpen}
+        onOpenChange={setVatTuSheetOpen}
       />
     </div>
   );

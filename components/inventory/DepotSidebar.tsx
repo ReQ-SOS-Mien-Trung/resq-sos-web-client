@@ -76,8 +76,9 @@ const DepotSidebar = ({
   selectedCategory,
   onCategorySelect,
   apiCategories,
+  activeTab,
+  onActiveTabChange,
 }: DepotSidebarProps) => {
-  const [activeTab, setActiveTab] = useState("inventory");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter items
@@ -119,13 +120,11 @@ const DepotSidebar = ({
     <div className="h-full flex flex-col bg-background border-r">
       {/* Header */}
       <div className="p-4 border-b">
-        <h2 className="font-bold text-lg flex items-center gap-2">
+        <h2 className="font-regular tracking-tighter text-lg flex items-center gap-2">
           <Warehouse className="h-5 w-5 text-primary" />
           {depotInfo.name}
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Quản lý kho cứu trợ
-        </p>
+       
       </div>
 
       {/* Stats Bar */}
@@ -153,21 +152,21 @@ const DepotSidebar = ({
       {/* Tabs */}
       <Tabs
         value={activeTab}
-        onValueChange={setActiveTab}
+        onValueChange={onActiveTabChange}
         className="flex-1 flex flex-col overflow-hidden"
       >
-        <TabsList className="mx-3 mt-3 grid grid-cols-3">
-          <TabsTrigger value="inventory" className="text-xs">
-            <Package className="h-3 w-3 mr-1" />
+        <TabsList className="mx-3 mt-3 grid grid-cols-2 h-auto gap-1 bg-muted/50 p-1 w-[calc(100%-24px)] shrink-0">
+          <TabsTrigger value="inventory" className="text-xs py-1.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">
             Kho
           </TabsTrigger>
-          <TabsTrigger value="requests" className="text-xs">
-            <ClipboardText className="h-3 w-3 mr-1" />
+          <TabsTrigger value="requests" className="text-xs py-1.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">
             Yêu cầu
           </TabsTrigger>
-          <TabsTrigger value="shipments" className="text-xs">
-            <Truck className="h-3 w-3 mr-1" />
+          <TabsTrigger value="shipments" className="text-xs py-1.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">
             Vận chuyển
+          </TabsTrigger>
+          <TabsTrigger value="vattu" className="text-xs py-1.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            Vật tư
           </TabsTrigger>
         </TabsList>
 
@@ -200,18 +199,18 @@ const DepotSidebar = ({
             </Badge>
             {apiCategories && apiCategories.length > 0
               ? apiCategories.map((cat) => (
-                  <Badge
-                    key={cat.id}
-                    variant={
-                      selectedCategory === cat.code ? "default" : "outline"
-                    }
-                    className="cursor-pointer text-xs"
-                    onClick={() => onCategorySelect?.(cat.code)}
-                  >
-                    {categoryIcons[cat.code] ?? <Package className="h-4 w-4" />}
-                    <span className="ml-1">{cat.name}</span>
-                  </Badge>
-                ))
+                <Badge
+                  key={cat.id}
+                  variant={
+                    selectedCategory === cat.code ? "default" : "outline"
+                  }
+                  className="cursor-pointer text-xs"
+                  onClick={() => onCategorySelect?.(cat.code)}
+                >
+                  {categoryIcons[cat.code] ?? <Package className="h-4 w-4" />}
+                  <span className="ml-1">{cat.name}</span>
+                </Badge>
+              ))
               : null}
           </div>
 
@@ -378,6 +377,11 @@ const DepotSidebar = ({
               )}
             </div>
           </ScrollArea>
+        </TabsContent>
+
+        {/* Empty Content for Vattu (forces sidebar to be empty below tabs when vat tu is active) */}
+        <TabsContent value="vattu" className="flex-1 m-0 mt-3 p-4 text-center text-sm text-muted-foreground font-medium">
+          Chi tiết vật tư hiển thị ở bên phải
         </TabsContent>
       </Tabs>
     </div>

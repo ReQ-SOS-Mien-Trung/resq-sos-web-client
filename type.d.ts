@@ -547,6 +547,15 @@ export interface UserTableProps {
   onDelete?: (user: User) => void;
   onBan?: (user: User) => void;
   onActivate?: (user: User) => void;
+  onViewDetail?: (userId: string) => void;
+  onPrefetch?: (userId: string) => void;
+  // server-side pagination
+  page?: number;
+  totalPages?: number;
+  totalCount?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  isLoading?: boolean;
 }
 
 export interface UserStatsProps {
@@ -557,10 +566,10 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: "admin" | "coordinator" | "rescuer" | "citizen";
-  status: "active" | "pending" | "banned" | "inactive";
+  role: "admin" | "coordinator" | "rescuer" | "victim";
+  status: "active" | "banned";
   region: string;
-  phone?: string;
+  phone: string;
   avatar?: string;
   createdAt: string;
   lastLogin?: string;
@@ -574,9 +583,8 @@ export interface UserStats {
 }
 
 export interface UserFilters {
-  role?: User["role"];
-  status?: User["status"];
-  region?: string;
+  roles?: User["role"][];
+  statuses?: User["status"][];
   search?: string;
 }
 
@@ -1091,6 +1099,8 @@ export interface InventoryStatsProps {
 
 export interface DepotSidebarProps {
   depotInfo: DepotInfo;
+  activeTab: string;
+  onActiveTabChange: (tab: string) => void;
   inventoryItems: InventoryItem[];
   supplyRequests: SupplyRequest[];
   shipments: Shipment[];

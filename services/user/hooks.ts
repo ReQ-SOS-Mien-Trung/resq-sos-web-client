@@ -1,6 +1,23 @@
 import { useQuery, useMutation, UseQueryOptions } from "@tanstack/react-query";
-import { getUserMe, updateUserAvatar, getAdminUsers, banUser, unbanUser } from "./api";
-import { UserMeResponse, GetUsersParams, GetUsersResponse, BanUserRequest } from "./type";
+import {
+  getUserMe,
+  updateUserAvatar,
+  getAdminUsers,
+  getAdminUserById,
+  banUser,
+  unbanUser,
+  adminCreateUser,
+  updateAdminUser,
+} from "./api";
+import {
+  UserMeResponse,
+  GetUsersParams,
+  GetUsersResponse,
+  BanUserRequest,
+  AdminCreateUserRequest,
+  AdminUpdateUserRequest,
+  UserEntity,
+} from "./type";
 
 export const USER_ME_QUERY_KEY = ["user", "me"] as const;
 
@@ -20,8 +37,13 @@ export function useUserMe(options?: UseUserMeOptions) {
 
 export function useUpdateUserAvatar() {
   return useMutation({
-    mutationFn: ({ userId, avatarUrl }: { userId: string; avatarUrl: string }) =>
-      updateUserAvatar(userId, avatarUrl),
+    mutationFn: ({
+      userId,
+      avatarUrl,
+    }: {
+      userId: string;
+      avatarUrl: string;
+    }) => updateUserAvatar(userId, avatarUrl),
   });
 }
 
@@ -29,7 +51,10 @@ export const ADMIN_USERS_QUERY_KEY = ["admin", "users"] as const;
 
 export function useAdminUsers(
   params?: GetUsersParams,
-  options?: Omit<UseQueryOptions<GetUsersResponse, Error>, "queryKey" | "queryFn">
+  options?: Omit<
+    UseQueryOptions<GetUsersResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
 ) {
   return useQuery<GetUsersResponse, Error>({
     queryKey: [...ADMIN_USERS_QUERY_KEY, params],
@@ -38,14 +63,44 @@ export function useAdminUsers(
   });
 }
 
+export function useAdminUserById(
+  userId: string,
+  options?: Omit<UseQueryOptions<UserEntity, Error>, "queryKey" | "queryFn">,
+) {
+  return useQuery<UserEntity, Error>({
+    queryKey: [...ADMIN_USERS_QUERY_KEY, userId],
+    queryFn: () => getAdminUserById(userId),
+    ...options,
+  });
+}
+
 export function useBanUser() {
   return useMutation({
-    mutationFn: ({ userId, data }: { userId: string; data: BanUserRequest }) => banUser(userId, data),
+    mutationFn: ({ userId, data }: { userId: string; data: BanUserRequest }) =>
+      banUser(userId, data),
   });
 }
 
 export function useUnbanUser() {
   return useMutation({
     mutationFn: (userId: string) => unbanUser(userId),
+  });
+}
+
+export function useAdminCreateUser() {
+  return useMutation({
+    mutationFn: (data: AdminCreateUserRequest) => adminCreateUser(data),
+  });
+}
+
+export function useUpdateAdminUser() {
+  return useMutation({
+    mutationFn: ({
+      userId,
+      data,
+    }: {
+      userId: string;
+      data: AdminUpdateUserRequest;
+    }) => updateAdminUser(userId, data),
   });
 }

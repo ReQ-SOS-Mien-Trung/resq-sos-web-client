@@ -24,6 +24,8 @@ export interface LoginResponse {
   tokenType: string;
   userId: string;
   username: string;
+  firstName: string;
+  lastName: string;
   fullName: string;
   roleId: number;
 }

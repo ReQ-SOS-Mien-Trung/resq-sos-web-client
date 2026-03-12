@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import { UserFilters, UserStats, UserTable } from "@/components/admin/users";
+import { UserStats, UserTable, UserDetailSheet } from "@/components/admin/users";
 import { useAdminUsers, useBanUser, useUnbanUser, ADMIN_USERS_QUERY_KEY } from "@/services/user/hooks";
 import { UserEntity } from "@/services/user/type";
 import { User } from "@/type";
@@ -14,16 +14,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ShieldCheck } from "lucide-react";
+import { ArrowRight } from "@phosphor-icons/react";
 
 function mapUserEntityToUser(entity: UserEntity): User {
-  let role: User["role"] = "citizen";
+  let role: User["role"] = "victim";
   if (entity.roleId === 1 || entity.roleId === 4) role = "admin";
   else if (entity.roleId === 2) role = "coordinator";
   else if (entity.roleId === 3) role = "rescuer";
 
-  let status: User["status"] = "pending";
-  if (entity.isBanned) status = "banned";
-  else if (entity.isOnboarded) status = "active";
+  const status: User["status"] = entity.isBanned ? "banned" : "active";
 
   return {
     id: entity.id,
@@ -31,7 +30,7 @@ function mapUserEntityToUser(entity: UserEntity): User {
     name: `${entity.lastName} ${entity.firstName}`,
     role,
     status,
-    region: "Chưa cập nhật", // Region not in UserEntity
+    region: entity.province || "Chưa cập nhật",
     phone: entity.phone,
     avatar: entity.avatarUrl || undefined,
     createdAt: entity.createdAt,
@@ -41,7 +40,6 @@ function mapUserEntityToUser(entity: UserEntity): User {
 
 const UsersPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [filters, setFilters] = useState({});
   const [loading, setLoading] = useState(true);
 
   const queryClient = useQueryClient();
@@ -51,16 +49,22 @@ const UsersPage = () => {
   const [banModalOpen, setBanModalOpen] = useState(false);
   const [userToBan, setUserToBan] = useState<User | null>(null);
   const [banReason, setBanReason] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [detailSheetMode, setDetailSheetMode] = useState<"view" | "edit">("view");
 
-  const { data: usersData, isLoading: isLoadingUsers } = useAdminUsers({
+  // Fetch all users; search & filtering are done client-side inside UserTable
+  const apiParams = {
     pageNumber: 1,
     pageSize: 1000,
-  });
+  };
+
+  const { data: usersData, isLoading: isLoadingUsers } = useAdminUsers(apiParams);
 
   const dynamicStats = {
-    total: usersData?.items?.length || 0,
-    active: usersData?.items?.filter(u => !u.isBanned).length || 0,
-    pending: 0, // no longer in UI
+    total: usersData?.totalCount || 0,
+    active: (usersData?.totalCount || 0) - (usersData?.items?.filter(u => u.isBanned).length || 0),
+    pending: 0,
     banned: usersData?.items?.filter(u => u.isBanned).length || 0,
   };
 
@@ -77,6 +81,12 @@ const UsersPage = () => {
     };
     fetchData();
   }, []);
+
+  const handleEditClick = (user: User) => {
+    setSelectedUserId(user.id);
+    setDetailSheetMode("edit");
+    setDetailSheetOpen(true);
+  };
 
   const handleBanClick = (user: User) => {
     setUserToBan(user);
@@ -138,32 +148,54 @@ const UsersPage = () => {
       cloudStorage={dashboardData.cloudStorage}
     >
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <ShieldCheck size={20} className="text-foreground" />
-            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Quản lý hồ sơ
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5 mb-1">
+              <ShieldCheck size={20} className="text-foreground" />
+              <p className="text-xs font-semibold uppercase tracking-tighter text-muted-foreground">
+                Quản lý hồ sơ
+              </p>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tighter text-foreground leading-tight">
+              Quản lý người dùng
+            </h1>
+            <p className="text-sm tracking-tighter text-muted-foreground mt-1">
+              Xem xét và quản lý tài khoản của người dùng
             </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground leading-tight">
-            Quản lý người dùng
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Xem xét và phê duyệt hồ sơ của người dùng
-          </p>
+          <button
+            onClick={() => window.location.href = "/dashboard/admin/users/create"}
+            className="px-2 sm:px-4 py-4 bg-black text-white text-[12px] sm:text-[14px] font-bold uppercase tracking-tighter hover:bg-[#FF5722] transition-colors flex items-center justify-center gap-2 group"
+          >
+            Tạo tài khoản
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </button>
         </div>
 
         <UserStats stats={dynamicStats} />
 
-        <UserFilters filters={filters} onFiltersChange={setFilters} />
-
         <UserTable
-          users={usersData?.items ? usersData.items.map(mapUserEntityToUser) : []}
-          filters={filters}
+          users={usersData?.items?.map(mapUserEntityToUser) ?? []}
+          onEdit={handleEditClick}
           onBan={handleBanClick}
           onActivate={handleActivateClick}
+          onPrefetch={(userId) => setSelectedUserId(userId)}
+          onViewDetail={(userId) => {
+            setSelectedUserId(userId);
+            setDetailSheetMode("view");
+            setDetailSheetOpen(true);
+          }}
+          totalCount={usersData?.totalCount}
+          isLoading={isLoadingUsers}
         />
       </div>
+
+      <UserDetailSheet
+        userId={selectedUserId}
+        open={detailSheetOpen}
+        onOpenChange={setDetailSheetOpen}
+        initialMode={detailSheetMode}
+      />
 
       <Dialog open={banModalOpen} onOpenChange={setBanModalOpen}>
         <DialogContent className="sm:max-w-md border border-border/60">
@@ -203,3 +235,4 @@ const UsersPage = () => {
 };
 
 export default UsersPage;
+

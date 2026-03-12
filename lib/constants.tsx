@@ -34,6 +34,7 @@ import {
   Truck,
   Wrench,
   Users as UsersIcon,
+  MapTrifold,
 } from "@phosphor-icons/react";
 import {
   Bell,
@@ -361,6 +362,11 @@ export const navigationItems = [
     icon: ChatCircle,
     label: "Cấu hình phòng chat",
     href: "/dashboard/admin/chat-config",
+  },
+  {
+    icon: MapTrifold,
+    label: "Khoanh vùng cứu hộ",
+    href: "/dashboard/admin/map-zone",
   },
 ];
 
