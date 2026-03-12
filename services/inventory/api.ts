@@ -2,9 +2,15 @@ import api from "@/config/axios";
 import {
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
+  ImportInventoryRequest,
   InventoryCategory,
   InventoryItemType,
+  InventoryOrganization,
   InventoryTargetGroup,
+  InventoryActionType,
+  InventorySourceType,
+  GetDepotTransactionsParams,
+  GetDepotTransactionsResponse,
 } from "./type";
 
 /**
@@ -49,5 +55,70 @@ export async function getInventoryTargetGroups(): Promise<
   InventoryTargetGroup[]
 > {
   const { data } = await api.get("/logistics/inventory/metadata/target-groups");
+  return data;
+}
+
+/**
+ * Get list of organizations
+ * GET /logistics/inventory/metadata/organizations
+ */
+export async function getInventoryOrganizations(): Promise<
+  InventoryOrganization[]
+> {
+  const { data } = await api.get("/logistics/inventory/metadata/organizations");
+  return data;
+}
+
+/**
+ * Get list of inventory action types
+ * GET /logistics/inventory/metadata/inventory-action-types
+ */
+export async function getInventoryActionTypes(): Promise<
+  InventoryActionType[]
+> {
+  const { data } = await api.get(
+    "/logistics/inventory/metadata/inventory-action-types",
+  );
+  return data;
+}
+
+/**
+ * Get list of inventory source types
+ * GET /logistics/inventory/metadata/inventory-source-types
+ */
+export async function getInventorySourceTypes(): Promise<
+  InventorySourceType[]
+> {
+  const { data } = await api.get(
+    "/logistics/inventory/metadata/inventory-source-types",
+  );
+  return data;
+}
+
+/**
+ * Import inventory items from an organization
+ * POST /logistics/inventory/import
+ */
+export async function importInventory(
+  payload: ImportInventoryRequest,
+): Promise<void> {
+  await api.post("/logistics/inventory/import", payload, {
+    timeout: 60000, // 60 seconds for large imports
+  });
+}
+
+/**
+ * Get depot transaction history
+ * GET /logistics/inventory/transactions/my-depot
+ */
+export async function getDepotTransactions(
+  params: GetDepotTransactionsParams,
+): Promise<GetDepotTransactionsResponse> {
+  const { data } = await api.get("/logistics/inventory/transactions/my-depot", {
+    params,
+    paramsSerializer: {
+      indexes: null,
+    },
+  });
   return data;
 }

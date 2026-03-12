@@ -7,6 +7,12 @@ export type InventoryItemType = InventoryCategory;
 
 export type InventoryTargetGroup = InventoryCategory;
 
+export type InventoryOrganization = InventoryCategory;
+
+export type InventoryActionType = InventoryCategory;
+
+export type InventorySourceType = InventoryCategory;
+
 export interface InventoryItemEntity {
   reliefItemId: number;
   reliefItemName: string;
@@ -30,6 +36,70 @@ export interface GetMyDepotInventoryParams {
 
 export interface GetMyDepotInventoryResponse {
   items: InventoryItemEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+// ─── Import from Organization ───
+
+export interface ImportInventoryItem {
+  row: number;
+  itemName: string;
+  categoryCode: string;
+  quantity: number;
+  unit: string;
+  itemType: string;
+  targetGroup: string;
+  receivedDate: string;
+  expiredDate?: string | null;
+  notes?: string | null;
+}
+
+export interface ImportInventoryRequest {
+  organizationId: number;
+  items: ImportInventoryItem[];
+}
+
+// ─── Transaction History ───
+
+export interface TransactionItem {
+  itemId: number;
+  itemName: string;
+  quantityChange: number;
+  formattedQuantityChange: string;
+  unit: string;
+  itemType: string;
+  targetGroup: string;
+  categoryName: string;
+}
+
+export interface TransactionEntity {
+  transactionId: string;
+  actionType: string;
+  sourceType: string;
+  sourceId: number | null;
+  sourceName: string;
+  performedByName: string;
+  note: string;
+  createdAt: string;
+  items: TransactionItem[];
+}
+
+export interface GetDepotTransactionsParams {
+  actionTypes?: string[];
+  sourceTypes?: string[];
+  fromDate?: string;
+  toDate?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetDepotTransactionsResponse {
+  items: TransactionEntity[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;

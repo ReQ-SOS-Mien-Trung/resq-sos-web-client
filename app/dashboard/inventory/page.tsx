@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,8 +31,10 @@ import {
   Moon,
   Plus,
   FileArrowDown,
-  Warehouse,
   SignOut,
+  Buildings,
+  CaretDown,
+  Package,
 } from "@phosphor-icons/react";
 import {
   CategoryOverview,
@@ -58,6 +61,7 @@ import { useDepots } from "@/services/depot/hooks";
 import { DepotEntity } from "@/services/depot/type";
 import { useItemCategories } from "@/services/item_categories/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FileTextIcon } from "lucide-react";
 
 // --- Helpers ---
 
@@ -135,6 +139,8 @@ const InventoryDashboardPage = () => {
   const [activeTab, setActiveTab] = useState("inventory");
   const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
+
+  const router = useRouter();
 
   // ── Auth ──
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -333,13 +339,40 @@ const InventoryDashboardPage = () => {
 
         <div className="flex items-center gap-2">
           {/* Quick Actions */}
-          <Button variant="outline" size="sm" className="hidden md:flex gap-2">
-            <Plus className="h-4 w-4" />
-            Nhập kho
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+                <Plus className="h-4 w-4" />
+                Nhập kho
+                <CaretDown className="h-3.5 w-3.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer"
+                onClick={() => router.push("/dashboard/inventory/import")}
+              >
+                <Buildings className="h-4 w-4" />
+                Nhập kho từ tổ chức
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2 cursor-pointer">
+                <Package className="h-4 w-4" />
+                Nhập kho thường
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" size="sm" className="hidden md:flex gap-2">
             <FileArrowDown className="h-4 w-4" />
             Xuất báo cáo
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="hidden md:flex gap-2"
+            onClick={() => router.push("/dashboard/inventory/transactions")}
+          >
+            <FileTextIcon className="h-4 w-4" />
+            Truy xuất
           </Button>
 
           {/* Notifications */}
@@ -527,6 +560,7 @@ const InventoryDashboardPage = () => {
         open={vatTuSheetOpen}
         onOpenChange={setVatTuSheetOpen}
       />
+
     </div>
   );
 };
