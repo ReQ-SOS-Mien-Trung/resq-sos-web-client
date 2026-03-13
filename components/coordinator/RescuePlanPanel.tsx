@@ -661,15 +661,17 @@ interface RouteSegment {
 }
 
 const COORD_EPSILON = 0.0005; // ~55m tolerance for "same location"
+const HUE_DEFAULT_ORIGIN = { lat: 16.4637, lng: 107.5909 };
+const RESCUE_ROUTE_ACTIVITY_TYPES = new Set([
+  "RESCUE",
+  "MEDICAL_AID",
+  "EVACUATE",
+]);
 
 const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
   const [open, setOpen] = useState(false);
   const [vehicle, setVehicle] = useState<RouteVehicle>("bike");
-  const [originCoords, setOriginCoords] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [geoError, setGeoError] = useState(false);
+  const [originCoords] = useState(HUE_DEFAULT_ORIGIN);
   const [segments, setSegments] = useState<RouteSegment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -681,7 +683,10 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
   // Filter activities that have valid coordinates, sorted by step
   // Fallback: if targetLatitude/Longitude are 0 or all the same, try parsing from description
   const routeActivities = useMemo(() => {
-    const acts = mission.activities.slice().sort((a, b) => a.step - b.step);
+    const acts = mission.activities
+      .filter((a) => RESCUE_ROUTE_ACTIVITY_TYPES.has(a.activityType))
+      .slice()
+      .sort((a, b) => a.step - b.step);
 
     // Enrich activities: if coords are 0, try extracting from description
     const enriched = acts.map((a) => {
@@ -764,32 +769,9 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
     document.head.appendChild(link);
   }, []);
 
-  // Get geolocation when opened
-  useEffect(() => {
-    if (!open || originCoords) return;
-    if (!navigator.geolocation) {
-      setOriginCoords({ lat: 16.4637, lng: 107.5909 });
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setOriginCoords({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
-        setGeoError(false);
-      },
-      () => {
-        setOriginCoords({ lat: 16.4637, lng: 107.5909 });
-        setGeoError(true);
-      },
-      { timeout: 5000, maximumAge: 30_000 },
-    );
-  }, [open, originCoords]);
-
   // Fetch routes only between distinct waypoints, chaining origins
   useEffect(() => {
-    if (!open || !originCoords || uniqueWaypoints.length === 0) return;
+    if (!open || uniqueWaypoints.length === 0) return;
     abortRef.current = false;
     setLoading(true);
     setError(null);
@@ -947,18 +929,10 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
         </div>
       </div>
 
-      {!originCoords && (
-        <p className="text-[10px] text-muted-foreground flex items-center gap-1 animate-pulse">
-          <CircleNotch className="h-3 w-3 animate-spin" />
-          Đang lấy vị trí hiện tại...
-        </p>
-      )}
-      {geoError && (
-        <p className="text-[10px] text-orange-500 flex items-center gap-1">
-          <Warning className="h-3 w-3" weight="fill" />
-          Dùng vị trí mặc định (Huế)
-        </p>
-      )}
+      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+        <MapPin className="h-3 w-3" weight="fill" />
+        Xuất phát mặc định: Huế (16.4637, 107.5909)
+      </p>
       {loading && (
         <div className="space-y-1">
           <p className="text-[10px] text-muted-foreground flex items-center gap-1 animate-pulse">
