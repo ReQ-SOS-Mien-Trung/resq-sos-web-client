@@ -146,23 +146,19 @@ function CreateSOSContent() {
     }
     setIsGeocoding(true);
     try {
-      const params = new URLSearchParams({
-        q: query,
-        format: "json",
-        limit: "1",
-        addressdetails: "1",
-        countrycodes: "vn",
-      });
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?${params}`,
-        { headers: { "Accept-Language": "vi,en" } },
-      );
-      if (!res.ok) throw new Error("Nominatim request failed");
-      const data = await res.json();
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error("Geocode request failed");
+
+      const payload = (await res.json()) as {
+        results?: Array<{ lat: string; lon: string; display_name: string }>;
+      };
+      const data = payload.results ?? [];
+
       if (!data.length) {
         toast.error("Không tìm thấy địa chỉ, hãy thử từ khoá khác");
         return;
       }
+
       const { lat: resLat, lon: resLon, display_name } = data[0];
       setLat(parseFloat(resLat).toFixed(6));
       setLng(parseFloat(resLon).toFixed(6));
