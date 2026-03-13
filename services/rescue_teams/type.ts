@@ -30,6 +30,66 @@ export interface RescueTeamMember {
   isLeader: boolean;
 }
 
+export type RescueTeamMemberStatus = "Accepted" | "Pending" | "Rejected";
+
+export type RescueTeamRoleInTeam = "Leader" | "Member";
+
+export interface RescueTeamMemberDetail {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  avatarUrl: string | null;
+  rescuerType: "Volunteer" | "Core" | null;
+  status: RescueTeamMemberStatus;
+  isLeader: boolean;
+  roleInTeam: RescueTeamRoleInTeam;
+  checkedIn: boolean;
+}
+
+export interface RescueTeamEntity {
+  id: number;
+  code: string;
+  name: string;
+  teamType: RescueTeamTypeKey;
+  status: RescueTeamStatusKey;
+  assemblyPointId: number;
+  assemblyPointName: string;
+  maxMembers: number;
+  currentMemberCount: number;
+  createdAt: string;
+}
+
+export interface GetRescueTeamsParams {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetRescueTeamsResponse {
+  items: RescueTeamEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface GetRescueTeamByIdResponse {
+  id: number;
+  code: string;
+  name: string;
+  teamType: RescueTeamTypeKey;
+  status: RescueTeamStatusKey;
+  assemblyPointId: number;
+  assemblyPointName: string;
+  managedBy: string;
+  maxMembers: number;
+  assemblyDate: string | null;
+  createdAt: string;
+  members: RescueTeamMemberDetail[];
+}
+
 export interface CreateRescueTeamRequest {
   name: string;
   type: RescueTeamTypeKey;

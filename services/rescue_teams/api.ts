@@ -2,9 +2,39 @@ import api from "@/config/axios";
 import type {
   RescueTeamTypeOption,
   RescueTeamStatusOption,
+  GetRescueTeamsParams,
+  GetRescueTeamsResponse,
+  GetRescueTeamByIdResponse,
   CreateRescueTeamRequest,
   CreateRescueTeamResponse,
 } from "./type";
+
+/**
+ * Get rescue teams with pagination.
+ * GET /personnel/rescue-teams
+ */
+export async function getRescueTeams(
+  params?: GetRescueTeamsParams,
+): Promise<GetRescueTeamsResponse> {
+  const { data } = await api.get("/personnel/rescue-teams", {
+    params: {
+      pageNumber: params?.pageNumber ?? 1,
+      pageSize: params?.pageSize ?? 10,
+    },
+  });
+  return data;
+}
+
+/**
+ * Get rescue team detail by ID.
+ * GET /personnel/rescue-teams/{id}
+ */
+export async function getRescueTeamById(
+  id: number,
+): Promise<GetRescueTeamByIdResponse> {
+  const { data } = await api.get(`/personnel/rescue-teams/${id}`);
+  return data;
+}
 
 /**
  * Get rescue team metadata types.
