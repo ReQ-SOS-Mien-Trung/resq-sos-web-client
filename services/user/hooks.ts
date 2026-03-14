@@ -3,6 +3,7 @@ import {
   getUserMe,
   updateUserAvatar,
   getAdminUsers,
+  getAdminRescuers,
   getAdminUserById,
   banUser,
   unbanUser,
@@ -13,6 +14,8 @@ import {
   UserMeResponse,
   GetUsersParams,
   GetUsersResponse,
+  GetRescuersParams,
+  GetRescuersResponse,
   BanUserRequest,
   AdminCreateUserRequest,
   AdminUpdateUserRequest,
@@ -59,6 +62,22 @@ export function useAdminUsers(
   return useQuery<GetUsersResponse, Error>({
     queryKey: [...ADMIN_USERS_QUERY_KEY, params],
     queryFn: () => getAdminUsers(params),
+    ...options,
+  });
+}
+
+export const ADMIN_RESCUERS_QUERY_KEY = ["admin", "rescuers"] as const;
+
+export function useAdminRescuers(
+  params?: GetRescuersParams,
+  options?: Omit<
+    UseQueryOptions<GetRescuersResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<GetRescuersResponse, Error>({
+    queryKey: [...ADMIN_RESCUERS_QUERY_KEY, params],
+    queryFn: () => getAdminRescuers(params),
     ...options,
   });
 }

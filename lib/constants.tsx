@@ -335,7 +335,7 @@ export const navigationItems = [
   { icon: Users, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
   {    icon: UserCheck,
     label: "Quản lý cứu hộ viên",
-    href: "/dashboard/admin/rescuer-verification",
+    href: "/dashboard/admin/rescuers",
   },
   {
     icon: IdentificationCardIcon,

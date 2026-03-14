@@ -3,6 +3,8 @@ import {
   UserMeResponse,
   GetUsersParams,
   GetUsersResponse,
+  GetRescuersParams,
+  GetRescuersResponse,
   BanUserRequest,
   AdminCreateUserRequest,
   AdminUpdateUserRequest,
@@ -28,6 +30,13 @@ export async function getAdminUsers(
   params?: GetUsersParams,
 ): Promise<GetUsersResponse> {
   const { data } = await api.get("/identity/admin/users", { params });
+  return data;
+}
+
+export async function getAdminRescuers(
+  params?: GetRescuersParams,
+): Promise<GetRescuersResponse> {
+  const { data } = await api.get("/identity/admin/users/rescuers", { params });
   return data;
 }
 

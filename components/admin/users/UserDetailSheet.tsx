@@ -82,21 +82,6 @@ const FieldRow = ({ label, value }: FieldRowProps) => (
   </div>
 );
 
-interface StatusDotProps {
-  active: boolean;
-  label: string;
-}
-
-const StatusDot = ({ active, label }: StatusDotProps) => (
-  <div className="flex items-center gap-2">
-    <span
-      className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-        active ? "bg-emerald-500" : "bg-muted-foreground/30"
-      }`}
-    />
-    <span className="text-sm text-foreground">{label}</span>
-  </div>
-);
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   <p className="text-[14px] font-bold text-primary tracking-tight mb-3">
@@ -453,7 +438,7 @@ const UserDetailSheet = ({
         </div>
 
         {/* ── liên hệ ── */}
-        <div className="px-6 py-4 border-b border-border/30">
+        <div className="px-6 py-2 border-b border-border/30">
           <SectionLabel>THÔNG TIN LIÊN HỆ</SectionLabel>
           {isLoading ? (
             <div className="space-y-3">
@@ -463,40 +448,40 @@ const UserDetailSheet = ({
           ) : isEditing ? (
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs tracking-tighter text-muted-foreground">Số điện thoại</label>
+                <label className="text-sm tracking-tighter text-muted-foreground">Số điện thoại</label>
                 <Input
                   value={form.phone}
                   onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
                   placeholder="0912345678"
-                  className="h-8 text-sm tracking-tighter"
+                  className="h-8 mt-1.5 text-sm tracking-tighter"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs tracking-tighter text-muted-foreground">Email</label>
+                <label className="text-sm tracking-tighter text-muted-foreground">Email</label>
                 <Input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                   placeholder="example@resq.com"
-                  className="h-8 text-sm tracking-tighter"
+                  className="h-8 mt-1.5 text-sm tracking-tighter"
                 />
               </div>
               {user?.roleId === 3 && (
                 <div className="space-y-1">
-                  <label className="text-xs tracking-tighter text-muted-foreground">Loại cứu hộ (Rescuer Type)</label>
+                  <label className="text-sm tracking-tighter text-muted-foreground">Loại cứu hộ</label>
                   <div className="flex gap-2">
-                    {["core", "normal"].map((t) => (
+                    {(["Core", "Volunteer"] as const).map((t) => (
                       <button
                         key={t}
                         type="button"
                         onClick={() => setForm((p) => ({ ...p, rescuerType: t }))}
-                        className={`flex-1 py-1.5 text-xs tracking-tighter font-medium border rounded transition-colors ${
+                        className={`flex-1 py-1.5 mt-1.5 text-sm tracking-tighter font-medium border transition-colors ${
                           form.rescuerType === t
                             ? "bg-primary text-primary-foreground border-primary"
                             : "border-border hover:bg-muted/50"
                         }`}
                       >
-                        {t === "core" ? "Core (Nòng cốt)" : "Normal (Thông thường)"}
+                        {t === "Core" ? "Cứu hộ hệ thống" : "Tình nguyện viên"}
                       </button>
                     ))}
                   </div>
@@ -524,14 +509,23 @@ const UserDetailSheet = ({
                 }
               />
               {user?.roleId === 3 && (
-                <FieldRow label="Loại cứu hộ" value={user.rescuerType ?? "—"} />
+                <FieldRow
+                  label="Loại cứu hộ"
+                  value={
+                    user.rescuerType === "Core"
+                      ? "Cứu hộ hệ thống"
+                      : user.rescuerType === "Volunteer"
+                      ? "Tình nguyện viên"
+                      : user.rescuerType ?? "—"
+                  }
+                />
               )}
             </>
           )}
         </div>
 
         {/* ── địa chỉ ── */}
-        <div className="px-6 py-4 border-b border-border/30">
+        <div className="px-6 py-2 border-b border-border/30">
           <SectionLabel>ĐỊA CHỈ</SectionLabel>
           {isLoading ? (
             <div className="space-y-3">
@@ -542,18 +536,18 @@ const UserDetailSheet = ({
           ) : isEditing ? (
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs tracking-tighter text-muted-foreground">Địa chỉ</label>
+                <label className="text-sm tracking-tighter text-muted-foreground">Địa chỉ</label>
                 <Input
                   value={form.address}
                   onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
                   placeholder="Số nhà, tên đường"
-                  className="h-8 text-sm"
+                  className="h-8 mt-1.5 text-sm"
                 />
               </div>
 
               {/* Province dropdown */}
               <div className="space-y-1" ref={cityDropdownRef}>
-                <label className="text-xs tracking-tighter text-muted-foreground">Tỉnh / Thành phố</label>
+                <label className="text-sm tracking-tighter text-muted-foreground">Tỉnh / Thành phố</label>
                 <div className="relative">
                   <Input
                     value={citySearch || form.province}
@@ -567,7 +561,7 @@ const UserDetailSheet = ({
                     onFocus={() => { setCityOpen(true); setCitySearch(""); }}
                     readOnly={!!form.province && !cityOpen}
                     placeholder="Chọn tỉnh/thành phố"
-                    className="h-8 text-sm pr-7 cursor-pointer"
+                    className="h-8 mt-1.5 text-sm pr-7 cursor-pointer"
                   />
                   <CaretDown
                     size={13}
@@ -575,7 +569,7 @@ const UserDetailSheet = ({
                   />
                   {cityOpen && (
                     <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border border-border/60 shadow-xl overflow-y-auto rounded-md" style={{ maxHeight: 200 }}>
-                      {provinces.length === 0 && <p className="text-xs text-muted-foreground px-4 py-3 text-center">Đang tải...</p>}
+                      {provinces.length === 0 && <p className="text-xs tracking-tighter text-muted-foreground px-4 py-3 text-center">Đang tải...</p>}
                       {provinces
                         .filter((p) => p.name.toLowerCase().includes((citySearch || "").toLowerCase()))
                         .map((p) => (
@@ -590,7 +584,7 @@ const UserDetailSheet = ({
                               setCityOpen(false);
                               setCitySearch("");
                             }}
-                            className={`w-full text-left px-4 py-2 text-xs hover:bg-muted/50 transition-colors ${form.province === p.name ? "bg-primary/5 text-primary font-bold" : ""}`}
+                            className={`w-full tracking-tighter text-left px-4 py-2 text-xs hover:bg-muted/50 transition-colors ${form.province === p.name ? "bg-primary/5 text-primary font-bold" : ""}`}
                           >
                             {p.name}
                           </button>
@@ -602,7 +596,7 @@ const UserDetailSheet = ({
 
               {/* Ward dropdown */}
               <div className="space-y-1" ref={wardDropdownRef}>
-                <label className="text-xs text-muted-foreground">Phường / Xã</label>
+                <label className="text-sm tracking-tighter text-muted-foreground">Phường / Xã</label>
                 <div className="relative">
                   <Input
                     value={wardSearch || form.ward}
@@ -615,7 +609,7 @@ const UserDetailSheet = ({
                     onFocus={() => { setWardOpen(true); setWardSearch(""); }}
                     readOnly={!!form.ward && !wardOpen}
                     placeholder={selectedProvinceCode ? "Chọn phường/xã" : "Chọn tỉnh trước"}
-                    className="h-8 text-sm pr-7 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-8 mt-1.5 text-sm pr-7 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <CaretDown
                     size={13}
@@ -635,7 +629,7 @@ const UserDetailSheet = ({
                               setWardOpen(false);
                               setWardSearch("");
                             }}
-                            className={`w-full text-left px-4 py-2 text-xs hover:bg-muted/50 transition-colors ${form.ward === w.name ? "bg-primary/5 text-primary font-bold" : ""}`}
+                            className={`w-full tracking-tighter text-left px-4 py-2 text-xs hover:bg-muted/50 transition-colors ${form.ward === w.name ? "bg-primary/5 text-primary font-bold" : ""}`}
                           >
                             {w.name}
                           </button>
@@ -671,11 +665,11 @@ const UserDetailSheet = ({
             ) : (
               <>
                 <FieldRow
-                  label="Tạo lúc"
+                  label="Thời gian tạo"
                   value={user?.createdAt ? formatDateTime(user.createdAt) : "—"}
                 />
                 <FieldRow
-                  label="Cập nhật"
+                  label="Cập nhật lần cuối"
                   value={user?.updatedAt ? formatDateTime(user.updatedAt) : "—"}
                 />
                 {user?.approvedAt && (
