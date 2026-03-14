@@ -53,6 +53,7 @@ import {
 import {
   ClusterSuggestedActivity,
   ClusterActivityType,
+  ClusterSupplyCollection,
   MissionSuggestionEntity,
 } from "@/services/sos_cluster/type";
 import { useMyDepotInventory } from "@/services/inventory/hooks";
@@ -662,10 +663,106 @@ interface RouteSegment {
 const COORD_EPSILON = 0.0005; // ~55m tolerance for "same location"
 const HUE_DEFAULT_ORIGIN = { lat: 16.4637, lng: 107.5909 };
 const RESCUE_ROUTE_ACTIVITY_TYPES = new Set([
+  "COLLECT_SUPPLIES",
   "RESCUE",
   "MEDICAL_AID",
   "EVACUATE",
 ]);
+const SOS_TARGET_REGEX = /SOS\s*#?\s*(\d+)/i;
+
+interface WaypointMeta {
+  labels: string[];
+  hasSOS: boolean;
+  hasDepot: boolean;
+}
+
+function getSupplyDisplayName(supply: {
+  itemName?: string | null;
+  itemId?: number | null;
+}): string {
+  const name =
+    typeof supply.itemName === "string" ? supply.itemName.trim() : "";
+  if (name) return name;
+  if (typeof supply.itemId === "number") return `Vật tư #${supply.itemId}`;
+  return "Vật tư chưa rõ tên";
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function syncDescriptionWithSupplies(
+  description: string,
+  supplies: ClusterSupplyCollection[] | null | undefined,
+): string {
+  if (!supplies || supplies.length === 0) return description;
+
+  let next = description;
+  for (const supply of supplies) {
+    const name = getSupplyDisplayName(supply);
+    if (!name || name === "Vật tư chưa rõ tên") continue;
+
+    // Match patterns like "Tên vật tư x20", "Tên vật tư x 20", "Tên vật tư ×20".
+    const qtyPattern = new RegExp(
+      `(${escapeRegExp(name)}\\s*[xX×]\\s*)\\d+`,
+      "g",
+    );
+    next = next.replace(qtyPattern, `$1${supply.quantity}`);
+  }
+
+  return next;
+}
+
+function extractSOSLabel(activity: MissionActivity): string | null {
+  const target = typeof activity.target === "string" ? activity.target : "";
+  const desc =
+    typeof activity.description === "string" ? activity.description : "";
+
+  const targetMatch = target.match(SOS_TARGET_REGEX);
+  if (targetMatch?.[1]) return `SOS #${targetMatch[1]}`;
+
+  const descMatch = desc.match(SOS_TARGET_REGEX);
+  if (descMatch?.[1]) return `SOS #${descMatch[1]}`;
+
+  return null;
+}
+
+function extractDepotLabel(activity: MissionActivity): string | null {
+  const target =
+    typeof activity.target === "string" ? activity.target.trim() : "";
+  const hasDepotKeyword = /\b(kho|depot)\b/i.test(target);
+  const isDepotActivity = activity.activityType === "COLLECT_SUPPLIES";
+
+  if (!isDepotActivity && !hasDepotKeyword) return null;
+  if (target && !SOS_TARGET_REGEX.test(target)) return target;
+  return "Kho tiếp tế";
+}
+
+function getWaypointMeta(waypoint: UniqueWaypoint): WaypointMeta {
+  const labels = new Set<string>();
+  let hasSOS = false;
+  let hasDepot = false;
+
+  for (const activity of waypoint.activities) {
+    const sosLabel = extractSOSLabel(activity);
+    if (sosLabel) {
+      labels.add(sosLabel);
+      hasSOS = true;
+    }
+
+    const depotLabel = extractDepotLabel(activity);
+    if (depotLabel) {
+      labels.add(depotLabel);
+      hasDepot = true;
+    }
+  }
+
+  return {
+    labels: Array.from(labels),
+    hasSOS,
+    hasDepot,
+  };
+}
 
 const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
   const [open, setOpen] = useState(false);
@@ -843,6 +940,11 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
     };
   }, [open, originCoords, uniqueWaypoints, vehicle, mission.id]);
 
+  const waypointMetaList = useMemo(
+    () => uniqueWaypoints.map(getWaypointMeta),
+    [uniqueWaypoints],
+  );
+
   if (routeActivities.length === 0) return null;
 
   if (!open) {
@@ -999,6 +1101,16 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
                 {/* Unique waypoint markers */}
                 {uniqueWaypoints.map((wp, idx) => {
                   const isLast = idx === uniqueWaypoints.length - 1;
+                  const meta = waypointMetaList[idx];
+
+                  const markerColor = isLast
+                    ? "#dc2626"
+                    : meta?.hasDepot
+                      ? "#a16207"
+                      : meta?.hasSOS
+                        ? "#2563eb"
+                        : segmentColors[idx % segmentColors.length];
+
                   return (
                     <CircleMarker
                       key={`wp-${idx}`}
@@ -1007,12 +1119,23 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
                       pathOptions={{
                         color: "#ffffff",
                         weight: 2,
-                        fillColor: isLast
-                          ? "#dc2626"
-                          : segmentColors[idx % segmentColors.length],
+                        fillColor: markerColor,
                         fillOpacity: 1,
                       }}
-                    />
+                    >
+                      {meta?.labels.length > 0 && (
+                        <Tooltip
+                          direction="top"
+                          offset={[0, -10]}
+                          opacity={1}
+                          permanent
+                        >
+                          <div className="text-[10px] font-semibold whitespace-nowrap">
+                            {meta.labels.join(" • ")}
+                          </div>
+                        </Tooltip>
+                      )}
+                    </CircleMarker>
                   );
                 })}
               </MapContainer>
@@ -1023,6 +1146,7 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
           <div className="space-y-1.5 mt-1">
             {uniqueWaypoints.map((wp, wpIdx) => {
               const seg = segments.find((s) => s.index === wpIdx);
+              const meta = waypointMetaList[wpIdx];
               return (
                 <div key={wpIdx} className="space-y-0.5">
                   {/* Route distance to this waypoint */}
@@ -1042,6 +1166,19 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
                       <span className="text-muted-foreground">
                         {seg.distance} · {seg.duration}
                       </span>
+                    </div>
+                  )}
+                  {meta?.labels.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 pl-6">
+                      {meta.labels.map((label) => (
+                        <Badge
+                          key={`${wpIdx}-${label}`}
+                          variant="outline"
+                          className="h-4 px-1.5 text-[9px]"
+                        >
+                          {label}
+                        </Badge>
+                      ))}
                     </div>
                   )}
                   {/* Activities at this waypoint */}
@@ -1212,7 +1349,7 @@ const SuggestionCard = ({
                             >
                               <Package className="h-3 w-3 shrink-0" />
                               <span className="font-medium">
-                                {supply.itemName}
+                                {getSupplyDisplayName(supply)}
                               </span>
                               <span className="font-bold bg-blue-50 dark:bg-blue-900/20 px-1 rounded">
                                 {supply.quantity} {supply.unit}
@@ -1245,10 +1382,12 @@ const RescuePlanPanel = ({
   defaultTab,
 }: RescuePlanPanelProps) => {
   // ── Custom resizable split ──
-  const [splitPercent, setSplitPercent] = useState(55); // left panel %
+  const [splitPercent, setSplitPercent] = useState(42); // left panel %
+  const [isStatsCollapsed, setIsStatsCollapsed] = useState(false);
   const isDraggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
+  const mainScrollAreaRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -1453,36 +1592,43 @@ const RescuePlanPanel = ({
         priorityScore: editPriorityScore,
         startTime: new Date(editStartTime).toISOString(),
         expectedEndTime: new Date(editExpectedEndTime).toISOString(),
-        activities: editActivities.map((a, i) => ({
-          step: i + 1,
-          activityCode: `${a.activityType}_${i + 1}`,
-          activityType: a.activityType,
-          description: a.description,
-          target: a.depotName || `SOS #${a.sosRequestId || "general"}`,
-          items: a.suppliesToCollect
-            ? a.suppliesToCollect
-                .map((s) => `${s.itemName} x${s.quantity}`)
-                .join(", ")
-            : "",
-          targetLatitude:
-            extractCoordsFromDescription(a.description)?.lat ??
-            (a.sosRequestId
-              ? (clusterSOSRequests.find(
-                  (s) => String(s.id) === String(a.sosRequestId),
-                )?.location?.lat ??
-                sos?.location?.lat ??
-                0)
-              : (sos?.location?.lat ?? 0)),
-          targetLongitude:
-            extractCoordsFromDescription(a.description)?.lng ??
-            (a.sosRequestId
-              ? (clusterSOSRequests.find(
-                  (s) => String(s.id) === String(a.sosRequestId),
-                )?.location?.lng ??
-                sos?.location?.lng ??
-                0)
-              : (sos?.location?.lng ?? 0)),
-        })),
+        activities: editActivities.map((a, i) => {
+          const syncedDescription = syncDescriptionWithSupplies(
+            a.description,
+            a.suppliesToCollect,
+          );
+
+          return {
+            step: i + 1,
+            activityCode: `${a.activityType}_${i + 1}`,
+            activityType: a.activityType,
+            description: syncedDescription,
+            target: a.depotName || `SOS #${a.sosRequestId || "general"}`,
+            items: a.suppliesToCollect
+              ? a.suppliesToCollect
+                  .map((s) => `${getSupplyDisplayName(s)} x${s.quantity}`)
+                  .join(", ")
+              : "",
+            targetLatitude:
+              extractCoordsFromDescription(syncedDescription)?.lat ??
+              (a.sosRequestId
+                ? (clusterSOSRequests.find(
+                    (s) => String(s.id) === String(a.sosRequestId),
+                  )?.location?.lat ??
+                  sos?.location?.lat ??
+                  0)
+                : (sos?.location?.lat ?? 0)),
+            targetLongitude:
+              extractCoordsFromDescription(syncedDescription)?.lng ??
+              (a.sosRequestId
+                ? (clusterSOSRequests.find(
+                    (s) => String(s.id) === String(a.sosRequestId),
+                  )?.location?.lng ??
+                  sos?.location?.lng ??
+                  0)
+                : (sos?.location?.lng ?? 0)),
+          };
+        }),
       },
       {
         onSuccess: () => {
@@ -1716,6 +1862,26 @@ const RescuePlanPanel = ({
     return groups;
   }, [activeSuggestion]);
 
+  // Auto-collapse Quick Stats when user scrolls deep into the main plan content.
+  useEffect(() => {
+    if (!activeSuggestion) {
+      setIsStatsCollapsed(false);
+      return;
+    }
+
+    const root = mainScrollAreaRef.current;
+    const viewport = root?.firstElementChild as HTMLDivElement | null;
+    if (!viewport) return;
+
+    const onScroll = () => {
+      setIsStatsCollapsed(viewport.scrollTop > 120);
+    };
+
+    onScroll();
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+    return () => viewport.removeEventListener("scroll", onScroll);
+  }, [activeSuggestion, activeTab, isEditMode, open]);
+
   // Early returns AFTER all hooks
   if (!activeSuggestion && !clusterId) return null;
 
@@ -1730,7 +1896,7 @@ const RescuePlanPanel = ({
     >
       <div className="h-full bg-background backdrop-blur-sm shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="p-4 pb-3 border-b shrink-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10">
+        <div className="sticky top-0 z-30 p-3 pb-2 border-b shrink-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 shadow-sm">
@@ -1839,9 +2005,17 @@ const RescuePlanPanel = ({
 
           {/* Quick Stats Bar */}
           {activeSuggestion && (
-            <div className="grid grid-cols-4 gap-2 mt-3">
+            <div
+              className={cn(
+                "mt-2 transition-all duration-200",
+                isStatsCollapsed
+                  ? "grid grid-cols-4 gap-1"
+                  : "grid grid-cols-2 lg:grid-cols-4 gap-1.5",
+              )}
+            >
               {[
                 {
+                  icon: Warning,
                   value: (activeSuggestion.suggestedPriorityScore ?? 0).toFixed(
                     1,
                   ),
@@ -1850,6 +2024,7 @@ const RescuePlanPanel = ({
                   bg: "bg-red-500/5 border-red-500/15",
                 },
                 {
+                  icon: TreeStructure,
                   value:
                     activeSuggestion.sosRequestCount ??
                     clusterSOSRequests.length,
@@ -1858,12 +2033,14 @@ const RescuePlanPanel = ({
                   bg: "bg-blue-500/5 border-blue-500/15",
                 },
                 {
+                  icon: ShieldCheck,
                   value: `${((activeSuggestion.confidenceScore ?? 0) * 100).toFixed(0)}%`,
                   label: "Độ tin cậy",
                   color: "text-emerald-500",
                   bg: "bg-emerald-500/5 border-emerald-500/15",
                 },
                 {
+                  icon: Clock,
                   value: `${((activeSuggestion.responseTimeMs || 0) / 1000).toFixed(1)}s`,
                   label: "Thời gian AI",
                   color: "text-orange-500",
@@ -1872,19 +2049,32 @@ const RescuePlanPanel = ({
               ].map((stat) => (
                 <div
                   key={stat.label}
-                  className={cn("rounded-lg p-2 text-center border", stat.bg)}
+                  className={cn(
+                    "rounded-md border min-w-0",
+                    isStatsCollapsed
+                      ? "px-1.5 py-1 flex items-center justify-center gap-1.5"
+                      : "px-2 py-1.5 flex items-center justify-between gap-2",
+                    stat.bg,
+                  )}
+                  title={stat.label}
                 >
+                  <stat.icon
+                    className={cn("h-3 w-3 shrink-0", stat.color)}
+                    weight="fill"
+                  />
                   <div
                     className={cn(
-                      "text-base font-bold leading-none",
+                      "text-sm font-bold leading-none shrink-0",
                       stat.color,
                     )}
                   >
                     {stat.value}
                   </div>
-                  <div className="text-[10px] text-muted-foreground mt-1">
-                    {stat.label}
-                  </div>
+                  {!isStatsCollapsed && (
+                    <div className="text-[10px] text-muted-foreground truncate">
+                      {stat.label}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1939,7 +2129,7 @@ const RescuePlanPanel = ({
             className="h-full overflow-hidden"
             style={{ width: showSidebar ? `${splitPercent}%` : "100%" }}
           >
-            <ScrollArea className="h-full">
+            <ScrollArea ref={mainScrollAreaRef} className="h-full">
               <div className="p-4 space-y-4">
                 {/* ═══ TAB: Missions ═══ */}
                 {activeTab === "missions" && (
@@ -2216,7 +2406,9 @@ const RescuePlanPanel = ({
                                                     >
                                                       <Package className="h-3 w-3 shrink-0" />
                                                       <span className="font-medium">
-                                                        {supply.itemName}
+                                                        {getSupplyDisplayName(
+                                                          supply,
+                                                        )}
                                                       </span>
                                                       <span className="font-bold bg-blue-50 dark:bg-blue-900/20 px-1 rounded">
                                                         {supply.quantity}{" "}
@@ -2653,7 +2845,7 @@ const RescuePlanPanel = ({
                                               >
                                                 <Package className="h-3 w-3 text-blue-500 shrink-0" />
                                                 <span className="font-medium truncate flex-1 min-w-0">
-                                                  {supply.itemName}
+                                                  {getSupplyDisplayName(supply)}
                                                 </span>
                                                 <Input
                                                   type="number"
@@ -2750,241 +2942,16 @@ const RescuePlanPanel = ({
                           </>
                         )}
 
-                        {/* Activity Steps — Grouped by SOS / Depot */}
+                        {/* SOS Info — moved from right sidebar */}
                         <section>
-                          <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                              <ListChecks
-                                className="h-3.5 w-3.5"
-                                weight="bold"
-                              />
-                              Kế hoạch thực hiện
-                            </h3>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-                                onClick={enterEditMode}
-                              >
-                                <PencilSimpleLine className="h-3 w-3" />
-                                Chỉnh sửa
-                              </Button>
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px] h-5 px-2"
-                              >
-                                {
-                                  (activeSuggestion?.suggestedActivities ?? [])
-                                    .length
-                                }{" "}
-                                bước
-                              </Badge>
-                            </div>
-                          </div>
-
-                          <div className="space-y-4">
-                            {activityGroups.map((group, gIdx) => {
-                              const matchedSOS =
-                                group.type === "sos" && group.sosRequestId
-                                  ? clusterSOSRequests.find(
-                                      (s) =>
-                                        s.id === String(group.sosRequestId),
-                                    )
-                                  : null;
-
-                              return (
-                                <div
-                                  key={gIdx}
-                                  className={cn(
-                                    "rounded-xl border overflow-hidden",
-                                    group.type === "depot"
-                                      ? "border-amber-300/50 dark:border-amber-700/40"
-                                      : group.type === "sos" &&
-                                          matchedSOS?.priority === "P1"
-                                        ? "border-red-300/50 dark:border-red-700/40"
-                                        : group.type === "sos" &&
-                                            matchedSOS?.priority === "P2"
-                                          ? "border-orange-300/50 dark:border-orange-700/40"
-                                          : "border-border",
-                                  )}
-                                >
-                                  {/* Group Header */}
-                                  <div
-                                    className={cn(
-                                      "flex items-center gap-2.5 px-3.5 py-2.5",
-                                      group.type === "depot"
-                                        ? "bg-amber-50 dark:bg-amber-900/15"
-                                        : group.type === "sos" &&
-                                            matchedSOS?.priority === "P1"
-                                          ? "bg-red-50 dark:bg-red-900/15"
-                                          : group.type === "sos" &&
-                                              matchedSOS?.priority === "P2"
-                                            ? "bg-orange-50 dark:bg-orange-900/15"
-                                            : "bg-muted/40",
-                                    )}
-                                  >
-                                    {group.type === "depot" ? (
-                                      <>
-                                        <div className="p-2 rounded-lg bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300 ring-1 ring-amber-400/40">
-                                          <Storefront
-                                            className="h-5 w-5"
-                                            weight="fill"
-                                          />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <p className="text-sm font-extrabold text-amber-900 dark:text-amber-200 truncate tracking-tight">
-                                            📦 Kho:{" "}
-                                            <span className="underline decoration-amber-400 decoration-2 underline-offset-2">
-                                              {group.depotName}
-                                            </span>
-                                          </p>
-                                          {group.depotAddress && (
-                                            <p className="text-[11px] text-amber-700/70 dark:text-amber-400/60 truncate mt-0.5">
-                                              {group.depotAddress}
-                                            </p>
-                                          )}
-                                        </div>
-                                        <Badge
-                                          variant="outline"
-                                          className="text-[10px] h-5 px-1.5 shrink-0 border-amber-400/60 text-amber-700 dark:text-amber-300 font-semibold"
-                                        >
-                                          {group.activities.length} bước
-                                        </Badge>
-                                      </>
-                                    ) : group.type === "sos" && matchedSOS ? (
-                                      <SOSGroupHeader
-                                        matchedSOS={matchedSOS}
-                                        groupActivitiesLength={
-                                          group.activities.length
-                                        }
-                                      />
-                                    ) : (
-                                      <>
-                                        <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">
-                                          <ListChecks
-                                            className="h-4 w-4"
-                                            weight="fill"
-                                          />
-                                        </div>
-                                        <p className="text-sm font-bold text-blue-800 dark:text-blue-300">
-                                          Nhiệm vụ chung
-                                        </p>
-                                        <Badge
-                                          variant="outline"
-                                          className="text-[10px] h-5 px-1.5 shrink-0"
-                                        >
-                                          {group.activities.length} bước
-                                        </Badge>
-                                      </>
-                                    )}
-                                  </div>
-
-                                  {/* Steps inside group */}
-                                  <div className="p-3 space-y-2 bg-card">
-                                    {group.activities.map((activity, aIdx) => {
-                                      const config =
-                                        activityTypeConfig[
-                                          activity.activityType
-                                        ] || activityTypeConfig["ASSESS"];
-                                      const cleanDescription =
-                                        activity.description
-                                          .replace(
-                                            /\b\d{1,2}\.\d+,\s*\d{1,3}\.\d+\b\s*(\(.*?\))?/g,
-                                            "",
-                                          )
-                                          .replace(/\s+/g, " ")
-                                          .replace(/\(\s*\)/g, "")
-                                          .replace(/: \./g, ":")
-                                          .trim();
-
-                                      return (
-                                        <div
-                                          key={aIdx}
-                                          className="rounded-lg border bg-background p-3 hover:bg-accent/20 transition-colors"
-                                        >
-                                          <div className="flex items-start gap-2.5">
-                                            <div
-                                              className={cn(
-                                                "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-                                                config.bgColor,
-                                                config.color,
-                                              )}
-                                            >
-                                              {activity.step}
-                                            </div>
-                                            <div className="flex-1 min-w-0 space-y-1.5">
-                                              <div className="flex items-center gap-1.5 flex-wrap">
-                                                <Badge
-                                                  variant="outline"
-                                                  className={cn(
-                                                    "text-[11px] font-semibold px-2 py-0 h-5",
-                                                    config.color,
-                                                    config.bgColor,
-                                                    "border-transparent",
-                                                  )}
-                                                >
-                                                  {config.label}
-                                                </Badge>
-                                                <span className="text-[11px] text-muted-foreground flex items-center gap-1 bg-muted/60 px-1.5 py-0.5 rounded-md">
-                                                  <Clock className="h-3 w-3" />
-                                                  {activity.estimatedTime}
-                                                </span>
-                                                {activity.priority && (
-                                                  <span className="text-[11px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md">
-                                                    {activity.priority}
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <p className="text-sm leading-relaxed text-foreground/80">
-                                                {cleanDescription}
-                                              </p>
-
-                                              {/* Supply list */}
-                                              {activity.suppliesToCollect &&
-                                                activity.suppliesToCollect
-                                                  .length > 0 && (
-                                                  <div className="mt-2 p-2 rounded-md bg-muted/50 border border-dashed">
-                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
-                                                      {activity.activityType ===
-                                                      "DELIVER_SUPPLIES"
-                                                        ? "Danh sách giao hàng"
-                                                        : "Yêu cầu lấy vật tư"}
-                                                    </p>
-                                                    <div className="space-y-1">
-                                                      {activity.suppliesToCollect.map(
-                                                        (supply, sIdx) => (
-                                                          <div
-                                                            key={sIdx}
-                                                            className="flex items-center justify-between gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
-                                                          >
-                                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                              <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                                              <span className="font-medium truncate">
-                                                                {
-                                                                  supply.itemName
-                                                                }
-                                                              </span>
-                                                            </div>
-                                                            <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
-                                                              {supply.quantity}{" "}
-                                                              {supply.unit}
-                                                            </div>
-                                                          </div>
-                                                        ),
-                                                      )}
-                                                    </div>
-                                                  </div>
-                                                )}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              );
-                            })}
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-3">
+                            <Info className="h-3.5 w-3.5" weight="fill" />
+                            Thông tin SOS
+                          </h3>
+                          <div className="space-y-2">
+                            {clusterSOSRequests.map((sos) => (
+                              <SOSRequestSidebarCard key={sos.id} sos={sos} />
+                            ))}
                           </div>
                         </section>
 
@@ -3149,20 +3116,242 @@ const RescuePlanPanel = ({
             >
               <ScrollArea className="h-full">
                 <div className="p-3 space-y-3">
-                  {/* SOS Requests Overview */}
-                  <section>
-                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
-                      <Info className="h-3.5 w-3.5" weight="fill" />
-                      Thông tin SOS
-                    </h4>
-                    <div className="space-y-2">
-                      {clusterSOSRequests.map((sos) => (
-                        <SOSRequestSidebarCard key={sos.id} sos={sos} />
-                      ))}
-                    </div>
-                  </section>
+                  {/* Activity Steps — moved from left column */}
+                  {activeSuggestion && !isEditMode && (
+                    <>
+                      <section>
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <ListChecks className="h-3.5 w-3.5" weight="bold" />
+                            Kế hoạch thực hiện
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                              onClick={enterEditMode}
+                            >
+                              <PencilSimpleLine className="h-3 w-3" />
+                              Chỉnh sửa
+                            </Button>
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] h-5 px-2"
+                            >
+                              {
+                                (activeSuggestion?.suggestedActivities ?? [])
+                                  .length
+                              }{" "}
+                              bước
+                            </Badge>
+                          </div>
+                        </div>
 
-                  <Separator />
+                        <div className="space-y-4">
+                          {activityGroups.map((group, gIdx) => {
+                            const matchedSOS =
+                              group.type === "sos" && group.sosRequestId
+                                ? clusterSOSRequests.find(
+                                    (s) => s.id === String(group.sosRequestId),
+                                  )
+                                : null;
+
+                            return (
+                              <div
+                                key={gIdx}
+                                className={cn(
+                                  "rounded-xl border overflow-hidden",
+                                  group.type === "depot"
+                                    ? "border-amber-300/50 dark:border-amber-700/40"
+                                    : group.type === "sos" &&
+                                        matchedSOS?.priority === "P1"
+                                      ? "border-red-300/50 dark:border-red-700/40"
+                                      : group.type === "sos" &&
+                                          matchedSOS?.priority === "P2"
+                                        ? "border-orange-300/50 dark:border-orange-700/40"
+                                        : "border-border",
+                                )}
+                              >
+                                <div
+                                  className={cn(
+                                    "flex items-center gap-2.5 px-3.5 py-2.5",
+                                    group.type === "depot"
+                                      ? "bg-amber-50 dark:bg-amber-900/15"
+                                      : group.type === "sos" &&
+                                          matchedSOS?.priority === "P1"
+                                        ? "bg-red-50 dark:bg-red-900/15"
+                                        : group.type === "sos" &&
+                                            matchedSOS?.priority === "P2"
+                                          ? "bg-orange-50 dark:bg-orange-900/15"
+                                          : "bg-muted/40",
+                                  )}
+                                >
+                                  {group.type === "depot" ? (
+                                    <>
+                                      <div className="p-2 rounded-lg bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300 ring-1 ring-amber-400/40">
+                                        <Storefront
+                                          className="h-5 w-5"
+                                          weight="fill"
+                                        />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-extrabold text-amber-900 dark:text-amber-200 truncate tracking-tight">
+                                          📦 Kho:{" "}
+                                          <span className="underline decoration-amber-400 decoration-2 underline-offset-2">
+                                            {group.depotName}
+                                          </span>
+                                        </p>
+                                        {group.depotAddress && (
+                                          <p className="text-[11px] text-amber-700/70 dark:text-amber-400/60 truncate mt-0.5">
+                                            {group.depotAddress}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] h-5 px-1.5 shrink-0 border-amber-400/60 text-amber-700 dark:text-amber-300 font-semibold"
+                                      >
+                                        {group.activities.length} bước
+                                      </Badge>
+                                    </>
+                                  ) : group.type === "sos" && matchedSOS ? (
+                                    <SOSGroupHeader
+                                      matchedSOS={matchedSOS}
+                                      groupActivitiesLength={
+                                        group.activities.length
+                                      }
+                                    />
+                                  ) : (
+                                    <>
+                                      <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">
+                                        <ListChecks
+                                          className="h-4 w-4"
+                                          weight="fill"
+                                        />
+                                      </div>
+                                      <p className="text-sm font-bold text-blue-800 dark:text-blue-300">
+                                        Nhiệm vụ chung
+                                      </p>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] h-5 px-1.5 shrink-0"
+                                      >
+                                        {group.activities.length} bước
+                                      </Badge>
+                                    </>
+                                  )}
+                                </div>
+
+                                <div className="p-3 space-y-2 bg-card">
+                                  {group.activities.map((activity, aIdx) => {
+                                    const config =
+                                      activityTypeConfig[
+                                        activity.activityType
+                                      ] || activityTypeConfig["ASSESS"];
+                                    const cleanDescription =
+                                      activity.description
+                                        .replace(
+                                          /\b\d{1,2}\.\d+,\s*\d{1,3}\.\d+\b\s*(\(.*?\))?/g,
+                                          "",
+                                        )
+                                        .replace(/\s+/g, " ")
+                                        .replace(/\(\s*\)/g, "")
+                                        .replace(/: \./g, ":")
+                                        .trim();
+
+                                    return (
+                                      <div
+                                        key={aIdx}
+                                        className="rounded-lg border bg-background p-3 hover:bg-accent/20 transition-colors"
+                                      >
+                                        <div className="flex items-start gap-2.5">
+                                          <div
+                                            className={cn(
+                                              "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+                                              config.bgColor,
+                                              config.color,
+                                            )}
+                                          >
+                                            {activity.step}
+                                          </div>
+                                          <div className="flex-1 min-w-0 space-y-1.5">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                              <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                  "text-[11px] font-semibold px-2 py-0 h-5",
+                                                  config.color,
+                                                  config.bgColor,
+                                                  "border-transparent",
+                                                )}
+                                              >
+                                                {config.label}
+                                              </Badge>
+                                              <span className="text-[11px] text-muted-foreground flex items-center gap-1 bg-muted/60 px-1.5 py-0.5 rounded-md">
+                                                <Clock className="h-3 w-3" />
+                                                {activity.estimatedTime}
+                                              </span>
+                                              {activity.priority && (
+                                                <span className="text-[11px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md">
+                                                  {activity.priority}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <p className="text-sm leading-relaxed text-foreground/80">
+                                              {cleanDescription}
+                                            </p>
+
+                                            {activity.suppliesToCollect &&
+                                              activity.suppliesToCollect
+                                                .length > 0 && (
+                                                <div className="mt-2 p-2 rounded-md bg-muted/50 border border-dashed">
+                                                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
+                                                    {activity.activityType ===
+                                                    "DELIVER_SUPPLIES"
+                                                      ? "Danh sách giao hàng"
+                                                      : "Yêu cầu lấy vật tư"}
+                                                  </p>
+                                                  <div className="space-y-1">
+                                                    {activity.suppliesToCollect.map(
+                                                      (supply, sIdx) => (
+                                                        <div
+                                                          key={sIdx}
+                                                          className="flex items-center justify-between gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
+                                                        >
+                                                          <div className="flex items-center gap-1.5 min-w-0">
+                                                            <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                            <span className="font-medium truncate">
+                                                              {getSupplyDisplayName(
+                                                                supply,
+                                                              )}
+                                                            </span>
+                                                          </div>
+                                                          <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                                                            {supply.quantity}{" "}
+                                                            {supply.unit}
+                                                          </div>
+                                                        </div>
+                                                      ),
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </section>
+
+                      <Separator />
+                    </>
+                  )}
 
                   {/* Resources */}
                   {activeSuggestion && (
