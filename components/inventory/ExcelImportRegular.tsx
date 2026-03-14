@@ -422,8 +422,6 @@ const EMPTY_VAT_FORM: VatFormState = {
 interface PurchaseGroup {
   id: string;
   vatFile: File | null;
-  vatFileUrl: string;
-  vatFileUploading: boolean;
   vatParsing: boolean;
   vatForm: VatFormState;
   rows: ImportRow[];
@@ -434,8 +432,6 @@ function createEmptyGroup(): PurchaseGroup {
   return {
     id: `grp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     vatFile: null,
-    vatFileUrl: "",
-    vatFileUploading: false,
     vatParsing: false,
     vatForm: { ...EMPTY_VAT_FORM },
     rows: [],
@@ -448,6 +444,7 @@ export default function ExcelImportRegular() {
   const [step, setStep] = useState<Step>("upload");
   const [groups, setGroups] = useState<PurchaseGroup[]>([createEmptyGroup()]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const vatInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -500,42 +497,31 @@ export default function ExcelImportRegular() {
         toast.error("Chỉ chấp nhận file PDF");
         return;
       }
-      patchGroup(groupId, { vatFile: file, vatFileUrl: "", vatForm: { ...EMPTY_VAT_FORM }, vatParsing: true, vatFileUploading: true });
-
-      const [parsedFields, uploadedUrl] = await Promise.allSettled([
-        parseVatPdf(file),
-        uploadRawToCloudinary(file),
-      ]);
-
-      patchGroup(groupId, { vatParsing: false, vatFileUploading: false });
-
-      if (parsedFields.status === "fulfilled") {
-        const f = parsedFields.value;
+      patchGroup(groupId, { vatFile: file, vatForm: { ...EMPTY_VAT_FORM }, vatParsing: true });
+      try {
+        const parsedFields = await parseVatPdf(file);
         patchGroup(groupId, (g) => ({
           ...g,
+          vatParsing: false,
           vatForm: {
             ...g.vatForm,
-            invoiceSerial: f.invoiceSerial ?? g.vatForm.invoiceSerial,
-            invoiceNumber: f.invoiceNumber ?? g.vatForm.invoiceNumber,
-            supplierName: f.supplierName ?? g.vatForm.supplierName,
-            supplierTaxCode: f.supplierTaxCode ?? g.vatForm.supplierTaxCode,
-            invoiceDate: f.invoiceDate ?? g.vatForm.invoiceDate,
-            totalAmount: f.totalAmount ?? g.vatForm.totalAmount,
+            invoiceSerial: parsedFields.invoiceSerial ?? g.vatForm.invoiceSerial,
+            invoiceNumber: parsedFields.invoiceNumber ?? g.vatForm.invoiceNumber,
+            supplierName: parsedFields.supplierName ?? g.vatForm.supplierName,
+            supplierTaxCode: parsedFields.supplierTaxCode ?? g.vatForm.supplierTaxCode,
+            invoiceDate: parsedFields.invoiceDate ?? g.vatForm.invoiceDate,
+            totalAmount: parsedFields.totalAmount ?? g.vatForm.totalAmount,
           },
         }));
-        const filledCount = Object.values(parsedFields.value).filter(Boolean).length;
+        const filledCount = Object.values(parsedFields).filter(Boolean).length;
         if (filledCount > 0) {
           toast.success(`Đọc được ${filledCount}/6 trường từ PDF`);
         } else {
           toast.warning("Không đọc được thông tin từ PDF. Vui lòng điền thủ công.");
         }
-      }
-
-      if (uploadedUrl.status === "fulfilled") {
-        patchGroup(groupId, { vatFileUrl: uploadedUrl.value });
-      } else {
-        toast.error("Tải PDF lên thất bại. Vui lòng thử lại.");
-        patchGroup(groupId, { vatFile: null });
+      } catch {
+        patchGroup(groupId, { vatParsing: false });
+        toast.warning("Không đọc được thông tin từ PDF. Vui lòng điền thủ công.");
       }
     },
     [patchGroup],
@@ -692,14 +678,14 @@ export default function ExcelImportRegular() {
     () => groups.reduce((s, g) => s + g.rows.filter((r) => Object.keys(r.errors).length > 0).length, 0),
     [groups],
   );
-  const isBusy = useMemo(() => groups.some((g) => g.vatFileUploading || g.vatParsing), [groups]);
+  const isBusy = useMemo(() => groups.some((g) => g.vatParsing), [groups]);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (totalRows === 0) { toast.error("Không có dữ liệu để nhập kho"); return; }
     if (totalErrors > 0) { toast.error(`Còn ${totalErrors} dòng lỗi. Vui lòng sửa trước khi nhập.`); return; }
     for (const g of groups) {
       const idx = groups.indexOf(g) + 1;
-      if (!g.vatFileUrl) { toast.error(`Hóa đơn #${idx} chưa tải PDF lên.`); return; }
+      if (!g.vatFile) { toast.error(`Hóa đơn #${idx} chưa chọn file PDF.`); return; }
       const vatErrors: string[] = [];
       if (!g.vatForm.invoiceSerial.trim()) vatErrors.push("ký hiệu hóa đơn");
       if (!g.vatForm.invoiceNumber.trim()) vatErrors.push("số hóa đơn");
@@ -711,7 +697,21 @@ export default function ExcelImportRegular() {
       if (vatErrors.length > 0) { toast.error(`Hóa đơn #${idx}: Vui lòng điền đầy đủ thông tin (${vatErrors.join(", ")})`); return; }
     }
 
-    const payload = { invoices: groups.map((g) => ({
+    setIsUploading(true);
+    const uploadToastId = toast.loading(`Đang tải ${groups.length} hóa đơn PDF lên...`);
+    let fileUrls: string[];
+    try {
+      fileUrls = await Promise.all(groups.map((g) => uploadRawToCloudinary(g.vatFile!)));
+    } catch {
+      setIsUploading(false);
+      toast.dismiss(uploadToastId);
+      toast.error("Tải PDF thất bại. Vui lòng thử lại.");
+      return;
+    }
+    setIsUploading(false);
+    toast.dismiss(uploadToastId);
+
+    const payload = { invoices: groups.map((g, i) => ({
       vatInvoice: {
         invoiceSerial: g.vatForm.invoiceSerial.trim(),
         invoiceNumber: g.vatForm.invoiceNumber.trim(),
@@ -719,7 +719,7 @@ export default function ExcelImportRegular() {
         supplierTaxCode: g.vatForm.supplierTaxCode.trim(),
         invoiceDate: g.vatForm.invoiceDate,
         totalAmount: parseFloat(g.vatForm.totalAmount.replace(/[^\d.]/g, "")) || 0,
-        fileUrl: g.vatFileUrl,
+        fileUrl: fileUrls[i],
       } as VatInvoice,
       items: g.rows.map((r) => ({
         row: r.row,
@@ -853,7 +853,7 @@ export default function ExcelImportRegular() {
   const vatField = (
     groupId: string,
     vatForm: VatFormState,
-    vatFileUrl: string,
+    hasFile: boolean,
     label: string,
     key: keyof VatFormState,
     placeholder: string,
@@ -879,15 +879,15 @@ export default function ExcelImportRegular() {
         className={cn(
           "h-8 text-sm",
           type === "date" && "pr-2 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer",
-          vatFileUrl && required && !vatForm[key].trim() && "border-red-400 focus-visible:ring-red-400",
-          vatFileUrl && type === "date" && vatForm[key] && vatForm[key] > new Date().toISOString().slice(0, 10) && "border-red-400 focus-visible:ring-red-400",
+          hasFile && required && !vatForm[key].trim() && "border-red-400 focus-visible:ring-red-400",
+          hasFile && type === "date" && vatForm[key] && vatForm[key] > new Date().toISOString().slice(0, 10) && "border-red-400 focus-visible:ring-red-400",
         )}
       />
-      {vatFileUrl && required && !vatForm[key].trim() && (
-        <p className="text-[11px] text-red-500">Trường này là bắt buộc</p>
+      {hasFile && required && !vatForm[key].trim() && (
+        <p className="text-[11px] tracking-tighter text-red-500">Không được phép để trống</p>
       )}
-      {vatFileUrl && type === "date" && vatForm[key] && vatForm[key] > new Date().toISOString().slice(0, 10) && (
-        <p className="text-[11px] text-red-500">Ngày không được là ngày trong tương lai</p>
+      {hasFile && type === "date" && vatForm[key] && vatForm[key] > new Date().toISOString().slice(0, 10) && (
+        <p className="text-[11px] tracking-tighter text-red-500">Ngày không được là ngày trong tương lai</p>
       )}
     </div>
   );
@@ -937,7 +937,7 @@ export default function ExcelImportRegular() {
                   <div className="flex items-center gap-2 tracking-tighter">
                     <Receipt className={cn("h-4 w-4", color.icon)} weight="duotone" />
                     <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full tracking-tighter", color.badge)}>Hóa đơn #{idx + 1}</span>
-                    {group.vatFileUrl && <CheckCircle className="h-3.5 w-3.5 text-green-500" weight="fill" />}
+                    {group.vatFile && !group.vatParsing && <CheckCircle className="h-3.5 w-3.5 text-green-500" weight="fill" />}
                     {group.rows.length > 0 && (
                       <span className="text-xs tracking-tighter text-muted-foreground">· {group.rows.length} vật phẩm</span>
                     )}
@@ -980,18 +980,16 @@ export default function ExcelImportRegular() {
                         <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted border">
                           <FilePdf className="h-5 w-5 text-red-500 shrink-0" weight="duotone" />
                           <p className="flex-1 text-sm tracking-tighter font-medium truncate">{group.vatFile.name}</p>
-                          {(group.vatParsing || group.vatFileUploading) ? (
+                          {group.vatParsing ? (
                             <SpinnerGap className="h-4 w-4 text-blue-500 animate-spin shrink-0" />
-                          ) : group.vatFileUrl ? (
-                            <CheckCircle className="h-4 w-4 text-green-500 shrink-0" weight="fill" />
                           ) : (
-                            <WarningCircle className="h-4 w-4 text-red-500 shrink-0" weight="fill" />
+                            <CheckCircle className="h-4 w-4 text-green-500 shrink-0" weight="fill" />
                           )}
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6 shrink-0"
-                            onClick={() => patchGroup(group.id, { vatFile: null, vatFileUrl: "", vatForm: { ...EMPTY_VAT_FORM } })}
+                            onClick={() => patchGroup(group.id, { vatFile: null, vatForm: { ...EMPTY_VAT_FORM } })}
                           >
                             <X className="h-3.5 w-3.5" />
                           </Button>
@@ -1002,22 +1000,22 @@ export default function ExcelImportRegular() {
                             Đang đọc thông tin từ PDF...
                           </p>
                         )}
-                        {!group.vatParsing && group.vatFileUrl && (
+                        {!group.vatParsing && group.vatFile && (
                           <p className="text-xs tracking-tighter text-green-600 flex items-center gap-1.5">
                             <CheckCircle className="h-3.5 w-3.5" weight="fill" />
-                            PDF đã tải lên. Kiểm tra và chỉnh sửa các trường bên dưới nếu cần.
+                            PDF sẵn sàng. Kiểm tra và chỉnh sửa các trường bên dưới nếu cần.
                           </p>
                         )}
                         {!group.vatParsing && (
                           <div className="grid grid-cols-2 gap-3 tracking-tighter">
-                            {vatField(group.id, group.vatForm, group.vatFileUrl, "Ký hiệu", "invoiceSerial", "VD: AA/26E", "text", true)}
-                            {vatField(group.id, group.vatForm, group.vatFileUrl, "Số hóa đơn", "invoiceNumber", "VD: 0000123", "text", true)}
+                            {vatField(group.id, group.vatForm, !!group.vatFile, "Ký hiệu", "invoiceSerial", "VD: AA/26E", "text", true)}
+                            {vatField(group.id, group.vatForm, !!group.vatFile, "Số hóa đơn", "invoiceNumber", "VD: 0000123", "text", true)}
                             <div className="col-span-2">
-                              {vatField(group.id, group.vatForm, group.vatFileUrl, "Tên nhà cung cấp", "supplierName", "Tên đơn vị bán hàng", "text", true)}
+                              {vatField(group.id, group.vatForm, !!group.vatFile, "Tên nhà cung cấp", "supplierName", "Tên đơn vị bán hàng", "text", true)}
                             </div>
-                            {vatField(group.id, group.vatForm, group.vatFileUrl, "Mã số thuế", "supplierTaxCode", "VD: 0123456789", "text", true)}
-                            {vatField(group.id, group.vatForm, group.vatFileUrl, "Ngày hóa đơn", "invoiceDate", "", "date", true)}
-                            {vatField(group.id, group.vatForm, group.vatFileUrl, "Tổng tiền (VNĐ)", "totalAmount", "VD: 5.000.000", "number", true, true)}
+                            {vatField(group.id, group.vatForm, !!group.vatFile, "Mã số thuế", "supplierTaxCode", "VD: 0123456789", "text", true)}
+                            {vatField(group.id, group.vatForm, !!group.vatFile, "Ngày hóa đơn", "invoiceDate", "", "date", true)}
+                            {vatField(group.id, group.vatForm, !!group.vatFile, "Tổng tiền (VNĐ)", "totalAmount", "VD: 5.000.000", "number", true, true)}
                           </div>
                         )}
                         <Button
@@ -1150,17 +1148,17 @@ export default function ExcelImportRegular() {
           <div className="space-y-5 flex flex-col">
             <div className="flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs tracking-tighter font-medium">
                   <CheckCircle className="h-3.5 w-3.5" weight="fill" />
                   {totalRows - totalErrors} hợp lệ
                 </div>
                 {totalErrors > 0 && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 text-xs font-medium">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 text-xs tracking-tighter font-medium">
                     <WarningCircle className="h-3.5 w-3.5" weight="fill" />
                     {totalErrors} lỗi
                   </div>
                 )}
-                <span className="text-xs text-muted-foreground">{groups.length} hóa đơn · {totalRows} vật phẩm</span>
+                <span className="text-xs tracking-tighter text-muted-foreground">{groups.length} hóa đơn · {totalRows} vật phẩm</span>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="gap-1.5 tracking-tighter" onClick={addGroup}>
@@ -1231,8 +1229,8 @@ export default function ExcelImportRegular() {
                     <div className="flex items-center gap-2">
                       <Receipt className={cn("h-4 w-4", color.icon)} weight="duotone" />
                       <p className="text-sm tracking-tighter font-medium">Thông tin hóa đơn VAT</p>
-                      {!group.vatFileUrl && <span className="text-xs tracking-tighter text-red-500">(chưa tải lên)</span>}
-                      {group.vatFileUrl && <CheckCircle className="h-3.5 w-3.5 text-green-500" weight="fill" />}
+                      {!group.vatFile && <span className="text-xs tracking-tighter text-red-500">(chưa chọn PDF)</span>}
+                      {group.vatFile && <CheckCircle className="h-3.5 w-3.5 text-green-500" weight="fill" />}
                       {group.vatFile && (
                         <span className="text-xs tracking-tighter text-muted-foreground truncate max-w-48 ml-1">{group.vatFile.name}</span>
                       )}
@@ -1254,12 +1252,12 @@ export default function ExcelImportRegular() {
                       />
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 tracking-tighter">
-                      {vatField(group.id, group.vatForm, group.vatFileUrl, "Ký hiệu", "invoiceSerial", "AA/26E", "text", true)}
-                      {vatField(group.id, group.vatForm, group.vatFileUrl, "Số hóa đơn", "invoiceNumber", "0000123", "text", true)}
-                      {vatField(group.id, group.vatForm, group.vatFileUrl, "Tên nhà cung cấp", "supplierName", "Tên đơn vị bán...", "text", true)}
-                      {vatField(group.id, group.vatForm, group.vatFileUrl, "Mã số thuế", "supplierTaxCode", "0123456789", "text", true)}
-                      {vatField(group.id, group.vatForm, group.vatFileUrl, "Ngày hóa đơn", "invoiceDate", "", "date", true)}
-                      {vatField(group.id, group.vatForm, group.vatFileUrl, "Tổng tiền (VNĐ)", "totalAmount", "5.000.000", "number", true, true)}
+                      {vatField(group.id, group.vatForm, !!group.vatFile, "Ký hiệu", "invoiceSerial", "AA/26E", "text", true)}
+                      {vatField(group.id, group.vatForm, !!group.vatFile, "Số hóa đơn", "invoiceNumber", "0000123", "text", true)}
+                      {vatField(group.id, group.vatForm, !!group.vatFile, "Tên nhà cung cấp", "supplierName", "Tên đơn vị bán...", "text", true)}
+                      {vatField(group.id, group.vatForm, !!group.vatFile, "Mã số thuế", "supplierTaxCode", "0123456789", "text", true)}
+                      {vatField(group.id, group.vatForm, !!group.vatFile, "Ngày hóa đơn", "invoiceDate", "", "date", true)}
+                      {vatField(group.id, group.vatForm, !!group.vatFile, "Tổng tiền (VNĐ)", "totalAmount", "5.000.000", "number", true, true)}
                     </div>
                   </div>
 
@@ -1351,7 +1349,7 @@ export default function ExcelImportRegular() {
                             <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
                               <div className="flex flex-col items-center gap-2">
                                 <Trash className="h-7 w-7" weight="duotone" />
-                                <p className="text-sm">Chưa có vật phẩm</p>
+                                <p className="text-sm tracking-tighter">Chưa có vật phẩm</p>
                                 <div className="flex gap-2">
                                   <Button variant="outline" size="sm" className="gap-1.5" onClick={() => addRow(group.id)}>
                                     <Plus className="h-3.5 w-3.5" /> Thêm dòng
@@ -1380,15 +1378,15 @@ export default function ExcelImportRegular() {
                 size="sm"
                 className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={handleSubmit}
-                disabled={totalRows === 0 || importMutation.isPending || isBusy}
+                disabled={totalRows === 0 || importMutation.isPending || isUploading || isBusy}
               >
-                {importMutation.isPending ? (
+                {(importMutation.isPending || isUploading) ? (
                   <SpinnerGap className="h-4 w-4 animate-spin" />
                 ) : (
                   <FloppyDisk className="h-4 w-4" weight="fill" />
                 )}
-                {importMutation.isPending ? "Đang nhập kho..." : "Xác nhận nhập kho"}
-                {totalRows > 0 && !importMutation.isPending && (
+                {isUploading ? "Đang tải PDF..." : importMutation.isPending ? "Đang nhập kho..." : "Xác nhận nhập kho"}
+                {totalRows > 0 && !importMutation.isPending && !isUploading && (
                   <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/20 text-xs">{totalRows}</span>
                 )}
               </Button>
