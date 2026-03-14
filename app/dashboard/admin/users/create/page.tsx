@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, UserPlus, CheckCircle, CaretDown, MapPin, X, Image as ImageIcon, UploadSimple, Trash, Eye, EyeSlash } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { uploadImageToCloudinary } from "@/utils/uploadFile";
 import { useAdminCreateUser } from "@/services/user/hooks";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { useAuthStore } from "@/stores/auth.store";
@@ -199,25 +200,13 @@ export default function CreateUserPage() {
         if (avatarFile) {
             setIsUploading(true);
             toast.loading("Đang tải ảnh lên hệ thống...");
-            const uploadData = new FormData();
-            uploadData.append("file", avatarFile);
-            uploadData.append("upload_preset", process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "ResQ_SOS");
-
-            fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dezgwdrfs"}/image/upload`, {
-                method: "POST",
-                body: uploadData,
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.secure_url) {
-                        toast.dismiss();
-                        setIsUploading(false);
-                        proceedWithCreation(data.secure_url);
-                    } else {
-                        throw new Error("Lỗi tải ảnh");
-                    }
+            uploadImageToCloudinary(avatarFile)
+                .then((url) => {
+                    toast.dismiss();
+                    setIsUploading(false);
+                    proceedWithCreation(url);
                 })
-                .catch(err => {
+                .catch(() => {
                     toast.dismiss();
                     setIsUploading(false);
                     toast.error("Tải ảnh thất bại, vui lòng kiểm tra lại ảnh hoặc kết nối mạng!");

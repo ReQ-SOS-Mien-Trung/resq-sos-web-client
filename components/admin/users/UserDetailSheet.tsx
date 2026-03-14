@@ -16,6 +16,7 @@ import { useAdminUserById, useUpdateAdminUser, ADMIN_USERS_QUERY_KEY } from "@/s
 import { useAuthStore } from "@/stores/auth.store";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { uploadImageToCloudinary } from "@/utils/uploadFile";
 import {
   Phone,
   EnvelopeSimple,
@@ -280,19 +281,11 @@ const UserDetailSheet = ({
     if (avatarFile) {
       setIsUploading(true);
       toast.loading("Đang tải ảnh lên...");
-      const fd = new FormData();
-      fd.append("file", avatarFile);
-      fd.append("upload_preset", process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "ResQ_SOS");
-      fetch(
-        `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dezgwdrfs"}/image/upload`,
-        { method: "POST", body: fd }
-      )
-        .then((r) => r.json())
-        .then((d) => {
+      uploadImageToCloudinary(avatarFile)
+        .then((url) => {
           toast.dismiss();
           setIsUploading(false);
-          if (d.secure_url) proceed(d.secure_url);
-          else throw new Error("No URL");
+          proceed(url);
         })
         .catch(() => {
           toast.dismiss();

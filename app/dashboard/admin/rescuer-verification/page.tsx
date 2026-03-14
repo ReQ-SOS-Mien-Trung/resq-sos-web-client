@@ -42,6 +42,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { uploadImageToCloudinary } from "@/utils/uploadFile";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import { gsap } from "gsap";
@@ -113,24 +114,12 @@ const RescuerVerificationPage = () => {
       if (reviewDialog.isApproved && avatarFile) {
         toast.loading("Đang tải ảnh đại diện lên...");
 
-        const formData = new FormData();
-        formData.append("file", avatarFile);
-        formData.append("upload_preset", process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "resq_preset");
-        formData.append("cloud_name", process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dsjsjm1ee");
-
-        const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dsjsjm1ee"}/image/upload`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!res.ok) throw new Error("Upload fail to Cloudinary");
-
-        const data = await res.json();
+        const url = await uploadImageToCloudinary(avatarFile);
 
         toast.loading("Đang cập nhật hệ thống...");
         await updateAvatarMutate({
           userId: reviewDialog.item.userId,
-          avatarUrl: data.secure_url
+          avatarUrl: url
         });
         toast.dismiss();
       }

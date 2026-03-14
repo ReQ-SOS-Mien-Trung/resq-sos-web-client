@@ -147,6 +147,7 @@ export default function ExcelImportFromOrg() {
   // Organization: either select from list (→ send id) or type manually (→ send name only)
   const [orgSearchValue, setOrgSearchValue] = useState("");
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [orgError, setOrgError] = useState("");
   const [isOrgOpen, setIsOrgOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const orgInputRef = useRef<HTMLInputElement>(null);
@@ -185,6 +186,7 @@ export default function ExcelImportFromOrg() {
     if (!row.itemType) errors.itemType = "Loại vật phẩm không được trống";
     if (!row.targetGroup) errors.targetGroup = "Đối tượng không được trống";
     if (!row.receivedDate) errors.receivedDate = "Ngày nhận không được trống";
+    else if (row.receivedDate > new Date().toISOString().slice(0, 10)) errors.receivedDate = "Ngày nhận không được là ngày trong tương lai";
     return errors;
   }, []);
 
@@ -210,8 +212,19 @@ export default function ExcelImportFromOrg() {
             const categoryCode = CATEGORY_VI_MAP[rawCategory.toLowerCase()] ?? "";
 
             const itemName = String(raw[COL.TEN] ?? "").trim();
-            const targetGroup = String(raw[COL.DOITUONG] ?? "").trim();
-            const itemType = String(raw[COL.LOAI] ?? "").trim();
+
+            const rawTargetGroup = String(raw[COL.DOITUONG] ?? "").trim();
+            const matchedTargetGroup = targetGroups.find(
+              (t) => t.value.toLowerCase() === rawTargetGroup.toLowerCase() || t.key.toLowerCase() === rawTargetGroup.toLowerCase(),
+            );
+            const targetGroup = matchedTargetGroup?.key ?? rawTargetGroup;
+
+            const rawItemType = String(raw[COL.LOAI] ?? "").trim();
+            const matchedItemType = itemTypes.find(
+              (t) => t.value.toLowerCase() === rawItemType.toLowerCase() || t.key.toLowerCase() === rawItemType.toLowerCase(),
+            );
+            const itemType = matchedItemType?.key ?? rawItemType;
+
             const unit = String(raw[COL.DONVI] ?? "").trim();
             const quantity = Number(raw[COL.SOLUONG] ?? 0);
             const expiredDate = parseExcelDate(raw[COL.HETHAN]);
@@ -240,21 +253,19 @@ export default function ExcelImportFromOrg() {
           setStep("review");
 
           const errCount = parsed.filter((r) => Object.keys(r.errors).length > 0).length;
-          if (errCount > 0) {
-            toast.warning(`${parsed.length} dòng đã đọc. ${errCount} dòng có lỗi cần kiểm tra.`);
-          } else {
-            toast.success(`${parsed.length} dòng đã đọc thành công`);
-          }
+          toast.success(
+            errCount > 0
+              ? `${parsed.length} dòng đã đọc. ${errCount} dòng có lỗi cần kiểm tra.`
+              : `${parsed.length} dòng đã đọc thành công`,
+          );
         } catch {
           toast.error("Không thể đọc file Excel. Vui lòng kiểm tra lại file.");
         }
       };
       reader.readAsArrayBuffer(file);
     },
-    [validateRow],
+    [validateRow, itemTypes, targetGroups],
   );
-
-  // ─── File handling ───
   const handleFile = useCallback(
     (file: File) => {
       if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
@@ -342,13 +353,26 @@ export default function ExcelImportFromOrg() {
             const parsed: ImportRow[] = jsonData.map((raw, idx) => {
               const rawCategory = String(raw[COL.DANHMUC] ?? "").trim();
               const categoryCode = CATEGORY_VI_MAP[rawCategory.toLowerCase()] ?? "";
+
+              const rawTargetGroup = String(raw[COL.DOITUONG] ?? "").trim();
+              const matchedTargetGroup = targetGroups.find(
+                (t) => t.value.toLowerCase() === rawTargetGroup.toLowerCase() || t.key.toLowerCase() === rawTargetGroup.toLowerCase(),
+              );
+              const targetGroup = matchedTargetGroup?.key ?? rawTargetGroup;
+
+              const rawItemType = String(raw[COL.LOAI] ?? "").trim();
+              const matchedItemType = itemTypes.find(
+                (t) => t.value.toLowerCase() === rawItemType.toLowerCase() || t.key.toLowerCase() === rawItemType.toLowerCase(),
+              );
+              const itemType = matchedItemType?.key ?? rawItemType;
+
               const rowData = {
                 id: `row-${offset + idx}-${Date.now()}`,
                 row: offset + idx + 1,
                 itemName: String(raw[COL.TEN] ?? "").trim(),
                 categoryCode,
-                targetGroup: String(raw[COL.DOITUONG] ?? "").trim(),
-                itemType: String(raw[COL.LOAI] ?? "").trim(),
+                targetGroup,
+                itemType,
                 unit: String(raw[COL.DONVI] ?? "").trim(),
                 quantity: Number(raw[COL.SOLUONG] ?? 0) > 0 ? Number(raw[COL.SOLUONG]) : 0,
                 expiredDate: parseExcelDate(raw[COL.HETHAN]),
@@ -368,7 +392,7 @@ export default function ExcelImportFromOrg() {
       };
       reader.readAsArrayBuffer(file);
     },
-    [validateRow],
+    [validateRow, itemTypes, targetGroups],
   );
 
   // ─── Row editing ───
@@ -410,7 +434,7 @@ export default function ExcelImportFromOrg() {
       return;
     }
     if (!orgSearchValue.trim()) {
-      toast.error("Vui lòng chọn hoặc nhập tên tổ chức viện trợ");
+      setOrgError("Vui lòng chọn hoặc nhập tên tổ chức viện trợ");
       return;
     }
 
@@ -571,10 +595,10 @@ export default function ExcelImportFromOrg() {
                 <Buildings className="h-5 w-5 text-[#FF5722]" weight="duotone" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold tracking-tight">
-                  Nhập kho từ tổ chức
+                <h1 className="text-xl font-semibold tracking-tighter">
+                  Nhập kho từ thiện
                 </h1>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm tracking-tighter text-muted-foreground">
                   Nhập thủ công hoặc tải file Excel từ tổ chức viện trợ
                 </p>
               </div>
@@ -616,11 +640,12 @@ export default function ExcelImportFromOrg() {
                           onChange={(e) => {
                             setOrgSearchValue(e.target.value);
                             setSelectedOrgId(null);
+                            setOrgError("");
                             setIsOrgOpen(true);
                           }}
                           onFocus={() => setIsOrgOpen(true)}
                           placeholder="Tìm hoặc nhập tên tổ chức..."
-                          className="pl-9 pr-9 tracking-tighter"
+                          className={cn("pl-9 pr-9 tracking-tighter", orgError && "border-red-400 focus-visible:ring-red-400")}
                         />
                         <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
                         {orgSearchValue && (
@@ -630,6 +655,7 @@ export default function ExcelImportFromOrg() {
                               e.stopPropagation();
                               setOrgSearchValue("");
                               setSelectedOrgId(null);
+                              setOrgError("");
                               orgInputRef.current?.focus();
                             }}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground tracking-tighter hover:text-foreground"
@@ -670,6 +696,9 @@ export default function ExcelImportFromOrg() {
                       )}
                     </PopoverContent>
                   </Popover>
+                  {orgError && (
+                    <p className="text-[11px] text-red-500">{orgError}</p>
+                  )}
                   <p className="text-sm tracking-tighter text-muted-foreground">
                     Chọn từ danh sách hoặc nhập tên tổ chức từ thiện bất kỳ
                   </p>
@@ -718,15 +747,15 @@ export default function ExcelImportFromOrg() {
                       <UploadSimple className="h-10 w-10" weight="duotone" />
                     </div>
                     <div>
-                      <p className="font-semibold text-base mb-1">Kéo thả file Excel vào đây</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-semibold tracking-tighter text-base mb-1">Kéo thả file Excel vào đây</p>
+                      <p className="text-sm tracking-tighter text-muted-foreground">
                         hoặc{" "}
-                        <span className="text-[#FF5722] font-medium underline underline-offset-2">
+                        <span className="text-[#FF5722] tracking-tighter font-medium underline underline-offset-2">
                           nhấp để chọn file
                         </span>
                       </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs tracking-tighter text-muted-foreground">
                       Chấp nhận{" "}
                       <code className="px-1.5 py-0.5 rounded bg-muted">.xlsx</code>{" "}
                       — tối đa 500 dòng
@@ -754,12 +783,12 @@ export default function ExcelImportFromOrg() {
                   onClick={handleManualEntry}
                   className="rounded-xl border-2 border-dashed border-muted-foreground/25 py-8 flex flex-col items-center gap-3 text-muted-foreground hover:border-[#FF5722]/50 hover:text-[#FF5722] hover:bg-orange-50/50 dark:hover:bg-orange-950/10 transition-all"
                 >
-                  <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center">
+                  <div className="h-14 w-14 rounded-2xl tracking-tighter bg-muted flex items-center justify-center">
                     <PencilSimple className="h-7 w-7" weight="duotone" />
                   </div>
                   <div className="text-center">
-                    <p className="font-semibold text-base">Nhập thủ công</p>
-                    <p className="text-sm mt-0.5">Thêm từng dòng vật phẩm bằng tay</p>
+                    <p className="font-semibold tracking-tighter text-base">Nhập thủ công</p>
+                    <p className="text-sm tracking-tighter mt-0.5">Thêm từng dòng vật phẩm bằng tay</p>
                   </div>
                 </button>
               </div>
@@ -772,13 +801,13 @@ export default function ExcelImportFromOrg() {
             {/* Top bar */}
             <div className="flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <div className="h-10 w-10 tracking-tighter rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                   {fileName
                     ? <FileXls className="h-5 w-5 text-green-600" weight="duotone" />
                     : <PencilSimple className="h-5 w-5 text-[#FF5722]" weight="duotone" />}
                 </div>
                 <div>
-                  <p className="font-medium text-sm">{fileName || "Nhập thủ công"}</p>
+                  <p className="font-medium tracking-tighter text-sm">{fileName || "Nhập thủ công"}</p>
                   <p className="text-xs tracking-tighter text-muted-foreground">
                     {rows.length} dòng • {orgDisplayLabel}
                   </p>
@@ -985,7 +1014,7 @@ export default function ExcelImportFromOrg() {
                             type="date"
                             value={row.expiredDate}
                             onChange={(e) => updateRow(row.id, "expiredDate", e.target.value)}
-                            className="h-8 text-sm"
+                            className="h-8 text-sm pr-2 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                           />
                         </TableCell>
 
@@ -997,7 +1026,7 @@ export default function ExcelImportFromOrg() {
                               value={row.receivedDate}
                               onChange={(e) => updateRow(row.id, "receivedDate", e.target.value)}
                               className={cn(
-                                "h-8 text-sm",
+                                "h-8 text-sm pr-2 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer",
                                 row.errors.receivedDate && "border-red-500 focus-visible:ring-red-500",
                               )}
                             />

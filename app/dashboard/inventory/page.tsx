@@ -349,14 +349,14 @@ const InventoryDashboardPage = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem
-                className="gap-2 cursor-pointer"
+                className="gap-2 cursor-pointer tracking-tighter"
                 onClick={() => router.push("/dashboard/inventory/import")}
               >
                 <Buildings className="h-4 w-4" />
                 Nhập kho từ thiện
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="gap-2 cursor-pointer"
+                className="gap-2 cursor-pointer tracking-tighter"
                 onClick={() => router.push("/dashboard/inventory/import-regular")}
               >
                 <Package className="h-4 w-4" />

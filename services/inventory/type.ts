@@ -91,10 +91,12 @@ export interface ImportPurchaseItem {
   notes?: string | null;
 }
 
-export interface ImportRegularRequest {
-  vatInvoice: VatInvoice;
-  items: ImportPurchaseItem[];
-}
+export type ImportRegularRequest = {
+  invoices: Array<{
+    vatInvoice: VatInvoice;
+    items: ImportPurchaseItem[];
+  }>;
+};
 
 // ─── Transaction History ───
 
