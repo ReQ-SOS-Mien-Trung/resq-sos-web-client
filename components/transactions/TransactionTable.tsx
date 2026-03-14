@@ -454,7 +454,7 @@ const TransactionTable: React.FC = () => {
                           <div className="flex flex-col items-center gap-2">
                             <Package className="h-8 w-8 text-muted-foreground" />
                             <p className="text-muted-foreground">
-                              Không thể tải dữ liệu
+                              Không thể tải dữ liệu.
                             </p>
                           </div>
                         </TableCell>
@@ -465,7 +465,7 @@ const TransactionTable: React.FC = () => {
                           <div className="flex flex-col items-center gap-2">
                             <Package className="h-8 w-8 text-muted-foreground" />
                             <p className="text-muted-foreground">
-                              Không có dữ liệu xuất nhập kho nào
+                              Không có dữ liệu xuất nhập kho nào.
                             </p>
                           </div>
                         </TableCell>
