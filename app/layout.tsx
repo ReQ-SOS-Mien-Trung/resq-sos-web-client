@@ -4,6 +4,7 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import { sfUIDisplay } from "./fonts";
 import Providers from "./providers";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
   title: "ResQ SOS Mien Trung",
@@ -24,8 +25,13 @@ export default function RootLayout({
           strategy="beforeInteractive"
         />
       </head>
-      <body className={`${sfUIDisplay.variable} antialiased`} suppressHydrationWarning>
-        <Providers>{children}</Providers>
+      <body
+        className={`${sfUIDisplay.variable} antialiased`}
+        suppressHydrationWarning
+      >
+        <Providers>
+          <TooltipProvider>{children}</TooltipProvider>
+        </Providers>
         <Toaster richColors position="top-right" />
       </body>
     </html>

@@ -787,6 +787,17 @@ const CoordinatorDashboardContent = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Rescue Teams Navigation */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/dashboard/coordinator/rescue-teams")}
+            className="flex items-center gap-2"
+          >
+            <UsersThree className="h-4 w-4" />
+            <span>Quản lý Đội cứu hộ</span>
+          </Button>
+
           {/* Connection Status */}
           <div
             className={cn(

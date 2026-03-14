@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useInfiniteQuery,
+} from "@tanstack/react-query";
 import {
   getAssemblyPoints,
   getAssemblyPointById,
@@ -46,6 +51,32 @@ export function useAssemblyPoints(options?: UseAssemblyPointsOptions) {
   return useQuery<GetAssemblyPointsResponse>({
     queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, options?.params],
     queryFn: () => getAssemblyPoints(options?.params),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Hook to fetch all assembly points with infinite pagination
+ */
+export function useInfiniteAssemblyPoints(options?: UseAssemblyPointsOptions) {
+  return useInfiniteQuery<GetAssemblyPointsResponse>({
+    queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, "infinite", options?.params],
+    queryFn: ({ pageParam = 1 }) =>
+      getAssemblyPoints({
+        ...options?.params,
+        pageNumber: pageParam as number,
+        pageSize: options?.params?.pageSize || 10,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => {
+      // Assuming paginated response shape typically contains `currentPage` and `totalPages` directly
+      // Adjust according to actual response shape
+      const { currentPage, totalPages } = lastPage as any;
+      if (typeof currentPage === "number" && typeof totalPages === "number") {
+        return currentPage < totalPages ? currentPage + 1 : undefined;
+      }
+      return undefined;
+    },
     enabled: options?.enabled ?? true,
   });
 }

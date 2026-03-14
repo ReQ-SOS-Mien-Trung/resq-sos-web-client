@@ -12,6 +12,11 @@ export async function getFreeRescuers(
     params: {
       pageNumber: params?.pageNumber ?? 1,
       pageSize: params?.pageSize ?? 10,
+      firstName: params?.firstName,
+      lastName: params?.lastName,
+      phone: params?.phone,
+      email: params?.email,
+      rescuerType: params?.rescuerType,
     },
   });
 

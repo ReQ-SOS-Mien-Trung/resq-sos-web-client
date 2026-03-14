@@ -17,6 +17,11 @@ export interface FreeRescuerEntity {
 export interface GetFreeRescuersParams {
   pageNumber?: number;
   pageSize?: number;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  email?: string;
+  rescuerType?: Exclude<RescuerType, null>;
 }
 
 export interface GetFreeRescuersResponse {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { SOSDetailsPanelProps } from "@/type";
 import { cn } from "@/lib/utils";
 import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
@@ -238,6 +239,80 @@ function ParsedMessage({ text }: { text?: string | null }) {
   );
 }
 
+function FormulaTooltip({
+  title,
+  formula,
+  details,
+}: {
+  title: string;
+  formula: string;
+  details?: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const handleEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const tooltipWidth = 320;
+    const viewportPadding = 12;
+    const maxLeft = window.innerWidth - tooltipWidth - viewportPadding;
+    const left = Math.max(viewportPadding, Math.min(rect.left, maxLeft));
+    setPos({
+      top: rect.bottom + 8,
+      left,
+    });
+    setOpen(true);
+  };
+
+  return (
+    <span className="inline-flex items-center">
+      <button
+        type="button"
+        className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
+        aria-label={`Xem công thức: ${title}`}
+        onMouseEnter={handleEnter}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPos({ top: rect.bottom + 8, left: Math.max(12, rect.left) });
+          setOpen(true);
+        }}
+        onBlur={() => setOpen(false)}
+      >
+        <Info className="h-3.5 w-3.5" weight="fill" />
+      </button>
+      {mounted &&
+        open &&
+        createPortal(
+          <div
+            className="fixed z-[9999] w-80 max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-3 text-[11px] leading-relaxed shadow-md"
+            style={{ top: pos.top, left: pos.left }}
+            onMouseEnter={() => setOpen(true)}
+            onMouseLeave={() => setOpen(false)}
+          >
+            <p className="font-semibold text-foreground">{title}</p>
+            <p className="mt-1 text-muted-foreground whitespace-normal break-words">
+              {formula}
+            </p>
+            {details && details.length > 0 && (
+              <div className="mt-2 space-y-1 text-muted-foreground whitespace-normal break-words">
+                {details.map((line, idx) => (
+                  <p key={idx}>- {line}</p>
+                ))}
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
+    </span>
+  );
+}
+
 const SOSDetailsPanel = ({
   open,
   onOpenChange,
@@ -285,6 +360,96 @@ const SOSDetailsPanel = ({
 
   // Get risk factors from AI analysis
   const riskFactors = sosRequest.aiAnalysis?.riskFactors || [];
+
+  const scoreRows = [
+    {
+      key: "medical",
+      label: "Y tế",
+      value: ruleEvaluation?.medicalScore ?? 0,
+      icon: FirstAid,
+      colorClass: "text-red-600 dark:text-red-400",
+      formula: "Điểm y tế dựa trên mức độ cần can thiệp y tế khẩn cấp (0-100).",
+    },
+    {
+      key: "injury",
+      label: "Chấn thương",
+      value: ruleEvaluation?.injuryScore ?? 0,
+      icon: Warning,
+      colorClass: "text-orange-600 dark:text-orange-400",
+      formula:
+        "Điểm chấn thương tăng khi có người bị thương nặng hoặc nhiều ca cùng lúc (0-100).",
+    },
+    {
+      key: "environment",
+      label: "Môi trường",
+      value: ruleEvaluation?.environmentScore ?? 0,
+      icon: Lightning,
+      colorClass: "text-blue-600 dark:text-blue-400",
+      formula:
+        "Điểm môi trường phản ánh rủi ro từ lũ, thời tiết, ngập, sạt lở... (0-100).",
+    },
+    {
+      key: "mobility",
+      label: "Di chuyển",
+      value: ruleEvaluation?.mobilityScore ?? 0,
+      icon: MapPin,
+      colorClass: "text-amber-600 dark:text-amber-400",
+      formula:
+        "Điểm di chuyển tăng khi nạn nhân khó/không thể tự di chuyển (0-100).",
+    },
+    {
+      key: "food",
+      label: "Thực phẩm",
+      value: ruleEvaluation?.foodScore ?? 0,
+      icon: ForkKnife,
+      colorClass: "text-green-600 dark:text-green-400",
+      formula:
+        "Điểm thực phẩm phản ánh nhu cầu nhu yếu phẩm và nước uống (0-100).",
+    },
+  ] as const;
+
+  const summedScore = scoreRows.reduce((sum, row) => sum + row.value, 0);
+  const displayedTotalScore = ruleEvaluation?.totalScore ?? 0;
+
+  const isV3 = ruleEvaluation?.ruleVersion?.startsWith("3");
+
+  // Calculate local factors to match BE Rule 3.0 (for display in tooltip)
+  let requestTypeScore = 10;
+  let requestTypeLabel = "Khác";
+  const sosTypeStr = ((sosRequest as any).sosType || "").toLowerCase();
+  if (sosTypeStr.includes("rescue")) {
+    requestTypeScore = 30;
+    requestTypeLabel = "Cứu hộ";
+  } else if (sosTypeStr.includes("relief") || sosTypeStr.includes("support")) {
+    requestTypeScore = 20;
+    requestTypeLabel = "Cứu trợ";
+  }
+
+  let situationMultiplier = 1.0;
+  let situationLabel = "Mặc định";
+  const sitStr = (sosRequest.situation || "").toLowerCase();
+  if (
+    sitStr.includes("flood") ||
+    sitStr.includes("collapse") ||
+    sitStr.includes("flooding") ||
+    sitStr.includes("building_collapse")
+  ) {
+    situationMultiplier = 1.5;
+    situationLabel = "Lũ lụt/Sập công trình";
+  } else if (sitStr.includes("trapped") || sitStr.includes("danger")) {
+    situationMultiplier = 1.3;
+    situationLabel = "Mắc kẹt/Nguy hiểm";
+  } else if (sitStr.includes("cannot_move") || sosRequest.canMove === false) {
+    situationMultiplier = 1.2;
+    situationLabel = "Không thể di chuyển";
+  }
+
+  // Filter out 0-value factors for v3.0
+  const displayScoreRows = isV3
+    ? scoreRows.filter(
+        (r) => !["injury", "mobility", "food"].includes(r.key) || r.value > 0,
+      )
+    : scoreRows;
 
   return (
     <div
@@ -695,8 +860,16 @@ const SOSDetailsPanel = ({
                         </h4>
                         <div className="bg-muted/30 rounded-lg p-3.5 border shadow-sm">
                           <div className="flex items-center justify-between mb-3 pb-3 border-b border-border/50">
-                            <span className="text-sm font-medium">
+                            <span className="text-sm font-medium inline-flex items-center gap-1.5">
                               Điểm rủi ro tổng hợp:
+                              <FormulaTooltip
+                                title="Công thức tính chuẩn hóa"
+                                formula={
+                                  isV3
+                                    ? `Tổng điểm = (Loại yêu cầu + Điểm y tế) × Hệ số tình trạng = (${requestTypeScore} + ${ruleEvaluation.medicalScore.toFixed(1)}) × ${situationMultiplier} ≈ ${displayedTotalScore.toFixed(1)}`
+                                    : `Tổng điểm = (Y tế × 0.3) + (Chấn thương × 0.25) + (Di chuyển × 0.15) + (Môi trường × 0.20) + (Thực phẩm × 0.10) ≈ ${displayedTotalScore.toFixed(1)}`
+                                }
+                              />
                             </span>
                             <div className="flex items-center gap-2">
                               {ruleEvaluation.priorityLevel && (
@@ -750,51 +923,28 @@ const SOSDetailsPanel = ({
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-[13px]">
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground flex items-center gap-1.5">
-                                <FirstAid className="w-3.5 h-3.5" /> Y tế:
-                              </span>
-                              <span className="font-semibold text-red-600 dark:text-red-400">
-                                {ruleEvaluation.medicalScore?.toFixed(1) ||
-                                  "0.0"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground flex items-center gap-1.5">
-                                <Warning className="w-3.5 h-3.5" /> Chấn thương:
-                              </span>
-                              <span className="font-semibold text-orange-600 dark:text-orange-400">
-                                {ruleEvaluation.injuryScore?.toFixed(1) ||
-                                  "0.0"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground flex items-center gap-1.5">
-                                <Lightning className="w-3.5 h-3.5" /> Môi
-                                trường:
-                              </span>
-                              <span className="font-semibold text-blue-600 dark:text-blue-400">
-                                {ruleEvaluation.environmentScore?.toFixed(1) ||
-                                  "0.0"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5" /> Di chuyển:
-                              </span>
-                              <span className="font-semibold text-amber-600 dark:text-amber-400">
-                                {ruleEvaluation.mobilityScore?.toFixed(1) ||
-                                  "0.0"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground flex items-center gap-1.5">
-                                <ForkKnife className="w-3.5 h-3.5" /> Thực phẩm:
-                              </span>
-                              <span className="font-semibold text-green-600 dark:text-green-400">
-                                {ruleEvaluation.foodScore?.toFixed(1) || "0.0"}
-                              </span>
-                            </div>
+                            {displayScoreRows.map((row) => {
+                              const RowIcon = row.icon;
+                              return (
+                                <div
+                                  key={row.key}
+                                  className="flex justify-between items-center"
+                                >
+                                  <span className="text-muted-foreground flex items-center gap-1.5">
+                                    <RowIcon className="w-3.5 h-3.5" />
+                                    {row.label}:
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      "font-semibold",
+                                      row.colorClass,
+                                    )}
+                                  >
+                                    {row.value.toFixed(1)}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
 
                           {/* Items Needed */}

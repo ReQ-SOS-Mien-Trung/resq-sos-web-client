@@ -36,6 +36,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   useCreateMission,
   useMissions,
   useActivityRoute,
@@ -1431,6 +1439,7 @@ const RescuePlanPanel = ({
   const [editPriorityScore, setEditPriorityScore] = useState(5);
   const [editStartTime, setEditStartTime] = useState("");
   const [editExpectedEndTime, setEditExpectedEndTime] = useState("");
+  const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
 
   const { mutate: createMission, isPending: isCreatingMission } =
     useCreateMission();
@@ -1567,22 +1576,35 @@ const RescuePlanPanel = ({
     [],
   );
 
-  const handleSubmitEdit = useCallback(() => {
-    if (!clusterId) return;
+  const validateEditMission = useCallback(() => {
+    if (!clusterId) return false;
     if (editActivities.length === 0) {
       toast.error("Vui lòng thêm ít nhất 1 hoạt động");
-      return;
+      return false;
     }
     for (let i = 0; i < editActivities.length; i++) {
       if (!editActivities[i].description.trim()) {
         toast.error(`Bước ${i + 1}: Vui lòng nhập mô tả`);
-        return;
+        return false;
       }
     }
     if (!editStartTime || !editExpectedEndTime) {
       toast.error("Vui lòng chọn thời gian bắt đầu và kết thúc");
-      return;
+      return false;
     }
+
+    return true;
+  }, [clusterId, editActivities, editStartTime, editExpectedEndTime]);
+
+  const handleOpenSubmitConfirm = useCallback(() => {
+    if (!validateEditMission()) return;
+    setConfirmSubmitOpen(true);
+  }, [validateEditMission]);
+
+  const handleSubmitEdit = useCallback(() => {
+    if (!validateEditMission() || !clusterId) return;
+
+    setConfirmSubmitOpen(false);
 
     const sos = clusterSOSRequests[0];
     createMission(
@@ -1653,6 +1675,7 @@ const RescuePlanPanel = ({
     createMission,
     exitEditMode,
     onApprove,
+    validateEditMission,
   ]);
 
   // ── AI Stream ──
@@ -3544,7 +3567,7 @@ const RescuePlanPanel = ({
             {isEditMode ? (
               <Button
                 className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg shadow-amber-500/20"
-                onClick={handleSubmitEdit}
+                onClick={handleOpenSubmitConfirm}
                 disabled={isCreatingMission}
               >
                 {isCreatingMission ? (
@@ -3567,6 +3590,34 @@ const RescuePlanPanel = ({
             ) : null}
           </div>
         </div>
+
+        <Dialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Xác nhận tạo nhiệm vụ</DialogTitle>
+              <DialogDescription>
+                Bạn có chắc muốn hoàn tất chỉnh sửa và tạo nhiệm vụ này không?
+                Sau khi tạo, nhiệm vụ sẽ được lưu vào danh sách nhiệm vụ đã tạo.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setConfirmSubmitOpen(false)}
+                disabled={isCreatingMission}
+              >
+                Quay lại chỉnh sửa
+              </Button>
+              <Button
+                className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                onClick={handleSubmitEdit}
+                disabled={isCreatingMission}
+              >
+                {isCreatingMission ? "Đang tạo..." : "Đồng ý tạo nhiệm vụ"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
