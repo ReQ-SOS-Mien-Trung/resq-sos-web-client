@@ -13,12 +13,14 @@ import {
   getInventoryActionTypes,
   getInventorySourceTypes,
   importInventory,
+  importRegularInventory,
   getDepotTransactions,
 } from "./api";
 import {
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
   ImportInventoryRequest,
+  ImportRegularRequest,
   InventoryCategory,
   InventoryItemType,
   InventoryOrganization,
@@ -144,6 +146,17 @@ export function useImportInventory() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: ImportInventoryRequest) => importInventory(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function useImportRegularInventory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ImportRegularRequest) =>
+      importRegularInventory(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
     },

@@ -65,7 +65,7 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                   key={item.label}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-none text-sm font-medium transition-all duration-200",
                     isActive
                       ? "bg-linear-to-r from-red-500/10 to-orange-500/10 text-red-600 dark:text-red-400 shadow-sm border border-red-500/10"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1",
@@ -79,7 +79,7 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                       isActive && "text-red-500",
                     )}
                   />
-                  <span className="truncate">{item.label}</span>
+                  <span className="truncate tracking-tighter">{item.label}</span>
                   {isActive && (
                     <div className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
                   )}

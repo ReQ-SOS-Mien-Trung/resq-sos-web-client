@@ -60,8 +60,40 @@ export interface ImportInventoryItem {
 }
 
 export interface ImportInventoryRequest {
-  organizationId: number;
+  organizationId?: number;
+  organizationName?: string;
   items: ImportInventoryItem[];
+}
+
+// ─── VAT Invoice (Purchase Import) ───
+
+export interface VatInvoice {
+  invoiceSerial: string;
+  invoiceNumber: string;
+  supplierName: string;
+  supplierTaxCode: string;
+  invoiceDate: string;
+  totalAmount: number;
+  fileUrl: string;
+}
+
+export interface ImportPurchaseItem {
+  row: number;
+  itemName: string;
+  categoryCode: string;
+  quantity: number;
+  unitPrice: number;
+  unit: string;
+  itemType: string;
+  targetGroup: string;
+  receivedDate: string;
+  expiredDate?: string | null;
+  notes?: string | null;
+}
+
+export interface ImportRegularRequest {
+  vatInvoice: VatInvoice;
+  items: ImportPurchaseItem[];
 }
 
 // ─── Transaction History ───

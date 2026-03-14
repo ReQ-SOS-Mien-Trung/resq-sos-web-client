@@ -3,6 +3,7 @@ import {
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
   ImportInventoryRequest,
+  ImportRegularRequest,
   InventoryCategory,
   InventoryItemType,
   InventoryOrganization,
@@ -103,7 +104,19 @@ export async function importInventory(
   payload: ImportInventoryRequest,
 ): Promise<void> {
   await api.post("/logistics/inventory/import", payload, {
-    timeout: 60000, // 60 seconds for large imports
+    timeout: 60000,
+  });
+}
+
+/**
+ * Import regular (purchase) inventory items with VAT invoice
+ * POST /logistics/inventory/import-purchase
+ */
+export async function importRegularInventory(
+  payload: ImportRegularRequest,
+): Promise<void> {
+  await api.post("/logistics/inventory/import-purchase", payload, {
+    timeout: 60000,
   });
 }
 

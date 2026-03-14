@@ -15,6 +15,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Table,
   TableBody,
   TableCell,
@@ -35,6 +40,9 @@ import {
   ArrowLeft,
   Buildings,
   SpinnerGap,
+  MagnifyingGlass,
+  Plus,
+  PencilSimple,
 } from "@phosphor-icons/react";
 import {
   useInventoryItemTypes,
@@ -136,8 +144,12 @@ export default function ExcelImportFromOrg() {
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [fileName, setFileName] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-  const [organizationId, setOrganizationId] = useState<string>("");
+  // Organization: either select from list (→ send id) or type manually (→ send name only)
+  const [orgSearchValue, setOrgSearchValue] = useState("");
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [isOrgOpen, setIsOrgOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const orgInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch metadata from API
   const { data: itemTypesData } = useInventoryItemTypes();
@@ -148,6 +160,20 @@ export default function ExcelImportFromOrg() {
   const itemTypes = useMemo(() => itemTypesData ?? [], [itemTypesData]);
   const targetGroups = useMemo(() => targetGroupsData ?? [], [targetGroupsData]);
   const organizations = useMemo(() => organizationsData ?? [], [organizationsData]);
+
+  const filteredOrgs = useMemo(() => {
+    if (!orgSearchValue.trim()) return organizations;
+    const q = orgSearchValue.toLowerCase();
+    return organizations.filter((o) => o.value.toLowerCase().includes(q));
+  }, [organizations, orgSearchValue]);
+
+  // Derived display label for review step
+  const orgDisplayLabel = useMemo(() => {
+    if (selectedOrgId) {
+      return organizations.find((o) => o.key === selectedOrgId)?.value ?? orgSearchValue;
+    }
+    return orgSearchValue || "Chưa chọn tổ chức";
+  }, [selectedOrgId, orgSearchValue, organizations]);
 
   // ─── Validate a single row ───
   const validateRow = useCallback((row: Omit<ImportRow, "errors">): Record<string, string> => {
@@ -266,6 +292,85 @@ export default function ExcelImportFromOrg() {
     [handleFile],
   );
 
+  // ─── Add blank row ───
+  const addRow = useCallback(() => {
+    setRows((prev) => {
+      const newRow: ImportRow = {
+        id: `row-manual-${Date.now()}-${Math.random()}`,
+        row: prev.length + 1,
+        itemName: "",
+        categoryCode: "",
+        targetGroup: "",
+        itemType: "",
+        unit: "",
+        quantity: 0,
+        expiredDate: "",
+        receivedDate: "",
+        notes: "",
+        errors: {},
+      };
+      newRow.errors = validateRow(newRow);
+      return [...prev, newRow];
+    });
+  }, [validateRow]);
+
+  // ─── Start manual entry ───
+  const handleManualEntry = useCallback(() => {
+    setRows([]);
+    setFileName("");
+    setStep("review");
+  }, []);
+
+  // ─── Append rows from a new Excel file (in review step) ───
+  const excelReviewInputRef = useRef<HTMLInputElement>(null);
+  const handleAppendExcel = useCallback(
+    (file: File) => {
+      if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
+        toast.error("Chỉ chấp nhận file .xlsx");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+          if (jsonData.length === 0) { toast.error("File Excel không có dữ liệu"); return; }
+          setRows((prev) => {
+            const offset = prev.length;
+            const parsed: ImportRow[] = jsonData.map((raw, idx) => {
+              const rawCategory = String(raw[COL.DANHMUC] ?? "").trim();
+              const categoryCode = CATEGORY_VI_MAP[rawCategory.toLowerCase()] ?? "";
+              const rowData = {
+                id: `row-${offset + idx}-${Date.now()}`,
+                row: offset + idx + 1,
+                itemName: String(raw[COL.TEN] ?? "").trim(),
+                categoryCode,
+                targetGroup: String(raw[COL.DOITUONG] ?? "").trim(),
+                itemType: String(raw[COL.LOAI] ?? "").trim(),
+                unit: String(raw[COL.DONVI] ?? "").trim(),
+                quantity: Number(raw[COL.SOLUONG] ?? 0) > 0 ? Number(raw[COL.SOLUONG]) : 0,
+                expiredDate: parseExcelDate(raw[COL.HETHAN]),
+                receivedDate: parseExcelDate(raw[COL.NHAN]),
+                notes: String(raw[COL.GHICHU] ?? "").trim(),
+              };
+              return { ...rowData, errors: validateRow(rowData) };
+            });
+            const merged = [...prev, ...parsed];
+            return merged.map((r, i) => ({ ...r, row: i + 1 }));
+          });
+          setFileName(file.name);
+          toast.success(`Đã thêm ${jsonData.length} dòng từ file Excel`);
+        } catch {
+          toast.error("Không thể đọc file Excel.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    },
+    [validateRow],
+  );
+
   // ─── Row editing ───
   const updateRow = useCallback(
     (id: string, field: keyof ImportRow, value: string | number) => {
@@ -304,8 +409,8 @@ export default function ExcelImportFromOrg() {
       toast.error(`Còn ${errorCount} dòng lỗi. Vui lòng sửa trước khi nhập.`);
       return;
     }
-    if (!organizationId) {
-      toast.error("Vui lòng chọn tổ chức viện trợ");
+    if (!orgSearchValue.trim()) {
+      toast.error("Vui lòng chọn hoặc nhập tên tổ chức viện trợ");
       return;
     }
 
@@ -322,7 +427,13 @@ export default function ExcelImportFromOrg() {
       notes: r.notes || null,
     }));
 
-    const payload = { organizationId: Number(organizationId), items };
+    const payload: { organizationId?: number; organizationName?: string; items: ImportInventoryItem[] } = { items };
+    if (selectedOrgId) {
+      payload.organizationId = Number(selectedOrgId);
+    }
+    if (orgSearchValue.trim()) {
+      payload.organizationName = orgSearchValue.trim();
+    }
 
     importMutation.mutate(payload, {
       onSuccess: () => {
@@ -334,7 +445,7 @@ export default function ExcelImportFromOrg() {
         toast.error(`Nhập kho thất bại: ${errorMsg}`);
       },
     });
-  }, [rows, errorCount, organizationId, importMutation, router]);
+  }, [rows, errorCount, selectedOrgId, orgSearchValue, importMutation, router]);
 
   // ─── Reset ───
   const handleReset = useCallback(() => {
@@ -343,12 +454,10 @@ export default function ExcelImportFromOrg() {
     setFileName("");
   }, []);
 
-  // ─── Download template ───
   const handleDownloadTemplate = useCallback(() => {
-    // Tải file Excel có sẵn từ thư mục public/templates/
     const link = document.createElement("a");
-    link.href = "/templates/mau_nhap_kho_to_chuc.xlsx";
-    link.download = "mau_nhap_kho_to_chuc.xlsx";
+    link.href = "/templates/mau_nhap_kho_tu_thien.xlsx";
+    link.download = "mau_nhap_kho_tu_thien.xlsx";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -413,7 +522,7 @@ export default function ExcelImportFromOrg() {
         >
           <SelectTrigger
             className={cn(
-              "h-8 text-sm",
+              "text-sm",
               error && "border-red-500 focus:ring-red-500",
             )}
           >
@@ -466,7 +575,7 @@ export default function ExcelImportFromOrg() {
                   Nhập kho từ tổ chức
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Tải lên file Excel danh sách vật phẩm nhận từ tổ chức viện trợ
+                  Nhập thủ công hoặc tải file Excel từ tổ chức viện trợ
                 </p>
               </div>
             </div>
@@ -493,34 +602,82 @@ export default function ExcelImportFromOrg() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column - Info */}
               <div className="space-y-6">
-                {/* Organization Select */}
+                {/* Organization Combobox */}
                 <div className="rounded-xl border bg-card p-6 space-y-3">
-                  <label className="text-sm font-medium">
-                    Tổ chức viện trợ <span className="text-red-500">*</span>
-                  </label>
-                  <Select
-                    value={organizationId}
-                    onValueChange={setOrganizationId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn tổ chức viện trợ" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {organizations.map((org) => (
-                        <SelectItem key={org.key} value={org.key}>
-                          {org.value}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Chọn tổ chức đã gửi hàng viện trợ đến kho
+                  <div className="flex items-center justify-between">
+                    <label className="text-[16px] tracking-tighter font-medium">Tổ chức viện trợ</label>
+                  </div>
+                  <Popover open={isOrgOpen} onOpenChange={setIsOrgOpen}>
+                    <PopoverTrigger asChild>
+                      <div className="relative cursor-text">
+                        <Input
+                          ref={orgInputRef}
+                          value={orgSearchValue}
+                          onChange={(e) => {
+                            setOrgSearchValue(e.target.value);
+                            setSelectedOrgId(null);
+                            setIsOrgOpen(true);
+                          }}
+                          onFocus={() => setIsOrgOpen(true)}
+                          placeholder="Tìm hoặc nhập tên tổ chức..."
+                          className="pl-9 pr-9 tracking-tighter"
+                        />
+                        <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                        {orgSearchValue && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOrgSearchValue("");
+                              setSelectedOrgId(null);
+                              orgInputRef.current?.focus();
+                            }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground tracking-tighter hover:text-foreground"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="p-1 w-(--radix-popover-trigger-width)"
+                      align="start"
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                    >
+                      {filteredOrgs.length > 0 && (
+                        <ul className="max-h-52 overflow-auto">
+                          {filteredOrgs.map((org) => (
+                            <li
+                              key={org.key}
+                              onClick={() => {
+                                setOrgSearchValue(org.value);
+                                setSelectedOrgId(org.key);
+                                setIsOrgOpen(false);
+                              }}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-muted transition-colors",
+                                selectedOrgId === org.key && "bg-muted font-medium",
+                              )}
+                            >
+                              <Buildings className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="truncate">{org.value}</span>
+                              {selectedOrgId === org.key && (
+                                <CheckCircle className="ml-auto h-4 w-4 text-green-600 shrink-0" weight="fill" />
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-sm tracking-tighter text-muted-foreground">
+                    Chọn từ danh sách hoặc nhập tên tổ chức từ thiện bất kỳ
                   </p>
                 </div>
 
                 {/* Column Preview */}
                 <div className="rounded-xl border bg-card p-6">
-                  <p className="text-sm font-medium mb-3">Các cột trong file Excel:</p>
+                  <p className="text-[16px] tracking-tighter font-medium mb-3">Các cột trong file Excel:</p>
                   <div className="flex flex-wrap gap-2">
                     {Object.values(COL).map((col) => (
                       <span
@@ -534,48 +691,46 @@ export default function ExcelImportFromOrg() {
                 </div>
               </div>
 
-              {/* Right Column - Upload Zone */}
-              <div className="flex items-stretch">
+              {/* Right Column - Two options */}
+              <div className="flex flex-col gap-4">
+                {/* Option 1: Excel upload */}
                 <div
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onClick={() => fileInputRef.current?.click()}
                   className={cn(
-                    "w-full border-2 border-dashed rounded-xl p-24 min-h-[500px] flex items-center justify-center cursor-pointer transition-all duration-200",
+                    "flex-1 border-2 border-dashed rounded-xl p-10 flex items-center justify-center cursor-pointer transition-all duration-200",
                     isDragging
                       ? "border-[#FF5722] bg-orange-50 dark:bg-orange-950/20"
                       : "border-muted-foreground/25 hover:border-[#FF5722]/50 hover:bg-muted/50",
                   )}
                 >
-                  <div className="flex flex-col items-center gap-6 text-center">
+                  <div className="flex flex-col items-center gap-4 text-center">
                     <div
                       className={cn(
-                        "h-28 w-28 rounded-3xl flex items-center justify-center transition-colors",
+                        "h-20 w-20 rounded-2xl flex items-center justify-center transition-colors",
                         isDragging
                           ? "bg-[#FF5722]/15 text-[#FF5722]"
                           : "bg-muted text-muted-foreground",
                       )}
                     >
-                      <UploadSimple className="h-14 w-14" weight="duotone" />
+                      <UploadSimple className="h-10 w-10" weight="duotone" />
                     </div>
                     <div>
-                      <p className="font-semibold text-xl mb-2">Kéo thả file Excel vào đây</p>
-                      <p className="text-base text-muted-foreground">
+                      <p className="font-semibold text-base mb-1">Kéo thả file Excel vào đây</p>
+                      <p className="text-sm text-muted-foreground">
                         hoặc{" "}
                         <span className="text-[#FF5722] font-medium underline underline-offset-2">
                           nhấp để chọn file
                         </span>
                       </p>
                     </div>
-                    <div className="mt-4 space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        Chấp nhận file <code className="px-1.5 py-0.5 rounded bg-muted">.xlsx</code>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Tối đa 500 dòng
-                      </p>
-                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Chấp nhận{" "}
+                      <code className="px-1.5 py-0.5 rounded bg-muted">.xlsx</code>{" "}
+                      — tối đa 500 dòng
+                    </p>
                   </div>
                   <input
                     ref={fileInputRef}
@@ -585,6 +740,28 @@ export default function ExcelImportFromOrg() {
                     className="hidden"
                   />
                 </div>
+
+                {/* Divider */}
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground">hoặc</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+
+                {/* Option 2: Manual entry */}
+                <button
+                  type="button"
+                  onClick={handleManualEntry}
+                  className="rounded-xl border-2 border-dashed border-muted-foreground/25 py-8 flex flex-col items-center gap-3 text-muted-foreground hover:border-[#FF5722]/50 hover:text-[#FF5722] hover:bg-orange-50/50 dark:hover:bg-orange-950/10 transition-all"
+                >
+                  <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center">
+                    <PencilSimple className="h-7 w-7" weight="duotone" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-base">Nhập thủ công</p>
+                    <p className="text-sm mt-0.5">Thêm từng dòng vật phẩm bằng tay</p>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
@@ -596,37 +773,146 @@ export default function ExcelImportFromOrg() {
             <div className="flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                  <FileXls className="h-5 w-5 text-green-600" weight="duotone" />
+                  {fileName
+                    ? <FileXls className="h-5 w-5 text-green-600" weight="duotone" />
+                    : <PencilSimple className="h-5 w-5 text-[#FF5722]" weight="duotone" />}
                 </div>
                 <div>
-                  <p className="font-medium text-sm">{fileName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {rows.length} dòng • {organizations.find((o) => o.key === organizationId)?.value ?? `Tổ chức #${organizationId}`}
+                  <p className="font-medium text-sm">{fileName || "Nhập thủ công"}</p>
+                  <p className="text-xs tracking-tighter text-muted-foreground">
+                    {rows.length} dòng • {orgDisplayLabel}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {/* Validation badges */}
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium tracking-tighter">
                   <CheckCircle className="h-3.5 w-3.5" weight="fill" />
                   {validCount} hợp lệ
                 </div>
                 {errorCount > 0 && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-medium">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-medium tracking-tighter">
                     <WarningCircle className="h-3.5 w-3.5" weight="fill" />
                     {errorCount} lỗi
                   </div>
                 )}
+                {/* Append Excel */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 ml-2"
+                  onClick={() => excelReviewInputRef.current?.click()}
+                >
+                  <FileXls className="h-4 w-4" />
+                  Nhập từ Excel
+                </Button>
+                <input
+                  ref={excelReviewInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAppendExcel(f); e.target.value = ""; }}
+                  className="hidden"
+                />
+                {/* Add blank row */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={addRow}
+                >
+                  <Plus className="h-4 w-4" />
+                  Thêm dòng
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="gap-1.5 text-muted-foreground ml-2"
+                  className="gap-1.5 text-muted-foreground"
                   onClick={handleReset}
                 >
                   <ArrowCounterClockwise className="h-4 w-4" />
-                  Chọn file khác
+                  Nhập lại
                 </Button>
               </div>
+            </div>
+
+            {/* Organization picker (compact, always visible in review) */}
+            <div className="shrink-0 rounded-xl border bg-card px-4 py-3 flex items-center gap-3">
+              <Buildings className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm tracking-tighter font-medium shrink-0">Tổ chức viện trợ</span>
+              {!orgSearchValue.trim() && (
+                <span className="text-xs tracking-tighter text-red-500 shrink-0">(bắt buộc)</span>
+              )}
+              <div className="flex-1 relative">
+                <Popover open={isOrgOpen} onOpenChange={setIsOrgOpen}>
+                  <PopoverTrigger asChild>
+                    <div className="relative">
+                      <Input
+                        ref={orgInputRef}
+                        value={orgSearchValue}
+                        onChange={(e) => {
+                          setOrgSearchValue(e.target.value);
+                          setSelectedOrgId(null);
+                          setIsOrgOpen(true);
+                        }}
+                        onFocus={() => setIsOrgOpen(true)}
+                        placeholder="Tìm hoặc nhập tên tổ chức..."
+                        className={cn(
+                          "h-8 text-sm pl-3 pr-8 tracking-tighter",
+                          !orgSearchValue.trim() && "border-red-400 focus-visible:ring-red-400",
+                        )}
+                      />
+                      {orgSearchValue ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOrgSearchValue("");
+                            setSelectedOrgId(null);
+                            orgInputRef.current?.focus();
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 tracking-tighter text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <MagnifyingGlass className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      )}
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="p-1 w-(--radix-popover-trigger-width)"
+                    align="start"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                  >
+                    {filteredOrgs.length > 0 && (
+                      <ul className="max-h-48 overflow-auto">
+                        {filteredOrgs.map((org) => (
+                          <li
+                            key={org.key}
+                            onClick={() => {
+                              setOrgSearchValue(org.value);
+                              setSelectedOrgId(org.key);
+                              setIsOrgOpen(false);
+                            }}
+                            className={cn(
+                              "flex items-center gap-2 px-3 py-2 rounded-md text-sm cursor-pointer hover:bg-muted transition-colors",
+                              selectedOrgId === org.key && "bg-muted font-medium",
+                            )}
+                          >
+                            <Buildings className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <span className="truncate">{org.value}</span>
+                            {selectedOrgId === org.key && (
+                              <CheckCircle className="ml-auto h-4 w-4 text-green-600 shrink-0" weight="fill" />
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {selectedOrgId && (
+                <CheckCircle className="h-4 w-4 text-green-600 shrink-0" weight="fill" />
+              )}
             </div>
 
             {/* Editable Table */}
@@ -748,13 +1034,18 @@ export default function ExcelImportFromOrg() {
 
                   {rows.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
-                        <div className="flex flex-col items-center gap-2">
+                      <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center gap-3">
                           <Trash className="h-8 w-8" weight="duotone" />
-                          <p>Đã xóa hết dữ liệu</p>
-                          <Button variant="outline" size="sm" onClick={handleReset}>
-                            Chọn file khác
-                          </Button>
+                          <p className="text-sm">Chưa có dữ liệu</p>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" className="gap-1.5" onClick={addRow}>
+                              <Plus className="h-3.5 w-3.5" /> Thêm dòng
+                            </Button>
+                            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => excelReviewInputRef.current?.click()}>
+                              <FileXls className="h-3.5 w-3.5" /> Nhập từ Excel
+                            </Button>
+                          </div>
                         </div>
                       </TableCell>
                     </TableRow>

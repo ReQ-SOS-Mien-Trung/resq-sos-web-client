@@ -353,9 +353,12 @@ const InventoryDashboardPage = () => {
                 onClick={() => router.push("/dashboard/inventory/import")}
               >
                 <Buildings className="h-4 w-4" />
-                Nhập kho từ tổ chức
+                Nhập kho từ thiện
               </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2 cursor-pointer">
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer"
+                onClick={() => router.push("/dashboard/inventory/import-regular")}
+              >
                 <Package className="h-4 w-4" />
                 Nhập kho thường
               </DropdownMenuItem>
