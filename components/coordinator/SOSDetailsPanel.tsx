@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { SOSDetailsPanelProps } from "@/type";
 import { cn } from "@/lib/utils";
+import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -260,6 +261,7 @@ const SOSDetailsPanel = ({
     P1: "bg-red-500",
     P2: "bg-orange-500",
     P3: "bg-yellow-500",
+    P4: "bg-teal-500",
   };
 
   const statusLabels = {
@@ -314,16 +316,10 @@ const SOSDetailsPanel = ({
             </div>
             <div className="flex items-center gap-2">
               <Badge
-                variant={
-                  sosRequest.priority === "P1"
-                    ? "p1"
-                    : sosRequest.priority === "P2"
-                      ? "p2"
-                      : "p3"
-                }
+                variant={PRIORITY_BADGE_VARIANT[sosRequest.priority]}
                 className="text-sm px-3"
               >
-                {sosRequest.priority}
+                {PRIORITY_LABELS[sosRequest.priority]}
               </Badge>
               <Button
                 variant="ghost"
@@ -976,23 +972,19 @@ const SOSDetailsPanel = ({
                               ? "text-red-500"
                               : sos.priority === "P2"
                                 ? "text-orange-500"
-                                : "text-yellow-500",
+                                : sos.priority === "P3"
+                                  ? "text-yellow-500"
+                                  : "text-teal-500",
                           )}
                           weight="fill"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <Badge
-                              variant={
-                                sos.priority === "P1"
-                                  ? "p1"
-                                  : sos.priority === "P2"
-                                    ? "p2"
-                                    : "p3"
-                              }
+                              variant={PRIORITY_BADGE_VARIANT[sos.priority]}
                               className="text-[10px] px-1.5 py-0 h-5"
                             >
-                              {sos.priority}
+                              {PRIORITY_LABELS[sos.priority]}
                             </Badge>
                             <span className="text-xs font-mono text-muted-foreground">
                               SOS #{sos.id}

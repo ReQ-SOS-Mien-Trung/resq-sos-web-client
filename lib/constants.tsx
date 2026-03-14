@@ -594,15 +594,15 @@ export const resourceTypeIcons: Record<string, React.ReactNode> = {
 };
 
 export const severityConfig: Record<string, SeverityConfig> = {
-  Critical: { variant: "p1", label: "Nguy cấp" },
-  High: { variant: "p1", label: "Cao" },
-  Medium: { variant: "p2", label: "Trung bình" },
-  Low: { variant: "p3", label: "Thấp" },
+  Critical: { variant: "p1", label: "Rất nghiêm trọng" },
+  High: { variant: "p2", label: "Nghiêm trọng" },
+  Medium: { variant: "p3", label: "Trung bình" },
+  Low: { variant: "p4", label: "Thấp" },
 };
 
 export const priorityLabelMap: Record<string, string> = {
-  Critical: "Nguy cấp",
-  High: "Cao",
+  Critical: "Rất nghiêm trọng",
+  High: "Nghiêm trọng",
   Medium: "Trung bình",
   Low: "Thấp",
 };

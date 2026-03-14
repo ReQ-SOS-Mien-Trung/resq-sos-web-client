@@ -16,6 +16,7 @@ import {
   resourceTypeIcons,
   severityConfig,
 } from "@/lib/constants";
+import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -194,7 +195,9 @@ const SOSRequestSidebarCard = ({ sos }: { sos: SOSRequest }) => {
           ? "border-red-200 dark:border-red-800/40"
           : sos.priority === "P2"
             ? "border-orange-200 dark:border-orange-800/40"
-            : "border-border",
+            : sos.priority === "P3"
+              ? "border-yellow-200 dark:border-yellow-800/40"
+              : "border-teal-200 dark:border-teal-800/40",
       )}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -205,7 +208,9 @@ const SOSRequestSidebarCard = ({ sos }: { sos: SOSRequest }) => {
               ? "text-red-500"
               : sos.priority === "P2"
                 ? "text-orange-500"
-                : "text-yellow-500",
+                : sos.priority === "P3"
+                  ? "text-yellow-500"
+                  : "text-teal-500",
           )}
           weight="fill"
         />
@@ -239,12 +244,10 @@ const SOSRequestSidebarCard = ({ sos }: { sos: SOSRequest }) => {
           </Badge>
         )}
         <Badge
-          variant={
-            sos.priority === "P1" ? "p1" : sos.priority === "P2" ? "p2" : "p3"
-          }
+          variant={PRIORITY_BADGE_VARIANT[sos.priority]}
           className="text-[9px] px-1 h-3.5 ml-auto shrink-0"
         >
-          {sos.priority}
+          {PRIORITY_LABELS[sos.priority]}
         </Badge>
       </div>
       <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">
@@ -279,7 +282,9 @@ const SOSGroupHeader = ({
             ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
             : matchedSOS.priority === "P2"
               ? "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400"
-              : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400",
+              : matchedSOS.priority === "P3"
+                ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400"
+                : "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-400",
         )}
       >
         <MapPin className="h-4 w-4" weight="fill" />
@@ -304,16 +309,10 @@ const SOSGroupHeader = ({
             </Badge>
           )}
           <Badge
-            variant={
-              matchedSOS.priority === "P1"
-                ? "p1"
-                : matchedSOS.priority === "P2"
-                  ? "p2"
-                  : "p3"
-            }
+            variant={PRIORITY_BADGE_VARIANT[matchedSOS.priority]}
             className="text-[10px] px-1.5 h-4"
           >
-            {matchedSOS.priority}
+            {PRIORITY_LABELS[matchedSOS.priority]}
           </Badge>
         </div>
         <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">

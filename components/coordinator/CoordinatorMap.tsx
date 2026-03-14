@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { PRIORITY_ORDER } from "@/lib/priority";
 
 // Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
 // and the isMounted guard inside this component.
@@ -841,6 +842,7 @@ function SOSRequestMarker({
     P1: "#ef4444", // red-500
     P2: "#f97316", // orange-500
     P3: "#eab308", // yellow-500
+    P4: "#14b8a6", // teal-500
   };
 
   const color = priorityColors[sos.priority];
@@ -1068,7 +1070,7 @@ function AutoClusterMarker({
   const lng = group.reduce((sum, s) => sum + s.location.lng, 0) / count;
 
   // Use highest priority in group for color
-  const priorityOrder = { P1: 0, P2: 1, P3: 2 };
+  const priorityOrder = PRIORITY_ORDER;
   const highestPriority = group.reduce(
     (best, s) =>
       priorityOrder[s.priority] < priorityOrder[best] ? s.priority : best,
@@ -1078,6 +1080,7 @@ function AutoClusterMarker({
     P1: "#ef4444",
     P2: "#f97316",
     P3: "#eab308",
+    P4: "#14b8a6",
   };
   const color = colors[highestPriority] || "#f97316";
 
@@ -1246,15 +1249,19 @@ function MapLegend() {
       <div className="space-y-1.5 text-xs">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-red-500"></div>
-          <span>P1 - Khẩn cấp</span>
+          <span>P1 - Rất nghiêm trọng</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-          <span>P2 - Cao</span>
+          <span>P2 - Nghiêm trọng</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
           <span>P3 - Trung bình</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-teal-500"></div>
+          <span>P4 - Thấp</span>
         </div>
         <div className="border-t pt-1.5 mt-1.5">
           <div className="flex items-center gap-2">

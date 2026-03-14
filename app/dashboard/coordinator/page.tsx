@@ -99,10 +99,11 @@ const WindyLeafletMap = dynamic(
 // ── Helpers ──
 
 /** Map backend priority to frontend priority code */
-function toPriority(level: string): "P1" | "P2" | "P3" {
-  if (level === "Critical" || level === "High") return "P1";
-  if (level === "Medium") return "P2";
-  return "P3";
+function toPriority(level: string): "P1" | "P2" | "P3" | "P4" {
+  if (level === "Critical") return "P1";
+  if (level === "High") return "P2";
+  if (level === "Medium") return "P3";
+  return "P4";
 }
 
 /** Map backend status to frontend status */
@@ -203,7 +204,7 @@ function buildAutoClusters(sosRequests: SOSRequest[]): SOSRequest[][] {
     groups.get(root)!.push(pending[i]);
   }
 
-  const priorityOrder = { P1: 0, P2: 1, P3: 2 };
+  const priorityOrder = { P1: 0, P2: 1, P3: 2, P4: 3 };
   return Array.from(groups.values())
     .filter((g) => g.length >= 2)
     .sort(
@@ -1019,7 +1020,7 @@ const CoordinatorDashboardContent = () => {
                           }
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          P1 Khẩn cấp
+                          P1 Rất nghiêm trọng
                         </div>
                       </div>
                       <div>
