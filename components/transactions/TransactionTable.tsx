@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import {
   useDepotTransactions,
@@ -59,10 +60,7 @@ const TransactionTable: React.FC = () => {
   const [selectedActionTypes, setSelectedActionTypes] = useState<string[]>([]);
   const [selectedSourceTypes, setSelectedSourceTypes] = useState<string[]>([]);
   const [selectedSourceNames, setSelectedSourceNames] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<{
-    from?: Date;
-    to?: Date;
-  }>({});
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -87,8 +85,8 @@ const TransactionTable: React.FC = () => {
     pageSize: pageSize,
     actionTypes: selectedActionTypes.length > 0 ? selectedActionTypes : undefined,
     sourceTypes: selectedSourceTypes.length > 0 ? selectedSourceTypes : undefined,
-    fromDate: dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined,
-    toDate: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
+    fromDate: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined,
+    toDate: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
   }), [page, pageSize, selectedActionTypes, selectedSourceTypes, dateRange]);
 
   // Fetch data
@@ -173,7 +171,7 @@ const TransactionTable: React.FC = () => {
     setSelectedActionTypes([]);
     setSelectedSourceTypes([]);
     setSelectedSourceNames([]);
-    setDateRange({});
+    setDateRange(undefined);
   };
 
   const hasActiveFilters = useMemo(() => {
@@ -181,8 +179,8 @@ const TransactionTable: React.FC = () => {
       selectedActionTypes.length > 0 ||
       selectedSourceTypes.length > 0 ||
       selectedSourceNames.length > 0 ||
-      dateRange.from ||
-      dateRange.to;
+        dateRange?.from ||
+        dateRange?.to;
   }, [search, selectedActionTypes, selectedSourceTypes, selectedSourceNames, dateRange]);
 
   // Format date for display
@@ -361,12 +359,12 @@ const TransactionTable: React.FC = () => {
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !dateRange.from && "text-muted-foreground"
+                      !dateRange?.from && "text-muted-foreground"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? (
-                      dateRange.to ? (
+                    {dateRange?.from ? (
+                      dateRange?.to ? (
                         <>
                           {format(dateRange.from, "dd/MM/yyyy", { locale: vi })} -{" "}
                           {format(dateRange.to, "dd/MM/yyyy", { locale: vi })}
@@ -383,7 +381,7 @@ const TransactionTable: React.FC = () => {
                   <Calendar
                     initialFocus
                     mode="range"
-                    defaultMonth={dateRange.from}
+                    defaultMonth={dateRange?.from}
                     selected={dateRange}
                     onSelect={setDateRange}
                     numberOfMonths={2}
@@ -402,7 +400,7 @@ const TransactionTable: React.FC = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Lịch sử giao dịch
+                Lịch sử xuất nhập kho
               </CardTitle>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 {displayTransactions && (
@@ -412,7 +410,7 @@ const TransactionTable: React.FC = () => {
                     </span>
                     <Separator orientation="vertical" className="h-4" />
                     <span>
-                      Tổng {displayTransactions.totalElements.toLocaleString('vi-VN')} giao dịch
+                      Tổng {displayTransactions.totalElements.toLocaleString('vi-VN')} lần
                     </span>
                   </>
                 )}
@@ -426,7 +424,7 @@ const TransactionTable: React.FC = () => {
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
-                      <TableHead>Mã GD</TableHead>
+                      <TableHead>Mã</TableHead>
                       <TableHead>Loại hành động</TableHead>
                       <TableHead>Nguồn</TableHead>
                       <TableHead>Vật tư</TableHead>
@@ -456,7 +454,7 @@ const TransactionTable: React.FC = () => {
                           <div className="flex flex-col items-center gap-2">
                             <Package className="h-8 w-8 text-muted-foreground" />
                             <p className="text-muted-foreground">
-                              Không thể tải dữ liệu giao dịch
+                              Không thể tải dữ liệu
                             </p>
                           </div>
                         </TableCell>
@@ -467,7 +465,7 @@ const TransactionTable: React.FC = () => {
                           <div className="flex flex-col items-center gap-2">
                             <Package className="h-8 w-8 text-muted-foreground" />
                             <p className="text-muted-foreground">
-                              Không có giao dịch nào
+                              Không có dữ liệu xuất nhập kho nào
                             </p>
                           </div>
                         </TableCell>

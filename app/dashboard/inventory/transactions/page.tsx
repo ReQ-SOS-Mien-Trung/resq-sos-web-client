@@ -10,9 +10,9 @@ const TransactionsPage: React.FC = () => {
       <header className="border-b bg-background px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Truy xuất giao dịch</h1>
+            <h1 className="text-2xl font-bold text-foreground">Truy xuất xuất nhập kho</h1>
             <p className="text-sm text-muted-foreground">
-              Theo dõi tất cả các giao dịch xuất nhập kho
+              Theo dõi tất cả các lần xuất nhập kho
             </p>
           </div>
         </div>
