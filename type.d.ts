@@ -542,20 +542,13 @@ export interface FloodAlertsProps {
 // User Management Types
 export interface UserTableProps {
   users: User[];
-  filters?: UserFilters;
   onEdit?: (user: User) => void;
-  onDelete?: (user: User) => void;
   onBan?: (user: User) => void;
   onActivate?: (user: User) => void;
   onViewDetail?: (userId: string) => void;
   onPrefetch?: (userId: string) => void;
-  // server-side pagination
-  page?: number;
-  totalPages?: number;
-  totalCount?: number;
-  pageSize?: number;
-  onPageChange?: (page: number) => void;
   isLoading?: boolean;
+  totalCount?: number;
 }
 
 export interface UserStatsProps {
@@ -566,7 +559,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: "admin" | "coordinator" | "rescuer" | "victim";
+  role: "admin" | "coordinator" | "rescuer" | "victim" | "manager";
   status: "active" | "banned";
   region: string;
   phone: string;

@@ -10,46 +10,42 @@ import {
 } from "@/type";
 import {
   ArrowsCounterClockwise,
+  IdentificationCardIcon,
+  Bell,
+  Boat,
   ChartBar,
   ChatCircle,
   CheckCircle,
   Clock,
-  Cloud as CloudIcon,
+  Cloud,
   CloudSun,
   Drop,
-  Package,
-  Pulse,
-  Robot,
-  SquaresFour,
-  Target,
-  Thermometer,
-  TShirt,
-  UserCheck,
-  Warning,
-  WarningCircle,
-  Wind,
-  XCircle,
-  Boat,
   FirstAid,
-  Truck,
-  Wrench,
-  Users as UsersIcon,
-  MapTrifold,
-} from "@phosphor-icons/react";
-import {
-  Bell,
-  Cloud,
+  ForkKnife,
   Heart,
   MapPin,
-  Shield,
-  Users,
-  Warehouse,
+  MapTrifold,
+  Package,
+  Pulse,
   Radio,
-  BarChart3,
+  Robot,
+  Shield,
+  SquaresFour,
   Stethoscope,
-  ForkKnife,
+  Target,
   Tent,
-} from "lucide-react";
+  Thermometer,
+  TShirt,
+  Truck,
+  UserCheck,
+  Users,
+  Warning,
+  WarningCircle,
+  Warehouse,
+  Wind,
+  Wrench,
+  XCircle,
+} from "@phosphor-icons/react";
 
 export const navLinks = [
   { href: "#features", label: "Tính năng" },
@@ -159,7 +155,7 @@ export const features = [
     label: "Điều phối",
   },
   {
-    icon: <BarChart3 className="w-5 h-5" />,
+    icon: <ChartBar className="w-5 h-5" />,
     label: "Báo cáo",
   },
   {
@@ -337,6 +333,15 @@ export const navigationItems = [
     href: "/dashboard/admin",
   },
   { icon: Users, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
+  {    icon: UserCheck,
+    label: "Quản lý cứu hộ viên",
+    href: "/dashboard/admin/rescuer-verification",
+  },
+  {
+    icon: IdentificationCardIcon,
+    label: "Quản lý hồ sơ cứu hộ viên",
+    href: "/dashboard/admin/rescuer-verification",
+  },
   {
     icon: CloudSun,
     label: "Bài đăng thời tiết",
@@ -348,11 +353,7 @@ export const navigationItems = [
     href: "/dashboard/admin/weather-flood",
   },
   { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
-  {
-    icon: UserCheck,
-    label: "Quản lý cứu hộ viên",
-    href: "/dashboard/admin/rescuer-verification",
-  },
+  
   {
     icon: Robot,
     label: "Cấu hình AI Prompt",
@@ -481,7 +482,7 @@ export const WINDY_LAYERS: {
     label: "Mưa",
     icon: <Drop className="h-4 w-4" weight="fill" />,
   },
-  { id: "clouds", label: "Mây", icon: <CloudIcon className="h-4 w-4" /> },
+  { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
 ];
 
 // ════════════════════════════════
@@ -583,7 +584,7 @@ export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
 };
 
 export const resourceTypeIcons: Record<string, React.ReactNode> = {
-  TEAM: <UsersIcon className="h-5 w-5" weight="fill" />,
+  TEAM: <Users className="h-5 w-5" weight="fill" />,
   BOAT: <Boat className="h-5 w-5" weight="fill" />,
   MEDICAL_KIT: <FirstAid className="h-5 w-5" weight="fill" />,
   EQUIPMENT: <Wrench className="h-5 w-5" weight="fill" />,

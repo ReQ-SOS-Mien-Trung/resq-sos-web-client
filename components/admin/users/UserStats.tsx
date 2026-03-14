@@ -39,10 +39,10 @@ const UserStats = ({ stats }: UserStatsProps) => {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground font-medium mb-1">
+                  <p className="text-sm tracking-tighter text-muted-foreground font-medium mb-1">
                     {item.label}
                   </p>
-                  <p className="text-2xl font-bold text-foreground">
+                  <p className="text-2xl tracking-tighter font-bold text-foreground">
                     {item.value}
                   </p>
                 </div>
