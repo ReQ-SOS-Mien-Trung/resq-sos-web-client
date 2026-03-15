@@ -20,6 +20,7 @@ import {
   useCreateSOSCluster,
   useClusterRescueSuggestion,
   useSOSClusters,
+  useAiMissionStream,
 } from "@/services/sos_cluster/hooks";
 import type {
   ClusterRescueSuggestionResponse,
@@ -52,17 +53,24 @@ import {
   CloudSun,
   MapTrifold,
   SignOut,
+  Phone,
+  UsersThree,
 } from "@phosphor-icons/react";
 import {
   SOSDetailsPanel,
-  RescuePlanPanel,
   SOSSidebar,
   LocationDetailsPanel,
-  ManualMissionBuilder,
 } from "@/components/coordinator";
+import RescuePlanPanel from "@/components/coordinator/RescuePlanPanel";
+import ManualMissionBuilder from "@/components/coordinator/ManualMissionBuilder";
+import AiStreamPanel from "@/components/coordinator/AiStreamPanel";
+
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMapUrlSync } from "@/hooks/useMapUrlSync";
+
+// ── Lazy-loaded map components ──
 
 const CoordinatorMap = dynamic(
   () => import("@/components/coordinator/CoordinatorMap"),
@@ -88,14 +96,170 @@ const WindyLeafletMap = dynamic(
   },
 );
 
-// Inner component that uses searchParams
+// ── Helpers ──
+
+/** Map backend priority to frontend priority code */
+function toPriority(level: string): "P1" | "P2" | "P3" | "P4" {
+  if (level === "Critical") return "P1";
+  if (level === "High") return "P2";
+  if (level === "Medium") return "P3";
+  return "P4";
+}
+
+/** Map backend status to frontend status */
+function toStatus(status: string): "PENDING" | "ASSIGNED" | "RESCUED" {
+  if (status === "Pending") return "PENDING";
+  if (status === "InProgress" || status === "Assigned") return "ASSIGNED";
+  return "RESCUED";
+}
+
+/** Convert SOSRequestEntity from API to SOSRequest used by UI */
+function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
+  const sd = entity.structuredData;
+  const si = entity.senderInfo;
+  const nm = entity.networkMetadata;
+  const supplies = sd?.supplies ?? [];
+  const receivedAt = entity.receivedAt ?? entity.createdAt;
+  const createdAt = new Date(receivedAt);
+  const computedWaitTimeMinutes =
+    entity.waitTimeMinutes ??
+    Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 60000));
+
+  return {
+    id: String(entity.id),
+    groupId: entity.clusterId ? String(entity.clusterId) : String(entity.id),
+    location: { lat: entity.latitude, lng: entity.longitude },
+    priority: toPriority(entity.priorityLevel),
+    needs: {
+      medical: sd?.need_medical ?? supplies.includes("MEDICINE"),
+      food: supplies.includes("FOOD") || supplies.includes("WATER"),
+      boat:
+        supplies.includes("RESCUE_EQUIPMENT") ||
+        supplies.includes("TRANSPORTATION"),
+    },
+    status: toStatus(entity.status),
+    message: entity.msg,
+    createdAt,
+    peopleCount: sd?.people_count,
+    injuredPersons: sd?.injured_persons?.map((person) => ({
+      index: person.index,
+      name: person.name,
+      customName: person.custom_name,
+      personType: person.person_type,
+      medicalIssues: person.medical_issues,
+      severity: person.severity,
+    })),
+    waitTimeMinutes: computedWaitTimeMinutes,
+    sosType: entity.sosType ?? undefined,
+    situation: sd?.situation,
+    medicalIssues: sd?.medical_issues,
+    supplies: sd?.supplies,
+    canMove: sd?.can_move,
+    hasInjured: sd?.has_injured,
+    othersAreStable: sd?.others_are_stable,
+    additionalDescription: sd?.additional_description ?? undefined,
+    senderPhone: si?.user_phone ?? undefined,
+    senderName: si?.user_name ?? undefined,
+    isOnline: si?.is_online,
+    hopCount: nm?.hop_count,
+    locationAccuracy: entity.locationAccuracy,
+  };
+}
+
+/** Haversine distance in km between two lat/lng points */
+function haversine(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Group nearby PENDING SOS requests within 10km using Union-Find */
+function buildAutoClusters(sosRequests: SOSRequest[]): SOSRequest[][] {
+  const pending = sosRequests.filter(
+    (s) => s.status === "PENDING" && s.groupId === s.id,
+  );
+  const n = pending.length;
+  if (n < 2) return [];
+
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (x: number): number =>
+    parent[x] === x ? x : (parent[x] = find(parent[x]));
+  const union = (a: number, b: number) => {
+    parent[find(a)] = find(b);
+  };
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const d = haversine(
+        pending[i].location.lat,
+        pending[i].location.lng,
+        pending[j].location.lat,
+        pending[j].location.lng,
+      );
+      if (d <= 10) union(i, j);
+    }
+  }
+
+  const groups = new Map<number, SOSRequest[]>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root)!.push(pending[i]);
+  }
+
+  const priorityOrder = { P1: 0, P2: 1, P3: 2, P4: 3 };
+  return Array.from(groups.values())
+    .filter((g) => g.length >= 2)
+    .sort(
+      (a, b) =>
+        Math.min(...a.map((s) => priorityOrder[s.priority])) -
+        Math.min(...b.map((s) => priorityOrder[s.priority])),
+    );
+}
+
+/** Get SOS requests belonging to a specific cluster */
+function getClusterSOSRequests(
+  clusterId: number | null,
+  sosRequests: SOSRequest[],
+  clusters: SOSClusterEntity[],
+): SOSRequest[] {
+  if (!clusterId) return [];
+  const cluster = clusters.find((c) => c.id === clusterId);
+  if (!cluster) return [];
+  const idSet = new Set(cluster.sosRequestIds.map(String));
+  return sosRequests.filter((s) => idSet.has(s.id));
+}
+
+// ── Main Dashboard Content ──
+
 const CoordinatorDashboardContent = () => {
-  // URL params for weather map mode
+  // ─── URL Sync ───
+  const {
+    urlState,
+    hasInitialView,
+    initialCenter,
+    initialZoom,
+    handleMapViewChange,
+    handleEntitySelect,
+    clearSelection,
+  } = useMapUrlSync();
+
   const searchParams = useSearchParams();
   const router = useRouter();
-  const isWeatherMode = searchParams.get("mode") === "weather";
+  const isWeatherMode = urlState.mode === "weather";
 
-  // State management
+  // ─── UI State ───
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedSOS, setSelectedSOS] = useState<SOSRequest | null>(null);
   const [selectedRescuer, setSelectedRescuer] = useState<Rescuer | null>(null);
@@ -103,97 +267,138 @@ const CoordinatorDashboardContent = () => {
   const [flyToZoom, setFlyToZoom] = useState<number | undefined>(undefined);
   const [isConnected] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // Geolocation: current device position
   const [userLocation, setUserLocation] = useState<Location | null>(null);
+  /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
+  const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
 
-  // Panel states
+  // ─── Panel State ───
   const [sosDetailOpen, setSOSDetailOpen] = useState(false);
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
+  const [rescuePlanDefaultTab, setRescuePlanDefaultTab] = useState<
+    "plan" | "missions" | undefined
+  >(undefined);
   const [rescueSuggestion, setRescueSuggestion] =
     useState<ClusterRescueSuggestionResponse | null>(null);
   const [activeClusterId, setActiveClusterId] = useState<number | null>(null);
+  // Cache of rescue suggestions per cluster ID
+  const suggestionCacheRef = useRef<
+    Map<number, ClusterRescueSuggestionResponse>
+  >(new Map());
   const [locationPanelOpen, setLocationPanelOpen] = useState(false);
   const [locationPanelData, setLocationPanelData] =
     useState<LocationPanelData | null>(null);
 
-  // Manual mission builder
+  // ─── Manual Mission Builder ───
   const [manualMissionOpen, setManualMissionOpen] = useState(false);
   const [manualMissionClusterId, setManualMissionClusterId] = useState<
     number | null
   >(null);
+  const [existingMissionId, setExistingMissionId] = useState<number | null>(
+    null,
+  );
 
-  // Multi-select SOS for clustering
+  // ─── Processing State ───
   const [processingClusterIndex, setProcessingClusterIndex] = useState<
     number | null
   >(null);
   const [processingSosId, setProcessingSosId] = useState<string | null>(null);
-
-  // Track which backend cluster is being analyzed
   const [analyzingClusterId, setAnalyzingClusterId] = useState<number | null>(
     null,
   );
 
-  // Remember sidebar state before RescuePlanPanel opens
+  // ─── Refs ───
   const sidebarBeforeRescuePlanRef = useRef(true);
+  const initialSelectionAppliedRef = useRef(false);
+  const [notificationCount] = useState(3);
 
-  // Track if CoordinatorMap has been loaded (which loads Leaflet 1.9.4)
-  const coordinatorMapLoadedRef = useRef(false);
+  // ─── Data Fetching ───
+  const { data: sosData } = useSOSRequests({
+    params: { pageSize: 200 },
+  });
+  const { data: depotsData } = useDepots({ params: { pageSize: 100 } });
+  const { data: assemblyPointsData } = useAssemblyPoints({
+    params: { pageSize: 100 },
+  });
+  const { data: clustersData } = useSOSClusters();
 
-  // Handle weather map toggle - use URL navigation to force full page reload
-  const handleWeatherMapToggle = useCallback(() => {
-    if (isWeatherMode) {
-      // Switch back to SOS map - remove mode param
-      router.push("/dashboard/coordinator");
-    } else {
-      // Switch to weather map - add mode param (this will cause a navigation/reload)
-      window.location.href = "/dashboard/coordinator?mode=weather";
-    }
-  }, [isWeatherMode, router]);
+  const sosRequests = useMemo(
+    () => sosData?.items?.map(mapEntityToSOS) ?? [],
+    [sosData],
+  );
+  const depots = useMemo<DepotEntity[]>(
+    () => depotsData?.items ?? [],
+    [depotsData],
+  );
+  const assemblyPoints = useMemo<AssemblyPointEntity[]>(
+    () => assemblyPointsData?.items ?? [],
+    [assemblyPointsData],
+  );
+  const clusters = useMemo<SOSClusterEntity[]>(
+    () => clustersData?.clusters ?? [],
+    [clustersData],
+  );
 
-  // Track when CoordinatorMap loads
-  useEffect(() => {
-    if (!isWeatherMode) {
-      coordinatorMapLoadedRef.current = true;
-    }
-  }, [isWeatherMode]);
+  const autoClusters = useMemo(
+    () => buildAutoClusters(sosRequests),
+    [sosRequests],
+  );
 
-  // Watch user's current geolocation
+  // ─── Auth ───
+  const { mutate: logout, isPending: isLoggingOut } = useLogout();
+  const user = useAuthStore((state) => state.user);
+  const userInitials = user?.fullName
+    ? user.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "U";
+
+  // ─── Mutations ───
+  const { mutate: createCluster, isPending: isCreatingCluster } =
+    useCreateSOSCluster();
+  const {
+    mutate: fetchClusterRescueSuggestion,
+    isPending: isFetchingSuggestion,
+  } = useClusterRescueSuggestion();
+  const isProcessingSOS = isCreatingCluster || isFetchingSuggestion;
+
+  // ─── AI Stream ───
+  const aiStream = useAiMissionStream();
+  const [aiStreamOpen, setAiStreamOpen] = useState(false);
+  const [aiStreamClusterId, setAiStreamClusterId] = useState<number | null>(
+    null,
+  );
+
+  // ─── Geolocation ───
   useEffect(() => {
     if (!navigator.geolocation) return;
 
-    // Get initial position
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      (pos) =>
         setUserLocation({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
-        });
-      },
-      (err) => {
-        console.warn("Geolocation error:", err.message);
-      },
+        }),
+      (err) => console.warn("Geolocation error:", err.message),
       { enableHighAccuracy: true, timeout: 10000 },
     );
 
-    // Continuously watch position
     const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
+      (pos) =>
         setUserLocation({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
-        });
-      },
-      (err) => {
-        console.warn("Geolocation watch error:", err.message);
-      },
+        }),
+      (err) => console.warn("Geolocation watch error:", err.message),
       { enableHighAccuracy: true },
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // Auto-collapse sidebar when RescuePlanPanel opens, restore when it closes
+  // ─── Sidebar auto-collapse when RescuePlanPanel opens ───
   useEffect(() => {
     if (rescuePlanOpen) {
       sidebarBeforeRescuePlanRef.current = sidebarOpen;
@@ -204,197 +409,93 @@ const CoordinatorDashboardContent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rescuePlanOpen]);
 
-  // Notification count (mock)
-  const [notificationCount] = useState(3);
+  // ─── URL → State: Restore selection from URL on initial load ───
+  useEffect(() => {
+    if (initialSelectionAppliedRef.current) return;
+    if (!urlState.selected) return;
 
-  // Fetch SOS requests from backend
-  const { data: sosData } = useSOSRequests();
+    const sel = urlState.selected;
 
-  // Map SOSRequestEntity → SOSRequest (for sidebar/panels)
-  const sosRequests: SOSRequest[] = useMemo(() => {
-    if (!sosData?.items) return [];
-    return sosData.items.map((entity: SOSRequestEntity): SOSRequest => {
-      const sd = entity.structuredData;
-      const si = entity.senderInfo;
-      const nm = entity.networkMetadata;
-      const supplies = sd?.supplies ?? [];
-
-      return {
-        id: String(entity.id),
-        groupId: entity.clusterId
-          ? String(entity.clusterId)
-          : String(entity.id),
-        location: { lat: entity.latitude, lng: entity.longitude },
-        priority:
-          entity.priorityLevel === "Critical"
-            ? "P1"
-            : entity.priorityLevel === "High"
-              ? "P1"
-              : entity.priorityLevel === "Medium"
-                ? "P2"
-                : "P3",
-        needs: {
-          medical: sd?.need_medical ?? supplies.includes("MEDICINE"),
-          food: supplies.includes("FOOD") || supplies.includes("WATER"),
-          boat:
-            supplies.includes("RESCUE_EQUIPMENT") ||
-            supplies.includes("TRANSPORTATION"),
-        },
-        status:
-          entity.status === "Pending"
-            ? "PENDING"
-            : entity.status === "InProgress" || entity.status === "Assigned"
-              ? "ASSIGNED"
-              : "RESCUED",
-        message: entity.msg,
-        createdAt: new Date(entity.createdAt),
-        // Extended fields
-        peopleCount: sd?.people_count,
-        waitTimeMinutes: entity.waitTimeMinutes,
-        situation: sd?.situation,
-        medicalIssues: sd?.medical_issues,
-        supplies: sd?.supplies,
-        canMove: sd?.can_move,
-        hasInjured: sd?.has_injured,
-        othersAreStable: sd?.others_are_stable,
-        additionalDescription: sd?.additional_description,
-        senderPhone: si?.user_phone,
-        senderName: si?.user_name,
-        isOnline: si?.is_online,
-        hopCount: nm?.hop_count,
-        locationAccuracy: entity.locationAccuracy,
-      };
-    });
-  }, [sosData]);
-
-  // Fetch depots from backend for map display
-  const { data: depotsData } = useDepots({
-    params: { pageSize: 100 },
-  });
-
-  const depots: DepotEntity[] = useMemo(() => {
-    if (!depotsData?.items) return [];
-    return depotsData.items;
-  }, [depotsData]);
-
-  // Fetch assembly points from backend for map display
-  const { data: assemblyPointsData } = useAssemblyPoints({
-    params: { pageSize: 100 },
-  });
-
-  const assemblyPoints: AssemblyPointEntity[] = useMemo(() => {
-    if (!assemblyPointsData?.items) return [];
-    return assemblyPointsData.items;
-  }, [assemblyPointsData]);
-
-  // Fetch SOS clusters for map display
-  const { data: clustersData } = useSOSClusters();
-
-  const clusters: SOSClusterEntity[] = useMemo(() => {
-    if (!clustersData?.clusters) return [];
-    return clustersData.clusters;
-  }, [clustersData]);
-
-  // Logout hook
-  const { mutate: logout, isPending: isLoggingOut } = useLogout();
-
-  // User info from auth store
-  const user = useAuthStore((state) => state.user);
-
-  // Get user initials for avatar
-  const userInitials = user?.fullName
-    ? user.fullName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "U";
-
-  // ── Auto-cluster PENDING SOS by 10 km proximity ──
-  const autoClusters: SOSRequest[][] = useMemo(() => {
-    // Only include PENDING requests that are NOT already in a cluster
-    const pending = sosRequests.filter(
-      (s) => s.status === "PENDING" && s.groupId === s.id,
-    );
-    const n = pending.length;
-    if (n < 2) return [];
-
-    // Haversine distance in km
-    const haversine = (
-      lat1: number,
-      lng1: number,
-      lat2: number,
-      lng2: number,
-    ) => {
-      const R = 6371;
-      const dLat = ((lat2 - lat1) * Math.PI) / 180;
-      const dLng = ((lng2 - lng1) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos((lat1 * Math.PI) / 180) *
-          Math.cos((lat2 * Math.PI) / 180) *
-          Math.sin(dLng / 2) ** 2;
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
-
-    // Union-Find for connected-component grouping
-    const parent = Array.from({ length: n }, (_, i) => i);
-    const find = (x: number): number =>
-      parent[x] === x ? x : (parent[x] = find(parent[x]));
-    const union = (a: number, b: number) => {
-      parent[find(a)] = find(b);
-    };
-
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const d = haversine(
-          pending[i].location.lat,
-          pending[i].location.lng,
-          pending[j].location.lat,
-          pending[j].location.lng,
-        );
-        if (d <= 10) union(i, j); // ≤ 10 km
+    if (sel.type === "sos" && sosRequests.length > 0) {
+      const sos = sosRequests.find((s) => s.id === sel.id);
+      if (sos) {
+        setSelectedSOS(sos);
+        setSOSDetailOpen(true);
+        if (!hasInitialView) {
+          setFlyToLocation(sos.location);
+        }
+        initialSelectionAppliedRef.current = true;
+      }
+    } else if (sel.type === "cluster" && clusters.length > 0) {
+      const cluster = clusters.find((c) => c.id === sel.id);
+      if (cluster) {
+        setFlyToZoom(13);
+        setFlyToLocation({
+          lat: cluster.centerLatitude,
+          lng: cluster.centerLongitude,
+        });
+        initialSelectionAppliedRef.current = true;
+      }
+    } else if (sel.type === "depot" && depots.length > 0) {
+      const depot = depots.find((d) => d.id === sel.id);
+      if (depot) {
+        setLocationPanelData({ type: "depot", data: depot });
+        setLocationPanelOpen(true);
+        if (!hasInitialView) {
+          setFlyToLocation({ lat: depot.latitude, lng: depot.longitude });
+        }
+        initialSelectionAppliedRef.current = true;
+      }
+    } else if (sel.type === "assemblyPoint" && assemblyPoints.length > 0) {
+      const point = assemblyPoints.find((p) => p.id === sel.id);
+      if (point) {
+        setLocationPanelData({ type: "assemblyPoint", data: point });
+        setLocationPanelOpen(true);
+        if (!hasInitialView) {
+          setFlyToLocation({ lat: point.latitude, lng: point.longitude });
+        }
+        initialSelectionAppliedRef.current = true;
       }
     }
+  }, [
+    urlState.selected,
+    sosRequests,
+    clusters,
+    depots,
+    assemblyPoints,
+    hasInitialView,
+  ]);
 
-    const groups = new Map<number, SOSRequest[]>();
-    for (let i = 0; i < n; i++) {
-      const root = find(i);
-      if (!groups.has(root)) groups.set(root, []);
-      groups.get(root)!.push(pending[i]);
+  // ─── URL → State: Set initial map view from URL ───
+  const initialFlyAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialFlyAppliedRef.current || !hasInitialView || !urlState.view)
+      return;
+    setFlyToZoom(urlState.view.zoom);
+    setFlyToLocation({ lat: urlState.view.lat, lng: urlState.view.lng });
+    initialFlyAppliedRef.current = true;
+  }, [hasInitialView, urlState.view]);
+
+  // ─── Handlers ───
+
+  const handleWeatherMapToggle = useCallback(() => {
+    if (isWeatherMode) {
+      router.push("/dashboard/coordinator");
+    } else {
+      window.location.href = "/dashboard/coordinator?mode=weather";
     }
+  }, [isWeatherMode, router]);
 
-    // Only keep groups with ≥ 2 requests, sorted by highest priority
-    const priorityOrder = { P1: 0, P2: 1, P3: 2 };
-    return Array.from(groups.values())
-      .filter((g) => g.length >= 2)
-      .sort(
-        (a, b) =>
-          Math.min(...a.map((s) => priorityOrder[s.priority])) -
-          Math.min(...b.map((s) => priorityOrder[s.priority])),
-      );
-  }, [sosRequests]);
-
-  // Cluster creation mutation
-  const { mutate: createCluster, isPending: isCreatingCluster } =
-    useCreateSOSCluster();
-
-  // Rescue suggestion mutation (cluster-based)
-  const {
-    mutate: fetchClusterRescueSuggestion,
-    isPending: isFetchingSuggestion,
-  } = useClusterRescueSuggestion();
-
-  const isProcessingSOS = isCreatingCluster || isFetchingSuggestion;
-
-  // Handlers
-  const handleSOSSelect = useCallback((sos: SOSRequest) => {
-    setSelectedSOS(sos);
-    setFlyToZoom(undefined);
-    setFlyToLocation(sos.location);
-    setSOSDetailOpen(true);
-  }, []);
+  const handleSOSSelect = useCallback(
+    (sos: SOSRequest) => {
+      setSelectedSOS(sos);
+      setFlyToZoom(undefined);
+      setFlyToLocation(sos.location);
+      setSOSDetailOpen(true);
+      handleEntitySelect({ type: "sos", id: sos.id });
+    },
+    [handleEntitySelect],
+  );
 
   const handleRescuerSelect = useCallback((rescuer: Rescuer) => {
     setSelectedRescuer(rescuer);
@@ -402,14 +503,17 @@ const CoordinatorDashboardContent = () => {
     setFlyToLocation(rescuer.location);
   }, []);
 
-  const handleDepotSelect = useCallback((depot: DepotEntity) => {
-    setLocationPanelData({ type: "depot", data: depot });
-    setLocationPanelOpen(true);
-    setFlyToZoom(undefined);
-    setFlyToLocation({ lat: depot.latitude, lng: depot.longitude });
-    // Close other panels
-    setSOSDetailOpen(false);
-  }, []);
+  const handleDepotSelect = useCallback(
+    (depot: DepotEntity) => {
+      setLocationPanelData({ type: "depot", data: depot });
+      setLocationPanelOpen(true);
+      setFlyToZoom(undefined);
+      setFlyToLocation({ lat: depot.latitude, lng: depot.longitude });
+      setSOSDetailOpen(false);
+      handleEntitySelect({ type: "depot", id: depot.id });
+    },
+    [handleEntitySelect],
+  );
 
   const handleAssemblyPointSelect = useCallback(
     (point: AssemblyPointEntity) => {
@@ -417,35 +521,40 @@ const CoordinatorDashboardContent = () => {
       setLocationPanelOpen(true);
       setFlyToZoom(undefined);
       setFlyToLocation({ lat: point.latitude, lng: point.longitude });
-      // Close other panels
       setSOSDetailOpen(false);
+      handleEntitySelect({ type: "assemblyPoint", id: point.id });
     },
-    [],
+    [handleEntitySelect],
   );
 
-  // Click on existing cluster → zoom into cluster to reveal individual SOS markers
-  const handleClusterSelect = useCallback((cluster: SOSClusterEntity) => {
-    // Zoom to level 13 (past CLUSTER_ZOOM_THRESHOLD=12) to show individual SOS markers
-    setFlyToZoom(13);
-    setFlyToLocation({
-      lat: cluster.centerLatitude,
-      lng: cluster.centerLongitude,
-    });
-  }, []);
+  const handleClusterSelect = useCallback(
+    (cluster: SOSClusterEntity) => {
+      setFlyToZoom(13);
+      setFlyToLocation({
+        lat: Number(cluster.centerLatitude),
+        lng: Number(cluster.centerLongitude),
+      });
+      handleEntitySelect({ type: "cluster", id: cluster.id });
+    },
+    [handleEntitySelect],
+  );
 
-  // View rescue plan history for a cluster (triggered from sidebar)
   const handleViewClusterPlan = useCallback(
     (clusterId: number) => {
       setActiveClusterId(clusterId);
-      setRescueSuggestion(null);
       const cluster = clusters.find((c) => c.id === clusterId);
       if (cluster) {
         setFlyToZoom(undefined);
         setFlyToLocation({
-          lat: cluster.centerLatitude,
-          lng: cluster.centerLongitude,
+          lat: Number(cluster.centerLatitude),
+          lng: Number(cluster.centerLongitude),
         });
       }
+      // Use cached suggestion if available, otherwise open in history mode
+      // (RescuePlanPanel will auto-display the latest from useMissionSuggestions)
+      const cached = suggestionCacheRef.current.get(clusterId);
+      setRescueSuggestion(cached ?? null);
+      setRescuePlanDefaultTab(undefined);
       setRescuePlanOpen(true);
       setSOSDetailOpen(false);
       setLocationPanelOpen(false);
@@ -453,7 +562,6 @@ const CoordinatorDashboardContent = () => {
     [clusters],
   );
 
-  // Create clusters only (no AI suggestion) — one API call per auto-cluster group
   const handleClusterOnly = useCallback(
     (clusterGroups: SOSRequest[][]) => {
       let created = 0;
@@ -470,9 +578,9 @@ const CoordinatorDashboardContent = () => {
         createCluster(
           { sosRequestIds: ids },
           {
-            onSuccess: (clusterData) => {
+            onSuccess: (data) => {
               created++;
-              setActiveClusterId(clusterData.clusterId);
+              setActiveClusterId(data.clusterId);
               if (created + failed === total) {
                 toast.success(`Đã gom thành công ${created} cụm SOS`);
               }
@@ -497,10 +605,8 @@ const CoordinatorDashboardContent = () => {
     [createCluster],
   );
 
-  // Create cluster → then trigger AI suggestion (accepts SOS IDs from auto-cluster)
   const handleProcessSOS = useCallback(
     (sosIds: string[]) => {
-      // Filter to only include PENDING SOS requests
       const pendingIds = sosIds.filter((id) => {
         const sos = sosRequests.find((s) => s.id === id);
         return sos?.status === "PENDING";
@@ -508,13 +614,11 @@ const CoordinatorDashboardContent = () => {
       const ids = pendingIds.map(Number).filter(Boolean);
       if (ids.length === 0) return;
 
-      // Determine which auto-cluster index is being processed (for UI spinner)
       const clusterIdx = autoClusters.findIndex((cluster) =>
         sosIds.every((id) => cluster.some((s) => s.id === id)),
       );
       setProcessingClusterIndex(clusterIdx >= 0 ? clusterIdx : null);
 
-      // Track standalone SOS processing (single SOS cluster)
       if (sosIds.length === 1 && clusterIdx < 0) {
         setProcessingSosId(sosIds[0]);
       }
@@ -524,36 +628,12 @@ const CoordinatorDashboardContent = () => {
         {
           onSuccess: (clusterData) => {
             setActiveClusterId(clusterData.clusterId);
-            // Now trigger AI rescue suggestion with the created cluster
-            fetchClusterRescueSuggestion(clusterData.clusterId, {
-              onSuccess: (suggestion) => {
-                if (!suggestion.isSuccess) {
-                  console.error(
-                    "AI suggestion failed:",
-                    suggestion.errorMessage,
-                  );
-                  toast.error(
-                    suggestion.errorMessage ||
-                      "Đề xuất AI không thành công. Vui lòng thử lại.",
-                  );
-                  setProcessingClusterIndex(null);
-                  setProcessingSosId(null);
-                  return;
-                }
-                setRescueSuggestion(suggestion);
-                setRescuePlanOpen(true);
-                setProcessingClusterIndex(null);
-                setProcessingSosId(null);
-              },
-              onError: (error) => {
-                console.error("Failed to get rescue suggestion:", error);
-                toast.error(
-                  "Đã gom cụm thành công nhưng không thể lấy đề xuất AI. Vui lòng thử lại.",
-                );
-                setProcessingClusterIndex(null);
-                setProcessingSosId(null);
-              },
-            });
+            setAnalyzingClusterId(clusterData.clusterId);
+            setAiStreamClusterId(clusterData.clusterId);
+            setAiStreamOpen(true);
+            aiStream.startStream(clusterData.clusterId);
+            setProcessingClusterIndex(null);
+            setProcessingSosId(null);
           },
           onError: (error) => {
             console.error("Failed to create cluster:", error);
@@ -567,63 +647,122 @@ const CoordinatorDashboardContent = () => {
     [sosRequests, autoClusters, createCluster, fetchClusterRescueSuggestion],
   );
 
-  // Analyze an existing backend cluster with AI
   const handleAnalyzeCluster = useCallback(
     (clusterId: number) => {
       setAnalyzingClusterId(clusterId);
       setActiveClusterId(clusterId);
-      fetchClusterRescueSuggestion(clusterId, {
-        onSuccess: (suggestion) => {
-          setAnalyzingClusterId(null);
-          if (!suggestion.isSuccess) {
-            console.error("AI suggestion failed:", suggestion.errorMessage);
-            toast.error(
-              suggestion.errorMessage ||
-                "Đề xuất AI không thành công. Vui lòng thử lại.",
-            );
-            return;
-          }
-          setRescueSuggestion(suggestion);
-          setRescuePlanOpen(true);
-        },
-        onError: (error) => {
-          console.error("Failed to get rescue suggestion:", error);
-          toast.error("Không thể lấy đề xuất AI. Vui lòng thử lại.");
-          setAnalyzingClusterId(null);
-        },
-      });
+      setAiStreamClusterId(clusterId);
+      setAiStreamOpen(true);
+      aiStream.startStream(clusterId);
     },
-    [fetchClusterRescueSuggestion],
+    [aiStream],
   );
 
+  // When stream produces a result, cache it and update sidebar state
+  useEffect(() => {
+    if (aiStream.result && aiStreamClusterId) {
+      setRescueSuggestion(aiStream.result);
+      suggestionCacheRef.current.set(aiStreamClusterId, aiStream.result);
+      setAnalyzingClusterId(null);
+    }
+  }, [aiStream.result, aiStreamClusterId]);
+
+  // When stream errors or stops, clear analyzing state
+  useEffect(() => {
+    if (aiStream.error) {
+      setAnalyzingClusterId(null);
+    }
+  }, [aiStream.error]);
+
+  // When stream finishes loading, clear analyzing state
+  useEffect(() => {
+    if (!aiStream.loading && aiStreamClusterId) {
+      setAnalyzingClusterId(null);
+    }
+  }, [aiStream.loading, aiStreamClusterId]);
+
   const handleApproveDecision = useCallback(() => {
-    toast.success("Nhiệm vụ đã được phê duyệt và gửi đến đội cứu hộ!");
+    toast.success("Đã tạo nhiệm vụ thành công!");
     setRescuePlanOpen(false);
     setSOSDetailOpen(false);
     setSelectedSOS(null);
     setRescueSuggestion(null);
     setActiveClusterId(null);
-  }, []);
+    clearSelection();
+  }, [clearSelection]);
 
-  // Open manual mission builder for a cluster
   const handleOpenManualMission = useCallback((clusterId: number) => {
     setManualMissionClusterId(clusterId);
+    setExistingMissionId(null);
     setManualMissionOpen(true);
-    // Close other panels
     setSOSDetailOpen(false);
     setRescuePlanOpen(false);
     setLocationPanelOpen(false);
   }, []);
 
+  const handleViewMission = useCallback(
+    (clusterId: number | null, missionId: number) => {
+      setManualMissionClusterId(clusterId);
+      setExistingMissionId(missionId);
+      setManualMissionOpen(true);
+      setSOSDetailOpen(false);
+      setRescuePlanOpen(false);
+      setLocationPanelOpen(false);
+    },
+    [],
+  );
+
   const handleManualMissionCreated = useCallback(() => {
     setManualMissionOpen(false);
     setManualMissionClusterId(null);
+    setExistingMissionId(null);
   }, []);
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    document.documentElement.classList.toggle("dark");
-  };
+  const handleReAnalyze = useCallback(() => {
+    if (!activeClusterId) return;
+    setAiStreamClusterId(activeClusterId);
+    setAiStreamOpen(true);
+    setRescuePlanOpen(false);
+    aiStream.startStream(activeClusterId);
+  }, [activeClusterId, aiStream]);
+
+  const toggleDarkMode = useCallback(() => {
+    setIsDarkMode((prev) => {
+      document.documentElement.classList.toggle("dark");
+      return !prev;
+    });
+  }, []);
+
+  // ─── Derived data for panels ───
+
+  const rescuePlanSOSRequests = useMemo(
+    () => getClusterSOSRequests(activeClusterId, sosRequests, clusters),
+    [activeClusterId, sosRequests, clusters],
+  );
+
+  const manualMissionSOSRequests = useMemo(
+    () => getClusterSOSRequests(manualMissionClusterId, sosRequests, clusters),
+    [manualMissionClusterId, sosRequests, clusters],
+  );
+
+  const nearbySOSForDetail = useMemo(() => {
+    if (!selectedSOS) return [];
+    return (
+      autoClusters
+        .find((c) => c.some((s) => s.id === selectedSOS.id))
+        ?.filter((s) => s.id !== selectedSOS.id) ?? []
+    );
+  }, [selectedSOS, autoClusters]);
+
+  const activeManualCluster = useMemo(
+    () =>
+      manualMissionClusterId
+        ? (clusters.find((c) => c.id === manualMissionClusterId) ?? null)
+        : null,
+    [manualMissionClusterId, clusters],
+  );
+
+  // ── Render ──
 
   return (
     <div
@@ -632,8 +771,8 @@ const CoordinatorDashboardContent = () => {
         isDarkMode && "dark",
       )}
     >
-      {/* Top Header Bar */}
-      <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0 z-20">
+      {/* ━━━ Top Header Bar ━━━ */}
+      <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0 relative z-[1200]">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -641,11 +780,10 @@ const CoordinatorDashboardContent = () => {
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="shrink-0"
           >
-            {sidebarOpen ? (
-              <SidebarSimple className="h-5 w-5" weight="fill" />
-            ) : (
-              <SidebarSimple className="h-5 w-5" />
-            )}
+            <SidebarSimple
+              className="h-5 w-5"
+              weight={sidebarOpen ? "fill" : "regular"}
+            />
           </Button>
 
           <div className="flex items-center gap-2">
@@ -654,7 +792,7 @@ const CoordinatorDashboardContent = () => {
               alt="ReQ-SOS Logo"
               width={80}
               height={32}
-              className="dark:invert h-8 w-auto object-contain"
+              className="dark:invert h-auto w-auto object-contain"
             />
             <Badge variant="secondary" className="text-xs">
               Miền Trung
@@ -663,6 +801,17 @@ const CoordinatorDashboardContent = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Rescue Teams Navigation */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/dashboard/coordinator/rescue-teams")}
+            className="flex items-center gap-2"
+          >
+            <UsersThree className="h-4 w-4" />
+            <span>Quản lý Đội cứu hộ</span>
+          </Button>
+
           {/* Connection Status */}
           <div
             className={cn(
@@ -733,7 +882,7 @@ const CoordinatorDashboardContent = () => {
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-48 z-[1200]">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
                   <span className="font-semibold">
@@ -776,7 +925,7 @@ const CoordinatorDashboardContent = () => {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* ━━━ Main Content ━━━ */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside
@@ -801,10 +950,12 @@ const CoordinatorDashboardContent = () => {
               processingSosId={processingSosId}
               backendClusters={clusters}
               onAnalyzeCluster={handleAnalyzeCluster}
-              isAnalyzingCluster={isFetchingSuggestion}
+              isAnalyzingCluster={aiStream.loading || isFetchingSuggestion}
               analyzingClusterId={analyzingClusterId}
+              analyzingStatus={aiStream.status}
               onManualMission={handleOpenManualMission}
               onViewClusterPlan={handleViewClusterPlan}
+              onViewMission={handleViewMission}
             />
           )}
         </aside>
@@ -831,6 +982,7 @@ const CoordinatorDashboardContent = () => {
                 depots={depots}
                 assemblyPoints={assemblyPoints}
                 clusters={clusters}
+                autoClusters={autoClusters}
                 selectedSOS={selectedSOS}
                 selectedRescuer={selectedRescuer}
                 aiDecision={null}
@@ -842,9 +994,40 @@ const CoordinatorDashboardContent = () => {
                 flyToLocation={flyToLocation}
                 flyToZoom={flyToZoom}
                 userLocation={userLocation}
+                onViewChange={handleMapViewChange}
+                routeOverlay={routeOverlay}
               />
 
-              {/* Floating Stats Panel - Only show when SOS detail panel is closed */}
+              {/* Floating Action Buttons */}
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[40] flex items-center gap-3">
+                {/* Create Rescue Team Button */}
+                <Button
+                  size="lg"
+                  className="rounded-full shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold gap-2 px-6 h-12 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105"
+                  onClick={() => {
+                    router.push("/dashboard/coordinator/rescue-teams/create");
+                  }}
+                >
+                  <span className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                  <UsersThree className="w-5 h-5" weight="fill" />
+                  <span className="tracking-wide">TẠO ĐỘI CỨU HỘ</span>
+                </Button>
+
+                {/* Create SOS Button */}
+                <Button
+                  size="lg"
+                  className="rounded-full shadow-[0_0_30px_rgba(220,38,38,0.4)] bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold gap-2.5 px-8 h-14 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105"
+                  onClick={() => {
+                    router.push("/dashboard/coordinator/create-sos");
+                  }}
+                >
+                  <span className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                  <Phone className="w-5 h-5 animate-bounce" weight="fill" />
+                  <span className="tracking-wide">TẠO YÊU CẦU SOS</span>
+                </Button>
+              </div>
+
+              {/* Floating Stats Panel */}
               {!sosDetailOpen && (
                 <div className="absolute top-4 right-4 z-[40]">
                   <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
@@ -862,7 +1045,7 @@ const CoordinatorDashboardContent = () => {
                           }
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          P1 Khẩn cấp
+                          P1 Rất nghiêm trọng
                         </div>
                       </div>
                       <div>
@@ -881,95 +1064,75 @@ const CoordinatorDashboardContent = () => {
                 </div>
               )}
 
-              {/* SOS Details Panel - Overlays on map from right */}
+              {/* SOS Details Panel */}
               <SOSDetailsPanel
                 open={sosDetailOpen}
                 onOpenChange={setSOSDetailOpen}
                 sosRequest={selectedSOS}
                 onProcessSOS={handleProcessSOS}
                 isProcessing={isProcessingSOS}
-                nearbySOSRequests={
-                  selectedSOS
-                    ? (autoClusters
-                        .find((c) => c.some((s) => s.id === selectedSOS.id))
-                        ?.filter((s) => s.id !== selectedSOS.id) ?? [])
-                    : []
-                }
+                nearbySOSRequests={nearbySOSForDetail}
                 allSOSRequests={sosRequests}
               />
 
-              {/* Rescue Plan Panel - Slides up from bottom, overlays map and sidebar */}
+              {/* Rescue Plan Panel */}
               <RescuePlanPanel
                 open={rescuePlanOpen}
                 onOpenChange={setRescuePlanOpen}
-                clusterSOSRequests={
-                  activeClusterId
-                    ? sosRequests.filter((s) => {
-                        const cluster = clusters.find(
-                          (c) => c.id === activeClusterId,
-                        );
-                        return cluster?.sosRequestIds
-                          .map(String)
-                          .includes(s.id);
-                      })
-                    : []
-                }
+                clusterSOSRequests={rescuePlanSOSRequests}
                 clusterId={activeClusterId}
                 rescueSuggestion={rescueSuggestion}
                 onApprove={handleApproveDecision}
-                onReAnalyze={() => {
-                  if (!activeClusterId) return;
-                  fetchClusterRescueSuggestion(activeClusterId, {
-                    onSuccess: (suggestion) => {
-                      if (!suggestion.isSuccess) {
-                        toast.error(
-                          suggestion.errorMessage ||
-                            "Phân tích lại không thành công. Vui lòng thử lại.",
-                        );
-                        return;
-                      }
-                      setRescueSuggestion(suggestion);
-                      toast.success("Đã phân tích lại thành công!");
-                    },
-                    onError: () => {
-                      toast.error("Không thể phân tích lại. Vui lòng thử lại.");
-                    },
-                  });
-                }}
-                isReAnalyzing={isFetchingSuggestion}
+                onReAnalyze={handleReAnalyze}
+                isReAnalyzing={isFetchingSuggestion || aiStream.loading}
+                onShowRoute={setRouteOverlay}
+                defaultTab={rescuePlanDefaultTab}
               />
 
-              {/* Location Details Panel - Depot / Assembly Point */}
+              {/* AI Stream Panel */}
+              <AiStreamPanel
+                open={aiStreamOpen}
+                onClose={() => {
+                  setAiStreamOpen(false);
+                  aiStream.stopStream();
+                }}
+                clusterId={aiStreamClusterId}
+                status={aiStream.status}
+                statusLog={aiStream.statusLog}
+                thinkingText={aiStream.thinkingText}
+                result={aiStream.result}
+                error={aiStream.error}
+                loading={aiStream.loading}
+                phase={aiStream.phase}
+                onStop={() => aiStream.stopStream()}
+                onRetry={() => {
+                  if (aiStreamClusterId) {
+                    aiStream.startStream(aiStreamClusterId);
+                  }
+                }}
+                onViewPlan={() => {
+                  setAiStreamOpen(false);
+                  setRescuePlanDefaultTab("plan");
+                  setRescuePlanOpen(true);
+                }}
+              />
+
+              {/* Location Details Panel */}
               <LocationDetailsPanel
                 open={locationPanelOpen}
                 onOpenChange={setLocationPanelOpen}
                 location={locationPanelData}
               />
 
-              {/* Manual Mission Builder - Drag & Drop */}
+              {/* Manual Mission Builder */}
               <ManualMissionBuilder
                 open={manualMissionOpen}
                 onOpenChange={setManualMissionOpen}
                 clusterId={manualMissionClusterId}
-                cluster={
-                  manualMissionClusterId
-                    ? (clusters.find((c) => c.id === manualMissionClusterId) ??
-                      null)
-                    : null
-                }
-                clusterSOSRequests={
-                  manualMissionClusterId
-                    ? sosRequests.filter((s) => {
-                        const cluster = clusters.find(
-                          (c) => c.id === manualMissionClusterId,
-                        );
-                        return cluster?.sosRequestIds
-                          .map(String)
-                          .includes(s.id);
-                      })
-                    : []
-                }
+                cluster={activeManualCluster}
+                clusterSOSRequests={manualMissionSOSRequests}
                 onCreated={handleManualMissionCreated}
+                existingMissionId={existingMissionId}
               />
             </>
           )}
@@ -979,7 +1142,8 @@ const CoordinatorDashboardContent = () => {
   );
 };
 
-// Wrapper component with Suspense for useSearchParams
+// ── Page wrapper with Suspense ──
+
 const CoordinatorDashboardPage = () => {
   return (
     <Suspense
@@ -1002,7 +1166,6 @@ const CoordinatorDashboardPage = () => {
           </header>
           {/* Body Skeleton */}
           <div className="flex-1 flex overflow-hidden">
-            {/* Sidebar Skeleton */}
             <aside className="w-80 shrink-0 border-r bg-background p-4 space-y-4">
               <Skeleton className="h-10 w-full rounded-lg" />
               <div className="space-y-3">
@@ -1018,7 +1181,6 @@ const CoordinatorDashboardPage = () => {
                 ))}
               </div>
             </aside>
-            {/* Map Area Skeleton */}
             <main className="flex-1 relative">
               <Skeleton className="w-full h-full rounded-none" />
             </main>

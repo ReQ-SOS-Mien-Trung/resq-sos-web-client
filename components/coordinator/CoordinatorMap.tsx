@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { PRIORITY_ORDER } from "@/lib/priority";
 
 // Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
 // and the isMounted guard inside this component.
@@ -28,9 +29,25 @@ import {
   TileLayer,
   Marker,
   Polyline,
+  useMap,
+  useMapEvents,
 } from "react-leaflet";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
+
+const RouteOverlayFitBounds = ({ points }: { points: [number, number][] }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map || points.length < 2) return;
+    map.fitBounds(points, {
+      padding: [60, 60],
+      maxZoom: 12,
+    });
+  }, [map, points]);
+
+  return null;
+};
 
 const CoordinatorMap = ({
   sosRequests,
@@ -38,6 +55,7 @@ const CoordinatorMap = ({
   depots,
   assemblyPoints = [],
   clusters = [],
+  autoClusters = [],
   selectedSOS,
   selectedRescuer,
   aiDecision,
@@ -49,6 +67,10 @@ const CoordinatorMap = ({
   flyToLocation,
   flyToZoom,
   userLocation,
+  onViewChange,
+  isPickingLocation,
+  onMapClick,
+  routeOverlay,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0);
@@ -58,6 +80,9 @@ const CoordinatorMap = ({
     lat: number;
     lng: number;
   } | null>(null);
+  const [searchFlyToZoom, setSearchFlyToZoom] = useState<number | undefined>(
+    undefined,
+  );
   const [searchFilter, setSearchFilter] = useState<
     "all" | "depot" | "assemblyPoint"
   >("all");
@@ -162,16 +187,27 @@ const CoordinatorMap = ({
     return ids;
   }, [clusters]);
 
-  // When zoomed in: show all SOS. When zoomed out: hide SOS that belong to a cluster.
+  // Build a set of SOS IDs that belong to an auto-cluster
+  const autoClusteredSOSIds = useMemo(() => {
+    const ids = new Set<string>();
+    autoClusters.forEach((group) => group.forEach((s) => ids.add(s.id)));
+    return ids;
+  }, [autoClusters]);
+
+  // When zoomed in: show all SOS. When zoomed out: hide SOS that belong to a backend or auto cluster.
   const visibleSOSRequests = useMemo(() => {
     if (isZoomedIn) return sosRequests;
-    return sosRequests.filter((s) => !clusteredSOSIds.has(s.id));
-  }, [sosRequests, isZoomedIn, clusteredSOSIds]);
+    return sosRequests.filter(
+      (s) => !clusteredSOSIds.has(s.id) && !autoClusteredSOSIds.has(s.id),
+    );
+  }, [sosRequests, isZoomedIn, clusteredSOSIds, autoClusteredSOSIds]);
 
   // When zoomed in: hide clusters. When zoomed out: merge nearby clusters based on zoom.
-  const visibleClusters = useMemo(() => {
+  type ClusterWithMergeFlag = SOSClusterEntity & { _isMerged: boolean };
+  const visibleClusters = useMemo((): ClusterWithMergeFlag[] => {
     if (isZoomedIn) return [];
-    if (clusters.length <= 1) return clusters;
+    if (clusters.length <= 1)
+      return clusters.map((c) => ({ ...c, _isMerged: false }));
 
     // Merge radius grows as zoom decreases (further out = bigger merge radius)
     // zoom 11 → ~15km, zoom 10 → ~30km, zoom 9 → ~60km, zoom 8 → ~120km ...
@@ -224,7 +260,8 @@ const CoordinatorMap = ({
 
     // Merge groups into virtual clusters
     return Array.from(groups.values()).map((indices) => {
-      if (indices.length === 1) return clusters[indices[0]];
+      if (indices.length === 1)
+        return { ...clusters[indices[0]], _isMerged: false as const };
       // Weighted center by SOS count
       let totalSOS = 0;
       let latSum = 0;
@@ -270,6 +307,7 @@ const CoordinatorMap = ({
         sosRequestIds: allIds,
         severityLevel: highestSeverity as (typeof clusters)[0]["severityLevel"],
         victimEstimated: totalVictims || null,
+        _isMerged: true as const,
       };
     });
   }, [clusters, isZoomedIn, currentZoom, CLUSTER_ZOOM_THRESHOLD]);
@@ -323,6 +361,7 @@ const CoordinatorMap = ({
   // Handle selecting a search result
   const handleSelectResult = (result: SearchResult) => {
     setSearchFlyToLocation({ lat: result.latitude, lng: result.longitude });
+    setSearchFlyToZoom(16); // Default search zoom
     setSelectedSearchName(result.name);
     setSearchQuery("");
     setIsSearchOpen(false);
@@ -602,12 +641,22 @@ const CoordinatorMap = ({
         />
 
         {/* Fly to location handler */}
-        <FlyToHandler location={activeFlyToLocation} zoom={flyToZoom} />
+        <FlyToHandler
+          location={activeFlyToLocation}
+          zoom={searchFlyToLocation ? searchFlyToZoom : flyToZoom}
+        />
 
         {/* Map zoom handler - provides controls to parent */}
         <MapZoomHandler
           onMapReady={handleMapReady}
           onZoomChange={handleZoomChange}
+          onViewChange={onViewChange}
+        />
+
+        {/* Map click handler for picking location */}
+        <MapClickHandler
+          isPickingLocation={isPickingLocation}
+          onMapClick={onMapClick}
         />
 
         {/* SOS Request Markers */}
@@ -648,12 +697,51 @@ const CoordinatorMap = ({
           />
         ))}
 
+        {/* Auto-Cluster Markers (client-side suggested clusters) */}
+        {!isZoomedIn &&
+          autoClusters.map((group, idx) => (
+            <AutoClusterMarker
+              key={`auto-cluster-${idx}`}
+              group={group}
+              index={idx}
+              onClick={() => {
+                // Fly to the auto-cluster center on click
+                const lat =
+                  group.reduce((sum, s) => sum + s.location.lat, 0) /
+                  group.length;
+                const lng =
+                  group.reduce((sum, s) => sum + s.location.lng, 0) /
+                  group.length;
+                setSearchFlyToLocation({ lat, lng });
+                setSearchFlyToZoom(
+                  Math.max(currentZoom + 2, CLUSTER_ZOOM_THRESHOLD),
+                );
+              }}
+            />
+          ))}
+
         {/* Cluster Markers */}
         {visibleClusters.map((cluster) => (
           <ClusterMarker
-            key={`cluster-${cluster.id}`}
+            key={`cluster-${cluster.id}-${cluster._isMerged}`}
             cluster={cluster}
-            onClick={() => onClusterSelect?.(cluster)}
+            isMerged={cluster._isMerged}
+            onClick={() => {
+              if (cluster._isMerged) {
+                // For virtual merged clusters, just fly/zoom in to break them apart
+                const targetZoom = Math.max(
+                  currentZoom + 2,
+                  CLUSTER_ZOOM_THRESHOLD,
+                );
+                setSearchFlyToLocation({
+                  lat: Number(cluster.centerLatitude),
+                  lng: Number(cluster.centerLongitude),
+                });
+                setSearchFlyToZoom(targetZoom);
+              } else {
+                onClusterSelect?.(cluster);
+              }
+            }}
           />
         ))}
 
@@ -671,6 +759,23 @@ const CoordinatorMap = ({
               dashArray: "10, 10",
             }}
           />
+        )}
+
+        {/* Rescue Route Overlay (from ActivityRoutePreview) */}
+        {routeOverlay && routeOverlay.length > 1 && (
+          <>
+            <RouteOverlayFitBounds points={routeOverlay} />
+            <Polyline
+              positions={routeOverlay}
+              pathOptions={{
+                color: "#FF6B35",
+                weight: 5,
+                opacity: 0.9,
+                lineJoin: "round",
+                lineCap: "round",
+              }}
+            />
+          </>
         )}
       </MapContainer>
 
@@ -702,7 +807,10 @@ const CoordinatorMap = ({
           <>
             <div className="h-px bg-border/40 mx-2" />
             <button
-              onClick={() => setSearchFlyToLocation(userLocation)}
+              onClick={() => {
+                setSearchFlyToLocation(userLocation);
+                setSearchFlyToZoom(15);
+              }}
               className="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 border border-blue-400/60 shadow-lg flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-all duration-150"
               title="Vị trí của tôi"
             >
@@ -734,6 +842,7 @@ function SOSRequestMarker({
     P1: "#ef4444", // red-500
     P2: "#f97316", // orange-500
     P3: "#eab308", // yellow-500
+    P4: "#14b8a6", // teal-500
   };
 
   const color = priorityColors[sos.priority];
@@ -869,7 +978,7 @@ function DepotMarker({
         <div class="relative flex items-center justify-center" style="width: 36px; height: 36px;">
           <div class="rounded-lg flex items-center justify-center text-lg bg-blue-100 border-2 border-blue-500" 
                style="width: 36px; height: 36px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
-            🏭
+            📦
           </div>
           <div class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white"
                style="background-color: ${color};"></div>
@@ -946,12 +1055,82 @@ function AssemblyPointMarker({
   );
 }
 
+// Auto-Cluster Marker – shows client-side suggested clusters (dashed border, muted)
+function AutoClusterMarker({
+  group,
+  index,
+  onClick,
+}: {
+  group: SOSRequest[];
+  index: number;
+  onClick?: () => void;
+}) {
+  const count = group.length;
+  const lat = group.reduce((sum, s) => sum + s.location.lat, 0) / count;
+  const lng = group.reduce((sum, s) => sum + s.location.lng, 0) / count;
+
+  // Use highest priority in group for color
+  const priorityOrder = PRIORITY_ORDER;
+  const highestPriority = group.reduce(
+    (best, s) =>
+      priorityOrder[s.priority] < priorityOrder[best] ? s.priority : best,
+    group[0].priority,
+  );
+  const colors: Record<string, string> = {
+    P1: "#ef4444",
+    P2: "#f97316",
+    P3: "#eab308",
+    P4: "#14b8a6",
+  };
+  const color = colors[highestPriority] || "#f97316";
+
+  const size = Math.min(52 + count * 4, 72);
+  const ringSize = size + 20;
+
+  const iconEl = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const L = require("leaflet");
+
+    return L.divIcon({
+      className: "custom-auto-cluster-marker",
+      html: `
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${ringSize}px;height:${ringSize}px;">
+          <div style="position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.12;animation:clusterPulse 2.5s ease-out infinite;"></div>
+          <div style="position:absolute;inset:${(ringSize - size) / 2}px;border-radius:50%;background:${color}11;border:2px dashed ${color}66;"></div>
+          <div style="position:relative;width:${size - 4}px;height:${size - 4}px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+                      background:linear-gradient(145deg, ${color}dd, ${color}99);border:2px dashed white;
+                      box-shadow:0 2px 10px rgba(0,0,0,0.25), 0 0 0 2px ${color}33;">
+            <span style="font-size:15px;font-weight:800;color:white;line-height:1;">#${index + 1}</span>
+            <span style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.9);line-height:1;margin-top:1px;">${count} SOS</span>
+          </div>
+        </div>
+      `,
+      iconSize: [ringSize, ringSize],
+      iconAnchor: [ringSize / 2, ringSize / 2],
+    });
+  }, [count, index, color, size, ringSize]);
+
+  if (!iconEl) return null;
+
+  return (
+    <Marker
+      position={[lat, lng]}
+      icon={iconEl}
+      zIndexOffset={900}
+      eventHandlers={{ click: () => onClick?.() }}
+    />
+  );
+}
+
 // Cluster Marker Component – shows grouped SOS clusters on the map
 function ClusterMarker({
   cluster,
+  isMerged = false,
   onClick,
 }: {
   cluster: SOSClusterEntity;
+  isMerged?: boolean;
   onClick?: () => void;
 }) {
   const severityColors: Record<string, string> = {
@@ -991,8 +1170,8 @@ function ClusterMarker({
           <div style="position:relative;width:${size - 4}px;height:${size - 4}px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
                       background:linear-gradient(145deg, ${color}, ${color}cc);border:3px solid white;
                       box-shadow:0 3px 14px rgba(0,0,0,0.35), 0 0 0 2px ${color}44;">
-            <span style="font-size:18px;font-weight:800;color:white;line-height:1;">${cluster.sosRequestCount}</span>
-            <span style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.9);line-height:1;margin-top:1px;">SOS</span>
+            <span style="font-size:${isMerged ? 18 : 15}px;font-weight:800;color:white;line-height:1;">${isMerged ? cluster.sosRequestCount : `#${cluster.id}`}</span>
+            <span style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.9);line-height:1;margin-top:1px;">${isMerged ? "SOS" : `${cluster.sosRequestCount} SOS`}</span>
           </div>
         </div>
         <style>
@@ -1006,7 +1185,14 @@ function ClusterMarker({
       iconSize: [ringSize, ringSize],
       iconAnchor: [ringSize / 2, ringSize / 2],
     });
-  }, [cluster.severityLevel, cluster.sosRequestCount, color, size]);
+  }, [
+    cluster.severityLevel,
+    cluster.sosRequestCount,
+    cluster.id,
+    isMerged,
+    color,
+    size,
+  ]);
 
   if (!iconEl) return null;
 
@@ -1052,9 +1238,7 @@ function UserLocationMarker({
 
   if (!icon) return null;
 
-  return (
-    <Marker position={[location.lat, location.lng]} icon={icon} />
-  );
+  return <Marker position={[location.lat, location.lng]} icon={icon} />;
 }
 
 // Map Legend Component
@@ -1065,15 +1249,19 @@ function MapLegend() {
       <div className="space-y-1.5 text-xs">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-red-500"></div>
-          <span>P1 - Khẩn cấp</span>
+          <span>P1 - Rất nghiêm trọng</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-          <span>P2 - Cao</span>
+          <span>P2 - Nghiêm trọng</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
           <span>P3 - Trung bình</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-teal-500"></div>
+          <span>P4 - Thấp</span>
         </div>
         <div className="border-t pt-1.5 mt-1.5">
           <div className="flex items-center gap-2">
@@ -1087,7 +1275,7 @@ function MapLegend() {
         </div>
         <div className="border-t pt-1.5 mt-1.5">
           <div className="flex items-center gap-2">
-            <span>🏭</span>
+            <span>📦</span>
             <span>Kho vật tư (Depot)</span>
           </div>
           <div className="flex items-center gap-2">
@@ -1108,4 +1296,31 @@ function MapLegend() {
       </div>
     </div>
   );
+}
+
+// Map Click Handler Component for location picking
+function MapClickHandler({
+  isPickingLocation,
+  onMapClick,
+}: {
+  isPickingLocation?: boolean;
+  onMapClick?: (lat: number, lng: number) => void;
+}) {
+  const map = useMapEvents({
+    click: (e) => {
+      if (isPickingLocation && onMapClick) {
+        onMapClick(e.latlng.lat, e.latlng.lng);
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (isPickingLocation) {
+      map.getContainer().style.cursor = "crosshair";
+    } else {
+      map.getContainer().style.cursor = "";
+    }
+  }, [isPickingLocation, map]);
+
+  return null;
 }

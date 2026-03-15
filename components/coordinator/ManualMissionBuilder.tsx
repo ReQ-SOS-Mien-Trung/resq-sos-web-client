@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -26,6 +26,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { activityTypeConfig } from "@/lib/constants";
+import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,7 +61,15 @@ import {
 import type { SOSRequest } from "@/type";
 import type { SOSClusterEntity } from "@/services/sos_cluster/type";
 import type { ClusterActivityType } from "@/services/sos_cluster/type";
-import { useCreateMission } from "@/services/mission/hooks";
+import {
+  useCreateMission,
+  useMission,
+  useMissionActivities,
+  useUpdateMission,
+  useUpdateActivity,
+  useCreateActivity,
+} from "@/services/mission/hooks";
+import type { MissionActivity } from "@/services/mission/type";
 
 // ── Types ──
 
@@ -81,6 +90,8 @@ interface ManualMissionBuilderProps {
   cluster: SOSClusterEntity | null;
   clusterSOSRequests: SOSRequest[];
   onCreated: () => void;
+  /** When provided, load an existing mission for viewing/editing */
+  existingMissionId?: number | null;
 }
 
 // ── Activity type palette items ──
@@ -158,13 +169,19 @@ function SortableActivityCard({
   onUpdate,
   onRemove,
   onCopyLocation,
+  clusterSOSRequests,
 }: {
   activity: ManualActivity;
   index: number;
   isLast: boolean;
-  onUpdate: (id: string, field: keyof ManualActivity, value: string | number) => void;
+  onUpdate: (
+    id: string,
+    field: keyof ManualActivity,
+    value: string | number,
+  ) => void;
   onRemove: (id: string) => void;
   onCopyLocation: (lat: number, lng: number) => void;
+  clusterSOSRequests: SOSRequest[];
 }) {
   const config =
     activityTypeConfig[activity.activityType] || activityTypeConfig["ASSESS"];
@@ -176,6 +193,13 @@ function SortableActivityCard({
     transition,
     isDragging,
   } = useSortable({ id: activity.id });
+
+  const matchSos = clusterSOSRequests.find(
+    (s) =>
+      s.location.lat === activity.targetLatitude &&
+      s.location.lng === activity.targetLongitude,
+  );
+  const selectValue = matchSos ? matchSos.id : "";
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -258,7 +282,7 @@ function SortableActivityCard({
             </Label>
             <Input
               placeholder="Mô tả hoạt động..."
-              value={activity.description}
+              value={activity.description || ""}
               onChange={(e) =>
                 onUpdate(activity.id, "description", e.target.value)
               }
@@ -273,54 +297,45 @@ function SortableActivityCard({
             </Label>
             <Input
               placeholder="Tên địa điểm / mục tiêu..."
-              value={activity.target}
-              onChange={(e) =>
-                onUpdate(activity.id, "target", e.target.value)
-              }
+              value={activity.target || ""}
+              onChange={(e) => onUpdate(activity.id, "target", e.target.value)}
               className="h-8 text-xs mt-0.5"
             />
           </div>
 
           {/* Location */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Vĩ độ
-              </Label>
-              <Input
-                type="number"
-                step="any"
-                placeholder="16.4637"
-                value={activity.targetLatitude || ""}
-                onChange={(e) =>
-                  onUpdate(
-                    activity.id,
-                    "targetLatitude",
-                    parseFloat(e.target.value) || 0,
-                  )
+          <div>
+            <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
+              Liên kết yêu cầu SOS
+            </Label>
+            <Select
+              value={selectValue}
+              onValueChange={(val) => {
+                const sos = clusterSOSRequests.find((s) => s.id === val);
+                if (sos) {
+                  onUpdate(activity.id, "targetLatitude", sos.location.lat);
+                  onUpdate(activity.id, "targetLongitude", sos.location.lng);
                 }
-                className="h-8 text-xs mt-0.5"
-              />
-            </div>
-            <div>
-              <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                Kinh độ
-              </Label>
-              <Input
-                type="number"
-                step="any"
-                placeholder="107.5909"
-                value={activity.targetLongitude || ""}
-                onChange={(e) =>
-                  onUpdate(
-                    activity.id,
-                    "targetLongitude",
-                    parseFloat(e.target.value) || 0,
-                  )
-                }
-                className="h-8 text-xs mt-0.5"
-              />
-            </div>
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs mt-0.5">
+                <SelectValue placeholder="Chọn một yêu cầu SOS để gán tọa độ..." />
+              </SelectTrigger>
+              <SelectContent className="z-[1200]">
+                {clusterSOSRequests.map((sos) => (
+                  <SelectItem key={sos.id} value={sos.id}>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-muted-foreground">
+                        #{sos.id}
+                      </span>
+                      <span className="truncate max-w-[200px]">
+                        {sos.message}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Items */}
@@ -330,10 +345,8 @@ function SortableActivityCard({
             </Label>
             <Input
               placeholder="VD: Áo phao x5, Lương khô x10..."
-              value={activity.items}
-              onChange={(e) =>
-                onUpdate(activity.id, "items", e.target.value)
-              }
+              value={activity.items || ""}
+              onChange={(e) => onUpdate(activity.id, "items", e.target.value)}
               className="h-8 text-xs mt-0.5"
             />
           </div>
@@ -345,11 +358,7 @@ function SortableActivityCard({
 
 // ── Drag Overlay Item (preview while dragging) ──
 
-function DragOverlayContent({
-  type,
-}: {
-  type: ClusterActivityType;
-}) {
+function DragOverlayContent({ type }: { type: ClusterActivityType }) {
   const config = activityTypeConfig[type] || activityTypeConfig["ASSESS"];
   return (
     <div
@@ -376,7 +385,13 @@ function DragOverlayContent({
 
 // ── Timeline Drop Zone ──
 
-function TimelineDropZone({ children, isEmpty }: { children: React.ReactNode; isEmpty: boolean }) {
+function TimelineDropZone({
+  children,
+  isEmpty,
+}: {
+  children: React.ReactNode;
+  isEmpty: boolean;
+}) {
   const { isOver, setNodeRef } = useDroppable({ id: DROPPABLE_ID });
 
   return (
@@ -384,9 +399,7 @@ function TimelineDropZone({ children, isEmpty }: { children: React.ReactNode; is
       ref={setNodeRef}
       className={cn(
         "min-h-[200px] rounded-xl border-2 border-dashed transition-all duration-200 p-3",
-        isEmpty
-          ? "flex flex-col items-center justify-center"
-          : "space-y-3",
+        isEmpty ? "flex flex-col items-center justify-center" : "space-y-3",
         isOver
           ? "border-primary/60 bg-primary/5"
           : "border-border/50 bg-muted/10",
@@ -418,27 +431,88 @@ const ManualMissionBuilder = ({
   cluster,
   clusterSOSRequests,
   onCreated,
+  existingMissionId,
 }: ManualMissionBuilderProps) => {
   // ── State ──
   const [activities, setActivities] = useState<ManualActivity[]>([]);
-  const [missionType, setMissionType] = useState<"RESCUE" | "RESCUER">("RESCUE");
+  const [missionType, setMissionType] = useState<"RESCUE" | "RESCUER">(
+    "RESCUE",
+  );
   const [priorityScore, setPriorityScore] = useState(5);
   const [startTime, setStartTime] = useState("");
   const [expectedEndTime, setExpectedEndTime] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [activeDragType, setActiveDragType] = useState<ClusterActivityType | null>(null);
+  const [activeDragType, setActiveDragType] =
+    useState<ClusterActivityType | null>(null);
+  const [hasLoadedExisting, setHasLoadedExisting] = useState(false);
 
-  const { mutate: createMission, isPending } = useCreateMission();
+  const { mutateAsync: createMissionAsync, isPending: isCreatingMission } =
+    useCreateMission();
+  const { mutateAsync: updateMissionAsync, isPending: isUpdatingMission } =
+    useUpdateMission();
+  const { mutateAsync: updateActivityAsync, isPending: isUpdatingAct } =
+    useUpdateActivity();
+  const { mutateAsync: createActivityAsync, isPending: isCreatingAct } =
+    useCreateActivity();
+
+  const isSubmitting =
+    isCreatingMission || isUpdatingMission || isUpdatingAct || isCreatingAct;
+
+  // ── Fetch existing mission ──
+  const { data: existingMission } = useMission(existingMissionId ?? 0, {
+    enabled: !!existingMissionId && open,
+  });
+  const { data: existingActivities } = useMissionActivities(
+    existingMissionId ?? 0,
+    {
+      enabled: !!existingMissionId && open,
+    },
+  );
+
+  const isEditingExisting = !!existingMissionId;
+
+  // ── Pre-fill from existing mission ──
+  useEffect(() => {
+    if (!existingMission || !open || hasLoadedExisting) return;
+    setMissionType(existingMission.missionType || "RESCUE");
+    setPriorityScore(existingMission.priorityScore || 5);
+    setStartTime(existingMission.startTime?.slice(0, 16) || "");
+    setExpectedEndTime(existingMission.expectedEndTime?.slice(0, 16) || "");
+
+    const acts = existingMission.activities ?? existingActivities ?? [];
+    if (acts.length > 0) {
+      setActivities(
+        acts.map((a: MissionActivity) => ({
+          id: `${TIMELINE_PREFIX}existing-${a.id}-${Date.now()}`,
+          activityType: (a.activityType || "ASSESS") as ClusterActivityType,
+          description: a.description || "",
+          target: a.target || "",
+          items: typeof a.items === "string" ? a.items : "",
+          targetLatitude: a.targetLatitude || 0,
+          targetLongitude: a.targetLongitude || 0,
+        })),
+      );
+    }
+    setHasLoadedExisting(true);
+  }, [existingMission, existingActivities, open, hasLoadedExisting]);
+
+  // Reset loaded flag when closing or changing mission
+  useEffect(() => {
+    if (!open) setHasLoadedExisting(false);
+  }, [open]);
 
   // ── DnD sensors ──
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   // ── Generate unique ID ──
   const genId = useCallback(
-    () => `${TIMELINE_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    () =>
+      `${TIMELINE_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     [],
   );
 
@@ -457,17 +531,20 @@ const ManualMissionBuilder = ({
   );
 
   // ── DnD handlers ──
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const { active } = event;
-    setActiveId(String(active.id));
-    const data = active.data.current;
-    if (data?.source === "palette") {
-      setActiveDragType(data.type as ClusterActivityType);
-    } else {
-      const act = activities.find((a) => a.id === String(active.id));
-      if (act) setActiveDragType(act.activityType);
-    }
-  }, [activities]);
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const { active } = event;
+      setActiveId(String(active.id));
+      const data = active.data.current;
+      if (data?.source === "palette") {
+        setActiveDragType(data.type as ClusterActivityType);
+      } else {
+        const act = activities.find((a) => a.id === String(active.id));
+        if (act) setActiveDragType(act.activityType);
+      }
+    },
+    [activities],
+  );
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -600,47 +677,101 @@ const ManualMissionBuilder = ({
   }, [activities, startTime, expectedEndTime]);
 
   // ── Submit ──
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!clusterId || !validate()) return;
 
-    createMission(
-      {
-        clusterId,
-        missionType,
-        priorityScore,
-        startTime: new Date(startTime).toISOString(),
-        expectedEndTime: new Date(expectedEndTime).toISOString(),
-        activities: activities.map((a, i) => ({
-          step: i + 1,
-          activityCode: `${a.activityType}_${i + 1}`,
-          activityType: a.activityType,
-          description: a.description,
-          target: a.target,
-          items: a.items || "",
-          targetLatitude: a.targetLatitude,
-          targetLongitude: a.targetLongitude,
-        })),
-      },
-      {
-        onSuccess: () => {
-          toast.success("Đã tạo nhiệm vụ thành công!");
-          setActivities([]);
-          setStartTime("");
-          setExpectedEndTime("");
-          setPriorityScore(5);
-          onOpenChange(false);
-          onCreated();
-        },
-        onError: (error) => {
-          console.error("Failed to create mission:", error);
-          toast.error("Không thể tạo nhiệm vụ. Vui lòng thử lại.");
-        },
-      },
-    );
+    if (isEditingExisting && existingMissionId) {
+      try {
+        await updateMissionAsync({
+          missionId: existingMissionId,
+          request: {
+            missionType,
+            priorityScore,
+            startTime: new Date(startTime).toISOString(),
+            expectedEndTime: new Date(expectedEndTime).toISOString(),
+          },
+        });
+
+        // Update or create activities
+        await Promise.all(
+          activities.map((a, i) => {
+            const step = i + 1;
+            const activityCode = `${a.activityType}_${step}`;
+            const reqData = {
+              step,
+              activityCode,
+              activityType: a.activityType,
+              description: a.description,
+              target: a.target,
+              items: a.items || "",
+              targetLatitude: a.targetLatitude,
+              targetLongitude: a.targetLongitude,
+            };
+
+            if (a.id.startsWith(`${TIMELINE_PREFIX}existing-`)) {
+              const activityId = parseInt(a.id.split("-")[2], 10);
+              return updateActivityAsync({
+                missionId: existingMissionId,
+                activityId: activityId,
+                request: reqData,
+              });
+            } else {
+              return createActivityAsync({
+                missionId: existingMissionId,
+                request: reqData,
+              });
+            }
+          }),
+        );
+
+        toast.success("Đã cập nhật nhiệm vụ và hoạt động thành công!");
+        onOpenChange(false);
+        onCreated();
+      } catch (error) {
+        console.error("Failed to update mission or activities:", error);
+        toast.error("Không thể cập nhật nhiệm vụ. Vui lòng thử lại.");
+      }
+    } else {
+      try {
+        await createMissionAsync({
+          clusterId,
+          missionType,
+          priorityScore,
+          startTime: new Date(startTime).toISOString(),
+          expectedEndTime: new Date(expectedEndTime).toISOString(),
+          activities: activities.map((a, i) => ({
+            step: i + 1,
+            activityCode: `${a.activityType}_${i + 1}`,
+            activityType: a.activityType,
+            description: a.description,
+            target: a.target,
+            items: a.items || "",
+            targetLatitude: a.targetLatitude,
+            targetLongitude: a.targetLongitude,
+          })),
+        });
+
+        toast.success("Đã tạo nhiệm vụ thành công!");
+        setActivities([]);
+        setStartTime("");
+        setExpectedEndTime("");
+        setPriorityScore(5);
+        onOpenChange(false);
+        onCreated();
+      } catch (error) {
+        console.error("Failed to create mission:", error);
+        toast.error("Không thể tạo nhiệm vụ. Vui lòng thử lại.");
+      }
+    }
   }, [
     clusterId,
     validate,
-    createMission,
+    isEditingExisting,
+    existingMissionId,
+    updateMissionAsync,
+    createMissionAsync,
+    updateActivityAsync,
+    createActivityAsync,
     missionType,
     priorityScore,
     startTime,
@@ -651,10 +782,7 @@ const ManualMissionBuilder = ({
   ]);
 
   // ── Sortable IDs ──
-  const sortableIds = useMemo(
-    () => activities.map((a) => a.id),
-    [activities],
-  );
+  const sortableIds = useMemo(() => activities.map((a) => a.id), [activities]);
 
   if (!clusterId) return null;
 
@@ -680,7 +808,9 @@ const ManualMissionBuilder = ({
               </div>
               <div>
                 <h2 className="text-base font-bold leading-tight">
-                  Tạo nhiệm vụ thủ công — Cụm #{clusterId}
+                  {isEditingExisting
+                    ? `Xem / Sửa nhiệm vụ #${existingMissionId} — Cụm #${clusterId}`
+                    : `Tạo nhiệm vụ thủ công — Cụm #${clusterId}`}
                 </h2>
                 <div className="flex items-center gap-1.5 mt-1">
                   <Badge
@@ -765,10 +895,7 @@ const ManualMissionBuilder = ({
                             <div className="font-semibold">{tpl.label}</div>
                             <div className="text-[10px] text-muted-foreground mt-0.5">
                               {tpl.types
-                                .map(
-                                  (t) =>
-                                    activityTypeConfig[t]?.label || t,
-                                )
+                                .map((t) => activityTypeConfig[t]?.label || t)
                                 .join(" → ")}
                             </div>
                           </div>
@@ -806,21 +933,17 @@ const ManualMissionBuilder = ({
                                   ? "text-red-500"
                                   : sos.priority === "P2"
                                     ? "text-orange-500"
-                                    : "text-yellow-500",
+                                    : sos.priority === "P3"
+                                      ? "text-yellow-500"
+                                      : "text-teal-500",
                               )}
                               weight="fill"
                             />
                             <Badge
-                              variant={
-                                sos.priority === "P1"
-                                  ? "p1"
-                                  : sos.priority === "P2"
-                                    ? "p2"
-                                    : "p3"
-                              }
+                              variant={PRIORITY_BADGE_VARIANT[sos.priority]}
                               className="text-[9px] h-3.5 px-1"
                             >
-                              {sos.priority}
+                              {PRIORITY_LABELS[sos.priority]}
                             </Badge>
                             <span className="text-[10px] font-mono text-muted-foreground">
                               #{sos.id}
@@ -852,10 +975,7 @@ const ManualMissionBuilder = ({
                       <ListChecks className="h-3.5 w-3.5" weight="bold" />
                       Kế hoạch thực hiện
                     </h3>
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] h-5 px-2"
-                    >
+                    <Badge variant="secondary" className="text-[10px] h-5 px-2">
                       {activities.length} bước
                     </Badge>
                   </div>
@@ -875,6 +995,7 @@ const ManualMissionBuilder = ({
                           onUpdate={handleUpdateActivity}
                           onRemove={handleRemoveActivity}
                           onCopyLocation={handleSOSLocationFill}
+                          clusterSOSRequests={clusterSOSRequests}
                         />
                       ))}
                     </SortableContext>
@@ -915,9 +1036,7 @@ const ManualMissionBuilder = ({
 
                       {/* Priority Score */}
                       <div>
-                        <Label className="text-xs">
-                          Điểm ưu tiên (1-10)
-                        </Label>
+                        <Label className="text-xs">Điểm ưu tiên (1-10)</Label>
                         <Input
                           type="number"
                           min={1}
@@ -981,17 +1100,19 @@ const ManualMissionBuilder = ({
                     size="sm"
                     className="h-9 gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-sm"
                     onClick={handleSubmit}
-                    disabled={isPending || activities.length === 0}
+                    disabled={isSubmitting || activities.length === 0}
                   >
-                    {isPending ? (
+                    {isSubmitting ? (
                       <>
                         <CircleNotch className="h-4 w-4 animate-spin" />
-                        Đang tạo...
+                        {isEditingExisting ? "Đang cập nhật..." : "Đang tạo..."}
                       </>
                     ) : (
                       <>
                         <CheckCircle className="h-4 w-4" weight="fill" />
-                        Tạo nhiệm vụ
+                        {isEditingExisting
+                          ? "Cập nhật nhiệm vụ"
+                          : "Tạo nhiệm vụ"}
                       </>
                     )}
                   </Button>

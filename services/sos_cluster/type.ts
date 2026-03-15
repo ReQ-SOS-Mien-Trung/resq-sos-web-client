@@ -17,6 +17,7 @@ export interface SOSClusterEntity {
   medicalUrgencyScore: number | null;
   sosRequestCount: number;
   sosRequestIds: number[];
+  isMissionCreated: boolean;
   createdAt: string;
   lastUpdatedAt: string;
 }
@@ -155,4 +156,22 @@ export interface ClusterRescueSuggestionResponse {
   needsManualReview: boolean;
   lowConfidenceWarning: string | null;
   multiDepotRecommended: boolean;
+}
+
+// ---- SSE Stream types ----
+
+export type SseEventType = "status" | "chunk" | "result" | "error";
+
+export interface SseMissionEvent {
+  eventType: SseEventType;
+  data: string | null;
+  result: ClusterRescueSuggestionResponse | null;
+}
+
+export interface AiStreamState {
+  status: string;
+  thinkingText: string;
+  result: ClusterRescueSuggestionResponse | null;
+  error: string | null;
+  loading: boolean;
 }

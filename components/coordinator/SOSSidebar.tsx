@@ -5,6 +5,13 @@ import { SOSRequest, Rescuer, Mission, SOSSidebarProps } from "@/type";
 import { getRescuerTypeIcon } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { activityTypeConfig } from "@/lib/constants";
+import {
+  PRIORITY_BADGE_VARIANT,
+  PRIORITY_BORDER_COLOR,
+  PRIORITY_LABELS,
+  PRIORITY_ORDER,
+  PRIORITY_TEXT_COLOR,
+} from "@/lib/priority";
 import { useMissions } from "@/services/mission/hooks";
 import type { MissionEntity } from "@/services/mission/type";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +33,7 @@ import {
   Users,
   CaretDown,
   CaretUp,
+  CaretRight,
   PencilSimpleLine,
   Eye,
   Rocket,
@@ -86,8 +94,10 @@ const SOSSidebar = ({
   onAnalyzeCluster,
   isAnalyzingCluster = false,
   analyzingClusterId = null,
+  analyzingStatus,
   onManualMission,
   onViewClusterPlan,
+  onViewMission,
 }: SOSSidebarProps) => {
   const [activeTab, setActiveTab] = useState("incoming");
   const [expandedClusters, setExpandedClusters] = useState<Set<number>>(
@@ -228,8 +238,8 @@ const SOSSidebar = ({
                       Low: "text-teal-700 bg-teal-100 dark:text-teal-300 dark:bg-teal-900/30",
                     };
                     const severityLabels: Record<string, string> = {
-                      Critical: "Nghiêm trọng",
-                      High: "Cao",
+                      Critical: "Rất nghiêm trọng",
+                      High: "Nghiêm trọng",
                       Medium: "Trung bình",
                       Low: "Thấp",
                     };
@@ -281,6 +291,17 @@ const SOSSidebar = ({
                               <span className="text-xs font-semibold">
                                 Cụm #{cluster.id}
                               </span>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px] h-4 px-1.5 border-0",
+                                  severityBadge[cluster.severityLevel] ||
+                                    severityBadge.Low,
+                                )}
+                              >
+                                {severityLabels[cluster.severityLevel] ||
+                                  cluster.severityLevel}
+                              </Badge>
                             </div>
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] text-muted-foreground">
@@ -328,25 +349,17 @@ const SOSSidebar = ({
                                         <MapPin
                                           className={cn(
                                             "h-3.5 w-3.5",
-                                            sos.priority === "P1"
-                                              ? "text-red-500"
-                                              : sos.priority === "P2"
-                                                ? "text-orange-500"
-                                                : "text-yellow-500",
+                                            PRIORITY_TEXT_COLOR[sos.priority],
                                           )}
                                           weight="fill"
                                         />
                                         <Badge
                                           variant={
-                                            sos.priority === "P1"
-                                              ? "p1"
-                                              : sos.priority === "P2"
-                                                ? "p2"
-                                                : "p3"
+                                            PRIORITY_BADGE_VARIANT[sos.priority]
                                           }
                                           className="text-[10px] h-4 px-1.5"
                                         >
-                                          {sos.priority}
+                                          {PRIORITY_LABELS[sos.priority]}
                                         </Badge>
                                         <span className="text-xs font-mono text-muted-foreground">
                                           #{sos.id}
@@ -375,68 +388,18 @@ const SOSSidebar = ({
                               )}
                             </div>
 
-                            {/* Action buttons: AI Analyze + View Plan + Manual */}
-                            <div className="px-3 py-2 border-t border-inherit space-y-1.5">
-                              <Button
-                                variant="default"
-                                size="sm"
-                                className="w-full h-7 text-[11px] bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onAnalyzeCluster(cluster.id);
-                                }}
-                                disabled={isAnalyzingCluster}
-                              >
-                                {isAnalyzing ? (
-                                  <>
-                                    <Spinner className="h-3 w-3 mr-1 animate-spin" />
-                                    AI đang phân tích...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Lightning
-                                      className="h-3 w-3 mr-1"
-                                      weight="fill"
-                                    />
-                                    AI Phân tích Rescue Plan
-                                  </>
-                                )}
-                              </Button>
-                              {onViewClusterPlan && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full h-7 text-[11px] border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onViewClusterPlan(cluster.id);
-                                  }}
-                                >
-                                  <Eye className="h-3 w-3 mr-1" weight="fill" />
-                                  Xem kế hoạch AI đã gợi ý
-                                </Button>
-                              )}
-                              {onManualMission && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="w-full h-7 text-[11px] border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onManualMission(cluster.id);
-                                  }}
-                                >
-                                  <PencilSimpleLine
-                                    className="h-3 w-3 mr-1"
-                                    weight="fill"
-                                  />
-                                  Tạo nhiệm vụ thủ công
-                                </Button>
-                              )}
-                            </div>
-
-                            {/* Missions created for this cluster */}
-                            <ClusterMissions clusterId={cluster.id} />
+                            {/* Action buttons + Missions (uses hook inside) */}
+                            <ClusterActionButtons
+                              clusterId={cluster.id}
+                              isMissionCreated={cluster.isMissionCreated}
+                              isAnalyzing={!!isAnalyzing}
+                              isAnalyzingCluster={isAnalyzingCluster}
+                              analyzingStatus={analyzingStatus}
+                              onAnalyzeCluster={onAnalyzeCluster}
+                              onViewClusterPlan={onViewClusterPlan}
+                              onManualMission={onManualMission}
+                              onViewMission={onViewMission}
+                            />
                           </>
                         )}
                       </div>
@@ -454,12 +417,11 @@ const SOSSidebar = ({
                   {autoClusters.map((cluster, clusterIdx) => {
                     const highestPriority = cluster.reduce(
                       (best, s) => {
-                        const order = { P1: 0, P2: 1, P3: 2 };
-                        return order[s.priority] < order[best]
+                        return PRIORITY_ORDER[s.priority] < PRIORITY_ORDER[best]
                           ? s.priority
                           : best;
                       },
-                      "P3" as "P1" | "P2" | "P3",
+                      "P4" as "P1" | "P2" | "P3" | "P4",
                     );
                     const isProcessing =
                       isCreatingCluster &&
@@ -524,25 +486,17 @@ const SOSSidebar = ({
                                   <MapPin
                                     className={cn(
                                       "h-3.5 w-3.5",
-                                      sos.priority === "P1"
-                                        ? "text-red-500"
-                                        : sos.priority === "P2"
-                                          ? "text-orange-500"
-                                          : "text-yellow-500",
+                                      PRIORITY_TEXT_COLOR[sos.priority],
                                     )}
                                     weight="fill"
                                   />
                                   <Badge
                                     variant={
-                                      sos.priority === "P1"
-                                        ? "p1"
-                                        : sos.priority === "P2"
-                                          ? "p2"
-                                          : "p3"
+                                      PRIORITY_BADGE_VARIANT[sos.priority]
                                     }
                                     className="text-[10px] h-4 px-1.5"
                                   >
-                                    {sos.priority}
+                                    {PRIORITY_LABELS[sos.priority]}
                                   </Badge>
                                   <span className="text-xs font-mono text-muted-foreground">
                                     #{sos.id}
@@ -576,11 +530,7 @@ const SOSSidebar = ({
                       key={sos.id}
                       className={cn(
                         "rounded-xl border overflow-hidden",
-                        sos.priority === "P1"
-                          ? "border-red-400 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10"
-                          : sos.priority === "P2"
-                            ? "border-orange-400 bg-orange-50/50 dark:border-orange-800/40 dark:bg-orange-900/10"
-                            : "border-yellow-400 bg-yellow-50/50 dark:border-yellow-800/40 dark:bg-yellow-900/10",
+                        PRIORITY_BORDER_COLOR[sos.priority],
                       )}
                     >
                       <div
@@ -596,25 +546,15 @@ const SOSSidebar = ({
                             <MapPin
                               className={cn(
                                 "h-3.5 w-3.5",
-                                sos.priority === "P1"
-                                  ? "text-red-500"
-                                  : sos.priority === "P2"
-                                    ? "text-orange-500"
-                                    : "text-yellow-500",
+                                PRIORITY_TEXT_COLOR[sos.priority],
                               )}
                               weight="fill"
                             />
                             <Badge
-                              variant={
-                                sos.priority === "P1"
-                                  ? "p1"
-                                  : sos.priority === "P2"
-                                    ? "p2"
-                                    : "p3"
-                              }
+                              variant={PRIORITY_BADGE_VARIANT[sos.priority]}
                               className="text-[10px] h-4 px-1.5"
                             >
-                              {sos.priority}
+                              {PRIORITY_LABELS[sos.priority]}
                             </Badge>
                             <span className="text-xs font-mono text-muted-foreground">
                               #{sos.id}
@@ -665,17 +605,6 @@ const SOSSidebar = ({
                             </>
                           )}
                         </Button>
-                        {onViewClusterPlan && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-7 text-[11px] border-orange-300 dark:border-orange-700 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                            disabled
-                          >
-                            <Eye className="h-3 w-3 mr-1" weight="fill" />
-                            Xem kế hoạch AI đã gợi ý
-                          </Button>
-                        )}
                         {onManualMission && (
                           <Button
                             variant="outline"
@@ -732,10 +661,12 @@ const SOSSidebar = ({
         >
           <ScrollArea className="h-full">
             <div className="p-3 space-y-3">
-              {backendClusters.length > 0 ? (
-                backendClusters.map((cluster) => (
-                  <ClusterMissionsGroup key={cluster.id} cluster={cluster} />
-                ))
+              {backendClusters.some((c) => c.isMissionCreated) ? (
+                backendClusters
+                  .filter((c) => c.isMissionCreated)
+                  .map((cluster) => (
+                    <ClusterMissionsGroup key={cluster.id} cluster={cluster} />
+                  ))
               ) : (
                 <div className="text-center text-muted-foreground py-8">
                   <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -798,6 +729,7 @@ function SOSCard({
     P1: "p1" as const,
     P2: "p2" as const,
     P3: "p3" as const,
+    P4: "p4" as const,
   };
 
   return (
@@ -813,7 +745,7 @@ function SOSCard({
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
             <Badge variant={priorityVariant[sos.priority]}>
-              {sos.priority}
+              {PRIORITY_LABELS[sos.priority]}
             </Badge>
             <span className="text-xs font-mono text-muted-foreground">
               #{sos.id}
@@ -1007,9 +939,112 @@ const missionStatusConfig: Record<
   },
 };
 
+// ── ClusterActionButtons: action buttons + missions, hides create buttons if missions exist ──
+
+function ClusterActionButtons({
+  clusterId,
+  isMissionCreated,
+  isAnalyzing,
+  isAnalyzingCluster,
+  analyzingStatus,
+  onAnalyzeCluster,
+  onViewClusterPlan,
+  onManualMission,
+}: {
+  clusterId: number;
+  isMissionCreated: boolean;
+  isAnalyzing: boolean;
+  isAnalyzingCluster: boolean;
+  analyzingStatus?: string;
+  onAnalyzeCluster: (clusterId: number) => void;
+  onViewClusterPlan?: (clusterId: number) => void;
+  onViewMission?: (clusterId: number, missionId: number) => void;
+  onManualMission?: (clusterId: number) => void;
+}) {
+  return (
+    <div className="px-3 py-2 border-t border-inherit space-y-1.5">
+      {isMissionCreated ? (
+        // Mission exists — show view plan + re-analyze
+        <>
+          {onViewClusterPlan && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-7 text-[11px] border-emerald-300/60 dark:border-emerald-700/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewClusterPlan(clusterId);
+              }}
+            >
+              <Eye className="h-3 w-3 mr-1" />
+              Xem kế hoạch
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full h-7 text-[11px] border-blue-300/60 dark:border-blue-700/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAnalyzeCluster(clusterId);
+            }}
+            disabled={isAnalyzingCluster}
+          >
+            {isAnalyzing ? (
+              <div className="flex items-center w-full justify-center overflow-hidden">
+                <Spinner className="h-3 w-3 mr-1 shrink-0 animate-spin" />
+                <span className="truncate">
+                  {analyzingStatus || "Đang phân tích..."}
+                </span>
+              </div>
+            ) : (
+              <>
+                <Lightning className="h-3 w-3 mr-1" weight="fill" />
+                Phân tích lại
+              </>
+            )}
+          </Button>
+        </>
+      ) : (
+        // No mission yet — show AI analyze only
+        <Button
+          variant="default"
+          size="sm"
+          className="w-full h-7 text-[11px] bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAnalyzeCluster(clusterId);
+          }}
+          disabled={isAnalyzingCluster}
+        >
+          {isAnalyzing ? (
+            <div className="flex items-center w-full justify-center overflow-hidden">
+              <Spinner className="h-3 w-3 mr-1 shrink-0 animate-spin" />
+              <span className="truncate">
+                {analyzingStatus || "AI đang phân tích..."}
+              </span>
+            </div>
+          ) : (
+            <>
+              <Lightning className="h-3 w-3 mr-1" weight="fill" />
+              AI Phân tích Rescue Plan
+            </>
+          )}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 // ── ClusterMissions: compact mission list shown inside expanded cluster cards ──
 
-function ClusterMissions({ clusterId }: { clusterId: number }) {
+function ClusterMissions({
+  clusterId,
+  onViewMission,
+}: {
+  clusterId: number;
+  onViewMission?: (missionId: number) => void;
+}) {
   const { data: missionsData, isLoading } = useMissions(clusterId);
   const [expandedMissionId, setExpandedMissionId] = useState<number | null>(
     null,
@@ -1049,6 +1084,7 @@ function ClusterMissions({ clusterId }: { clusterId: number }) {
                 expandedMissionId === mission.id ? null : mission.id,
               )
             }
+            onViewMission={onViewMission}
           />
         ))}
       </div>
@@ -1060,22 +1096,33 @@ function ClusterMissions({ clusterId }: { clusterId: number }) {
 
 function MissionEntityCard({
   mission,
-  isExpanded,
-  onToggle,
+  clusterId,
+  isExpanded: _isExpanded,
+  onToggle: _onToggle,
+  onViewMission,
 }: {
   mission: MissionEntity;
+  clusterId?: number;
   isExpanded: boolean;
   onToggle: () => void;
+  onViewMission?: (clusterId: number, missionId: number) => void;
 }) {
   const status =
     missionStatusConfig[mission.status] ?? missionStatusConfig.Pending;
 
   return (
-    <div className="rounded-lg border bg-background/60 overflow-hidden">
-      <div
-        className="flex items-center justify-between px-2.5 py-1.5 cursor-pointer hover:bg-muted/40 transition-colors"
-        onClick={onToggle}
-      >
+    <div
+      className={cn(
+        "rounded-lg border bg-background/60 overflow-hidden transition-colors",
+        onViewMission && clusterId && "cursor-pointer hover:bg-muted/40",
+      )}
+      onClick={() => {
+        if (onViewMission && clusterId) {
+          onViewMission(clusterId, mission.id);
+        }
+      }}
+    >
+      <div className="flex items-center justify-between px-2.5 py-2">
         <div className="flex items-center gap-1.5">
           <Rocket className="h-3 w-3 text-orange-500" weight="fill" />
           <span className="text-[11px] font-semibold">NV #{mission.id}</span>
@@ -1088,95 +1135,31 @@ function MissionEntityCard({
             {status.label}
           </span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-muted-foreground">
             {mission.activityCount} bước
           </span>
-          {isExpanded ? (
-            <CaretUp className="h-3 w-3 text-muted-foreground" />
-          ) : (
-            <CaretDown className="h-3 w-3 text-muted-foreground" />
+          {onViewMission && clusterId && (
+            <CaretRight className="h-3 w-3 text-muted-foreground" />
           )}
         </div>
       </div>
 
-      {isExpanded && (
-        <div className="px-2.5 pb-2 border-t border-border/50">
-          {/* Priority & timing */}
-          <div className="flex items-center gap-3 text-[10px] text-muted-foreground py-1.5">
-            <span>Ưu tiên: {mission.priorityScore}</span>
-            <span>
-              {new Date(mission.startTime).toLocaleTimeString("vi-VN", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}{" "}
-              →{" "}
-              {new Date(mission.expectedEndTime).toLocaleTimeString("vi-VN", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
-
-          {/* Activities timeline */}
-          {mission.activities && mission.activities.length > 0 && (
-            <div className="space-y-1">
-              {[...mission.activities]
-                .sort((a, b) => a.step - b.step)
-                .map((activity, idx) => {
-                  const config = activityTypeConfig[activity.activityType];
-                  return (
-                    <div key={activity.id} className="flex items-start gap-2">
-                      <div
-                        className={cn(
-                          "w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5",
-                          config?.bgColor || "bg-muted",
-                          config?.color || "text-muted-foreground",
-                        )}
-                      >
-                        {idx + 1}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "text-[10px] font-semibold",
-                              config?.color || "text-foreground",
-                            )}
-                          >
-                            {config?.label || activity.activityType}
-                          </span>
-                          {activity.status === "Completed" ? (
-                            <CheckCircle
-                              className="h-3 w-3 text-green-500"
-                              weight="fill"
-                            />
-                          ) : activity.status === "InProgress" ? (
-                            <Play
-                              className="h-3 w-3 text-blue-500"
-                              weight="fill"
-                            />
-                          ) : null}
-                        </div>
-                        {activity.description && (
-                          <p className="text-[10px] text-muted-foreground line-clamp-2">
-                            {activity.description}
-                          </p>
-                        )}
-                        {activity.target && (
-                          <p className="text-[10px] text-muted-foreground/70 flex items-center gap-0.5">
-                            <MapPin className="h-2.5 w-2.5" weight="fill" />
-                            {activity.target}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Compact info row */}
+      <div className="flex items-center gap-3 px-2.5 pb-2 text-[10px] text-muted-foreground">
+        <span>Ưu tiên: {mission.priorityScore}</span>
+        <span>
+          {new Date(mission.startTime).toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}{" "}
+          →{" "}
+          {new Date(mission.expectedEndTime).toLocaleTimeString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+      </div>
     </div>
   );
 }

@@ -17,6 +17,7 @@ interface AuthState {
   refreshToken: string | null;
   expiresIn: number | null;
   tokenType: string | null;
+  tokenObtainedAt: number | null;
   user: User | null;
   isAuthenticated: boolean;
 
@@ -34,6 +35,7 @@ export const useAuthStore = create<AuthState>()(
         refreshToken: null,
         expiresIn: null,
         tokenType: null,
+        tokenObtainedAt: null,
         user: null,
         isAuthenticated: false,
 
@@ -44,6 +46,7 @@ export const useAuthStore = create<AuthState>()(
               refreshToken: data.refreshToken,
               expiresIn: data.expiresIn,
               tokenType: data.tokenType,
+              tokenObtainedAt: Date.now(),
               user: {
                 userId: data.userId,
                 username: data.username,
@@ -66,6 +69,7 @@ export const useAuthStore = create<AuthState>()(
               refreshToken: data.refreshToken,
               expiresIn: data.expiresIn,
               tokenType: data.tokenType,
+              tokenObtainedAt: Date.now(),
             },
             false,
             "auth/updateTokens",
@@ -78,6 +82,7 @@ export const useAuthStore = create<AuthState>()(
               refreshToken: null,
               expiresIn: null,
               tokenType: null,
+              tokenObtainedAt: null,
               user: null,
               isAuthenticated: false,
             },

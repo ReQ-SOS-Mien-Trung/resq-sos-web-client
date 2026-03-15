@@ -3,6 +3,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { useState } from "react";
+import { useTokenRefresh } from "@/hooks/useTokenRefresh";
+
+function TokenRefreshProvider({ children }: { children: React.ReactNode }) {
+  useTokenRefresh();
+  return <>{children}</>;
+}
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -21,7 +27,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <TokenRefreshProvider>{children}</TokenRefreshProvider>
+      </QueryClientProvider>
     </GoogleOAuthProvider>
   );
 }

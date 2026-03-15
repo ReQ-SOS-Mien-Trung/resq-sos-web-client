@@ -11,7 +11,7 @@ const API_URL = process.env.NEXT_PUBLIC_BASE_URL;
 // Khởi tạo 1 Axios instance duy nhất cho toàn app
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 60000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -79,6 +79,7 @@ axiosInstance.interceptors.response.use(
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
+          originalRequest._retry = true;
           if (originalRequest.headers) {
             originalRequest.headers.Authorization = `Bearer ${token}`;
           }
@@ -103,9 +104,12 @@ axiosInstance.interceptors.response.use(
       }
 
       try {
+        // Loại bỏ slash ở cuối nếu có để tránh // trong URL
+        const secureApiUrl = API_URL?.replace(/\/+$/, "") || "";
+
         // Gọi API refresh token (dùng axios thường, không dùng axiosInstance để tránh lặp interceptor)
         const { data } = await axios.post<RefreshTokenResponse>(
-          `${API_URL}/identity/auth/refresh-token`,
+          `${secureApiUrl}/identity/auth/refresh-token`,
           { accessToken, refreshToken },
           {
             headers: { "Content-Type": "application/json" },

@@ -42,7 +42,7 @@ type Period =
   | "max";
 
 // Based on the Hybrid Logic: Backend (PostGIS + Gemini AI)
-export type Priority = "P1" | "P2" | "P3";
+export type Priority = "P1" | "P2" | "P3" | "P4";
 export type RescuerType = "TRUCK" | "MOTORBOAT" | "SMALL_BOAT";
 export type SOSStatus = "PENDING" | "ASSIGNED" | "RESCUED";
 export type RescuerStatus = "AVAILABLE" | "BUSY";
@@ -68,9 +68,18 @@ export interface SOSRequest {
   aiAnalysis?: {
     riskFactors: string[];
   };
+  injuredPersons?: Array<{
+    index: number;
+    name: string;
+    customName?: string | null;
+    personType?: string;
+    medicalIssues?: string[];
+    severity?: string;
+  }>;
   // Extended fields from backend structuredData / senderInfo
   peopleCount?: { adult: number; child: number; elderly: number };
   waitTimeMinutes?: number;
+  sosType?: string;
   situation?: string;
   medicalIssues?: string[];
   supplies?: string[];
@@ -811,6 +820,10 @@ export interface RescuePlanPanelProps {
   onApprove: () => void;
   onReAnalyze: () => void;
   isReAnalyzing: boolean;
+  /** Called with decoded [lat,lng][] coords to draw a route on the map */
+  onShowRoute?: (coords: [number, number][]) => void;
+  /** Which tab to show when the panel opens */
+  defaultTab?: "plan" | "missions";
 }
 
 export interface ActivityTypeConfig {
@@ -820,7 +833,7 @@ export interface ActivityTypeConfig {
 }
 
 export interface SeverityConfig {
-  variant: "p1" | "p2" | "p3" | "warning";
+  variant: "p1" | "p2" | "p3" | "p4" | "warning";
   label: string;
 }
 
@@ -858,6 +871,8 @@ export interface CoordinatorMapProps {
   }[];
   // SOS Clusters from backend
   clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
+  /** Client-side auto-clusters (groups of nearby PENDING SOS) */
+  autoClusters?: SOSRequest[][];
   selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
   aiDecision?: AIDispatchDecision | null;
@@ -877,6 +892,16 @@ export interface CoordinatorMapProps {
   userLocation?: Location | null;
   /** Used to trigger map resize when side panel opens/closes */
   panelOpen?: boolean;
+  /** Called when map view changes (pan/zoom) with center + zoom */
+  onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
+  /** Whether the map is in a mode where the user is allowed to pick a location */
+  isPickingLocation?: boolean;
+  /** Callback when the user clicks on the map */
+  onMapClick?: (lat: number, lng: number) => void;
+  /** Decoded polyline coords [lat, lng][] to draw as a rescue route overlay */
+  routeOverlay?: [number, number][];
+  /** Called when route overlay should be cleared */
+  onClearRouteOverlay?: () => void;
 }
 
 // Assembly Point type for map display (from backend AssemblyPointEntity)
@@ -914,10 +939,14 @@ export interface SOSSidebarProps {
   isAnalyzingCluster?: boolean;
   /** Which backend cluster ID is being analyzed */
   analyzingClusterId?: number | null;
+  /** Real-time AI status */
+  analyzingStatus?: string;
   /** Open manual mission builder for a cluster */
   onManualMission?: (clusterId: number) => void;
   /** View rescue plan history for a cluster */
   onViewClusterPlan?: (clusterId: number) => void;
+  /** View/edit an existing mission in the builder */
+  onViewMission?: (clusterId: number, missionId: number) => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";
@@ -1138,7 +1167,7 @@ export interface CategorySummary {
 }
 
 //Coordinator Dashboard Types
-export type Priority = "P1" | "P2" | "P3";
+export type Priority = "P1" | "P2" | "P3" | "P4";
 export type RescuerType = "TRUCK" | "MOTORBOAT" | "SMALL_BOAT";
 export type SOSStatus = "PENDING" | "ASSIGNED" | "RESCUED";
 export type RescuerStatus = "AVAILABLE" | "BUSY";
