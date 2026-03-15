@@ -366,6 +366,11 @@ export const navigationItems = [
   },
   {
     icon: MapTrifold,
+    label: "Phân quyền người dùng",
+    href: "/dashboard/admin/permissions",
+  },
+  {
+    icon: MapTrifold,
     label: "Khoanh vùng cứu hộ",
     href: "/dashboard/admin/map-zone",
   },

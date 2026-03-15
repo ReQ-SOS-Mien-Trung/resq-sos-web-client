@@ -28,6 +28,7 @@ export interface LoginResponse {
   lastName: string;
   fullName: string;
   roleId: number;
+  permissions: string[];
 }
 
 // Logout Response
