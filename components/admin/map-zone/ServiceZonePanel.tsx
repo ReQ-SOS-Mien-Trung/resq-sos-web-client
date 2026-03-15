@@ -21,8 +21,6 @@ interface ServiceZonePanelProps {
   drawnCoordinates: Coordinate[] | null;
   /** Whether a save mutation is in progress */
   isSaving: boolean;
-  /** Whether this zone is the only active zone (blocks deactivating it) */
-  isOnlyActiveZone?: boolean;
   /** Callback to trigger saving */
   onSave: (name: string, coords: Coordinate[], isActive: boolean) => void;
 }
@@ -32,7 +30,6 @@ export default function ServiceZonePanel({
   isLoading,
   drawnCoordinates,
   isSaving,
-  isOnlyActiveZone = false,
   onSave,
 }: ServiceZonePanelProps) {
   const [name, setName] = useState("");
@@ -66,13 +63,9 @@ export default function ServiceZonePanel({
     ? nameChanged || activeChanged || coordsChanged
     : true; // create mode: always allow
 
-  // Block if this is the only active zone and user is trying to deactivate it
-  const willLeaveNoActive = isOnlyActiveZone && zone?.isActive && !isActive;
-
   // Create mode: must draw; Edit mode: existing coords are enough + must have changes
   const canSave =
     name.trim().length > 0 &&
-    !willLeaveNoActive &&
     (zone ? hasCoords && hasChanges : hasDrawing);
 
   const handleSave = () => {
@@ -132,14 +125,7 @@ export default function ServiceZonePanel({
               />
             </button>
           </div>
-          {willLeaveNoActive && (
-            <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
-              <Warning className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" weight="fill" />
-              <p className="text-xs tracking-tighter text-amber-700 dark:text-amber-400 leading-snug">
-                Phải có ít nhất 1 vùng đang hoạt động. Hãy kích hoạt vùng khác trước.
-              </p>
-            </div>
-          )}
+
         </div>
 
         <Separator className="border-border/40" />

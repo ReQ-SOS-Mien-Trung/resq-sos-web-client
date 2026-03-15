@@ -335,7 +335,6 @@ const MapZonePage = () => {
                 isLoading={false}
                 drawnCoordinates={drawnCoordinates}
                 isSaving={mode === "create" ? createMutation.isPending : updateMutation.isPending}
-                isOnlyActiveZone={allZones.filter((z) => z.isActive).length === 1 && selectedZone?.isActive === true}
                 onSave={mode === "create" ? handleCreate : handleUpdate}
               />
             )}

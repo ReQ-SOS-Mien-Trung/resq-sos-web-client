@@ -384,6 +384,19 @@ export const getFavoriteIcon = (name: string) => {
   }
 };
 
+export const getFavoriteHref = (name: string): string => {
+  switch (name) {
+    case "Cứu hộ viên":
+      return "/dashboard/admin#rescuer-overview";
+    case "Cảnh báo":
+      return "/dashboard/admin#sos-overview";
+    case "Hoạt động":
+      return "/dashboard/admin#sos-overview";
+    default:
+      return "/dashboard/admin";
+  }
+};
+
 export const getMetricIcon = (label: string) => {
   switch (label.toLowerCase()) {
     case "yêu cầu sos":

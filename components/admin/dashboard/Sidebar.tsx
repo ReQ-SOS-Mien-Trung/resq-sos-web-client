@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   CaretDown,
@@ -14,12 +14,35 @@ import {
   Question,
 } from "@phosphor-icons/react";
 import { SidebarProps } from "@/type";
-import { getFavoriteIcon, navigationItems } from "@/lib/constants";
+import { getFavoriteHref, getFavoriteIcon, navigationItems } from "@/lib/constants";
 
 const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
   const pathname = usePathname();
+  const router = useRouter();
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
+
+  const handleFavoriteClick = (e: React.MouseEvent, name: string) => {
+    e.preventDefault();
+    const href = getFavoriteHref(name);
+    const [basePath, hash] = href.split("#");
+    const isOnPage = pathname === basePath;
+
+    const scrollTo = () => {
+      if (hash) {
+        const el = document.getElementById(hash);
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+
+    if (isOnPage) {
+      scrollTo();
+    } else {
+      router.push(basePath);
+      // Wait for page to mount then scroll
+      setTimeout(scrollTo, 600);
+    }
+  };
 
   return (
     <aside
@@ -123,7 +146,8 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                     return (
                       <Link
                         key={favorite.id}
-                        href="#"
+                        href={getFavoriteHref(favorite.name)}
+                        onClick={(e) => handleFavoriteClick(e, favorite.name)}
                         className="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200 group"
                         style={{ animationDelay: `${index * 50}ms` }}
                       >

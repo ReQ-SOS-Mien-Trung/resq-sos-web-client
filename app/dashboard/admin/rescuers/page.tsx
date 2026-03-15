@@ -119,7 +119,7 @@ const RescuersPage = () => {
           <div>
             <div className="flex items-center gap-2.5 mb-1">
               <UserCheck size={24} className="text-foreground" />
-              <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
+              <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                 Quản lý hồ sơ
               </p>
             </div>

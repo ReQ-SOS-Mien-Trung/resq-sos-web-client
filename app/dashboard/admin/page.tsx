@@ -9,6 +9,7 @@ import {
   LeadsManagement,
   RetentionRate,
   RevenueChart,
+  RescuerOverview,
   SOSOverview,
   SummaryCards,
   TopCountries,
@@ -88,10 +89,20 @@ const AdminDashboardPage = () => {
 
         {/* SOS Overview - Full Width */}
         <div
+          id="sos-overview"
           className="animate-in fade-in slide-in-from-bottom-4 duration-500"
           style={{ animationDelay: "150ms" }}
         >
           <SOSOverview />
+        </div>
+
+        {/* Rescuer Overview - Full Width */}
+        <div
+          id="rescuer-overview"
+          className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+          style={{ animationDelay: "175ms" }}
+        >
+          <RescuerOverview />
         </div>
 
         {/* Main Grid */}
