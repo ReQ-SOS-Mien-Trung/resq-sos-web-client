@@ -364,7 +364,12 @@ const InventoryDashboardPage = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden md:flex gap-2"
+            onClick={() => router.push("/dashboard/inventory/export-report")}
+          >
             <FileArrowDown className="h-4 w-4" />
             Xuất báo cáo
           </Button>

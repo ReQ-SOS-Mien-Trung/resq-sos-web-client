@@ -15,6 +15,7 @@ import {
   importInventory,
   importRegularInventory,
   getDepotTransactions,
+  exportInventoryMovements,
 } from "./api";
 import {
   GetMyDepotInventoryParams,
@@ -29,6 +30,7 @@ import {
   InventorySourceType,
   GetDepotTransactionsParams,
   GetDepotTransactionsResponse,
+  ExportMovementsParams,
 } from "./type";
 
 export const INVENTORY_KEYS = {
@@ -174,5 +176,12 @@ export function useDepotTransactions(
     queryKey: INVENTORY_KEYS.transactions(params),
     queryFn: () => getDepotTransactions(params),
     ...options,
+  });
+}
+
+export function useExportInventoryMovements() {
+  return useMutation({
+    mutationFn: (params: ExportMovementsParams) =>
+      exportInventoryMovements(params),
   });
 }

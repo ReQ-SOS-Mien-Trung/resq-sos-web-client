@@ -1,4 +1,5 @@
 import api from "@/config/axios";
+import { useAuthStore } from "@/stores/auth.store";
 import {
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
@@ -12,6 +13,7 @@ import {
   InventorySourceType,
   GetDepotTransactionsParams,
   GetDepotTransactionsResponse,
+  ExportMovementsParams,
 } from "./type";
 
 /**
@@ -134,4 +136,55 @@ export async function getDepotTransactions(
     },
   });
   return data;
+}
+
+/**
+ * Export inventory movements to Excel.
+ * Routes through /api/inventory/export-movements (Next.js server-side proxy)
+ * so Content-Disposition header is readable without CORS restrictions.
+ */
+export async function exportInventoryMovements(
+  params: ExportMovementsParams,
+): Promise<{ blob: Blob; filename: string }> {
+  // Build query string
+  const searchParams = new URLSearchParams();
+  searchParams.set("periodType", params.periodType);
+  if (params.fromDate) searchParams.set("fromDate", params.fromDate);
+  if (params.toDate) searchParams.set("toDate", params.toDate);
+  if (params.month !== undefined)
+    searchParams.set("month", String(params.month));
+  if (params.year !== undefined) searchParams.set("year", String(params.year));
+
+  // Get token from store (Zustand getState works outside React)
+  const token = useAuthStore.getState().accessToken;
+
+  // Call the Next.js proxy — same-origin, so all response headers are readable
+  const response = await fetch(
+    `/api/inventory/export-movements?${searchParams.toString()}`,
+    {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Export failed: ${response.status}`);
+  }
+
+  // Content-Disposition is now readable (same-origin response)
+  const disposition = response.headers.get("content-disposition") ?? "";
+  let filename = "BaoCao.xlsx";
+
+  // RFC 5987: filename*=<charset>'<language>'<encoded-value>
+  const utf8Match = disposition.match(/filename\*=[^']*'[^']*'([^;\s]+)/i);
+  if (utf8Match) {
+    filename = decodeURIComponent(utf8Match[1]);
+  } else {
+    const asciiMatch = disposition.match(/filename="([^"]+)"/);
+    if (asciiMatch) filename = asciiMatch[1];
+  }
+
+  const blob = await response.blob();
+  return { blob, filename };
 }

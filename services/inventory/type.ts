@@ -132,6 +132,22 @@ export interface GetDepotTransactionsParams {
   pageSize?: number;
 }
 
+// ─── Export Movements ───
+
+export type ExportPeriodType = "ByDateRange" | "ByMonth";
+
+export interface ExportMovementsParams {
+  periodType: ExportPeriodType;
+  /** Required when periodType = ByMonth */
+  month?: number;
+  /** Required when periodType = ByMonth */
+  year?: number;
+  /** Required when periodType = ByDateRange */
+  fromDate?: string;
+  /** Required when periodType = ByDateRange */
+  toDate?: string;
+}
+
 export interface GetDepotTransactionsResponse {
   items: TransactionEntity[];
   pageNumber: number;
