@@ -68,9 +68,18 @@ export interface SOSRequest {
   aiAnalysis?: {
     riskFactors: string[];
   };
+  injuredPersons?: Array<{
+    index: number;
+    name: string;
+    customName?: string | null;
+    personType?: string;
+    medicalIssues?: string[];
+    severity?: string;
+  }>;
   // Extended fields from backend structuredData / senderInfo
   peopleCount?: { adult: number; child: number; elderly: number };
   waitTimeMinutes?: number;
+  sosType?: string;
   situation?: string;
   medicalIssues?: string[];
   supplies?: string[];

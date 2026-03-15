@@ -119,6 +119,11 @@ function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
   const si = entity.senderInfo;
   const nm = entity.networkMetadata;
   const supplies = sd?.supplies ?? [];
+  const receivedAt = entity.receivedAt ?? entity.createdAt;
+  const createdAt = new Date(receivedAt);
+  const computedWaitTimeMinutes =
+    entity.waitTimeMinutes ??
+    Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 60000));
 
   return {
     id: String(entity.id),
@@ -134,18 +139,27 @@ function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     },
     status: toStatus(entity.status),
     message: entity.msg,
-    createdAt: new Date(entity.createdAt),
+    createdAt,
     peopleCount: sd?.people_count,
-    waitTimeMinutes: entity.waitTimeMinutes,
+    injuredPersons: sd?.injured_persons?.map((person) => ({
+      index: person.index,
+      name: person.name,
+      customName: person.custom_name,
+      personType: person.person_type,
+      medicalIssues: person.medical_issues,
+      severity: person.severity,
+    })),
+    waitTimeMinutes: computedWaitTimeMinutes,
+    sosType: entity.sosType ?? undefined,
     situation: sd?.situation,
     medicalIssues: sd?.medical_issues,
     supplies: sd?.supplies,
     canMove: sd?.can_move,
     hasInjured: sd?.has_injured,
     othersAreStable: sd?.others_are_stable,
-    additionalDescription: sd?.additional_description,
-    senderPhone: si?.user_phone,
-    senderName: si?.user_name,
+    additionalDescription: sd?.additional_description ?? undefined,
+    senderPhone: si?.user_phone ?? undefined,
+    senderName: si?.user_name ?? undefined,
     isOnline: si?.is_online,
     hopCount: nm?.hop_count,
     locationAccuracy: entity.locationAccuracy,

@@ -62,7 +62,13 @@ function TimeElapsed({ date }: { date: Date }) {
   return <span>{elapsed}</span>;
 }
 
-function ParsedMessage({ text }: { text?: string | null }) {
+function ParsedMessage({
+  text,
+  hideInjurySection = false,
+}: {
+  text?: string | null;
+  hideInjurySection?: boolean;
+}) {
   if (!text) return null;
 
   if (!text.includes("|")) {
@@ -96,6 +102,10 @@ function ParsedMessage({ text }: { text?: string | null }) {
         if (colonIndex > -1) {
           const title = part.slice(0, colonIndex).trim();
           const content = part.slice(colonIndex + 1).trim();
+
+          if (hideInjurySection && title.toLowerCase() === "bị thương") {
+            return null;
+          }
 
           if (
             title.toLowerCase() === "bị thương" &&
@@ -360,6 +370,56 @@ const SOSDetailsPanel = ({
 
   // Get risk factors from AI analysis
   const riskFactors = sosRequest.aiAnalysis?.riskFactors || [];
+  const injuredPersons = sosRequest.injuredPersons ?? [];
+
+  const severityLabel = (value?: string) => {
+    const normalized = (value || "").toLowerCase();
+    if (normalized.includes("critical") || normalized.includes("nghiêm")) {
+      return "Nghiêm trọng";
+    }
+    if (normalized.includes("moderate") || normalized.includes("trung")) {
+      return "Trung bình";
+    }
+    if (normalized.includes("low") || normalized.includes("nhẹ")) {
+      return "Nhẹ";
+    }
+    return value || "Chưa rõ";
+  };
+
+  const severityBadgeClass = (value?: string) => {
+    const normalized = (value || "").toLowerCase();
+    if (normalized.includes("critical") || normalized.includes("nghiêm")) {
+      return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
+    }
+    if (normalized.includes("moderate") || normalized.includes("trung")) {
+      return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
+    }
+    if (normalized.includes("low") || normalized.includes("nhẹ")) {
+      return "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50";
+    }
+    return "bg-muted text-muted-foreground border-border";
+  };
+
+  const personTypeLabel = (value?: string) => {
+    const normalized = (value || "").toLowerCase();
+    if (normalized === "elderly") return "Người già";
+    if (normalized === "child") return "Trẻ em";
+    if (normalized === "adult") return "Người lớn";
+    return "Nạn nhân";
+  };
+
+  const issueLabel = (value: string) => {
+    const normalized = value.toLowerCase();
+    const labels: Record<string, string> = {
+      FRACTURE: "Gãy xương",
+      BLEEDING: "Chảy máu",
+      CHRONIC_DISEASE: "Bệnh nền",
+      PREGNANCY: "Thai kỳ",
+      BREATHING_DIFFICULTY: "Khó thở",
+      MOBILITY_IMPAIRMENT: "Hạn chế vận động",
+    };
+    return labels[value] || labels[normalized.toUpperCase()] || value;
+  };
 
   const scoreRows = [
     {
@@ -639,6 +699,7 @@ const SOSDetailsPanel = ({
                           cannotmove: "Không di chuyển được",
                           isolated: "Bị cô lập",
                           stranded: "Mắc cạn",
+                          accident: "Tai nạn",
                           landslide: "Sạt lở đất",
                           storm: "Mưa bão",
                           fire: "Hỏa hoạn",
@@ -669,6 +730,79 @@ const SOSDetailsPanel = ({
             )}
 
             {/* Medical Issues */}
+            {injuredPersons.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <FirstAid className="h-4 w-4 text-rose-500" weight="fill" />
+                  Người bị thương ({injuredPersons.length})
+                </h4>
+                <div className="space-y-2">
+                  {injuredPersons
+                    .slice()
+                    .sort((a, b) => {
+                      const rank = (s?: string) => {
+                        const v = (s || "").toLowerCase();
+                        if (v.includes("critical") || v.includes("nghiêm"))
+                          return 3;
+                        if (v.includes("moderate") || v.includes("trung"))
+                          return 2;
+                        if (v.includes("low") || v.includes("nhẹ")) return 1;
+                        return 0;
+                      };
+                      return rank(b.severity) - rank(a.severity);
+                    })
+                    .map((person) => {
+                      const displayName =
+                        person.customName?.trim() ||
+                        person.name ||
+                        `${personTypeLabel(person.personType)} ${person.index}`;
+
+                      return (
+                        <div
+                          key={`${person.index}-${displayName}`}
+                          className="rounded-lg border bg-background px-3 py-2.5 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold leading-snug">
+                                {displayName}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {personTypeLabel(person.personType)}
+                              </p>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10.5px] px-2 py-0.5 h-6 shrink-0 font-medium",
+                                severityBadgeClass(person.severity),
+                              )}
+                            >
+                              {severityLabel(person.severity)}
+                            </Badge>
+                          </div>
+
+                          {person.medicalIssues &&
+                            person.medicalIssues.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {person.medicalIssues.map((issue, idx) => (
+                                  <Badge
+                                    key={`${displayName}-${issue}-${idx}`}
+                                    variant="secondary"
+                                    className="text-[10.5px] h-5 px-1.5"
+                                  >
+                                    {issueLabel(issue)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
             {sosRequest.medicalIssues &&
               sosRequest.medicalIssues.length > 0 && (
                 <div>
@@ -798,7 +932,10 @@ const SOSDetailsPanel = ({
             <div>
               <h4 className="text-sm font-semibold mb-2">Nội dung cầu cứu</h4>
               <div className="bg-muted/30 rounded-lg p-4 border shadow-sm">
-                <ParsedMessage text={sosRequest.message} />
+                <ParsedMessage
+                  text={sosRequest.message}
+                  hideInjurySection={injuredPersons.length > 0}
+                />
               </div>
             </div>
 
