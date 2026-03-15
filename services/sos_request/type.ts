@@ -10,7 +10,14 @@ export type SOSRequestStatus =
 export type SOSPriorityLevel = "Low" | "Medium" | "High" | "Critical";
 
 // SOS Situation Type
-export type SOSSituation = "TRAPPED" | "ISOLATED" | "STRANDED" | "OTHER";
+export type SOSSituation =
+  | "FLOODING"
+  | "LANDSLIDE"
+  | "ACCIDENT"
+  | "TRAPPED"
+  | "ISOLATED"
+  | "STRANDED"
+  | "OTHER";
 
 // Supply types
 export type SupplyType =
@@ -33,19 +40,19 @@ export type MedicalIssueType =
 export interface InjuredPerson {
   index: number;
   name: string;
-  custom_name: string;
+  custom_name: string | null;
   person_type: string;
-  medical_issues: string[];
+  medical_issues: MedicalIssueType[];
   severity: string;
 }
 
 // Structured data from SOS request
 export interface SOSStructuredData {
-  situation: string;
-  other_situation_description: string;
+  situation: SOSSituation | string;
+  other_situation_description: string | null;
   has_injured: boolean;
-  medical_issues: string[];
-  other_medical_description: string;
+  medical_issues: MedicalIssueType[];
+  other_medical_description: string | null;
   others_are_stable: boolean;
   people_count: {
     adult: number;
@@ -54,9 +61,9 @@ export interface SOSStructuredData {
   };
   can_move: boolean;
   need_medical: boolean;
-  supplies: string[];
-  other_supply_description: string;
-  additional_description: string;
+  supplies: SupplyType[];
+  other_supply_description: string | null;
+  additional_description: string | null;
   injured_persons: InjuredPerson[];
 }
 
@@ -70,9 +77,9 @@ export interface SOSNetworkMetadata {
 export interface SOSSenderInfo {
   device_id: string;
   user_id: string;
-  user_name: string;
-  user_phone: string;
-  battery_level: number;
+  user_name: string | null;
+  user_phone: string | null;
+  battery_level: number | null;
   is_online: boolean;
 }
 
@@ -90,15 +97,17 @@ export interface SOSRequestEntity {
   originId: string | null;
   status: SOSRequestStatus;
   priorityLevel: SOSPriorityLevel;
-  waitTimeMinutes: number;
+  waitTimeMinutes?: number | null;
   latitude: number;
   longitude: number;
   locationAccuracy: number | null;
   timestamp: number | null;
   createdAt: string;
+  receivedAt?: string | null;
   lastUpdatedAt: string | null;
   reviewedAt: string | null;
   reviewedById: string | null;
+  createdByCoordinatorId?: string | null;
 }
 
 // Paginated Response

@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import { ClusterDetailsSheetProps, SOSRequest } from "@/type";
 import { cn } from "@/lib/utils";
+import {
+  PRIORITY_BADGE_VARIANT,
+  PRIORITY_BORDER_LEFT_COLOR,
+  PRIORITY_LABELS,
+} from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -68,6 +73,7 @@ const ClusterDetailsPanel = ({
     P1: "bg-red-500",
     P2: "bg-orange-500",
     P3: "bg-yellow-500",
+    P4: "bg-teal-500",
   };
 
   // Handle case when cluster is null but panel is open (during close animation)
@@ -129,11 +135,13 @@ const ClusterDetailsPanel = ({
                     ? "p1"
                     : cluster.highestPriority === "P2"
                       ? "p2"
-                      : "p3"
+                      : cluster.highestPriority === "P3"
+                        ? "p3"
+                        : "p4"
                 }
                 className="text-sm px-3"
               >
-                {cluster.highestPriority}
+                {PRIORITY_LABELS[cluster.highestPriority]}
               </Badge>
               <Button
                 variant="ghost"
@@ -290,12 +298,6 @@ function SOSDetailCard({
   sos: SOSRequest;
   onClick: () => void;
 }) {
-  const priorityColors = {
-    P1: "border-l-red-500",
-    P2: "border-l-orange-500",
-    P3: "border-l-yellow-500",
-  };
-
   const statusLabels = {
     PENDING: { text: "Chờ xử lý", variant: "warning" as const },
     ASSIGNED: { text: "Đã phân công", variant: "info" as const },
@@ -306,23 +308,15 @@ function SOSDetailCard({
     <Card
       className={cn(
         "cursor-pointer transition-all hover:shadow-md border-l-4 py-2",
-        priorityColors[sos.priority],
+        PRIORITY_BORDER_LEFT_COLOR[sos.priority],
       )}
       onClick={onClick}
     >
       <CardContent className="p-3">
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Badge
-              variant={
-                sos.priority === "P1"
-                  ? "p1"
-                  : sos.priority === "P2"
-                    ? "p2"
-                    : "p3"
-              }
-            >
-              {sos.priority}
+            <Badge variant={PRIORITY_BADGE_VARIANT[sos.priority]}>
+              {PRIORITY_LABELS[sos.priority]}
             </Badge>
             <span className="text-xs font-mono text-muted-foreground">
               #{sos.id.split("-")[1]}

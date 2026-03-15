@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { SOSDetailsPanelProps } from "@/type";
 import { cn } from "@/lib/utils";
+import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -60,7 +62,13 @@ function TimeElapsed({ date }: { date: Date }) {
   return <span>{elapsed}</span>;
 }
 
-function ParsedMessage({ text }: { text?: string | null }) {
+function ParsedMessage({
+  text,
+  hideInjurySection = false,
+}: {
+  text?: string | null;
+  hideInjurySection?: boolean;
+}) {
   if (!text) return null;
 
   if (!text.includes("|")) {
@@ -94,6 +102,10 @@ function ParsedMessage({ text }: { text?: string | null }) {
         if (colonIndex > -1) {
           const title = part.slice(0, colonIndex).trim();
           const content = part.slice(colonIndex + 1).trim();
+
+          if (hideInjurySection && title.toLowerCase() === "bị thương") {
+            return null;
+          }
 
           if (
             title.toLowerCase() === "bị thương" &&
@@ -237,6 +249,80 @@ function ParsedMessage({ text }: { text?: string | null }) {
   );
 }
 
+function FormulaTooltip({
+  title,
+  formula,
+  details,
+}: {
+  title: string;
+  formula: string;
+  details?: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const handleEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const tooltipWidth = 320;
+    const viewportPadding = 12;
+    const maxLeft = window.innerWidth - tooltipWidth - viewportPadding;
+    const left = Math.max(viewportPadding, Math.min(rect.left, maxLeft));
+    setPos({
+      top: rect.bottom + 8,
+      left,
+    });
+    setOpen(true);
+  };
+
+  return (
+    <span className="inline-flex items-center">
+      <button
+        type="button"
+        className="inline-flex items-center text-muted-foreground hover:text-foreground transition-colors"
+        aria-label={`Xem công thức: ${title}`}
+        onMouseEnter={handleEnter}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setPos({ top: rect.bottom + 8, left: Math.max(12, rect.left) });
+          setOpen(true);
+        }}
+        onBlur={() => setOpen(false)}
+      >
+        <Info className="h-3.5 w-3.5" weight="fill" />
+      </button>
+      {mounted &&
+        open &&
+        createPortal(
+          <div
+            className="fixed z-[9999] w-80 max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-3 text-[11px] leading-relaxed shadow-md"
+            style={{ top: pos.top, left: pos.left }}
+            onMouseEnter={() => setOpen(true)}
+            onMouseLeave={() => setOpen(false)}
+          >
+            <p className="font-semibold text-foreground">{title}</p>
+            <p className="mt-1 text-muted-foreground whitespace-normal break-words">
+              {formula}
+            </p>
+            {details && details.length > 0 && (
+              <div className="mt-2 space-y-1 text-muted-foreground whitespace-normal break-words">
+                {details.map((line, idx) => (
+                  <p key={idx}>- {line}</p>
+                ))}
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
+    </span>
+  );
+}
+
 const SOSDetailsPanel = ({
   open,
   onOpenChange,
@@ -260,6 +346,7 @@ const SOSDetailsPanel = ({
     P1: "bg-red-500",
     P2: "bg-orange-500",
     P3: "bg-yellow-500",
+    P4: "bg-teal-500",
   };
 
   const statusLabels = {
@@ -283,6 +370,146 @@ const SOSDetailsPanel = ({
 
   // Get risk factors from AI analysis
   const riskFactors = sosRequest.aiAnalysis?.riskFactors || [];
+  const injuredPersons = sosRequest.injuredPersons ?? [];
+
+  const severityLabel = (value?: string) => {
+    const normalized = (value || "").toLowerCase();
+    if (normalized.includes("critical") || normalized.includes("nghiêm")) {
+      return "Nghiêm trọng";
+    }
+    if (normalized.includes("moderate") || normalized.includes("trung")) {
+      return "Trung bình";
+    }
+    if (normalized.includes("low") || normalized.includes("nhẹ")) {
+      return "Nhẹ";
+    }
+    return value || "Chưa rõ";
+  };
+
+  const severityBadgeClass = (value?: string) => {
+    const normalized = (value || "").toLowerCase();
+    if (normalized.includes("critical") || normalized.includes("nghiêm")) {
+      return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
+    }
+    if (normalized.includes("moderate") || normalized.includes("trung")) {
+      return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
+    }
+    if (normalized.includes("low") || normalized.includes("nhẹ")) {
+      return "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/50";
+    }
+    return "bg-muted text-muted-foreground border-border";
+  };
+
+  const personTypeLabel = (value?: string) => {
+    const normalized = (value || "").toLowerCase();
+    if (normalized === "elderly") return "Người già";
+    if (normalized === "child") return "Trẻ em";
+    if (normalized === "adult") return "Người lớn";
+    return "Nạn nhân";
+  };
+
+  const issueLabel = (value: string) => {
+    const normalized = value.toLowerCase();
+    const labels: Record<string, string> = {
+      FRACTURE: "Gãy xương",
+      BLEEDING: "Chảy máu",
+      CHRONIC_DISEASE: "Bệnh nền",
+      PREGNANCY: "Thai kỳ",
+      BREATHING_DIFFICULTY: "Khó thở",
+      MOBILITY_IMPAIRMENT: "Hạn chế vận động",
+    };
+    return labels[value] || labels[normalized.toUpperCase()] || value;
+  };
+
+  const scoreRows = [
+    {
+      key: "medical",
+      label: "Y tế",
+      value: ruleEvaluation?.medicalScore ?? 0,
+      icon: FirstAid,
+      colorClass: "text-red-600 dark:text-red-400",
+      formula: "Điểm y tế dựa trên mức độ cần can thiệp y tế khẩn cấp (0-100).",
+    },
+    {
+      key: "injury",
+      label: "Chấn thương",
+      value: ruleEvaluation?.injuryScore ?? 0,
+      icon: Warning,
+      colorClass: "text-orange-600 dark:text-orange-400",
+      formula:
+        "Điểm chấn thương tăng khi có người bị thương nặng hoặc nhiều ca cùng lúc (0-100).",
+    },
+    {
+      key: "environment",
+      label: "Môi trường",
+      value: ruleEvaluation?.environmentScore ?? 0,
+      icon: Lightning,
+      colorClass: "text-blue-600 dark:text-blue-400",
+      formula:
+        "Điểm môi trường phản ánh rủi ro từ lũ, thời tiết, ngập, sạt lở... (0-100).",
+    },
+    {
+      key: "mobility",
+      label: "Di chuyển",
+      value: ruleEvaluation?.mobilityScore ?? 0,
+      icon: MapPin,
+      colorClass: "text-amber-600 dark:text-amber-400",
+      formula:
+        "Điểm di chuyển tăng khi nạn nhân khó/không thể tự di chuyển (0-100).",
+    },
+    {
+      key: "food",
+      label: "Thực phẩm",
+      value: ruleEvaluation?.foodScore ?? 0,
+      icon: ForkKnife,
+      colorClass: "text-green-600 dark:text-green-400",
+      formula:
+        "Điểm thực phẩm phản ánh nhu cầu nhu yếu phẩm và nước uống (0-100).",
+    },
+  ] as const;
+
+  const summedScore = scoreRows.reduce((sum, row) => sum + row.value, 0);
+  const displayedTotalScore = ruleEvaluation?.totalScore ?? 0;
+
+  const isV3 = ruleEvaluation?.ruleVersion?.startsWith("3");
+
+  // Calculate local factors to match BE Rule 3.0 (for display in tooltip)
+  let requestTypeScore = 10;
+  let requestTypeLabel = "Khác";
+  const sosTypeStr = ((sosRequest as any).sosType || "").toLowerCase();
+  if (sosTypeStr.includes("rescue")) {
+    requestTypeScore = 30;
+    requestTypeLabel = "Cứu hộ";
+  } else if (sosTypeStr.includes("relief") || sosTypeStr.includes("support")) {
+    requestTypeScore = 20;
+    requestTypeLabel = "Cứu trợ";
+  }
+
+  let situationMultiplier = 1.0;
+  let situationLabel = "Mặc định";
+  const sitStr = (sosRequest.situation || "").toLowerCase();
+  if (
+    sitStr.includes("flood") ||
+    sitStr.includes("collapse") ||
+    sitStr.includes("flooding") ||
+    sitStr.includes("building_collapse")
+  ) {
+    situationMultiplier = 1.5;
+    situationLabel = "Lũ lụt/Sập công trình";
+  } else if (sitStr.includes("trapped") || sitStr.includes("danger")) {
+    situationMultiplier = 1.3;
+    situationLabel = "Mắc kẹt/Nguy hiểm";
+  } else if (sitStr.includes("cannot_move") || sosRequest.canMove === false) {
+    situationMultiplier = 1.2;
+    situationLabel = "Không thể di chuyển";
+  }
+
+  // Filter out 0-value factors for v3.0
+  const displayScoreRows = isV3
+    ? scoreRows.filter(
+        (r) => !["injury", "mobility", "food"].includes(r.key) || r.value > 0,
+      )
+    : scoreRows;
 
   return (
     <div
@@ -314,16 +541,10 @@ const SOSDetailsPanel = ({
             </div>
             <div className="flex items-center gap-2">
               <Badge
-                variant={
-                  sosRequest.priority === "P1"
-                    ? "p1"
-                    : sosRequest.priority === "P2"
-                      ? "p2"
-                      : "p3"
-                }
+                variant={PRIORITY_BADGE_VARIANT[sosRequest.priority]}
                 className="text-sm px-3"
               >
-                {sosRequest.priority}
+                {PRIORITY_LABELS[sosRequest.priority]}
               </Badge>
               <Button
                 variant="ghost"
@@ -478,6 +699,7 @@ const SOSDetailsPanel = ({
                           cannotmove: "Không di chuyển được",
                           isolated: "Bị cô lập",
                           stranded: "Mắc cạn",
+                          accident: "Tai nạn",
                           landslide: "Sạt lở đất",
                           storm: "Mưa bão",
                           fire: "Hỏa hoạn",
@@ -508,6 +730,79 @@ const SOSDetailsPanel = ({
             )}
 
             {/* Medical Issues */}
+            {injuredPersons.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <FirstAid className="h-4 w-4 text-rose-500" weight="fill" />
+                  Người bị thương ({injuredPersons.length})
+                </h4>
+                <div className="space-y-2">
+                  {injuredPersons
+                    .slice()
+                    .sort((a, b) => {
+                      const rank = (s?: string) => {
+                        const v = (s || "").toLowerCase();
+                        if (v.includes("critical") || v.includes("nghiêm"))
+                          return 3;
+                        if (v.includes("moderate") || v.includes("trung"))
+                          return 2;
+                        if (v.includes("low") || v.includes("nhẹ")) return 1;
+                        return 0;
+                      };
+                      return rank(b.severity) - rank(a.severity);
+                    })
+                    .map((person) => {
+                      const displayName =
+                        person.customName?.trim() ||
+                        person.name ||
+                        `${personTypeLabel(person.personType)} ${person.index}`;
+
+                      return (
+                        <div
+                          key={`${person.index}-${displayName}`}
+                          className="rounded-lg border bg-background px-3 py-2.5 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold leading-snug">
+                                {displayName}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {personTypeLabel(person.personType)}
+                              </p>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10.5px] px-2 py-0.5 h-6 shrink-0 font-medium",
+                                severityBadgeClass(person.severity),
+                              )}
+                            >
+                              {severityLabel(person.severity)}
+                            </Badge>
+                          </div>
+
+                          {person.medicalIssues &&
+                            person.medicalIssues.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {person.medicalIssues.map((issue, idx) => (
+                                  <Badge
+                                    key={`${displayName}-${issue}-${idx}`}
+                                    variant="secondary"
+                                    className="text-[10.5px] h-5 px-1.5"
+                                  >
+                                    {issueLabel(issue)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
             {sosRequest.medicalIssues &&
               sosRequest.medicalIssues.length > 0 && (
                 <div>
@@ -637,7 +932,10 @@ const SOSDetailsPanel = ({
             <div>
               <h4 className="text-sm font-semibold mb-2">Nội dung cầu cứu</h4>
               <div className="bg-muted/30 rounded-lg p-4 border shadow-sm">
-                <ParsedMessage text={sosRequest.message} />
+                <ParsedMessage
+                  text={sosRequest.message}
+                  hideInjurySection={injuredPersons.length > 0}
+                />
               </div>
             </div>
 
@@ -699,8 +997,16 @@ const SOSDetailsPanel = ({
                         </h4>
                         <div className="bg-muted/30 rounded-lg p-3.5 border shadow-sm">
                           <div className="flex items-center justify-between mb-3 pb-3 border-b border-border/50">
-                            <span className="text-sm font-medium">
+                            <span className="text-sm font-medium inline-flex items-center gap-1.5">
                               Điểm rủi ro tổng hợp:
+                              <FormulaTooltip
+                                title="Công thức tính chuẩn hóa"
+                                formula={
+                                  isV3
+                                    ? `Tổng điểm = (Loại yêu cầu + Điểm y tế) × Hệ số tình trạng = (${requestTypeScore} + ${ruleEvaluation.medicalScore.toFixed(1)}) × ${situationMultiplier} ≈ ${displayedTotalScore.toFixed(1)}`
+                                    : `Tổng điểm = (Y tế × 0.3) + (Chấn thương × 0.25) + (Di chuyển × 0.15) + (Môi trường × 0.20) + (Thực phẩm × 0.10) ≈ ${displayedTotalScore.toFixed(1)}`
+                                }
+                              />
                             </span>
                             <div className="flex items-center gap-2">
                               {ruleEvaluation.priorityLevel && (
@@ -754,51 +1060,28 @@ const SOSDetailsPanel = ({
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-[13px]">
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground flex items-center gap-1.5">
-                                <FirstAid className="w-3.5 h-3.5" /> Y tế:
-                              </span>
-                              <span className="font-semibold text-red-600 dark:text-red-400">
-                                {ruleEvaluation.medicalScore?.toFixed(1) ||
-                                  "0.0"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground flex items-center gap-1.5">
-                                <Warning className="w-3.5 h-3.5" /> Chấn thương:
-                              </span>
-                              <span className="font-semibold text-orange-600 dark:text-orange-400">
-                                {ruleEvaluation.injuryScore?.toFixed(1) ||
-                                  "0.0"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground flex items-center gap-1.5">
-                                <Lightning className="w-3.5 h-3.5" /> Môi
-                                trường:
-                              </span>
-                              <span className="font-semibold text-blue-600 dark:text-blue-400">
-                                {ruleEvaluation.environmentScore?.toFixed(1) ||
-                                  "0.0"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5" /> Di chuyển:
-                              </span>
-                              <span className="font-semibold text-amber-600 dark:text-amber-400">
-                                {ruleEvaluation.mobilityScore?.toFixed(1) ||
-                                  "0.0"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground flex items-center gap-1.5">
-                                <ForkKnife className="w-3.5 h-3.5" /> Thực phẩm:
-                              </span>
-                              <span className="font-semibold text-green-600 dark:text-green-400">
-                                {ruleEvaluation.foodScore?.toFixed(1) || "0.0"}
-                              </span>
-                            </div>
+                            {displayScoreRows.map((row) => {
+                              const RowIcon = row.icon;
+                              return (
+                                <div
+                                  key={row.key}
+                                  className="flex justify-between items-center"
+                                >
+                                  <span className="text-muted-foreground flex items-center gap-1.5">
+                                    <RowIcon className="w-3.5 h-3.5" />
+                                    {row.label}:
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      "font-semibold",
+                                      row.colorClass,
+                                    )}
+                                  >
+                                    {row.value.toFixed(1)}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
 
                           {/* Items Needed */}
@@ -976,23 +1259,19 @@ const SOSDetailsPanel = ({
                               ? "text-red-500"
                               : sos.priority === "P2"
                                 ? "text-orange-500"
-                                : "text-yellow-500",
+                                : sos.priority === "P3"
+                                  ? "text-yellow-500"
+                                  : "text-teal-500",
                           )}
                           weight="fill"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <Badge
-                              variant={
-                                sos.priority === "P1"
-                                  ? "p1"
-                                  : sos.priority === "P2"
-                                    ? "p2"
-                                    : "p3"
-                              }
+                              variant={PRIORITY_BADGE_VARIANT[sos.priority]}
                               className="text-[10px] px-1.5 py-0 h-5"
                             >
-                              {sos.priority}
+                              {PRIORITY_LABELS[sos.priority]}
                             </Badge>
                             <span className="text-xs font-mono text-muted-foreground">
                               SOS #{sos.id}

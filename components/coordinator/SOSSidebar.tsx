@@ -5,6 +5,13 @@ import { SOSRequest, Rescuer, Mission, SOSSidebarProps } from "@/type";
 import { getRescuerTypeIcon } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { activityTypeConfig } from "@/lib/constants";
+import {
+  PRIORITY_BADGE_VARIANT,
+  PRIORITY_BORDER_COLOR,
+  PRIORITY_LABELS,
+  PRIORITY_ORDER,
+  PRIORITY_TEXT_COLOR,
+} from "@/lib/priority";
 import { useMissions } from "@/services/mission/hooks";
 import type { MissionEntity } from "@/services/mission/type";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -231,8 +238,8 @@ const SOSSidebar = ({
                       Low: "text-teal-700 bg-teal-100 dark:text-teal-300 dark:bg-teal-900/30",
                     };
                     const severityLabels: Record<string, string> = {
-                      Critical: "Nghiêm trọng",
-                      High: "Cao",
+                      Critical: "Rất nghiêm trọng",
+                      High: "Nghiêm trọng",
                       Medium: "Trung bình",
                       Low: "Thấp",
                     };
@@ -284,6 +291,17 @@ const SOSSidebar = ({
                               <span className="text-xs font-semibold">
                                 Cụm #{cluster.id}
                               </span>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px] h-4 px-1.5 border-0",
+                                  severityBadge[cluster.severityLevel] ||
+                                    severityBadge.Low,
+                                )}
+                              >
+                                {severityLabels[cluster.severityLevel] ||
+                                  cluster.severityLevel}
+                              </Badge>
                             </div>
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] text-muted-foreground">
@@ -331,25 +349,17 @@ const SOSSidebar = ({
                                         <MapPin
                                           className={cn(
                                             "h-3.5 w-3.5",
-                                            sos.priority === "P1"
-                                              ? "text-red-500"
-                                              : sos.priority === "P2"
-                                                ? "text-orange-500"
-                                                : "text-yellow-500",
+                                            PRIORITY_TEXT_COLOR[sos.priority],
                                           )}
                                           weight="fill"
                                         />
                                         <Badge
                                           variant={
-                                            sos.priority === "P1"
-                                              ? "p1"
-                                              : sos.priority === "P2"
-                                                ? "p2"
-                                                : "p3"
+                                            PRIORITY_BADGE_VARIANT[sos.priority]
                                           }
                                           className="text-[10px] h-4 px-1.5"
                                         >
-                                          {sos.priority}
+                                          {PRIORITY_LABELS[sos.priority]}
                                         </Badge>
                                         <span className="text-xs font-mono text-muted-foreground">
                                           #{sos.id}
@@ -407,12 +417,11 @@ const SOSSidebar = ({
                   {autoClusters.map((cluster, clusterIdx) => {
                     const highestPriority = cluster.reduce(
                       (best, s) => {
-                        const order = { P1: 0, P2: 1, P3: 2 };
-                        return order[s.priority] < order[best]
+                        return PRIORITY_ORDER[s.priority] < PRIORITY_ORDER[best]
                           ? s.priority
                           : best;
                       },
-                      "P3" as "P1" | "P2" | "P3",
+                      "P4" as "P1" | "P2" | "P3" | "P4",
                     );
                     const isProcessing =
                       isCreatingCluster &&
@@ -477,25 +486,17 @@ const SOSSidebar = ({
                                   <MapPin
                                     className={cn(
                                       "h-3.5 w-3.5",
-                                      sos.priority === "P1"
-                                        ? "text-red-500"
-                                        : sos.priority === "P2"
-                                          ? "text-orange-500"
-                                          : "text-yellow-500",
+                                      PRIORITY_TEXT_COLOR[sos.priority],
                                     )}
                                     weight="fill"
                                   />
                                   <Badge
                                     variant={
-                                      sos.priority === "P1"
-                                        ? "p1"
-                                        : sos.priority === "P2"
-                                          ? "p2"
-                                          : "p3"
+                                      PRIORITY_BADGE_VARIANT[sos.priority]
                                     }
                                     className="text-[10px] h-4 px-1.5"
                                   >
-                                    {sos.priority}
+                                    {PRIORITY_LABELS[sos.priority]}
                                   </Badge>
                                   <span className="text-xs font-mono text-muted-foreground">
                                     #{sos.id}
@@ -529,11 +530,7 @@ const SOSSidebar = ({
                       key={sos.id}
                       className={cn(
                         "rounded-xl border overflow-hidden",
-                        sos.priority === "P1"
-                          ? "border-red-400 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10"
-                          : sos.priority === "P2"
-                            ? "border-orange-400 bg-orange-50/50 dark:border-orange-800/40 dark:bg-orange-900/10"
-                            : "border-yellow-400 bg-yellow-50/50 dark:border-yellow-800/40 dark:bg-yellow-900/10",
+                        PRIORITY_BORDER_COLOR[sos.priority],
                       )}
                     >
                       <div
@@ -549,25 +546,15 @@ const SOSSidebar = ({
                             <MapPin
                               className={cn(
                                 "h-3.5 w-3.5",
-                                sos.priority === "P1"
-                                  ? "text-red-500"
-                                  : sos.priority === "P2"
-                                    ? "text-orange-500"
-                                    : "text-yellow-500",
+                                PRIORITY_TEXT_COLOR[sos.priority],
                               )}
                               weight="fill"
                             />
                             <Badge
-                              variant={
-                                sos.priority === "P1"
-                                  ? "p1"
-                                  : sos.priority === "P2"
-                                    ? "p2"
-                                    : "p3"
-                              }
+                              variant={PRIORITY_BADGE_VARIANT[sos.priority]}
                               className="text-[10px] h-4 px-1.5"
                             >
-                              {sos.priority}
+                              {PRIORITY_LABELS[sos.priority]}
                             </Badge>
                             <span className="text-xs font-mono text-muted-foreground">
                               #{sos.id}
@@ -742,6 +729,7 @@ function SOSCard({
     P1: "p1" as const,
     P2: "p2" as const,
     P3: "p3" as const,
+    P4: "p4" as const,
   };
 
   return (
@@ -757,7 +745,7 @@ function SOSCard({
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
             <Badge variant={priorityVariant[sos.priority]}>
-              {sos.priority}
+              {PRIORITY_LABELS[sos.priority]}
             </Badge>
             <span className="text-xs font-mono text-muted-foreground">
               #{sos.id}

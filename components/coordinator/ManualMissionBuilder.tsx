@@ -26,6 +26,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { activityTypeConfig } from "@/lib/constants";
+import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -932,21 +933,17 @@ const ManualMissionBuilder = ({
                                   ? "text-red-500"
                                   : sos.priority === "P2"
                                     ? "text-orange-500"
-                                    : "text-yellow-500",
+                                    : sos.priority === "P3"
+                                      ? "text-yellow-500"
+                                      : "text-teal-500",
                               )}
                               weight="fill"
                             />
                             <Badge
-                              variant={
-                                sos.priority === "P1"
-                                  ? "p1"
-                                  : sos.priority === "P2"
-                                    ? "p2"
-                                    : "p3"
-                              }
+                              variant={PRIORITY_BADGE_VARIANT[sos.priority]}
                               className="text-[9px] h-3.5 px-1"
                             >
-                              {sos.priority}
+                              {PRIORITY_LABELS[sos.priority]}
                             </Badge>
                             <span className="text-[10px] font-mono text-muted-foreground">
                               #{sos.id}

@@ -14,7 +14,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
   MapPin,
-  Phone,
   User,
   WarningCircle,
   FirstAid,
@@ -80,11 +79,11 @@ function ToggleChip({
   return (
     <Badge
       variant={selected ? "default" : "outline"}
-      className="cursor-pointer select-none transition-colors text-sm py-1.5 px-3"
+      className="cursor-pointer select-none transition-colors text-xs py-1 px-2 hover:opacity-80"
       onClick={onClick}
     >
       {label}
-      {selected && <X size={10} className="ml-1" />}
+      {selected && <X size={12} className="ml-1" />}
     </Badge>
   );
 }
@@ -106,7 +105,7 @@ function SituationCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-lg border-2 px-4 py-3 text-sm font-medium transition-all text-left ${
+      className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-center ${
         selected
           ? "border-primary bg-primary/10 text-primary"
           : "border-border hover:border-muted-foreground/40 text-foreground"
@@ -146,23 +145,19 @@ function CreateSOSContent() {
     }
     setIsGeocoding(true);
     try {
-      const params = new URLSearchParams({
-        q: query,
-        format: "json",
-        limit: "1",
-        addressdetails: "1",
-        countrycodes: "vn",
-      });
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?${params}`,
-        { headers: { "Accept-Language": "vi,en" } },
-      );
-      if (!res.ok) throw new Error("Nominatim request failed");
-      const data = await res.json();
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error("Geocode request failed");
+
+      const payload = (await res.json()) as {
+        results?: Array<{ lat: string; lon: string; display_name: string }>;
+      };
+      const data = payload.results ?? [];
+
       if (!data.length) {
         toast.error("Không tìm thấy địa chỉ, hãy thử từ khoá khác");
         return;
       }
+
       const { lat: resLat, lon: resLon, display_name } = data[0];
       setLat(parseFloat(resLat).toFixed(6));
       setLng(parseFloat(resLon).toFixed(6));
@@ -296,9 +291,8 @@ function CreateSOSContent() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* ── Header ── */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto flex h-14 max-w-3xl items-center gap-4 px-4">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4">
           <Button
             variant="ghost"
             size="icon"
@@ -309,296 +303,273 @@ function CreateSOSContent() {
           <div>
             <h1 className="text-base font-semibold">Tạo yêu cầu SOS</h1>
             <p className="text-xs text-muted-foreground">
-              Nhập thông tin từ cuộc gọi cầu cứu
+              Giao diện nhập nhanh dành cho điều phối viên
             </p>
           </div>
         </div>
       </header>
 
-      {/* ── Form ── */}
       <form
+        id="create-sos-form"
         onSubmit={handleSubmit}
-        className="mx-auto max-w-3xl p-4 space-y-6 pb-28"
+        className="mx-auto max-w-7xl px-4 py-4 pb-24"
       >
-        {/* ─── 1. Sender Info ─── */}
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
-              <User size={16} /> Thông tin người gọi
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Tên người gọi</Label>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Nguyễn Văn A"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1.5">
-                  <Phone size={14} /> Số điện thoại
-                </Label>
-                <Input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0901 234 567"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <section className="space-y-4 xl:col-span-8">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <Card>
+                <CardContent className="pt-5 space-y-3">
+                  <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                    <User size={16} /> Thông tin người gọi
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium text-foreground/90">
+                        Tên người gọi
+                      </Label>
+                      <Input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Nguyễn Văn A"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-medium text-foreground/90">
+                        Số điện thoại
+                      </Label>
+                      <Input
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="0901 234 567"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-        {/* ─── 2. Location ─── */}
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
-              <MapPin size={16} /> Toạ độ vị trí{" "}
-              <span className="text-red-500">*</span>
-            </p>
-
-            {/* Address → geocode */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1.5">
-                <MagnifyingGlass size={14} /> Tra địa chỉ
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="VD: 123 Nguyễn Trãi"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      geocodeAddress();
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="shrink-0"
-                  onClick={geocodeAddress}
-                  disabled={isGeocoding}
-                >
-                  <MagnifyingGlass size={14} className="mr-1" />
-                  {isGeocoding ? "Đang tìm..." : "Tìm"}
-                </Button>
-              </div>
+              <Card>
+                <CardContent className="pt-5 space-y-3">
+                  <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                    <WarningCircle size={16} /> Tình huống
+                    <span className="text-red-500">*</span>
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {SITUATION_OPTIONS.map((opt) => (
+                      <SituationCard
+                        key={opt.value}
+                        label={opt.label}
+                        value={opt.value}
+                        selected={situation === opt.value}
+                        onClick={() => setSituation(opt.value)}
+                      />
+                    ))}
+                  </div>
+                  {situation === "OTHER" && (
+                    <Input
+                      value={otherSituation}
+                      onChange={(e) => setOtherSituation(e.target.value)}
+                      placeholder="Mô tả tình huống khác..."
+                    />
+                  )}
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Mini Map Picker */}
-            <div className="rounded-lg overflow-hidden border">
-              <LocationPickerMap
-                lat={lat ? Number(lat) : undefined}
-                lng={lng ? Number(lng) : undefined}
-                onPick={(pickedLat, pickedLng) => {
-                  setLat(pickedLat.toFixed(6));
-                  setLng(pickedLng.toFixed(6));
-                }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Crosshair size={12} />
-              Click trên bản đồ để chọn vị trí, hoặc nhập toạ độ thủ công bên
-              dưới
-            </p>
+            <Card>
+              <CardContent className="pt-5 space-y-4">
+                <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                  <MapPin size={16} /> Vị trí cần cứu
+                  <span className="text-red-500">*</span>
+                </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Vĩ độ (Latitude)</Label>
-                <Input
-                  value={lat}
-                  onChange={(e) => setLat(e.target.value)}
-                  placeholder="16.047079"
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+                  <Input
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Tìm nhanh địa chỉ: số nhà, đường, xã/phường..."
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        geocodeAddress();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={geocodeAddress}
+                    disabled={isGeocoding}
+                    className="gap-1.5"
+                  >
+                    <MagnifyingGlass size={14} />
+                    {isGeocoding ? "Đang tìm..." : "Tìm vị trí"}
+                  </Button>
+                </div>
+
+                <div className="rounded-lg overflow-hidden border h-[280px]">
+                  <LocationPickerMap
+                    lat={lat ? Number(lat) : undefined}
+                    lng={lng ? Number(lng) : undefined}
+                    onPick={(pickedLat, pickedLng) => {
+                      setLat(pickedLat.toFixed(6));
+                      setLng(pickedLng.toFixed(6));
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Crosshair size={12} /> Chạm vào bản đồ để chọn điểm chính xác
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-5 space-y-2">
+                <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                  <PaperPlaneTilt size={16} /> Mô tả tình trạng
+                  <span className="text-red-500">*</span>
+                </p>
+                <Textarea
+                  value={msg}
+                  onChange={(e) => setMsg(e.target.value)}
+                  placeholder="Ví dụ: Nước ngập nhanh, có người già và trẻ em, cần hỗ trợ khẩn cấp..."
+                  rows={3}
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Kinh độ (Longitude)</Label>
-                <Input
-                  value={lng}
-                  onChange={(e) => setLng(e.target.value)}
-                  placeholder="108.206230"
-                  required
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </section>
 
-        {/* ─── 3. Message ─── */}
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
-              <WarningCircle size={16} /> Lời gọi cứu{" "}
-              <span className="text-red-500">*</span>
-            </p>
-            <Textarea
-              value={msg}
-              onChange={(e) => setMsg(e.target.value)}
-              placeholder="Nước ngập ngang ngực, cần thuyền cứu hộ gấp..."
-              rows={3}
-              required
-            />
-          </CardContent>
-        </Card>
+          <aside className="space-y-4 xl:col-span-4 xl:sticky xl:top-20 xl:self-start">
+            <Card>
+              <CardContent className="pt-5 space-y-3">
+                <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                  <Users size={16} /> Số người cần hỗ trợ
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Người lớn</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={adultCount}
+                      onChange={(e) => setAdultCount(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Trẻ em</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={childCount}
+                      onChange={(e) => setChildCount(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Người già</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={elderlyCount}
+                      onChange={(e) => setElderlyCount(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* ─── 4. Situation ─── */}
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            <p className="text-sm font-semibold text-muted-foreground">
-              Tình huống <span className="text-red-500">*</span>
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {SITUATION_OPTIONS.map((opt) => (
-                <SituationCard
-                  key={opt.value}
-                  label={opt.label}
-                  value={opt.value}
-                  selected={situation === opt.value}
-                  onClick={() => setSituation(opt.value)}
-                />
-              ))}
-            </div>
-            {situation === "OTHER" && (
-              <Input
-                value={otherSituation}
-                onChange={(e) => setOtherSituation(e.target.value)}
-                placeholder="Mô tả tình huống khác..."
-                className="mt-2"
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ─── 5. People Count ─── */}
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
-              <Users size={16} /> Số người
-            </p>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Người lớn</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={adultCount}
-                  onChange={(e) => setAdultCount(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Trẻ em</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={childCount}
-                  onChange={(e) => setChildCount(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Người già</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={elderlyCount}
-                  onChange={(e) => setElderlyCount(e.target.value)}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ─── 6. Medical / Injury ─── */}
-        <Card>
-          <CardContent className="pt-6 space-y-5">
-            <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
-              <FirstAid size={16} /> Tình trạng y tế
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <ToggleChip
-                label="Có người bị thương"
-                selected={hasInjured}
-                onClick={() => setHasInjured(!hasInjured)}
-              />
-              <ToggleChip
-                label="Cần hỗ trợ y tế"
-                selected={needMedical}
-                onClick={() => setNeedMedical(!needMedical)}
-              />
-              <ToggleChip
-                label="Có thể di chuyển"
-                selected={canMove}
-                onClick={() => setCanMove(!canMove)}
-              />
-              <ToggleChip
-                label="Người khác ổn định"
-                selected={othersAreStable}
-                onClick={() => setOthersAreStable(!othersAreStable)}
-              />
-            </div>
-
-            {hasInjured && (
-              <div className="space-y-2 pt-1">
-                <Label className="text-muted-foreground">
-                  Vấn đề y tế cụ thể
-                </Label>
+            <Card>
+              <CardContent className="pt-5 space-y-3">
+                <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                  <FirstAid size={16} /> Tình trạng y tế
+                </p>
                 <div className="flex flex-wrap gap-2">
-                  {MEDICAL_ISSUE_OPTIONS.map((opt) => (
+                  <ToggleChip
+                    label="Có người bị thương"
+                    selected={hasInjured}
+                    onClick={() => setHasInjured(!hasInjured)}
+                  />
+                  <ToggleChip
+                    label="Cần hỗ trợ y tế"
+                    selected={needMedical}
+                    onClick={() => setNeedMedical(!needMedical)}
+                  />
+                  <ToggleChip
+                    label="Có thể di chuyển"
+                    selected={canMove}
+                    onClick={() => setCanMove(!canMove)}
+                  />
+                  <ToggleChip
+                    label="Người khác ổn định"
+                    selected={othersAreStable}
+                    onClick={() => setOthersAreStable(!othersAreStable)}
+                  />
+                </div>
+
+                {hasInjured && (
+                  <div className="space-y-2 pt-1">
+                    <Label className="text-muted-foreground">
+                      Vấn đề y tế cụ thể
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {MEDICAL_ISSUE_OPTIONS.map((opt) => (
+                        <ToggleChip
+                          key={opt.value}
+                          label={opt.label}
+                          selected={medicalIssues.includes(opt.value)}
+                          onClick={() =>
+                            toggleItem(
+                              medicalIssues,
+                              setMedicalIssues,
+                              opt.value,
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-5 space-y-3">
+                <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                  <Package size={16} /> Nhu yếu phẩm
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {SUPPLY_OPTIONS.map((opt) => (
                     <ToggleChip
                       key={opt.value}
                       label={opt.label}
-                      selected={medicalIssues.includes(opt.value)}
+                      selected={supplies.includes(opt.value)}
                       onClick={() =>
-                        toggleItem(medicalIssues, setMedicalIssues, opt.value)
+                        toggleItem(supplies, setSupplies, opt.value)
                       }
                     />
                   ))}
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        {/* ─── 7. Supplies ─── */}
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
-              <Package size={16} /> Nhu yếu phẩm cần thiết
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {SUPPLY_OPTIONS.map((opt) => (
-                <ToggleChip
-                  key={opt.value}
-                  label={opt.label}
-                  selected={supplies.includes(opt.value)}
-                  onClick={() => toggleItem(supplies, setSupplies, opt.value)}
+            <Card>
+              <CardContent className="pt-5 space-y-2">
+                <Label className="text-sm font-semibold text-muted-foreground">
+                  Ghi chú thêm
+                </Label>
+                <Textarea
+                  value={additionalDescription}
+                  onChange={(e) => setAdditionalDescription(e.target.value)}
+                  placeholder="Thông tin bổ sung từ cuộc gọi (nếu có)..."
+                  rows={3}
                 />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ─── 8. Additional ─── */}
-        <Card>
-          <CardContent className="pt-6 space-y-4">
-            <p className="text-sm font-semibold text-muted-foreground">
-              Ghi chú thêm
-            </p>
-            <Textarea
-              value={additionalDescription}
-              onChange={(e) => setAdditionalDescription(e.target.value)}
-              placeholder="Thông tin bổ sung từ cuộc gọi (nếu có)..."
-              rows={3}
-            />
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
       </form>
 
-      {/* ── Sticky Footer ── */}
       <div className="fixed bottom-0 inset-x-0 border-t bg-background/95 backdrop-blur-sm z-50">
-        <div className="mx-auto max-w-3xl flex items-center justify-between gap-4 px-4 py-3">
+        <div className="mx-auto max-w-7xl flex items-center justify-between gap-3 px-4 py-3">
           <Button
             type="button"
             variant="outline"
@@ -612,12 +583,6 @@ function CreateSOSContent() {
             form="create-sos-form"
             disabled={isPending}
             className="gap-2"
-            onClick={(e) => {
-              // Submit the form by dispatching a submit event
-              e.preventDefault();
-              const form = document.querySelector("form");
-              form?.requestSubmit();
-            }}
           >
             {isPending ? (
               <>

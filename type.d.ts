@@ -42,7 +42,7 @@ type Period =
   | "max";
 
 // Based on the Hybrid Logic: Backend (PostGIS + Gemini AI)
-export type Priority = "P1" | "P2" | "P3";
+export type Priority = "P1" | "P2" | "P3" | "P4";
 export type RescuerType = "TRUCK" | "MOTORBOAT" | "SMALL_BOAT";
 export type SOSStatus = "PENDING" | "ASSIGNED" | "RESCUED";
 export type RescuerStatus = "AVAILABLE" | "BUSY";
@@ -68,9 +68,18 @@ export interface SOSRequest {
   aiAnalysis?: {
     riskFactors: string[];
   };
+  injuredPersons?: Array<{
+    index: number;
+    name: string;
+    customName?: string | null;
+    personType?: string;
+    medicalIssues?: string[];
+    severity?: string;
+  }>;
   // Extended fields from backend structuredData / senderInfo
   peopleCount?: { adult: number; child: number; elderly: number };
   waitTimeMinutes?: number;
+  sosType?: string;
   situation?: string;
   medicalIssues?: string[];
   supplies?: string[];
@@ -831,7 +840,7 @@ export interface ActivityTypeConfig {
 }
 
 export interface SeverityConfig {
-  variant: "p1" | "p2" | "p3" | "warning";
+  variant: "p1" | "p2" | "p3" | "p4" | "warning";
   label: string;
 }
 
@@ -1165,7 +1174,7 @@ export interface CategorySummary {
 }
 
 //Coordinator Dashboard Types
-export type Priority = "P1" | "P2" | "P3";
+export type Priority = "P1" | "P2" | "P3" | "P4";
 export type RescuerType = "TRUCK" | "MOTORBOAT" | "SMALL_BOAT";
 export type SOSStatus = "PENDING" | "ASSIGNED" | "RESCUED";
 export type RescuerStatus = "AVAILABLE" | "BUSY";
