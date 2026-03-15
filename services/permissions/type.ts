@@ -27,3 +27,6 @@ export interface UserPermissionsResponse {
 export interface UpdateUserPermissionsPayload {
   permissionIds: number[];
 }
+
+// ── GET /identity/permissions (all system permissions) ───
+export type AllPermissionsResponse = PermissionEntity[];

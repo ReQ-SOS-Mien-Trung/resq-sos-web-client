@@ -9,6 +9,7 @@ import {
   unbanUser,
   adminCreateUser,
   updateAdminUser,
+  getUsersForPermission,
 } from "./api";
 import {
   UserMeResponse,
@@ -20,6 +21,8 @@ import {
   AdminCreateUserRequest,
   AdminUpdateUserRequest,
   UserEntity,
+  GetUsersForPermissionParams,
+  GetUsersForPermissionResponse,
 } from "./type";
 
 export const USER_ME_QUERY_KEY = ["user", "me"] as const;
@@ -121,5 +124,21 @@ export function useUpdateAdminUser() {
       userId: string;
       data: AdminUpdateUserRequest;
     }) => updateAdminUser(userId, data),
+  });
+}
+
+export const USERS_FOR_PERMISSION_QUERY_KEY = [
+  "admin",
+  "users",
+  "for-permission",
+] as const;
+
+export function useUsersForPermission(params?: GetUsersForPermissionParams) {
+  return useQuery<GetUsersForPermissionResponse, Error>({
+    queryKey: [...USERS_FOR_PERMISSION_QUERY_KEY, params],
+    queryFn: () => getUsersForPermission(params),
+    enabled: !!params?.search?.trim() || !!params?.roleId,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
 }

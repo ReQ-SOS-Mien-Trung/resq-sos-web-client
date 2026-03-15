@@ -23,6 +23,7 @@ import {
   FirstAid,
   ForkKnife,
   Heart,
+  LockKey,
   MapPin,
   MapTrifold,
   Package,
@@ -365,7 +366,7 @@ export const navigationItems = [
     href: "/dashboard/admin/chat-config",
   },
   {
-    icon: MapTrifold,
+    icon: LockKey,
     label: "Phân quyền người dùng",
     href: "/dashboard/admin/permissions",
   },

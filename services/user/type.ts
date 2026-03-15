@@ -83,6 +83,18 @@ export interface GetRescuersParams {
   search?: string;
 }
 
+// For permission assignment search
+export interface GetUsersForPermissionParams {
+  search?: string;
+  pageSize?: number;
+  roleId?: number;
+}
+
+export interface GetUsersForPermissionResponse {
+  items: UserEntity[];
+  totalCount: number;
+}
+
 export interface AdminUpdateUserRequest {
   firstName?: string;
   lastName?: string;

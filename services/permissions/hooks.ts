@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  getAllPermissions,
   getRolePermissions,
   updateRolePermissions,
   getUserPermissions,
@@ -12,9 +13,18 @@ import {
 
 // ── Query Keys ───────────────────────────────────────────
 export const permissionKeys = {
+  all: ["permissions", "all"] as const,
   rolePermissions: (roleId: number) => ["permissions", "role", roleId] as const,
   userPermissions: (userId: string) => ["permissions", "user", userId] as const,
 };
+
+// ── GET /identity/permissions (all system permissions) ───
+export function useAllPermissions() {
+  return useQuery({
+    queryKey: permissionKeys.all,
+    queryFn: getAllPermissions,
+  });
+}
 
 // ── GET /identity/roles/{roleId}/permissions ─────────────
 export function useRolePermissions(roleId: number) {

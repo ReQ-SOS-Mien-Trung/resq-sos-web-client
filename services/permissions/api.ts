@@ -4,7 +4,14 @@ import {
   UpdateRolePermissionsPayload,
   UserPermissionsResponse,
   UpdateUserPermissionsPayload,
+  PermissionEntity,
 } from "./type";
+
+// GET /identity/permissions (all system permissions)
+export async function getAllPermissions(): Promise<PermissionEntity[]> {
+  const { data } = await api.get("/identity/permissions");
+  return data;
+}
 
 // GET /identity/roles/{roleId}/permissions
 export async function getRolePermissions(

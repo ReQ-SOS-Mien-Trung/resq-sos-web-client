@@ -9,6 +9,8 @@ import {
   AdminCreateUserRequest,
   AdminUpdateUserRequest,
   UserEntity,
+  GetUsersForPermissionParams,
+  GetUsersForPermissionResponse,
 } from "./type";
 
 export async function getUserMe(): Promise<UserMeResponse> {
@@ -69,4 +71,13 @@ export async function updateAdminUser(
 ): Promise<UserEntity> {
   const response = await api.put(`/identity/admin/users/${userId}`, data);
   return response.data;
+}
+
+export async function getUsersForPermission(
+  params?: GetUsersForPermissionParams,
+): Promise<GetUsersForPermissionResponse> {
+  const { data } = await api.get("/identity/admin/users/for-permission", {
+    params,
+  });
+  return data;
 }
