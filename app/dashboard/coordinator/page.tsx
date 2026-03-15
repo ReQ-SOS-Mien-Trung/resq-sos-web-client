@@ -55,6 +55,7 @@ import {
   SignOut,
   Phone,
   UsersThree,
+  ChatCircleDots,
 } from "@phosphor-icons/react";
 import {
   SOSDetailsPanel,
@@ -801,6 +802,17 @@ const CoordinatorDashboardContent = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Coordinator Chat Navigation */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/dashboard/coordinator/chat")}
+            className="flex items-center gap-2"
+          >
+            <ChatCircleDots className="h-4 w-4" />
+            <span>Chat với Victim</span>
+          </Button>
+
           {/* Rescue Teams Navigation */}
           <Button
             variant="outline"
