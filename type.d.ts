@@ -90,6 +90,7 @@ export interface SOSRequest {
   additionalDescription?: string;
   senderPhone?: string;
   senderName?: string;
+  createdByCoordinatorId?: string | null;
   isOnline?: boolean;
   hopCount?: number;
   locationAccuracy?: number | null;

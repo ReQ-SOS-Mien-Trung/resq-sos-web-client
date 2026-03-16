@@ -162,6 +162,7 @@ function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     additionalDescription: sd?.additional_description ?? undefined,
     senderPhone: si?.user_phone ?? undefined,
     senderName: si?.user_name ?? undefined,
+    createdByCoordinatorId: entity.createdByCoordinatorId ?? null,
     isOnline: si?.is_online,
     hopCount: nm?.hop_count,
     locationAccuracy: entity.locationAccuracy,
