@@ -35,6 +35,21 @@ function toConnectionLabel(
 export class ChatTransportService {
   private connection: HubConnection | null = null;
 
+  private async waitForDisconnected(
+    connection: HubConnection,
+    timeoutMs = 2500,
+  ): Promise<void> {
+    const startedAt = Date.now();
+
+    while (connection.state === HubConnectionState.Disconnecting) {
+      if (Date.now() - startedAt >= timeoutMs) {
+        throw new Error("Chat connection is still disconnecting.");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+  }
+
   private buildConnection(): HubConnection {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") || "";
 
@@ -73,6 +88,17 @@ export class ChatTransportService {
 
     if (connection.state === HubConnectionState.Connecting) {
       return;
+    }
+
+    if (connection.state === HubConnectionState.Reconnecting) {
+      return;
+    }
+
+    if (connection.state === HubConnectionState.Disconnecting) {
+      await this.waitForDisconnected(connection);
+      if (connection.state !== HubConnectionState.Disconnected) {
+        return;
+      }
     }
 
     await connection.start();
@@ -121,6 +147,12 @@ export class ChatTransportService {
 
     if (connection.state !== HubConnectionState.Connected) {
       await this.start();
+    }
+
+    if (connection.state !== HubConnectionState.Connected) {
+      throw new Error(
+        "Realtime chat is reconnecting. Please wait a moment and retry.",
+      );
     }
 
     return connection.invoke<T>(method, ...args);

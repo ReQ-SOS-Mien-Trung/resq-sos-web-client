@@ -12,6 +12,7 @@ import {
   CHAT_EVENTS,
   ConversationMessageEntity,
   CoordinatorChatConnectionState,
+  JoinedConversationEvent,
   CoordinatorJoinedEvent,
   GetConversationMessagesResponse,
   JoinConversationResponse,
@@ -73,6 +74,7 @@ export function useConversationMessages(
 export interface UseCoordinatorChatConnectionOptions {
   enabled?: boolean;
   activeConversationId: number | null;
+  onJoinedConversation?: (event: JoinedConversationEvent) => void;
   onReceiveMessage?: (message: ReceiveMessageEvent) => void;
   onCoordinatorJoined?: (event: CoordinatorJoinedEvent) => void;
   onLeftConversation?: (event: LeftConversationEvent) => void;
@@ -86,6 +88,7 @@ export function useCoordinatorChatConnection(
   const {
     enabled = true,
     activeConversationId,
+    onJoinedConversation,
     onReceiveMessage,
     onCoordinatorJoined,
     onLeftConversation,
@@ -98,11 +101,16 @@ export function useCoordinatorChatConnection(
   const [transportError, setTransportError] = useState<string | null>(null);
   const [retryAttempts, setRetryAttempts] = useState(0);
   const joinedConversationRef = useRef<number | null>(null);
+  const onJoinedConversationRef = useRef(options.onJoinedConversation);
   const onReceiveMessageRef = useRef(options.onReceiveMessage);
   const onCoordinatorJoinedRef = useRef(options.onCoordinatorJoined);
   const onLeftConversationRef = useRef(options.onLeftConversation);
   const onErrorRef = useRef(options.onError);
   const onResyncRequestedRef = useRef(options.onResyncRequested);
+
+  useEffect(() => {
+    onJoinedConversationRef.current = onJoinedConversation;
+  }, [onJoinedConversation]);
 
   useEffect(() => {
     onReceiveMessageRef.current = onReceiveMessage;
@@ -135,6 +143,10 @@ export function useCoordinatorChatConnection(
 
     let mounted = true;
 
+    const handleJoinedConversation = (event: JoinedConversationEvent) => {
+      onJoinedConversationRef.current?.(event);
+    };
+
     const handleReceiveMessage = (message: ReceiveMessageEvent) => {
       onReceiveMessageRef.current?.(message);
     };
@@ -152,6 +164,10 @@ export function useCoordinatorChatConnection(
       onErrorRef.current?.(errorMessage);
     };
 
+    coordinatorChatTransport.on<JoinedConversationEvent>(
+      CHAT_EVENTS.JoinedConversation,
+      handleJoinedConversation,
+    );
     coordinatorChatTransport.on<ReceiveMessageEvent>(
       CHAT_EVENTS.ReceiveMessage,
       handleReceiveMessage,
@@ -213,6 +229,10 @@ export function useCoordinatorChatConnection(
 
     return () => {
       mounted = false;
+      coordinatorChatTransport.off<JoinedConversationEvent>(
+        CHAT_EVENTS.JoinedConversation,
+        handleJoinedConversation,
+      );
       coordinatorChatTransport.off<ReceiveMessageEvent>(
         CHAT_EVENTS.ReceiveMessage,
         handleReceiveMessage,
