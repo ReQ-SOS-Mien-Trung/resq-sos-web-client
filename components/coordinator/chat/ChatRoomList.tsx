@@ -10,6 +10,7 @@ interface ChatRoomListProps {
   activeConversationId: number | null;
   unreadByConversation: Record<number, number>;
   isLoading: boolean;
+  isRefreshing?: boolean;
   onSelectRoom: (conversationId: number) => void;
 }
 
@@ -26,6 +27,7 @@ export default function ChatRoomList({
   activeConversationId,
   unreadByConversation,
   isLoading,
+  isRefreshing,
   onSelectRoom,
 }: ChatRoomListProps) {
   if (isLoading) {
@@ -48,7 +50,13 @@ export default function ChatRoomList({
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-3 space-y-2">
+      <div className="space-y-2 p-3">
+        {isRefreshing ? (
+          <p className="px-1 text-[11px] text-muted-foreground">
+            Đang cập nhật danh sách...
+          </p>
+        ) : null}
+
         {rooms.map((room) => {
           const isActive = room.conversationId === activeConversationId;
           const unreadCount = unreadByConversation[room.conversationId] ?? 0;
@@ -59,10 +67,10 @@ export default function ChatRoomList({
               type="button"
               variant="ghost"
               className={cn(
-                "w-full h-auto justify-start text-left rounded-xl p-3 border transition-colors",
+                "h-auto w-full justify-start rounded-xl border p-3 text-left transition-all",
                 isActive
-                  ? "bg-primary/10 border-primary/30"
-                  : "border-border hover:border-primary/25 hover:bg-muted/40",
+                  ? "border-primary/30 bg-primary/10 shadow-sm"
+                  : "border-border bg-white/60 hover:border-primary/25 hover:bg-muted/40",
               )}
               onClick={() => onSelectRoom(room.conversationId)}
             >

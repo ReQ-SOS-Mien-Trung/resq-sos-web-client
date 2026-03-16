@@ -94,7 +94,6 @@ import {
   DotsSixVertical,
   Path,
   NavigationArrow,
-  PaperPlaneTilt,
 } from "@phosphor-icons/react";
 
 // Extract lat/lng from activity description text
@@ -223,7 +222,7 @@ const SOSRequestSidebarCard = ({ sos }: { sos: SOSRequest }) => {
           )}
           weight="fill"
         />
-        <span className="text-xs font-bold truncate">SOS #{sos.id}</span>
+        <span className="text-xs font-bold truncate">SOS {sos.id}</span>
 
         {isLoading && (
           <Badge
@@ -300,7 +299,7 @@ const SOSGroupHeader = ({
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-bold truncate">SOS #{matchedSOS.id}</p>
+          <p className="text-sm font-bold truncate">SOS {matchedSOS.id}</p>
           {isLoading && (
             <Badge
               variant="outline"
@@ -684,6 +683,11 @@ interface WaypointMeta {
   hasDepot: boolean;
 }
 
+type SupplyDisplayItem = {
+  name: string;
+  quantityLabel: string;
+};
+
 function getSupplyDisplayName(supply: {
   itemName?: string | null;
   itemId?: number | null;
@@ -744,6 +748,163 @@ function extractDepotLabel(activity: MissionActivity): string | null {
   if (!isDepotActivity && !hasDepotKeyword) return null;
   if (target && !SOS_TARGET_REGEX.test(target)) return target;
   return "Kho tiếp tế";
+}
+
+function inferSOSRequestIdFromActivity(
+  activity: MissionActivity,
+  sosRequests: SOSRequest[],
+): string | null {
+  const explicitLabel = extractSOSLabel(activity);
+  if (explicitLabel) return explicitLabel.replace("SOS #", "").trim();
+
+  const hasValidCoords =
+    activity.targetLatitude !== 0 && activity.targetLongitude !== 0;
+  if (hasValidCoords) {
+    const withCoords = sosRequests.filter(
+      (s) =>
+        typeof s.location?.lat === "number" &&
+        typeof s.location?.lng === "number",
+    );
+    if (withCoords.length > 0) {
+      const nearest = withCoords.reduce((best, current) => {
+        const bestDist =
+          Math.pow(best.location!.lat - activity.targetLatitude, 2) +
+          Math.pow(best.location!.lng - activity.targetLongitude, 2);
+        const currentDist =
+          Math.pow(current.location!.lat - activity.targetLatitude, 2) +
+          Math.pow(current.location!.lng - activity.targetLongitude, 2);
+        return currentDist < bestDist ? current : best;
+      });
+      return String(nearest.id);
+    }
+  }
+
+  if (sosRequests.length > 0) return String(sosRequests[0].id);
+  return null;
+}
+
+function isSupplyStep(activityType: string): boolean {
+  return (
+    activityType === "COLLECT_SUPPLIES" || activityType === "DELIVER_SUPPLIES"
+  );
+}
+
+function parseSupplyItemsFromDescription(
+  description: string,
+): SupplyDisplayItem[] {
+  const markerMatch = description.match(
+    /(?:Lấy|Lay|Giao vật tư|Tiếp tế|Tiep te|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?)[^:]*:\s*(.+)$/i,
+  );
+  if (!markerMatch?.[1]) return [];
+
+  const listText = markerMatch[1].replace(/\.+\s*$/, "").trim();
+  if (!listText) return [];
+
+  return listText
+    .split(/\s*,\s*/)
+    .map((chunk) => {
+      const value = chunk.trim();
+      if (!value) return null;
+
+      const qtyMatch = value.match(/^(.*?)[xX×]\s*(\d+(?:[.,]\d+)?)\s*(.*)$/);
+      if (!qtyMatch) {
+        return {
+          name: value,
+          quantityLabel: "",
+        };
+      }
+
+      const name = qtyMatch[1].trim();
+      const quantity = qtyMatch[2].trim();
+      const unit = qtyMatch[3].trim();
+
+      return {
+        name: name || value,
+        quantityLabel: `${quantity} ${unit}`.trim(),
+      };
+    })
+    .filter((item): item is SupplyDisplayItem => !!item && !!item.name);
+}
+
+function getSupplyDisplayItems(activity: {
+  activityType: string;
+  description: string;
+  suppliesToCollect?: ClusterSupplyCollection[] | null;
+}): SupplyDisplayItem[] {
+  if (activity.suppliesToCollect && activity.suppliesToCollect.length > 0) {
+    return activity.suppliesToCollect.map((supply) => ({
+      name: getSupplyDisplayName(supply),
+      quantityLabel: `${supply.quantity} ${supply.unit}`.trim(),
+    }));
+  }
+
+  if (!isSupplyStep(activity.activityType)) return [];
+  return parseSupplyItemsFromDescription(activity.description);
+}
+
+function stripSupplyDetailsFromDescription(description: string): string {
+  return description
+    .replace(
+      /\s*(?:Lấy|Lay|Giao vật tư|Tiếp tế|Tiep te|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?)[^:]*:\s*.*$/i,
+      "",
+    )
+    .replace(/[\s,;:.]+$/, "")
+    .trim();
+}
+
+function getActivityStatusMeta(status: string | null | undefined): {
+  label: string;
+  className: string;
+  icon: React.ReactNode;
+} {
+  const normalizedStatus = (status ?? "").trim().toLowerCase();
+
+  if (normalizedStatus === "completed") {
+    return {
+      label: "Hoàn thành",
+      className:
+        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+      icon: <CheckCircle className="h-3.5 w-3.5" weight="fill" />,
+    };
+  }
+
+  if (
+    normalizedStatus === "inprogress" ||
+    normalizedStatus === "in_progress" ||
+    normalizedStatus === "in progress"
+  ) {
+    return {
+      label: "Đang thực hiện",
+      className:
+        "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
+      icon: <CircleNotch className="h-3.5 w-3.5 animate-spin" weight="bold" />,
+    };
+  }
+
+  if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+    return {
+      label: "Đã hủy",
+      className:
+        "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700",
+      icon: <Warning className="h-3.5 w-3.5" weight="fill" />,
+    };
+  }
+
+  if (normalizedStatus === "pending" || normalizedStatus === "planned") {
+    return {
+      label: normalizedStatus === "planned" ? "Đã lập kế hoạch" : "Chờ xử lý",
+      className:
+        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+      icon: <Clock className="h-3.5 w-3.5" />,
+    };
+  }
+
+  return {
+    label: status || "Chưa rõ",
+    className:
+      "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
+    icon: <Clock className="h-3.5 w-3.5" />,
+  };
 }
 
 function getWaypointMeta(waypoint: UniqueWaypoint): WaypointMeta {
@@ -1625,7 +1786,8 @@ const RescuePlanPanel = ({
             activityCode: `${a.activityType}_${i + 1}`,
             activityType: a.activityType,
             description: syncedDescription,
-            target: a.depotName || `SOS #${a.sosRequestId || "general"}`,
+            target:
+              a.depotName || `SOS ${a.sosRequestId || sos?.id || "unknown"}`,
             items: a.suppliesToCollect
               ? a.suppliesToCollect
                   .map((s) => `${getSupplyDisplayName(s)} x${s.quantity}`)
@@ -1783,33 +1945,48 @@ const RescuePlanPanel = ({
   }, [activeSuggestion]);
 
   // Enter edit from an existing mission (missions tab -> edit)
-  const enterEditFromMission = useCallback((mission: MissionEntity) => {
-    setEditActivities(
-      mission.activities.map((a, i) => ({
-        _id: `edit-m-${i}-${Date.now()}`,
-        step: a.step,
-        activityType: a.activityType as ClusterActivityType,
-        description: a.description,
-        priority: "Medium",
-        estimatedTime: "",
-        sosRequestId: null,
-        depotId: null,
-        depotName: a.target || null,
-        depotAddress: null,
-        suppliesToCollect: a.suppliesToCollect,
-      })),
-    );
-    setEditMissionType(
-      (mission.missionType as "RESCUE" | "RESCUER") || "RESCUE",
-    );
-    setEditPriorityScore(mission.priorityScore);
-    setEditStartTime(new Date(mission.startTime).toISOString().slice(0, 16));
-    setEditExpectedEndTime(
-      new Date(mission.expectedEndTime).toISOString().slice(0, 16),
-    );
-    setActiveTab("plan");
-    setIsEditMode(true);
-  }, []);
+  const enterEditFromMission = useCallback(
+    (mission: MissionEntity) => {
+      setEditActivities(
+        mission.activities.map((a, i) => {
+          const inferredSosRequestId = inferSOSRequestIdFromActivity(
+            a,
+            clusterSOSRequests,
+          );
+          const isDepot = a.activityType === "COLLECT_SUPPLIES";
+
+          return {
+            _id: `edit-m-${i}-${Date.now()}`,
+            step: a.step,
+            activityType: a.activityType as ClusterActivityType,
+            description: a.description,
+            priority: "Medium",
+            estimatedTime: "",
+            sosRequestId: isDepot
+              ? null
+              : inferredSosRequestId
+                ? Number(inferredSosRequestId)
+                : null,
+            depotId: null,
+            depotName: isDepot ? a.target || null : null,
+            depotAddress: null,
+            suppliesToCollect: a.suppliesToCollect,
+          };
+        }),
+      );
+      setEditMissionType(
+        (mission.missionType as "RESCUE" | "RESCUER") || "RESCUE",
+      );
+      setEditPriorityScore(mission.priorityScore);
+      setEditStartTime(new Date(mission.startTime).toISOString().slice(0, 16));
+      setEditExpectedEndTime(
+        new Date(mission.expectedEndTime).toISOString().slice(0, 16),
+      );
+      setActiveTab("plan");
+      setIsEditMode(true);
+    },
+    [clusterSOSRequests],
+  );
 
   const hasSidebar = !!activeSuggestion;
 
@@ -1844,7 +2021,7 @@ const RescuePlanPanel = ({
 
   // Group activities by SOS request or depot
   type ActivityGroup = {
-    type: "sos" | "depot" | "general";
+    type: "sos" | "depot";
     sosRequestId?: number | null;
     depotId?: number | null;
     depotName?: string | null;
@@ -1857,24 +2034,31 @@ const RescuePlanPanel = ({
       ? activeSuggestion.suggestedActivities
       : [];
     if (sourceActivities.length === 0) return [];
+
+    const fallbackSosRequestId =
+      clusterSOSRequests.length > 0 ? Number(clusterSOSRequests[0].id) : null;
+
     const groups: ActivityGroup[] = [];
     for (const act of sourceActivities) {
       const isDepot = act.activityType === "COLLECT_SUPPLIES" && act.depotId;
+      const resolvedSosRequestId = isDepot
+        ? null
+        : (act.sosRequestId ?? fallbackSosRequestId);
       const key = isDepot
         ? `depot-${act.depotId}`
-        : `sos-${act.sosRequestId ?? "general"}`;
+        : `sos-${resolvedSosRequestId ?? "unknown"}`;
       const last = groups[groups.length - 1];
       const lastKey = last
         ? last.type === "depot"
           ? `depot-${last.depotId}`
-          : `sos-${last.sosRequestId ?? "general"}`
+          : `sos-${last.sosRequestId ?? "unknown"}`
         : null;
       if (lastKey === key) {
         last.activities.push(act);
       } else {
         groups.push({
-          type: isDepot ? "depot" : act.sosRequestId ? "sos" : "general",
-          sosRequestId: act.sosRequestId,
+          type: isDepot ? "depot" : "sos",
+          sosRequestId: resolvedSosRequestId,
           depotId: act.depotId,
           depotName: act.depotName,
           depotAddress: act.depotAddress,
@@ -1883,7 +2067,7 @@ const RescuePlanPanel = ({
       }
     }
     return groups;
-  }, [activeSuggestion]);
+  }, [activeSuggestion, clusterSOSRequests]);
 
   // Auto-collapse Quick Stats when user scrolls deep into the main plan content.
   useEffect(() => {
@@ -2188,81 +2372,98 @@ const RescuePlanPanel = ({
                         {missionsData.missions.map((mission) => (
                           <Card key={mission.id} className="overflow-hidden">
                             <CardContent className="p-3 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Rocket
-                                    className="h-4 w-4 text-emerald-500 shrink-0"
-                                    weight="fill"
-                                  />
-                                  <span className="text-sm font-bold truncate">
-                                    {mission.suggestedMissionTitle ||
-                                      `Nhiệm vụ #${mission.id}`}
-                                  </span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] h-4 px-1.5 shrink-0"
-                                  >
-                                    {mission.missionType}
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  {(mission.status === "Planned" ||
-                                    mission.status === "Pending") && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-6 text-[10px] gap-1 px-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400"
-                                      onClick={() => {
-                                        toast.success(
-                                          "Đã gửi nhiệm vụ cho đội cứu hộ!",
-                                        );
-                                      }}
-                                    >
-                                      <PaperPlaneTilt
-                                        className="h-3 w-3"
+                              {(() => {
+                                const normalizedStatus = mission.status
+                                  .trim()
+                                  .toLowerCase();
+                                const statusText =
+                                  normalizedStatus === "completed"
+                                    ? "Hoàn thành"
+                                    : normalizedStatus === "inprogress" ||
+                                        normalizedStatus === "in_progress" ||
+                                        normalizedStatus === "in progress"
+                                      ? "Đang thực hiện"
+                                      : normalizedStatus === "cancelled" ||
+                                          normalizedStatus === "canceled"
+                                        ? "Đã hủy"
+                                        : normalizedStatus === "pending"
+                                          ? "Chờ xử lý"
+                                          : normalizedStatus === "planned"
+                                            ? "Đã lập kế hoạch"
+                                            : mission.status;
+                                const statusClass =
+                                  normalizedStatus === "completed"
+                                    ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
+                                    : normalizedStatus === "inprogress" ||
+                                        normalizedStatus === "in_progress" ||
+                                        normalizedStatus === "in progress"
+                                      ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700"
+                                      : normalizedStatus === "cancelled" ||
+                                          normalizedStatus === "canceled"
+                                        ? "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700"
+                                        : normalizedStatus === "pending" ||
+                                            normalizedStatus === "planned"
+                                          ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
+                                          : "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600";
+
+                                return (
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <Rocket
+                                        className="h-4 w-4 text-emerald-500 shrink-0"
                                         weight="fill"
                                       />
-                                      Gửi cho đội cứu hộ
-                                    </Button>
-                                  )}
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 text-[10px] gap-1 px-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-                                    onClick={() =>
-                                      enterEditFromMission(mission)
-                                    }
-                                  >
-                                    <PencilSimpleLine className="h-3 w-3" />
-                                    Chỉnh sửa
-                                  </Button>
-                                  <Badge
-                                    variant={
-                                      mission.status === "Completed"
-                                        ? "default"
-                                        : mission.status === "InProgress"
-                                          ? "p2"
-                                          : mission.status === "Cancelled"
-                                            ? "destructive"
-                                            : "outline"
-                                    }
-                                    className="text-[10px] h-4 px-1.5"
-                                  >
-                                    {mission.status}
-                                  </Badge>
-                                </div>
-                              </div>
+                                      <span className="text-base font-bold truncate">
+                                        {mission.suggestedMissionTitle ||
+                                          `Nhiệm vụ #${mission.id}`}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs h-5 px-2 shrink-0 font-semibold"
+                                      >
+                                        {mission.missionType === "RESCUE"
+                                          ? "Cứu hộ"
+                                          : mission.missionType === "RESCUER"
+                                            ? "Điều phối"
+                                            : mission.missionType}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-xs gap-1 px-2.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                                        onClick={() =>
+                                          enterEditFromMission(mission)
+                                        }
+                                      >
+                                        <PencilSimpleLine className="h-3.5 w-3.5" />
+                                        Chỉnh sửa
+                                      </Button>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "text-xs h-7 px-3 font-extrabold uppercase tracking-wide border-2",
+                                          statusClass,
+                                        )}
+                                      >
+                                        {statusText}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
 
                               {/* AI assessment */}
                               {mission.overallAssessment && (
                                 <div className="bg-muted/40 rounded-lg p-2.5 border border-border/50">
-                                  <p className="text-[11px] text-foreground/75 leading-relaxed line-clamp-3">
+                                  <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3">
                                     {mission.overallAssessment}
                                   </p>
                                 </div>
                               )}
 
-                              <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
                                   {new Date(mission.startTime).toLocaleString(
@@ -2366,86 +2567,274 @@ const RescuePlanPanel = ({
                                 </div>
                               )}
 
-                              {/* Activities */}
+                              {/* Activities Grouped */}
                               {mission.activities.length > 0 && (
-                                <div className="space-y-1.5 mt-1">
-                                  {mission.activities.map((act) => {
-                                    const config =
-                                      activityTypeConfig[act.activityType] ||
-                                      activityTypeConfig["ASSESS"];
-                                    return (
-                                      <div
-                                        key={act.id}
-                                        className="flex items-start gap-2 px-2 py-1.5 rounded-md border bg-background"
-                                      >
+                                <div className="space-y-4 mt-4">
+                                  {(() => {
+                                    const groups = [];
+                                    for (const act of mission.activities) {
+                                      const isDepot =
+                                        act.activityType === "COLLECT_SUPPLIES";
+                                      let targetType = "sos";
+                                      let sosRequestId = undefined;
+                                      let depotName = undefined;
+                                      const targetStr = act.target || "";
+
+                                      if (isDepot) {
+                                        depotName = targetStr;
+                                        targetType = "depot";
+                                      } else {
+                                        sosRequestId =
+                                          inferSOSRequestIdFromActivity(
+                                            act,
+                                            clusterSOSRequests,
+                                          ) ?? "unknown";
+                                      }
+
+                                      const key =
+                                        targetType === "depot"
+                                          ? `depot-${depotName}`
+                                          : `sos-${sosRequestId}`;
+
+                                      const last = groups[groups.length - 1];
+                                      if (last && last.key === key) {
+                                        last.activities.push(act);
+                                      } else {
+                                        groups.push({
+                                          key,
+                                          type: targetType,
+                                          sosRequestId,
+                                          depotName,
+                                          activities: [act],
+                                        });
+                                      }
+                                    }
+
+                                    return groups.map((group, gIdx) => {
+                                      const matchedSOS =
+                                        group.type === "sos" &&
+                                        group.sosRequestId
+                                          ? clusterSOSRequests.find(
+                                              (s) =>
+                                                s.id ===
+                                                String(group.sosRequestId),
+                                            )
+                                          : null;
+
+                                      return (
                                         <div
+                                          key={gIdx}
                                           className={cn(
-                                            "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5",
-                                            config.bgColor,
-                                            config.color,
+                                            "rounded-xl border overflow-hidden shadow-sm",
+                                            group.type === "depot"
+                                              ? "border-amber-300/50 dark:border-amber-700/40"
+                                              : group.type === "sos" &&
+                                                  matchedSOS?.priority === "P1"
+                                                ? "border-red-300/50 dark:border-red-700/40"
+                                                : group.type === "sos" &&
+                                                    matchedSOS?.priority ===
+                                                      "P2"
+                                                  ? "border-orange-300/50 dark:border-orange-700/40"
+                                                  : "border-border",
                                           )}
                                         >
-                                          {act.step}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-center gap-1.5">
-                                            <Badge
-                                              variant="outline"
-                                              className={cn(
-                                                "text-[10px] font-semibold px-1.5 py-0 h-4",
-                                                config.color,
-                                                config.bgColor,
-                                                "border-transparent",
-                                              )}
-                                            >
-                                              {config.label}
-                                            </Badge>
-                                            <Badge
-                                              variant={
-                                                act.status === "Completed"
-                                                  ? "default"
-                                                  : act.status === "InProgress"
-                                                    ? "p2"
-                                                    : "outline"
-                                              }
-                                              className="text-[9px] h-3.5 px-1"
-                                            >
-                                              {act.status}
-                                            </Badge>
-                                          </div>
-                                          <p className="text-xs text-foreground/80 mt-0.5 leading-relaxed">
-                                            {act.description}
-                                          </p>
-                                          {/* Supply list in activity */}
-                                          {act.suppliesToCollect &&
-                                            act.suppliesToCollect.length >
-                                              0 && (
-                                              <div className="mt-1.5 space-y-0.5">
-                                                {act.suppliesToCollect.map(
-                                                  (supply, sIdx) => (
-                                                    <div
-                                                      key={sIdx}
-                                                      className="flex items-center gap-1.5 text-[10px] text-blue-700 dark:text-blue-400"
-                                                    >
-                                                      <Package className="h-3 w-3 shrink-0" />
-                                                      <span className="font-medium">
-                                                        {getSupplyDisplayName(
-                                                          supply,
-                                                        )}
-                                                      </span>
-                                                      <span className="font-bold bg-blue-50 dark:bg-blue-900/20 px-1 rounded">
-                                                        {supply.quantity}{" "}
-                                                        {supply.unit}
-                                                      </span>
-                                                    </div>
-                                                  ),
-                                                )}
-                                              </div>
+                                          <div
+                                            className={cn(
+                                              "flex items-center gap-2.5 px-3.5 py-2.5",
+                                              group.type === "depot"
+                                                ? "bg-amber-50 dark:bg-amber-900/15"
+                                                : group.type === "sos" &&
+                                                    matchedSOS?.priority ===
+                                                      "P1"
+                                                  ? "bg-red-50 dark:bg-red-900/15"
+                                                  : group.type === "sos" &&
+                                                      matchedSOS?.priority ===
+                                                        "P2"
+                                                    ? "bg-orange-50 dark:bg-orange-900/15"
+                                                    : "bg-muted/40",
                                             )}
+                                          >
+                                            {group.type === "depot" ? (
+                                              <>
+                                                <div className="p-2 rounded-lg bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300 ring-1 ring-amber-400/40">
+                                                  <Storefront
+                                                    className="h-5 w-5"
+                                                    weight="fill"
+                                                  />
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                  <p className="text-sm font-extrabold text-amber-900 dark:text-amber-200 truncate tracking-tight">
+                                                    Kho:{" "}
+                                                    <span className="underline decoration-amber-400 decoration-2 underline-offset-2">
+                                                      {group.depotName}
+                                                    </span>
+                                                  </p>
+                                                </div>
+                                                <Badge
+                                                  variant="outline"
+                                                  className="text-[10px] h-5 px-1.5 shrink-0 border-amber-400/60 text-amber-700 dark:text-amber-300 font-semibold"
+                                                >
+                                                  {group.activities.length} bước
+                                                </Badge>
+                                              </>
+                                            ) : group.type === "sos" &&
+                                              matchedSOS ? (
+                                              <SOSGroupHeader
+                                                matchedSOS={matchedSOS}
+                                                groupActivitiesLength={
+                                                  group.activities.length
+                                                }
+                                              />
+                                            ) : (
+                                              <>
+                                                <div className="p-1.5 rounded-lg bg-blue-100/80 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">
+                                                  <ListChecks
+                                                    className="h-4 w-4"
+                                                    weight="fill"
+                                                  />
+                                                </div>
+                                                <p className="text-sm font-bold text-blue-800 dark:text-blue-300 flex-1">
+                                                  {group.type === "sos"
+                                                    ? `SOS ${group.sosRequestId ?? "unknown"}`
+                                                    : "Cụm nhiệm vụ"}
+                                                </p>
+                                                <Badge
+                                                  variant="outline"
+                                                  className="text-[10px] h-5 px-1.5 shrink-0"
+                                                >
+                                                  {group.activities.length} bước
+                                                </Badge>
+                                              </>
+                                            )}
+                                          </div>
+
+                                          <div className="p-3 space-y-2.5 bg-card">
+                                            {group.activities.map(
+                                              (activity, aIdx) => {
+                                                const config =
+                                                  activityTypeConfig[
+                                                    activity.activityType
+                                                  ] ||
+                                                  activityTypeConfig["ASSESS"];
+                                                const cleanDescription =
+                                                  activity.description
+                                                    .replace(
+                                                      /\b\d{1,2}\.\d+,\s*\d{1,2}\.\d+\b\s*(\([^\)]*\))?/g,
+                                                      "",
+                                                    )
+                                                    .replace(/\s+/g, " ")
+                                                    .replace(/\(\s*\)/g, "")
+                                                    .replace(/: \./g, ":")
+                                                    .trim();
+                                                const supplyItems =
+                                                  getSupplyDisplayItems(
+                                                    activity,
+                                                  );
+                                                const displayDescription =
+                                                  supplyItems.length > 0
+                                                    ? stripSupplyDetailsFromDescription(
+                                                        cleanDescription,
+                                                      )
+                                                    : cleanDescription;
+                                                const stepStatus =
+                                                  getActivityStatusMeta(
+                                                    activity.status,
+                                                  );
+
+                                                return (
+                                                  <div
+                                                    key={aIdx}
+                                                    className="rounded-lg border bg-background p-3 hover:bg-accent/20 transition-colors shadow-sm"
+                                                  >
+                                                    <div className="flex items-start gap-3">
+                                                      <div
+                                                        className={cn(
+                                                          "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5",
+                                                          config.bgColor,
+                                                          config.color,
+                                                        )}
+                                                      >
+                                                        {activity.step}
+                                                      </div>
+                                                      <div className="flex-1 min-w-0 space-y-1.5">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                          <Badge
+                                                            variant="outline"
+                                                            className={cn(
+                                                              "text-[11px] font-semibold px-2 py-0 h-5",
+                                                              config.color,
+                                                              config.bgColor,
+                                                              "border-transparent",
+                                                            )}
+                                                          >
+                                                            {config.label}
+                                                          </Badge>
+                                                          <Badge
+                                                            variant="outline"
+                                                            className={cn(
+                                                              "text-[11px] h-6 px-2 font-bold border flex items-center gap-1",
+                                                              stepStatus.className,
+                                                            )}
+                                                          >
+                                                            {stepStatus.icon}
+                                                            {stepStatus.label}
+                                                          </Badge>
+                                                        </div>
+                                                        <p className="text-sm text-foreground/80 leading-relaxed font-medium">
+                                                          {displayDescription}
+                                                        </p>
+                                                        {supplyItems.length >
+                                                          0 && (
+                                                          <div className="mt-2.5 p-2.5 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600/80 dark:text-blue-400 mb-1.5 flex items-center gap-1.5">
+                                                              <Package
+                                                                className="h-3 w-3"
+                                                                weight="fill"
+                                                              />
+                                                              {activity.activityType ===
+                                                              "DELIVER_SUPPLIES"
+                                                                ? "Danh sách giao hàng"
+                                                                : "Yêu cầu lấy vật tư"}
+                                                            </p>
+                                                            <div className="space-y-1">
+                                                              {supplyItems.map(
+                                                                (
+                                                                  supply,
+                                                                  sIdx,
+                                                                ) => (
+                                                                  <div
+                                                                    key={sIdx}
+                                                                    className="flex items-center justify-between gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
+                                                                  >
+                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                      <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                                      <span className="font-medium truncate">
+                                                                        {
+                                                                          supply.name
+                                                                        }
+                                                                      </span>
+                                                                    </div>
+                                                                    <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                                                                      {supply.quantityLabel ||
+                                                                        "-"}
+                                                                    </div>
+                                                                  </div>
+                                                                ),
+                                                              )}
+                                                            </div>
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              },
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    );
-                                  })}
+                                      );
+                                    });
+                                  })()}
                                 </div>
                               )}
                               {/* Consolidated route for entire mission */}
@@ -3254,7 +3643,7 @@ const RescuePlanPanel = ({
                                         />
                                       </div>
                                       <p className="text-sm font-bold text-blue-800 dark:text-blue-300">
-                                        Nhiệm vụ chung
+                                        SOS {group.sosRequestId ?? "unknown"}
                                       </p>
                                       <Badge
                                         variant="outline"
@@ -3282,6 +3671,16 @@ const RescuePlanPanel = ({
                                         .replace(/\(\s*\)/g, "")
                                         .replace(/: \./g, ":")
                                         .trim();
+                                    const supplyItems =
+                                      getSupplyDisplayItems(activity);
+                                    const displayDescription =
+                                      supplyItems.length > 0
+                                        ? stripSupplyDetailsFromDescription(
+                                            cleanDescription,
+                                          )
+                                        : cleanDescription;
+                                    const stepStatus =
+                                      getActivityStatusMeta("Pending");
 
                                     return (
                                       <div
@@ -3320,46 +3719,52 @@ const RescuePlanPanel = ({
                                                   {activity.priority}
                                                 </span>
                                               )}
+                                              <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                  "text-[11px] h-6 px-2 font-bold border flex items-center gap-1",
+                                                  stepStatus.className,
+                                                )}
+                                              >
+                                                {stepStatus.icon}
+                                                {stepStatus.label}
+                                              </Badge>
                                             </div>
                                             <p className="text-sm leading-relaxed text-foreground/80">
-                                              {cleanDescription}
+                                              {displayDescription}
                                             </p>
 
-                                            {activity.suppliesToCollect &&
-                                              activity.suppliesToCollect
-                                                .length > 0 && (
-                                                <div className="mt-2 p-2 rounded-md bg-muted/50 border border-dashed">
-                                                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
-                                                    {activity.activityType ===
-                                                    "DELIVER_SUPPLIES"
-                                                      ? "Danh sách giao hàng"
-                                                      : "Yêu cầu lấy vật tư"}
-                                                  </p>
-                                                  <div className="space-y-1">
-                                                    {activity.suppliesToCollect.map(
-                                                      (supply, sIdx) => (
-                                                        <div
-                                                          key={sIdx}
-                                                          className="flex items-center justify-between gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
-                                                        >
-                                                          <div className="flex items-center gap-1.5 min-w-0">
-                                                            <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                                            <span className="font-medium truncate">
-                                                              {getSupplyDisplayName(
-                                                                supply,
-                                                              )}
-                                                            </span>
-                                                          </div>
-                                                          <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
-                                                            {supply.quantity}{" "}
-                                                            {supply.unit}
-                                                          </div>
+                                            {supplyItems.length > 0 && (
+                                              <div className="mt-2 p-2 rounded-md bg-muted/50 border border-dashed">
+                                                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
+                                                  {activity.activityType ===
+                                                  "DELIVER_SUPPLIES"
+                                                    ? "Danh sách giao hàng"
+                                                    : "Yêu cầu lấy vật tư"}
+                                                </p>
+                                                <div className="space-y-1">
+                                                  {supplyItems.map(
+                                                    (supply, sIdx) => (
+                                                      <div
+                                                        key={sIdx}
+                                                        className="flex items-center justify-between gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
+                                                      >
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                          <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                          <span className="font-medium truncate">
+                                                            {supply.name}
+                                                          </span>
                                                         </div>
-                                                      ),
-                                                    )}
-                                                  </div>
+                                                        <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                                                          {supply.quantityLabel ||
+                                                            "-"}
+                                                        </div>
+                                                      </div>
+                                                    ),
+                                                  )}
                                                 </div>
-                                              )}
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       </div>

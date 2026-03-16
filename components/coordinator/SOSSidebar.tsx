@@ -119,12 +119,19 @@ const SOSSidebar = ({
     (s) => !clusteredIds.has(s.id) && !backendClusteredIds.has(s.id),
   );
 
-  // Backend clusters that have at least one PENDING SOS request
+  // Assigned SOS that are NOT in any backend cluster (clustered assigned SOS stay inside cluster cards)
+  const standaloneAssignedRequests = assignedRequests.filter(
+    (s) => !backendClusteredIds.has(s.id),
+  );
+
+  // Backend clusters that are still active in operations (pending/assigned/mission-created)
   const activeClusters = backendClusters.filter((c) => {
     const clusterSOS = sosRequests.filter((s) =>
       c.sosRequestIds.includes(Number(s.id)),
     );
-    return clusterSOS.some((s) => s.status === "PENDING");
+    const hasActiveSOS = clusterSOS.some((s) => s.status !== "RESCUED");
+
+    return hasActiveSOS || c.isMissionCreated;
   });
 
   return (
@@ -305,7 +312,11 @@ const SOSSidebar = ({
                             </div>
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] text-muted-foreground">
-                                {pendingClusterSOS.length} chờ xử lý
+                                {pendingClusterSOS.length > 0
+                                  ? `${pendingClusterSOS.length} chờ xử lý`
+                                  : assignedClusterSOS.length > 0
+                                    ? `${assignedClusterSOS.length} đang cứu hộ`
+                                    : `${sosCount} SOS`}
                               </span>
                               {isExpanded ? (
                                 <CaretUp className="h-3.5 w-3.5 text-muted-foreground" />
@@ -333,8 +344,12 @@ const SOSSidebar = ({
                         {isExpanded && (
                           <>
                             <div className="border-t border-inherit divide-y divide-inherit">
-                              {pendingClusterSOS.length > 0 ? (
-                                pendingClusterSOS.map((sos) => (
+                              {pendingClusterSOS.length > 0 ||
+                              assignedClusterSOS.length > 0 ? (
+                                [
+                                  ...pendingClusterSOS,
+                                  ...assignedClusterSOS,
+                                ].map((sos) => (
                                   <div
                                     key={sos.id}
                                     className={cn(
@@ -346,13 +361,6 @@ const SOSSidebar = ({
                                   >
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
-                                        <MapPin
-                                          className={cn(
-                                            "h-3.5 w-3.5",
-                                            PRIORITY_TEXT_COLOR[sos.priority],
-                                          )}
-                                          weight="fill"
-                                        />
                                         <Badge
                                           variant={
                                             PRIORITY_BADGE_VARIANT[sos.priority]
@@ -362,13 +370,19 @@ const SOSSidebar = ({
                                           {PRIORITY_LABELS[sos.priority]}
                                         </Badge>
                                         <span className="text-xs font-mono text-muted-foreground">
-                                          #{sos.id}
+                                          SOS {sos.id}
                                         </span>
                                         <Badge
-                                          variant="warning"
+                                          variant={
+                                            sos.status === "PENDING"
+                                              ? "warning"
+                                              : "info"
+                                          }
                                           className="text-[9px] h-3.5 px-1"
                                         >
-                                          Chờ
+                                          {sos.status === "PENDING"
+                                            ? "Chờ"
+                                            : "Đang cứu"}
                                         </Badge>
                                       </div>
                                       <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -483,13 +497,6 @@ const SOSSidebar = ({
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  <MapPin
-                                    className={cn(
-                                      "h-3.5 w-3.5",
-                                      PRIORITY_TEXT_COLOR[sos.priority],
-                                    )}
-                                    weight="fill"
-                                  />
                                   <Badge
                                     variant={
                                       PRIORITY_BADGE_VARIANT[sos.priority]
@@ -499,7 +506,7 @@ const SOSSidebar = ({
                                     {PRIORITY_LABELS[sos.priority]}
                                   </Badge>
                                   <span className="text-xs font-mono text-muted-foreground">
-                                    #{sos.id}
+                                    SOS {sos.id}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
@@ -543,13 +550,6 @@ const SOSSidebar = ({
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <MapPin
-                              className={cn(
-                                "h-3.5 w-3.5",
-                                PRIORITY_TEXT_COLOR[sos.priority],
-                              )}
-                              weight="fill"
-                            />
                             <Badge
                               variant={PRIORITY_BADGE_VARIANT[sos.priority]}
                               className="text-[10px] h-4 px-1.5"
@@ -557,7 +557,7 @@ const SOSSidebar = ({
                               {PRIORITY_LABELS[sos.priority]}
                             </Badge>
                             <span className="text-xs font-mono text-muted-foreground">
-                              #{sos.id}
+                              SOS {sos.id}
                             </span>
                             <Badge
                               variant="warning"
@@ -626,12 +626,12 @@ const SOSSidebar = ({
               )}
 
               {/* Assigned / In-progress SOS Requests */}
-              {assignedRequests.length > 0 && (
+              {standaloneAssignedRequests.length > 0 && (
                 <>
                   <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-4">
-                    Đang cứu hộ ({assignedRequests.length})
+                    Đang cứu hộ ({standaloneAssignedRequests.length})
                   </div>
-                  {assignedRequests.map((sos) => (
+                  {standaloneAssignedRequests.map((sos) => (
                     <SOSCard
                       key={sos.id}
                       sos={sos}
@@ -748,7 +748,7 @@ function SOSCard({
               {PRIORITY_LABELS[sos.priority]}
             </Badge>
             <span className="text-xs font-mono text-muted-foreground">
-              #{sos.id}
+              SOS {sos.id}
             </span>
           </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">

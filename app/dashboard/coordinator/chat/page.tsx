@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -49,8 +49,18 @@ export default function CoordinatorChatPage() {
   const {
     rooms,
     isLoading: waitingLoading,
+    isFetching: roomsRefreshing,
     error: waitingError,
+    refetch: refetchRooms,
   } = useCoordinatorChatRooms();
+
+  const knownConversationIdsRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    knownConversationIdsRef.current = new Set(
+      rooms.map((room) => room.conversationId),
+    );
+  }, [rooms]);
 
   const joinMutation = useJoinConversation();
   const sendMessageMutation = useSendConversationMessage();
@@ -75,6 +85,11 @@ export default function CoordinatorChatPage() {
   const handleRealtimeMessage = useCallback(
     (message: ReceiveMessageEvent) => {
       setRealtimeMessages((prev) => [...prev, message]);
+
+      if (!knownConversationIdsRef.current.has(message.conversationId)) {
+        void refetchRooms();
+      }
+
       if (
         !activeConversationId ||
         message.conversationId !== activeConversationId
@@ -87,12 +102,13 @@ export default function CoordinatorChatPage() {
         markConversationAsRead(message.conversationId);
       }
     },
-    [activeConversationId, markConversationAsRead],
+    [activeConversationId, markConversationAsRead, refetchRooms],
   );
 
   const handleResyncRequested = useCallback(() => {
+    void refetchRooms();
     void messagesQuery.refetch();
-  }, [messagesQuery]);
+  }, [messagesQuery, refetchRooms]);
 
   const {
     connectionState,
@@ -101,11 +117,18 @@ export default function CoordinatorChatPage() {
     retryConnection,
     disconnect,
   } = useCoordinatorChatConnection({
-    enabled: !!activeConversationId,
+    enabled: true,
     activeConversationId,
+    onJoinedConversation: () => {
+      void refetchRooms();
+    },
     onReceiveMessage: handleRealtimeMessage,
     onCoordinatorJoined: () => {
       setActiveStatus("CoordinatorActive");
+      void refetchRooms();
+    },
+    onLeftConversation: () => {
+      void refetchRooms();
     },
     onResyncRequested: handleResyncRequested,
   });
@@ -137,6 +160,15 @@ export default function CoordinatorChatPage() {
       );
     });
   }, [rooms, searchText]);
+
+  const activeRoom = useMemo(
+    () =>
+      activeConversationId
+        ? (rooms.find((room) => room.conversationId === activeConversationId) ??
+          null)
+        : null,
+    [activeConversationId, rooms],
+  );
 
   const mergedMessages = useMemo(() => {
     if (!activeConversationId) {
@@ -214,6 +246,11 @@ export default function CoordinatorChatPage() {
       return;
     }
 
+    if (connectionState !== "connected") {
+      toast.error("Kết nối realtime chưa sẵn sàng. Vui lòng thử lại sau.");
+      return;
+    }
+
     try {
       await sendMessageMutation.mutateAsync({
         conversationId: activeConversationId,
@@ -227,32 +264,48 @@ export default function CoordinatorChatPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-background">
-      <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push("/dashboard/coordinator")}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <p className="font-semibold text-sm">Coordinator - Victim Chat</p>
-            <p className="text-xs text-muted-foreground">
-              Realtime conversation between coordinator website and victim
-              mobile app
-            </p>
+    <div className="flex h-screen flex-col overflow-hidden bg-gradient-to-b from-slate-50 to-background">
+      <header className="shrink-0 border-b bg-background/80 px-4 py-3 backdrop-blur md:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push("/dashboard/coordinator")}
+              className="rounded-xl"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <p className="text-sm font-semibold md:text-base">
+                Coordinator - Victim Chat
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Theo dõi hội thoại realtime giữa coordinator web và victim app
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">
-            {activeStatus === "CoordinatorActive"
-              ? "CoordinatorActive"
-              : "WaitingCoordinator"}
-          </Badge>
-          <ChatConnectionBadge state={connectionState} />
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="rounded-full px-3">
+              {activeStatus === "CoordinatorActive"
+                ? "CoordinatorActive"
+                : "WaitingCoordinator"}
+            </Badge>
+            <ChatConnectionBadge state={connectionState} />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 rounded-full"
+              onClick={() => {
+                void refetchRooms();
+              }}
+              disabled={waitingLoading || roomsRefreshing}
+            >
+              <ArrowClockwise className="h-4 w-4" />
+              Làm mới
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -291,9 +344,9 @@ export default function CoordinatorChatPage() {
         </div>
       ) : null}
 
-      <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
-        <aside className="w-full md:w-[360px] border-r bg-muted/20 flex flex-col">
-          <div className="p-3 border-b">
+      <div className="flex flex-1 flex-col gap-3 overflow-hidden p-3 md:flex-row md:p-4">
+        <aside className="flex w-full flex-col overflow-hidden rounded-2xl border bg-white/75 shadow-sm md:w-[320px] lg:w-[340px]">
+          <div className="border-b p-3">
             <Input
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
@@ -308,6 +361,7 @@ export default function CoordinatorChatPage() {
               activeConversationId={activeConversationId}
               unreadByConversation={unreadByConversationView}
               isLoading={waitingLoading}
+              isRefreshing={roomsRefreshing}
               onSelectRoom={(conversationId) => {
                 void handleSelectRoom(conversationId);
               }}
@@ -315,7 +369,7 @@ export default function CoordinatorChatPage() {
           </div>
         </aside>
 
-        <section className="flex-1 flex flex-col min-h-0">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm">
           {waitingError ? (
             <div className="m-4 p-3 rounded-lg border border-destructive/40 bg-destructive/10 text-sm text-destructive">
               Không thể tải danh sách cuộc trò chuyện.
@@ -324,7 +378,7 @@ export default function CoordinatorChatPage() {
 
           {activeConversationId ? (
             <>
-              <div className="px-4 py-3 border-b bg-background">
+              <div className="border-b bg-slate-50/80 px-4 py-3">
                 <p className="text-sm font-medium">
                   Conversation #{activeConversationId}
                 </p>
@@ -334,14 +388,12 @@ export default function CoordinatorChatPage() {
                 <ChatMessageThread
                   messages={mergedMessages}
                   isLoading={messagesQuery.isLoading}
+                  conversationPartnerLabel={activeRoom?.participantLabel}
                 />
               </div>
 
               <ChatComposer
-                disabled={
-                  sendMessageMutation.isPending ||
-                  connectionState !== "connected"
-                }
+                disabled={sendMessageMutation.isPending}
                 onSend={(content) => {
                   void handleSendMessage(content);
                 }}

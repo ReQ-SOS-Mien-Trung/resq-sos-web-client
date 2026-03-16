@@ -533,7 +533,7 @@ const SOSDetailsPanel = ({
                     priorityColors[sosRequest.priority],
                   )}
                 />
-                SOS #{sosRequest.id}
+                SOS {sosRequest.id}
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Chi tiết yêu cầu cứu hộ
@@ -1274,7 +1274,7 @@ const SOSDetailsPanel = ({
                               {PRIORITY_LABELS[sos.priority]}
                             </Badge>
                             <span className="text-xs font-mono text-muted-foreground">
-                              SOS #{sos.id}
+                              SOS {sos.id}
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-1 mt-1">

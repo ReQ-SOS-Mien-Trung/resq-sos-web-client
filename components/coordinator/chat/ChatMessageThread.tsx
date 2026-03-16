@@ -2,15 +2,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ReceiveMessageEvent } from "@/services/chat/type";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ChatMessageThreadProps {
   messages: ReceiveMessageEvent[];
   isLoading: boolean;
+  conversationPartnerLabel?: string;
 }
 
 export default function ChatMessageThread({
   messages,
   isLoading,
+  conversationPartnerLabel,
 }: ChatMessageThreadProps) {
   const currentUserId = useAuthStore((state) => state.user?.userId ?? null);
 
@@ -50,6 +54,10 @@ export default function ChatMessageThread({
           const isOwnMessage =
             !!currentUserId && message.senderId === currentUserId;
           const isAiMessage = message.messageType === "AiMessage";
+          const senderLabel =
+            message.senderName?.trim() ||
+            (!isOwnMessage && !isAiMessage ? conversationPartnerLabel : null) ||
+            "Unknown";
 
           return (
             <div
@@ -69,9 +77,11 @@ export default function ChatMessageThread({
                       : "bg-muted text-foreground",
                 )}
               >
-                <p className="text-sm whitespace-pre-wrap break-words">
-                  {message.content}
-                </p>
+                <div className="text-sm break-words [&_a]:underline [&_code]:rounded [&_code]:bg-black/10 [&_code]:px-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-black/15 [&_pre]:p-2 [&_ul]:list-disc [&_ul]:pl-5">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
                 <p
                   className={cn(
                     "mt-1 text-[11px]",
@@ -82,7 +92,7 @@ export default function ChatMessageThread({
                         : "text-muted-foreground",
                   )}
                 >
-                  {message.senderName || "Unknown"} •{" "}
+                  {senderLabel} •{" "}
                   {new Date(message.createdAt).toLocaleString("vi-VN")}
                 </p>
               </div>
