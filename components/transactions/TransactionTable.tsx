@@ -81,7 +81,7 @@ const TransactionTable: React.FC = () => {
 
   // Query filters
   const queryFilters = useMemo((): GetDepotTransactionsParams => ({
-    pageNumber: page,
+    pageNumber: page + 1,
     pageSize: pageSize,
     actionTypes: selectedActionTypes.length > 0 ? selectedActionTypes : undefined,
     sourceTypes: selectedSourceTypes.length > 0 ? selectedSourceTypes : undefined,
@@ -183,6 +183,24 @@ const TransactionTable: React.FC = () => {
         dateRange?.to;
   }, [search, selectedActionTypes, selectedSourceTypes, selectedSourceNames, dateRange]);
 
+  const ACTION_TYPE_MAP: Record<string, { label: string; className: string }> = {
+    Import:      { label: "Nhập kho",    className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+    Export:      { label: "Xuất kho",    className: "bg-red-100 text-red-700 border-red-200" },
+    Adjust:      { label: "Điều chỉnh",  className: "bg-orange-100 text-orange-700 border-orange-200" },
+    Return:      { label: "Hoàn trả",    className: "bg-blue-100 text-blue-700 border-blue-200" },
+    TransferIn:  { label: "Chuyển nhập", className: "bg-teal-100 text-teal-700 border-teal-200" },
+    TransferOut: { label: "Chuyển xuất", className: "bg-purple-100 text-purple-700 border-purple-200" },
+  };
+
+  const SOURCE_TYPE_MAP: Record<string, string> = {
+    Donation:   "Quyên góp",
+    Mission:    "Nhiệm vụ",
+    Purchase:   "Mua sắm",
+    Adjustment: "Điều chỉnh",
+    Transfer:   "Chuyển kho",
+    Manual:     "Thủ công",
+  };
+
   // Format date for display
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), 'dd/MM/yyyy HH:mm', { locale: vi });
@@ -193,22 +211,26 @@ const TransactionTable: React.FC = () => {
     return `${quantity.toLocaleString('vi-VN')} ${unit}`;
   };
 
-  // Get action type badge color
+  // Get action type badge with Vietnamese label + proper color
   const getActionTypeBadge = (actionType: string) => {
-    return (
-      <Badge variant={actionType.includes('Nhập') ? 'default' : 'destructive'}>
-        {actionType}
-      </Badge>
-    );
+    const config = ACTION_TYPE_MAP[actionType];
+    if (config) {
+      return (
+        <Badge variant="outline" className={config.className}>
+          {config.label}
+        </Badge>
+      );
+    }
+    return <Badge variant="outline">{actionType}</Badge>;
   };
 
   const displayTransactions = filteredTransactions || transactions;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col pb-6">
       {/* Filters Section */}
       <Card className="mx-6 mt-4 mb-4">
-        <CardHeader className="pb-4">
+        <CardHeader className="pb-0.5">
           <CardTitle className="text-lg flex items-center gap-2">
             <Filter className="h-5 w-5" />
             Bộ lọc
@@ -218,13 +240,13 @@ const TransactionTable: React.FC = () => {
           {/* Search and Clear */}
           <div className="flex items-center gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Tìm kiếm theo tên nguồn hoặc vật tư..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-10"
               />
+               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             </div>
             {hasActiveFilters && (
               <Button
@@ -241,7 +263,7 @@ const TransactionTable: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Action Types Filter */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Loại hành động</Label>
+              <Label className="text-sm tracking-tighter font-mono">Loại hành động</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
@@ -266,8 +288,8 @@ const TransactionTable: React.FC = () => {
                             }
                           }}
                         />
-                        <Label htmlFor={`action-${actionType.key}`} className="text-sm">
-                          {actionType.value}
+                        <Label htmlFor={`action-${actionType.key}`} className="text-sm tracking-tighter">
+                          {ACTION_TYPE_MAP[actionType.key]?.label ?? actionType.value}
                         </Label>
                       </div>
                     ))}
@@ -278,7 +300,7 @@ const TransactionTable: React.FC = () => {
 
             {/* Source Types Filter */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Loại nguồn</Label>
+              <Label className="text-sm tracking-tighter font-mono">Loại nguồn</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
@@ -303,8 +325,8 @@ const TransactionTable: React.FC = () => {
                             }
                           }}
                         />
-                        <Label htmlFor={`source-${sourceType.key}`} className="text-sm">
-                          {sourceType.value}
+                        <Label htmlFor={`source-${sourceType.key}`} className="text-sm tracking-tighter">
+                          {SOURCE_TYPE_MAP[sourceType.key] ?? sourceType.value}
                         </Label>
                       </div>
                     ))}
@@ -315,7 +337,7 @@ const TransactionTable: React.FC = () => {
 
             {/* Source Names Filter */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Tên nguồn</Label>
+              <Label className="text-sm tracking-tighter font-mono">Tên nguồn</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
@@ -340,8 +362,8 @@ const TransactionTable: React.FC = () => {
                             }
                           }}
                         />
-                        <Label htmlFor={`source-name-${sourceName}`} className="text-sm">
-                          {sourceName}
+                        <Label htmlFor={`source-name-${sourceName}`} className="text-sm tracking-tighter">
+                          {sourceName || "Không có"}
                         </Label>
                       </div>
                     ))}
@@ -352,14 +374,14 @@ const TransactionTable: React.FC = () => {
 
             {/* Date Range Filter */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Khoảng thời gian</Label>
+              <Label className="text-sm tracking-tighter font-mono">Khoảng thời gian</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !dateRange?.from && "text-muted-foreground"
+                      !dateRange?.from && "font-medium"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -385,6 +407,7 @@ const TransactionTable: React.FC = () => {
                     selected={dateRange}
                     onSelect={setDateRange}
                     numberOfMonths={2}
+                    locale={vi}
                   />
                 </PopoverContent>
               </Popover>
@@ -394,15 +417,15 @@ const TransactionTable: React.FC = () => {
       </Card>
 
       {/* Table */}
-      <div className="flex-1 mx-6 overflow-hidden">
-        <Card className="h-full flex flex-col">
-          <CardHeader className="pb-4">
+      <div className="mx-6">
+        <Card>
+          <CardHeader className="pb-1">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Lịch sử xuất nhập kho
               </CardTitle>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-sm tracking-tighter text-muted-foreground">
                 {displayTransactions && (
                   <>
                     <span>
@@ -417,10 +440,10 @@ const TransactionTable: React.FC = () => {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="flex-1 p-0 overflow-hidden">
-            <div className="h-full flex flex-col">
+          <CardContent className="p-0">
+            <div>
               {/* Table wrapper with scroll */}
-              <div className="flex-1 overflow-auto">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
@@ -429,8 +452,7 @@ const TransactionTable: React.FC = () => {
                       <TableHead>Nguồn</TableHead>
                       <TableHead>Vật tư</TableHead>
                       <TableHead className="text-right">Số lượng</TableHead>
-                      <TableHead>Thời gian</TableHead>
-                      <TableHead>Người thực hiện</TableHead>
+                      <TableHead>Thời gian</TableHead>                   
                       <TableHead>Ghi chú</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -453,7 +475,7 @@ const TransactionTable: React.FC = () => {
                         <TableCell colSpan={8} className="text-center py-8">
                           <div className="flex flex-col items-center gap-2">
                             <Package className="h-8 w-8 text-muted-foreground" />
-                            <p className="text-muted-foreground">
+                            <p className="text-muted-foreground tracking-tighter">
                               Không thể tải dữ liệu.
                             </p>
                           </div>
@@ -464,7 +486,7 @@ const TransactionTable: React.FC = () => {
                         <TableCell colSpan={8} className="text-center py-8">
                           <div className="flex flex-col items-center gap-2">
                             <Package className="h-8 w-8 text-muted-foreground" />
-                            <p className="text-muted-foreground">
+                            <p className="text-muted-foreground tracking-tighter">
                               Không có dữ liệu xuất nhập kho nào.
                             </p>
                           </div>
@@ -473,19 +495,14 @@ const TransactionTable: React.FC = () => {
                     ) : (
                       displayTransactions.content.map((transaction) => (
                         <TableRow key={transaction.id} className="hover:bg-muted/50">
-                          <TableCell className="font-mono text-xs">
+                          <TableCell className="font-regular text-sm">
                             {transaction.transactionId}
                           </TableCell>
                           <TableCell>
                             {getActionTypeBadge(transaction.actionType)}
                           </TableCell>
                           <TableCell>
-                            <div>
-                              <p className="font-medium">{transaction.sourceName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {transaction.sourceType}
-                              </p>
-                            </div>
+                            {transaction.sourceName || "—"}
                           </TableCell>
                           <TableCell>
                             <div>
@@ -501,11 +518,8 @@ const TransactionTable: React.FC = () => {
                           <TableCell className="text-sm">
                             {formatDate(transaction.createdAt)}
                           </TableCell>
-                          <TableCell>
-                            {transaction.createdByName}
-                          </TableCell>
                           <TableCell className="max-w-xs">
-                            <p className="text-xs text-muted-foreground truncate">
+                            <p className="text-sm font-regular truncate">
                               {transaction.notes || '-'}
                             </p>
                           </TableCell>
@@ -520,7 +534,7 @@ const TransactionTable: React.FC = () => {
               {displayTransactions && displayTransactions.totalPages > 0 && (
                 <div className="border-t bg-background px-6 py-4">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 text-sm tracking-tighter text-muted-foreground">
                       <span>Hiển thị</span>
                       <Select
                         value={pageSize.toString()}

@@ -51,6 +51,7 @@ import {
   useImportInventory,
 } from "@/services/inventory/hooks";
 import type { ImportInventoryItem } from "@/services/inventory/type";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 
 // ─── System categories (seed) ───
 const SYSTEM_CATEGORIES = [
@@ -1010,25 +1011,21 @@ export default function ExcelImportFromOrg() {
 
                         {/* Ngày hết hạn */}
                         <TableCell>
-                          <Input
-                            type="date"
+                          <DatePickerInput
                             value={row.expiredDate}
-                            onChange={(e) => updateRow(row.id, "expiredDate", e.target.value)}
-                            className="h-8 text-sm pr-2 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                            onChange={(v) => updateRow(row.id, "expiredDate", v)}
+                            placeholder="Chọn ngày..."
                           />
                         </TableCell>
 
                         {/* Ngày nhận */}
                         <TableCell>
                           <div className="space-y-1">
-                            <Input
-                              type="date"
+                            <DatePickerInput
                               value={row.receivedDate}
-                              onChange={(e) => updateRow(row.id, "receivedDate", e.target.value)}
-                              className={cn(
-                                "h-8 text-sm pr-2 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer",
-                                row.errors.receivedDate && "border-red-500 focus-visible:ring-red-500",
-                              )}
+                              onChange={(v) => updateRow(row.id, "receivedDate", v)}
+                              placeholder="Chọn ngày..."
+                              hasError={!!row.errors.receivedDate}
                             />
                             {row.errors.receivedDate && (
                               <p className="text-[11px] text-red-500">{row.errors.receivedDate}</p>

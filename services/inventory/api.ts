@@ -129,12 +129,15 @@ export async function importRegularInventory(
 export async function getDepotTransactions(
   params: GetDepotTransactionsParams,
 ): Promise<GetDepotTransactionsResponse> {
-  const { data } = await api.get("/logistics/inventory/transactions/my-depot", {
-    params,
-    paramsSerializer: {
-      indexes: null,
+  const { data } = await api.get(
+    "/logistics/inventory/stock-movements/my-depot",
+    {
+      params,
+      paramsSerializer: {
+        indexes: null,
+      },
     },
-  });
+  );
   return data;
 }
 

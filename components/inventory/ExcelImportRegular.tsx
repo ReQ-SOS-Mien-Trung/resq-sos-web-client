@@ -47,6 +47,7 @@ import {
 } from "@/services/inventory/hooks";
 import type { ImportPurchaseItem, VatInvoice } from "@/services/inventory/type";
 import { uploadRawToCloudinary } from "@/utils/uploadFile";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 
 const SYSTEM_CATEGORIES = [
   { label: "Thực phẩm", value: "Food" },
@@ -1303,20 +1304,19 @@ export default function ExcelImportRegular() {
                               <TableCell>{renderCurrencyCell(group.id, row, "unitPrice")}</TableCell>
                               <TableCell>{renderInputCell(group.id, row, "quantity", "0", "number")}</TableCell>
                               <TableCell>
-                                <Input
-                                  type="date"
+                                <DatePickerInput
                                   value={row.expiredDate}
-                                  onChange={(e) => updateRow(group.id, row.id, "expiredDate", e.target.value)}
-                                  className="h-8 text-sm pr-2 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                                  onChange={(v) => updateRow(group.id, row.id, "expiredDate", v)}
+                                  placeholder="Chọn ngày..."
                                 />
                               </TableCell>
                               <TableCell>
                                 <div className="space-y-1">
-                                  <Input
-                                    type="date"
+                                  <DatePickerInput
                                     value={row.receivedDate}
-                                    onChange={(e) => updateRow(group.id, row.id, "receivedDate", e.target.value)}
-                                    className={cn("h-8 text-sm pr-2 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer", row.errors.receivedDate && "border-red-500 focus-visible:ring-red-500")}
+                                    onChange={(v) => updateRow(group.id, row.id, "receivedDate", v)}
+                                    placeholder="Chọn ngày..."
+                                    hasError={!!row.errors.receivedDate}
                                   />
                                   {row.errors.receivedDate && (
                                     <p className="text-[11px] text-red-500">{row.errors.receivedDate}</p>

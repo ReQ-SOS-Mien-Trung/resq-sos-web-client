@@ -38,7 +38,11 @@ import {
 } from "@phosphor-icons/react";
 import { FileTextIcon, FileSpreadsheet, CalendarRange, CalendarDays, ChevronRight } from "lucide-react";
 import { DepotSidebar } from "@/components/inventory";
+import { VatTuSection } from "@/components/inventory/VatTuTabContent";
+import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
+import { InventoryItemEntity } from "@/services/inventory/type";
 import { Label } from "@/components/ui/label";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import {
   mockInventoryItems,
   mockSupplyRequests,
@@ -100,6 +104,8 @@ export default function ExportReportPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState("inventory");
+  const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
+  const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
 
   // ── Auth ──
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -376,7 +382,15 @@ export default function ExportReportPage() {
 
         {/* Main */}
         <main className="flex-1 overflow-auto bg-muted/30">
-          <div className="p-6 md:p-8 space-y-8">
+          {activeTab === "vattu" ? (
+            <div className="p-6 md:p-8">
+              <VatTuSection onItemSelect={(item) => {
+                setVatTuSelectedItem(item);
+                setVatTuSheetOpen(true);
+              }} />
+            </div>
+          ) : null}
+          <div className={activeTab === "vattu" ? "hidden" : "p-6 md:p-8 space-y-8"}>
             {/* ── Hero / Page header ── */}
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -418,21 +432,21 @@ export default function ExportReportPage() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium tracking-tighter text-muted-foreground">Từ ngày</Label>
-                        <input
-                          type="date"
+                        <Label className="text-sm font-medium tracking-tighter text-muted-foreground">Từ ngày</Label>
+                        <DatePickerInput
                           value={leftFromDate}
-                          onChange={(e) => setLeftFromDate(e.target.value)}
-                          className="w-full h-10 border border-input rounded-lg px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
+                          onChange={setLeftFromDate}
+                          placeholder="Chọn ngày..."
+                          className="h-10 mt-1"
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium tracking-tighter text-muted-foreground">Đến ngày</Label>
-                        <input
-                          type="date"
+                        <Label className="text-sm font-medium tracking-tighter text-muted-foreground">Đến ngày</Label>
+                        <DatePickerInput
                           value={leftToDate}
-                          onChange={(e) => setLeftToDate(e.target.value)}
-                          className="w-full h-10 border border-input tracking-tighter rounded-lg px-3 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
+                          onChange={setLeftToDate}
+                          placeholder="Chọn ngày..."
+                          className="h-10 mt-1"
                         />
                       </div>
                     </div>
@@ -477,9 +491,9 @@ export default function ExportReportPage() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <Label className="text-xs tracking-tighter font-medium text-muted-foreground">Tháng</Label>
+                        <Label className="text-sm tracking-tighter font-medium text-muted-foreground">Tháng</Label>
                         <Select value={rightMonth} onValueChange={setRightMonth}>
-                          <SelectTrigger className="h-10 text-sm rounded-lg">
+                          <SelectTrigger className="h-10 mt-1 text-sm rounded-lg">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -492,9 +506,9 @@ export default function ExportReportPage() {
                         </Select>
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs tracking-tighter font-medium text-muted-foreground">Năm</Label>
+                        <Label className="text-sm tracking-tighter font-medium text-muted-foreground">Năm</Label>
                         <Select value={rightYear} onValueChange={setRightYear}>
-                          <SelectTrigger className="h-10 text-sm rounded-lg border-emerald-500/50 ring-1 ring-emerald-500/20">
+                          <SelectTrigger className="h-10 mt-1 text-sm rounded-lg border-emerald-500/50 ring-1 ring-emerald-500/20">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -530,6 +544,13 @@ export default function ExportReportPage() {
           </div>
         </main>
       </div>
+
+      {/* Vat Tu Details Sheet */}
+      <VatTuDetailsSheet
+        item={vatTuSelectedItem}
+        open={vatTuSheetOpen}
+        onOpenChange={setVatTuSheetOpen}
+      />
     </div>
   );
 }
