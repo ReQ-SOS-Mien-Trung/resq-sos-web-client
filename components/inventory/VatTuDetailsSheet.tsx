@@ -62,17 +62,15 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
               <Package className="h-6 w-6" weight="fill" />
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <SheetTitle className="text-xl">{item.reliefItemName}</SheetTitle>
-              <SheetDescription className="flex items-center gap-2 mt-1">
-                <span className="font-medium text-sm text-black dark:text-white uppercase tracking-wider">{item.categoryName}</span>
-                <span>•</span>
-                <span>{itemTypeLabel(item.itemType)}</span>
+              <SheetTitle className="text-xl tracking-tighter">{item.reliefItemName}</SheetTitle>
+              <SheetDescription className="flex tracking-tighter items-center gap-2 mt-1">
+                Danh mục: <span className="font-medium text-sm text-black dark:text-white uppercase tracking-tight">{item.categoryName}</span>
               </SheetDescription>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 text-left">
-            <Badge variant="outline" className="rounded-none border-black/20 text-xs">{targetGroupLabel(item.targetGroup)}</Badge>
-            <Badge className={cn("rounded-none text-xs text-white", item.availableQuantity > 0 ? "bg-[#FF5722] hover:bg-[#FF5722]/90 border-transparent" : "bg-red-500 hover:bg-red-500/90 border-transparent")}>
+            {/* <Badge variant="outline" className="rounded-none tracking-tighter border-black/20 text-sm">{targetGroupLabel(item.targetGroup)}</Badge> */}
+            <Badge className={cn("rounded-none tracking-tighter text-sm text-white", item.availableQuantity > 0 ? "bg-[#FF5722] hover:bg-[#FF5722]/90 border-transparent" : "bg-red-500 hover:bg-red-500/90 border-transparent")}>
               {item.availableQuantity > 0 ? "Còn Hàng" : "Hết Hàng"}
             </Badge>
           </div>
@@ -80,17 +78,16 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
 
         <div className="mt-6 space-y-6">
           {/* Stock Level Visual */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <Package className="h-4 w-4" />
+          <div className="space-y-2">
+            <h3 className="text-lg font-medium tracking-tighter flex items-center">
               Tình Trạng Tồn Kho
             </h3>
             <div className="bg-muted/50 rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-3xl font-bold">
+                <span className="text-3xl tracking-tighter font-bold">
                   {item.availableQuantity.toLocaleString()}
                 </span>
-                <span className="text-muted-foreground font-medium">
+                <span className="text-muted-foreground tracking-tighter font-medium">
                   / {item.quantity.toLocaleString()} (Tổng)
                 </span>
               </div>
@@ -98,20 +95,20 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
               {/* Progress bar container */}
               <div className="h-3 bg-muted rounded-full overflow-hidden flex">
                 <div
-                  className="h-full bg-[#FF5722] transition-all"
+                  className="h-full bg-[#FF5722] tracking-tighter transition-all"
                   style={{ width: `${availablePercent}%` }}
                   title={`Có sẵn: ${item.availableQuantity.toLocaleString()}`}
                 />
                 <div
-                  className="h-full bg-orange-300 transition-all"
+                  className="h-full bg-orange-300 tracking-tighter transition-all"
                   style={{ width: `${reservedPercent}%` }}
                   title={`Đã cọc: ${item.reservedQuantity.toLocaleString()}`}
                 />
               </div>
 
               <div className="flex justify-between text-sm text-muted-foreground mt-2">
-                <span className="text-[#FF5722] font-semibold">Khả dụng: {item.availableQuantity.toLocaleString()}</span>
-                <span className="text-orange-500 font-semibold">Đã cọc: {item.reservedQuantity.toLocaleString()}</span>
+                <span className="text-[#FF5722] tracking-tighter font-semibold">Khả dụng: {item.availableQuantity.toLocaleString()}</span>
+                <span className="text-orange-500 tracking-tighter font-semibold">Đã cọc: {item.reservedQuantity.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -120,22 +117,22 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
 
           {/* Item Details */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold">Chi Tiết</h3>
+            <h3 className="text-sm tracking-tighter font-semibold">Chi Tiết</h3>
             <div className="grid gap-3">
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center tracking-tighter gap-3 text-sm">
                 <Tag className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Phân loại:</span>
-                <span className="font-medium">{itemTypeLabel(item.itemType)}</span>
+                <span className="text-muted-foreground tracking-tighter">Phân loại:</span>
+                <span className="font-medium tracking-tighter">{itemTypeLabel(item.itemType)}</span>
               </div>
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center tracking-tighter gap-3 text-sm">
                 <HandHeart className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Đối tượng:</span>
-                <span className="font-medium">{targetGroupLabel(item.targetGroup)}</span>
+                <span className="text-muted-foreground tracking-tighter">Đối tượng:</span>
+                <span className="font-medium tracking-tighter">{targetGroupLabel(item.targetGroup)}</span>
               </div>
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center tracking-tighter gap-3 text-sm">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Lần nhập xuất kho cuối:</span>
-                <span className="font-medium">
+                <span className="text-muted-foreground tracking-tighter">Lần nhập xuất kho cuối:</span>
+                <span className="font-medium tracking-tighter">
                   {formatDate(item.lastStockedAt)}
                 </span>
               </div>
@@ -145,7 +142,7 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
           <Separator />
 
           {/* Actions */}
-          <div className="space-y-3">
+          {/* <div className="space-y-3">
             <h3 className="text-sm font-semibold">Thao Tác</h3>
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" className="w-full border-black/20 hover:bg-[#FF5722] hover:text-white hover:border-[#FF5722] transition-colors rounded-none gap-2">
@@ -167,7 +164,7 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
                 Lịch sử
               </Button>
             </div>
-          </div>
+          </div> */}
         </div>
       </SheetContent>
     </Sheet>

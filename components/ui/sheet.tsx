@@ -78,12 +78,14 @@ function SheetTrigger({
 
 interface SheetContentProps extends React.ComponentProps<"div"> {
   side?: "top" | "right" | "bottom" | "left";
+  showOverlay?: boolean;
 }
 
 function SheetContent({
   className,
   children,
   side = "right",
+  showOverlay = true,
   ...props
 }: SheetContentProps) {
   const { open, onOpenChange } = useSheet();
@@ -130,15 +132,16 @@ function SheetContent({
 
   return ReactDOM.createPortal(
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-100 bg-black/80"
-        style={{
-          opacity: isEntered ? 1 : 0,
-          transition: "opacity 300ms ease",
-        }}
-        onClick={() => onOpenChange(false)}
-      />
+      {showOverlay && (
+        <div
+          className="fixed inset-0 z-100 bg-black/80"
+          style={{
+            opacity: isEntered ? 1 : 0,
+            transition: "opacity 300ms ease",
+          }}
+          onClick={() => onOpenChange(false)}
+        />
+      )}
       {/* Content */}
       <div
         className={cn(

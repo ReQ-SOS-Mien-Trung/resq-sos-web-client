@@ -140,6 +140,8 @@ const InventoryDashboardPage = () => {
   const [activeTab, setActiveTab] = useState("inventory");
   const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
+  const [isRequestSelectionSidebarOpen, setIsRequestSelectionSidebarOpen] =
+    useState(false);
 
   const router = useRouter();
 
@@ -490,7 +492,14 @@ const InventoryDashboardPage = () => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto bg-muted/30">
+        <main
+          className={cn(
+            "flex-1 overflow-auto bg-muted/30 transition-[margin] duration-300",
+            activeTab === "requests" && isRequestSelectionSidebarOpen
+              ? "sm:mr-144"
+              : "mr-0",
+          )}
+        >
           <div className="p-6 space-y-6">
             {/* Page Title */}
             <div className="flex items-center justify-between">
@@ -519,13 +528,10 @@ const InventoryDashboardPage = () => {
               }} />
             ) : activeTab === "requests" ? (
               <SupplyRequestSection
-                categories={
-                  categoriesData?.items?.map((cat) => ({
-                    id: cat.id,
-                    code: cat.code,
-                    name: cat.name,
-                  })) ?? []
-                }
+                onSelectionSidebarOpen={() => {
+                  if (sidebarOpen) setSidebarOpen(false);
+                }}
+                onSelectionSidebarChange={setIsRequestSelectionSidebarOpen}
               />
             ) : (
               <>

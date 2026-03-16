@@ -380,7 +380,7 @@ const DepotSidebar = ({
         </TabsContent>
 
         {/* Empty Content for Vattu (forces sidebar to be empty below tabs when vat tu is active) */}
-        <TabsContent value="vattu" className="flex-1 m-0 mt-3 p-4 text-center text-sm text-muted-foreground font-medium">
+        <TabsContent value="vattu" className="flex-1 m-0 mt-3 p-4 text-center text-sm tracking-tighter text-muted-foreground font-medium">
           Chi tiết vật tư hiển thị ở bên phải
         </TabsContent>
       </Tabs>

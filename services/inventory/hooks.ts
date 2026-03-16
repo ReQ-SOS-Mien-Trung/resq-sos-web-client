@@ -14,6 +14,8 @@ import {
   getInventorySourceTypes,
   getInventoryReliefItemsByCategory,
   searchDepotsByReliefItems,
+  createSupplyRequests,
+  getSupplyRequests,
   importInventory,
   importRegularInventory,
   getDepotTransactions,
@@ -33,6 +35,9 @@ import {
   InventoryReliefItem,
   SearchDepotsParams,
   SearchDepotsResponse,
+  CreateSupplyRequestsPayload,
+  GetSupplyRequestsParams,
+  GetSupplyRequestsResponse,
   GetDepotTransactionsParams,
   GetDepotTransactionsResponse,
   ExportMovementsParams,
@@ -51,6 +56,8 @@ export const INVENTORY_KEYS = {
     [...INVENTORY_KEYS.all, "reliefItemsByCategory", categoryCode] as const,
   searchDepots: (params: SearchDepotsParams) =>
     [...INVENTORY_KEYS.all, "searchDepots", params] as const,
+  supplyRequests: (params: GetSupplyRequestsParams) =>
+    [...INVENTORY_KEYS.all, "supplyRequests", params] as const,
   organizations: () => [...INVENTORY_KEYS.all, "organizations"] as const,
   transactions: (params: GetDepotTransactionsParams) =>
     [...INVENTORY_KEYS.all, "transactions", params] as const,
@@ -165,6 +172,31 @@ export function useSearchDepotsByReliefItems(
   return useQuery({
     queryKey: INVENTORY_KEYS.searchDepots(params),
     queryFn: () => searchDepotsByReliefItems(params),
+    ...options,
+  });
+}
+
+export function useCreateSupplyRequests() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateSupplyRequestsPayload) =>
+      createSupplyRequests(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function useSupplyRequests(
+  params: GetSupplyRequestsParams,
+  options?: Omit<
+    UseQueryOptions<GetSupplyRequestsResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.supplyRequests(params),
+    queryFn: () => getSupplyRequests(params),
     ...options,
   });
 }

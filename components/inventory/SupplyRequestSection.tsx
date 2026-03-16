@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -21,25 +22,35 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   Plus,
   Trash,
   MagnifyingGlass,
   Warehouse,
   MapPin,
   Package,
+  CheckCircle,
+  ShoppingCartSimple,
+  PaperPlaneTilt,
+  ClipboardTextIcon,
 } from "@phosphor-icons/react";
 import {
+  useInventoryCategories,
+  useCreateSupplyRequests,
   useInventoryReliefItemsByCategory,
   useSearchDepotsByReliefItems,
 } from "@/services/inventory";
-import { SearchDepotsParams } from "@/services/inventory/type";
+import {
+  SearchDepotsParams,
+  SearchDepotItemEntity,
+  SearchDepotWarehouseEntity,
+} from "@/services/inventory/type";
 import { toast } from "sonner";
-
-type CategoryOption = {
-  id: number;
-  code: string;
-  name: string;
-};
 
 type RequestLine = {
   id: string;
@@ -48,9 +59,33 @@ type RequestLine = {
   quantity: string;
 };
 
+type SelectedDepotByItem = {
+  reliefItemId: number;
+  reliefItemName: string;
+  unit: string;
+  requestQuantity: number;
+  depotId: number;
+  depotName: string;
+  depotAddress: string;
+  depotStatus: string;
+  availableQuantity: number;
+  distanceKm: number;
+};
+
 interface SupplyRequestSectionProps {
-  categories: CategoryOption[];
+  onSelectionSidebarOpen?: () => void;
+  onSelectionSidebarChange?: (open: boolean) => void;
 }
+
+type FlyToken = {
+  id: string;
+  text: string;
+  startX: number;
+  startY: number;
+  dx: number;
+  dy: number;
+  active: boolean;
+};
 
 const DEPOT_STATUS_LABELS: Record<string, string> = {
   Available: "Có sẵn",
@@ -62,12 +97,14 @@ const DEPOT_STATUS_LABELS: Record<string, string> = {
 function RequestLineRow({
   line,
   categories,
+  isCategoriesLoading,
   canRemove,
   onChange,
   onRemove,
 }: {
   line: RequestLine;
-  categories: CategoryOption[];
+  categories: Array<{ key: string; value: string }>;
+  isCategoriesLoading: boolean;
   canRemove: boolean;
   onChange: (id: string, patch: Partial<RequestLine>) => void;
   onRemove: (id: string) => void;
@@ -91,14 +128,17 @@ function RequestLineRow({
               reliefItemKey: "",
             })
           }
+          disabled={isCategoriesLoading}
         >
           <SelectTrigger className="w-full h-10 leading-normal">
-            <SelectValue placeholder="Chọn danh mục" />
+            <SelectValue
+              placeholder={isCategoriesLoading ? "Đang tải danh mục..." : "Chọn danh mục"}
+            />
           </SelectTrigger>
           <SelectContent>
             {categories.map((cat) => (
-              <SelectItem key={cat.id} value={cat.code}>
-                {cat.name}
+              <SelectItem key={cat.key} value={cat.key}>
+                {cat.value}
               </SelectItem>
             ))}
           </SelectContent>
@@ -165,12 +205,35 @@ function RequestLineRow({
   );
 }
 
-export default function SupplyRequestSection({ categories }: SupplyRequestSectionProps) {
+export default function SupplyRequestSection({
+  onSelectionSidebarOpen,
+  onSelectionSidebarChange,
+}: SupplyRequestSectionProps) {
+  const { data: categories = [], isLoading: isCategoriesLoading } =
+    useInventoryCategories();
+  const { mutateAsync: createSupplyRequests, isPending: isSubmittingRequest } =
+    useCreateSupplyRequests();
+
   const [lines, setLines] = useState<RequestLine[]>([
     { id: crypto.randomUUID(), categoryCode: "", reliefItemKey: "", quantity: "" },
   ]);
   const [submittedParams, setSubmittedParams] =
     useState<SearchDepotsParams | null>(null);
+  const [selectedDepotByItem, setSelectedDepotByItem] = useState<
+    Record<number, SelectedDepotByItem>
+  >({});
+  const [depotNotes, setDepotNotes] = useState<Record<number, string>>({});
+  const [isSelectionSheetOpen, setIsSelectionSheetOpen] = useState(false);
+  const [animatedDepotId, setAnimatedDepotId] = useState<number | null>(null);
+  const [flyTokens, setFlyTokens] = useState<FlyToken[]>([]);
+
+  const setSelectionSheetOpen = (open: boolean) => {
+    setIsSelectionSheetOpen(open);
+    onSelectionSidebarChange?.(open);
+    if (open) {
+      onSelectionSidebarOpen?.();
+    }
+  };
 
   const queryParams = submittedParams ?? {
     reliefItemIds: [],
@@ -189,6 +252,51 @@ export default function SupplyRequestSection({ categories }: SupplyRequestSectio
   });
 
   const hasSearched = !!submittedParams;
+
+  const requestedQuantityByResultItemId = useMemo(() => {
+    const map: Record<number, number> = {};
+    const quantities = submittedParams?.quantities ?? [];
+
+    (searchResult?.items ?? []).forEach((item, index) => {
+      const quantity = Number(quantities[index]);
+      if (Number.isFinite(quantity) && quantity > 0) {
+        map[item.reliefItemId] = quantity;
+      }
+    });
+
+    return map;
+  }, [searchResult, submittedParams]);
+
+  const getRequestedQuantity = (reliefItemId: number) => {
+    let quantity = 0;
+
+    const ids = submittedParams?.reliefItemIds ?? [];
+    const quantities = submittedParams?.quantities ?? [];
+
+    for (let index = 0; index < ids.length; index += 1) {
+      if (Number(ids[index]) === reliefItemId) {
+        const parsedQty = Number(quantities[index]);
+        if (Number.isFinite(parsedQty) && parsedQty > 0) {
+          quantity += parsedQty;
+        }
+      }
+    }
+
+    if (quantity > 0) {
+      return quantity;
+    }
+
+    lines.forEach((line) => {
+      if (Number(line.reliefItemKey) === reliefItemId) {
+        const parsedQty = Number(line.quantity);
+        if (Number.isFinite(parsedQty) && parsedQty > 0) {
+          quantity += parsedQty;
+        }
+      }
+    });
+
+    return quantity;
+  };
 
   const handleChangeLine = (id: string, patch: Partial<RequestLine>) => {
     setLines((prev) =>
@@ -239,6 +347,191 @@ export default function SupplyRequestSection({ categories }: SupplyRequestSectio
       pageNumber: 1,
       pageSize: 10,
     });
+
+    setSelectedDepotByItem({});
+    setDepotNotes({});
+    setSelectionSheetOpen(false);
+  };
+
+  const spawnFlyToken = (sourceElement: HTMLElement, text: string) => {
+    const rect = sourceElement.getBoundingClientRect();
+    const startX = rect.left + rect.width / 2;
+    const startY = rect.top + rect.height / 2;
+    const sheetWidth = Math.min(576, window.innerWidth * 0.9);
+    const targetX = window.innerWidth - sheetWidth + 72;
+    const targetY = 98;
+    const id = crypto.randomUUID();
+
+    setFlyTokens((prev) => [
+      ...prev,
+      {
+        id,
+        text,
+        startX,
+        startY,
+        dx: targetX - startX,
+        dy: targetY - startY,
+        active: false,
+      },
+    ]);
+
+    window.setTimeout(() => {
+      setFlyTokens((prev) =>
+        prev.map((token) =>
+          token.id === id ? { ...token, active: true } : token,
+        ),
+      );
+    }, 30);
+
+    window.setTimeout(() => {
+      setFlyTokens((prev) => prev.filter((token) => token.id !== id));
+    }, 1200);
+  };
+
+  const handleSelectDepotForItem = (
+    item: SearchDepotItemEntity,
+    warehouse: SearchDepotWarehouseEntity,
+    sourceElement: HTMLElement,
+  ) => {
+    let isDeselectAction = false;
+    let nextSelectedCount = 0;
+
+    setSelectedDepotByItem((prev) => {
+      const current = prev[item.reliefItemId];
+
+      if (current?.depotId === warehouse.depotId) {
+        const next = { ...prev };
+        delete next[item.reliefItemId];
+        isDeselectAction = true;
+        nextSelectedCount = Object.keys(next).length;
+        return next;
+      }
+
+      const next = {
+        ...prev,
+        [item.reliefItemId]: {
+          reliefItemId: item.reliefItemId,
+          reliefItemName: item.reliefItemName,
+          unit: item.unit,
+          requestQuantity: Math.max(
+            1,
+            requestedQuantityByResultItemId[item.reliefItemId] ??
+              getRequestedQuantity(item.reliefItemId),
+          ),
+          depotId: warehouse.depotId,
+          depotName: warehouse.depotName,
+          depotAddress: warehouse.depotAddress,
+          depotStatus: warehouse.depotStatus,
+          availableQuantity: warehouse.availableQuantity,
+          distanceKm: warehouse.distanceKm,
+        },
+      };
+
+      nextSelectedCount = Object.keys(next).length;
+      return next;
+    });
+
+    if (isDeselectAction) {
+      if (nextSelectedCount === 0) {
+        setSelectionSheetOpen(false);
+      }
+      return;
+    }
+
+    setAnimatedDepotId(warehouse.depotId);
+    spawnFlyToken(sourceElement, warehouse.depotName);
+    setSelectionSheetOpen(true);
+  };
+
+  const handleOpenSelectionSheet = () => {
+    setSelectionSheetOpen(true);
+  };
+
+  const groupedSelectedDepots = useMemo(() => {
+    const grouped = new Map<
+      number,
+      {
+        depotId: number;
+        depotName: string;
+        depotAddress: string;
+        depotStatus: string;
+        distanceKm: number;
+        items: Array<{
+          reliefItemId: number;
+          reliefItemName: string;
+          quantity: number;
+          unit: string;
+        }>;
+      }
+    >();
+
+    Object.values(selectedDepotByItem).forEach((selection) => {
+      const quantity = Math.max(1, Number(selection.requestQuantity) || 0);
+
+      const existing = grouped.get(selection.depotId);
+      if (!existing) {
+        grouped.set(selection.depotId, {
+          depotId: selection.depotId,
+          depotName: selection.depotName,
+          depotAddress: selection.depotAddress,
+          depotStatus: selection.depotStatus,
+          distanceKm: selection.distanceKm,
+          items: [
+            {
+              reliefItemId: selection.reliefItemId,
+              reliefItemName: selection.reliefItemName,
+              quantity,
+              unit: selection.unit,
+            },
+          ],
+        });
+        return;
+      }
+
+      existing.items.push({
+        reliefItemId: selection.reliefItemId,
+        reliefItemName: selection.reliefItemName,
+        quantity,
+        unit: selection.unit,
+      });
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => a.distanceKm - b.distanceKm);
+  }, [selectedDepotByItem]);
+
+  const handleSubmitSupplyRequests = async () => {
+    if (groupedSelectedDepots.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 kho nguồn");
+      return;
+    }
+
+    const requests = groupedSelectedDepots
+      .map((depot) => ({
+      sourceDepotId: depot.depotId,
+      items: depot.items
+        .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
+        .map((item) => ({
+          reliefItemId: item.reliefItemId,
+          quantity: item.quantity,
+        })),
+      note: depotNotes[depot.depotId]?.trim() || undefined,
+      }))
+      .filter((request) => request.items.length > 0);
+
+    if (requests.length === 0) {
+      toast.error("Không tìm thấy số lượng hợp lệ để gửi yêu cầu");
+      return;
+    }
+
+    try {
+      await createSupplyRequests({ requests });
+      toast.success("Đã gửi yêu cầu tiếp tế thành công");
+      setSelectedDepotByItem({});
+      setDepotNotes({});
+      setSelectionSheetOpen(false);
+    } catch {
+      toast.error("Gửi yêu cầu thất bại. Vui lòng thử lại");
+    }
   };
 
   const totalWarehouses = useMemo(
@@ -283,6 +576,7 @@ export default function SupplyRequestSection({ categories }: SupplyRequestSectio
                   key={line.id}
                   line={line}
                   categories={categories}
+                  isCategoriesLoading={isCategoriesLoading}
                   canRemove={lines.length > 1}
                   onChange={handleChangeLine}
                   onRemove={handleRemoveLine}
@@ -323,13 +617,12 @@ export default function SupplyRequestSection({ categories }: SupplyRequestSectio
             <CardTitle className="text-base font-semibold tracking-tighter flex items-center gap-2">
               <Warehouse className="h-5 w-5 text-primary" />
               Kết quả tìm kho
-               {!isSearching && (
-              <CardDescription className="tracking-tighter text-muted-foreground text-sm">
-                {(searchResult?.items?.length ?? 0)} vật tư • {totalWarehouses} kho phù hợp
-              </CardDescription>
-            )}
+              {!isSearching && (
+                <CardDescription className="tracking-tighter text-muted-foreground text-sm">
+                  {(searchResult?.items?.length ?? 0)} vật tư • {totalWarehouses} kho phù hợp
+                </CardDescription>
+              )}
             </CardTitle>
-           
           </CardHeader>
           <CardContent className="space-y-4">
             {isSearching && (
@@ -360,6 +653,20 @@ export default function SupplyRequestSection({ categories }: SupplyRequestSectio
 
             {!isSearching && !isError && (searchResult?.items?.length ?? 0) > 0 && (
               <div className="space-y-4">
+                <div className="flex items-center justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={handleOpenSelectionSheet}
+                    disabled={groupedSelectedDepots.length === 0}
+                  >
+                    <ShoppingCartSimple size={16} />
+                    Kho đã chọn ({groupedSelectedDepots.length})
+                  </Button>
+                </div>
+
                 {searchResult!.items.map((item) => (
                   <Card key={item.reliefItemId} className="border-border/60">
                     <CardHeader className="pb-3">
@@ -380,9 +687,38 @@ export default function SupplyRequestSection({ categories }: SupplyRequestSectio
                     <CardContent>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                         {item.warehouses.map((warehouse) => (
+                          (() => {
+                            const isSelected =
+                              selectedDepotByItem[item.reliefItemId]?.depotId ===
+                              warehouse.depotId;
+
+                            return (
                           <div
                             key={`${item.reliefItemId}-${warehouse.depotId}`}
-                            className="rounded-lg border border-border/60 p-4 bg-muted/20"
+                            role="button"
+                            tabIndex={0}
+                            onClick={(event) =>
+                              handleSelectDepotForItem(
+                                item,
+                                warehouse,
+                                event.currentTarget,
+                              )
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                handleSelectDepotForItem(
+                                  item,
+                                  warehouse,
+                                  event.currentTarget,
+                                );
+                              }
+                            }}
+                            className={`rounded-lg border p-4 transition-all duration-300 cursor-pointer bg-muted/20 hover:-translate-y-0.5 hover:shadow-sm ${
+                              isSelected
+                                ? "border-primary ring-1 ring-primary/30 bg-primary/5"
+                                : "border-border/60"
+                            }`}
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div>
@@ -399,6 +735,13 @@ export default function SupplyRequestSection({ categories }: SupplyRequestSectio
                                   warehouse.depotStatus}
                               </Badge>
                             </div>
+
+                            {isSelected && (
+                              <div className="mt-3 flex w-fit items-center gap-1.5 tracking-tighter rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                                <CheckCircle size={14} weight="fill" />
+                                Đã chọn
+                              </div>
+                            )}
 
                             <div className="grid grid-cols-3 gap-2 mt-3 text-sm tracking-tighter">
                               <div>
@@ -430,6 +773,8 @@ export default function SupplyRequestSection({ categories }: SupplyRequestSectio
                               </span>
                             </div>
                           </div>
+                            );
+                          })()
                         ))}
                       </div>
                     </CardContent>
@@ -440,6 +785,120 @@ export default function SupplyRequestSection({ categories }: SupplyRequestSectio
           </CardContent>
         </Card>
       )}
+
+      <Sheet open={isSelectionSheetOpen} onOpenChange={setSelectionSheetOpen}>
+        <SheetContent
+          className="w-full sm:max-w-xl h-dvh overflow-y-auto p-0"
+          side="right"
+          showOverlay={false}
+        >
+          <div className="flex h-full flex-col">
+            <SheetHeader className="border-b p-3 pb-3">
+              <SheetTitle className="tracking-tighter flex items-center gap-2">
+                <ClipboardTextIcon className="h-5 w-5 text-primary" />
+                Danh sách kho đã chọn
+              </SheetTitle>
+            </SheetHeader>
+
+            <div className="flex flex-1 flex-col items-center overflow-y-auto p-6 space-y-4">
+              {groupedSelectedDepots.length === 0 ? (
+                <div className="w-full max-w-lg rounded-lg border border-dashed border-border/70 p-4 text-sm text-muted-foreground tracking-tighter">
+                  Chưa có kho nào được chọn.
+                </div>
+              ) : (
+                groupedSelectedDepots.map((depot) => (
+                  <Card
+                    key={String(depot.depotId)}
+                    className={`w-full max-w-lg border-border/60 transition-all duration-300 ${
+                      animatedDepotId === depot.depotId
+                        ? "ring-1 ring-primary/25"
+                        : ""
+                    }`}
+                  >
+                    <CardHeader className="pb-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-base tracking-tighter">
+                            {depot.depotName}
+                          </CardTitle>
+                          <CardDescription className="tracking-tighter mt-1 flex items-start gap-1">
+                            <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                            {depot.depotAddress}
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2">
+                        {depot.items.map((item) => (
+                          <div
+                            key={`${depot.depotId}-${item.reliefItemId}`}
+                            className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm tracking-tighter flex items-center justify-between"
+                          >
+                            <span className="font-medium">{item.reliefItemName}</span>
+                            <span className="text-primary font-semibold">
+                              {item.quantity.toLocaleString("vi-VN")} {item.unit}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs mt-1 text-muted-foreground tracking-tighter">
+                          Ghi chú
+                        </Label>
+                        <Textarea
+                          placeholder="Nhập ghi chú (nếu có)..."
+                          className="min-h-21"
+                          value={depotNotes[depot.depotId] ?? ""}
+                          onChange={(event) =>
+                            setDepotNotes((prev) => ({
+                              ...prev,
+                              [depot.depotId]: event.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+
+            <div className="border-t p-4 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
+              <Button
+                type="button"
+                className="w-full gap-2"
+                onClick={handleSubmitSupplyRequests}
+                disabled={groupedSelectedDepots.length === 0 || isSubmittingRequest}
+              >
+                <PaperPlaneTilt size={16} />
+                {isSubmittingRequest ? "Đang gửi yêu cầu..." : "Gửi yêu cầu tiếp tế"}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {flyTokens.map((token) => (
+        <div
+          key={token.id}
+          className="pointer-events-none fixed z-150 inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-background/95 px-3 py-1.5 text-xs font-medium text-primary shadow-lg"
+          style={{
+            left: token.startX,
+            top: token.startY,
+            transform: token.active
+              ? `translate(${token.dx}px, ${token.dy}px) scale(0.35)`
+              : "translate(0, 0) scale(1)",
+            opacity: token.active ? 0.25 : 1,
+            transition: "transform 900ms cubic-bezier(0.16, 1, 0.3, 1), opacity 900ms ease",
+          }}
+        >
+          <CheckCircle size={12} weight="fill" />
+          {token.text}
+        </div>
+      ))}
     </div>
   );
 }

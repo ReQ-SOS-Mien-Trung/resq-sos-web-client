@@ -29,7 +29,7 @@ export interface InventoryItemEntity {
 }
 
 export interface GetMyDepotInventoryParams {
-  categoryIds?: number[];
+  categoryCode?: string[];
   itemTypes?: string[];
   targetGroups?: string[];
   pageNumber?: number;
@@ -194,4 +194,71 @@ export interface SearchDepotItemEntity {
 
 export interface SearchDepotsResponse {
   items: SearchDepotItemEntity[];
+}
+
+// ─── Create Supply Requests ───
+
+export interface CreateSupplyRequestItem {
+  reliefItemId: number;
+  quantity: number;
+}
+
+export interface CreateSupplyRequestEntry {
+  sourceDepotId: number;
+  items: CreateSupplyRequestItem[];
+  note?: string;
+}
+
+export interface CreateSupplyRequestsPayload {
+  requests: CreateSupplyRequestEntry[];
+}
+
+// ─── Supply Requests List ───
+
+export type SourceSupplyRequestStatus =
+  | "Pending"
+  | "Accepted"
+  | "Preparing"
+  | "Shipped"
+  | "Completed"
+  | "Rejected";
+
+export type RequestingSupplyRequestStatus =
+  | "WaitingForApproval"
+  | "Approved"
+  | "InTransit"
+  | "Received"
+  | "Rejected";
+
+export type SupplyRequestRole = "Requester" | "Source";
+
+export interface GetSupplyRequestsParams {
+  sourceStatus?: SourceSupplyRequestStatus;
+  requestingStatus?: RequestingSupplyRequestStatus;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface SupplyRequestListItem {
+  supplyRequestId: number;
+  role: SupplyRequestRole;
+  sourceStatus?: SourceSupplyRequestStatus;
+  requestingStatus?: RequestingSupplyRequestStatus;
+  sourceDepotId?: number;
+  sourceDepotName?: string;
+  requestingDepotId?: number;
+  requestingDepotName?: string;
+  requestedAt?: string;
+  updatedAt?: string;
+  note?: string;
+}
+
+export interface GetSupplyRequestsResponse {
+  items: SupplyRequestListItem[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 }

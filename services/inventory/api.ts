@@ -14,6 +14,9 @@ import {
   InventoryReliefItem,
   SearchDepotsParams,
   SearchDepotsResponse,
+  CreateSupplyRequestsPayload,
+  GetSupplyRequestsParams,
+  GetSupplyRequestsResponse,
   GetDepotTransactionsParams,
   GetDepotTransactionsResponse,
   ExportMovementsParams,
@@ -126,6 +129,29 @@ export async function searchDepotsByReliefItems(
     paramsSerializer: {
       indexes: null,
     },
+  });
+  return data;
+}
+
+/**
+ * Create supply requests
+ * POST /logistics/inventory/supply-requests
+ */
+export async function createSupplyRequests(
+  payload: CreateSupplyRequestsPayload,
+): Promise<void> {
+  await api.post("/logistics/inventory/supply-requests", payload);
+}
+
+/**
+ * Get supply requests list of current depot (both requested and source roles)
+ * GET /logistics/inventory/supply-requests
+ */
+export async function getSupplyRequests(
+  params: GetSupplyRequestsParams,
+): Promise<GetSupplyRequestsResponse> {
+  const { data } = await api.get("/logistics/inventory/supply-requests", {
+    params,
   });
   return data;
 }
