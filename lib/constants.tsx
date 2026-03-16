@@ -46,6 +46,7 @@ import {
   Wind,
   Wrench,
   XCircle,
+  FadersIcon,
 } from "@phosphor-icons/react";
 
 export const navLinks = [
@@ -342,6 +343,11 @@ export const navigationItems = [
     icon: IdentificationCardIcon,
     label: "Quản lý hồ sơ cứu hộ viên",
     href: "/dashboard/admin/rescuer-verification",
+  },
+  {
+    icon: FadersIcon,
+    label: "Điều chỉnh tham số hệ thống",
+    href: "/dashboard/admin/config",
   },
   {
     icon: CloudSun,
