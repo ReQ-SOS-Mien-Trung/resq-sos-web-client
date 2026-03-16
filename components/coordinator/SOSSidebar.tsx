@@ -289,8 +289,8 @@ const SOSSidebar = ({
                             });
                           }}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
                               <TreeStructure
                                 className="h-4 w-4 text-violet-600 dark:text-violet-400"
                                 weight="fill"
@@ -301,7 +301,7 @@ const SOSSidebar = ({
                               <Badge
                                 variant="outline"
                                 className={cn(
-                                  "text-[10px] h-4 px-1.5 border-0",
+                                  "text-[10px] h-5 px-1.5 border-0 leading-none whitespace-nowrap shrink-0",
                                   severityBadge[cluster.severityLevel] ||
                                     severityBadge.Low,
                                 )}
@@ -310,8 +310,8 @@ const SOSSidebar = ({
                                   cluster.severityLevel}
                               </Badge>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-muted-foreground">
+                            <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                                 {pendingClusterSOS.length > 0
                                   ? `${pendingClusterSOS.length} chờ xử lý`
                                   : assignedClusterSOS.length > 0
@@ -359,13 +359,13 @@ const SOSSidebar = ({
                                     )}
                                     onClick={() => onSOSSelect(sos)}
                                   >
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
+                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                      <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                                         <Badge
                                           variant={
                                             PRIORITY_BADGE_VARIANT[sos.priority]
                                           }
-                                          className="text-[10px] h-4 px-1.5"
+                                          className="text-[10px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                                         >
                                           {PRIORITY_LABELS[sos.priority]}
                                         </Badge>
@@ -378,14 +378,14 @@ const SOSSidebar = ({
                                               ? "warning"
                                               : "info"
                                           }
-                                          className="text-[9px] h-3.5 px-1"
+                                          className="text-[9px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                                         >
                                           {sos.status === "PENDING"
                                             ? "Chờ"
                                             : "Đang cứu"}
                                         </Badge>
                                       </div>
-                                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
                                         <Clock className="h-3 w-3" />
                                         <TimeElapsed date={sos.createdAt} />
                                       </div>
@@ -495,13 +495,13 @@ const SOSSidebar = ({
                               )}
                               onClick={() => onSOSSelect(sos)}
                             >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
+                              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                                   <Badge
                                     variant={
                                       PRIORITY_BADGE_VARIANT[sos.priority]
                                     }
-                                    className="text-[10px] h-4 px-1.5"
+                                    className="text-[10px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                                   >
                                     {PRIORITY_LABELS[sos.priority]}
                                   </Badge>
@@ -509,7 +509,7 @@ const SOSSidebar = ({
                                     SOS {sos.id}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
                                   <Clock className="h-3 w-3" />
                                   <TimeElapsed date={sos.createdAt} />
                                 </div>
@@ -548,11 +548,11 @@ const SOSSidebar = ({
                         )}
                         onClick={() => onSOSSelect(sos)}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                             <Badge
                               variant={PRIORITY_BADGE_VARIANT[sos.priority]}
-                              className="text-[10px] h-4 px-1.5"
+                              className="text-[10px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                             >
                               {PRIORITY_LABELS[sos.priority]}
                             </Badge>
@@ -561,12 +561,12 @@ const SOSSidebar = ({
                             </span>
                             <Badge
                               variant="warning"
-                              className="text-[9px] h-3.5 px-1"
+                              className="text-[9px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                             >
                               Chờ
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
                             <Clock className="h-3 w-3" />
                             <TimeElapsed date={sos.createdAt} />
                           </div>

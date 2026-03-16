@@ -14,10 +14,28 @@ export type MissionStatus =
   | "Cancelled";
 
 export type ActivityStatus =
+  | "Planned"
   | "Pending"
   | "InProgress"
   | "Completed"
   | "Cancelled";
+
+export interface MissionTeam {
+  missionTeamId: number;
+  rescueTeamId: number;
+  teamName: string | null;
+  teamCode: string | null;
+  assemblyPointName: string | null;
+  teamType: string | null;
+  status: string;
+  note: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  locationUpdatedAt: string | null;
+  locationSource: string | null;
+  assignedAt: string;
+  unassignedAt: string | null;
+}
 
 export interface MissionActivity {
   id: number;
@@ -50,6 +68,7 @@ export interface MissionEntity {
   completedAt: string | null;
   activityCount: number;
   activities: MissionActivity[];
+  teams?: MissionTeam[] | null;
   // AI suggestion fields (flat from backend)
   aiSuggestionId: number | null;
   suggestedMissionTitle: string | null;
@@ -61,6 +80,7 @@ export interface MissionEntity {
   overallAssessment: string | null;
   estimatedDuration: string | null;
   specialNotes: string | null;
+  suggestedActivities?: ClusterSuggestedActivity[] | null;
   suggestedResources: ClusterSuggestedResource[];
   aiCreatedAt: string | null;
 }
@@ -107,6 +127,7 @@ export interface CreateMissionActivityRequest {
   items: string;
   targetLatitude: number;
   targetLongitude: number;
+  rescueTeamId?: number | null;
 }
 
 export type CreateActivityResponse = MissionActivity;
@@ -148,6 +169,7 @@ export interface UpdateActivityRequest {
   items: string;
   targetLatitude: number;
   targetLongitude: number;
+  rescueTeamId?: number | null;
 }
 
 export interface UpdateActivityResponse {
