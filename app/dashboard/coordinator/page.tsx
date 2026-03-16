@@ -120,11 +120,11 @@ function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
   const si = entity.senderInfo;
   const nm = entity.networkMetadata;
   const supplies = sd?.supplies ?? [];
-  const receivedAt = entity.receivedAt ?? entity.createdAt;
-  const createdAt = new Date(receivedAt);
-  const computedWaitTimeMinutes =
-    entity.waitTimeMinutes ??
-    Math.max(0, Math.floor((Date.now() - createdAt.getTime()) / 60000));
+  const createdAt = new Date(entity.createdAt);
+  const computedWaitTimeMinutes = Math.max(
+    0,
+    Math.floor((Date.now() - createdAt.getTime()) / 60000),
+  );
 
   return {
     id: String(entity.id),
@@ -141,6 +141,7 @@ function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     status: toStatus(entity.status),
     message: entity.msg,
     createdAt,
+    receivedAt: entity.receivedAt ? new Date(entity.receivedAt) : null,
     peopleCount: sd?.people_count,
     injuredPersons: sd?.injured_persons?.map((person) => ({
       index: person.index,
@@ -1012,19 +1013,6 @@ const CoordinatorDashboardContent = () => {
 
               {/* Floating Action Buttons */}
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[40] flex items-center gap-3">
-                {/* Create Rescue Team Button */}
-                <Button
-                  size="lg"
-                  className="rounded-full shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold gap-2 px-6 h-12 border-4 border-white dark:border-zinc-900 overflow-hidden group transition-transform hover:scale-105"
-                  onClick={() => {
-                    router.push("/dashboard/coordinator/rescue-teams/create");
-                  }}
-                >
-                  <span className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-                  <UsersThree className="w-5 h-5" weight="fill" />
-                  <span className="tracking-wide">TẠO ĐỘI CỨU HỘ</span>
-                </Button>
-
                 {/* Create SOS Button */}
                 <Button
                   size="lg"

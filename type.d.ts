@@ -65,6 +65,7 @@ export interface SOSRequest {
   status: SOSStatus;
   message: string;
   createdAt: Date;
+  receivedAt?: Date | null;
   aiAnalysis?: {
     riskFactors: string[];
   };

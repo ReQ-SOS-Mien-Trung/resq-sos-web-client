@@ -33,35 +33,6 @@ import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
 // Panel width
 const PANEL_WIDTH = 420;
 
-// Time elapsed display component
-function TimeElapsed({ date }: { date: Date }) {
-  const [elapsed, setElapsed] = useState("");
-
-  useEffect(() => {
-    const updateElapsed = () => {
-      const now = Date.now();
-      const minutes = Math.floor((now - date.getTime()) / 60000);
-      if (minutes < 60) {
-        setElapsed(`${minutes} phút trước`);
-      } else {
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) {
-          setElapsed(`${hours} giờ trước`);
-        } else {
-          const days = Math.floor(hours / 24);
-          setElapsed(`${days} ngày trước`);
-        }
-      }
-    };
-
-    updateElapsed();
-    const interval = setInterval(updateElapsed, 60000);
-    return () => clearInterval(interval);
-  }, [date]);
-
-  return <span>{elapsed}</span>;
-}
-
 function ParsedMessage({
   text,
   hideInjurySection = false,
@@ -371,6 +342,18 @@ const SOSDetailsPanel = ({
   // Get risk factors from AI analysis
   const riskFactors = sosRequest.aiAnalysis?.riskFactors || [];
   const injuredPersons = sosRequest.injuredPersons ?? [];
+  const waitTimeMinutes =
+    sosRequest.waitTimeMinutes ??
+    Math.max(
+      0,
+      Math.floor((Date.now() - sosRequest.createdAt.getTime()) / 60000),
+    );
+  const waitDurationLabel =
+    waitTimeMinutes < 60
+      ? `${waitTimeMinutes} phút`
+      : waitTimeMinutes < 1440
+        ? `${Math.floor(waitTimeMinutes / 60)} giờ`
+        : `${Math.floor(waitTimeMinutes / 1440)} ngày`;
 
   const severityLabel = (value?: string) => {
     const normalized = (value || "").toLowerCase();
@@ -574,12 +557,12 @@ const SOSDetailsPanel = ({
             </div>
             <div className="bg-muted rounded-lg p-3 text-center">
               <Timer className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-              <div className="text-xs text-muted-foreground">
-                {sosRequest.waitTimeMinutes != null &&
-                sosRequest.waitTimeMinutes > 0 ? (
-                  `Chờ ${sosRequest.waitTimeMinutes} phút`
-                ) : (
-                  <TimeElapsed date={sosRequest.createdAt} />
+              <div className="text-xs text-muted-foreground leading-tight space-y-0.5">
+                <div>Đã chờ {waitDurationLabel}</div>
+                {sosRequest.receivedAt && (
+                  <div className="text-[10px] text-muted-foreground/90">
+                    Nhận lúc {sosRequest.receivedAt.toLocaleString("vi-VN")}
+                  </div>
                 )}
               </div>
             </div>

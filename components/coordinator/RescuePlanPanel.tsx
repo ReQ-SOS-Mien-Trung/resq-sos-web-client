@@ -64,7 +64,7 @@ import {
   ClusterSupplyCollection,
   MissionSuggestionEntity,
 } from "@/services/sos_cluster/type";
-import { useMyDepotInventory } from "@/services/inventory/hooks";
+import { useDepotInventory } from "@/services/inventory/hooks";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
 import { SOSRequest } from "@/type";
 import {
@@ -110,6 +110,22 @@ const extractCoordsFromDescription = (
   if (a >= 8 && a <= 24 && b >= 100 && b <= 115) return { lat: a, lng: b };
   if (b >= 8 && b <= 24 && a >= 100 && a <= 115) return { lat: b, lng: a };
   return null;
+};
+
+const TEAM_TYPE_LABELS: Record<string, string> = {
+  RESCUE: "Cứu hộ",
+  MEDICAL: "Y tế",
+  LOGISTICS: "Hậu cần",
+  BOAT: "Đội thuyền",
+  EVACUATION: "Sơ tán",
+  FIREFIGHTER: "Cứu hỏa",
+  SEARCH_AND_RESCUE: "Tìm kiếm cứu nạn",
+};
+
+const formatTeamTypeLabel = (teamType?: string | null) => {
+  if (!teamType) return "Chưa rõ";
+  const normalized = teamType.trim().toUpperCase();
+  return TEAM_TYPE_LABELS[normalized] ?? teamType;
 };
 
 const RoutePreviewFitBounds = ({ points }: { points: [number, number][] }) => {
@@ -345,7 +361,8 @@ const DepotInventoryCard = ({
   depotAddress: string | null;
   isDraggable: boolean;
 }) => {
-  const { data, isLoading } = useMyDepotInventory({
+  const { data, isLoading } = useDepotInventory({
+    depotId,
     pageSize: 50,
   });
 
@@ -1508,6 +1525,29 @@ const SuggestionCard = ({
                     <p className="text-xs text-foreground/80 mt-0.5 leading-relaxed">
                       {act.description}
                     </p>
+                    {act.suggestedTeam && (
+                      <div className="mt-1.5 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15 px-2 py-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                          <ShieldCheck className="h-3 w-3" weight="fill" />
+                          Đội đề xuất
+                        </p>
+                        <p className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
+                          {act.suggestedTeam.teamName ||
+                            (act.suggestedTeam.teamId
+                              ? `Đội #${act.suggestedTeam.teamId}`
+                              : "Đội chưa đặt tên")}
+                        </p>
+                        <p className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                          {`Loại: ${formatTeamTypeLabel(act.suggestedTeam.teamType)}`}
+                          {act.suggestedTeam.contactPhone
+                            ? ` • SĐT: ${act.suggestedTeam.contactPhone}`
+                            : ""}
+                          {act.suggestedTeam.estimatedEtaMinutes != null
+                            ? ` • ETA: ${act.suggestedTeam.estimatedEtaMinutes} phút`
+                            : ""}
+                        </p>
+                      </div>
+                    )}
                     {act.suppliesToCollect &&
                       act.suppliesToCollect.length > 0 && (
                         <div className="mt-1 space-y-0.5">
@@ -3733,6 +3773,37 @@ const RescuePlanPanel = ({
                                             <p className="text-sm leading-relaxed text-foreground/80">
                                               {displayDescription}
                                             </p>
+
+                                            {activity.suggestedTeam && (
+                                              <div className="mt-2 p-2.5 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
+                                                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
+                                                  <ShieldCheck
+                                                    className="h-3 w-3"
+                                                    weight="fill"
+                                                  />
+                                                  Đội đề xuất
+                                                </p>
+                                                <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                                                  {activity.suggestedTeam
+                                                    .teamName ||
+                                                    (activity.suggestedTeam
+                                                      .teamId
+                                                      ? `Đội #${activity.suggestedTeam.teamId}`
+                                                      : "Đội chưa đặt tên")}
+                                                </p>
+                                                <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                  {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
+                                                  {activity.suggestedTeam
+                                                    .contactPhone
+                                                    ? ` • SĐT: ${activity.suggestedTeam.contactPhone}`
+                                                    : ""}
+                                                  {activity.suggestedTeam
+                                                    .estimatedEtaMinutes != null
+                                                    ? ` • ETA: ${activity.suggestedTeam.estimatedEtaMinutes} phút`
+                                                    : ""}
+                                                </p>
+                                              </div>
+                                            )}
 
                                             {supplyItems.length > 0 && (
                                               <div className="mt-2 p-2 rounded-md bg-muted/50 border border-dashed">
