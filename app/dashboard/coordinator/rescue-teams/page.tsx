@@ -11,8 +11,17 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, MapPin, Activity, ArrowRight, UserPlus } from "lucide-react";
+import {
+  Users,
+  MapPin,
+  Activity,
+  ArrowRight,
+  UserPlus,
+  Plus,
+  MoreVertical,
+} from "lucide-react";
 import Link from "next/link";
 import {
   RescueTeamStatusKey,
@@ -107,62 +116,124 @@ export default function RescueTeamsPage() {
     );
   };
 
+  const getOccupancyPercent = (
+    currentMemberCount: number,
+    maxMembers: number,
+  ) => {
+    if (maxMembers <= 0) return 0;
+    return Math.min(100, Math.round((currentMemberCount / maxMembers) * 100));
+  };
+
+  const getColumnKey = (status: RescueTeamStatusKey) => {
+    if (
+      status === "AwaitingAcceptance" ||
+      status === "Ready" ||
+      status === "Available"
+    ) {
+      return "todo";
+    }
+
+    if (
+      status === "Gathering" ||
+      status === "Assigned" ||
+      status === "OnMission" ||
+      status === "Stuck"
+    ) {
+      return "in-progress";
+    }
+
+    return "completed";
+  };
+
+  const columns = [
+    {
+      key: "todo",
+      title: "Chờ điều phối",
+      dotClassName: "bg-orange-500",
+      cardClassName: "bg-orange-50/30 border-orange-100",
+    },
+    {
+      key: "in-progress",
+      title: "Đang triển khai",
+      dotClassName: "bg-blue-500",
+      cardClassName: "bg-blue-50/30 border-blue-100",
+    },
+    {
+      key: "completed",
+      title: "Hoàn tất / Ngưng",
+      dotClassName: "bg-emerald-500",
+      cardClassName: "bg-emerald-50/30 border-emerald-100",
+    },
+  ] as const;
+
+  const teams = data?.items ?? [];
+  const teamsByColumn = teams.reduce(
+    (acc, team) => {
+      acc[getColumnKey(team.status)].push(team);
+      return acc;
+    },
+    {
+      todo: [] as typeof teams,
+      "in-progress": [] as typeof teams,
+      completed: [] as typeof teams,
+    },
+  );
+
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 max-w-7xl">
-        <div className="flex justify-between items-center mb-6">
+      <div className="mx-auto w-full max-w-[1480px] p-4 md:p-6">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
               Quản lý Đội Cứu Hộ
             </h1>
             <p className="text-muted-foreground mt-1">
-              Xem và quản lý các đội cứu hộ hiện có trên hệ thống
+              Theo dõi đội theo trạng thái xử lý theo dạng Kanban trực quan
             </p>
           </div>
-          <Button disabled className="flex items-center gap-2">
-            <UserPlus className="h-4 w-4" />
-            Tạo Đội Mới
+          <Button disabled className="gap-2">
+            <Plus className="h-4 w-4" />
+            Thêm đội cứu hộ
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Card key={i} className="h-full flex flex-col">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="h-5 w-3/4" />
-                  </div>
-                  <Skeleton className="h-5 w-20 rounded-full ml-2" />
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 pb-4">
-                <div className="space-y-4 mt-2">
+        <div className="rounded-3xl border bg-slate-50/80 p-3 md:p-4">
+          <div className="grid gap-4 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, columnIndex) => (
+              <div
+                key={columnIndex}
+                className="rounded-2xl border bg-white/70 p-3"
+              >
+                <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Skeleton className="h-4 w-4 rounded-full shrink-0" />
-                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-2.5 w-2.5 rounded-full" />
+                    <Skeleton className="h-5 w-28" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="h-4 w-4 rounded-full shrink-0" />
-                    <Skeleton className="h-4 w-32" />
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Skeleton className="h-4 w-4 rounded-full shrink-0 mt-0.5" />
-                    <div className="space-y-2 flex-1">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-2/3" />
-                    </div>
-                  </div>
+                  <Skeleton className="h-8 w-8 rounded-md" />
                 </div>
-              </CardContent>
-              <CardFooter className="pt-0 border-t mt-4 border-slate-100">
-                <div className="w-full mt-4 flex justify-center">
-                  <Skeleton className="h-9 w-32" />
+
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Card key={i} className="border-slate-200/80 shadow-sm">
+                      <CardHeader className="space-y-2 pb-2">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-5 w-3/4" />
+                      </CardHeader>
+                      <CardContent className="space-y-2 pb-3 text-sm">
+                        <Skeleton className="h-5 w-24 rounded-full" />
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-2.5 w-full" />
+                        <Skeleton className="h-3 w-4/5" />
+                      </CardContent>
+                      <CardFooter className="pt-0">
+                        <Skeleton className="h-9 w-full" />
+                      </CardFooter>
+                    </Card>
+                  ))}
                 </div>
-              </CardFooter>
-            </Card>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -170,118 +241,183 @@ export default function RescueTeamsPage() {
 
   if (isError) {
     return (
-      <div className="p-8 text-red-500 text-center">
+      <div className="p-8 text-center text-red-500">
         Đã xảy ra lỗi khi tải danh sách đội cứu hộ.
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex justify-between items-center mb-6">
+    <div className="mx-auto w-full max-w-[1480px] p-4 md:p-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
             Quản lý Đội Cứu Hộ
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Xem và quản lý các đội cứu hộ hiện có trên hệ thống
+          <p className="mt-1 text-muted-foreground">
+            Theo dõi, điều phối và cập nhật trạng thái đội cứu hộ theo luồng
+            công việc
           </p>
         </div>
+
         <Link href="/dashboard/coordinator/rescue-teams/create">
-          <Button className="flex items-center gap-2">
+          <Button className="gap-2 rounded-xl px-4">
             <UserPlus className="h-4 w-4" />
-            Tạo Đội Mới
+            Thêm đội cứu hộ
           </Button>
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {data?.items.map((team) => (
-          <Card
-            key={team.id}
-            className="h-full flex flex-col hover:shadow-md transition-shadow"
-          >
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="text-xs text-muted-foreground mb-1">
-                    {team.code}
-                  </div>
-                  <CardTitle className="text-lg line-clamp-1" title={team.name}>
-                    {team.name}
-                  </CardTitle>
-                </div>
-                <div className="ml-2">{getStatusBadge(team.status)}</div>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1 pb-4 text-sm">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Activity className="h-4 w-4 shrink-0" />
-                  <span className="truncate">
-                    {getTypeBadge(team.teamType)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Users className="h-4 w-4 shrink-0" />
-                  <span>
-                    <span className="font-medium text-foreground">
-                      {team.currentMemberCount}
-                    </span>
-                    <span className="text-muted-foreground mx-1">/</span>
-                    <span className="text-muted-foreground">
-                      {team.maxMembers}
-                    </span>{" "}
-                    thành viên
-                  </span>
-                </div>
-                <div className="flex items-start gap-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span className="line-clamp-2" title={team.assemblyPointName}>
-                    {team.assemblyPointName}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="pt-0 border-t mt-4 border-slate-100">
-              <Link
-                href={`/dashboard/coordinator/rescue-teams/${team.id}`}
-                className="w-full mt-4"
-              >
-                <Button
-                  variant="ghost"
-                  className="w-full text-primary hover:text-primary/80"
-                >
-                  Xem chi tiết <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-            </CardFooter>
-          </Card>
-        ))}
+      <div className="rounded-3xl border bg-slate-50/80 p-3 md:p-4">
+        <div className="grid gap-4 lg:grid-cols-3">
+          {columns.map((column) => {
+            const columnTeams = teamsByColumn[column.key];
 
-        {data?.items.length === 0 && (
-          <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-lg">
-            Chưa có đội cứu hộ nào. Hãy tạo mới.
-          </div>
-        )}
+            return (
+              <div
+                key={column.key}
+                className={`rounded-2xl border p-3 ${column.cardClassName}`}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${column.dotClassName}`}
+                    />
+                    <h2 className="text-lg font-semibold">{column.title}</h2>
+                    <span className="text-sm text-muted-foreground">
+                      ({columnTeams.length})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {columnTeams.map((team) => {
+                    const occupancy = getOccupancyPercent(
+                      team.currentMemberCount,
+                      team.maxMembers,
+                    );
+
+                    return (
+                      <Card
+                        key={team.id}
+                        className="border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                      >
+                        <CardHeader className="pb-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="mb-1 text-xs text-muted-foreground">
+                                {team.code}
+                              </p>
+                              <CardTitle
+                                className="line-clamp-1 text-lg"
+                                title={team.name}
+                              >
+                                {team.name}
+                              </CardTitle>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0 rounded-md"
+                            >
+                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </div>
+                        </CardHeader>
+
+                        <CardContent className="space-y-3 pb-3 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            {getTypeBadge(team.teamType)}
+                            {getStatusBadge(team.status)}
+                          </div>
+
+                          <div>
+                            <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5" />
+                                Quân số
+                              </span>
+                              <span>{occupancy}%</span>
+                            </div>
+
+                            <Progress value={occupancy} className="h-2" />
+
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              <span className="font-medium text-foreground">
+                                {team.currentMemberCount}
+                              </span>{" "}
+                              / {team.maxMembers} thành viên
+                            </p>
+                          </div>
+
+                          <div className="flex items-start gap-2 text-muted-foreground">
+                            <Activity className="mt-0.5 h-4 w-4 shrink-0" />
+                            <p className="line-clamp-1">
+                              Đội {typeMap[team.teamType]?.label ?? "khác"}
+                            </p>
+                          </div>
+
+                          <div className="flex items-start gap-2 text-muted-foreground">
+                            <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                            <p
+                              className="line-clamp-2"
+                              title={team.assemblyPointName}
+                            >
+                              {team.assemblyPointName}
+                            </p>
+                          </div>
+                        </CardContent>
+
+                        <CardFooter className="border-t pt-3">
+                          <Link
+                            href={`/dashboard/coordinator/rescue-teams/${team.id}`}
+                            className="w-full"
+                          >
+                            <Button
+                              variant="outline"
+                              className="w-full gap-1.5 rounded-lg"
+                            >
+                              Xem chi tiết
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </CardFooter>
+                      </Card>
+                    );
+                  })}
+
+                  {columnTeams.length === 0 && (
+                    <div className="rounded-xl border border-dashed bg-white/70 px-4 py-10 text-center text-sm text-muted-foreground">
+                      Không có đội trong cột này.
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {data && data.totalPages > 1 && (
-        <div className="flex justify-center items-center gap-4 mt-8">
+        <div className="mt-6 flex items-center justify-center gap-4">
           <Button
             variant="outline"
             disabled={!data.hasPreviousPage}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="rounded-lg"
           >
             Trước
           </Button>
+
           <span className="text-sm text-muted-foreground">
             Trang {data.pageNumber} / {data.totalPages}
           </span>
+
           <Button
             variant="outline"
             disabled={!data.hasNextPage}
             onClick={() => setPage((p) => p + 1)}
+            className="rounded-lg"
           >
             Sau
           </Button>

@@ -1,11 +1,14 @@
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
 import {
+  getDepotInventory,
   getMyDepotInventory,
   getInventoryCategories,
   getInventoryItemTypes,
   getInventoryTargetGroups,
 } from "./api";
 import {
+  GetDepotInventoryParams,
+  GetDepotInventoryResponse,
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
   InventoryCategory,
@@ -15,12 +18,28 @@ import {
 
 export const INVENTORY_KEYS = {
   all: ["inventory"] as const,
+  depot: (params: GetDepotInventoryParams) =>
+    [...INVENTORY_KEYS.all, "depot", params] as const,
   myDepot: (params: GetMyDepotInventoryParams) =>
     [...INVENTORY_KEYS.all, "myDepot", params] as const,
   categories: () => [...INVENTORY_KEYS.all, "categories"] as const,
   itemTypes: () => [...INVENTORY_KEYS.all, "itemTypes"] as const,
   targetGroups: () => [...INVENTORY_KEYS.all, "targetGroups"] as const,
 };
+
+export function useDepotInventory(
+  params: GetDepotInventoryParams,
+  options?: Omit<
+    UseQueryOptions<GetDepotInventoryResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.depot(params),
+    queryFn: () => getDepotInventory(params),
+    ...options,
+  });
+}
 
 export function useMyDepotInventory(
   params: GetMyDepotInventoryParams,

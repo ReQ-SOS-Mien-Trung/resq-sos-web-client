@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useDepotInventory } from "@/services/inventory/hooks";
 import {
   X,
   MapPin,
@@ -103,6 +105,16 @@ function DepotDetails({
   depot: DepotEntity;
   onClose: () => void;
 }) {
+  const {
+    data: inventoryData,
+    isLoading: isInventoryLoading,
+    isError: isInventoryError,
+  } = useDepotInventory({
+    depotId: depot.id,
+    pageNumber: 1,
+    pageSize: 8,
+  });
+
   const statusConfig = depotStatusConfig[depot.status];
   const StatusIcon = statusConfig.icon;
 
@@ -122,6 +134,30 @@ function DepotDetails({
         : utilizationPercent >= 40
           ? "bg-yellow-500"
           : "bg-green-500";
+
+  const inventorySummary = useMemo(() => {
+    if (!inventoryData?.items) {
+      return {
+        totalStock: 0,
+        reservedStock: 0,
+        availableStock: 0,
+      };
+    }
+
+    return inventoryData.items.reduce(
+      (acc, item) => {
+        acc.totalStock += item.quantity;
+        acc.reservedStock += item.reservedQuantity;
+        acc.availableStock += item.availableQuantity;
+        return acc;
+      },
+      {
+        totalStock: 0,
+        reservedStock: 0,
+        availableStock: 0,
+      },
+    );
+  }, [inventoryData]);
 
   return (
     <>
@@ -302,6 +338,111 @@ function DepotDetails({
             primary={formatLastUpdated(depot.lastUpdatedAt)}
             secondary="Cập nhật lần cuối"
           />
+
+          <div className="h-px bg-border mx-5" />
+
+          {/* Inventory from backend */}
+          <div className="px-5 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold">Tồn kho hiện tại</h4>
+              {inventoryData ? (
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                  {inventoryData.totalCount} loại
+                </Badge>
+              ) : null}
+            </div>
+
+            {isInventoryLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <Skeleton key={idx} className="h-12 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : isInventoryError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+                Không tải được dữ liệu tồn kho.
+              </div>
+            ) : inventoryData?.items && inventoryData.items.length > 0 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
+                    <p className="text-[10px] text-muted-foreground">
+                      Tổng tồn
+                    </p>
+                    <p className="text-sm font-bold text-slate-800">
+                      {inventorySummary.totalStock.toLocaleString("vi-VN")}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2">
+                    <p className="text-[10px] text-amber-700">Đã giữ chỗ</p>
+                    <p className="text-sm font-bold text-amber-800">
+                      {inventorySummary.reservedStock.toLocaleString("vi-VN")}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
+                    <p className="text-[10px] text-emerald-700">Còn khả dụng</p>
+                    <p className="text-sm font-bold text-emerald-800">
+                      {inventorySummary.availableStock.toLocaleString("vi-VN")}
+                    </p>
+                  </div>
+                </div>
+
+                {inventoryData.items.map((item) => (
+                  <div
+                    key={item.reliefItemId}
+                    className="rounded-lg border border-border/60 bg-card px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium truncate">
+                        {item.reliefItemName}
+                      </p>
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] shrink-0"
+                      >
+                        {item.itemType === "Consumable"
+                          ? "Tiêu thụ"
+                          : "Tái sử dụng"}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{item.categoryName}</span>
+                      <span>•</span>
+                      <span>{item.targetGroup}</span>
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-3 gap-1.5">
+                      <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
+                        <p className="text-[10px] text-slate-600">Tổng tồn</p>
+                        <p className="text-sm font-semibold leading-none text-slate-800">
+                          {item.quantity.toLocaleString("vi-VN")}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+                        <p className="text-[10px] text-amber-700">Đã giữ</p>
+                        <p className="text-sm font-semibold leading-none text-amber-800">
+                          {item.reservedQuantity.toLocaleString("vi-VN")}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5">
+                        <p className="text-[10px] text-emerald-700">
+                          Còn khả dụng
+                        </p>
+                        <p className="text-sm font-semibold leading-none text-emerald-800">
+                          {item.availableQuantity.toLocaleString("vi-VN")}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                Kho chưa có dữ liệu vật tư.
+              </div>
+            )}
+          </div>
 
           {/* Additional Info Section */}
           <div className="h-2 bg-muted/50" />

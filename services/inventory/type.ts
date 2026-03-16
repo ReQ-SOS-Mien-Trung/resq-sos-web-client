@@ -28,6 +28,15 @@ export interface GetMyDepotInventoryParams {
   pageSize?: number;
 }
 
+export interface GetDepotInventoryParams {
+  depotId: number;
+  categoryIds?: number[];
+  itemTypes?: string[];
+  targetGroups?: string[];
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface GetMyDepotInventoryResponse {
   items: InventoryItemEntity[];
   pageNumber: number;
@@ -37,3 +46,5 @@ export interface GetMyDepotInventoryResponse {
   hasPreviousPage: boolean;
   hasNextPage: boolean;
 }
+
+export type GetDepotInventoryResponse = GetMyDepotInventoryResponse;
