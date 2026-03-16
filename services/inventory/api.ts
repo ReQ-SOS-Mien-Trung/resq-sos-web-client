@@ -11,6 +11,9 @@ import {
   InventoryTargetGroup,
   InventoryActionType,
   InventorySourceType,
+  InventoryReliefItem,
+  SearchDepotsParams,
+  SearchDepotsResponse,
   GetDepotTransactionsParams,
   GetDepotTransactionsResponse,
   ExportMovementsParams,
@@ -95,6 +98,35 @@ export async function getInventorySourceTypes(): Promise<
   const { data } = await api.get(
     "/logistics/inventory/metadata/inventory-source-types",
   );
+  return data;
+}
+
+/**
+ * Get list of relief items by category code
+ * GET /logistics/inventory/metadata/relief-items/category/{categoryCode}
+ */
+export async function getInventoryReliefItemsByCategory(
+  categoryCode: string,
+): Promise<InventoryReliefItem[]> {
+  const { data } = await api.get(
+    `/logistics/inventory/metadata/relief-items/category/${categoryCode}`,
+  );
+  return data;
+}
+
+/**
+ * Search depots by requested relief items and quantities
+ * GET /logistics/inventory/search-depots
+ */
+export async function searchDepotsByReliefItems(
+  params: SearchDepotsParams,
+): Promise<SearchDepotsResponse> {
+  const { data } = await api.get("/logistics/inventory/search-depots", {
+    params,
+    paramsSerializer: {
+      indexes: null,
+    },
+  });
   return data;
 }
 

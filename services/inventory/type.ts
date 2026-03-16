@@ -13,6 +13,8 @@ export type InventoryActionType = InventoryCategory;
 
 export type InventorySourceType = InventoryCategory;
 
+export type InventoryReliefItem = InventoryCategory;
+
 export interface InventoryItemEntity {
   reliefItemId: number;
   reliefItemName: string;
@@ -156,4 +158,40 @@ export interface GetDepotTransactionsResponse {
   totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
+}
+
+// ─── Search Depots by Relief Items ───
+
+export interface SearchDepotsParams {
+  reliefItemIds: number[];
+  quantities: number[];
+  activeDepotsOnly?: boolean;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface SearchDepotWarehouseEntity {
+  depotId: number;
+  depotName: string;
+  depotAddress: string;
+  depotStatus: string;
+  totalQuantity: number;
+  reservedQuantity: number;
+  availableQuantity: number;
+  lastStockedAt: string;
+  distanceKm: number;
+}
+
+export interface SearchDepotItemEntity {
+  reliefItemId: number;
+  reliefItemName: string;
+  categoryName: string;
+  itemType: string;
+  unit: string;
+  totalAvailableAcrossWarehouses: number;
+  warehouses: SearchDepotWarehouseEntity[];
+}
+
+export interface SearchDepotsResponse {
+  items: SearchDepotItemEntity[];
 }

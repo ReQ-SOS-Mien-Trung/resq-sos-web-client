@@ -43,6 +43,7 @@ import {
   ItemDetailsSheet,
   LowStockAlerts,
   RecentActivity,
+  SupplyRequestSection,
 } from "@/components/inventory";
 import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
@@ -516,6 +517,16 @@ const InventoryDashboardPage = () => {
                 setVatTuSelectedItem(item);
                 setVatTuSheetOpen(true);
               }} />
+            ) : activeTab === "requests" ? (
+              <SupplyRequestSection
+                categories={
+                  categoriesData?.items?.map((cat) => ({
+                    id: cat.id,
+                    code: cat.code,
+                    name: cat.name,
+                  })) ?? []
+                }
+              />
             ) : (
               <>
                 {/* Stats Overview */}

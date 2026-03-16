@@ -12,6 +12,8 @@ import {
   getInventoryOrganizations,
   getInventoryActionTypes,
   getInventorySourceTypes,
+  getInventoryReliefItemsByCategory,
+  searchDepotsByReliefItems,
   importInventory,
   importRegularInventory,
   getDepotTransactions,
@@ -28,6 +30,9 @@ import {
   InventoryTargetGroup,
   InventoryActionType,
   InventorySourceType,
+  InventoryReliefItem,
+  SearchDepotsParams,
+  SearchDepotsResponse,
   GetDepotTransactionsParams,
   GetDepotTransactionsResponse,
   ExportMovementsParams,
@@ -42,6 +47,10 @@ export const INVENTORY_KEYS = {
   targetGroups: () => [...INVENTORY_KEYS.all, "targetGroups"] as const,
   actionTypes: () => [...INVENTORY_KEYS.all, "actionTypes"] as const,
   sourceTypes: () => [...INVENTORY_KEYS.all, "sourceTypes"] as const,
+  reliefItemsByCategory: (categoryCode: string) =>
+    [...INVENTORY_KEYS.all, "reliefItemsByCategory", categoryCode] as const,
+  searchDepots: (params: SearchDepotsParams) =>
+    [...INVENTORY_KEYS.all, "searchDepots", params] as const,
   organizations: () => [...INVENTORY_KEYS.all, "organizations"] as const,
   transactions: (params: GetDepotTransactionsParams) =>
     [...INVENTORY_KEYS.all, "transactions", params] as const,
@@ -126,6 +135,36 @@ export function useInventorySourceTypes(
     queryKey: INVENTORY_KEYS.sourceTypes(),
     queryFn: getInventorySourceTypes,
     staleTime: Infinity,
+    ...options,
+  });
+}
+
+export function useInventoryReliefItemsByCategory(
+  categoryCode: string,
+  options?: Omit<
+    UseQueryOptions<InventoryReliefItem[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.reliefItemsByCategory(categoryCode),
+    queryFn: () => getInventoryReliefItemsByCategory(categoryCode),
+    enabled: !!categoryCode,
+    staleTime: Infinity,
+    ...options,
+  });
+}
+
+export function useSearchDepotsByReliefItems(
+  params: SearchDepotsParams,
+  options?: Omit<
+    UseQueryOptions<SearchDepotsResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.searchDepots(params),
+    queryFn: () => searchDepotsByReliefItems(params),
     ...options,
   });
 }
