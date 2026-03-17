@@ -65,6 +65,7 @@ export interface SOSRequest {
   status: SOSStatus;
   message: string;
   createdAt: Date;
+  receivedAt?: Date | null;
   aiAnalysis?: {
     riskFactors: string[];
   };
@@ -89,6 +90,7 @@ export interface SOSRequest {
   additionalDescription?: string;
   senderPhone?: string;
   senderName?: string;
+  createdByCoordinatorId?: string | null;
   isOnline?: boolean;
   hopCount?: number;
   locationAccuracy?: number | null;

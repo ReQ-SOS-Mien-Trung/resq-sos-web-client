@@ -75,6 +75,22 @@ const activityIconMap: Record<
   MIXED: Sparkle,
 };
 
+const TEAM_TYPE_LABELS: Record<string, string> = {
+  RESCUE: "Cứu hộ",
+  MEDICAL: "Y tế",
+  LOGISTICS: "Hậu cần",
+  BOAT: "Đội thuyền",
+  EVACUATION: "Sơ tán",
+  FIREFIGHTER: "Cứu hỏa",
+  SEARCH_AND_RESCUE: "Tìm kiếm cứu nạn",
+};
+
+const formatTeamTypeLabel = (teamType?: string | null) => {
+  if (!teamType) return "Chưa rõ";
+  const normalized = teamType.trim().toUpperCase();
+  return TEAM_TYPE_LABELS[normalized] ?? teamType;
+};
+
 /* ═══ Main Component ═══ */
 
 export default function AiStreamPanel({
@@ -848,6 +864,30 @@ function ActivityFlowNode({
         <p className="text-xs leading-relaxed text-muted-foreground mb-2 pl-9">
           {activity.description}
         </p>
+
+        {activity.suggestedTeam && (
+          <div className="ml-9 mb-2 rounded-lg border border-emerald-300/40 bg-emerald-50/50 dark:bg-emerald-900/15 dark:border-emerald-700/40 p-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+              <ShieldCheck className="h-3 w-3" weight="fill" />
+              Đội đề xuất
+            </p>
+            <p className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
+              {activity.suggestedTeam.teamName ||
+                (activity.suggestedTeam.teamId
+                  ? `Đội #${activity.suggestedTeam.teamId}`
+                  : "Đội chưa đặt tên")}
+            </p>
+            <p className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+              {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
+              {activity.suggestedTeam.contactPhone
+                ? ` • SĐT: ${activity.suggestedTeam.contactPhone}`
+                : ""}
+              {activity.suggestedTeam.estimatedEtaMinutes != null
+                ? ` • ETA: ${activity.suggestedTeam.estimatedEtaMinutes} phút`
+                : ""}
+            </p>
+          </div>
+        )}
 
         {activity.depotName && (
           <div className="ml-9 flex items-center gap-2 p-2 rounded-lg bg-amber-50/50 dark:bg-amber-500/[0.06] border border-amber-500/15 mb-2">

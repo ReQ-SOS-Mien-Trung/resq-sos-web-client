@@ -36,6 +36,15 @@ export interface GetMyDepotInventoryParams {
   pageSize?: number;
 }
 
+export interface GetDepotInventoryParams {
+  depotId: number;
+  categoryIds?: number[];
+  itemTypes?: string[];
+  targetGroups?: string[];
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface GetMyDepotInventoryResponse {
   items: InventoryItemEntity[];
   pageNumber: number;
@@ -278,3 +287,4 @@ export interface GetSupplyRequestsResponse {
 export interface RejectSupplyRequestPayload {
   reason: string;
 }
+export type GetDepotInventoryResponse = GetMyDepotInventoryResponse;

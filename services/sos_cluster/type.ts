@@ -61,6 +61,16 @@ export interface ClusterSupplyCollection {
   unit: string;
 }
 
+// Suggested team info (shape may expand from backend over time)
+export interface ClusterSuggestedTeam {
+  teamId?: number | null;
+  teamName?: string | null;
+  teamType?: string | null;
+  contactPhone?: string | null;
+  estimatedEtaMinutes?: number | null;
+  [key: string]: unknown;
+}
+
 // Suggested activity step
 export interface ClusterSuggestedActivity {
   step: number;
@@ -73,6 +83,7 @@ export interface ClusterSuggestedActivity {
   depotName: string | null;
   depotAddress: string | null;
   suppliesToCollect: ClusterSupplyCollection[] | null;
+  suggestedTeam?: ClusterSuggestedTeam | null;
 }
 
 // Activity group (wraps suggested activities)

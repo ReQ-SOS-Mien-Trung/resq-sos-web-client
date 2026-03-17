@@ -164,12 +164,14 @@ function RescuerCard({
   user,
   selected,
   isLeader,
+  canBeLeader,
   onToggleSelect,
   onToggleLeader,
 }: {
   user: FreeRescuerEntity;
   selected: boolean;
   isLeader: boolean;
+  canBeLeader: boolean;
   onToggleSelect: () => void;
   onToggleLeader: () => void;
 }) {
@@ -248,7 +250,7 @@ function RescuerCard({
           </div>
         </div>
 
-        {selected && (
+        {selected && canBeLeader && (
           <Button
             type="button"
             variant={isLeader ? "default" : "outline"}
@@ -373,10 +375,12 @@ export default function CreateRescueTeamPage() {
     params: { pageSize: 10 },
   });
 
-  const assemblyPoints = useMemo(
-    () => pointsData?.pages.flatMap((page) => page.items) || [],
-    [pointsData],
-  );
+  const assemblyPoints = useMemo(() => {
+    const allPoints = pointsData?.pages.flatMap((page) => page.items) || [];
+    return allPoints.filter(
+      (point) => point.status === "Active" || point.status === "Overloaded",
+    );
+  }, [pointsData]);
 
   const rescuerFilters = useMemo(() => {
     const filters: {
@@ -491,6 +495,12 @@ export default function CreateRescueTeamPage() {
   };
 
   const toggleLeader = (userId: string) => {
+    const user = eligibleRescuers.find((u) => u.id === userId);
+    if (user?.rescuerType !== "Core") {
+      toast.error("Chỉ thành viên cốt cán mới có thể làm đội trưởng.");
+      return;
+    }
+
     setSelectedMembers((prev) =>
       prev.map((m) => ({
         ...m,
@@ -723,6 +733,11 @@ export default function CreateRescueTeamPage() {
                       <SelectValue placeholder="Chọn điểm tập kết..." />
                     </SelectTrigger>
                     <SelectContent>
+                      {assemblyPoints.length === 0 && (
+                        <div className="px-2 py-2 text-xs text-muted-foreground">
+                          Không có điểm tập kết đang hoạt động
+                        </div>
+                      )}
                       {assemblyPoints.map((point) => (
                         <SelectItem key={point.id} value={String(point.id)}>
                           <div className="flex items-center gap-2">
@@ -917,7 +932,7 @@ export default function CreateRescueTeamPage() {
                     />
                     <p className="text-[12px] text-orange-700 dark:text-orange-400 leading-snug">
                       Vui lòng <strong>Chọn làm đội trưởng</strong> cho một
-                      thành viên trong nhóm.
+                      thành viên <strong>cốt cán</strong> trong nhóm.
                     </p>
                   </div>
                 )}
@@ -940,6 +955,7 @@ export default function CreateRescueTeamPage() {
                         user={user}
                         selected={isMemberSelected(user.id)}
                         isLeader={isLeader(user.id)}
+                        canBeLeader={user.rescuerType === "Core"}
                         onToggleSelect={() => toggleMember(user.id)}
                         onToggleLeader={() => toggleLeader(user.id)}
                       />

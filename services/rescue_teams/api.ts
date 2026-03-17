@@ -7,6 +7,9 @@ import type {
   GetRescueTeamByIdResponse,
   CreateRescueTeamRequest,
   CreateRescueTeamResponse,
+  ScheduleRescueTeamAssemblyRequest,
+  RemoveRescueTeamMemberRequest,
+  AddRescueTeamMemberRequest,
 } from "./type";
 
 /**
@@ -65,4 +68,51 @@ export async function createRescueTeam(
 ): Promise<CreateRescueTeamResponse> {
   const { data } = await api.post("/personnel/rescue-teams", request);
   return data;
+}
+
+/**
+ * Schedule rescue team assembly time.
+ * PATCH /personnel/rescue-teams/{id}/schedule-assembly
+ * Success response: 204 No Content
+ */
+export async function scheduleRescueTeamAssembly(
+  request: ScheduleRescueTeamAssemblyRequest,
+): Promise<void> {
+  const { id, assemblyAt } = request;
+  await api.patch(
+    `/personnel/rescue-teams/${id}/schedule-assembly`,
+    JSON.stringify(assemblyAt),
+    {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+}
+
+/**
+ * Remove a member from rescue team.
+ * DELETE /personnel/rescue-teams/{id}/members/{userId}
+ * Success response: 204 No Content
+ */
+export async function removeRescueTeamMember(
+  request: RemoveRescueTeamMemberRequest,
+): Promise<void> {
+  const { id, userId } = request;
+  await api.delete(`/personnel/rescue-teams/${id}/members/${userId}`);
+}
+
+/**
+ * Add a member to rescue team.
+ * POST /personnel/rescue-teams/{id}/members
+ * Success response: 204 No Content
+ */
+export async function addRescueTeamMember(
+  request: AddRescueTeamMemberRequest,
+): Promise<void> {
+  const { id, userId, isLeader } = request;
+  await api.post(`/personnel/rescue-teams/${id}/members`, {
+    userId,
+    isLeader,
+  });
 }

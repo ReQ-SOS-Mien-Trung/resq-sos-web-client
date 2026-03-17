@@ -1,6 +1,8 @@
 import api from "@/config/axios";
 import { useAuthStore } from "@/stores/auth.store";
 import {
+  GetDepotInventoryParams,
+  GetDepotInventoryResponse,
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
   ImportInventoryRequest,
@@ -22,6 +24,23 @@ import {
   GetDepotTransactionsResponse,
   ExportMovementsParams,
 } from "./type";
+
+/**
+ * Get inventory by depot ID with optional filters
+ * GET /logistics/inventory/depot/{depotId}
+ */
+export async function getDepotInventory(
+  params: GetDepotInventoryParams,
+): Promise<GetDepotInventoryResponse> {
+  const { depotId, ...query } = params;
+  const { data } = await api.get(`/logistics/inventory/depot/${depotId}`, {
+    params: query,
+    paramsSerializer: {
+      indexes: null,
+    },
+  });
+  return data;
+}
 
 /**
  * Get depot inventory by passing multiple optional filters

@@ -103,7 +103,7 @@ export interface SOSRequestEntity {
   locationAccuracy: number | null;
   timestamp: number | null;
   createdAt: string;
-  receivedAt?: string | null;
+  receivedAt: string | null;
   lastUpdatedAt: string | null;
   reviewedAt: string | null;
   reviewedById: string | null;

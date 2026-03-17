@@ -52,6 +52,7 @@ import { getActivityRoute } from "@/services/mission/api";
 import type {
   MissionActivity,
   MissionEntity,
+  MissionTeam,
   RouteVehicle,
 } from "@/services/mission/type";
 import {
@@ -64,7 +65,7 @@ import {
   ClusterSupplyCollection,
   MissionSuggestionEntity,
 } from "@/services/sos_cluster/type";
-import { useMyDepotInventory } from "@/services/inventory/hooks";
+import { useDepotInventory } from "@/services/inventory/hooks";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
 import { SOSRequest } from "@/type";
 import {
@@ -94,7 +95,6 @@ import {
   DotsSixVertical,
   Path,
   NavigationArrow,
-  PaperPlaneTilt,
 } from "@phosphor-icons/react";
 
 // Extract lat/lng from activity description text
@@ -111,6 +111,22 @@ const extractCoordsFromDescription = (
   if (a >= 8 && a <= 24 && b >= 100 && b <= 115) return { lat: a, lng: b };
   if (b >= 8 && b <= 24 && a >= 100 && a <= 115) return { lat: b, lng: a };
   return null;
+};
+
+const TEAM_TYPE_LABELS: Record<string, string> = {
+  RESCUE: "Cứu hộ",
+  MEDICAL: "Y tế",
+  LOGISTICS: "Hậu cần",
+  BOAT: "Đội thuyền",
+  EVACUATION: "Sơ tán",
+  FIREFIGHTER: "Cứu hỏa",
+  SEARCH_AND_RESCUE: "Tìm kiếm cứu nạn",
+};
+
+const formatTeamTypeLabel = (teamType?: string | null) => {
+  if (!teamType) return "Chưa rõ";
+  const normalized = teamType.trim().toUpperCase();
+  return TEAM_TYPE_LABELS[normalized] ?? teamType;
 };
 
 const RoutePreviewFitBounds = ({ points }: { points: [number, number][] }) => {
@@ -223,7 +239,7 @@ const SOSRequestSidebarCard = ({ sos }: { sos: SOSRequest }) => {
           )}
           weight="fill"
         />
-        <span className="text-xs font-bold truncate">SOS #{sos.id}</span>
+        <span className="text-xs font-bold truncate">SOS {sos.id}</span>
 
         {isLoading && (
           <Badge
@@ -300,7 +316,7 @@ const SOSGroupHeader = ({
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-bold truncate">SOS #{matchedSOS.id}</p>
+          <p className="text-sm font-bold truncate">SOS {matchedSOS.id}</p>
           {isLoading && (
             <Badge
               variant="outline"
@@ -346,7 +362,8 @@ const DepotInventoryCard = ({
   depotAddress: string | null;
   isDraggable: boolean;
 }) => {
-  const { data, isLoading } = useMyDepotInventory({
+  const { data, isLoading } = useDepotInventory({
+    depotId,
     pageSize: 50,
   });
 
@@ -670,8 +687,10 @@ interface RouteSegment {
 
 const COORD_EPSILON = 0.0005; // ~55m tolerance for "same location"
 const HUE_DEFAULT_ORIGIN = { lat: 16.4637, lng: 107.5909 };
+const SOS_COORD_MATCH_EPSILON = 0.003; // ~330m tolerance for SOS coordinate matching
 const RESCUE_ROUTE_ACTIVITY_TYPES = new Set([
   "COLLECT_SUPPLIES",
+  "DELIVER_SUPPLIES",
   "RESCUE",
   "MEDICAL_AID",
   "EVACUATE",
@@ -683,6 +702,11 @@ interface WaypointMeta {
   hasSOS: boolean;
   hasDepot: boolean;
 }
+
+type SupplyDisplayItem = {
+  name: string;
+  quantityLabel: string;
+};
 
 function getSupplyDisplayName(supply: {
   itemName?: string | null;
@@ -746,22 +770,286 @@ function extractDepotLabel(activity: MissionActivity): string | null {
   return "Kho tiếp tế";
 }
 
-function getWaypointMeta(waypoint: UniqueWaypoint): WaypointMeta {
+function inferSOSRequestIdFromActivity(
+  activity: MissionActivity,
+  sosRequests: SOSRequest[],
+): string | null {
+  const explicitLabel = extractSOSLabel(activity);
+  if (explicitLabel) return explicitLabel.replace("SOS #", "").trim();
+
+  const hasValidCoords =
+    activity.targetLatitude !== 0 && activity.targetLongitude !== 0;
+  if (hasValidCoords) {
+    const withCoords = sosRequests.filter(
+      (s) =>
+        typeof s.location?.lat === "number" &&
+        typeof s.location?.lng === "number",
+    );
+    if (withCoords.length > 0) {
+      const nearest = withCoords.reduce((best, current) => {
+        const bestDist =
+          Math.pow(best.location!.lat - activity.targetLatitude, 2) +
+          Math.pow(best.location!.lng - activity.targetLongitude, 2);
+        const currentDist =
+          Math.pow(current.location!.lat - activity.targetLatitude, 2) +
+          Math.pow(current.location!.lng - activity.targetLongitude, 2);
+        return currentDist < bestDist ? current : best;
+      });
+      return String(nearest.id);
+    }
+  }
+
+  if (sosRequests.length > 0) return String(sosRequests[0].id);
+  return null;
+}
+
+function isSupplyStep(activityType: string): boolean {
+  return (
+    activityType === "COLLECT_SUPPLIES" || activityType === "DELIVER_SUPPLIES"
+  );
+}
+
+function parseSupplyItemsFromDescription(
+  description: string,
+): SupplyDisplayItem[] {
+  const markerMatch = description.match(
+    /(?:Lấy|Lay|Giao vật tư|Tiếp tế|Tiep te|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?)[^:]*:\s*(.+)$/i,
+  );
+  if (!markerMatch?.[1]) return [];
+
+  const listText = markerMatch[1].replace(/\.+\s*$/, "").trim();
+  if (!listText) return [];
+
+  return listText
+    .split(/\s*,\s*/)
+    .map((chunk) => {
+      const value = chunk.trim();
+      if (!value) return null;
+
+      const qtyMatch = value.match(/^(.*?)[xX×]\s*(\d+(?:[.,]\d+)?)\s*(.*)$/);
+      if (!qtyMatch) {
+        return {
+          name: value,
+          quantityLabel: "",
+        };
+      }
+
+      const name = qtyMatch[1].trim();
+      const quantity = qtyMatch[2].trim();
+      const unit = qtyMatch[3].trim();
+
+      return {
+        name: name || value,
+        quantityLabel: `${quantity} ${unit}`.trim(),
+      };
+    })
+    .filter((item): item is SupplyDisplayItem => !!item && !!item.name);
+}
+
+function getSupplyDisplayItems(activity: {
+  activityType: string;
+  description: string;
+  suppliesToCollect?: ClusterSupplyCollection[] | null;
+}): SupplyDisplayItem[] {
+  if (activity.suppliesToCollect && activity.suppliesToCollect.length > 0) {
+    return activity.suppliesToCollect.map((supply) => ({
+      name: getSupplyDisplayName(supply),
+      quantityLabel: `${supply.quantity} ${supply.unit}`.trim(),
+    }));
+  }
+
+  if (!isSupplyStep(activity.activityType)) return [];
+  return parseSupplyItemsFromDescription(activity.description);
+}
+
+function stripSupplyDetailsFromDescription(description: string): string {
+  return description
+    .replace(
+      /\s*(?:Lấy|Lay|Giao vật tư|Tiếp tế|Tiep te|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?)[^:]*:\s*.*$/i,
+      "",
+    )
+    .replace(/[\s,;:.]+$/, "")
+    .trim();
+}
+
+function getActivityStatusMeta(status: string | null | undefined): {
+  label: string;
+  className: string;
+  icon: React.ReactNode;
+} {
+  const normalizedStatus = (status ?? "").trim().toLowerCase();
+
+  if (normalizedStatus === "completed") {
+    return {
+      label: "Hoàn thành",
+      className:
+        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+      icon: <CheckCircle className="h-3.5 w-3.5" weight="fill" />,
+    };
+  }
+
+  if (
+    normalizedStatus === "inprogress" ||
+    normalizedStatus === "in_progress" ||
+    normalizedStatus === "in progress"
+  ) {
+    return {
+      label: "Đang thực hiện",
+      className:
+        "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
+      icon: <CircleNotch className="h-3.5 w-3.5 animate-spin" weight="bold" />,
+    };
+  }
+
+  if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+    return {
+      label: "Đã hủy",
+      className:
+        "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700",
+      icon: <Warning className="h-3.5 w-3.5" weight="fill" />,
+    };
+  }
+
+  if (normalizedStatus === "pending" || normalizedStatus === "planned") {
+    return {
+      label: normalizedStatus === "planned" ? "Đã lập kế hoạch" : "Chờ xử lý",
+      className:
+        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+      icon: <Clock className="h-3.5 w-3.5" />,
+    };
+  }
+
+  return {
+    label: status || "Chưa rõ",
+    className:
+      "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
+    icon: <Clock className="h-3.5 w-3.5" />,
+  };
+}
+
+function getTeamAssignmentStatusMeta(status: string | null | undefined): {
+  label: string;
+  className: string;
+} {
+  const normalizedStatus = (status ?? "").trim().toLowerCase();
+
+  if (normalizedStatus === "assigned") {
+    return {
+      label: "Đã phân công",
+      className:
+        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+    };
+  }
+
+  if (
+    normalizedStatus === "inprogress" ||
+    normalizedStatus === "in_progress" ||
+    normalizedStatus === "in progress"
+  ) {
+    return {
+      label: "Đang thực hiện",
+      className:
+        "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
+    };
+  }
+
+  if (
+    normalizedStatus === "unassigned" ||
+    normalizedStatus === "removed" ||
+    normalizedStatus === "inactive"
+  ) {
+    return {
+      label: "Ngừng phụ trách",
+      className:
+        "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700",
+    };
+  }
+
+  return {
+    label: status || "Chưa rõ",
+    className:
+      "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
+  };
+}
+
+function isMissionTeamActive(team: MissionTeam): boolean {
+  const normalizedStatus = (team.status ?? "").trim().toLowerCase();
+  return (
+    team.unassignedAt == null &&
+    (normalizedStatus === "assigned" ||
+      normalizedStatus === "inprogress" ||
+      normalizedStatus === "in_progress" ||
+      normalizedStatus === "in progress")
+  );
+}
+
+function getActiveMissionTeams(mission: MissionEntity): MissionTeam[] {
+  return (mission.teams ?? []).filter(isMissionTeamActive);
+}
+
+function inferSOSLabelFromCoords(
+  lat: number,
+  lng: number,
+  sosRequests: SOSRequest[],
+): string | null {
+  const sosWithCoords = sosRequests.filter(
+    (sos) =>
+      typeof sos.location?.lat === "number" &&
+      typeof sos.location?.lng === "number",
+  );
+
+  if (sosWithCoords.length === 0) return null;
+
+  const nearest = sosWithCoords.reduce((best, current) => {
+    const bestDistSq =
+      Math.pow(best.location!.lat - lat, 2) +
+      Math.pow(best.location!.lng - lng, 2);
+    const currentDistSq =
+      Math.pow(current.location!.lat - lat, 2) +
+      Math.pow(current.location!.lng - lng, 2);
+    return currentDistSq < bestDistSq ? current : best;
+  });
+
+  const nearestDistSq =
+    Math.pow(nearest.location!.lat - lat, 2) +
+    Math.pow(nearest.location!.lng - lng, 2);
+
+  if (nearestDistSq > Math.pow(SOS_COORD_MATCH_EPSILON, 2)) return null;
+  return `SOS #${nearest.id}`;
+}
+
+function getWaypointMeta(
+  waypoint: UniqueWaypoint,
+  sosRequests: SOSRequest[],
+): WaypointMeta {
   const labels = new Set<string>();
   let hasSOS = false;
   let hasDepot = false;
+  const waypointHasDepot = waypoint.activities.some(
+    (activity) => !!extractDepotLabel(activity),
+  );
 
   for (const activity of waypoint.activities) {
-    const sosLabel = extractSOSLabel(activity);
-    if (sosLabel) {
-      labels.add(sosLabel);
-      hasSOS = true;
-    }
-
     const depotLabel = extractDepotLabel(activity);
     if (depotLabel) {
       labels.add(depotLabel);
       hasDepot = true;
+    }
+
+    const sosLabel = extractSOSLabel(activity);
+    if (sosLabel) {
+      labels.add(sosLabel);
+      hasSOS = true;
+    } else if (!waypointHasDepot && !depotLabel) {
+      const inferredFromCoords = inferSOSLabelFromCoords(
+        activity.targetLatitude,
+        activity.targetLongitude,
+        sosRequests,
+      );
+      if (inferredFromCoords) {
+        labels.add(inferredFromCoords);
+        hasSOS = true;
+      }
     }
   }
 
@@ -772,10 +1060,15 @@ function getWaypointMeta(waypoint: UniqueWaypoint): WaypointMeta {
   };
 }
 
-const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
+const MissionRoutePreview = ({
+  mission,
+  sosRequests,
+}: {
+  mission: MissionEntity;
+  sosRequests: SOSRequest[];
+}) => {
   const [open, setOpen] = useState(false);
   const [vehicle, setVehicle] = useState<RouteVehicle>("bike");
-  const [originCoords] = useState(HUE_DEFAULT_ORIGIN);
   const [segments, setSegments] = useState<RouteSegment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -783,6 +1076,100 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
   const [totalDuration, setTotalDuration] = useState(0);
   const [fetchProgress, setFetchProgress] = useState(0);
   const abortRef = useRef(false);
+
+  const routeOrigin = useMemo(() => {
+    const teams = mission.teams ?? [];
+    const hasActiveStatus = (status: string | null | undefined) => {
+      const normalized = (status ?? "").trim().toLowerCase();
+      return (
+        normalized === "assigned" ||
+        normalized === "inprogress" ||
+        normalized === "in_progress" ||
+        normalized === "in progress"
+      );
+    };
+
+    const activeTeams = teams.filter(
+      (team) => team.unassignedAt == null && hasActiveStatus(team.status),
+    );
+
+    const teamCandidates = activeTeams.length > 0 ? activeTeams : teams;
+
+    for (const team of teamCandidates) {
+      const lat =
+        typeof team.latitude === "number" ? team.latitude : Number.NaN;
+      const lng =
+        typeof team.longitude === "number" ? team.longitude : Number.NaN;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+      const baseName = team.teamName || `Đội #${team.rescueTeamId}`;
+      const sourceSuffix = team.locationSource
+        ? ` (${team.locationSource})`
+        : "";
+
+      return {
+        lat,
+        lng,
+        label: `${baseName}${sourceSuffix}`,
+        isFallback: false,
+      };
+    }
+
+    const activeTeamIds = new Set(activeTeams.map((team) => team.rescueTeamId));
+    const suggested = mission.suggestedActivities ?? [];
+    const suggestedCandidates =
+      activeTeamIds.size > 0
+        ? suggested.filter((activity) =>
+            activity.suggestedTeam?.teamId
+              ? activeTeamIds.has(activity.suggestedTeam.teamId)
+              : false,
+          )
+        : suggested;
+
+    for (const activity of suggestedCandidates) {
+      const rawLat = activity.suggestedTeam?.latitude;
+      const rawLng = activity.suggestedTeam?.longitude;
+      const lat =
+        typeof rawLat === "number"
+          ? rawLat
+          : typeof rawLat === "string"
+            ? Number(rawLat)
+            : Number.NaN;
+      const lng =
+        typeof rawLng === "number"
+          ? rawLng
+          : typeof rawLng === "string"
+            ? Number(rawLng)
+            : Number.NaN;
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+      const teamLabel =
+        activity.suggestedTeam?.teamName ||
+        (activity.suggestedTeam?.teamId
+          ? `Đội #${activity.suggestedTeam.teamId}`
+          : "Đội cứu hộ đề xuất");
+
+      return {
+        lat,
+        lng,
+        label: `${teamLabel} (AI đề xuất)`,
+        isFallback: false,
+      };
+    }
+
+    return {
+      lat: HUE_DEFAULT_ORIGIN.lat,
+      lng: HUE_DEFAULT_ORIGIN.lng,
+      label: "Mặc định Huế",
+      isFallback: true,
+    };
+  }, [mission.teams, mission.suggestedActivities]);
+
+  const originCoords = useMemo(
+    () => ({ lat: routeOrigin.lat, lng: routeOrigin.lng }),
+    [routeOrigin.lat, routeOrigin.lng],
+  );
 
   // Filter activities that have valid coordinates, sorted by step
   // Fallback: if targetLatitude/Longitude are 0 or all the same, try parsing from description
@@ -949,8 +1336,9 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
   }, [open, originCoords, uniqueWaypoints, vehicle, mission.id]);
 
   const waypointMetaList = useMemo(
-    () => uniqueWaypoints.map(getWaypointMeta),
-    [uniqueWaypoints],
+    () =>
+      uniqueWaypoints.map((waypoint) => getWaypointMeta(waypoint, sosRequests)),
+    [uniqueWaypoints, sosRequests],
   );
 
   if (routeActivities.length === 0) return null;
@@ -1040,7 +1428,9 @@ const MissionRoutePreview = ({ mission }: { mission: MissionEntity }) => {
 
       <p className="text-[10px] text-muted-foreground flex items-center gap-1">
         <MapPin className="h-3 w-3" weight="fill" />
-        Xuất phát mặc định: Huế (16.4637, 107.5909)
+        {routeOrigin.isFallback
+          ? `Xuất phát mặc định: Huế (${originCoords.lat.toFixed(4)}, ${originCoords.lng.toFixed(4)})`
+          : `Xuất phát từ ${routeOrigin.label} (${originCoords.lat.toFixed(4)}, ${originCoords.lng.toFixed(4)})`}
       </p>
       {loading && (
         <div className="space-y-1">
@@ -1347,6 +1737,29 @@ const SuggestionCard = ({
                     <p className="text-xs text-foreground/80 mt-0.5 leading-relaxed">
                       {act.description}
                     </p>
+                    {act.suggestedTeam && (
+                      <div className="mt-1.5 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15 px-2 py-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                          <ShieldCheck className="h-3 w-3" weight="fill" />
+                          Đội đề xuất
+                        </p>
+                        <p className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
+                          {act.suggestedTeam.teamName ||
+                            (act.suggestedTeam.teamId
+                              ? `Đội #${act.suggestedTeam.teamId}`
+                              : "Đội chưa đặt tên")}
+                        </p>
+                        <p className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                          {`Loại: ${formatTeamTypeLabel(act.suggestedTeam.teamType)}`}
+                          {act.suggestedTeam.contactPhone
+                            ? ` • SĐT: ${act.suggestedTeam.contactPhone}`
+                            : ""}
+                          {act.suggestedTeam.estimatedEtaMinutes != null
+                            ? ` • ETA: ${act.suggestedTeam.estimatedEtaMinutes} phút`
+                            : ""}
+                        </p>
+                      </div>
+                    )}
                     {act.suppliesToCollect &&
                       act.suppliesToCollect.length > 0 && (
                         <div className="mt-1 space-y-0.5">
@@ -1455,10 +1868,10 @@ const RescuePlanPanel = ({
         prev.map((a) => {
           if (a._id !== id) return a;
 
-          // Only COLLECT_SUPPLIES activities should keep supply list.
+          // Only supply-related activities should keep the supply list.
           if (field === "activityType") {
             const nextType = value as ClusterActivityType;
-            if (nextType !== "COLLECT_SUPPLIES") {
+            if (!isSupplyStep(nextType)) {
               return {
                 ...a,
                 activityType: nextType,
@@ -1625,7 +2038,8 @@ const RescuePlanPanel = ({
             activityCode: `${a.activityType}_${i + 1}`,
             activityType: a.activityType,
             description: syncedDescription,
-            target: a.depotName || `SOS #${a.sosRequestId || "general"}`,
+            target:
+              a.depotName || `SOS ${a.sosRequestId || sos?.id || "unknown"}`,
             items: a.suppliesToCollect
               ? a.suppliesToCollect
                   .map((s) => `${getSupplyDisplayName(s)} x${s.quantity}`)
@@ -1649,6 +2063,7 @@ const RescuePlanPanel = ({
                   sos?.location?.lng ??
                   0)
                 : (sos?.location?.lng ?? 0)),
+            rescueTeamId: a.suggestedTeam?.teamId ?? null,
           };
         }),
       },
@@ -1783,33 +2198,48 @@ const RescuePlanPanel = ({
   }, [activeSuggestion]);
 
   // Enter edit from an existing mission (missions tab -> edit)
-  const enterEditFromMission = useCallback((mission: MissionEntity) => {
-    setEditActivities(
-      mission.activities.map((a, i) => ({
-        _id: `edit-m-${i}-${Date.now()}`,
-        step: a.step,
-        activityType: a.activityType as ClusterActivityType,
-        description: a.description,
-        priority: "Medium",
-        estimatedTime: "",
-        sosRequestId: null,
-        depotId: null,
-        depotName: a.target || null,
-        depotAddress: null,
-        suppliesToCollect: a.suppliesToCollect,
-      })),
-    );
-    setEditMissionType(
-      (mission.missionType as "RESCUE" | "RESCUER") || "RESCUE",
-    );
-    setEditPriorityScore(mission.priorityScore);
-    setEditStartTime(new Date(mission.startTime).toISOString().slice(0, 16));
-    setEditExpectedEndTime(
-      new Date(mission.expectedEndTime).toISOString().slice(0, 16),
-    );
-    setActiveTab("plan");
-    setIsEditMode(true);
-  }, []);
+  const enterEditFromMission = useCallback(
+    (mission: MissionEntity) => {
+      setEditActivities(
+        mission.activities.map((a, i) => {
+          const inferredSosRequestId = inferSOSRequestIdFromActivity(
+            a,
+            clusterSOSRequests,
+          );
+          const isDepot = a.activityType === "COLLECT_SUPPLIES";
+
+          return {
+            _id: `edit-m-${i}-${Date.now()}`,
+            step: a.step,
+            activityType: a.activityType as ClusterActivityType,
+            description: a.description,
+            priority: "Medium",
+            estimatedTime: "",
+            sosRequestId: isDepot
+              ? null
+              : inferredSosRequestId
+                ? Number(inferredSosRequestId)
+                : null,
+            depotId: null,
+            depotName: isDepot ? a.target || null : null,
+            depotAddress: null,
+            suppliesToCollect: a.suppliesToCollect,
+          };
+        }),
+      );
+      setEditMissionType(
+        (mission.missionType as "RESCUE" | "RESCUER") || "RESCUE",
+      );
+      setEditPriorityScore(mission.priorityScore);
+      setEditStartTime(new Date(mission.startTime).toISOString().slice(0, 16));
+      setEditExpectedEndTime(
+        new Date(mission.expectedEndTime).toISOString().slice(0, 16),
+      );
+      setActiveTab("plan");
+      setIsEditMode(true);
+    },
+    [clusterSOSRequests],
+  );
 
   const hasSidebar = !!activeSuggestion;
 
@@ -1837,6 +2267,24 @@ const RescuePlanPanel = ({
 
   const showSidebar = hasSidebar || sidebarDepots.length > 0;
 
+  const sortedMissions = useMemo(() => {
+    const source = (missionsData?.missions ?? []).slice();
+    return source.sort((a, b) => {
+      const aAssigned = getActiveMissionTeams(a).length > 0 ? 1 : 0;
+      const bAssigned = getActiveMissionTeams(b).length > 0 ? 1 : 0;
+      if (aAssigned !== bAssigned) return bAssigned - aAssigned;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [missionsData?.missions]);
+
+  const assignedMissionCount = useMemo(
+    () =>
+      sortedMissions.filter(
+        (mission) => getActiveMissionTeams(mission).length > 0,
+      ).length,
+    [sortedMissions],
+  );
+
   const severity = activeSuggestion
     ? severityConfig[activeSuggestion.suggestedSeverityLevel] ||
       severityConfig["Medium"]
@@ -1844,7 +2292,7 @@ const RescuePlanPanel = ({
 
   // Group activities by SOS request or depot
   type ActivityGroup = {
-    type: "sos" | "depot" | "general";
+    type: "sos" | "depot";
     sosRequestId?: number | null;
     depotId?: number | null;
     depotName?: string | null;
@@ -1857,24 +2305,31 @@ const RescuePlanPanel = ({
       ? activeSuggestion.suggestedActivities
       : [];
     if (sourceActivities.length === 0) return [];
+
+    const fallbackSosRequestId =
+      clusterSOSRequests.length > 0 ? Number(clusterSOSRequests[0].id) : null;
+
     const groups: ActivityGroup[] = [];
     for (const act of sourceActivities) {
       const isDepot = act.activityType === "COLLECT_SUPPLIES" && act.depotId;
+      const resolvedSosRequestId = isDepot
+        ? null
+        : (act.sosRequestId ?? fallbackSosRequestId);
       const key = isDepot
         ? `depot-${act.depotId}`
-        : `sos-${act.sosRequestId ?? "general"}`;
+        : `sos-${resolvedSosRequestId ?? "unknown"}`;
       const last = groups[groups.length - 1];
       const lastKey = last
         ? last.type === "depot"
           ? `depot-${last.depotId}`
-          : `sos-${last.sosRequestId ?? "general"}`
+          : `sos-${last.sosRequestId ?? "unknown"}`
         : null;
       if (lastKey === key) {
         last.activities.push(act);
       } else {
         groups.push({
-          type: isDepot ? "depot" : act.sosRequestId ? "sos" : "general",
-          sosRequestId: act.sosRequestId,
+          type: isDepot ? "depot" : "sos",
+          sosRequestId: resolvedSosRequestId,
           depotId: act.depotId,
           depotName: act.depotName,
           depotAddress: act.depotAddress,
@@ -1883,7 +2338,7 @@ const RescuePlanPanel = ({
       }
     }
     return groups;
-  }, [activeSuggestion]);
+  }, [activeSuggestion, clusterSOSRequests]);
 
   // Auto-collapse Quick Stats when user scrolls deep into the main plan content.
   useEffect(() => {
@@ -2158,10 +2613,29 @@ const RescuePlanPanel = ({
                 {activeTab === "missions" && (
                   <section>
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                        <ListChecks className="h-3.5 w-3.5" weight="bold" />
-                        Nhiệm vụ đã tạo cho cụm này
-                      </h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          <ListChecks className="h-3.5 w-3.5" weight="bold" />
+                          Nhiệm vụ đã tạo cho cụm này
+                        </h3>
+                        {sortedMissions.length > 0 && (
+                          <>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] h-5 px-1.5 border-emerald-300/70 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
+                            >
+                              Đã phân công: {assignedMissionCount}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] h-5 px-1.5 border-amber-300/70 text-amber-700 dark:border-amber-700 dark:text-amber-300"
+                            >
+                              Chờ phân công:{" "}
+                              {sortedMissions.length - assignedMissionCount}
+                            </Badge>
+                          </>
+                        )}
+                      </div>
                       <Button
                         variant="outline"
                         size="sm"
@@ -2182,277 +2656,653 @@ const RescuePlanPanel = ({
                           />
                         ))}
                       </div>
-                    ) : missionsData?.missions &&
-                      missionsData.missions.length > 0 ? (
+                    ) : sortedMissions.length > 0 ? (
                       <div className="space-y-3">
-                        {missionsData.missions.map((mission) => (
-                          <Card key={mission.id} className="overflow-hidden">
-                            <CardContent className="p-3 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <Rocket
-                                    className="h-4 w-4 text-emerald-500 shrink-0"
-                                    weight="fill"
-                                  />
-                                  <span className="text-sm font-bold truncate">
-                                    {mission.suggestedMissionTitle ||
-                                      `Nhiệm vụ #${mission.id}`}
-                                  </span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] h-4 px-1.5 shrink-0"
-                                  >
-                                    {mission.missionType}
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  {(mission.status === "Planned" ||
-                                    mission.status === "Pending") && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-6 text-[10px] gap-1 px-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400"
-                                      onClick={() => {
-                                        toast.success(
-                                          "Đã gửi nhiệm vụ cho đội cứu hộ!",
-                                        );
-                                      }}
+                        {sortedMissions.map((mission) => {
+                          const activeMissionTeams =
+                            getActiveMissionTeams(mission);
+                          const hasAssignedTeams =
+                            activeMissionTeams.length > 0;
+
+                          return (
+                            <Card
+                              key={mission.id}
+                              className={cn(
+                                "overflow-hidden border-2",
+                                hasAssignedTeams
+                                  ? "border-emerald-300/70 dark:border-emerald-700/60"
+                                  : "border-amber-300/70 dark:border-amber-700/60",
+                              )}
+                            >
+                              <CardContent className="p-3 space-y-2">
+                                {(() => {
+                                  const normalizedStatus = mission.status
+                                    .trim()
+                                    .toLowerCase();
+                                  const statusText =
+                                    normalizedStatus === "completed"
+                                      ? "Hoàn thành"
+                                      : normalizedStatus === "inprogress" ||
+                                          normalizedStatus === "in_progress" ||
+                                          normalizedStatus === "in progress"
+                                        ? "Đang thực hiện"
+                                        : normalizedStatus === "cancelled" ||
+                                            normalizedStatus === "canceled"
+                                          ? "Đã hủy"
+                                          : normalizedStatus === "pending"
+                                            ? "Chờ xử lý"
+                                            : normalizedStatus === "planned"
+                                              ? "Đã lập kế hoạch"
+                                              : mission.status;
+                                  const statusClass =
+                                    normalizedStatus === "completed"
+                                      ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
+                                      : normalizedStatus === "inprogress" ||
+                                          normalizedStatus === "in_progress" ||
+                                          normalizedStatus === "in progress"
+                                        ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700"
+                                        : normalizedStatus === "cancelled" ||
+                                            normalizedStatus === "canceled"
+                                          ? "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700"
+                                          : normalizedStatus === "pending" ||
+                                              normalizedStatus === "planned"
+                                            ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
+                                            : "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600";
+
+                                  return (
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <Rocket
+                                          className="h-4 w-4 text-emerald-500 shrink-0"
+                                          weight="fill"
+                                        />
+                                        <span className="text-base font-bold truncate">
+                                          {mission.suggestedMissionTitle ||
+                                            `Nhiệm vụ #${mission.id}`}
+                                        </span>
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs h-5 px-2 shrink-0 font-semibold"
+                                        >
+                                          {mission.missionType === "RESCUE"
+                                            ? "Cứu hộ"
+                                            : mission.missionType === "RESCUER"
+                                              ? "Điều phối"
+                                              : mission.missionType}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-7 text-xs gap-1 px-2.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                                          onClick={() =>
+                                            enterEditFromMission(mission)
+                                          }
+                                        >
+                                          <PencilSimpleLine className="h-3.5 w-3.5" />
+                                          Chỉnh sửa
+                                        </Button>
+                                        <Badge
+                                          variant="outline"
+                                          className={cn(
+                                            "text-xs h-7 px-3 font-extrabold uppercase tracking-wide border-2",
+                                            statusClass,
+                                          )}
+                                        >
+                                          {statusText}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+
+                                <div
+                                  className={cn(
+                                    "rounded-lg border px-2.5 py-2",
+                                    hasAssignedTeams
+                                      ? "border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-700/50 dark:bg-emerald-900/15"
+                                      : "border-amber-200/80 bg-amber-50/60 dark:border-amber-700/50 dark:bg-amber-900/15",
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <p
+                                      className={cn(
+                                        "text-[11px] font-bold uppercase tracking-wider flex items-center gap-1",
+                                        hasAssignedTeams
+                                          ? "text-emerald-700 dark:text-emerald-300"
+                                          : "text-amber-700 dark:text-amber-300",
+                                      )}
                                     >
-                                      <PaperPlaneTilt
-                                        className="h-3 w-3"
+                                      <ShieldCheck
+                                        className="h-3.5 w-3.5"
                                         weight="fill"
                                       />
-                                      Gửi cho đội cứu hộ
-                                    </Button>
-                                  )}
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 text-[10px] gap-1 px-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-                                    onClick={() =>
-                                      enterEditFromMission(mission)
-                                    }
-                                  >
-                                    <PencilSimpleLine className="h-3 w-3" />
-                                    Chỉnh sửa
-                                  </Button>
-                                  <Badge
-                                    variant={
-                                      mission.status === "Completed"
-                                        ? "default"
-                                        : mission.status === "InProgress"
-                                          ? "p2"
-                                          : mission.status === "Cancelled"
-                                            ? "destructive"
-                                            : "outline"
-                                    }
-                                    className="text-[10px] h-4 px-1.5"
-                                  >
-                                    {mission.status}
-                                  </Badge>
-                                </div>
-                              </div>
-
-                              {/* AI assessment */}
-                              {mission.overallAssessment && (
-                                <div className="bg-muted/40 rounded-lg p-2.5 border border-border/50">
-                                  <p className="text-[11px] text-foreground/75 leading-relaxed line-clamp-3">
-                                    {mission.overallAssessment}
-                                  </p>
-                                </div>
-                              )}
-
-                              <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-wrap">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  {new Date(mission.startTime).toLocaleString(
-                                    "vi-VN",
-                                    {
-                                      day: "2-digit",
-                                      month: "2-digit",
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    },
-                                  )}
-                                  {" → "}
-                                  {new Date(
-                                    mission.expectedEndTime,
-                                  ).toLocaleString("vi-VN", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
-                                {mission.estimatedDuration && (
-                                  <span className="flex items-center gap-1">
-                                    <ClockCounterClockwise className="h-3 w-3" />
-                                    {mission.estimatedDuration}
-                                  </span>
-                                )}
-                                <span>
-                                  Ưu tiên: {mission.priorityScore.toFixed(1)}
-                                </span>
-                                <span>{mission.activityCount} bước</span>
-                                {mission.modelName && (
-                                  <span className="flex items-center gap-1">
-                                    <Lightning
-                                      className="h-3 w-3"
-                                      weight="fill"
-                                    />
-                                    {mission.modelName}
-                                  </span>
-                                )}
-                                {mission.aiConfidenceScore != null && (
-                                  <span>
-                                    Tin cậy:{" "}
-                                    {(mission.aiConfidenceScore * 100).toFixed(
-                                      0,
-                                    )}
-                                    %
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Suggested Resources */}
-                              {mission.suggestedResources &&
-                                mission.suggestedResources.length > 0 && (
-                                  <div className="mt-1">
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                                      <Cube className="h-3 w-3" weight="bold" />
-                                      Tài nguyên cần thiết
+                                      {hasAssignedTeams
+                                        ? `Đã phân công ${activeMissionTeams.length} đội cứu hộ`
+                                        : "Chưa phân công đội cứu hộ"}
                                     </p>
-                                    <div className="space-y-1">
-                                      {mission.suggestedResources.map(
-                                        (resource, rIdx) => {
-                                          const icon = resourceTypeIcons[
-                                            resource.resourceType
-                                          ] || (
-                                            <Package className="h-3.5 w-3.5" />
-                                          );
-                                          return (
-                                            <div
-                                              key={rIdx}
-                                              className="flex items-center gap-2 p-1.5 rounded border bg-background"
-                                            >
-                                              <div className="p-1 rounded bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 shrink-0">
-                                                {icon}
-                                              </div>
-                                              <span className="text-[11px] font-medium truncate flex-1 min-w-0">
-                                                {resource.description}
-                                              </span>
-                                              <span className="text-[11px] font-bold text-primary shrink-0">
-                                                x{resource.quantity}
-                                              </span>
-                                            </div>
-                                          );
-                                        },
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[10px] h-5 px-1.5",
+                                        hasAssignedTeams
+                                          ? "border-emerald-300/80 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
+                                          : "border-amber-300/80 text-amber-700 dark:border-amber-700 dark:text-amber-300",
                                       )}
-                                    </div>
+                                    >
+                                      {hasAssignedTeams
+                                        ? "Giám sát đang hoạt động"
+                                        : "Cần phân công"}
+                                    </Badge>
+                                  </div>
+                                  {hasAssignedTeams && (
+                                    <p className="text-[11px] text-foreground/75 mt-1 line-clamp-2">
+                                      {activeMissionTeams
+                                        .map(
+                                          (team) =>
+                                            team.teamName ||
+                                            `Đội #${team.rescueTeamId}`,
+                                        )
+                                        .join(" • ")}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* AI assessment */}
+                                {mission.overallAssessment && (
+                                  <div className="bg-muted/40 rounded-lg p-2.5 border border-border/50">
+                                    <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3">
+                                      {mission.overallAssessment}
+                                    </p>
                                   </div>
                                 )}
 
-                              {/* Special Notes */}
-                              {mission.specialNotes && (
-                                <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-lg p-2">
-                                  <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-0.5 flex items-center gap-1">
-                                    <Warning
-                                      className="h-3 w-3"
-                                      weight="fill"
-                                    />
-                                    Lưu ý
-                                  </p>
-                                  <p className="text-[11px] text-foreground/75 leading-relaxed">
-                                    {mission.specialNotes}
-                                  </p>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {new Date(mission.startTime).toLocaleString(
+                                      "vi-VN",
+                                      {
+                                        day: "2-digit",
+                                        month: "2-digit",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      },
+                                    )}
+                                    {" → "}
+                                    {new Date(
+                                      mission.expectedEndTime,
+                                    ).toLocaleString("vi-VN", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                  {mission.estimatedDuration && (
+                                    <span className="flex items-center gap-1">
+                                      <ClockCounterClockwise className="h-3 w-3" />
+                                      {mission.estimatedDuration}
+                                    </span>
+                                  )}
+                                  <span>
+                                    Ưu tiên: {mission.priorityScore.toFixed(1)}
+                                  </span>
+                                  <span>{mission.activityCount} bước</span>
+                                  {mission.modelName && (
+                                    <span className="flex items-center gap-1">
+                                      <Lightning
+                                        className="h-3 w-3"
+                                        weight="fill"
+                                      />
+                                      {mission.modelName}
+                                    </span>
+                                  )}
+                                  {mission.aiConfidenceScore != null && (
+                                    <span>
+                                      Tin cậy:{" "}
+                                      {(
+                                        mission.aiConfidenceScore * 100
+                                      ).toFixed(0)}
+                                      %
+                                    </span>
+                                  )}
                                 </div>
-                              )}
 
-                              {/* Activities */}
-                              {mission.activities.length > 0 && (
-                                <div className="space-y-1.5 mt-1">
-                                  {mission.activities.map((act) => {
-                                    const config =
-                                      activityTypeConfig[act.activityType] ||
-                                      activityTypeConfig["ASSESS"];
-                                    return (
-                                      <div
-                                        key={act.id}
-                                        className="flex items-start gap-2 px-2 py-1.5 rounded-md border bg-background"
-                                      >
-                                        <div
-                                          className={cn(
-                                            "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5",
-                                            config.bgColor,
-                                            config.color,
-                                          )}
-                                        >
-                                          {act.step}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-center gap-1.5">
-                                            <Badge
-                                              variant="outline"
+                                {/* Suggested Resources */}
+                                {mission.suggestedResources &&
+                                  mission.suggestedResources.length > 0 && (
+                                    <div className="mt-1">
+                                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                                        <Cube
+                                          className="h-3 w-3"
+                                          weight="bold"
+                                        />
+                                        Tài nguyên cần thiết
+                                      </p>
+                                      <div className="space-y-1">
+                                        {mission.suggestedResources.map(
+                                          (resource, rIdx) => {
+                                            const icon = resourceTypeIcons[
+                                              resource.resourceType
+                                            ] || (
+                                              <Package className="h-3.5 w-3.5" />
+                                            );
+                                            return (
+                                              <div
+                                                key={rIdx}
+                                                className="flex items-center gap-2 p-1.5 rounded border bg-background"
+                                              >
+                                                <div className="p-1 rounded bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 shrink-0">
+                                                  {icon}
+                                                </div>
+                                                <span className="text-[11px] font-medium truncate flex-1 min-w-0">
+                                                  {resource.description}
+                                                </span>
+                                                <span className="text-[11px] font-bold text-primary shrink-0">
+                                                  x{resource.quantity}
+                                                </span>
+                                              </div>
+                                            );
+                                          },
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                {/* Special Notes */}
+                                {mission.specialNotes && (
+                                  <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-lg p-2">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-orange-600 mb-0.5 flex items-center gap-1">
+                                      <Warning
+                                        className="h-3 w-3"
+                                        weight="fill"
+                                      />
+                                      Lưu ý
+                                    </p>
+                                    <p className="text-[11px] text-foreground/75 leading-relaxed">
+                                      {mission.specialNotes}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Activities Grouped */}
+                                {mission.activities.length > 0 && (
+                                  <div className="space-y-4 mt-4">
+                                    {(() => {
+                                      const groups = [];
+                                      for (const act of mission.activities) {
+                                        const isDepot =
+                                          act.activityType ===
+                                          "COLLECT_SUPPLIES";
+                                        let targetType = "sos";
+                                        let sosRequestId = undefined;
+                                        let depotName = undefined;
+                                        const targetStr = act.target || "";
+
+                                        if (isDepot) {
+                                          depotName = targetStr;
+                                          targetType = "depot";
+                                        } else {
+                                          sosRequestId =
+                                            inferSOSRequestIdFromActivity(
+                                              act,
+                                              clusterSOSRequests,
+                                            ) ?? "unknown";
+                                        }
+
+                                        const key =
+                                          targetType === "depot"
+                                            ? `depot-${depotName}`
+                                            : `sos-${sosRequestId}`;
+
+                                        const last = groups[groups.length - 1];
+                                        if (last && last.key === key) {
+                                          last.activities.push(act);
+                                        } else {
+                                          groups.push({
+                                            key,
+                                            type: targetType,
+                                            sosRequestId,
+                                            depotName,
+                                            activities: [act],
+                                          });
+                                        }
+                                      }
+
+                                      return groups.map((group, gIdx) => {
+                                        const matchedSOS =
+                                          group.type === "sos" &&
+                                          group.sosRequestId
+                                            ? clusterSOSRequests.find(
+                                                (s) =>
+                                                  s.id ===
+                                                  String(group.sosRequestId),
+                                              )
+                                            : null;
+
+                                        return (
+                                          <div
+                                            key={gIdx}
+                                            className={cn(
+                                              "rounded-xl border overflow-hidden shadow-sm",
+                                              group.type === "depot"
+                                                ? "border-amber-300/50 dark:border-amber-700/40"
+                                                : group.type === "sos" &&
+                                                    matchedSOS?.priority ===
+                                                      "P1"
+                                                  ? "border-red-300/50 dark:border-red-700/40"
+                                                  : group.type === "sos" &&
+                                                      matchedSOS?.priority ===
+                                                        "P2"
+                                                    ? "border-orange-300/50 dark:border-orange-700/40"
+                                                    : "border-border",
+                                            )}
+                                          >
+                                            <div
                                               className={cn(
-                                                "text-[10px] font-semibold px-1.5 py-0 h-4",
-                                                config.color,
-                                                config.bgColor,
-                                                "border-transparent",
+                                                "flex items-center gap-2.5 px-3.5 py-2.5",
+                                                group.type === "depot"
+                                                  ? "bg-amber-50 dark:bg-amber-900/15"
+                                                  : group.type === "sos" &&
+                                                      matchedSOS?.priority ===
+                                                        "P1"
+                                                    ? "bg-red-50 dark:bg-red-900/15"
+                                                    : group.type === "sos" &&
+                                                        matchedSOS?.priority ===
+                                                          "P2"
+                                                      ? "bg-orange-50 dark:bg-orange-900/15"
+                                                      : "bg-muted/40",
                                               )}
                                             >
-                                              {config.label}
-                                            </Badge>
-                                            <Badge
-                                              variant={
-                                                act.status === "Completed"
-                                                  ? "default"
-                                                  : act.status === "InProgress"
-                                                    ? "p2"
-                                                    : "outline"
-                                              }
-                                              className="text-[9px] h-3.5 px-1"
-                                            >
-                                              {act.status}
-                                            </Badge>
-                                          </div>
-                                          <p className="text-xs text-foreground/80 mt-0.5 leading-relaxed">
-                                            {act.description}
-                                          </p>
-                                          {/* Supply list in activity */}
-                                          {act.suppliesToCollect &&
-                                            act.suppliesToCollect.length >
-                                              0 && (
-                                              <div className="mt-1.5 space-y-0.5">
-                                                {act.suppliesToCollect.map(
-                                                  (supply, sIdx) => (
+                                              {group.type === "depot" ? (
+                                                <>
+                                                  <div className="p-2 rounded-lg bg-amber-200/80 text-amber-800 dark:bg-amber-800/50 dark:text-amber-300 ring-1 ring-amber-400/40">
+                                                    <Storefront
+                                                      className="h-5 w-5"
+                                                      weight="fill"
+                                                    />
+                                                  </div>
+                                                  <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-extrabold text-amber-900 dark:text-amber-200 truncate tracking-tight">
+                                                      Kho:{" "}
+                                                      <span className="underline decoration-amber-400 decoration-2 underline-offset-2">
+                                                        {group.depotName}
+                                                      </span>
+                                                    </p>
+                                                  </div>
+                                                  <Badge
+                                                    variant="outline"
+                                                    className="text-[10px] h-5 px-1.5 shrink-0 border-amber-400/60 text-amber-700 dark:text-amber-300 font-semibold"
+                                                  >
+                                                    {group.activities.length}{" "}
+                                                    bước
+                                                  </Badge>
+                                                </>
+                                              ) : group.type === "sos" &&
+                                                matchedSOS ? (
+                                                <SOSGroupHeader
+                                                  matchedSOS={matchedSOS}
+                                                  groupActivitiesLength={
+                                                    group.activities.length
+                                                  }
+                                                />
+                                              ) : (
+                                                <>
+                                                  <div className="p-1.5 rounded-lg bg-blue-100/80 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">
+                                                    <ListChecks
+                                                      className="h-4 w-4"
+                                                      weight="fill"
+                                                    />
+                                                  </div>
+                                                  <p className="text-sm font-bold text-blue-800 dark:text-blue-300 flex-1">
+                                                    {group.type === "sos"
+                                                      ? `SOS ${group.sosRequestId ?? "unknown"}`
+                                                      : "Cụm nhiệm vụ"}
+                                                  </p>
+                                                  <Badge
+                                                    variant="outline"
+                                                    className="text-[10px] h-5 px-1.5 shrink-0"
+                                                  >
+                                                    {group.activities.length}{" "}
+                                                    bước
+                                                  </Badge>
+                                                </>
+                                              )}
+                                            </div>
+
+                                            <div className="p-3 space-y-2.5 bg-card">
+                                              {group.activities.map(
+                                                (activity, aIdx) => {
+                                                  const assignedMissionTeams = (
+                                                    mission.teams ?? []
+                                                  ).filter((team) => {
+                                                    const normalizedStatus = (
+                                                      team.status ?? ""
+                                                    )
+                                                      .trim()
+                                                      .toLowerCase();
+                                                    return (
+                                                      team.unassignedAt ==
+                                                        null &&
+                                                      (normalizedStatus ===
+                                                        "assigned" ||
+                                                        normalizedStatus ===
+                                                          "inprogress" ||
+                                                        normalizedStatus ===
+                                                          "in_progress" ||
+                                                        normalizedStatus ===
+                                                          "in progress")
+                                                    );
+                                                  });
+                                                  const teamsForStep =
+                                                    assignedMissionTeams.length >
+                                                    0
+                                                      ? assignedMissionTeams
+                                                      : (mission.teams ?? []);
+                                                  const config =
+                                                    activityTypeConfig[
+                                                      activity.activityType
+                                                    ] ||
+                                                    activityTypeConfig[
+                                                      "ASSESS"
+                                                    ];
+                                                  const cleanDescription =
+                                                    activity.description
+                                                      .replace(
+                                                        /\b\d{1,2}\.\d+,\s*\d{1,2}\.\d+\b\s*(\([^\)]*\))?/g,
+                                                        "",
+                                                      )
+                                                      .replace(/\s+/g, " ")
+                                                      .replace(/\(\s*\)/g, "")
+                                                      .replace(/: \./g, ":")
+                                                      .trim();
+                                                  const supplyItems =
+                                                    getSupplyDisplayItems(
+                                                      activity,
+                                                    );
+                                                  const displayDescription =
+                                                    supplyItems.length > 0
+                                                      ? stripSupplyDetailsFromDescription(
+                                                          cleanDescription,
+                                                        )
+                                                      : cleanDescription;
+                                                  const stepStatus =
+                                                    getActivityStatusMeta(
+                                                      activity.status,
+                                                    );
+
+                                                  return (
                                                     <div
-                                                      key={sIdx}
-                                                      className="flex items-center gap-1.5 text-[10px] text-blue-700 dark:text-blue-400"
+                                                      key={aIdx}
+                                                      className="rounded-lg border bg-background p-3 hover:bg-accent/20 transition-colors shadow-sm"
                                                     >
-                                                      <Package className="h-3 w-3 shrink-0" />
-                                                      <span className="font-medium">
-                                                        {getSupplyDisplayName(
-                                                          supply,
-                                                        )}
-                                                      </span>
-                                                      <span className="font-bold bg-blue-50 dark:bg-blue-900/20 px-1 rounded">
-                                                        {supply.quantity}{" "}
-                                                        {supply.unit}
-                                                      </span>
+                                                      <div className="flex items-start gap-3">
+                                                        <div
+                                                          className={cn(
+                                                            "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5",
+                                                            config.bgColor,
+                                                            config.color,
+                                                          )}
+                                                        >
+                                                          {activity.step}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0 space-y-1.5">
+                                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <Badge
+                                                              variant="outline"
+                                                              className={cn(
+                                                                "text-[11px] font-semibold px-2 py-0 h-5",
+                                                                config.color,
+                                                                config.bgColor,
+                                                                "border-transparent",
+                                                              )}
+                                                            >
+                                                              {config.label}
+                                                            </Badge>
+                                                            <Badge
+                                                              variant="outline"
+                                                              className={cn(
+                                                                "text-[11px] h-6 px-2 font-bold border flex items-center gap-1",
+                                                                stepStatus.className,
+                                                              )}
+                                                            >
+                                                              {stepStatus.icon}
+                                                              {stepStatus.label}
+                                                            </Badge>
+                                                          </div>
+                                                          <p className="text-sm text-foreground/80 leading-relaxed font-medium">
+                                                            {displayDescription}
+                                                          </p>
+                                                          {teamsForStep.length >
+                                                            0 && (
+                                                            <div className="mt-2 p-2 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
+                                                              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
+                                                                <ShieldCheck
+                                                                  className="h-3 w-3"
+                                                                  weight="fill"
+                                                                />
+                                                                Đội phụ trách
+                                                              </p>
+                                                              <div className="space-y-1.5">
+                                                                {teamsForStep.map(
+                                                                  (team) => {
+                                                                    const teamStatusMeta =
+                                                                      getTeamAssignmentStatusMeta(
+                                                                        team.status,
+                                                                      );
+
+                                                                    return (
+                                                                      <div
+                                                                        key={
+                                                                          team.missionTeamId
+                                                                        }
+                                                                        className="rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-background/80 px-2 py-1.5"
+                                                                      >
+                                                                        <p className="text-[11px] font-semibold text-emerald-900 dark:text-emerald-100">
+                                                                          {team.teamName ||
+                                                                            `Đội #${team.rescueTeamId}`}
+                                                                        </p>
+                                                                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                                                          {team.teamCode && (
+                                                                            <Badge
+                                                                              variant="outline"
+                                                                              className="h-5 px-1.5 text-[10px] border-emerald-300/70 text-emerald-800 dark:border-emerald-700 dark:text-emerald-200"
+                                                                            >
+                                                                              {
+                                                                                team.teamCode
+                                                                              }
+                                                                            </Badge>
+                                                                          )}
+                                                                          {team.teamType && (
+                                                                            <span className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80">
+                                                                              Loại:{" "}
+                                                                              {formatTeamTypeLabel(
+                                                                                team.teamType,
+                                                                              )}
+                                                                            </span>
+                                                                          )}
+                                                                          <Badge
+                                                                            variant="outline"
+                                                                            className={cn(
+                                                                              "h-5 px-1.5 text-[10px] font-semibold",
+                                                                              teamStatusMeta.className,
+                                                                            )}
+                                                                          >
+                                                                            {
+                                                                              teamStatusMeta.label
+                                                                            }
+                                                                          </Badge>
+                                                                        </div>
+                                                                      </div>
+                                                                    );
+                                                                  },
+                                                                )}
+                                                              </div>
+                                                            </div>
+                                                          )}
+                                                          {supplyItems.length >
+                                                            0 && (
+                                                            <div className="mt-2.5 p-2.5 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                                                              <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600/80 dark:text-blue-400 mb-1.5 flex items-center gap-1.5">
+                                                                <Package
+                                                                  className="h-3 w-3"
+                                                                  weight="fill"
+                                                                />
+                                                                {activity.activityType ===
+                                                                "DELIVER_SUPPLIES"
+                                                                  ? "Danh sách giao hàng"
+                                                                  : "Yêu cầu lấy vật tư"}
+                                                              </p>
+                                                              <div className="space-y-1">
+                                                                {supplyItems.map(
+                                                                  (
+                                                                    supply,
+                                                                    sIdx,
+                                                                  ) => (
+                                                                    <div
+                                                                      key={sIdx}
+                                                                      className="flex items-center justify-between gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
+                                                                    >
+                                                                      <div className="flex items-center gap-1.5 min-w-0">
+                                                                        <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                                        <span className="font-medium truncate">
+                                                                          {
+                                                                            supply.name
+                                                                          }
+                                                                        </span>
+                                                                      </div>
+                                                                      <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                                                                        {supply.quantityLabel ||
+                                                                          "-"}
+                                                                      </div>
+                                                                    </div>
+                                                                  ),
+                                                                )}
+                                                              </div>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      </div>
                                                     </div>
-                                                  ),
-                                                )}
-                                              </div>
-                                            )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                              {/* Consolidated route for entire mission */}
-                              <MissionRoutePreview mission={mission} />
-                            </CardContent>
-                          </Card>
-                        ))}
+                                                  );
+                                                },
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      });
+                                    })()}
+                                  </div>
+                                )}
+                                {/* Consolidated route for entire mission */}
+                                <MissionRoutePreview
+                                  mission={mission}
+                                  sosRequests={clusterSOSRequests}
+                                />
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="text-center py-8 rounded-xl border-2 border-dashed border-border/50">
@@ -2805,9 +3655,8 @@ const RescuePlanPanel = ({
                                     </div>
                                   </div>
 
-                                  {/* Supply drop zone (only for COLLECT_SUPPLIES) */}
-                                  {activity.activityType ===
-                                    "COLLECT_SUPPLIES" && (
+                                  {/* Supply drop zone (for supply activities) */}
+                                  {isSupplyStep(activity.activityType) && (
                                     <div
                                       className={cn(
                                         "mt-1 p-2 rounded-lg border-2 border-dashed transition-colors",
@@ -3254,7 +4103,7 @@ const RescuePlanPanel = ({
                                         />
                                       </div>
                                       <p className="text-sm font-bold text-blue-800 dark:text-blue-300">
-                                        Nhiệm vụ chung
+                                        SOS {group.sosRequestId ?? "unknown"}
                                       </p>
                                       <Badge
                                         variant="outline"
@@ -3282,6 +4131,16 @@ const RescuePlanPanel = ({
                                         .replace(/\(\s*\)/g, "")
                                         .replace(/: \./g, ":")
                                         .trim();
+                                    const supplyItems =
+                                      getSupplyDisplayItems(activity);
+                                    const displayDescription =
+                                      supplyItems.length > 0
+                                        ? stripSupplyDetailsFromDescription(
+                                            cleanDescription,
+                                          )
+                                        : cleanDescription;
+                                    const stepStatus =
+                                      getActivityStatusMeta("Pending");
 
                                     return (
                                       <div
@@ -3320,46 +4179,83 @@ const RescuePlanPanel = ({
                                                   {activity.priority}
                                                 </span>
                                               )}
+                                              <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                  "text-[11px] h-6 px-2 font-bold border flex items-center gap-1",
+                                                  stepStatus.className,
+                                                )}
+                                              >
+                                                {stepStatus.icon}
+                                                {stepStatus.label}
+                                              </Badge>
                                             </div>
                                             <p className="text-sm leading-relaxed text-foreground/80">
-                                              {cleanDescription}
+                                              {displayDescription}
                                             </p>
 
-                                            {activity.suppliesToCollect &&
-                                              activity.suppliesToCollect
-                                                .length > 0 && (
-                                                <div className="mt-2 p-2 rounded-md bg-muted/50 border border-dashed">
-                                                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
-                                                    {activity.activityType ===
-                                                    "DELIVER_SUPPLIES"
-                                                      ? "Danh sách giao hàng"
-                                                      : "Yêu cầu lấy vật tư"}
-                                                  </p>
-                                                  <div className="space-y-1">
-                                                    {activity.suppliesToCollect.map(
-                                                      (supply, sIdx) => (
-                                                        <div
-                                                          key={sIdx}
-                                                          className="flex items-center justify-between gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
-                                                        >
-                                                          <div className="flex items-center gap-1.5 min-w-0">
-                                                            <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                                            <span className="font-medium truncate">
-                                                              {getSupplyDisplayName(
-                                                                supply,
-                                                              )}
-                                                            </span>
-                                                          </div>
-                                                          <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
-                                                            {supply.quantity}{" "}
-                                                            {supply.unit}
-                                                          </div>
+                                            {activity.suggestedTeam && (
+                                              <div className="mt-2 p-2.5 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
+                                                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
+                                                  <ShieldCheck
+                                                    className="h-3 w-3"
+                                                    weight="fill"
+                                                  />
+                                                  Đội đề xuất
+                                                </p>
+                                                <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                                                  {activity.suggestedTeam
+                                                    .teamName ||
+                                                    (activity.suggestedTeam
+                                                      .teamId
+                                                      ? `Đội #${activity.suggestedTeam.teamId}`
+                                                      : "Đội chưa đặt tên")}
+                                                </p>
+                                                <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                  {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
+                                                  {activity.suggestedTeam
+                                                    .contactPhone
+                                                    ? ` • SĐT: ${activity.suggestedTeam.contactPhone}`
+                                                    : ""}
+                                                  {activity.suggestedTeam
+                                                    .estimatedEtaMinutes != null
+                                                    ? ` • ETA: ${activity.suggestedTeam.estimatedEtaMinutes} phút`
+                                                    : ""}
+                                                </p>
+                                              </div>
+                                            )}
+
+                                            {supplyItems.length > 0 && (
+                                              <div className="mt-2 p-2 rounded-md bg-muted/50 border border-dashed">
+                                                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
+                                                  {activity.activityType ===
+                                                  "DELIVER_SUPPLIES"
+                                                    ? "Danh sách giao hàng"
+                                                    : "Yêu cầu lấy vật tư"}
+                                                </p>
+                                                <div className="space-y-1">
+                                                  {supplyItems.map(
+                                                    (supply, sIdx) => (
+                                                      <div
+                                                        key={sIdx}
+                                                        className="flex items-center justify-between gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
+                                                      >
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                          <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                          <span className="font-medium truncate">
+                                                            {supply.name}
+                                                          </span>
                                                         </div>
-                                                      ),
-                                                    )}
-                                                  </div>
+                                                        <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                                                          {supply.quantityLabel ||
+                                                            "-"}
+                                                        </div>
+                                                      </div>
+                                                    ),
+                                                  )}
                                                 </div>
-                                              )}
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
@@ -3597,7 +4493,8 @@ const RescuePlanPanel = ({
               <DialogTitle>Xác nhận tạo nhiệm vụ</DialogTitle>
               <DialogDescription>
                 Bạn có chắc muốn hoàn tất chỉnh sửa và tạo nhiệm vụ này không?
-                Sau khi tạo, nhiệm vụ sẽ được lưu vào danh sách nhiệm vụ đã tạo.
+                Sau khi tạo, nhiệm vụ sẽ được lưu vào danh sách nhiệm vụ đã tạo
+                và gửi đến đội cứu hộ được chỉ định.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

@@ -33,35 +33,6 @@ import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
 // Panel width
 const PANEL_WIDTH = 420;
 
-// Time elapsed display component
-function TimeElapsed({ date }: { date: Date }) {
-  const [elapsed, setElapsed] = useState("");
-
-  useEffect(() => {
-    const updateElapsed = () => {
-      const now = Date.now();
-      const minutes = Math.floor((now - date.getTime()) / 60000);
-      if (minutes < 60) {
-        setElapsed(`${minutes} phút trước`);
-      } else {
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) {
-          setElapsed(`${hours} giờ trước`);
-        } else {
-          const days = Math.floor(hours / 24);
-          setElapsed(`${days} ngày trước`);
-        }
-      }
-    };
-
-    updateElapsed();
-    const interval = setInterval(updateElapsed, 60000);
-    return () => clearInterval(interval);
-  }, [date]);
-
-  return <span>{elapsed}</span>;
-}
-
 function ParsedMessage({
   text,
   hideInjurySection = false,
@@ -371,6 +342,16 @@ const SOSDetailsPanel = ({
   // Get risk factors from AI analysis
   const riskFactors = sosRequest.aiAnalysis?.riskFactors || [];
   const injuredPersons = sosRequest.injuredPersons ?? [];
+  const waitTimeMinutes =
+    sosRequest.waitTimeMinutes ??
+    Math.max(
+      0,
+      Math.floor((Date.now() - sosRequest.createdAt.getTime()) / 60000),
+    );
+  const waitDurationLabel =
+    waitTimeMinutes >= 1440
+      ? `${Math.floor(waitTimeMinutes / 1440)} ngày`
+      : `${Math.max(1, Math.floor(waitTimeMinutes / 60))} giờ`;
 
   const severityLabel = (value?: string) => {
     const normalized = (value || "").toLowerCase();
@@ -533,7 +514,7 @@ const SOSDetailsPanel = ({
                     priorityColors[sosRequest.priority],
                   )}
                 />
-                SOS #{sosRequest.id}
+                SOS {sosRequest.id}
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Chi tiết yêu cầu cứu hộ
@@ -574,13 +555,8 @@ const SOSDetailsPanel = ({
             </div>
             <div className="bg-muted rounded-lg p-3 text-center">
               <Timer className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-              <div className="text-xs text-muted-foreground">
-                {sosRequest.waitTimeMinutes != null &&
-                sosRequest.waitTimeMinutes > 0 ? (
-                  `Chờ ${sosRequest.waitTimeMinutes} phút`
-                ) : (
-                  <TimeElapsed date={sosRequest.createdAt} />
-                )}
+              <div className="text-xs text-muted-foreground leading-tight">
+                Chờ {waitDurationLabel}
               </div>
             </div>
           </div>
@@ -590,7 +566,9 @@ const SOSDetailsPanel = ({
         <ScrollArea className="flex-1">
           <div className="p-5 space-y-5">
             {/* Sender Info */}
-            {(sosRequest.senderPhone || sosRequest.senderName) && (
+            {(sosRequest.senderPhone ||
+              sosRequest.senderName ||
+              sosRequest.createdByCoordinatorId) && (
               <div className="bg-muted/50 rounded-lg p-4">
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
                   <Phone className="h-4 w-4" />
@@ -606,28 +584,48 @@ const SOSDetailsPanel = ({
                         {sosRequest.senderPhone}
                       </div>
                     )}
+                    {sosRequest.createdByCoordinatorId && (
+                      <div className="text-xs text-muted-foreground">
+                        Tạo hộ bởi điều phối viên:{" "}
+                        {sosRequest.createdByCoordinatorId}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {sosRequest.isOnline ? (
-                      <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-md border border-green-200 dark:border-green-800">
-                        <WifiHigh
-                          className="h-3.5 w-3.5 text-green-600 dark:text-green-400"
+                    {sosRequest.createdByCoordinatorId ? (
+                      <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-200 dark:border-blue-800">
+                        <Users
+                          className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400"
                           weight="fill"
                         />
-                        <span className="text-xs font-medium text-green-700 dark:text-green-300">
-                          Gửi qua Internet
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                          Điều phối viên tạo yêu cầu hộ
                         </span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-md border border-orange-200 dark:border-orange-800">
-                        <WifiSlash
-                          className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400"
-                          weight="fill"
-                        />
-                        <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
-                          Gửi ngoại tuyến (Mesh)
-                        </span>
-                      </div>
+                      <>
+                        {sosRequest.isOnline ? (
+                          <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-md border border-green-200 dark:border-green-800">
+                            <WifiHigh
+                              className="h-3.5 w-3.5 text-green-600 dark:text-green-400"
+                              weight="fill"
+                            />
+                            <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                              Gửi qua Internet
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-md border border-orange-200 dark:border-orange-800">
+                            <WifiSlash
+                              className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400"
+                              weight="fill"
+                            />
+                            <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
+                              Gửi ngoại tuyến (Mesh)
+                            </span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1274,7 +1272,7 @@ const SOSDetailsPanel = ({
                               {PRIORITY_LABELS[sos.priority]}
                             </Badge>
                             <span className="text-xs font-mono text-muted-foreground">
-                              SOS #{sos.id}
+                              SOS {sos.id}
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-1 mt-1">

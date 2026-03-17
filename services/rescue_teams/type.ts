@@ -107,3 +107,27 @@ export interface CreateRescueTeamResponse {
   status: RescueTeamStatusKey;
   createdAt: string;
 }
+
+export interface ScheduleRescueTeamAssemblyRequest {
+  id: number;
+  assemblyAt: string;
+}
+
+export interface ScheduleRescueTeamAssemblyErrorResponse {
+  message: string;
+  errors?: {
+    _domainMsg?: string[];
+    [key: string]: string[] | undefined;
+  };
+}
+
+export interface RemoveRescueTeamMemberRequest {
+  id: number;
+  userId: string;
+}
+
+export interface AddRescueTeamMemberRequest {
+  id: number;
+  userId: string;
+  isLeader: boolean;
+}
