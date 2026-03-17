@@ -264,39 +264,42 @@ export default function CoordinatorChatPage() {
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-gradient-to-b from-slate-50 to-background">
-      <header className="shrink-0 border-b bg-background/80 px-4 py-3 backdrop-blur md:px-5">
+    <div className="flex h-screen flex-col overflow-hidden bg-white text-black tracking-tighter">
+      <header className="shrink-0 border-b border-black bg-white px-4 py-3 md:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => router.push("/dashboard/coordinator")}
-              className="rounded-xl"
+              className="rounded-none border border-black"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <p className="text-sm font-semibold md:text-base">
+              <p className="text-sm font-semibold uppercase md:text-base">
                 Coordinator - Victim Chat
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-black/70">
                 Theo dõi hội thoại realtime giữa coordinator web và victim app
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="rounded-full px-3">
+            <Badge
+              variant="secondary"
+              className="rounded-none border border-black bg-black text-white"
+            >
               {activeStatus === "CoordinatorActive"
                 ? "CoordinatorActive"
                 : "WaitingCoordinator"}
             </Badge>
             <ChatConnectionBadge state={connectionState} />
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
-              className="gap-1.5 rounded-full"
+              className="gap-1.5 rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19]"
               onClick={() => {
                 void refetchRooms();
               }}
@@ -310,7 +313,7 @@ export default function CoordinatorChatPage() {
       </header>
 
       {!isConnectionHealthy ? (
-        <div className="mx-4 mt-4 p-3 rounded-lg border border-amber-500/30 bg-amber-100/60 text-amber-900 dark:bg-amber-900/20 dark:text-amber-100 dark:border-amber-400/30">
+        <div className="mx-4 mt-4 border border-[#FF5722] bg-[#FF5722]/10 p-3 text-[#9a3412] md:mx-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-medium">
@@ -327,7 +330,7 @@ export default function CoordinatorChatPage() {
             </div>
 
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
               onClick={() => {
                 void retryConnection();
@@ -335,7 +338,7 @@ export default function CoordinatorChatPage() {
               disabled={
                 !activeConversationId || connectionState === "connecting"
               }
-              className="shrink-0"
+              className="shrink-0 rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19]"
             >
               <ArrowClockwise className="h-4 w-4" />
               Thử lại
@@ -344,9 +347,9 @@ export default function CoordinatorChatPage() {
         </div>
       ) : null}
 
-      <div className="flex flex-1 flex-col gap-3 overflow-hidden p-3 md:flex-row md:p-4">
-        <aside className="flex w-full flex-col overflow-hidden rounded-2xl border bg-white/75 shadow-sm md:w-[320px] lg:w-[340px]">
-          <div className="border-b p-3">
+      <div className="grid flex-1 grid-cols-1 gap-3 overflow-hidden p-3 md:grid-cols-[320px_minmax(0,1fr)] md:grid-rows-1 md:gap-0 md:p-5">
+        <aside className="flex w-full flex-col overflow-hidden border border-black bg-white md:w-auto md:border-r-0">
+          <div className="border-b border-black p-3">
             <Input
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
@@ -369,7 +372,7 @@ export default function CoordinatorChatPage() {
           </div>
         </aside>
 
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden border border-black bg-white before:absolute before:inset-0 before:-z-10 before:bg-[linear-gradient(to_right,rgba(0,0,0,0.07)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.07)_1px,transparent_1px)] before:bg-[size:28px_28px]">
           {waitingError ? (
             <div className="m-4 p-3 rounded-lg border border-destructive/40 bg-destructive/10 text-sm text-destructive">
               Không thể tải danh sách cuộc trò chuyện.
@@ -378,8 +381,8 @@ export default function CoordinatorChatPage() {
 
           {activeConversationId ? (
             <>
-              <div className="border-b bg-slate-50/80 px-4 py-3">
-                <p className="text-sm font-medium">
+              <div className="border-b border-black bg-white px-4 py-3">
+                <p className="text-sm font-semibold uppercase">
                   Conversation #{activeConversationId}
                 </p>
               </div>
@@ -400,7 +403,7 @@ export default function CoordinatorChatPage() {
               />
             </>
           ) : (
-            <div className="h-full grid place-items-center text-sm text-muted-foreground">
+            <div className="grid h-full place-items-center text-sm text-black/70">
               Chọn một cuộc trò chuyện ở cột trái để bắt đầu.
             </div>
           )}

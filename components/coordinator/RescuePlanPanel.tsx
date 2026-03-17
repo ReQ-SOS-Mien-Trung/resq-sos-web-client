@@ -7,10 +7,10 @@ import {
   CircleMarker,
   MapContainer,
   Polyline,
-  TileLayer,
   Tooltip,
   useMap,
 } from "react-leaflet";
+import { tileLayer } from "leaflet";
 import {
   activityTypeConfig,
   resourceTypeIcons,
@@ -143,6 +143,36 @@ const RoutePreviewFitBounds = ({ points }: { points: [number, number][] }) => {
   return null;
 };
 
+const SafeTileLayer = ({ url }: { url: string }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map.getPane("tilePane")) {
+      return;
+    }
+
+    const layer = tileLayer(url);
+
+    try {
+      layer.addTo(map);
+    } catch {
+      return;
+    }
+
+    return () => {
+      try {
+        if (map.hasLayer(layer)) {
+          layer.remove();
+        }
+      } catch {
+        // Ignore teardown races when parent map unmounts first.
+      }
+    };
+  }, [map, url]);
+
+  return null;
+};
+
 const RoutePreviewMap = ({
   points,
   origin,
@@ -163,7 +193,7 @@ const RoutePreviewMap = ({
         attributionControl={false}
         className="h-full w-full"
       >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <RoutePreviewFitBounds points={points} />
         <Polyline
           positions={points}
@@ -1469,7 +1499,7 @@ const MissionRoutePreview = ({
                 attributionControl={false}
                 className="h-full w-full"
               >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <RoutePreviewFitBounds points={allPoints} />
                 {/* Render each segment with different color */}
                 {segments.map((seg, idx) => (
@@ -4492,9 +4522,9 @@ const RescuePlanPanel = ({
             <DialogHeader>
               <DialogTitle>Xác nhận tạo nhiệm vụ</DialogTitle>
               <DialogDescription>
-                Bạn có chắc muốn hoàn tất chỉnh sửa và tạo nhiệm vụ này không?
-                Sau khi tạo, nhiệm vụ sẽ được lưu vào danh sách nhiệm vụ đã tạo
-                và gửi đến đội cứu hộ được chỉ định.
+                Bạn có chắc muốn hoàn tất chỉnh sửa không? Sau khi tạo, nhiệm vụ
+                sẽ được lưu vào danh sách nhiệm vụ đã tạo và gửi đến đội cứu hộ
+                được chỉ định.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

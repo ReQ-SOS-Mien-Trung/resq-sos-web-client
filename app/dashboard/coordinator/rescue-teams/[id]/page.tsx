@@ -55,19 +55,19 @@ const teamTypeMap: Record<
 > = {
   Rescue: {
     label: "Cứu hộ",
-    className: "text-orange-700 bg-orange-100 border-orange-200",
+    className: "border-black bg-white text-black",
   },
   Medical: {
     label: "Y tế",
-    className: "text-red-700 bg-red-100 border-red-200",
+    className: "border-black bg-white text-black",
   },
   Transportation: {
     label: "Vận chuyển",
-    className: "text-blue-700 bg-blue-100 border-blue-200",
+    className: "border-black bg-white text-black",
   },
   Mixed: {
     label: "Hỗn hợp",
-    className: "text-violet-700 bg-violet-100 border-violet-200",
+    className: "border-black bg-white text-black",
   },
 };
 
@@ -81,47 +81,47 @@ const statusMap: Record<
 > = {
   AwaitingAcceptance: {
     label: "Chờ xác nhận",
-    className: "bg-slate-100 text-slate-700 border-slate-200",
+    className: "border-black bg-white text-black",
     tone: "neutral",
   },
   Ready: {
     label: "Sẵn sàng",
-    className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    className: "border-black bg-white text-black",
     tone: "good",
   },
   Gathering: {
     label: "Đang tập hợp",
-    className: "bg-amber-100 text-amber-700 border-amber-200",
+    className: "border-black bg-white text-black",
     tone: "warn",
   },
   Available: {
     label: "Trống",
-    className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    className: "border-black bg-white text-black",
     tone: "good",
   },
   Assigned: {
     label: "Đã phân công",
-    className: "bg-amber-100 text-amber-700 border-amber-200",
+    className: "border-black bg-white text-black",
     tone: "warn",
   },
   OnMission: {
     label: "Đang làm nhiệm vụ",
-    className: "bg-blue-100 text-blue-700 border-blue-200",
+    className: "border-black bg-white text-black",
     tone: "warn",
   },
   Stuck: {
     label: "Mắc kẹt",
-    className: "bg-red-100 text-red-700 border-red-200",
+    className: "border-black bg-white text-black",
     tone: "danger",
   },
   Unavailable: {
     label: "Không khả dụng",
-    className: "bg-red-100 text-red-700 border-red-200",
+    className: "border-black bg-white text-black",
     tone: "danger",
   },
   Disbanded: {
     label: "Đã giải tán",
-    className: "bg-zinc-100 text-zinc-700 border-zinc-200",
+    className: "border-black bg-white text-black",
     tone: "neutral",
   },
 };
@@ -129,15 +129,15 @@ const statusMap: Record<
 const memberStatusMap: Record<string, { label: string; className: string }> = {
   Accepted: {
     label: "Đã xác nhận",
-    className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    className: "border-black bg-white text-black",
   },
   Pending: {
     label: "Đang chờ",
-    className: "bg-amber-100 text-amber-700 border-amber-200",
+    className: "border-black bg-white text-black",
   },
   Rejected: {
     label: "Từ chối",
-    className: "bg-rose-100 text-rose-700 border-rose-200",
+    className: "border-black bg-white text-black",
   },
 };
 
@@ -203,16 +203,16 @@ function MemberCard({
     "?";
   const status = memberStatusMap[member.status] || {
     label: member.status,
-    className: "bg-slate-100 text-slate-700 border-slate-200",
+    className: "border-black bg-white text-black",
   };
 
   return (
-    <Card className="border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <Card className="border-black bg-white transition hover:-translate-y-0.5">
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10 border border-background shadow-sm">
+          <Avatar className="h-10 w-10 border border-black/20 shadow-sm">
             <AvatarImage src={member.avatarUrl || DEFAULT_RESCUER_AVATAR} />
-            <AvatarFallback className="bg-gradient-to-br from-slate-500 to-slate-700 text-white text-xs font-bold">
+            <AvatarFallback className="bg-black text-xs font-bold text-white">
               {initials}
             </AvatarFallback>
           </Avatar>
@@ -224,7 +224,7 @@ function MemberCard({
                   {member.firstName} {member.lastName}
                 </p>
                 {member.isLeader && (
-                  <Badge className="h-5 px-1.5 text-[10px] bg-amber-500 hover:bg-amber-600 text-white">
+                  <Badge className="h-5 rounded-none bg-[#FF5722] px-1.5 text-[10px] text-white hover:bg-[#e64a19]">
                     <Crown className="mr-1 h-3 w-3" />
                     Đội trưởng
                   </Badge>
@@ -234,7 +234,7 @@ function MemberCard({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                className="h-7 rounded-none border border-black/30 px-2 text-black hover:bg-black/5 hover:text-black"
                 onClick={() => onRemove(member)}
                 disabled={isRemoving}
               >
@@ -247,22 +247,28 @@ function MemberCard({
               </Button>
             </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-              <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-black/70">
+              <Badge
+                variant="secondary"
+                className="h-5 rounded-none border border-black px-1.5 text-[10px]"
+              >
                 {member.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
               </Badge>
               <Badge
                 variant="outline"
-                className={`h-5 px-1.5 text-[10px] ${status.className}`}
+                className={`h-5 rounded-none px-1.5 text-[10px] ${status.className}`}
               >
                 {status.label}
               </Badge>
-              <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
+              <Badge
+                variant="outline"
+                className="h-5 rounded-none border-black px-1.5 text-[10px]"
+              >
                 {member.checkedIn ? "Đã check-in" : "Chưa check-in"}
               </Badge>
             </div>
 
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-black/70">
               <Phone className="h-3.5 w-3.5" />
               <span>{member.phone || "Không có số điện thoại"}</span>
             </div>
@@ -449,9 +455,9 @@ export default function RescueTeamDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-[1320px] p-4 md:p-6 space-y-6">
+      <div className="mx-auto w-full max-w-[1320px] space-y-6 p-4 tracking-tighter md:p-6">
         <Skeleton className="h-10 w-64" />
-        <Card className="rounded-2xl">
+        <Card className="border-black shadow-none">
           <CardContent className="p-6 space-y-4">
             <Skeleton className="h-8 w-1/2" />
             <Skeleton className="h-6 w-40" />
@@ -474,18 +480,21 @@ export default function RescueTeamDetailPage() {
 
   if (isError || !data) {
     return (
-      <div className="mx-auto w-full max-w-[920px] p-6">
-        <Card className="border-rose-200 bg-rose-50/40">
+      <div className="mx-auto w-full max-w-[920px] p-6 tracking-tighter">
+        <Card className="border-black bg-white">
           <CardContent className="p-8 text-center">
-            <p className="text-base font-semibold text-rose-700">
+            <p className="text-base font-semibold text-black">
               Không tải được chi tiết đội cứu hộ.
             </p>
-            <p className="mt-2 text-sm text-rose-600/80">
+            <p className="mt-2 text-sm text-black/70">
               Vui lòng thử lại hoặc quay về danh sách đội.
             </p>
             <div className="mt-5">
               <Link href="/dashboard/coordinator/rescue-teams">
-                <Button variant="outline" className="gap-1.5">
+                <Button
+                  variant="outline"
+                  className="gap-1.5 rounded-none border-black"
+                >
                   <ArrowLeft className="h-4 w-4" />
                   Quay lại danh sách
                 </Button>
@@ -499,28 +508,31 @@ export default function RescueTeamDetailPage() {
 
   const teamType = teamTypeMap[data.teamType] || {
     label: data.teamType,
-    className: "text-slate-700 bg-slate-100 border-slate-200",
+    className: "border-black bg-white text-black",
   };
   const teamStatus = statusMap[data.status] || {
     label: data.status,
-    className: "bg-slate-100 text-slate-700 border-slate-200",
+    className: "border-black bg-white text-black",
     tone: "neutral" as const,
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1320px] p-4 md:p-6 space-y-6">
+    <div className="mx-auto w-full max-w-[1320px] space-y-6 bg-[linear-gradient(to_right,rgba(0,0,0,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.08)_1px,transparent_1px)] bg-[size:30px_30px] bg-white p-4 tracking-tighter md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <Link href="/dashboard/coordinator/rescue-teams">
-            <Button variant="ghost" className="h-8 px-2 text-xs gap-1.5 -ml-2">
+            <Button
+              variant="ghost"
+              className="-ml-2 h-8 gap-1.5 rounded-none border border-black px-2 text-xs"
+            >
               <ArrowLeft className="h-4 w-4" />
               Danh sách đội cứu hộ
             </Button>
           </Link>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl font-bold uppercase md:text-3xl">
             Chi tiết đội cứu hộ
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-black/70">
             Theo dõi thông tin đội, thành viên và mức độ sẵn sàng theo thời gian
             thực.
           </p>
@@ -529,14 +541,14 @@ export default function RescueTeamDetailPage() {
         <div className="flex items-center gap-2">
           <Badge
             variant="outline"
-            className={`h-7 px-2.5 border ${teamType.className}`}
+            className={`h-7 rounded-none px-2.5 ${teamType.className}`}
           >
             <Shield className="mr-1.5 h-3.5 w-3.5" />
             {teamType.label}
           </Badge>
           <Badge
             variant="outline"
-            className={`h-7 px-2.5 border ${teamStatus.className}`}
+            className={`h-7 rounded-none px-2.5 ${teamStatus.className}`}
           >
             <Activity className="mr-1.5 h-3.5 w-3.5" />
             {teamStatus.label}
@@ -544,17 +556,15 @@ export default function RescueTeamDetailPage() {
         </div>
       </div>
 
-      <Card className="rounded-2xl border-0 shadow-lg bg-gradient-to-br from-emerald-50 via-white to-sky-50">
+      <Card className="border-black bg-white shadow-none">
         <CardContent className="p-5 md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                {data.code}
-              </p>
+              <p className="text-xs uppercase text-black/60">{data.code}</p>
               <h2 className="text-xl md:text-2xl font-bold mt-1">
                 {data.name}
               </h2>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-black/70">
                 <span className="inline-flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" />
                   {data.assemblyPointName}
@@ -567,26 +577,24 @@ export default function RescueTeamDetailPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 min-w-[240px]">
-              <div className="rounded-xl border bg-white/90 p-3">
-                <p className="text-[11px] text-muted-foreground">Quân số</p>
+              <div className="border border-black p-3">
+                <p className="text-[11px] text-black/60">Quân số</p>
                 <p className="mt-1 text-lg font-bold">
                   {memberStats.total}/{data.maxMembers}
                 </p>
               </div>
-              <div className="rounded-xl border bg-white/90 p-3">
-                <p className="text-[11px] text-muted-foreground">Đội trưởng</p>
+              <div className="border border-black p-3">
+                <p className="text-[11px] text-black/60">Đội trưởng</p>
                 <p className="mt-1 text-lg font-bold">{memberStats.leaders}</p>
               </div>
-              <div className="rounded-xl border bg-white/90 p-3">
-                <p className="text-[11px] text-muted-foreground">Ngày lập</p>
+              <div className="border border-black p-3">
+                <p className="text-[11px] text-black/60">Ngày lập</p>
                 <p className="mt-1 text-xs font-semibold leading-tight">
                   {formatDate(data.createdAt)}
                 </p>
               </div>
-              <div className="rounded-xl border bg-white/90 p-3">
-                <p className="text-[11px] text-muted-foreground">
-                  Ngày tập kết
-                </p>
+              <div className="border border-black p-3">
+                <p className="text-[11px] text-black/60">Ngày tập kết</p>
                 <p className="mt-1 text-xs font-semibold leading-tight">
                   {formatDate(data.assemblyDate)}
                 </p>
@@ -597,28 +605,26 @@ export default function RescueTeamDetailPage() {
       </Card>
 
       <section className="grid gap-4 xl:grid-cols-5">
-        <Card className="xl:col-span-2 border-sky-200 bg-gradient-to-br from-sky-50 to-white">
+        <Card className="xl:col-span-2 border-black bg-white shadow-none">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <CalendarClock className="h-4 w-4 text-sky-600" />
+              <CalendarClock className="h-4 w-4 text-[#FF5722]" />
               Lịch tập kết đội
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">
-                Thời gian tập kết
-              </Label>
+              <Label className="text-xs text-black/70">Thời gian tập kết</Label>
               <Input
                 type="datetime-local"
                 value={assemblyAtInput}
                 onChange={(e) => setAssemblyAtDraft(e.target.value)}
-                className="h-9"
+                className="h-9 border-black/50"
               />
             </div>
             <Button
               type="button"
-              className="w-full"
+              className="w-full rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19]"
               onClick={handleScheduleAssembly}
               disabled={isSchedulingAssembly}
             >
@@ -634,15 +640,15 @@ export default function RescueTeamDetailPage() {
           </CardContent>
         </Card>
 
-        <Card className="xl:col-span-3 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+        <Card className="xl:col-span-3 border-black bg-white shadow-none">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <UserPlus className="h-4 w-4 text-emerald-600" />
+              <UserPlus className="h-4 w-4 text-[#FF5722]" />
               Bổ sung thành viên
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-lg border bg-white/80 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 border border-black px-3 py-2 text-xs text-black/70">
               <span>Chỗ trống còn lại</span>
               <span className="font-semibold text-foreground">
                 {remainingSlots}/{data.maxMembers}
@@ -650,25 +656,25 @@ export default function RescueTeamDetailPage() {
             </div>
 
             {remainingSlots <= 0 ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+              <div className="border border-[#FF5722] bg-[#FF5722]/10 px-3 py-3 text-sm text-[#c2410c]">
                 Đội đã đủ quân số tối đa. Không thể thêm thành viên mới.
               </div>
             ) : (
               <>
                 <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                   <div className="relative">
-                    <Search className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-black/50" />
                     <Input
                       value={rescuerSearch}
                       onChange={(e) => setRescuerSearch(e.target.value)}
                       placeholder="Tìm theo tên, email, số điện thoại"
-                      className="h-9 pl-8"
+                      className="h-9 border-black/50 pl-8"
                     />
                   </div>
                   <Button
                     type="button"
                     variant={addAsLeader ? "default" : "outline"}
-                    className="h-9"
+                    className={`h-9 rounded-none border-black ${addAsLeader ? "bg-[#FF5722] text-white hover:bg-[#e64a19]" : ""}`}
                     onClick={() => setAddAsLeader((prev) => !prev)}
                     disabled={!selectedRescuerId}
                   >
@@ -682,7 +688,7 @@ export default function RescueTeamDetailPage() {
                   value={selectedRescuerId}
                   onValueChange={setSelectedRescuerId}
                 >
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-9 rounded-none border-black/50">
                     <SelectValue
                       placeholder={
                         isLoadingFreeRescuers
@@ -707,7 +713,7 @@ export default function RescueTeamDetailPage() {
                 </Select>
 
                 {selectedCandidate && (
-                  <div className="rounded-lg border bg-white/80 px-3 py-2 text-xs text-muted-foreground">
+                  <div className="border border-black px-3 py-2 text-xs text-black/70">
                     <span className="font-medium text-foreground">
                       {selectedCandidate.firstName} {selectedCandidate.lastName}
                     </span>
@@ -721,7 +727,7 @@ export default function RescueTeamDetailPage() {
                   type="button"
                   onClick={handleAddMember}
                   disabled={isAddingMember}
-                  className="w-full"
+                  className="w-full rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19]"
                 >
                   {isAddingMember ? (
                     <>
@@ -745,34 +751,34 @@ export default function RescueTeamDetailPage() {
           </h3>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="border-emerald-200 bg-emerald-50/40">
+          <Card className="border-black bg-white shadow-none">
             <CardContent className="p-4">
-              <p className="text-xs text-emerald-700/80">Đã xác nhận</p>
-              <p className="mt-1 text-2xl font-bold text-emerald-700">
+              <p className="text-xs text-black/60">Đã xác nhận</p>
+              <p className="mt-1 text-2xl font-bold text-black">
                 {memberStats.accepted}
               </p>
             </CardContent>
           </Card>
-          <Card className="border-amber-200 bg-amber-50/40">
+          <Card className="border-black bg-white shadow-none">
             <CardContent className="p-4">
-              <p className="text-xs text-amber-700/80">Đang chờ</p>
-              <p className="mt-1 text-2xl font-bold text-amber-700">
+              <p className="text-xs text-black/60">Đang chờ</p>
+              <p className="mt-1 text-2xl font-bold text-black">
                 {memberStats.pending}
               </p>
             </CardContent>
           </Card>
-          <Card className="border-rose-200 bg-rose-50/40">
+          <Card className="border-black bg-white shadow-none">
             <CardContent className="p-4">
-              <p className="text-xs text-rose-700/80">Từ chối</p>
-              <p className="mt-1 text-2xl font-bold text-rose-700">
+              <p className="text-xs text-black/60">Từ chối</p>
+              <p className="mt-1 text-2xl font-bold text-black">
                 {memberStats.rejected}
               </p>
             </CardContent>
           </Card>
-          <Card className="border-sky-200 bg-sky-50/40">
+          <Card className="border-black bg-white shadow-none">
             <CardContent className="p-4">
-              <p className="text-xs text-sky-700/80">Còn trống</p>
-              <p className="mt-1 text-2xl font-bold text-sky-700">
+              <p className="text-xs text-black/60">Còn trống</p>
+              <p className="mt-1 text-2xl font-bold text-black">
                 {Math.max(0, data.maxMembers - memberStats.total)}
               </p>
             </CardContent>
@@ -788,10 +794,10 @@ export default function RescueTeamDetailPage() {
         </div>
 
         {data.members.length === 0 ? (
-          <Card className="border-dashed">
+          <Card className="border-dashed border-black bg-white">
             <CardContent className="p-10 text-center">
               <UserRoundPlus className="mx-auto h-8 w-8 text-muted-foreground/50" />
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mt-3 text-sm text-black/70">
                 Đội này chưa có thành viên.
               </p>
             </CardContent>
@@ -820,31 +826,32 @@ export default function RescueTeamDetailPage() {
             onClick={() => setMemberPendingRemove(null)}
             aria-label="Đóng hộp thoại xác nhận"
           />
-          <div className="relative w-full max-w-md rounded-2xl border border-rose-200 bg-white shadow-2xl">
+          <div className="relative w-full max-w-md border border-black bg-white shadow-2xl">
             <div className="p-5">
-              <h4 className="text-base font-semibold text-slate-900">
+              <h4 className="text-base font-semibold text-black">
                 Xác nhận xóa thành viên
               </h4>
-              <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+              <p className="mt-2 text-sm leading-relaxed text-black/70">
                 Bạn có chắc muốn xóa
-                <span className="font-semibold text-slate-900">
+                <span className="font-semibold text-black">
                   {` ${memberPendingRemove.firstName} ${memberPendingRemove.lastName} `}
                 </span>
                 khỏi đội cứu hộ này không?
               </p>
             </div>
-            <div className="flex items-center justify-end gap-2 border-t bg-slate-50/60 px-5 py-3 rounded-b-2xl">
+            <div className="flex items-center justify-end gap-2 border-t border-black/20 bg-white px-5 py-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setMemberPendingRemove(null)}
                 disabled={isRemovingMember}
+                className="rounded-none border-black"
               >
                 Hủy
               </Button>
               <Button
                 type="button"
-                variant="destructive"
+                className="rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19]"
                 onClick={confirmRemoveMember}
                 disabled={isRemovingMember}
               >
