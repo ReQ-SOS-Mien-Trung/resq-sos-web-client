@@ -16,6 +16,12 @@ import {
   searchDepotsByReliefItems,
   createSupplyRequests,
   getSupplyRequests,
+  acceptSupplyRequest,
+  prepareSupplyRequest,
+  shipSupplyRequest,
+  completeSupplyRequest,
+  confirmSupplyRequest,
+  rejectSupplyRequest,
   importInventory,
   importRegularInventory,
   getDepotTransactions,
@@ -38,6 +44,7 @@ import {
   CreateSupplyRequestsPayload,
   GetSupplyRequestsParams,
   GetSupplyRequestsResponse,
+  RejectSupplyRequestPayload,
   GetDepotTransactionsParams,
   GetDepotTransactionsResponse,
   ExportMovementsParams,
@@ -254,5 +261,71 @@ export function useExportInventoryMovements() {
   return useMutation({
     mutationFn: (params: ExportMovementsParams) =>
       exportInventoryMovements(params),
+  });
+}
+
+export function useAcceptSupplyRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => acceptSupplyRequest(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function usePrepareSupplyRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => prepareSupplyRequest(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function useShipSupplyRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => shipSupplyRequest(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function useCompleteSupplyRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => completeSupplyRequest(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function useConfirmSupplyRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => confirmSupplyRequest(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function useRejectSupplyRequest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number;
+      payload: RejectSupplyRequestPayload;
+    }) => rejectSupplyRequest(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
   });
 }

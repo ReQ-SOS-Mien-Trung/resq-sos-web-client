@@ -526,8 +526,21 @@ export default function SupplyRequestSection({
     try {
       await createSupplyRequests({ requests });
       toast.success("Đã gửi yêu cầu tiếp tế thành công");
+
+      // Clear searched/request-building data after successful submit
+      setSubmittedParams(null);
+      setLines([
+        {
+          id: crypto.randomUUID(),
+          categoryCode: "",
+          reliefItemKey: "",
+          quantity: "",
+        },
+      ]);
       setSelectedDepotByItem({});
       setDepotNotes({});
+      setFlyTokens([]);
+      setAnimatedDepotId(null);
       setSelectionSheetOpen(false);
     } catch {
       toast.error("Gửi yêu cầu thất bại. Vui lòng thử lại");

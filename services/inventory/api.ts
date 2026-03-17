@@ -17,6 +17,7 @@ import {
   CreateSupplyRequestsPayload,
   GetSupplyRequestsParams,
   GetSupplyRequestsResponse,
+  RejectSupplyRequestPayload,
   GetDepotTransactionsParams,
   GetDepotTransactionsResponse,
   ExportMovementsParams,
@@ -154,6 +155,57 @@ export async function getSupplyRequests(
     params,
   });
   return data;
+}
+
+/**
+ * Accept a supply request (Source Manager)
+ * PUT /logistics/inventory/supply-requests/{id}/accept
+ */
+export async function acceptSupplyRequest(id: number): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/accept`);
+}
+
+/**
+ * Start preparing a supply request (Source Manager)
+ * PUT /logistics/inventory/supply-requests/{id}/prepare
+ */
+export async function prepareSupplyRequest(id: number): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/prepare`);
+}
+
+/**
+ * Ship a supply request — decreases source depot inventory (Source Manager)
+ * PUT /logistics/inventory/supply-requests/{id}/ship
+ */
+export async function shipSupplyRequest(id: number): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/ship`);
+}
+
+/**
+ * Mark supply request as completed/delivered (Source Manager)
+ * PUT /logistics/inventory/supply-requests/{id}/complete
+ */
+export async function completeSupplyRequest(id: number): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/complete`);
+}
+
+/**
+ * Confirm receipt of supply request — increases requesting depot inventory (Requesting Manager)
+ * PUT /logistics/inventory/supply-requests/{id}/confirm
+ */
+export async function confirmSupplyRequest(id: number): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/confirm`);
+}
+
+/**
+ * Reject a supply request with reason (Source Manager, only from Pending)
+ * PUT /logistics/inventory/supply-requests/{id}/reject
+ */
+export async function rejectSupplyRequest(
+  id: number,
+  payload: RejectSupplyRequestPayload,
+): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/reject`, payload);
 }
 
 /**

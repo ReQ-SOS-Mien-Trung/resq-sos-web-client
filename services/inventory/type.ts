@@ -239,26 +239,42 @@ export interface GetSupplyRequestsParams {
   pageSize?: number;
 }
 
+export interface SupplyRequestListReliefItem {
+  reliefItemId: number;
+  reliefItemName: string;
+  unit: string;
+  quantity: number;
+}
+
 export interface SupplyRequestListItem {
-  supplyRequestId: number;
+  id: number;
+  requestingDepotId: number;
+  requestingDepotName: string;
+  sourceDepotId: number;
+  sourceDepotName: string;
   role: SupplyRequestRole;
-  sourceStatus?: SourceSupplyRequestStatus;
-  requestingStatus?: RequestingSupplyRequestStatus;
-  sourceDepotId?: number;
-  sourceDepotName?: string;
-  requestingDepotId?: number;
-  requestingDepotName?: string;
-  requestedAt?: string;
-  updatedAt?: string;
-  note?: string;
+  sourceStatus: SourceSupplyRequestStatus;
+  requestingStatus: RequestingSupplyRequestStatus;
+  note: string | null;
+  rejectedReason: string | null;
+  requestedBy: string;
+  createdAt: string;
+  respondedAt: string | null;
+  shippedAt: string | null;
+  completedAt: string | null;
+  items: SupplyRequestListReliefItem[];
 }
 
 export interface GetSupplyRequestsResponse {
   items: SupplyRequestListItem[];
-  pageNumber: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-  hasPreviousPage: boolean;
-  hasNextPage: boolean;
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+}
+
+export interface RejectSupplyRequestPayload {
+  reason: string;
 }

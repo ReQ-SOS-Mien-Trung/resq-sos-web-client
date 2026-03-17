@@ -7,15 +7,10 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   Package,
   Calendar,
-  PencilSimple,
-  ArrowLineUp,
-  ArrowLineDown,
-  ClockCounterClockwise,
   HandHeart,
   Tag
 } from "@phosphor-icons/react";

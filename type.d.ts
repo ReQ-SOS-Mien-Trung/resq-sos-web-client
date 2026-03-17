@@ -1133,6 +1133,7 @@ export interface DepotSidebarProps {
   selectedRequest?: SupplyRequest | null;
   selectedCategory?: string | null;
   onCategorySelect?: (category: string | null) => void;
+  onViewAllRequests?: () => void;
   /** API item categories – when provided, drives the filter badges */
   apiCategories?: {
     id: number;
