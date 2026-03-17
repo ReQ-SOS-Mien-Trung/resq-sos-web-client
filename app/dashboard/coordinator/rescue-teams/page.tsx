@@ -136,8 +136,7 @@ export default function RescueTeamsPage() {
     if (
       status === "Gathering" ||
       status === "Assigned" ||
-      status === "OnMission" ||
-      status === "Stuck"
+      status === "OnMission"
     ) {
       return "in-progress";
     }

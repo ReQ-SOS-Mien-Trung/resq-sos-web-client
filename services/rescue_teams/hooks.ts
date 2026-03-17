@@ -5,6 +5,9 @@ import {
   getRescueTeamTypes,
   getRescueTeamStatuses,
   createRescueTeam,
+  scheduleRescueTeamAssembly,
+  removeRescueTeamMember,
+  addRescueTeamMember,
 } from "./api";
 import type {
   GetRescueTeamsParams,
@@ -14,7 +17,12 @@ import type {
   RescueTeamStatusOption,
   CreateRescueTeamRequest,
   CreateRescueTeamResponse,
+  ScheduleRescueTeamAssemblyRequest,
+  ScheduleRescueTeamAssemblyErrorResponse,
+  RemoveRescueTeamMemberRequest,
+  AddRescueTeamMemberRequest,
 } from "./type";
+import { AxiosError } from "axios";
 
 export const RESCUE_TEAMS_QUERY_KEY = ["rescue-teams"] as const;
 export const RESCUE_TEAM_TYPES_QUERY_KEY = ["rescue-team-types"] as const;
@@ -85,6 +93,60 @@ export function useCreateRescueTeam() {
     mutationFn: createRescueTeam,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: RESCUE_TEAMS_QUERY_KEY });
+    },
+  });
+}
+
+export function useScheduleRescueTeamAssembly() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    AxiosError<ScheduleRescueTeamAssemblyErrorResponse>,
+    ScheduleRescueTeamAssemblyRequest
+  >({
+    mutationFn: scheduleRescueTeamAssembly,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: RESCUE_TEAMS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...RESCUE_TEAMS_QUERY_KEY, variables.id],
+      });
+    },
+  });
+}
+
+export function useRemoveRescueTeamMember() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    AxiosError<{ message: string }>,
+    RemoveRescueTeamMemberRequest
+  >({
+    mutationFn: removeRescueTeamMember,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: RESCUE_TEAMS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...RESCUE_TEAMS_QUERY_KEY, variables.id],
+      });
+    },
+  });
+}
+
+export function useAddRescueTeamMember() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    AxiosError<{ message: string }>,
+    AddRescueTeamMemberRequest
+  >({
+    mutationFn: addRescueTeamMember,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: RESCUE_TEAMS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...RESCUE_TEAMS_QUERY_KEY, variables.id],
+      });
     },
   });
 }

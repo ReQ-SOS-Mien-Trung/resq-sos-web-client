@@ -1868,10 +1868,10 @@ const RescuePlanPanel = ({
         prev.map((a) => {
           if (a._id !== id) return a;
 
-          // Only COLLECT_SUPPLIES activities should keep supply list.
+          // Only supply-related activities should keep the supply list.
           if (field === "activityType") {
             const nextType = value as ClusterActivityType;
-            if (nextType !== "COLLECT_SUPPLIES") {
+            if (!isSupplyStep(nextType)) {
               return {
                 ...a,
                 activityType: nextType,
@@ -3655,9 +3655,8 @@ const RescuePlanPanel = ({
                                     </div>
                                   </div>
 
-                                  {/* Supply drop zone (only for COLLECT_SUPPLIES) */}
-                                  {activity.activityType ===
-                                    "COLLECT_SUPPLIES" && (
+                                  {/* Supply drop zone (for supply activities) */}
+                                  {isSupplyStep(activity.activityType) && (
                                     <div
                                       className={cn(
                                         "mt-1 p-2 rounded-lg border-2 border-dashed transition-colors",

@@ -1,9 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useRescueTeamById } from "@/services/rescue_teams/hooks";
+import { toast } from "sonner";
+import {
+  useRescueTeamById,
+  useScheduleRescueTeamAssembly,
+  useAddRescueTeamMember,
+  useRemoveRescueTeamMember,
+} from "@/services/rescue_teams/hooks";
+import { useFreeRescuers } from "@/services/rescuers/hooks";
 import type {
   RescueTeamStatusKey,
   RescueTeamTypeKey,
@@ -11,15 +18,21 @@ import type {
 } from "@/services/rescue_teams/type";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
-  Users,
   Shield,
-  UserCheck,
-  UserX,
   UserRoundPlus,
   Phone,
   CalendarClock,
@@ -27,6 +40,10 @@ import {
   Crown,
   UserRound,
   Activity,
+  Loader2,
+  UserPlus,
+  Trash2,
+  Search,
 } from "lucide-react";
 
 const DEFAULT_RESCUER_AVATAR =
@@ -135,7 +152,52 @@ function formatDate(date?: string | null) {
   });
 }
 
-function MemberCard({ member }: { member: RescueTeamMemberDetail }) {
+function toDatetimeLocalValue(date?: string | null): string {
+  if (!date) return "";
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const pad = (v: number) => String(v).padStart(2, "0");
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+}
+
+function extractApiErrorMessage(error: unknown, fallback: string): string {
+  const err = error as {
+    response?: {
+      data?: {
+        message?: string;
+        title?: string;
+        errors?: {
+          _domainMsg?: string[];
+          [key: string]: string[] | undefined;
+        };
+      };
+    };
+    message?: string;
+  };
+
+  const domain = err.response?.data?.errors?._domainMsg;
+  if (Array.isArray(domain) && domain.length > 0) {
+    return domain[0] || fallback;
+  }
+
+  return (
+    err.response?.data?.message ||
+    err.response?.data?.title ||
+    err.message ||
+    fallback
+  );
+}
+
+function MemberCard({
+  member,
+  onRemove,
+  isRemoving,
+}: {
+  member: RescueTeamMemberDetail;
+  onRemove: (member: RescueTeamMemberDetail) => void;
+  isRemoving: boolean;
+}) {
   const initials =
     `${member.firstName?.[0] || ""}${member.lastName?.[0] || ""}`.toUpperCase() ||
     "?";
@@ -156,16 +218,33 @@ function MemberCard({ member }: { member: RescueTeamMemberDetail }) {
           </Avatar>
 
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <p className="text-sm font-semibold truncate">
-                {member.firstName} {member.lastName}
-              </p>
-              {member.isLeader && (
-                <Badge className="h-5 px-1.5 text-[10px] bg-amber-500 hover:bg-amber-600 text-white">
-                  <Crown className="mr-1 h-3 w-3" />
-                  Đội trưởng
-                </Badge>
-              )}
+            <div className="flex flex-wrap items-center gap-1.5 justify-between">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p className="text-sm font-semibold truncate">
+                  {member.firstName} {member.lastName}
+                </p>
+                {member.isLeader && (
+                  <Badge className="h-5 px-1.5 text-[10px] bg-amber-500 hover:bg-amber-600 text-white">
+                    <Crown className="mr-1 h-3 w-3" />
+                    Đội trưởng
+                  </Badge>
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                onClick={() => onRemove(member)}
+                disabled={isRemoving}
+              >
+                {isRemoving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                <span className="ml-1 text-[11px]">Xóa</span>
+              </Button>
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
@@ -197,10 +276,32 @@ function MemberCard({ member }: { member: RescueTeamMemberDetail }) {
 export default function RescueTeamDetailPage() {
   const params = useParams();
   const teamId = Number(params?.id);
+  const [assemblyAtDraft, setAssemblyAtDraft] = useState<string | null>(null);
+  const [rescuerSearch, setRescuerSearch] = useState("");
+  const [selectedRescuerId, setSelectedRescuerId] = useState("");
+  const [addAsLeader, setAddAsLeader] = useState(false);
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
+  const [memberPendingRemove, setMemberPendingRemove] =
+    useState<RescueTeamMemberDetail | null>(null);
 
   const { data, isLoading, isError } = useRescueTeamById(teamId, {
     enabled: Number.isFinite(teamId) && teamId > 0,
   });
+  const { data: freeRescuersData, isLoading: isLoadingFreeRescuers } =
+    useFreeRescuers({
+      params: {
+        pageNumber: 1,
+        pageSize: 100,
+      },
+      enabled: Number.isFinite(teamId) && teamId > 0,
+    });
+
+  const { mutate: scheduleAssembly, isPending: isSchedulingAssembly } =
+    useScheduleRescueTeamAssembly();
+  const { mutate: addMember, isPending: isAddingMember } =
+    useAddRescueTeamMember();
+  const { mutate: removeMember, isPending: isRemovingMember } =
+    useRemoveRescueTeamMember();
 
   const memberStats = useMemo(() => {
     const members = data?.members ?? [];
@@ -212,6 +313,139 @@ export default function RescueTeamDetailPage() {
       leaders: members.filter((m) => m.isLeader).length,
     };
   }, [data?.members]);
+
+  const assemblyAtInput =
+    assemblyAtDraft ?? toDatetimeLocalValue(data?.assemblyDate);
+
+  const availableRescuers = useMemo(() => {
+    const pool = freeRescuersData?.items ?? [];
+    const memberIds = new Set((data?.members ?? []).map((m) => m.userId));
+    return pool.filter((rescuer) => !memberIds.has(rescuer.id));
+  }, [freeRescuersData?.items, data?.members]);
+
+  const filteredRescuers = useMemo(() => {
+    const query = rescuerSearch.trim().toLowerCase();
+    if (!query) return availableRescuers;
+
+    return availableRescuers.filter((rescuer) => {
+      const fullName = `${rescuer.firstName || ""} ${rescuer.lastName || ""}`
+        .trim()
+        .toLowerCase();
+      const phone = (rescuer.phone || "").toLowerCase();
+      const email = (rescuer.email || "").toLowerCase();
+      return (
+        fullName.includes(query) ||
+        phone.includes(query) ||
+        email.includes(query)
+      );
+    });
+  }, [availableRescuers, rescuerSearch]);
+
+  const selectedCandidate = useMemo(
+    () => filteredRescuers.find((rescuer) => rescuer.id === selectedRescuerId),
+    [filteredRescuers, selectedRescuerId],
+  );
+
+  const remainingSlots = Math.max(
+    0,
+    (data?.maxMembers ?? 0) - memberStats.total,
+  );
+
+  const handleScheduleAssembly = () => {
+    if (!assemblyAtInput) {
+      toast.error("Vui lòng chọn thời gian tập kết.");
+      return;
+    }
+
+    const asDate = new Date(assemblyAtInput);
+    if (Number.isNaN(asDate.getTime())) {
+      toast.error("Thời gian tập kết không hợp lệ.");
+      return;
+    }
+
+    scheduleAssembly(
+      {
+        id: teamId,
+        assemblyAt: asDate.toISOString(),
+      },
+      {
+        onSuccess: () => {
+          toast.success("Đã lên lịch tập kết cho đội.");
+          setAssemblyAtDraft(null);
+        },
+        onError: (error) => {
+          toast.error(
+            extractApiErrorMessage(error, "Không thể lên lịch tập kết."),
+          );
+        },
+      },
+    );
+  };
+
+  const handleAddMember = () => {
+    if (remainingSlots <= 0) {
+      toast.error("Đội đã đủ quân số tối đa.");
+      return;
+    }
+
+    if (!selectedRescuerId) {
+      toast.error("Vui lòng chọn thành viên cần thêm.");
+      return;
+    }
+
+    addMember(
+      {
+        id: teamId,
+        userId: selectedRescuerId,
+        isLeader: addAsLeader,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Đã thêm thành viên vào đội.");
+          setSelectedRescuerId("");
+          setAddAsLeader(false);
+          setRescuerSearch("");
+        },
+        onError: (error) => {
+          toast.error(
+            extractApiErrorMessage(error, "Không thể thêm thành viên vào đội."),
+          );
+        },
+      },
+    );
+  };
+
+  const handleRemoveMember = (member: RescueTeamMemberDetail) => {
+    setMemberPendingRemove(member);
+  };
+
+  const confirmRemoveMember = () => {
+    if (!memberPendingRemove) return;
+
+    const member = memberPendingRemove;
+    const memberName = `${member.firstName} ${member.lastName}`.trim();
+    setRemovingUserId(member.userId);
+    removeMember(
+      {
+        id: teamId,
+        userId: member.userId,
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Đã xóa ${memberName} khỏi đội.`);
+          setMemberPendingRemove(null);
+        },
+        onError: (error) => {
+          toast.error(
+            extractApiErrorMessage(error, "Không thể xóa thành viên khỏi đội."),
+          );
+        },
+        onSettled: () => {
+          setRemovingUserId(null);
+        },
+      },
+    );
+  };
 
   if (isLoading) {
     return (
@@ -362,6 +596,148 @@ export default function RescueTeamDetailPage() {
         </CardContent>
       </Card>
 
+      <section className="grid gap-4 xl:grid-cols-5">
+        <Card className="xl:col-span-2 border-sky-200 bg-gradient-to-br from-sky-50 to-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-sky-600" />
+              Lịch tập kết đội
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">
+                Thời gian tập kết
+              </Label>
+              <Input
+                type="datetime-local"
+                value={assemblyAtInput}
+                onChange={(e) => setAssemblyAtDraft(e.target.value)}
+                className="h-9"
+              />
+            </div>
+            <Button
+              type="button"
+              className="w-full"
+              onClick={handleScheduleAssembly}
+              disabled={isSchedulingAssembly}
+            >
+              {isSchedulingAssembly ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  Đang cập nhật...
+                </>
+              ) : (
+                "Lưu lịch tập kết"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="xl:col-span-3 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserPlus className="h-4 w-4 text-emerald-600" />
+              Bổ sung thành viên
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="rounded-lg border bg-white/80 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between gap-2">
+              <span>Chỗ trống còn lại</span>
+              <span className="font-semibold text-foreground">
+                {remainingSlots}/{data.maxMembers}
+              </span>
+            </div>
+
+            {remainingSlots <= 0 ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                Đội đã đủ quân số tối đa. Không thể thêm thành viên mới.
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <div className="relative">
+                    <Search className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <Input
+                      value={rescuerSearch}
+                      onChange={(e) => setRescuerSearch(e.target.value)}
+                      placeholder="Tìm theo tên, email, số điện thoại"
+                      className="h-9 pl-8"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant={addAsLeader ? "default" : "outline"}
+                    className="h-9"
+                    onClick={() => setAddAsLeader((prev) => !prev)}
+                    disabled={!selectedRescuerId}
+                  >
+                    {addAsLeader
+                      ? "Gán làm đội trưởng"
+                      : "Thêm dạng thành viên"}
+                  </Button>
+                </div>
+
+                <Select
+                  value={selectedRescuerId}
+                  onValueChange={setSelectedRescuerId}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue
+                      placeholder={
+                        isLoadingFreeRescuers
+                          ? "Đang tải danh sách cứu hộ..."
+                          : "Chọn thành viên để thêm"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredRescuers.length === 0 ? (
+                      <div className="px-2 py-2 text-xs text-muted-foreground">
+                        Không có cứu hộ phù hợp để thêm.
+                      </div>
+                    ) : (
+                      filteredRescuers.map((rescuer) => (
+                        <SelectItem key={rescuer.id} value={rescuer.id}>
+                          {rescuer.firstName} {rescuer.lastName}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+
+                {selectedCandidate && (
+                  <div className="rounded-lg border bg-white/80 px-3 py-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {selectedCandidate.firstName} {selectedCandidate.lastName}
+                    </span>
+                    {selectedCandidate.phone
+                      ? ` - ${selectedCandidate.phone}`
+                      : ""}
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  onClick={handleAddMember}
+                  disabled={isAddingMember}
+                  className="w-full"
+                >
+                  {isAddingMember ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      Đang thêm thành viên...
+                    </>
+                  ) : (
+                    "Thêm vào đội cứu hộ"
+                  )}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-base md:text-lg font-semibold">
@@ -423,11 +799,68 @@ export default function RescueTeamDetailPage() {
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {data.members.map((member) => (
-              <MemberCard key={member.userId} member={member} />
+              <MemberCard
+                key={member.userId}
+                member={member}
+                onRemove={handleRemoveMember}
+                isRemoving={
+                  isRemovingMember && removingUserId === member.userId
+                }
+              />
             ))}
           </div>
         )}
       </section>
+
+      {memberPendingRemove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-900/45 backdrop-blur-[1px]"
+            onClick={() => setMemberPendingRemove(null)}
+            aria-label="Đóng hộp thoại xác nhận"
+          />
+          <div className="relative w-full max-w-md rounded-2xl border border-rose-200 bg-white shadow-2xl">
+            <div className="p-5">
+              <h4 className="text-base font-semibold text-slate-900">
+                Xác nhận xóa thành viên
+              </h4>
+              <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+                Bạn có chắc muốn xóa
+                <span className="font-semibold text-slate-900">
+                  {` ${memberPendingRemove.firstName} ${memberPendingRemove.lastName} `}
+                </span>
+                khỏi đội cứu hộ này không?
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t bg-slate-50/60 px-5 py-3 rounded-b-2xl">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setMemberPendingRemove(null)}
+                disabled={isRemovingMember}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={confirmRemoveMember}
+                disabled={isRemovingMember}
+              >
+                {isRemovingMember ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    Đang xóa...
+                  </>
+                ) : (
+                  "Xóa thành viên"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
