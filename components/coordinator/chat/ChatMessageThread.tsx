@@ -57,7 +57,7 @@ export default function ChatMessageThread({
           const senderLabel =
             message.senderName?.trim() ||
             (!isOwnMessage && !isAiMessage ? conversationPartnerLabel : null) ||
-            "Unknown";
+            (!isOwnMessage && !isAiMessage ? "Người dân" : "Unknown");
 
           return (
             <div

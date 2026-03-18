@@ -27,12 +27,20 @@ import {
 } from "@/services/chat/hooks";
 import { ReceiveMessageEvent } from "@/services/chat/type";
 
+const ACTIVE_CONVERSATION_STORAGE_KEY =
+  "coordinator-chat-active-conversation-id";
+const ACTIVE_PARTNER_LABEL_STORAGE_KEY =
+  "coordinator-chat-active-partner-label";
+
 export default function CoordinatorChatPage() {
   const router = useRouter();
   const [searchText, setSearchText] = useState("");
   const [activeConversationId, setActiveConversationId] = useState<
     number | null
   >(null);
+  const [activePartnerLabel, setActivePartnerLabel] = useState<string | null>(
+    null,
+  );
   const [activeStatus, setActiveStatus] = useState<
     "WaitingCoordinator" | "CoordinatorActive"
   >("WaitingCoordinator");
@@ -57,10 +65,68 @@ export default function CoordinatorChatPage() {
   const knownConversationIdsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const storedConversationId = window.localStorage.getItem(
+      ACTIVE_CONVERSATION_STORAGE_KEY,
+    );
+    const parsedConversationId = Number(storedConversationId);
+
+    if (Number.isFinite(parsedConversationId) && parsedConversationId > 0) {
+      setActiveConversationId(parsedConversationId);
+      setActiveStatus("CoordinatorActive");
+    }
+
+    const storedPartnerLabel = window.localStorage.getItem(
+      ACTIVE_PARTNER_LABEL_STORAGE_KEY,
+    );
+    if (storedPartnerLabel?.trim()) {
+      setActivePartnerLabel(storedPartnerLabel.trim());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (activeConversationId && activeConversationId > 0) {
+      window.localStorage.setItem(
+        ACTIVE_CONVERSATION_STORAGE_KEY,
+        String(activeConversationId),
+      );
+    } else {
+      window.localStorage.removeItem(ACTIVE_CONVERSATION_STORAGE_KEY);
+    }
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (activePartnerLabel?.trim()) {
+      window.localStorage.setItem(
+        ACTIVE_PARTNER_LABEL_STORAGE_KEY,
+        activePartnerLabel.trim(),
+      );
+    } else {
+      window.localStorage.removeItem(ACTIVE_PARTNER_LABEL_STORAGE_KEY);
+    }
+  }, [activePartnerLabel]);
+
+  useEffect(() => {
     knownConversationIdsRef.current = new Set(
       rooms.map((room) => room.conversationId),
     );
   }, [rooms]);
+
+  useEffect(() => {
+    const roomForActiveConversation =
+      activeConversationId !== null
+        ? rooms.find((room) => room.conversationId === activeConversationId)
+        : null;
+
+    if (roomForActiveConversation?.participantLabel) {
+      setActivePartnerLabel(roomForActiveConversation.participantLabel);
+    }
+  }, [activeConversationId, rooms]);
 
   const joinMutation = useJoinConversation();
   const sendMessageMutation = useSendConversationMessage();
@@ -139,14 +205,40 @@ export default function CoordinatorChatPage() {
     };
   }, [disconnect]);
 
+  const roomsForView = useMemo(() => {
+    if (!activeConversationId) {
+      return rooms;
+    }
+
+    const hasActiveInList = rooms.some(
+      (room) => room.conversationId === activeConversationId,
+    );
+
+    if (hasActiveInList) {
+      return rooms;
+    }
+
+    return [
+      {
+        conversationId: activeConversationId,
+        participantLabel: activePartnerLabel || "Người dân",
+        topicLabel: "Cuộc trò chuyện đang diễn ra",
+        linkedSosRequestId: null,
+        updatedAt: new Date().toISOString(),
+        statusLabel: activeStatus,
+      },
+      ...rooms,
+    ];
+  }, [activeConversationId, activePartnerLabel, activeStatus, rooms]);
+
   const filteredRooms = useMemo(() => {
     const keyword = searchText.trim().toLowerCase();
 
     if (!keyword) {
-      return rooms;
+      return roomsForView;
     }
 
-    return rooms.filter((room) => {
+    return roomsForView.filter((room) => {
       const participant = room.participantLabel.toLowerCase();
       const topic = room.topicLabel.toLowerCase();
       const sosText = room.linkedSosRequestId
@@ -159,15 +251,16 @@ export default function CoordinatorChatPage() {
         sosText.includes(keyword)
       );
     });
-  }, [rooms, searchText]);
+  }, [roomsForView, searchText]);
 
   const activeRoom = useMemo(
     () =>
       activeConversationId
-        ? (rooms.find((room) => room.conversationId === activeConversationId) ??
-          null)
+        ? (roomsForView.find(
+            (room) => room.conversationId === activeConversationId,
+          ) ?? null)
         : null,
-    [activeConversationId, rooms],
+    [activeConversationId, roomsForView],
   );
 
   const mergedMessages = useMemo(() => {
@@ -219,9 +312,16 @@ export default function CoordinatorChatPage() {
   ]);
 
   const handleSelectRoom = async (conversationId: number) => {
+    const selectedRoom = roomsForView.find(
+      (room) => room.conversationId === conversationId,
+    );
+
     try {
       const joinResult = await joinMutation.mutateAsync(conversationId);
       setActiveConversationId(conversationId);
+      if (selectedRoom?.participantLabel) {
+        setActivePartnerLabel(selectedRoom.participantLabel);
+      }
       markConversationAsRead(conversationId);
       setActiveStatus(
         joinResult.status === "CoordinatorActive"
@@ -391,7 +491,11 @@ export default function CoordinatorChatPage() {
                 <ChatMessageThread
                   messages={mergedMessages}
                   isLoading={messagesQuery.isLoading}
-                  conversationPartnerLabel={activeRoom?.participantLabel}
+                  conversationPartnerLabel={
+                    activeRoom?.participantLabel ||
+                    activePartnerLabel ||
+                    undefined
+                  }
                 />
               </div>
 

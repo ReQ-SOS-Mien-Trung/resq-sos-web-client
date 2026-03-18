@@ -12,8 +12,13 @@ import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { toast } from "sonner";
-import { SOSRequest, Rescuer, Location, LocationPanelData } from "@/type";
-import { mockRescuers, mockActiveMissions } from "@/lib/mock-data";
+import {
+  SOSRequest,
+  Rescuer,
+  Location,
+  LocationPanelData,
+  Mission,
+} from "@/type";
 import { useSOSRequests } from "@/services/sos_request/hooks";
 import type { SOSRequestEntity } from "@/services/sos_request/type";
 import {
@@ -28,8 +33,13 @@ import type {
 } from "@/services/sos_cluster/type";
 import { useDepots } from "@/services/depot/hooks";
 import { useAssemblyPoints } from "@/services/assembly_points/hooks";
+import { useRescueTeams } from "@/services/rescue_teams/hooks";
 import type { DepotEntity } from "@/services/depot/type";
 import type { AssemblyPointEntity } from "@/services/assembly_points/type";
+import type {
+  RescueTeamEntity,
+  RescueTeamTypeKey,
+} from "@/services/rescue_teams/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -249,6 +259,59 @@ function getClusterSOSRequests(
   return sosRequests.filter((s) => idSet.has(s.id));
 }
 
+function mapTeamTypeToRescuerType(
+  teamType: RescueTeamTypeKey,
+): Rescuer["type"] {
+  if (teamType === "Transportation") return "MOTORBOAT";
+  if (teamType === "Medical") return "SMALL_BOAT";
+  if (teamType === "Mixed") return "TRUCK";
+  return "TRUCK";
+}
+
+function mapTeamStatusToRescuerStatus(
+  status: RescueTeamEntity["status"],
+): Rescuer["status"] {
+  if (
+    status === "Assigned" ||
+    status === "OnMission" ||
+    status === "Stuck" ||
+    status === "Unavailable" ||
+    status === "Disbanded"
+  ) {
+    return "BUSY";
+  }
+
+  return "AVAILABLE";
+}
+
+function getTeamCapabilities(teamType: RescueTeamTypeKey): string[] {
+  if (teamType === "Medical") return ["Y tế", "Sơ cứu"];
+  if (teamType === "Transportation") return ["Vận chuyển", "Cơ động"];
+  if (teamType === "Mixed") return ["Đa nhiệm", "Hậu cần"];
+  return ["Cứu hộ", "Hiện trường"];
+}
+
+function mapRescueTeamToRescuer(
+  team: RescueTeamEntity,
+  assemblyPointById: Map<number, AssemblyPointEntity>,
+): Rescuer {
+  const assemblyPoint = assemblyPointById.get(team.assemblyPointId);
+  const fallbackLocation = { lat: 16.4637, lng: 107.5909 };
+
+  return {
+    id: String(team.id),
+    name: team.name,
+    type: mapTeamTypeToRescuerType(team.teamType),
+    status: mapTeamStatusToRescuerStatus(team.status),
+    location: assemblyPoint
+      ? { lat: assemblyPoint.latitude, lng: assemblyPoint.longitude }
+      : fallbackLocation,
+    currentLoad: team.currentMemberCount,
+    capacity: team.maxMembers,
+    capabilities: getTeamCapabilities(team.teamType),
+  };
+}
+
 // ── Main Dashboard Content ──
 
 const CoordinatorDashboardContent = () => {
@@ -327,6 +390,9 @@ const CoordinatorDashboardContent = () => {
   const { data: assemblyPointsData } = useAssemblyPoints({
     params: { pageSize: 100 },
   });
+  const { data: rescueTeamsData } = useRescueTeams({
+    params: { pageSize: 200 },
+  });
   const { data: clustersData } = useSOSClusters();
 
   const sosRequests = useMemo(
@@ -341,6 +407,18 @@ const CoordinatorDashboardContent = () => {
     () => assemblyPointsData?.items ?? [],
     [assemblyPointsData],
   );
+  const rescuers = useMemo<Rescuer[]>(() => {
+    const teams = rescueTeamsData?.items ?? [];
+    if (teams.length === 0) return [];
+
+    const assemblyPointById = new Map(
+      assemblyPoints.map((point) => [point.id, point]),
+    );
+
+    return teams.map((team) => mapRescueTeamToRescuer(team, assemblyPointById));
+  }, [rescueTeamsData, assemblyPoints]);
+
+  const sidebarMissions = useMemo<Mission[]>(() => [], []);
   const clusters = useMemo<SOSClusterEntity[]>(
     () => clustersData?.clusters ?? [],
     [clustersData],
@@ -405,6 +483,20 @@ const CoordinatorDashboardContent = () => {
 
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
+
+  useEffect(() => {
+    if (!selectedRescuer) return;
+
+    const nextSelected = rescuers.find(
+      (rescuer) => rescuer.id === selectedRescuer.id,
+    );
+    if (nextSelected) {
+      setSelectedRescuer(nextSelected);
+      return;
+    }
+
+    setSelectedRescuer(null);
+  }, [rescuers, selectedRescuer]);
 
   // ─── Sidebar auto-collapse when RescuePlanPanel opens ───
   useEffect(() => {
@@ -956,8 +1048,8 @@ const CoordinatorDashboardContent = () => {
           {sidebarOpen && (
             <SOSSidebar
               sosRequests={sosRequests}
-              rescuers={mockRescuers}
-              missions={mockActiveMissions}
+              rescuers={rescuers}
+              missions={sidebarMissions}
               onSOSSelect={handleSOSSelect}
               onRescuerSelect={handleRescuerSelect}
               selectedSOS={selectedSOS}
@@ -984,7 +1076,7 @@ const CoordinatorDashboardContent = () => {
           {isWeatherMode ? (
             <WindyLeafletMap
               sosRequests={sosRequests}
-              rescuers={mockRescuers}
+              rescuers={rescuers}
               depots={depots}
               selectedSOS={selectedSOS}
               selectedRescuer={selectedRescuer}
@@ -997,7 +1089,7 @@ const CoordinatorDashboardContent = () => {
             <>
               <CoordinatorMap
                 sosRequests={sosRequests}
-                rescuers={mockRescuers}
+                rescuers={rescuers}
                 depots={depots}
                 assemblyPoints={assemblyPoints}
                 clusters={clusters}
@@ -1057,7 +1149,7 @@ const CoordinatorDashboardContent = () => {
                       <div>
                         <div className="text-2xl font-bold text-green-500">
                           {
-                            mockRescuers.filter((r) => r.status === "AVAILABLE")
+                            rescuers.filter((r) => r.status === "AVAILABLE")
                               .length
                           }
                         </div>
