@@ -11,9 +11,7 @@ import {
   XCircle,
   ArrowsClockwise,
   Package,
-  ArrowRight,
   ClipboardText,
-  Clock,
   MapPin,
   SealCheck,
   CaretRight,
@@ -49,7 +47,9 @@ function getNeedsAction(r: SupplyRequestListItem): boolean {
     );
   }
   if (r.role === "Requester") {
-    return r.sourceStatus === "Shipped" && r.requestingStatus === "InTransit";
+    // Source phải bấm "Xác nhận đã giao" (Completed) trước
+    // thì Requester mới cần action
+    return r.sourceStatus === "Completed" && r.requestingStatus === "InTransit";
   }
   return false;
 }
@@ -127,9 +127,24 @@ export default function IncomingRequestsSection() {
     isLoading,
     isFetching,
     refetch,
-  } = useSupplyRequests({ pageNumber: 1, pageSize: 100 });
+  } = useSupplyRequests(
+    { pageNumber: 1, pageSize: 100 },
+    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+  );
 
-  const allItems = useMemo(() => data?.items ?? [], [data]);
+  // Hiển thị:
+  // 1. Kho nguồn (Source) — tất cả trạng thái: cần duyệt, đóng gói, gửi đi
+  // 2. Kho yêu cầu (Requester) — CHỈ khi hàng đang trên đường (InTransit)
+  //    để bên yêu cầu có thể xác nhận đã nhận hàng
+  const allItems = useMemo(
+    () =>
+      (data?.items ?? []).filter(
+        (r) =>
+          r.role === "Source" ||
+          (r.role === "Requester" && r.requestingStatus === "InTransit"),
+      ),
+    [data],
+  );
 
   // ── Stats ──
   const needsActionCount = allItems.filter(getNeedsAction).length;
@@ -555,9 +570,18 @@ function RequestCard({
 
       {/* ── Route ── */}
       <div className="px-4 pb-3 space-y-1.5">
-        <div className="flex items-center">
+        <div className="flex items-center gap-1.5 min-w-0">
           <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <span className="text-sm tracking-tighter font-medium truncate flex-1 min-w-0 text-left">
+          <span className="text-sm tracking-tighter font-semibold truncate min-w-0 flex-1">
+            {request.sourceDepotName}
+          </span>
+          {/* Animated flowing arrow: chevrons light up left→right in sequence */}
+          <span className="flex items-center shrink-0 gap-0">
+            <CaretRight weight="bold" className="h-3.5 w-3.5 text-primary/20 animate-[pulse_1.2s_ease-in-out_0ms_infinite]" />
+            <CaretRight weight="bold" className="h-3.5 w-3.5 text-primary/55 animate-[pulse_1.2s_ease-in-out_250ms_infinite]" />
+            <CaretRight weight="bold" className="h-3.5 w-3.5 text-primary animate-[pulse_1.2s_ease-in-out_500ms_infinite]" />
+          </span>
+          <span className="text-sm tracking-tighter text-muted-foreground truncate min-w-0 flex-1 text-right">
             {request.requestingDepotName}
           </span>
         </div>
@@ -593,7 +617,7 @@ function RequestCard({
                   "pb-1.5 border-b border-dashed border-border/50",
               )}
             >
-              <span className="text-sm tracking-tighter text-foreground truncate leading-tight">
+              <span className="text-sm font-medium tracking-tighter text-foreground truncate leading-tight">
                 {item.reliefItemName}
               </span>
               <span className="text-sm font-bold text-primary whitespace-nowrap tabular-nums tracking-tighter leading-tight">
@@ -761,8 +785,10 @@ function RequestCard({
           </Button>
         )}
 
-        {/* Requester + InTransit → Confirm received */}
-        {request.role === "Requester" && request.requestingStatus === "InTransit" && (
+        {/* Requester + InTransit + Source đã Completed → Confirm received */}
+        {request.role === "Requester" &&
+          request.requestingStatus === "InTransit" &&
+          request.sourceStatus === "Completed" && (
           <Button
             size="sm"
             className="h-8 text-xs gap-1.5 flex-1 bg-green-600 hover:bg-green-700 tracking-tighter"
@@ -782,10 +808,10 @@ function RequestCard({
         <button
           type="button"
           onClick={onViewDetail}
-          className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground tracking-tighter transition-colors shrink-0"
+          className="group ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground tracking-tighter transition-colors shrink-0"
         >
           Chi tiết
-          <CaretRight className="h-3.5 w-3.5" />
+          <CaretRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
         </button>
       </div>
     </div>

@@ -12,7 +12,11 @@ import {
   Package,
   Calendar,
   HandHeart,
-  Tag
+  Tag,
+  Wrench,
+  CheckCircle,
+  WarningCircle,
+  XCircle,
 } from "@phosphor-icons/react";
 import { InventoryItemEntity } from "@/services/inventory/type";
 import { useInventoryItemTypes, useInventoryTargetGroups } from "@/services/inventory/hooks";
@@ -57,7 +61,7 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
               <Package className="h-6 w-6" weight="fill" />
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <SheetTitle className="text-xl tracking-tighter">{item.reliefItemName}</SheetTitle>
+              <SheetTitle className="text-2xl tracking-tighter">{item.itemModelName ?? item.reliefItemName}</SheetTitle>
               <SheetDescription className="flex tracking-tighter items-center gap-2 mt-1">
                 Danh mục: <span className="font-medium text-sm text-black dark:text-white uppercase tracking-tight">{item.categoryName}</span>
               </SheetDescription>
@@ -71,7 +75,7 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
           </div>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
+        <div className="mt-4 space-y-6">
           {/* Stock Level Visual */}
           <div className="space-y-2">
             <h3 className="text-lg font-medium tracking-tighter flex items-center">
@@ -103,14 +107,78 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
 
               <div className="flex justify-between text-sm text-muted-foreground mt-2">
                 <span className="text-[#FF5722] tracking-tighter font-semibold">Khả dụng: {item.availableQuantity.toLocaleString()}</span>
-                <span className="text-orange-500 tracking-tighter font-semibold">Đã cọc: {item.reservedQuantity.toLocaleString()}</span>
+                <span className="text-orange-500 tracking-tighter font-semibold">Đã phân bổ: {item.reservedQuantity.toLocaleString()}</span>
               </div>
             </div>
           </div>
 
           <Separator />
 
-          {/* Item Details */}
+          {/* Reusable Breakdown */}
+          {item.itemType === "Reusable" && item.reusableBreakdown && (() => {
+            const rb = item.reusableBreakdown;
+            return (
+              <div className="space-y-3">
+                <h3 className="text-xl tracking-tighter font-medium flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-muted-foreground" />
+                  Tình Trạng Thiết Bị
+                </h3>
+
+                {/* Status row */}
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="rounded-lg bg-green-50 border border-green-200 p-2">
+                    <p className="text-lg font-bold tracking-tighter text-green-700">{rb.availableUnits}</p>
+                    <p className="text-sm font-medium text-green-600 tracking-tighter">Khả dụng</p>
+                  </div>
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-2">
+                    <p className="text-lg font-bold tracking-tighter text-blue-700">{rb.inUseUnits}</p>
+                    <p className="text-sm font-medium text-blue-600 tracking-tighter">Đang dùng</p>
+                  </div>
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-2">
+                    <p className="text-lg font-bold tracking-tighter text-amber-700">{rb.maintenanceUnits}</p>
+                    <p className="text-sm font-medium text-amber-600 tracking-tighter">Bảo trì</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 p-2">
+                    <p className="text-lg font-bold tracking-tighter text-gray-500">{rb.decommissionedUnits}</p>
+                    <p className="text-sm font-medium text-gray-500 tracking-tighter">Ngừng dùng</p>
+                  </div>
+                </div>
+
+                {/* Quality row */}
+                <div className="space-y-1.5">
+                  <p className="text-sm tracking-tighter font-semibold py-2">Chất lượng</p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" weight="fill" />
+                      <span className="text-sm tracking-tighter text-muted-foreground flex-1">Còn tốt</span>
+                      <span className="text-sm font-bold tracking-tighter">{rb.goodCount}</span>
+                      <div className="h-1.5 w-24 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full" style={{ width: `${rb.totalUnits > 0 ? (rb.goodCount / rb.totalUnits) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <WarningCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" weight="fill" />
+                      <span className="text-sm tracking-tighter text-muted-foreground flex-1">Trung bình</span>
+                      <span className="text-sm font-bold tracking-tighter">{rb.fairCount}</span>
+                      <div className="h-1.5 w-24 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-amber-500 rounded-full" style={{ width: `${rb.totalUnits > 0 ? (rb.fairCount / rb.totalUnits) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" weight="fill" />
+                      <span className="text-sm tracking-tighter text-muted-foreground flex-1">Cần thay thế / sửa chữa</span>
+                      <span className="text-sm font-bold tracking-tighter">{rb.poorCount}</span>
+                      <div className="h-1.5 w-24 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-red-500 rounded-full" style={{ width: `${rb.totalUnits > 0 ? (rb.poorCount / rb.totalUnits) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {item.itemType === "Reusable" && item.reusableBreakdown && <Separator />}
           <div className="space-y-3">
             <h3 className="text-sm tracking-tighter font-semibold">Chi Tiết</h3>
             <div className="grid gap-3">

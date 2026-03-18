@@ -334,7 +334,7 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
               </SheetTitle>
               <p className="text-xs text-muted-foreground tracking-tighter">
                 Đơn yêu cầu số{" "}
-                <span className="font-semibold text-foreground">#{request.id}</span>
+                <span className="font-semibold text-foreground">{request.id}</span>
               </p>
             </div>
           </div>
@@ -362,7 +362,7 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
               <div className="flex items-center">
                 <div className="flex items-center gap-1">
                   <div className="h-px w-6 bg-border" />
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  <ArrowRight className="h-4 w-4 text-muted-foreground animate-[bounceX_1s_ease-in-out_infinite]" />
                   <div className="h-px w-6 bg-border" />
                 </div>
               </div>
@@ -512,12 +512,12 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                                 {step.label}
                               </p>
                               {stepState === "current" && (
-                                <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700 tracking-wide">
+                                <span className="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700 tracking-tighter">
                                   Đang thực hiện
                                 </span>
                               )}
                               {stepState === "completed" && isDone && index === STEPS.length - 1 && (
-                                <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700 tracking-wide">
+                                <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700 tracking-tighter">
                                   Hoàn tất
                                 </span>
                               )}

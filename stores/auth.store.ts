@@ -10,6 +10,8 @@ interface User {
   fullName: string;
   roleId: number;
   permissions: string[];
+  depotId: number | null;
+  depotName: string | null;
 }
 
 interface AuthState {
@@ -55,6 +57,8 @@ export const useAuthStore = create<AuthState>()(
                 fullName: data.fullName,
                 roleId: data.roleId,
                 permissions: data.permissions ?? [],
+                depotId: data.depotId ?? null,
+                depotName: data.depotName ?? null,
               },
               isAuthenticated: true,
             },

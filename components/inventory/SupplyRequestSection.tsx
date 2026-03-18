@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -60,8 +60,8 @@ type RequestLine = {
 };
 
 type SelectedDepotByItem = {
-  reliefItemId: number;
-  reliefItemName: string;
+  itemModelId: number;
+  itemModelName: string;
   unit: string;
   requestQuantity: number;
   depotId: number;
@@ -75,6 +75,7 @@ type SelectedDepotByItem = {
 interface SupplyRequestSectionProps {
   onSelectionSidebarOpen?: () => void;
   onSelectionSidebarChange?: (open: boolean) => void;
+  onPanelWidthChange?: (width: number) => void;
 }
 
 type FlyToken = {
@@ -115,7 +116,7 @@ function RequestLineRow({
     });
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 py-3">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 py-1">
       <div className="lg:col-span-4 space-y-1 lg:space-y-0">
         <Label className="text-base font-medium text-muted-foreground tracking-tighter lg:hidden">
           Danh mục
@@ -208,6 +209,7 @@ function RequestLineRow({
 export default function SupplyRequestSection({
   onSelectionSidebarOpen,
   onSelectionSidebarChange,
+  onPanelWidthChange,
 }: SupplyRequestSectionProps) {
   const { data: categories = [], isLoading: isCategoriesLoading } =
     useInventoryCategories();
@@ -226,6 +228,37 @@ export default function SupplyRequestSection({
   const [isSelectionSheetOpen, setIsSelectionSheetOpen] = useState(false);
   const [animatedDepotId, setAnimatedDepotId] = useState<number | null>(null);
   const [flyTokens, setFlyTokens] = useState<FlyToken[]>([]);
+  const panelWidthRef = useRef(480);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = panelWidthRef.current;
+
+      const onMove = (ev: MouseEvent) => {
+        const newW = Math.min(860, Math.max(300, startWidth + startX - ev.clientX));
+        panelWidthRef.current = newW;
+        // Direct DOM — zero React re-renders during drag
+        if (sheetRef.current) sheetRef.current.style.width = `${newW}px`;
+        onPanelWidthChange?.(newW);
+      };
+
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    [onPanelWidthChange],
+  );
 
   const setSelectionSheetOpen = (open: boolean) => {
     setIsSelectionSheetOpen(open);
@@ -236,7 +269,7 @@ export default function SupplyRequestSection({
   };
 
   const queryParams = submittedParams ?? {
-    reliefItemIds: [],
+    itemModelIds: [],
     quantities: [],
     activeDepotsOnly: true,
     pageNumber: 1,
@@ -260,21 +293,21 @@ export default function SupplyRequestSection({
     (searchResult?.items ?? []).forEach((item, index) => {
       const quantity = Number(quantities[index]);
       if (Number.isFinite(quantity) && quantity > 0) {
-        map[item.reliefItemId] = quantity;
+        map[item.itemModelId] = quantity;
       }
     });
 
     return map;
   }, [searchResult, submittedParams]);
 
-  const getRequestedQuantity = (reliefItemId: number) => {
+  const getRequestedQuantity = (itemModelId: number) => {
     let quantity = 0;
 
-    const ids = submittedParams?.reliefItemIds ?? [];
+    const ids = submittedParams?.itemModelIds ?? [];
     const quantities = submittedParams?.quantities ?? [];
 
     for (let index = 0; index < ids.length; index += 1) {
-      if (Number(ids[index]) === reliefItemId) {
+      if (Number(ids[index]) === itemModelId) {
         const parsedQty = Number(quantities[index]);
         if (Number.isFinite(parsedQty) && parsedQty > 0) {
           quantity += parsedQty;
@@ -287,7 +320,7 @@ export default function SupplyRequestSection({
     }
 
     lines.forEach((line) => {
-      if (Number(line.reliefItemKey) === reliefItemId) {
+      if (Number(line.reliefItemKey) === itemModelId) {
         const parsedQty = Number(line.quantity);
         if (Number.isFinite(parsedQty) && parsedQty > 0) {
           quantity += parsedQty;
@@ -337,11 +370,11 @@ export default function SupplyRequestSection({
       }
     }
 
-    const reliefItemIds = lines.map((line) => Number(line.reliefItemKey));
+    const itemModelIds = lines.map((line) => Number(line.reliefItemKey));
     const quantities = lines.map((line) => Number(line.quantity));
 
     setSubmittedParams({
-      reliefItemIds,
+      itemModelIds,
       quantities,
       activeDepotsOnly: true,
       pageNumber: 1,
@@ -397,11 +430,11 @@ export default function SupplyRequestSection({
     let nextSelectedCount = 0;
 
     setSelectedDepotByItem((prev) => {
-      const current = prev[item.reliefItemId];
+      const current = prev[item.itemModelId];
 
       if (current?.depotId === warehouse.depotId) {
         const next = { ...prev };
-        delete next[item.reliefItemId];
+        delete next[item.itemModelId];
         isDeselectAction = true;
         nextSelectedCount = Object.keys(next).length;
         return next;
@@ -409,14 +442,14 @@ export default function SupplyRequestSection({
 
       const next = {
         ...prev,
-        [item.reliefItemId]: {
-          reliefItemId: item.reliefItemId,
-          reliefItemName: item.reliefItemName,
+        [item.itemModelId]: {
+          itemModelId: item.itemModelId,
+          itemModelName: item.itemModelName,
           unit: item.unit,
           requestQuantity: Math.max(
             1,
-            requestedQuantityByResultItemId[item.reliefItemId] ??
-              getRequestedQuantity(item.reliefItemId),
+            requestedQuantityByResultItemId[item.itemModelId] ??
+              getRequestedQuantity(item.itemModelId),
           ),
           depotId: warehouse.depotId,
           depotName: warehouse.depotName,
@@ -457,8 +490,8 @@ export default function SupplyRequestSection({
         depotStatus: string;
         distanceKm: number;
         items: Array<{
-          reliefItemId: number;
-          reliefItemName: string;
+          itemModelId: number;
+          itemModelName: string;
           quantity: number;
           unit: string;
         }>;
@@ -478,8 +511,8 @@ export default function SupplyRequestSection({
           distanceKm: selection.distanceKm,
           items: [
             {
-              reliefItemId: selection.reliefItemId,
-              reliefItemName: selection.reliefItemName,
+              itemModelId: selection.itemModelId,
+              itemModelName: selection.itemModelName,
               quantity,
               unit: selection.unit,
             },
@@ -489,8 +522,8 @@ export default function SupplyRequestSection({
       }
 
       existing.items.push({
-        reliefItemId: selection.reliefItemId,
-        reliefItemName: selection.reliefItemName,
+        itemModelId: selection.itemModelId,
+        itemModelName: selection.itemModelName,
         quantity,
         unit: selection.unit,
       });
@@ -511,7 +544,7 @@ export default function SupplyRequestSection({
       items: depot.items
         .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
         .map((item) => ({
-          reliefItemId: item.reliefItemId,
+          reliefItemId: item.itemModelId,
           quantity: item.quantity,
         })),
       note: depotNotes[depot.depotId]?.trim() || undefined,
@@ -569,15 +602,15 @@ export default function SupplyRequestSection({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-lg border border-border/60 bg-card px-3 lg:px-4">
-            <div className="hidden lg:grid lg:grid-cols-12 gap-3 py-2 border-b border-border/60">
-              <p className="lg:col-span-4 text-xs text-muted-foreground tracking-tighter">
+          <div className="rounded-lg border border-border/60 bg-card py-1 lg:py-2 px-3 lg:px-4">
+            <div className="hidden lg:grid lg:grid-cols-12 gap-3 py-1">
+              <p className="lg:col-span-4 text-sm font-medium tracking-tighter">
                 Danh mục
               </p>
-              <p className="lg:col-span-5 text-xs text-muted-foreground tracking-tighter">
+              <p className="lg:col-span-5 text-sm font-medium tracking-tighter">
                 Vật tư tiếp tế
               </p>
-              <p className="lg:col-span-2 text-xs text-muted-foreground tracking-tighter">
+              <p className="lg:col-span-2 text-sm font-medium tracking-tighter">
                 Số lượng
               </p>
               <p className="lg:col-span-1" />
@@ -627,15 +660,25 @@ export default function SupplyRequestSection({
       {(hasSearched || isSearching) && (
         <Card className="border-border/60">
           <CardHeader>
-            <CardTitle className="text-base font-semibold tracking-tighter flex items-center gap-2">
-              <Warehouse className="h-5 w-5 text-primary" />
-              Kết quả tìm kho
-              {!isSearching && (
-                <CardDescription className="tracking-tighter text-muted-foreground text-sm">
-                  {(searchResult?.items?.length ?? 0)} vật tư • {totalWarehouses} kho phù hợp
-                </CardDescription>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold tracking-tighter flex items-center gap-2">
+                <Warehouse className="h-5 w-5 text-primary" />
+                Kết quả tìm kho
+              </CardTitle>
+              {!isSearching && !isError && (searchResult?.items?.length ?? 0) > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={handleOpenSelectionSheet}
+                  disabled={groupedSelectedDepots.length === 0}
+                >
+                  <ShoppingCartSimple size={16} />
+                  Kho đã chọn ({groupedSelectedDepots.length})
+                </Button>
               )}
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {isSearching && (
@@ -666,27 +709,14 @@ export default function SupplyRequestSection({
 
             {!isSearching && !isError && (searchResult?.items?.length ?? 0) > 0 && (
               <div className="space-y-4">
-                <div className="flex items-center justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="gap-2"
-                    onClick={handleOpenSelectionSheet}
-                    disabled={groupedSelectedDepots.length === 0}
-                  >
-                    <ShoppingCartSimple size={16} />
-                    Kho đã chọn ({groupedSelectedDepots.length})
-                  </Button>
-                </div>
 
                 {searchResult!.items.map((item) => (
-                  <Card key={item.reliefItemId} className="border-border/60">
+                  <Card key={item.itemModelId} className="border-border/60">
                     <CardHeader className="pb-3">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                         <div>
                           <CardTitle className="text-[16px] font-semibold tracking-tighter">
-                            {item.reliefItemName}
+                            {item.itemModelName}
                           </CardTitle>
                           <CardDescription className="tracking-tighter text-[14px]">
                             Danh mục: {item.categoryName}
@@ -702,12 +732,12 @@ export default function SupplyRequestSection({
                         {item.warehouses.map((warehouse) => (
                           (() => {
                             const isSelected =
-                              selectedDepotByItem[item.reliefItemId]?.depotId ===
+                              selectedDepotByItem[item.itemModelId]?.depotId ===
                               warehouse.depotId;
 
-                            return (
+                              return (
                           <div
-                            key={`${item.reliefItemId}-${warehouse.depotId}`}
+                            key={`${item.itemModelId}-${warehouse.depotId}`}
                             role="button"
                             tabIndex={0}
                             onClick={(event) =>
@@ -801,11 +831,21 @@ export default function SupplyRequestSection({
 
       <Sheet open={isSelectionSheetOpen} onOpenChange={setSelectionSheetOpen}>
         <SheetContent
-          className="w-full sm:max-w-xl h-dvh overflow-y-auto p-0"
+          ref={sheetRef}
+          className="h-dvh p-0 overflow-hidden"
+          style={{ width: 480, maxWidth: "85vw" }}
           side="right"
           showOverlay={false}
         >
-          <div className="flex h-full flex-col">
+          {/* Drag handle */}
+          <div
+            onMouseDown={handleResizeStart}
+            className="absolute left-0 inset-y-0 w-1.5 z-20 cursor-col-resize group flex items-center justify-center hover:bg-primary/15 active:bg-primary/25 transition-colors"
+          >
+            <div className="h-10 w-0.5 rounded-full bg-border/80 group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
+          </div>
+
+          <div className="flex h-full flex-col overflow-hidden">
             <SheetHeader className="border-b p-3 pb-3">
               <SheetTitle className="tracking-tighter flex items-center gap-2">
                 <ClipboardTextIcon className="h-5 w-5 text-primary" />
@@ -846,10 +886,10 @@ export default function SupplyRequestSection({
                       <div className="space-y-2">
                         {depot.items.map((item) => (
                           <div
-                            key={`${depot.depotId}-${item.reliefItemId}`}
+                            key={`${depot.depotId}-${item.itemModelId}`}
                             className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm tracking-tighter flex items-center justify-between"
                           >
-                            <span className="font-medium">{item.reliefItemName}</span>
+                            <span className="font-medium">{item.itemModelName}</span>
                             <span className="text-primary font-semibold">
                               {item.quantity.toLocaleString("vi-VN")} {item.unit}
                             </span>

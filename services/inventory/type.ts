@@ -15,8 +15,23 @@ export type InventorySourceType = InventoryCategory;
 
 export type InventoryReliefItem = InventoryCategory;
 
+export interface ReusableBreakdown {
+  totalUnits: number;
+  availableUnits: number;
+  inUseUnits: number;
+  maintenanceUnits: number;
+  decommissionedUnits: number;
+  goodCount: number;
+  fairCount: number;
+  poorCount: number;
+}
+
 export interface InventoryItemEntity {
+  itemModelId: number;
+  /** @alias itemModelId — kept for backward compatibility */
   reliefItemId: number;
+  itemModelName: string;
+  /** @alias itemModelName — kept for backward compatibility */
   reliefItemName: string;
   categoryId: number;
   categoryName: string;
@@ -26,6 +41,8 @@ export interface InventoryItemEntity {
   reservedQuantity: number;
   availableQuantity: number;
   lastStockedAt: string;
+  /** Only present when itemType === "Reusable" */
+  reusableBreakdown: ReusableBreakdown | null;
 }
 
 export interface GetMyDepotInventoryParams {
@@ -172,7 +189,7 @@ export interface GetDepotTransactionsResponse {
 // ─── Search Depots by Relief Items ───
 
 export interface SearchDepotsParams {
-  reliefItemIds: number[];
+  itemModelIds: number[];
   quantities: number[];
   activeDepotsOnly?: boolean;
   pageNumber?: number;
@@ -192,8 +209,8 @@ export interface SearchDepotWarehouseEntity {
 }
 
 export interface SearchDepotItemEntity {
-  reliefItemId: number;
-  reliefItemName: string;
+  itemModelId: number;
+  itemModelName: string;
   categoryName: string;
   itemType: string;
   unit: string;
@@ -203,6 +220,12 @@ export interface SearchDepotItemEntity {
 
 export interface SearchDepotsResponse {
   items: SearchDepotItemEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 }
 
 // ─── Create Supply Requests ───

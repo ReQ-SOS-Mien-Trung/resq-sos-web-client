@@ -132,7 +132,7 @@ export async function getInventoryReliefItemsByCategory(
   categoryCode: string,
 ): Promise<InventoryReliefItem[]> {
   const { data } = await api.get(
-    `/logistics/inventory/metadata/relief-items/category/${categoryCode}`,
+    `/logistics/inventory/metadata/item-models/category/${categoryCode}`,
   );
   return data;
 }

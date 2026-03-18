@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import {
   mockInventoryItems,
   mockSupplyRequests,
@@ -218,6 +218,7 @@ const InventoryDashboardPage = () => {
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
   const [isRequestSelectionSidebarOpen, setIsRequestSelectionSidebarOpen] =
     useState(false);
+  const mainRef = useRef<HTMLElement>(null);
   const [requestsPageNumber, setRequestsPageNumber] = useState(1);
   const requestsPageSize = 8;
   const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
@@ -261,7 +262,10 @@ const InventoryDashboardPage = () => {
     data: supplyRequestsData,
     isLoading: isSupplyRequestsLoading,
     refetch: refetchSupplyRequests,
-  } = useSupplyRequests({ pageNumber: 1, pageSize: 50 });
+  } = useSupplyRequests(
+    { pageNumber: 1, pageSize: 50 },
+    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+  );
 
   const {
     data: allRequestsPagedData,
@@ -270,7 +274,11 @@ const InventoryDashboardPage = () => {
     refetch: refetchAllRequests,
   } = useSupplyRequests(
     { pageNumber: requestsPageNumber, pageSize: requestsPageSize },
-    { enabled: activeTab === "shipments" },
+    {
+      enabled: activeTab === "shipments",
+      refetchInterval: 10_000,
+      refetchOnWindowFocus: true,
+    },
   );
 
   // Use the first depot as the current managed depot
@@ -281,7 +289,7 @@ const InventoryDashboardPage = () => {
 
   // Map API depot to DepotInfo for sidebar
   const depotInfo = useMemo<DepotInfo | null>(() => {
-    if (!currentDepot) return null;
+    if (!currentDepot && !user?.depotName) return null;
 
     const pendingCount = (supplyRequestsData?.items ?? []).filter(
       (request) =>
@@ -289,13 +297,34 @@ const InventoryDashboardPage = () => {
         request.requestingStatus === "WaitingForApproval",
     ).length;
 
-    return mapDepotEntityToInfo(
-      currentDepot,
-      displayName,
+    // Use auth store depotName as primary, fallback to depot API
+    const resolvedName = user?.depotName ?? currentDepot?.name ?? "—";
+
+    if (currentDepot) {
+      const info = mapDepotEntityToInfo(
+        currentDepot,
+        displayName,
+        totalCategories,
+        pendingCount,
+      );
+      return { ...info, name: resolvedName };
+    }
+
+    // Minimal depotInfo built only from auth store data (no depot API yet)
+    return {
+      id: String(user?.depotId ?? ""),
+      name: resolvedName,
+      address: "",
+      phone: "—",
+      manager: displayName,
+      totalItems: 0,
       totalCategories,
-      pendingCount,
-    );
-  }, [currentDepot, displayName, totalCategories, supplyRequestsData]);
+      criticalAlerts: 0,
+      lowStockAlerts: 0,
+      pendingRequests: pendingCount,
+      activeShipments: 0,
+    };
+  }, [currentDepot, user, displayName, totalCategories, supplyRequestsData]);
 
   const sidebarSupplyRequests = useMemo(
     () => (supplyRequestsData?.items ?? []).map(mapApiSupplyRequestToSidebar),
@@ -632,12 +661,12 @@ const InventoryDashboardPage = () => {
 
         {/* Main Content */}
         <main
-          className={cn(
-            "flex-1 overflow-auto bg-muted/30 transition-[margin] duration-300",
-            activeTab === "requests" && isRequestSelectionSidebarOpen
-              ? "sm:mr-144"
-              : "mr-0",
-          )}
+          ref={mainRef}
+          className="flex-1 overflow-auto bg-muted/30"
+          style={{
+            marginRight:
+              activeTab === "requests" && isRequestSelectionSidebarOpen ? 480 : 0,
+          }}
         >
           <div className="p-6 space-y-6">
             {/* Page Title — hidden on incoming tab (it has its own header) */}
@@ -646,7 +675,7 @@ const InventoryDashboardPage = () => {
                 <div>
                   <h1 className="text-2xl font-semibold tracking-tighter">Dashboard Kho Hàng</h1>
                   <p className="text-muted-foreground tracking-tighter">
-                    {depotInfo?.name ?? "Đang tải..."} • Quản lý bởi {displayName}
+                    {user?.depotName ?? depotInfo?.name ?? "Đang tải..."} • Quản lý bởi {displayName}
                   </p>
                 </div>
                 <Button
@@ -779,7 +808,10 @@ const InventoryDashboardPage = () => {
                         onClick={() => refetchAllRequests()}
                         disabled={isAllRequestsFetching || isAllRequestsLoading}
                       >
-                        Làm mới bảng
+                        <ArrowsClockwise
+                          size={15}
+                          className={isAllRequestsFetching ? "animate-spin" : ""}
+                        />
                       </Button>
                     </div>
                   </div>
@@ -789,7 +821,17 @@ const InventoryDashboardPage = () => {
                   onSelectionSidebarOpen={() => {
                     if (sidebarOpen) setSidebarOpen(false);
                   }}
-                  onSelectionSidebarChange={setIsRequestSelectionSidebarOpen}
+                  onSelectionSidebarChange={(open) => {
+                    setIsRequestSelectionSidebarOpen(open);
+                    if (mainRef.current) {
+                      mainRef.current.style.marginRight = open ? "480px" : "0px";
+                    }
+                  }}
+                  onPanelWidthChange={(w) => {
+                    if (mainRef.current) {
+                      mainRef.current.style.marginRight = `${w}px`;
+                    }
+                  }}
                 />
             ) : (
               <>

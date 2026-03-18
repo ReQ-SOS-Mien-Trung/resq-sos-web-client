@@ -165,10 +165,10 @@ const DepotSidebar = ({
       >
         <TabsList className="w-full mt-3 mb-1 flex flex-col h-auto bg-transparent p-0 px-3 rounded-none shrink-0 gap-0.5">
           <TabTriggerWithDot value="inventory" dot={hasUrgent} label="Kho hàng" icon={<ChartBar className="h-4 w-4" />} />
-          <TabTriggerWithDot value="requests" dot={hasPendingReqs} label="Tạo yêu cầu" icon={<ClipboardText className="h-4 w-4" />} />
-          <TabTriggerWithDot value="shipments" dot={false} label="Theo dõi tiến trình" icon={<Truck className="h-4 w-4" />} />
           <TabTriggerWithDot value="vattu" dot={false} label="Vật tư" icon={<Cube className="h-4 w-4" />} />
           <TabTriggerWithDot value="incoming" dot={hasPendingReqs} label="Tiếp nhận yêu cầu" icon={<BellRinging className="h-4 w-4" />} />
+          <TabTriggerWithDot value="requests" dot={hasPendingReqs} label="Tạo yêu cầu" icon={<ClipboardText className="h-4 w-4" />} />
+          <TabTriggerWithDot value="shipments" dot={false} label="Theo dõi tiến trình" icon={<Truck className="h-4 w-4" />} />
         </TabsList>
 
         {/* ── Inventory Tab ─────────────────────────────────────────────── */}

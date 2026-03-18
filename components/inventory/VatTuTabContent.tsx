@@ -184,10 +184,12 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {inventoryData?.items
-                .filter(item => item.reliefItemName.toLowerCase().includes(search.toLowerCase()))
+                .filter(item => (item.itemModelName ?? item.reliefItemName ?? "").toLowerCase().includes(search.toLowerCase()))
                 .sort((a, b) => {
-                  if (sortBy === "name_asc") return a.reliefItemName.localeCompare(b.reliefItemName);
-                  if (sortBy === "name_desc") return b.reliefItemName.localeCompare(a.reliefItemName);
+                  const nameA = a.itemModelName ?? a.reliefItemName ?? "";
+                  const nameB = b.itemModelName ?? b.reliefItemName ?? "";
+                  if (sortBy === "name_asc") return nameA.localeCompare(nameB);
+                  if (sortBy === "name_desc") return nameB.localeCompare(nameA);
                   return 0;
                 })
                 .map((item) => {
@@ -197,7 +199,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
                   return (
                     <div
-                      key={item.reliefItemId}
+                      key={item.itemModelId ?? item.reliefItemId}
                       onClick={() => onItemSelect?.(item)}
                       className="group border border-black/10 dark:border-white/10 p-3 hover:border-[#FF5722] hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between aspect-square relative bg-card shadow-sm hover:shadow-md"
                     >
@@ -211,7 +213,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
                       {/* Item Name */}
                       <h3 className="text-lg font-bold tracking-tighter leading-tight group-hover:text-[#FF5722] transition-colors mb-2 line-clamp-3">
-                        {item.reliefItemName}
+                        {item.itemModelName ?? item.reliefItemName}
                       </h3>
 
                       {/* Bottom Quantity Section */}
@@ -219,11 +221,30 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                         <span className="text-[12px] tracking-tighter text-muted-foreground uppercase mb-0.5 max-w-full truncate">
                           {itemTypesData?.find((t) => t.key === item.itemType)?.value ?? item.itemType}
                         </span>
-                        <div className="flex items-end justify-between">
-                          <span className="text-base font-black tracking-tighter">
-                            {item.availableQuantity.toLocaleString()} <span className="text-[14px] font-normal text-muted-foreground uppercase">SL</span>
-                          </span>
-                        </div>
+                        {item.itemType === "Reusable" && item.reusableBreakdown ? (
+                          <div className="flex items-end justify-between gap-1">
+                            <div className="flex flex-col">
+                              <span className="text-base font-black tracking-tighter">
+                                {item.reusableBreakdown.availableUnits}
+                                <span className="text-[11px] font-normal text-muted-foreground ml-0.5">/ {item.reusableBreakdown.totalUnits}</span>
+                              </span>
+                            </div>
+                            <div className="flex gap-0.5 items-center">
+                              {item.reusableBreakdown.inUseUnits > 0 && (
+                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded tracking-tighter">{item.reusableBreakdown.inUseUnits} đang dùng</span>
+                              )}
+                              {item.reusableBreakdown.maintenanceUnits > 0 && (
+                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded tracking-tighter">{item.reusableBreakdown.maintenanceUnits} bảo trì</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-end justify-between">
+                            <span className="text-base font-black tracking-tighter">
+                              {item.availableQuantity.toLocaleString()} <span className="text-[14px] font-normal text-muted-foreground uppercase">SL</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Editorial Accent */}

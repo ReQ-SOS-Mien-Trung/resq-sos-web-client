@@ -160,6 +160,15 @@
 }
 
 /* Smooth animations */
+@keyframes bounceX {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+
 @keyframes slideInFromBottom {
   from {
     opacity: 0;
