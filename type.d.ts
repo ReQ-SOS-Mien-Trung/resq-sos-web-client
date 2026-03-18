@@ -91,6 +91,7 @@ export interface SOSRequest {
   senderPhone?: string;
   senderName?: string;
   createdByCoordinatorId?: string | null;
+  createdByCoordinatorName?: string | null;
   isOnline?: boolean;
   hopCount?: number;
   locationAccuracy?: number | null;

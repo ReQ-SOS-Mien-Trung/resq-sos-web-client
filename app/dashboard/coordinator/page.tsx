@@ -163,6 +163,11 @@ function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     senderPhone: si?.user_phone ?? undefined,
     senderName: si?.user_name ?? undefined,
     createdByCoordinatorId: entity.createdByCoordinatorId ?? null,
+    createdByCoordinatorName:
+      entity.createdByCoordinatorName ??
+      (entity as { createdByCoordinator?: { fullName?: string | null } })
+        .createdByCoordinator?.fullName ??
+      null,
     isOnline: si?.is_online,
     hopCount: nm?.hop_count,
     locationAccuracy: entity.locationAccuracy,
