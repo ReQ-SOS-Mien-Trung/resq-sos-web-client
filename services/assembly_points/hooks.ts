@@ -17,6 +17,7 @@ import {
   GetAssemblyPointsResponse,
   GetAssemblyPointsParams,
   AssemblyPointEntity,
+  AssemblyPointDetailEntity,
   CreateAssemblyPointRequest,
   CreateAssemblyPointResponse,
   AssemblyPointStatusMetadata,
@@ -88,7 +89,7 @@ export function useAssemblyPointById(
   id: number,
   options?: UseAssemblyPointByIdOptions,
 ) {
-  return useQuery<AssemblyPointEntity>({
+  return useQuery<AssemblyPointDetailEntity>({
     queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, id],
     queryFn: () => getAssemblyPointById(id),
     enabled: options?.enabled ?? true,

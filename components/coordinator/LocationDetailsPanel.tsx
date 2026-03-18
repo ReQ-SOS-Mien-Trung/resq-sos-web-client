@@ -2,11 +2,16 @@
 
 import { useMemo } from "react";
 import type { DepotEntity } from "@/services/depot/type";
-import type { AssemblyPointEntity } from "@/services/assembly_points/type";
+import { useAssemblyPointById } from "@/services/assembly_points/hooks";
+import type {
+  AssemblyPointEntity,
+  AssemblyPointDetailEntity,
+  AssemblyPointTeam,
+  AssemblyPointTeamMember,
+} from "@/services/assembly_points/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import {
@@ -31,7 +36,38 @@ import { LocationDetailsPanelProps } from "@/type";
 import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
 
 // Panel width
-const PANEL_WIDTH = 380;
+const PANEL_WIDTH = 420;
+
+const assemblyTeamTypeLabel: Record<AssemblyPointTeam["teamType"], string> = {
+  Rescue: "Cứu hộ",
+  Medical: "Y tế",
+  Transportation: "Vận chuyển",
+};
+
+const assemblyTeamStatusLabel: Record<AssemblyPointTeam["status"], string> = {
+  AwaitingAcceptance: "Chờ xác nhận",
+  Ready: "Sẵn sàng",
+  Gathering: "Đang tập hợp",
+};
+
+const assemblyTeamStatusColor: Record<AssemblyPointTeam["status"], string> = {
+  AwaitingAcceptance:
+    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300",
+  Ready:
+    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300",
+  Gathering:
+    "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-300",
+};
+
+const memberStatusLabel: Record<AssemblyPointTeamMember["status"], string> = {
+  Accepted: "Đã xác nhận",
+  Pending: "Đang chờ",
+};
+
+const memberRoleLabel: Record<AssemblyPointTeamMember["roleInTeam"], string> = {
+  Leader: "Trưởng nhóm",
+  Member: "Thành viên",
+};
 
 function formatLastUpdated(dateStr: string): string {
   try {
@@ -78,7 +114,7 @@ const LocationDetailsPanel = ({
       )}
       style={{ width: PANEL_WIDTH }}
     >
-      <div className="h-full bg-background border-r shadow-2xl flex flex-col">
+      <div className="h-full bg-background border-r shadow-2xl overflow-y-auto">
         {location?.type === "depot" ? (
           <DepotDetails
             depot={location.data}
@@ -241,240 +277,231 @@ function DepotDetails({
       </div>
 
       {/* Content */}
-      <ScrollArea className="flex-1">
-        <div className="py-2">
-          {/* Capacity & Utilization */}
-          <div className="px-5 py-3">
-            <div className="flex items-center gap-3 mb-3">
-              <Package className="h-5 w-5 text-muted-foreground shrink-0" />
-              <div className="flex-1">
-                <div className="text-sm">Sức chứa</div>
-                <div className="text-xs text-muted-foreground">
-                  {depot.currentUtilization} / {depot.capacity} đơn vị
-                </div>
-              </div>
-            </div>
-
-            {/* Utilization bar */}
-            <div className="ml-8">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-muted-foreground">
-                  Mức sử dụng
-                </span>
-                <span className="text-xs font-semibold">
-                  {utilizationPercent}%
-                </span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={cn(
-                    "h-full rounded-full transition-all duration-500",
-                    utilizationColor,
-                  )}
-                  style={{ width: `${utilizationPercent}%` }}
-                />
+      <div className="py-2">
+        {/* Capacity & Utilization */}
+        <div className="px-5 py-3">
+          <div className="flex items-center gap-3 mb-3">
+            <Package className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="flex-1">
+              <div className="text-sm">Sức chứa</div>
+              <div className="text-xs text-muted-foreground">
+                {depot.currentUtilization} / {depot.capacity} đơn vị
               </div>
             </div>
           </div>
 
-          <div className="h-px bg-border mx-5" />
-
-          {/* Address */}
-          <InfoRow
-            icon={<MapPin className="h-5 w-5" />}
-            primary={depot.address}
-          />
-
-          <div className="h-px bg-border mx-5" />
-
-          <div className="h-px bg-border mx-5" />
-
-          {/* Manager Info */}
-          {depot.manager ? (
-            <>
-              <InfoRow
-                icon={<User className="h-5 w-5" />}
-                primary={depot.manager.fullName}
-                secondary="Quản lý kho"
-              />
-
-              <div className="h-px bg-border mx-5" />
-
-              <InfoRow
-                icon={<Phone className="h-5 w-5" />}
-                primary={depot.manager.phone}
-                secondary="Số điện thoại"
-                isLink
-              />
-
-              {depot.manager.email && (
-                <>
-                  <div className="h-px bg-border mx-5" />
-                  <InfoRow
-                    icon={<EnvelopeSimple className="h-5 w-5" />}
-                    primary={depot.manager.email}
-                    secondary="Email"
-                    isLink
-                  />
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <InfoRow
-                icon={<User className="h-5 w-5" />}
-                primary="Chưa có quản lý"
-                secondary="Quản lý kho"
-                isMuted
-              />
-            </>
-          )}
-
-          <div className="h-px bg-border mx-5" />
-
-          {/* Last Updated */}
-          <InfoRow
-            icon={<Clock className="h-5 w-5" />}
-            primary={formatLastUpdated(depot.lastUpdatedAt)}
-            secondary="Cập nhật lần cuối"
-          />
-
-          <div className="h-px bg-border mx-5" />
-
-          {/* Inventory from backend */}
-          <div className="px-5 py-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-semibold">Tồn kho hiện tại</h4>
-              {inventoryData ? (
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5">
-                  {inventoryData.totalCount} loại
-                </Badge>
-              ) : null}
+          {/* Utilization bar */}
+          <div className="ml-8">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-muted-foreground">Mức sử dụng</span>
+              <span className="text-xs font-semibold">
+                {utilizationPercent}%
+              </span>
             </div>
-
-            {isInventoryLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 3 }).map((_, idx) => (
-                  <Skeleton key={idx} className="h-12 w-full rounded-lg" />
-                ))}
-              </div>
-            ) : isInventoryError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
-                Không tải được dữ liệu tồn kho.
-              </div>
-            ) : inventoryData?.items && inventoryData.items.length > 0 ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
-                    <p className="text-[10px] text-muted-foreground">
-                      Tổng tồn
-                    </p>
-                    <p className="text-sm font-bold text-slate-800">
-                      {inventorySummary.totalStock.toLocaleString("vi-VN")}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2">
-                    <p className="text-[10px] text-amber-700">Đã giữ chỗ</p>
-                    <p className="text-sm font-bold text-amber-800">
-                      {inventorySummary.reservedStock.toLocaleString("vi-VN")}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
-                    <p className="text-[10px] text-emerald-700">Còn khả dụng</p>
-                    <p className="text-sm font-bold text-emerald-800">
-                      {inventorySummary.availableStock.toLocaleString("vi-VN")}
-                    </p>
-                  </div>
-                </div>
-
-                {inventoryData.items.map((item) => (
-                  <div
-                    key={item.reliefItemId}
-                    className="rounded-lg border border-border/60 bg-card px-3 py-2"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium truncate">
-                        {item.reliefItemName}
-                      </p>
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] shrink-0"
-                      >
-                        {item.itemType === "Consumable"
-                          ? "Tiêu thụ"
-                          : "Tái sử dụng"}
-                      </Badge>
-                    </div>
-
-                    <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{item.categoryName}</span>
-                      <span>•</span>
-                      <span>{item.targetGroup}</span>
-                    </div>
-
-                    <div className="mt-2 grid grid-cols-3 gap-1.5">
-                      <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
-                        <p className="text-[10px] text-slate-600">Tổng tồn</p>
-                        <p className="text-sm font-semibold leading-none text-slate-800">
-                          {item.quantity.toLocaleString("vi-VN")}
-                        </p>
-                      </div>
-                      <div className="min-w-0 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-                        <p className="text-[10px] text-amber-700">Đã giữ</p>
-                        <p className="text-sm font-semibold leading-none text-amber-800">
-                          {item.reservedQuantity.toLocaleString("vi-VN")}
-                        </p>
-                      </div>
-                      <div className="min-w-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5">
-                        <p className="text-[10px] text-emerald-700">
-                          Còn khả dụng
-                        </p>
-                        <p className="text-sm font-semibold leading-none text-emerald-800">
-                          {item.availableQuantity.toLocaleString("vi-VN")}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                Kho chưa có dữ liệu vật tư.
-              </div>
-            )}
-          </div>
-
-          {/* Additional Info Section */}
-          <div className="h-2 bg-muted/50" />
-
-          <div className="px-5 py-4">
-            <h4 className="text-sm font-semibold mb-3">Thông tin bổ sung</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard
-                label="ID"
-                value={`#${depot.id}`}
-                icon={<Hash className="h-4 w-4" />}
-              />
-              <StatCard
-                label="Tình trạng"
-                value={statusConfig.label}
-                icon={<StatusIcon className="h-4 w-4" />}
-                statusColor={statusConfig.textColor}
-              />
-              <StatCard
-                label="Sức chứa"
-                value={`${depot.capacity}`}
-                icon={<Package className="h-4 w-4" />}
-              />
-              <StatCard
-                label="Đang dùng"
-                value={`${depot.currentUtilization}`}
-                icon={<ChartBar className="h-4 w-4" />}
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  utilizationColor,
+                )}
+                style={{ width: `${utilizationPercent}%` }}
               />
             </div>
           </div>
         </div>
-      </ScrollArea>
+
+        <div className="h-px bg-border mx-5" />
+
+        {/* Address */}
+        <InfoRow
+          icon={<MapPin className="h-5 w-5" />}
+          primary={depot.address}
+        />
+
+        <div className="h-px bg-border mx-5" />
+
+        <div className="h-px bg-border mx-5" />
+
+        {/* Manager Info */}
+        {depot.manager ? (
+          <>
+            <InfoRow
+              icon={<User className="h-5 w-5" />}
+              primary={depot.manager.fullName}
+              secondary="Quản lý kho"
+            />
+
+            <div className="h-px bg-border mx-5" />
+
+            <InfoRow
+              icon={<Phone className="h-5 w-5" />}
+              primary={depot.manager.phone}
+              secondary="Số điện thoại"
+              isLink
+            />
+
+            {depot.manager.email && (
+              <>
+                <div className="h-px bg-border mx-5" />
+                <InfoRow
+                  icon={<EnvelopeSimple className="h-5 w-5" />}
+                  primary={depot.manager.email}
+                  secondary="Email"
+                  isLink
+                />
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <InfoRow
+              icon={<User className="h-5 w-5" />}
+              primary="Chưa có quản lý"
+              secondary="Quản lý kho"
+              isMuted
+            />
+          </>
+        )}
+
+        <div className="h-px bg-border mx-5" />
+
+        {/* Last Updated */}
+        <InfoRow
+          icon={<Clock className="h-5 w-5" />}
+          primary={formatLastUpdated(depot.lastUpdatedAt)}
+          secondary="Cập nhật lần cuối"
+        />
+
+        <div className="h-px bg-border mx-5" />
+
+        {/* Inventory from backend */}
+        <div className="px-5 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold">Tồn kho hiện tại</h4>
+            {inventoryData ? (
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                {inventoryData.totalCount} loại
+              </Badge>
+            ) : null}
+          </div>
+
+          {isInventoryLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <Skeleton key={idx} className="h-12 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : isInventoryError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+              Không tải được dữ liệu tồn kho.
+            </div>
+          ) : inventoryData?.items && inventoryData.items.length > 0 ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
+                  <p className="text-[10px] text-muted-foreground">Tổng tồn</p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {inventorySummary.totalStock.toLocaleString("vi-VN")}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2">
+                  <p className="text-[10px] text-amber-700">Đã giữ chỗ</p>
+                  <p className="text-sm font-bold text-amber-800">
+                    {inventorySummary.reservedStock.toLocaleString("vi-VN")}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
+                  <p className="text-[10px] text-emerald-700">Còn khả dụng</p>
+                  <p className="text-sm font-bold text-emerald-800">
+                    {inventorySummary.availableStock.toLocaleString("vi-VN")}
+                  </p>
+                </div>
+              </div>
+
+              {inventoryData.items.map((item) => (
+                <div
+                  key={item.reliefItemId}
+                  className="rounded-lg border border-border/60 bg-card px-3 py-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium truncate">
+                      {item.reliefItemName}
+                    </p>
+                    <Badge variant="secondary" className="text-[10px] shrink-0">
+                      {item.itemType === "Consumable"
+                        ? "Tiêu thụ"
+                        : "Tái sử dụng"}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{item.categoryName}</span>
+                    <span>•</span>
+                    <span>{item.targetGroup}</span>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-3 gap-1.5">
+                    <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
+                      <p className="text-[10px] text-slate-600">Tổng tồn</p>
+                      <p className="text-sm font-semibold leading-none text-slate-800">
+                        {item.quantity.toLocaleString("vi-VN")}
+                      </p>
+                    </div>
+                    <div className="min-w-0 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+                      <p className="text-[10px] text-amber-700">Đã giữ</p>
+                      <p className="text-sm font-semibold leading-none text-amber-800">
+                        {item.reservedQuantity.toLocaleString("vi-VN")}
+                      </p>
+                    </div>
+                    <div className="min-w-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5">
+                      <p className="text-[10px] text-emerald-700">
+                        Còn khả dụng
+                      </p>
+                      <p className="text-sm font-semibold leading-none text-emerald-800">
+                        {item.availableQuantity.toLocaleString("vi-VN")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              Kho chưa có dữ liệu vật tư.
+            </div>
+          )}
+        </div>
+
+        {/* Additional Info Section */}
+        <div className="h-2 bg-muted/50" />
+
+        <div className="px-5 py-4">
+          <h4 className="text-sm font-semibold mb-3">Thông tin bổ sung</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard
+              label="ID"
+              value={`#${depot.id}`}
+              icon={<Hash className="h-4 w-4" />}
+            />
+            <StatCard
+              label="Tình trạng"
+              value={statusConfig.label}
+              icon={<StatusIcon className="h-4 w-4" />}
+              statusColor={statusConfig.textColor}
+            />
+            <StatCard
+              label="Sức chứa"
+              value={`${depot.capacity}`}
+              icon={<Package className="h-4 w-4" />}
+            />
+            <StatCard
+              label="Đang dùng"
+              value={`${depot.currentUtilization}`}
+              icon={<ChartBar className="h-4 w-4" />}
+            />
+          </div>
+        </div>
+      </div>
     </>
   );
 }
@@ -489,6 +516,18 @@ function AssemblyPointDetails({
   assemblyPoint: AssemblyPointEntity;
   onClose: () => void;
 }) {
+  const {
+    data: assemblyPointDetail,
+    isLoading: isAssemblyPointDetailLoading,
+    isError: isAssemblyPointDetailError,
+  } = useAssemblyPointById(assemblyPoint.id, { enabled: true });
+
+  const displayAssemblyPoint: AssemblyPointDetailEntity | AssemblyPointEntity =
+    assemblyPointDetail ?? assemblyPoint;
+
+  const teams =
+    "teams" in displayAssemblyPoint ? displayAssemblyPoint.teams : [];
+
   const statusConfig = assemblyPointStatusConfig[assemblyPoint.status];
   const StatusIcon = statusConfig.icon;
 
@@ -528,10 +567,10 @@ function AssemblyPointDetails({
       {/* Title Section */}
       <div className="px-5 pt-4 pb-3 border-b shrink-0">
         <h3 className="text-lg font-bold leading-tight">
-          {assemblyPoint.name}
+          {displayAssemblyPoint.name}
         </h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Mã: {assemblyPoint.code}
+          Mã: {displayAssemblyPoint.code}
         </p>
 
         {/* Status row */}
@@ -579,64 +618,157 @@ function AssemblyPointDetails({
       </div>
 
       {/* Content */}
-      <ScrollArea className="flex-1">
-        <div className="py-2">
-          {/* Code */}
-          <InfoRow
-            icon={<Hash className="h-5 w-5" />}
-            primary={assemblyPoint.code}
-            secondary="Mã điểm tập kết"
-          />
+      <div className="py-2">
+        {/* Code */}
+        <InfoRow
+          icon={<Hash className="h-5 w-5" />}
+          primary={displayAssemblyPoint.code}
+          secondary="Mã điểm tập kết"
+        />
 
-          <div className="h-px bg-border mx-5" />
+        <div className="h-px bg-border mx-5" />
 
-          {/* Capacity */}
-          <InfoRow
-            icon={<Users className="h-5 w-5" />}
-            primary={`${assemblyPoint.capacityTeams} đội`}
-            secondary="Sức chứa đội cứu hộ"
-          />
+        {/* Capacity */}
+        <InfoRow
+          icon={<Users className="h-5 w-5" />}
+          primary={`${displayAssemblyPoint.capacityTeams} đội`}
+          secondary="Sức chứa đội cứu hộ"
+        />
 
-          <div className="h-px bg-border mx-5" />
+        <div className="h-px bg-border mx-5" />
 
-          {/* Last Updated */}
-          <InfoRow
-            icon={<Clock className="h-5 w-5" />}
-            primary={formatLastUpdated(assemblyPoint.lastUpdatedAt)}
-            secondary="Cập nhật lần cuối"
-          />
+        {/* Last Updated */}
+        <InfoRow
+          icon={<Clock className="h-5 w-5" />}
+          primary={formatLastUpdated(displayAssemblyPoint.lastUpdatedAt)}
+          secondary="Cập nhật lần cuối"
+        />
 
-          {/* Additional Info */}
-          <div className="h-2 bg-muted/50" />
+        <div className="h-px bg-border mx-5" />
 
-          <div className="px-5 py-4">
-            <h4 className="text-sm font-semibold mb-3">Thông tin bổ sung</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <StatCard
-                label="ID"
-                value={`#${assemblyPoint.id}`}
-                icon={<Hash className="h-4 w-4" />}
-              />
-              <StatCard
-                label="Tình trạng"
-                value={statusConfig.label}
-                icon={<StatusIcon className="h-4 w-4" />}
-                statusColor={statusConfig.textColor}
-              />
-              <StatCard
-                label="Sức chứa"
-                value={`${assemblyPoint.capacityTeams} đội`}
-                icon={<Users className="h-4 w-4" />}
-              />
-              <StatCard
-                label="Mã"
-                value={assemblyPoint.code}
-                icon={<Info className="h-4 w-4" />}
-              />
+        {/* Teams */}
+        <div className="px-5 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold">Đội tại điểm tập kết</h4>
+            <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+              {teams.length} đội
+            </Badge>
+          </div>
+
+          {isAssemblyPointDetailLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 2 }).map((_, idx) => (
+                <Skeleton key={idx} className="h-24 w-full rounded-lg" />
+              ))}
             </div>
+          ) : isAssemblyPointDetailError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+              Không tải được chi tiết đội của điểm tập kết.
+            </div>
+          ) : teams.length > 0 ? (
+            <div className="space-y-3">
+              {teams.map((team) => (
+                <div
+                  key={team.id}
+                  className="rounded-lg border border-border/60 bg-card px-3 py-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">
+                        {team.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {team.code}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] h-5 px-2 shrink-0 border",
+                        assemblyTeamStatusColor[team.status],
+                      )}
+                    >
+                      {assemblyTeamStatusLabel[team.status]}
+                    </Badge>
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{assemblyTeamTypeLabel[team.teamType]}</span>
+                    <span>•</span>
+                    <span>
+                      {team.members.length}/{team.maxMembers} thành viên
+                    </span>
+                  </div>
+
+                  <div className="mt-2 space-y-1.5">
+                    {team.members.map((member) => (
+                      <div
+                        key={member.userId}
+                        className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-2 py-1.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate">
+                            {member.firstName} {member.lastName}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {memberRoleLabel[member.roleInTeam]}
+                            {member.isLeader ? " • Leader" : ""}
+                          </p>
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "text-[10px] h-5 px-2 shrink-0",
+                            member.status === "Accepted"
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+                          )}
+                        >
+                          {memberStatusLabel[member.status]}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              Điểm tập kết hiện chưa có đội nào.
+            </div>
+          )}
+        </div>
+
+        {/* Additional Info */}
+        <div className="h-2 bg-muted/50" />
+
+        <div className="px-5 py-4">
+          <h4 className="text-sm font-semibold mb-3">Thông tin bổ sung</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard
+              label="ID"
+              value={`#${displayAssemblyPoint.id}`}
+              icon={<Hash className="h-4 w-4" />}
+            />
+            <StatCard
+              label="Tình trạng"
+              value={statusConfig.label}
+              icon={<StatusIcon className="h-4 w-4" />}
+              statusColor={statusConfig.textColor}
+            />
+            <StatCard
+              label="Sức chứa"
+              value={`${displayAssemblyPoint.capacityTeams} đội`}
+              icon={<Users className="h-4 w-4" />}
+            />
+            <StatCard
+              label="Mã"
+              value={displayAssemblyPoint.code}
+              icon={<Info className="h-4 w-4" />}
+            />
           </div>
         </div>
-      </ScrollArea>
+      </div>
     </>
   );
 }

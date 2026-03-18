@@ -19,6 +19,43 @@ export interface AssemblyPointEntity {
   lastUpdatedAt: string;
 }
 
+// Team domain for Assembly Point detail
+export type AssemblyPointTeamType = "Rescue" | "Medical" | "Transportation";
+
+export type AssemblyPointTeamStatus =
+  | "AwaitingAcceptance"
+  | "Ready"
+  | "Gathering";
+
+export type AssemblyPointTeamMemberStatus = "Accepted" | "Pending";
+
+export type AssemblyPointTeamMemberRole = "Leader" | "Member";
+
+export interface AssemblyPointTeamMember {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+  roleInTeam: AssemblyPointTeamMemberRole;
+  isLeader: boolean;
+  status: AssemblyPointTeamMemberStatus;
+}
+
+export interface AssemblyPointTeam {
+  id: number;
+  code: string;
+  name: string;
+  teamType: AssemblyPointTeamType;
+  status: AssemblyPointTeamStatus;
+  maxMembers: number;
+  members: AssemblyPointTeamMember[];
+}
+
+// Detail Response for GET /personnel/assembly-point/{id}
+export interface AssemblyPointDetailEntity extends AssemblyPointEntity {
+  teams: AssemblyPointTeam[];
+}
+
 // Paginated Response for Assembly Points
 export interface GetAssemblyPointsResponse {
   items: AssemblyPointEntity[];

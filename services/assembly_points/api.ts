@@ -3,6 +3,7 @@ import {
   GetAssemblyPointsResponse,
   GetAssemblyPointsParams,
   AssemblyPointEntity,
+  AssemblyPointDetailEntity,
   CreateAssemblyPointRequest,
   CreateAssemblyPointResponse,
   AssemblyPointStatusMetadata,
@@ -34,7 +35,7 @@ export async function getAssemblyPoints(
  */
 export async function getAssemblyPointById(
   id: number,
-): Promise<AssemblyPointEntity> {
+): Promise<AssemblyPointDetailEntity> {
   const { data } = await api.get(`/personnel/assembly-point/${id}`);
   return data;
 }
