@@ -70,7 +70,7 @@ function getStatusInfo(r: SupplyRequestListItem): {
       className: "bg-green-100 text-green-700 border-green-200",
     };
   }
-  if (r.sourceStatus === "Shipped" || r.requestingStatus === "InTransit") {
+  if (r.sourceStatus === "Shipping" || r.requestingStatus === "InTransit") {
     return {
       label: "Đang vận chuyển",
       className: "bg-blue-100 text-blue-700 border-blue-200",
@@ -150,7 +150,7 @@ export default function IncomingRequestsSection() {
   const needsActionCount = allItems.filter(getNeedsAction).length;
   const inTransitCount = allItems.filter(
     (r) =>
-      r.sourceStatus === "Shipped" || r.requestingStatus === "InTransit",
+      r.sourceStatus === "Shipping" || r.requestingStatus === "InTransit",
   ).length;
   const doneCount = allItems.filter(
     (r) =>
@@ -169,7 +169,7 @@ export default function IncomingRequestsSection() {
       case "in_transit":
         return allItems.filter(
           (r) =>
-            r.sourceStatus === "Shipped" || r.requestingStatus === "InTransit",
+            r.sourceStatus === "Shipping" || r.requestingStatus === "InTransit",
         );
       case "done":
         return allItems.filter(
@@ -532,8 +532,12 @@ function RequestCard({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={onViewDetail}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onViewDetail(); }}
       className={cn(
-        "rounded-xl border-y border-r border-l-4 bg-card overflow-hidden transition-all hover:shadow-lg",
+        "rounded-xl border-y border-r border-l-4 bg-card overflow-hidden transition-all hover:shadow-lg cursor-pointer",
         accentBorder,
       )}
     >
@@ -610,7 +614,7 @@ function RequestCard({
         <div className="space-y-1.5">
           {request.items.slice(0, 3).map((item, idx) => (
             <div
-              key={item.reliefItemId}
+              key={item.itemModelId}
               className={cn(
                 "flex items-baseline justify-between gap-2",
                 idx < Math.min(request.items.slice(0, 3).length, 3) - 1 &&
@@ -618,7 +622,7 @@ function RequestCard({
               )}
             >
               <span className="text-sm font-medium tracking-tighter text-foreground truncate leading-tight">
-                {item.reliefItemName}
+                {item.itemModelName}
               </span>
               <span className="text-sm font-bold text-primary whitespace-nowrap tabular-nums tracking-tighter leading-tight">
                 {item.quantity.toLocaleString("vi-VN")}{" "}
@@ -669,10 +673,7 @@ function RequestCard({
               <p className="text-xs font-semibold text-red-600 tracking-tighter">Lý do từ chối</p>
               <button
                 type="button"
-                onClick={() => {
-                  setShowRejectForm(false);
-                  setRejectReason("");
-                }}
+                onClick={(e) => { e.stopPropagation(); setShowRejectForm(false); setRejectReason(""); }}
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
@@ -689,7 +690,7 @@ function RequestCard({
               size="sm"
               variant="destructive"
               className="w-full h-8 text-xs gap-1 tracking-tighter"
-              onClick={handleReject}
+              onClick={(e) => { e.stopPropagation(); handleReject(); }}
               disabled={rejectMutation.isPending || !rejectReason.trim()}
             >
               {rejectMutation.isPending ? (
@@ -712,7 +713,7 @@ function RequestCard({
               size="sm"
               variant="outline"
               className="h-8 font-medium text-xs gap-1.5 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 tracking-tighter"
-              onClick={() => setShowRejectForm(true)}
+              onClick={(e) => { e.stopPropagation(); setShowRejectForm(true); }}
               disabled={isAnyPending}
             >
               <XCircle className="h-3.5 w-3.5" weight="fill" />
@@ -721,7 +722,7 @@ function RequestCard({
             <Button
               size="sm"
               className="h-8 font-medium text-xs gap-1.5 flex-1 bg-green-600 hover:bg-green-700 tracking-tighter"
-              onClick={handleAccept}
+              onClick={(e) => { e.stopPropagation(); handleAccept(); }}
               disabled={isAnyPending}
             >
               {acceptMutation.isPending ? (
@@ -739,7 +740,7 @@ function RequestCard({
           <Button
             size="sm"
             className="h-8 text-xs gap-1.5 flex-1 bg-purple-600 hover:bg-purple-700 tracking-tighter"
-            onClick={handlePrepare}
+            onClick={(e) => { e.stopPropagation(); handlePrepare(); }}
             disabled={isAnyPending}
           >
             {prepareMutation.isPending ? (
@@ -756,7 +757,7 @@ function RequestCard({
           <Button
             size="sm"
             className="h-8 text-xs gap-1.5 flex-1 bg-blue-600 hover:bg-blue-700 tracking-tighter"
-            onClick={handleShip}
+            onClick={(e) => { e.stopPropagation(); handleShip(); }}
             disabled={isAnyPending}
           >
             {shipMutation.isPending ? (
@@ -768,12 +769,12 @@ function RequestCard({
           </Button>
         )}
 
-        {/* Source + Shipped → Complete */}
-        {request.role === "Source" && request.sourceStatus === "Shipped" && (
+        {/* Source + Shipping → Complete */}
+        {request.role === "Source" && request.sourceStatus === "Shipping" && (
           <Button
             size="sm"
             className="h-8 text-xs gap-1.5 flex-1 bg-teal-600 hover:bg-teal-700 tracking-tighter"
-            onClick={handleComplete}
+            onClick={(e) => { e.stopPropagation(); handleComplete(); }}
             disabled={isAnyPending}
           >
             {completeMutation.isPending ? (
@@ -792,7 +793,7 @@ function RequestCard({
           <Button
             size="sm"
             className="h-8 text-xs gap-1.5 flex-1 bg-green-600 hover:bg-green-700 tracking-tighter"
-            onClick={handleConfirm}
+            onClick={(e) => { e.stopPropagation(); handleConfirm(); }}
             disabled={isAnyPending}
           >
             {confirmMutation.isPending ? (
@@ -803,16 +804,6 @@ function RequestCard({
             Xác nhận đã nhận
           </Button>
         )}
-
-        {/* View detail — always shown */}
-        <button
-          type="button"
-          onClick={onViewDetail}
-          className="group ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground tracking-tighter transition-colors shrink-0"
-        >
-          Chi tiết
-          <CaretRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
-        </button>
       </div>
     </div>
   );

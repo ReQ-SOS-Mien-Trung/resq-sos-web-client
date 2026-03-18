@@ -91,6 +91,14 @@ const DepotSidebar = ({
   const pendingRequestsAll = supplyRequests.filter((r) => r.status === "PENDING");
   const inProgressRequestsAll = supplyRequests.filter((r) => r.status === "IN_TRANSIT");
 
+  // "Tiếp nhận yêu cầu" dot — show when there are cards in that section
+  // (Source role = all statuses, Requester+InTransit)
+  const hasIncomingItems = supplyRequests.some(
+    (r) => r.type === "OUTBOUND" || (r.type === "INBOUND" && r.status === "IN_TRANSIT"),
+  );
+  // "Theo dõi tiến trình" dot — show when any requests exist in the table
+  const hasAnyRequests = supplyRequests.length > 0;
+
   const pendingRequests = [...pendingRequestsAll]
     .sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime())
     .slice(0, 2);
@@ -166,9 +174,9 @@ const DepotSidebar = ({
         <TabsList className="w-full mt-3 mb-1 flex flex-col h-auto bg-transparent p-0 px-3 rounded-none shrink-0 gap-0.5">
           <TabTriggerWithDot value="inventory" dot={hasUrgent} label="Kho hàng" icon={<ChartBar className="h-4 w-4" />} />
           <TabTriggerWithDot value="vattu" dot={false} label="Vật tư" icon={<Cube className="h-4 w-4" />} />
-          <TabTriggerWithDot value="incoming" dot={hasPendingReqs} label="Tiếp nhận yêu cầu" icon={<BellRinging className="h-4 w-4" />} />
           <TabTriggerWithDot value="requests" dot={hasPendingReqs} label="Tạo yêu cầu" icon={<ClipboardText className="h-4 w-4" />} />
-          <TabTriggerWithDot value="shipments" dot={false} label="Theo dõi tiến trình" icon={<Truck className="h-4 w-4" />} />
+          <TabTriggerWithDot value="incoming" dot={hasIncomingItems} label="Tiếp nhận yêu cầu" icon={<BellRinging className="h-4 w-4" />} />
+          <TabTriggerWithDot value="shipments" dot={hasAnyRequests} label="Theo dõi tiến trình" icon={<Truck className="h-4 w-4" />} />
         </TabsList>
 
         {/* ── Inventory Tab ─────────────────────────────────────────────── */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -265,6 +266,8 @@ export default function SupplyRequestSection({
     onSelectionSidebarChange?.(open);
     if (open) {
       onSelectionSidebarOpen?.();
+    } else {
+      setSelectedDepotByItem({});
     }
   };
 
@@ -390,7 +393,7 @@ export default function SupplyRequestSection({
     const rect = sourceElement.getBoundingClientRect();
     const startX = rect.left + rect.width / 2;
     const startY = rect.top + rect.height / 2;
-    const sheetWidth = Math.min(576, window.innerWidth * 0.9);
+    const sheetWidth = panelWidthRef.current;
     const targetX = window.innerWidth - sheetWidth + 72;
     const targetY = 98;
     const id = crypto.randomUUID();
@@ -544,7 +547,7 @@ export default function SupplyRequestSection({
       items: depot.items
         .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
         .map((item) => ({
-          reliefItemId: item.itemModelId,
+          itemModelId: item.itemModelId,
           quantity: item.quantity,
         })),
       note: depotNotes[depot.depotId]?.trim() || undefined,
@@ -855,14 +858,14 @@ export default function SupplyRequestSection({
 
             <div className="flex flex-1 flex-col items-center overflow-y-auto p-6 space-y-4">
               {groupedSelectedDepots.length === 0 ? (
-                <div className="w-full max-w-lg rounded-lg border border-dashed border-border/70 p-4 text-sm text-muted-foreground tracking-tighter">
+                <div className="w-full rounded-lg border border-dashed border-border/70 p-4 text-sm text-muted-foreground tracking-tighter">
                   Chưa có kho nào được chọn.
                 </div>
               ) : (
                 groupedSelectedDepots.map((depot) => (
                   <Card
                     key={String(depot.depotId)}
-                    className={`w-full max-w-lg border-border/60 transition-all duration-300 ${
+                    className={`w-full border-border/60 transition-all duration-300 ${
                       animatedDepotId === depot.depotId
                         ? "ring-1 ring-primary/25"
                         : ""
@@ -934,24 +937,29 @@ export default function SupplyRequestSection({
         </SheetContent>
       </Sheet>
 
-      {flyTokens.map((token) => (
-        <div
-          key={token.id}
-          className="pointer-events-none fixed z-150 inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-background/95 px-3 py-1.5 text-xs font-medium text-primary shadow-lg"
-          style={{
-            left: token.startX,
-            top: token.startY,
-            transform: token.active
-              ? `translate(${token.dx}px, ${token.dy}px) scale(0.35)`
-              : "translate(0, 0) scale(1)",
-            opacity: token.active ? 0.25 : 1,
-            transition: "transform 900ms cubic-bezier(0.16, 1, 0.3, 1), opacity 900ms ease",
-          }}
-        >
-          <CheckCircle size={12} weight="fill" />
-          {token.text}
-        </div>
-      ))}
+      {flyTokens.length > 0 && typeof document !== "undefined" &&
+        createPortal(
+          flyTokens.map((token) => (
+            <div
+              key={token.id}
+              className="pointer-events-none fixed inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-background/95 px-3 py-1.5 text-xs font-medium text-primary shadow-lg"
+              style={{
+                zIndex: 99999,
+                left: token.startX,
+                top: token.startY,
+                transform: token.active
+                  ? `translate(${token.dx}px, ${token.dy}px) scale(0.35)`
+                  : "translate(0, 0) scale(1)",
+                opacity: token.active ? 0.25 : 1,
+                transition: "transform 900ms cubic-bezier(0.16, 1, 0.3, 1), opacity 900ms ease",
+              }}
+            >
+              <CheckCircle size={12} weight="fill" />
+              {token.text}
+            </div>
+          )),
+          document.body,
+        )}
     </div>
   );
 }

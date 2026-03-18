@@ -69,7 +69,7 @@ const STEPS = [
     timestampField: null,
   },
   {
-    key: "shipped",
+    key: "shipping",
     label: "Đang vận chuyển",
     description: "Hàng hóa đã xuất kho — đang trên đường đến kho yêu cầu",
     Icon: Truck,
@@ -102,7 +102,7 @@ function getCurrentStepIndex(req: SupplyRequestListItem): number {
   if (sourceStatus === "Rejected" || requestingStatus === "Rejected") return -1;
   if (requestingStatus === "Received") return 5;
   if (sourceStatus === "Completed" && requestingStatus === "InTransit") return 4;
-  if (sourceStatus === "Shipped") return 3;
+  if (sourceStatus === "Shipping") return 3;
   if (sourceStatus === "Preparing") return 2;
   if (sourceStatus === "Accepted") return 1;
   return 0; // Pending / WaitingForApproval
@@ -272,7 +272,7 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
           </Button>
         );
       }
-      if (sourceStatus === "Shipped") {
+      if (sourceStatus === "Shipping") {
         return (
           <Button
             className="w-full gap-2 bg-teal-600 hover:bg-teal-700 text-white"
@@ -555,14 +555,14 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
             <div className="rounded-xl border bg-card overflow-hidden divide-y">
               {request.items.map((item) => (
                 <div
-                  key={item.reliefItemId}
+                  key={item.itemModelId}
                   className="flex items-center justify-between px-4 py-3 text-sm"
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
                       <Package className="h-3.5 w-3.5 text-primary" weight="fill" />
                     </div>
-                    <span className="tracking-tighter">{item.reliefItemName}</span>
+                    <span className="tracking-tighter">{item.itemModelName}</span>
                   </div>
                   <span className="font-semibold tracking-tighter text-primary tabular-nums">
                     {item.quantity.toLocaleString("vi-VN")}{" "}

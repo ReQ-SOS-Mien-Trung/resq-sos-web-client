@@ -138,7 +138,7 @@ const mapApiSupplyRequestToSidebar = (
   let status: SupplyRequest["status"] = "PENDING";
 
   if (
-    request.sourceStatus === "Shipped" &&
+    request.sourceStatus === "Shipping" &&
     request.requestingStatus === "InTransit"
   ) {
     status = "IN_TRANSIT";
@@ -170,8 +170,8 @@ const mapApiSupplyRequestToSidebar = (
     type: request.role === "Requester" ? "INBOUND" : "OUTBOUND",
     status,
     items: request.items.map((item) => ({
-      itemId: String(item.reliefItemId),
-      itemName: item.reliefItemName,
+      itemId: String(item.itemModelId),
+      itemName: item.itemModelName,
       quantity: item.quantity,
       unit: item.unit,
     })),
@@ -216,9 +216,8 @@ const InventoryDashboardPage = () => {
   const [activeTab, setActiveTab] = useState("inventory");
   const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
-  const [isRequestSelectionSidebarOpen, setIsRequestSelectionSidebarOpen] =
-    useState(false);
   const mainRef = useRef<HTMLElement>(null);
+  const panelWidthRef = useRef(480);
   const [requestsPageNumber, setRequestsPageNumber] = useState(1);
   const requestsPageSize = 8;
   const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
@@ -663,10 +662,6 @@ const InventoryDashboardPage = () => {
         <main
           ref={mainRef}
           className="flex-1 overflow-auto bg-muted/30"
-          style={{
-            marginRight:
-              activeTab === "requests" && isRequestSelectionSidebarOpen ? 480 : 0,
-          }}
         >
           <div className="p-6 space-y-6">
             {/* Page Title — hidden on incoming tab (it has its own header) */}
@@ -745,8 +740,8 @@ const InventoryDashboardPage = () => {
                                   <td className="px-4 py-3">
                                     <div className="space-y-1.5">
                                       {request.items.map((item) => (
-                                        <div key={`${request.id}-${item.reliefItemId}`} className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5">
-                                          <span>{item.reliefItemName}</span>
+                                        <div key={`${request.id}-${item.itemModelId}`} className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5">
+                                          <span>{item.itemModelName}</span>
                                           <span className="font-semibold text-primary whitespace-nowrap">
                                             {item.quantity.toLocaleString("vi-VN")} {item.unit}
                                           </span>
@@ -822,12 +817,12 @@ const InventoryDashboardPage = () => {
                     if (sidebarOpen) setSidebarOpen(false);
                   }}
                   onSelectionSidebarChange={(open) => {
-                    setIsRequestSelectionSidebarOpen(open);
                     if (mainRef.current) {
-                      mainRef.current.style.marginRight = open ? "480px" : "0px";
+                      mainRef.current.style.marginRight = open ? `${panelWidthRef.current}px` : "0px";
                     }
                   }}
                   onPanelWidthChange={(w) => {
+                    panelWidthRef.current = w;
                     if (mainRef.current) {
                       mainRef.current.style.marginRight = `${w}px`;
                     }

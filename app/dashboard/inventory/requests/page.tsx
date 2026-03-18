@@ -13,7 +13,7 @@
 //   Pending: "Chờ duyệt",
 //   Accepted: "Đã chấp nhận",
 //   Preparing: "Đang chuẩn bị",
-//   Shipped: "Đã gửi hàng",
+//   Shipping: "Đang gửi hàng",
 //   Completed: "Hoàn thành",
 //   Rejected: "Từ chối",
 // };

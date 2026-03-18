@@ -231,7 +231,7 @@ export interface SearchDepotsResponse {
 // ─── Create Supply Requests ───
 
 export interface CreateSupplyRequestItem {
-  reliefItemId: number;
+  itemModelId: number;
   quantity: number;
 }
 
@@ -251,7 +251,7 @@ export type SourceSupplyRequestStatus =
   | "Pending"
   | "Accepted"
   | "Preparing"
-  | "Shipped"
+  | "Shipping"
   | "Completed"
   | "Rejected";
 
@@ -272,8 +272,8 @@ export interface GetSupplyRequestsParams {
 }
 
 export interface SupplyRequestListReliefItem {
-  reliefItemId: number;
-  reliefItemName: string;
+  itemModelId: number;
+  itemModelName: string;
   unit: string;
   quantity: number;
 }
