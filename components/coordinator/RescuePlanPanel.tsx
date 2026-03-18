@@ -790,6 +790,10 @@ function extractSOSLabel(activity: MissionActivity): string | null {
 }
 
 function extractDepotLabel(activity: MissionActivity): string | null {
+  const depotName =
+    typeof activity.depotName === "string" ? activity.depotName.trim() : "";
+  if (depotName) return depotName;
+
   const target =
     typeof activity.target === "string" ? activity.target.trim() : "";
   const hasDepotKeyword = /\b(kho|depot)\b/i.test(target);
@@ -804,6 +808,10 @@ function inferSOSRequestIdFromActivity(
   activity: MissionActivity,
   sosRequests: SOSRequest[],
 ): string | null {
+  if (typeof activity.sosRequestId === "number") {
+    return String(activity.sosRequestId);
+  }
+
   const explicitLabel = extractSOSLabel(activity);
   if (explicitLabel) return explicitLabel.replace("SOS #", "").trim();
 
@@ -879,7 +887,15 @@ function parseSupplyItemsFromDescription(
 function getSupplyDisplayItems(activity: {
   activityType: string;
   description: string;
-  suppliesToCollect?: ClusterSupplyCollection[] | null;
+  suppliesToCollect?:
+    | ClusterSupplyCollection[]
+    | Array<{
+        itemId: number | null;
+        itemName: string | null;
+        quantity: number;
+        unit: string;
+      }>
+    | null;
 }): SupplyDisplayItem[] {
   if (activity.suppliesToCollect && activity.suppliesToCollect.length > 0) {
     return activity.suppliesToCollect.map((supply) => ({
@@ -1005,12 +1021,49 @@ function getTeamAssignmentStatusMeta(status: string | null | undefined): {
 function isMissionTeamActive(team: MissionTeam): boolean {
   const normalizedStatus = (team.status ?? "").trim().toLowerCase();
   return (
-    team.unassignedAt == null &&
+    (!team.unassignedAt || team.unassignedAt.trim() === "") &&
     (normalizedStatus === "assigned" ||
       normalizedStatus === "inprogress" ||
       normalizedStatus === "in_progress" ||
       normalizedStatus === "in progress")
   );
+}
+
+function getRescueTeamStatusMeta(status: string | null | undefined): {
+  label: string;
+  className: string;
+} {
+  const normalizedStatus = (status ?? "").trim().toLowerCase();
+
+  if (normalizedStatus === "ready") {
+    return {
+      label: "Sẵn sàng",
+      className:
+        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+    };
+  }
+
+  if (normalizedStatus === "gathering") {
+    return {
+      label: "Đang tập hợp",
+      className:
+        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+    };
+  }
+
+  if (normalizedStatus === "awaitingacceptance") {
+    return {
+      label: "Chờ xác nhận",
+      className:
+        "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
+    };
+  }
+
+  return {
+    label: status || "Chưa rõ",
+    className:
+      "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
+  };
 }
 
 function getActiveMissionTeams(mission: MissionEntity): MissionTeam[] {
@@ -2068,13 +2121,20 @@ const RescuePlanPanel = ({
             activityCode: `${a.activityType}_${i + 1}`,
             activityType: a.activityType,
             description: syncedDescription,
+            priority: a.priority || "Medium",
+            estimatedTime: Number.parseInt(String(a.estimatedTime), 10) || 30,
+            sosRequestId: Number(a.sosRequestId ?? sos?.id ?? 0),
+            depotId: Number(a.depotId ?? 0),
+            depotName: a.depotName ?? "",
+            depotAddress: a.depotAddress ?? "",
+            suppliesToCollect: (a.suppliesToCollect ?? []).map((s) => ({
+              id: s.itemId,
+              name: s.itemName,
+              quantity: s.quantity,
+              unit: s.unit,
+            })),
             target:
               a.depotName || `SOS ${a.sosRequestId || sos?.id || "unknown"}`,
-            items: a.suppliesToCollect
-              ? a.suppliesToCollect
-                  .map((s) => `${getSupplyDisplayName(s)} x${s.quantity}`)
-                  .join(", ")
-              : "",
             targetLatitude:
               extractCoordsFromDescription(syncedDescription)?.lat ??
               (a.sosRequestId
@@ -2099,7 +2159,6 @@ const RescuePlanPanel = ({
       },
       {
         onSuccess: () => {
-          toast.success("Đã tạo nhiệm vụ từ kế hoạch chỉnh sửa!");
           exitEditMode();
           onApprove();
         },
@@ -2230,8 +2289,15 @@ const RescuePlanPanel = ({
   // Enter edit from an existing mission (missions tab -> edit)
   const enterEditFromMission = useCallback(
     (mission: MissionEntity) => {
+      const sortedActivities = [...mission.activities].sort((a, b) => {
+        if (a.step !== b.step) {
+          return a.step - b.step;
+        }
+        return a.id - b.id;
+      });
+
       setEditActivities(
-        mission.activities.map((a, i) => {
+        sortedActivities.map((a, i) => {
           const inferredSosRequestId = inferSOSRequestIdFromActivity(
             a,
             clusterSOSRequests,
@@ -2754,9 +2820,11 @@ const RescuePlanPanel = ({
                                           variant="outline"
                                           className="text-xs h-5 px-2 shrink-0 font-semibold"
                                         >
-                                          {mission.missionType === "RESCUE"
+                                          {mission.missionType?.toUpperCase() ===
+                                          "RESCUE"
                                             ? "Cứu hộ"
-                                            : mission.missionType === "RESCUER"
+                                            : mission.missionType?.toUpperCase() ===
+                                                "RESCUER"
                                               ? "Điều phối"
                                               : mission.missionType}
                                         </Badge>
@@ -2960,14 +3028,26 @@ const RescuePlanPanel = ({
                                   <div className="space-y-4 mt-4">
                                     {(() => {
                                       const groups = [];
-                                      for (const act of mission.activities) {
+                                      const sortedActivities = [
+                                        ...mission.activities,
+                                      ].sort((a, b) => {
+                                        if (a.step !== b.step) {
+                                          return a.step - b.step;
+                                        }
+                                        return a.id - b.id;
+                                      });
+
+                                      for (const act of sortedActivities) {
                                         const isDepot =
                                           act.activityType ===
-                                          "COLLECT_SUPPLIES";
+                                            "COLLECT_SUPPLIES" ||
+                                          !!act.depotId ||
+                                          !!act.depotName;
                                         let targetType = "sos";
                                         let sosRequestId = undefined;
                                         let depotName = undefined;
-                                        const targetStr = act.target || "";
+                                        const targetStr =
+                                          act.depotName || act.target || "";
 
                                         if (isDepot) {
                                           depotName = targetStr;
@@ -3102,7 +3182,7 @@ const RescuePlanPanel = ({
 
                                             <div className="p-3 space-y-2.5 bg-card">
                                               {group.activities.map(
-                                                (activity, aIdx) => {
+                                                (activity) => {
                                                   const assignedMissionTeams = (
                                                     mission.teams ?? []
                                                   ).filter((team) => {
@@ -3125,10 +3205,19 @@ const RescuePlanPanel = ({
                                                     );
                                                   });
                                                   const teamsForStep =
-                                                    assignedMissionTeams.length >
-                                                    0
-                                                      ? assignedMissionTeams
-                                                      : (mission.teams ?? []);
+                                                    typeof activity.missionTeamId ===
+                                                    "number"
+                                                      ? (
+                                                          mission.teams ?? []
+                                                        ).filter(
+                                                          (team) =>
+                                                            team.missionTeamId ===
+                                                            activity.missionTeamId,
+                                                        )
+                                                      : assignedMissionTeams.length >
+                                                          0
+                                                        ? assignedMissionTeams
+                                                        : (mission.teams ?? []);
                                                   const config =
                                                     activityTypeConfig[
                                                       activity.activityType
@@ -3163,7 +3252,7 @@ const RescuePlanPanel = ({
 
                                                   return (
                                                     <div
-                                                      key={aIdx}
+                                                      key={activity.id}
                                                       className="rounded-lg border bg-background p-3 hover:bg-accent/20 transition-colors shadow-sm"
                                                     >
                                                       <div className="flex items-start gap-3">
@@ -3199,6 +3288,30 @@ const RescuePlanPanel = ({
                                                               {stepStatus.icon}
                                                               {stepStatus.label}
                                                             </Badge>
+                                                            {activity.priority ? (
+                                                              <Badge
+                                                                variant="outline"
+                                                                className="text-[11px] h-6 px-2 font-semibold"
+                                                              >
+                                                                Ưu tiên:{" "}
+                                                                {
+                                                                  activity.priority
+                                                                }
+                                                              </Badge>
+                                                            ) : null}
+                                                            {typeof activity.estimatedTime ===
+                                                            "number" ? (
+                                                              <Badge
+                                                                variant="outline"
+                                                                className="text-[11px] h-6 px-2 font-semibold"
+                                                              >
+                                                                ETA:{" "}
+                                                                {
+                                                                  activity.estimatedTime
+                                                                }{" "}
+                                                                phút
+                                                              </Badge>
+                                                            ) : null}
                                                           </div>
                                                           <p className="text-sm text-foreground/80 leading-relaxed font-medium">
                                                             {displayDescription}
@@ -3219,6 +3332,10 @@ const RescuePlanPanel = ({
                                                                     const teamStatusMeta =
                                                                       getTeamAssignmentStatusMeta(
                                                                         team.status,
+                                                                      );
+                                                                    const rescueTeamStatusMeta =
+                                                                      getRescueTeamStatusMeta(
+                                                                        team.teamStatus,
                                                                       );
 
                                                                     return (
@@ -3262,6 +3379,33 @@ const RescuePlanPanel = ({
                                                                               teamStatusMeta.label
                                                                             }
                                                                           </Badge>
+                                                                          {team.teamStatus && (
+                                                                            <Badge
+                                                                              variant="outline"
+                                                                              className={cn(
+                                                                                "h-5 px-1.5 text-[10px] font-semibold",
+                                                                                rescueTeamStatusMeta.className,
+                                                                              )}
+                                                                            >
+                                                                              Đội:{" "}
+                                                                              {
+                                                                                rescueTeamStatusMeta.label
+                                                                              }
+                                                                            </Badge>
+                                                                          )}
+                                                                          {typeof team.memberCount ===
+                                                                            "number" && (
+                                                                            <Badge
+                                                                              variant="outline"
+                                                                              className="h-5 px-1.5 text-[10px]"
+                                                                            >
+                                                                              {
+                                                                                team.memberCount
+                                                                              }{" "}
+                                                                              thành
+                                                                              viên
+                                                                            </Badge>
+                                                                          )}
                                                                         </div>
                                                                       </div>
                                                                     );

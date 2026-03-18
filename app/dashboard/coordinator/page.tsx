@@ -685,7 +685,7 @@ const CoordinatorDashboardContent = () => {
   }, [aiStream.loading, aiStreamClusterId]);
 
   const handleApproveDecision = useCallback(() => {
-    toast.success("Đã tạo nhiệm vụ thành công!");
+    toast.success("Đã gửi nhiệm vụ thành công");
     setRescuePlanOpen(false);
     setSOSDetailOpen(false);
     setSelectedSOS(null);

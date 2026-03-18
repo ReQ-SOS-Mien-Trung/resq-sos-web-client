@@ -474,7 +474,11 @@ const ManualMissionBuilder = ({
   // ── Pre-fill from existing mission ──
   useEffect(() => {
     if (!existingMission || !open || hasLoadedExisting) return;
-    setMissionType(existingMission.missionType || "RESCUE");
+    const normalizedMissionType =
+      existingMission.missionType?.toUpperCase() === "RESCUER"
+        ? "RESCUER"
+        : "RESCUE";
+    setMissionType(normalizedMissionType);
     setPriorityScore(existingMission.priorityScore || 5);
     setStartTime(existingMission.startTime?.slice(0, 16) || "");
     setExpectedEndTime(existingMission.expectedEndTime?.slice(0, 16) || "");
@@ -702,6 +706,13 @@ const ManualMissionBuilder = ({
               activityCode,
               activityType: a.activityType,
               description: a.description,
+              priority: "Medium",
+              estimatedTime: 30,
+              sosRequestId: 0,
+              depotId: 0,
+              depotName: "",
+              depotAddress: "",
+              suppliesToCollect: [],
               target: a.target,
               items: a.items || "",
               targetLatitude: a.targetLatitude,
@@ -739,16 +750,30 @@ const ManualMissionBuilder = ({
           priorityScore,
           startTime: new Date(startTime).toISOString(),
           expectedEndTime: new Date(expectedEndTime).toISOString(),
-          activities: activities.map((a, i) => ({
-            step: i + 1,
-            activityCode: `${a.activityType}_${i + 1}`,
-            activityType: a.activityType,
-            description: a.description,
-            target: a.target,
-            items: a.items || "",
-            targetLatitude: a.targetLatitude,
-            targetLongitude: a.targetLongitude,
-          })),
+          activities: activities.map((a, i) => {
+            const matchedSos = clusterSOSRequests.find(
+              (s) =>
+                s.location.lat === a.targetLatitude &&
+                s.location.lng === a.targetLongitude,
+            );
+
+            return {
+              step: i + 1,
+              activityCode: `${a.activityType}_${i + 1}`,
+              activityType: a.activityType,
+              description: a.description,
+              priority: "Medium",
+              estimatedTime: 30,
+              sosRequestId: Number(matchedSos?.id ?? 0),
+              depotId: 0,
+              depotName: "",
+              depotAddress: "",
+              suppliesToCollect: [],
+              target: a.target,
+              targetLatitude: a.targetLatitude,
+              targetLongitude: a.targetLongitude,
+            };
+          }),
         });
 
         toast.success("Đã tạo nhiệm vụ thành công!");
