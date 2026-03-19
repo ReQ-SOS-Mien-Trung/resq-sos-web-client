@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 import {
   Dialog,
@@ -20,16 +21,27 @@ import {
   Spinner,
   Lightning,
 } from "@phosphor-icons/react";
-import { useBroadcastNotification } from "@/services/noti_alert";
+import {
+  BroadcastNotificationType,
+  useBroadcastNotification,
+} from "@/services/noti_alert";
 import { toast } from "sonner";
 
-const PRESET_TYPES = [
+const PRESET_TYPES: Array<{
+  value: BroadcastNotificationType;
+  label: string;
+  icon: ReactNode;
+}> = [
   { value: "FLOOD_WARNING", label: "Cảnh báo lũ", icon: <WaveSine size={14} /> },
   { value: "FLOOD_EMERGENCY", label: "Khẩn cấp lũ", icon: <Lightning size={14} /> },
   { value: "EVACUATION", label: "Sơ tán", icon: <BellRinging size={14} /> },
 ];
 
-const PRESETS = [
+const PRESETS: Array<{
+  title: string;
+  body: string;
+  type: BroadcastNotificationType;
+}> = [
   {
     title: "🌊 CẢNH BÁO LŨ LỤT",
     body: "Mực nước sông đang tăng cao. Người dân vùng ven sông cần di chuyển đến nơi an toàn ngay lập tức.",
@@ -55,7 +67,7 @@ interface Props {
 export function FloodAlertModal({ open, onOpenChange }: Props) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [type, setType] = useState("FLOOD_WARNING");
+  const [type, setType] = useState<BroadcastNotificationType>("FLOOD_WARNING");
   const [confirmed, setConfirmed] = useState(false);
 
   const { mutate: broadcast, isPending } = useBroadcastNotification();
