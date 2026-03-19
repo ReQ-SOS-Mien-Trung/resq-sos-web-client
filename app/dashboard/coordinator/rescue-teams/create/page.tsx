@@ -138,19 +138,19 @@ function TypeCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
+      className={`border border-black px-3 py-2.5 text-left transition-all ${
         selected
-          ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/20"
-          : "border-border hover:border-muted-foreground/40 hover:bg-muted/30"
+          ? "border-[#FF5722] bg-[#FF5722]/10 ring-1 ring-[#FF5722]/30"
+          : "bg-white hover:bg-black/5"
       }`}
     >
       <div
-        className={`text-sm font-semibold mb-0.5 ${selected ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}
+        className={`mb-0.5 text-sm font-semibold ${selected ? "text-[#FF5722]" : "text-black"}`}
       >
         {label}
       </div>
       {description && (
-        <div className="text-[11px] text-muted-foreground line-clamp-1">
+        <div className="line-clamp-1 text-[11px] text-black/70">
           {description}
         </div>
       )}
@@ -203,10 +203,10 @@ function RescuerCard({
   return (
     <>
       <div
-        className={`relative flex items-center gap-3 p-2.5 rounded-xl border transition-all cursor-pointer ${
+        className={`relative flex cursor-pointer items-center gap-3 border p-2.5 transition-all ${
           selected
-            ? "border-emerald-500 bg-emerald-500/5 shadow-sm"
-            : "border-border hover:border-muted-foreground/30 hover:bg-muted/20"
+            ? "border-[#FF5722] bg-[#FF5722]/5"
+            : "border-black/30 bg-white hover:border-black hover:bg-black/5"
         }`}
         onClick={onToggleSelect}
         onMouseEnter={(e) => {
@@ -217,10 +217,8 @@ function RescuerCard({
         onMouseLeave={() => setIsHovering(false)}
       >
         <div
-          className={`flex-shrink-0 h-4 w-4 rounded border flex items-center justify-center transition-colors ${
-            selected
-              ? "bg-emerald-500 border-emerald-500"
-              : "border-muted-foreground/30"
+          className={`flex h-4 w-4 flex-shrink-0 items-center justify-center border transition-colors ${
+            selected ? "border-[#FF5722] bg-[#FF5722]" : "border-black/30"
           }`}
         >
           {selected && <Check className="h-3 w-3 text-white" weight="bold" />}
@@ -255,7 +253,7 @@ function RescuerCard({
             type="button"
             variant={isLeader ? "default" : "outline"}
             size="sm"
-            className={`shrink-0 h-7 text-[11px] px-2.5 gap-1 shadow-none transition-colors ${isLeader ? "bg-amber-500 hover:bg-amber-600 text-white border-transparent" : "text-muted-foreground hover:text-foreground"}`}
+            className={`h-7 shrink-0 gap-1 border-black px-2.5 text-[11px] shadow-none transition-colors ${isLeader ? "border-transparent bg-[#FF5722] text-white hover:bg-[#e64a19]" : "text-black/70 hover:bg-black/5 hover:text-black"}`}
             onClick={(e) => {
               e.stopPropagation();
               onToggleLeader();
@@ -272,7 +270,7 @@ function RescuerCard({
 
       {isHovering && (
         <div
-          className="fixed pointer-events-none p-3 w-72 space-y-2 z-[200] rounded-md border bg-popover text-popover-foreground shadow-md"
+          className="fixed z-[200] w-72 space-y-2 border border-black bg-white p-3 text-black shadow-md pointer-events-none"
           style={{ left: tooltipPos.x, top: tooltipPos.y }}
         >
           <div className="flex items-center gap-3">
@@ -288,13 +286,13 @@ function RescuerCard({
               </div>
               <Badge
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
-                className="text-[10px] font-medium h-5 px-1.5 mt-1"
+                className="mt-1 h-5 border border-black px-1.5 text-[10px] font-medium"
               >
                 {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
               </Badge>
             </div>
           </div>
-          <div className="text-[11px] space-y-1.5 mt-2 border-t pt-2 border-border/70">
+          <div className="mt-2 space-y-1.5 border-t border-black/40 pt-2 text-[11px]">
             <div className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">SĐT:</span>
               <span className="font-medium text-foreground">
@@ -325,7 +323,7 @@ function RescuerCard({
                     <Badge
                       key={idx}
                       variant="outline"
-                      className="text-[9px] px-1.5 py-0.5 h-auto leading-none bg-muted/50"
+                      className="h-auto border-black bg-white px-1.5 py-0.5 text-[9px] leading-none"
                     >
                       {getAbilityLabelVi(ability)}
                     </Badge>
@@ -590,9 +588,9 @@ export default function CreateRescueTeamPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-theme(spacing.16))] bg-muted/20 overflow-hidden">
+    <div className="flex h-[calc(100vh-theme(spacing.16))] flex-col overflow-hidden bg-white tracking-tighter text-black">
       {/* ── Header ── */}
-      <header className="shrink-0 border-b bg-background/95 backdrop-blur-sm z-10">
+      <header className="z-10 shrink-0 border-b border-black bg-white">
         <div className="flex h-12 items-center gap-4 px-6 max-w-7xl mx-auto w-full">
           <Button
             variant="ghost"
@@ -604,10 +602,13 @@ export default function CreateRescueTeamPage() {
           </Button>
           <div className="flex-1 flex items-center gap-3">
             <h1 className="text-sm font-semibold flex items-center gap-2">
-              <UsersThree className="h-4 w-4 text-emerald-500" weight="fill" />
+              <UsersThree className="h-4 w-4 text-[#FF5722]" weight="fill" />
               Tạo đội cứu hộ mới
             </h1>
-            <Badge variant="secondary" className="font-normal text-[10px] h-5">
+            <Badge
+              variant="secondary"
+              className="h-5 rounded-none border border-black bg-black px-2 font-normal text-[10px] text-white"
+            >
               Thiết lập nhanh
             </Badge>
           </div>
@@ -616,7 +617,7 @@ export default function CreateRescueTeamPage() {
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 text-xs"
+              className="h-8 rounded-none border-black text-xs"
               onClick={() => router.push("/dashboard/coordinator")}
               disabled={isCreating}
             >
@@ -626,7 +627,7 @@ export default function CreateRescueTeamPage() {
               type="submit"
               size="sm"
               disabled={isCreating}
-              className="h-8 text-xs gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
+              className="h-8 gap-1.5 rounded-none bg-[#FF5722] text-xs text-white hover:bg-[#e64a19]"
               onClick={(e) => {
                 e.preventDefault();
                 const form = document.querySelector("form");
@@ -653,15 +654,15 @@ export default function CreateRescueTeamPage() {
       <div className="flex-1 min-h-0 p-4 lg:p-6 w-full max-w-7xl mx-auto">
         <form
           onSubmit={handleSubmit}
-          className="h-full grid grid-cols-1 lg:grid-cols-12 gap-6"
+          className="grid h-full grid-cols-1 gap-6 lg:grid-cols-12"
         >
           {/* ─── Left Column (Config) ─── */}
           <div className="lg:col-span-5 flex flex-col gap-4 overflow-y-auto pr-1 pb-4 custom-scrollbar">
             {/* Info */}
-            <Card className="border-border/50 shadow-sm shrink-0">
+            <Card className="shrink-0 border-black bg-white shadow-none">
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <div className="p-1.5 rounded-md bg-emerald-500/10 text-emerald-600">
+                  <div className="bg-black p-1.5 text-[#FF5722]">
                     <ShieldStar size={16} weight="fill" />
                   </div>
                   Thông tin chung
@@ -713,10 +714,10 @@ export default function CreateRescueTeamPage() {
             </Card>
 
             {/* Assembly Point */}
-            <Card className="border-border/50 shadow-sm shrink-0">
+            <Card className="shrink-0 border-black bg-white shadow-none">
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <div className="p-1.5 rounded-md bg-blue-500/10 text-blue-600">
+                  <div className="bg-black p-1.5 text-[#FF5722]">
                     <MapTrifold size={16} weight="fill" />
                   </div>
                   Điểm tập kết <span className="text-red-500 ml-[-4px]">*</span>
@@ -771,12 +772,12 @@ export default function CreateRescueTeamPage() {
                   </Select>
                 )}
                 {assemblyPointId && assemblyPoints.length > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/50">
+                  <div className="mt-1 flex items-center gap-2 border border-[#FF5722] bg-[#FF5722]/10 px-3 py-2">
                     <CheckCircle
-                      className="h-3.5 w-3.5 text-blue-500"
+                      className="h-3.5 w-3.5 text-[#FF5722]"
                       weight="fill"
                     />
-                    <span className="text-[12px] text-blue-700 dark:text-blue-400">
+                    <span className="text-[12px] text-[#c2410c]">
                       {(() => {
                         const point = assemblyPoints.find(
                           (p) => String(p.id) === assemblyPointId,
@@ -792,10 +793,10 @@ export default function CreateRescueTeamPage() {
             </Card>
 
             {/* Type */}
-            <Card className="border-border/50 shadow-sm shrink-0">
+            <Card className="shrink-0 border-black bg-white shadow-none">
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <div className="p-1.5 rounded-md bg-violet-500/10 text-violet-600">
+                  <div className="bg-black p-1.5 text-[#FF5722]">
                     <Sparkle size={16} weight="fill" />
                   </div>
                   Chuyên môn <span className="text-red-500 ml-[-4px]">*</span>
@@ -833,12 +834,12 @@ export default function CreateRescueTeamPage() {
           </div>
 
           {/* ─── Right Column (Members) ─── */}
-          <div className="lg:col-span-7 flex flex-col h-full bg-background rounded-xl border border-border/50 shadow-sm overflow-hidden">
+          <div className="lg:col-span-7 flex h-full flex-col overflow-hidden border border-black bg-white shadow-none">
             {/* Header */}
-            <div className="p-4 border-b shrink-0 bg-muted/10">
+            <div className="shrink-0 border-b border-black bg-white p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <div className="p-1.5 rounded-md bg-amber-500/10 text-amber-600">
+                  <div className="bg-black p-1.5 text-[#FF5722]">
                     <UserCirclePlus size={16} weight="fill" />
                   </div>
                   Thành viên đội{" "}
@@ -850,7 +851,7 @@ export default function CreateRescueTeamPage() {
                     variant={
                       selectedMembers.length > 0 ? "secondary" : "outline"
                     }
-                    className="px-2 h-5 font-medium"
+                    className="h-5 border border-black px-2 font-medium"
                   >
                     {selectedMembers.length} / {maxMembers}
                   </Badge>
@@ -879,7 +880,7 @@ export default function CreateRescueTeamPage() {
                 <div className="relative">
                   <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
-                    className="h-9 pl-8 text-sm bg-background border-border/60"
+                    className="h-9 border-black/50 bg-white pl-8 text-sm"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Lọc theo họ tên, email, số điện thoại..."
@@ -901,7 +902,7 @@ export default function CreateRescueTeamPage() {
                         variant={member.isLeader ? "default" : "secondary"}
                         className={`text-[11px] py-0.5 px-2 gap-1.5 ${
                           member.isLeader
-                            ? "bg-amber-500 hover:bg-amber-600 text-white"
+                            ? "bg-[#FF5722] hover:bg-[#e64a19] text-white"
                             : ""
                         }`}
                       >
@@ -925,12 +926,12 @@ export default function CreateRescueTeamPage() {
               {/* Leader warning */}
               {selectedMembers.length > 0 &&
                 !selectedMembers.some((m) => m.isLeader) && (
-                  <div className="mt-3 flex items-start gap-2 p-2.5 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/50">
+                  <div className="mt-3 flex items-start gap-2 border border-[#FF5722] bg-[#FF5722]/10 p-2.5">
                     <Warning
-                      className="w-4 h-4 text-orange-500 shrink-0 mt-0.5"
+                      className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5722]"
                       weight="fill"
                     />
-                    <p className="text-[12px] text-orange-700 dark:text-orange-400 leading-snug">
+                    <p className="text-[12px] leading-snug text-[#c2410c]">
                       Vui lòng <strong>Chọn làm đội trưởng</strong> cho một
                       thành viên <strong>cốt cán</strong> trong nhóm.
                     </p>
@@ -939,11 +940,11 @@ export default function CreateRescueTeamPage() {
             </div>
 
             {/* List */}
-            <div className="flex-1 min-h-0 bg-muted/5 relative">
+            <div className="relative flex-1 min-h-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.06)_1px,transparent_1px)] bg-[size:28px_28px]">
               {isLoadingUsers ? (
                 <div className="p-4 space-y-2">
                   {[1, 2, 3, 4, 5].map((i) => (
-                    <Skeleton key={i} className="h-[60px] rounded-xl" />
+                    <Skeleton key={i} className="h-[60px]" />
                   ))}
                 </div>
               ) : displayedRescuers.length > 0 ? (

@@ -108,6 +108,7 @@ export interface SOSRequestEntity {
   reviewedAt: string | null;
   reviewedById: string | null;
   createdByCoordinatorId?: string | null;
+  createdByCoordinatorName?: string | null;
 }
 
 // Paginated Response

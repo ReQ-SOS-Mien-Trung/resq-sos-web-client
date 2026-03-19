@@ -16,6 +16,13 @@ export interface JoinConversationResponse {
   systemMessage: string;
 }
 
+export interface LeaveConversationResponse {
+  conversationId: number;
+  coordinatorId: string;
+  status: string;
+  systemMessage: string;
+}
+
 export interface ConversationMessageEntity {
   id: number;
   senderId: string | null;
@@ -46,6 +53,13 @@ export interface ReceiveMessageEvent extends ConversationMessageEntity {
 }
 
 export interface CoordinatorJoinedEvent {
+  conversationId: number;
+  coordinatorId: string;
+  status: string;
+  systemMessage: string;
+}
+
+export interface CoordinatorLeftEvent {
   conversationId: number;
   coordinatorId: string;
   status: string;
@@ -89,6 +103,7 @@ export const CHAT_METHODS = {
   LeaveConversation: "LeaveConversation",
   SendMessage: "SendMessage",
   CoordinatorJoin: "CoordinatorJoin",
+  CoordinatorLeave: "CoordinatorLeave",
 } as const;
 
 export const CHAT_EVENTS = {
@@ -96,5 +111,6 @@ export const CHAT_EVENTS = {
   LeftConversation: "LeftConversation",
   ReceiveMessage: "ReceiveMessage",
   CoordinatorJoined: "CoordinatorJoined",
+  CoordinatorLeft: "CoordinatorLeft",
   Error: "Error",
 } as const;

@@ -29,6 +29,7 @@ import {
   Info,
 } from "@phosphor-icons/react";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
+import { useAuthStore } from "@/stores/auth.store";
 
 // Panel width
 const PANEL_WIDTH = 420;
@@ -303,6 +304,8 @@ const SOSDetailsPanel = ({
   nearbySOSRequests,
   allSOSRequests,
 }: SOSDetailsPanelProps) => {
+  const currentUser = useAuthStore((state) => state.user);
+
   const { data: analysisResponse, isLoading: isLoadingAnalysis } =
     useSOSRequestAnalysis(Number(sosRequest?.id) || 0, {
       enabled: !!sosRequest?.id && open,
@@ -492,6 +495,13 @@ const SOSDetailsPanel = ({
       )
     : scoreRows;
 
+  const coordinatorDisplayName =
+    sosRequest.createdByCoordinatorName?.trim() ||
+    (sosRequest.createdByCoordinatorId &&
+    currentUser?.userId === sosRequest.createdByCoordinatorId
+      ? currentUser.fullName
+      : null);
+
   return (
     <div
       className={cn(
@@ -587,7 +597,7 @@ const SOSDetailsPanel = ({
                     {sosRequest.createdByCoordinatorId && (
                       <div className="text-xs text-muted-foreground">
                         Tạo hộ bởi điều phối viên:{" "}
-                        {sosRequest.createdByCoordinatorId}
+                        {coordinatorDisplayName || "Điều phối viên"}
                       </div>
                     )}
                   </div>

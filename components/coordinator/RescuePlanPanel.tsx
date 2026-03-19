@@ -7,10 +7,10 @@ import {
   CircleMarker,
   MapContainer,
   Polyline,
-  TileLayer,
   Tooltip,
   useMap,
 } from "react-leaflet";
+import { tileLayer } from "leaflet";
 import {
   activityTypeConfig,
   resourceTypeIcons,
@@ -143,6 +143,36 @@ const RoutePreviewFitBounds = ({ points }: { points: [number, number][] }) => {
   return null;
 };
 
+const SafeTileLayer = ({ url }: { url: string }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map.getPane("tilePane")) {
+      return;
+    }
+
+    const layer = tileLayer(url);
+
+    try {
+      layer.addTo(map);
+    } catch {
+      return;
+    }
+
+    return () => {
+      try {
+        if (map.hasLayer(layer)) {
+          layer.remove();
+        }
+      } catch {
+        // Ignore teardown races when parent map unmounts first.
+      }
+    };
+  }, [map, url]);
+
+  return null;
+};
+
 const RoutePreviewMap = ({
   points,
   origin,
@@ -163,7 +193,7 @@ const RoutePreviewMap = ({
         attributionControl={false}
         className="h-full w-full"
       >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <RoutePreviewFitBounds points={points} />
         <Polyline
           positions={points}
@@ -395,6 +425,18 @@ const DepotInventoryCard = ({
                 onDragStart={
                   isDraggable
                     ? (e) => {
+                        const itemWithUnit = item as typeof item & {
+                          unit?: string;
+                          unitName?: string;
+                        };
+                        const rawUnit =
+                          (typeof itemWithUnit.unit === "string"
+                            ? itemWithUnit.unit.trim()
+                            : "") ||
+                          (typeof itemWithUnit.unitName === "string"
+                            ? itemWithUnit.unitName.trim()
+                            : "");
+
                         e.dataTransfer.setData(
                           "application/inventory-item",
                           JSON.stringify({
@@ -402,6 +444,7 @@ const DepotInventoryCard = ({
                             itemName: item.reliefItemName,
                             availableQuantity: item.availableQuantity,
                             categoryName: item.categoryName,
+                            unit: rawUnit || null,
                           }),
                         );
                         e.dataTransfer.effectAllowed = "copy";
@@ -701,6 +744,8 @@ interface WaypointMeta {
   labels: string[];
   hasSOS: boolean;
   hasDepot: boolean;
+  stepNumbers: number[];
+  stepRangeLabel: string;
 }
 
 type SupplyDisplayItem = {
@@ -760,12 +805,19 @@ function extractSOSLabel(activity: MissionActivity): string | null {
 }
 
 function extractDepotLabel(activity: MissionActivity): string | null {
+  // Only pickup steps should be labeled as depot points on the consolidated route.
+  if (activity.activityType !== "COLLECT_SUPPLIES") {
+    return null;
+  }
+
+  const depotName =
+    typeof activity.depotName === "string" ? activity.depotName.trim() : "";
+  if (depotName) return depotName;
+
   const target =
     typeof activity.target === "string" ? activity.target.trim() : "";
   const hasDepotKeyword = /\b(kho|depot)\b/i.test(target);
-  const isDepotActivity = activity.activityType === "COLLECT_SUPPLIES";
-
-  if (!isDepotActivity && !hasDepotKeyword) return null;
+  if (!hasDepotKeyword) return null;
   if (target && !SOS_TARGET_REGEX.test(target)) return target;
   return "Kho tiếp tế";
 }
@@ -774,6 +826,10 @@ function inferSOSRequestIdFromActivity(
   activity: MissionActivity,
   sosRequests: SOSRequest[],
 ): string | null {
+  if (typeof activity.sosRequestId === "number") {
+    return String(activity.sosRequestId);
+  }
+
   const explicitLabel = extractSOSLabel(activity);
   if (explicitLabel) return explicitLabel.replace("SOS #", "").trim();
 
@@ -849,7 +905,15 @@ function parseSupplyItemsFromDescription(
 function getSupplyDisplayItems(activity: {
   activityType: string;
   description: string;
-  suppliesToCollect?: ClusterSupplyCollection[] | null;
+  suppliesToCollect?:
+    | ClusterSupplyCollection[]
+    | Array<{
+        itemId: number | null;
+        itemName: string | null;
+        quantity: number;
+        unit: string;
+      }>
+    | null;
 }): SupplyDisplayItem[] {
   if (activity.suppliesToCollect && activity.suppliesToCollect.length > 0) {
     return activity.suppliesToCollect.map((supply) => ({
@@ -975,12 +1039,49 @@ function getTeamAssignmentStatusMeta(status: string | null | undefined): {
 function isMissionTeamActive(team: MissionTeam): boolean {
   const normalizedStatus = (team.status ?? "").trim().toLowerCase();
   return (
-    team.unassignedAt == null &&
+    (!team.unassignedAt || team.unassignedAt.trim() === "") &&
     (normalizedStatus === "assigned" ||
       normalizedStatus === "inprogress" ||
       normalizedStatus === "in_progress" ||
       normalizedStatus === "in progress")
   );
+}
+
+function getRescueTeamStatusMeta(status: string | null | undefined): {
+  label: string;
+  className: string;
+} {
+  const normalizedStatus = (status ?? "").trim().toLowerCase();
+
+  if (normalizedStatus === "ready") {
+    return {
+      label: "Sẵn sàng",
+      className:
+        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+    };
+  }
+
+  if (normalizedStatus === "gathering") {
+    return {
+      label: "Đang tập hợp",
+      className:
+        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+    };
+  }
+
+  if (normalizedStatus === "awaitingacceptance") {
+    return {
+      label: "Chờ xác nhận",
+      className:
+        "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
+    };
+  }
+
+  return {
+    label: status || "Chưa rõ",
+    className:
+      "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
+  };
 }
 
 function getActiveMissionTeams(mission: MissionEntity): MissionTeam[] {
@@ -1022,41 +1123,69 @@ function getWaypointMeta(
   waypoint: UniqueWaypoint,
   sosRequests: SOSRequest[],
 ): WaypointMeta {
-  const labels = new Set<string>();
+  const sosIds = new Set<string>();
   let hasSOS = false;
   let hasDepot = false;
-  const waypointHasDepot = waypoint.activities.some(
-    (activity) => !!extractDepotLabel(activity),
-  );
+
+  const pushSosId = (value: string | null | undefined) => {
+    if (!value) return;
+    const match = value.match(/(\d+)/);
+    if (!match?.[1]) return;
+    sosIds.add(match[1]);
+    hasSOS = true;
+  };
 
   for (const activity of waypoint.activities) {
     const depotLabel = extractDepotLabel(activity);
     if (depotLabel) {
-      labels.add(depotLabel);
       hasDepot = true;
+    }
+
+    if (typeof activity.sosRequestId === "number") {
+      pushSosId(String(activity.sosRequestId));
+      continue;
     }
 
     const sosLabel = extractSOSLabel(activity);
     if (sosLabel) {
-      labels.add(sosLabel);
-      hasSOS = true;
-    } else if (!waypointHasDepot && !depotLabel) {
+      pushSosId(sosLabel);
+    } else if (!depotLabel) {
       const inferredFromCoords = inferSOSLabelFromCoords(
         activity.targetLatitude,
         activity.targetLongitude,
         sosRequests,
       );
       if (inferredFromCoords) {
-        labels.add(inferredFromCoords);
-        hasSOS = true;
+        pushSosId(inferredFromCoords);
       }
     }
   }
 
+  const orderedLabels = Array.from(sosIds)
+    .sort((a, b) => Number(a) - Number(b))
+    .map((id) => `SOS ${id}`);
+
+  const stepNumbers = waypoint.activities
+    .map((activity) => activity.step)
+    .filter((step) => Number.isFinite(step))
+    .sort((a, b) => a - b);
+
+  const uniqueStepNumbers = Array.from(new Set(stepNumbers));
+  const firstStep = uniqueStepNumbers[0];
+  const lastStep = uniqueStepNumbers[uniqueStepNumbers.length - 1];
+  const stepRangeLabel =
+    uniqueStepNumbers.length === 0
+      ? ""
+      : firstStep === lastStep
+        ? `Bước ${firstStep}`
+        : `Bước ${firstStep}-${lastStep}`;
+
   return {
-    labels: Array.from(labels),
+    labels: orderedLabels,
     hasSOS,
     hasDepot,
+    stepNumbers: uniqueStepNumbers,
+    stepRangeLabel,
   };
 }
 
@@ -1469,7 +1598,7 @@ const MissionRoutePreview = ({
                 attributionControl={false}
                 className="h-full w-full"
               >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <RoutePreviewFitBounds points={allPoints} />
                 {/* Render each segment with different color */}
                 {segments.map((seg, idx) => (
@@ -1503,10 +1632,10 @@ const MissionRoutePreview = ({
 
                   const markerColor = isLast
                     ? "#dc2626"
-                    : meta?.hasDepot
-                      ? "#a16207"
-                      : meta?.hasSOS
-                        ? "#2563eb"
+                    : meta?.hasSOS
+                      ? "#2563eb"
+                      : meta?.hasDepot
+                        ? "#a16207"
                         : segmentColors[idx % segmentColors.length];
 
                   return (
@@ -1853,6 +1982,7 @@ const RescuePlanPanel = ({
   const [editStartTime, setEditStartTime] = useState("");
   const [editExpectedEndTime, setEditExpectedEndTime] = useState("");
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
+  const supplyUnitByItemIdRef = useRef<Record<number, string>>({});
 
   const { mutate: createMission, isPending: isCreatingMission } =
     useCreateMission();
@@ -1919,22 +2049,61 @@ const RescuePlanPanel = ({
     });
   }, []);
 
+  useEffect(() => {
+    const next = { ...supplyUnitByItemIdRef.current };
+
+    for (const activity of editActivities) {
+      for (const supply of activity.suppliesToCollect ?? []) {
+        if (typeof supply.itemId !== "number") continue;
+        const unit = typeof supply.unit === "string" ? supply.unit.trim() : "";
+        if (unit) {
+          next[supply.itemId] = unit;
+        }
+      }
+    }
+
+    supplyUnitByItemIdRef.current = next;
+  }, [editActivities]);
+
   // ── Supply management for edit mode ──
   const handleAddSupply = useCallback(
     (
       activityId: string,
-      item: { itemId: number; itemName: string; availableQuantity: number },
+      item: {
+        itemId: number;
+        itemName: string;
+        availableQuantity: number;
+        unit?: string | null;
+      },
     ) => {
       setEditActivities((prev) =>
         prev.map((a) => {
           if (a._id !== activityId) return a;
+
+          const dragUnit =
+            typeof item.unit === "string" ? item.unit.trim() : "";
+          const cachedUnit =
+            supplyUnitByItemIdRef.current[item.itemId]?.trim() ?? "";
+          const resolvedUnit = dragUnit || cachedUnit || "đơn vị";
+          if (resolvedUnit) {
+            supplyUnitByItemIdRef.current[item.itemId] = resolvedUnit;
+          }
+
           const existing = a.suppliesToCollect ?? [];
           const foundIdx = existing.findIndex((s) => s.itemId === item.itemId);
           if (foundIdx >= 0) {
             const next = [...existing];
+            const currentUnit =
+              typeof next[foundIdx].unit === "string"
+                ? next[foundIdx].unit.trim()
+                : "";
+            const shouldUpgradeUnit =
+              (!currentUnit || currentUnit === "đơn vị") &&
+              resolvedUnit !== "đơn vị";
             next[foundIdx] = {
               ...next[foundIdx],
               quantity: next[foundIdx].quantity + 1,
+              unit: shouldUpgradeUnit ? resolvedUnit : next[foundIdx].unit,
             };
             return { ...a, suppliesToCollect: next };
           }
@@ -1946,7 +2115,7 @@ const RescuePlanPanel = ({
                 itemId: item.itemId,
                 itemName: item.itemName,
                 quantity: 1,
-                unit: "đơn vị",
+                unit: resolvedUnit,
               },
             ],
           };
@@ -2038,13 +2207,20 @@ const RescuePlanPanel = ({
             activityCode: `${a.activityType}_${i + 1}`,
             activityType: a.activityType,
             description: syncedDescription,
+            priority: a.priority || "Medium",
+            estimatedTime: Number.parseInt(String(a.estimatedTime), 10) || 30,
+            sosRequestId: Number(a.sosRequestId ?? sos?.id ?? 0),
+            depotId: Number(a.depotId ?? 0),
+            depotName: a.depotName ?? "",
+            depotAddress: a.depotAddress ?? "",
+            suppliesToCollect: (a.suppliesToCollect ?? []).map((s) => ({
+              id: s.itemId,
+              name: s.itemName,
+              quantity: s.quantity,
+              unit: s.unit,
+            })),
             target:
               a.depotName || `SOS ${a.sosRequestId || sos?.id || "unknown"}`,
-            items: a.suppliesToCollect
-              ? a.suppliesToCollect
-                  .map((s) => `${getSupplyDisplayName(s)} x${s.quantity}`)
-                  .join(", ")
-              : "",
             targetLatitude:
               extractCoordsFromDescription(syncedDescription)?.lat ??
               (a.sosRequestId
@@ -2069,7 +2245,6 @@ const RescuePlanPanel = ({
       },
       {
         onSuccess: () => {
-          toast.success("Đã tạo nhiệm vụ từ kế hoạch chỉnh sửa!");
           exitEditMode();
           onApprove();
         },
@@ -2200,8 +2375,15 @@ const RescuePlanPanel = ({
   // Enter edit from an existing mission (missions tab -> edit)
   const enterEditFromMission = useCallback(
     (mission: MissionEntity) => {
+      const sortedActivities = [...mission.activities].sort((a, b) => {
+        if (a.step !== b.step) {
+          return a.step - b.step;
+        }
+        return a.id - b.id;
+      });
+
       setEditActivities(
-        mission.activities.map((a, i) => {
+        sortedActivities.map((a, i) => {
           const inferredSosRequestId = inferSOSRequestIdFromActivity(
             a,
             clusterSOSRequests,
@@ -2724,9 +2906,11 @@ const RescuePlanPanel = ({
                                           variant="outline"
                                           className="text-xs h-5 px-2 shrink-0 font-semibold"
                                         >
-                                          {mission.missionType === "RESCUE"
+                                          {mission.missionType?.toUpperCase() ===
+                                          "RESCUE"
                                             ? "Cứu hộ"
-                                            : mission.missionType === "RESCUER"
+                                            : mission.missionType?.toUpperCase() ===
+                                                "RESCUER"
                                               ? "Điều phối"
                                               : mission.missionType}
                                         </Badge>
@@ -2930,14 +3114,26 @@ const RescuePlanPanel = ({
                                   <div className="space-y-4 mt-4">
                                     {(() => {
                                       const groups = [];
-                                      for (const act of mission.activities) {
+                                      const sortedActivities = [
+                                        ...mission.activities,
+                                      ].sort((a, b) => {
+                                        if (a.step !== b.step) {
+                                          return a.step - b.step;
+                                        }
+                                        return a.id - b.id;
+                                      });
+
+                                      for (const act of sortedActivities) {
+                                        // Only pickup steps belong to depot groups.
+                                        // Delivery steps should stay in SOS groups even if they contain depot info.
                                         const isDepot =
                                           act.activityType ===
                                           "COLLECT_SUPPLIES";
                                         let targetType = "sos";
                                         let sosRequestId = undefined;
                                         let depotName = undefined;
-                                        const targetStr = act.target || "";
+                                        const targetStr =
+                                          act.depotName || act.target || "";
 
                                         if (isDepot) {
                                           depotName = targetStr;
@@ -3072,7 +3268,7 @@ const RescuePlanPanel = ({
 
                                             <div className="p-3 space-y-2.5 bg-card">
                                               {group.activities.map(
-                                                (activity, aIdx) => {
+                                                (activity) => {
                                                   const assignedMissionTeams = (
                                                     mission.teams ?? []
                                                   ).filter((team) => {
@@ -3095,10 +3291,19 @@ const RescuePlanPanel = ({
                                                     );
                                                   });
                                                   const teamsForStep =
-                                                    assignedMissionTeams.length >
-                                                    0
-                                                      ? assignedMissionTeams
-                                                      : (mission.teams ?? []);
+                                                    typeof activity.missionTeamId ===
+                                                    "number"
+                                                      ? (
+                                                          mission.teams ?? []
+                                                        ).filter(
+                                                          (team) =>
+                                                            team.missionTeamId ===
+                                                            activity.missionTeamId,
+                                                        )
+                                                      : assignedMissionTeams.length >
+                                                          0
+                                                        ? assignedMissionTeams
+                                                        : (mission.teams ?? []);
                                                   const config =
                                                     activityTypeConfig[
                                                       activity.activityType
@@ -3133,7 +3338,7 @@ const RescuePlanPanel = ({
 
                                                   return (
                                                     <div
-                                                      key={aIdx}
+                                                      key={activity.id}
                                                       className="rounded-lg border bg-background p-3 hover:bg-accent/20 transition-colors shadow-sm"
                                                     >
                                                       <div className="flex items-start gap-3">
@@ -3169,6 +3374,30 @@ const RescuePlanPanel = ({
                                                               {stepStatus.icon}
                                                               {stepStatus.label}
                                                             </Badge>
+                                                            {activity.priority ? (
+                                                              <Badge
+                                                                variant="outline"
+                                                                className="text-[11px] h-6 px-2 font-semibold"
+                                                              >
+                                                                Ưu tiên:{" "}
+                                                                {
+                                                                  activity.priority
+                                                                }
+                                                              </Badge>
+                                                            ) : null}
+                                                            {typeof activity.estimatedTime ===
+                                                            "number" ? (
+                                                              <Badge
+                                                                variant="outline"
+                                                                className="text-[11px] h-6 px-2 font-semibold"
+                                                              >
+                                                                ETA:{" "}
+                                                                {
+                                                                  activity.estimatedTime
+                                                                }{" "}
+                                                                phút
+                                                              </Badge>
+                                                            ) : null}
                                                           </div>
                                                           <p className="text-sm text-foreground/80 leading-relaxed font-medium">
                                                             {displayDescription}
@@ -3189,6 +3418,10 @@ const RescuePlanPanel = ({
                                                                     const teamStatusMeta =
                                                                       getTeamAssignmentStatusMeta(
                                                                         team.status,
+                                                                      );
+                                                                    const rescueTeamStatusMeta =
+                                                                      getRescueTeamStatusMeta(
+                                                                        team.teamStatus,
                                                                       );
 
                                                                     return (
@@ -3232,6 +3465,33 @@ const RescuePlanPanel = ({
                                                                               teamStatusMeta.label
                                                                             }
                                                                           </Badge>
+                                                                          {team.teamStatus && (
+                                                                            <Badge
+                                                                              variant="outline"
+                                                                              className={cn(
+                                                                                "h-5 px-1.5 text-[10px] font-semibold",
+                                                                                rescueTeamStatusMeta.className,
+                                                                              )}
+                                                                            >
+                                                                              Đội:{" "}
+                                                                              {
+                                                                                rescueTeamStatusMeta.label
+                                                                              }
+                                                                            </Badge>
+                                                                          )}
+                                                                          {typeof team.memberCount ===
+                                                                            "number" && (
+                                                                            <Badge
+                                                                              variant="outline"
+                                                                              className="h-5 px-1.5 text-[10px]"
+                                                                            >
+                                                                              {
+                                                                                team.memberCount
+                                                                              }{" "}
+                                                                              thành
+                                                                              viên
+                                                                            </Badge>
+                                                                          )}
                                                                         </div>
                                                                       </div>
                                                                     );
@@ -3603,8 +3863,8 @@ const RescuePlanPanel = ({
 
                                   {/* Time + Priority */}
                                   <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                      <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                                    <div className="space-y-1">
+                                      <Label className="block h-4 text-[10px] leading-none text-muted-foreground uppercase tracking-wider">
                                         Thời gian ước tính
                                       </Label>
                                       <Input
@@ -3617,11 +3877,11 @@ const RescuePlanPanel = ({
                                           )
                                         }
                                         placeholder="VD: 30 phút"
-                                        className="h-7 text-xs mt-1"
+                                        className="h-10 w-full text-xs"
                                       />
                                     </div>
-                                    <div>
-                                      <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                                    <div className="space-y-1">
+                                      <Label className="block h-4 text-[10px] leading-none text-muted-foreground uppercase tracking-wider">
                                         Độ ưu tiên
                                       </Label>
                                       <Select
@@ -3634,7 +3894,7 @@ const RescuePlanPanel = ({
                                           )
                                         }
                                       >
-                                        <SelectTrigger className="h-7 text-xs mt-1">
+                                        <SelectTrigger className="h-10 w-full text-xs">
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="z-[1200]">
@@ -3713,12 +3973,23 @@ const RescuePlanPanel = ({
                                             (supply, sIdx) => (
                                               <div
                                                 key={sIdx}
-                                                className="flex items-center gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
+                                                className="grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
                                               >
-                                                <Package className="h-3 w-3 text-blue-500 shrink-0" />
-                                                <span className="font-medium truncate flex-1 min-w-0">
-                                                  {getSupplyDisplayName(supply)}
-                                                </span>
+                                                <div className="flex min-w-0 items-center gap-1.5">
+                                                  <Package className="h-3 w-3 text-blue-500 shrink-0" />
+                                                  <span
+                                                    className="truncate font-medium text-foreground"
+                                                    title={
+                                                      getSupplyDisplayName(
+                                                        supply,
+                                                      ) || "Vật tư chưa rõ tên"
+                                                    }
+                                                  >
+                                                    {getSupplyDisplayName(
+                                                      supply,
+                                                    ) || "Vật tư chưa rõ tên"}
+                                                  </span>
+                                                </div>
                                                 <Input
                                                   type="number"
                                                   min={1}
@@ -3732,15 +4003,15 @@ const RescuePlanPanel = ({
                                                       ) || 1,
                                                     )
                                                   }
-                                                  className="h-6 w-16 text-[11px] text-center px-1"
+                                                  className="h-6 w-full text-[11px] text-center px-1"
                                                 />
-                                                <span className="text-[10px] text-muted-foreground shrink-0">
+                                                <span className="text-right text-[10px] text-muted-foreground">
                                                   {supply.unit}
                                                 </span>
                                                 <Button
                                                   variant="ghost"
                                                   size="icon"
-                                                  className="h-5 w-5 shrink-0 text-muted-foreground hover:text-red-500"
+                                                  className="h-5 w-5 text-muted-foreground hover:text-red-500"
                                                   onClick={() =>
                                                     handleRemoveSupply(
                                                       activity._id,
@@ -4492,9 +4763,9 @@ const RescuePlanPanel = ({
             <DialogHeader>
               <DialogTitle>Xác nhận tạo nhiệm vụ</DialogTitle>
               <DialogDescription>
-                Bạn có chắc muốn hoàn tất chỉnh sửa và tạo nhiệm vụ này không?
-                Sau khi tạo, nhiệm vụ sẽ được lưu vào danh sách nhiệm vụ đã tạo
-                và gửi đến đội cứu hộ được chỉ định.
+                Bạn có chắc muốn hoàn tất chỉnh sửa không? Sau khi tạo, nhiệm vụ
+                sẽ được lưu vào danh sách nhiệm vụ đã tạo và gửi đến đội cứu hộ
+                được chỉ định.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

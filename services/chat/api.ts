@@ -2,6 +2,7 @@ import api from "@/config/axios";
 import {
   GetConversationMessagesResponse,
   JoinConversationResponse,
+  LeaveConversationResponse,
   MessageQueryParams,
   WaitingConversationEntity,
   CoordinatorChatRoomViewModel,
@@ -27,6 +28,18 @@ export async function joinConversation(
 ): Promise<JoinConversationResponse> {
   const { data } = await api.post<JoinConversationResponse>(
     `/operations/conversations/${conversationId}/join`,
+  );
+  return data;
+}
+
+/**
+ * POST /operations/conversations/{conversationId}/leave
+ */
+export async function leaveConversation(
+  conversationId: number,
+): Promise<LeaveConversationResponse> {
+  const { data } = await api.post<LeaveConversationResponse>(
+    `/operations/conversations/${conversationId}/leave`,
   );
   return data;
 }
@@ -60,7 +73,7 @@ export function toCoordinatorChatRoomViewModel(
   return {
     conversationId: item.conversationId,
     participantLabel: item.victimName?.trim() || fallbackVictimLabel,
-    topicLabel: item.selectedTopic?.trim() || "General Support",
+    topicLabel: item.selectedTopic?.trim() || "Chưa chọn chủ đề",
     linkedSosRequestId: item.linkedSosRequestId,
     updatedAt: item.updatedAt,
     statusLabel: "WaitingCoordinator",

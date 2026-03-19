@@ -28,6 +28,11 @@ import { useCreateSOSRequest } from "@/services/sos_request/hooks";
 import type { CreateSOSRequestPayload } from "@/services/sos_request/type";
 import { useAuthStore } from "@/stores/auth.store";
 
+const EDITORIAL_CARD =
+  "rounded-none border-2 border-black bg-white shadow-[4px_4px_0_0_#000]";
+const EDITORIAL_INPUT =
+  "rounded-none border-black focus-visible:ring-2 focus-visible:ring-[#FF5722]";
+
 // ── Dynamic Map Picker (SSR disabled) ──
 
 const LocationPickerMap = dynamic<{
@@ -36,7 +41,7 @@ const LocationPickerMap = dynamic<{
   onPick: (lat: number, lng: number) => void;
 }>(() => import("@/app/dashboard/coordinator/create-sos/LocationPickerMap"), {
   ssr: false,
-  loading: () => <Skeleton className="w-full h-[300px] rounded-lg" />,
+  loading: () => <Skeleton className="w-full h-[300px] rounded-none" />,
 });
 
 // ── Option Constants ──
@@ -78,8 +83,12 @@ function ToggleChip({
 }) {
   return (
     <Badge
-      variant={selected ? "default" : "outline"}
-      className="cursor-pointer select-none transition-colors text-xs py-1 px-2 hover:opacity-80"
+      variant="outline"
+      className={`cursor-pointer select-none transition-colors text-[11px] py-1 px-2 rounded-none border font-semibold tracking-tighter hover:opacity-90 ${
+        selected
+          ? "bg-[#FF5722] border-[#FF5722] text-white"
+          : "bg-white border-black text-black"
+      }`}
       onClick={onClick}
     >
       {label}
@@ -105,10 +114,10 @@ function SituationCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all text-center ${
+      className={`rounded-none border-2 px-3 py-2 text-xs font-bold transition-all text-left tracking-tighter ${
         selected
-          ? "border-primary bg-primary/10 text-primary"
-          : "border-border hover:border-muted-foreground/40 text-foreground"
+          ? "border-[#FF5722] bg-[#FF5722] text-white"
+          : "border-black hover:bg-black hover:text-white text-black"
       }`}
     >
       {label}
@@ -290,19 +299,25 @@ function CreateSOSContent() {
   };
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur-sm">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4">
+    <div className="min-h-screen bg-white text-black tracking-tighter">
+      <header className="sticky top-0 z-50 border-b-2 border-black bg-white/95 backdrop-blur-sm">
+        <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-3 px-4">
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
             onClick={() => router.push("/dashboard/coordinator")}
+            className="rounded-none border-black"
           >
             <ArrowLeft size={20} />
           </Button>
           <div>
-            <h1 className="text-base font-semibold">Tạo yêu cầu SOS</h1>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-[#FF5722]">
+              Coordinator Editorial Desk
+            </p>
+            <h1 className="text-xl font-black uppercase tracking-tight">
+              Tạo yêu cầu SOS
+            </h1>
+            <p className="text-xs text-black/65">
               Giao diện nhập nhanh dành cho điều phối viên
             </p>
           </div>
@@ -312,44 +327,46 @@ function CreateSOSContent() {
       <form
         id="create-sos-form"
         onSubmit={handleSubmit}
-        className="mx-auto max-w-7xl px-4 py-4 pb-24"
+        className="mx-auto max-w-[1600px] px-4 py-5 pb-24"
       >
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <section className="space-y-4 xl:col-span-8">
+          <section className="space-y-4 xl:col-span-8 xl:pr-4 xl:border-r-2 xl:border-black">
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Card>
+              <Card className={EDITORIAL_CARD}>
                 <CardContent className="pt-5 space-y-3">
-                  <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                  <p className="text-sm font-extrabold flex items-center gap-2 uppercase tracking-wide text-black">
                     <User size={16} /> Thông tin người gọi
                   </p>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-medium text-foreground/90">
+                      <Label className="text-xs font-bold uppercase tracking-wide text-black/80">
                         Tên người gọi
                       </Label>
                       <Input
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Nguyễn Văn A"
+                        className={EDITORIAL_INPUT}
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-medium text-foreground/90">
+                      <Label className="text-xs font-bold uppercase tracking-wide text-black/80">
                         Số điện thoại
                       </Label>
                       <Input
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="0901 234 567"
+                        className={EDITORIAL_INPUT}
                       />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className={EDITORIAL_CARD}>
                 <CardContent className="pt-5 space-y-3">
-                  <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                  <p className="text-sm font-extrabold flex items-center gap-2 uppercase tracking-wide text-black">
                     <WarningCircle size={16} /> Tình huống
                     <span className="text-red-500">*</span>
                   </p>
@@ -369,15 +386,16 @@ function CreateSOSContent() {
                       value={otherSituation}
                       onChange={(e) => setOtherSituation(e.target.value)}
                       placeholder="Mô tả tình huống khác..."
+                      className={EDITORIAL_INPUT}
                     />
                   )}
                 </CardContent>
               </Card>
             </div>
 
-            <Card>
+            <Card className={EDITORIAL_CARD}>
               <CardContent className="pt-5 space-y-4">
-                <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                <p className="text-sm font-extrabold flex items-center gap-2 uppercase tracking-wide text-black">
                   <MapPin size={16} /> Vị trí cần cứu
                   <span className="text-red-500">*</span>
                 </p>
@@ -387,6 +405,7 @@ function CreateSOSContent() {
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="Tìm nhanh địa chỉ: số nhà, đường, xã/phường..."
+                    className={EDITORIAL_INPUT}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -396,17 +415,17 @@ function CreateSOSContent() {
                   />
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     onClick={geocodeAddress}
                     disabled={isGeocoding}
-                    className="gap-1.5"
+                    className="gap-1.5 rounded-none border-black bg-white hover:bg-black hover:text-white"
                   >
                     <MagnifyingGlass size={14} />
                     {isGeocoding ? "Đang tìm..." : "Tìm vị trí"}
                   </Button>
                 </div>
 
-                <div className="rounded-lg overflow-hidden border h-[280px]">
+                <div className="overflow-hidden border-2 border-black h-[280px]">
                   <LocationPickerMap
                     lat={lat ? Number(lat) : undefined}
                     lng={lng ? Number(lng) : undefined}
@@ -416,15 +435,15 @@ function CreateSOSContent() {
                     }}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <p className="text-xs text-black/65 flex items-center gap-1 uppercase tracking-wide">
                   <Crosshair size={12} /> Chạm vào bản đồ để chọn điểm chính xác
                 </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={EDITORIAL_CARD}>
               <CardContent className="pt-5 space-y-2">
-                <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                <p className="text-sm font-extrabold flex items-center gap-2 uppercase tracking-wide text-black">
                   <PaperPlaneTilt size={16} /> Mô tả tình trạng
                   <span className="text-red-500">*</span>
                 </p>
@@ -433,53 +452,63 @@ function CreateSOSContent() {
                   onChange={(e) => setMsg(e.target.value)}
                   placeholder="Ví dụ: Nước ngập nhanh, có người già và trẻ em, cần hỗ trợ khẩn cấp..."
                   rows={3}
+                  className={EDITORIAL_INPUT}
                   required
                 />
               </CardContent>
             </Card>
           </section>
 
-          <aside className="space-y-4 xl:col-span-4 xl:sticky xl:top-20 xl:self-start">
-            <Card>
+          <aside className="space-y-4 xl:col-span-4 xl:sticky xl:top-20 xl:self-start xl:pl-4">
+            <Card className={EDITORIAL_CARD}>
               <CardContent className="pt-5 space-y-3">
-                <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                <p className="text-sm font-extrabold flex items-center gap-2 uppercase tracking-wide text-black">
                   <Users size={16} /> Số người cần hỗ trợ
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Người lớn</Label>
+                    <Label className="text-[11px] font-bold uppercase tracking-wide">
+                      Người lớn
+                    </Label>
                     <Input
                       type="number"
                       min={0}
                       value={adultCount}
                       onChange={(e) => setAdultCount(e.target.value)}
+                      className={EDITORIAL_INPUT}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Trẻ em</Label>
+                    <Label className="text-[11px] font-bold uppercase tracking-wide">
+                      Trẻ em
+                    </Label>
                     <Input
                       type="number"
                       min={0}
                       value={childCount}
                       onChange={(e) => setChildCount(e.target.value)}
+                      className={EDITORIAL_INPUT}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Người già</Label>
+                    <Label className="text-[11px] font-bold uppercase tracking-wide">
+                      Người già
+                    </Label>
                     <Input
                       type="number"
                       min={0}
                       value={elderlyCount}
                       onChange={(e) => setElderlyCount(e.target.value)}
+                      className={EDITORIAL_INPUT}
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={EDITORIAL_CARD}>
               <CardContent className="pt-5 space-y-3">
-                <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                <p className="text-sm font-extrabold flex items-center gap-2 uppercase tracking-wide text-black">
                   <FirstAid size={16} /> Tình trạng y tế
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -507,7 +536,7 @@ function CreateSOSContent() {
 
                 {hasInjured && (
                   <div className="space-y-2 pt-1">
-                    <Label className="text-muted-foreground">
+                    <Label className="text-black/70 text-xs font-semibold uppercase tracking-wide">
                       Vấn đề y tế cụ thể
                     </Label>
                     <div className="flex flex-wrap gap-2">
@@ -531,9 +560,9 @@ function CreateSOSContent() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={EDITORIAL_CARD}>
               <CardContent className="pt-5 space-y-3">
-                <p className="text-sm font-semibold flex items-center gap-2 text-muted-foreground">
+                <p className="text-sm font-extrabold flex items-center gap-2 uppercase tracking-wide text-black">
                   <Package size={16} /> Nhu yếu phẩm
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -551,9 +580,9 @@ function CreateSOSContent() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={EDITORIAL_CARD}>
               <CardContent className="pt-5 space-y-2">
-                <Label className="text-sm font-semibold text-muted-foreground">
+                <Label className="text-sm font-extrabold uppercase tracking-wide text-black">
                   Ghi chú thêm
                 </Label>
                 <Textarea
@@ -561,6 +590,7 @@ function CreateSOSContent() {
                   onChange={(e) => setAdditionalDescription(e.target.value)}
                   placeholder="Thông tin bổ sung từ cuộc gọi (nếu có)..."
                   rows={3}
+                  className={EDITORIAL_INPUT}
                 />
               </CardContent>
             </Card>
@@ -568,13 +598,14 @@ function CreateSOSContent() {
         </div>
       </form>
 
-      <div className="fixed bottom-0 inset-x-0 border-t bg-background/95 backdrop-blur-sm z-50">
-        <div className="mx-auto max-w-7xl flex items-center justify-between gap-3 px-4 py-3">
+      <div className="fixed bottom-0 inset-x-0 border-t-2 border-black bg-white/95 backdrop-blur-sm z-50">
+        <div className="mx-auto max-w-[1600px] flex items-center justify-between gap-3 px-4 py-3">
           <Button
             type="button"
             variant="outline"
             onClick={() => router.push("/dashboard/coordinator")}
             disabled={isPending}
+            className="rounded-none border-black hover:bg-black hover:text-white"
           >
             Huỷ bỏ
           </Button>
@@ -582,7 +613,7 @@ function CreateSOSContent() {
             type="submit"
             form="create-sos-form"
             disabled={isPending}
-            className="gap-2"
+            className="gap-2 rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19] border-2 border-[#FF5722]"
           >
             {isPending ? (
               <>

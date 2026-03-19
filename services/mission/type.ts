@@ -1,7 +1,6 @@
 import type {
   ClusterSuggestedActivity,
   ClusterSuggestedResource,
-  ClusterSupplyCollection,
 } from "@/services/sos_cluster/type";
 
 export type MissionType = "RESCUE" | "RESCUER";
@@ -28,13 +27,34 @@ export interface MissionTeam {
   assemblyPointName: string | null;
   teamType: string | null;
   status: string;
-  note: string | null;
+  teamStatus?: string | null;
+  memberCount?: number | null;
+  members?: MissionTeamMember[] | null;
+  note?: string | null;
   latitude: number | null;
   longitude: number | null;
   locationUpdatedAt: string | null;
-  locationSource: string | null;
+  locationSource?: string | null;
   assignedAt: string;
-  unassignedAt: string | null;
+  unassignedAt?: string | null;
+}
+
+export interface MissionTeamMember {
+  userId: string;
+  fullName: string;
+  avatarUrl: string | null;
+  rescuerType: string | null;
+  roleInTeam: string | null;
+  isLeader: boolean;
+  status: string;
+  checkedIn: boolean;
+}
+
+export interface MissionSupplyItem {
+  itemId: number | null;
+  itemName: string | null;
+  quantity: number;
+  unit: string;
 }
 
 export interface MissionActivity {
@@ -43,9 +63,16 @@ export interface MissionActivity {
   activityCode: string;
   activityType: string;
   description: string;
+  priority: string | null;
+  estimatedTime: number | null;
+  sosRequestId: number | null;
+  depotId: number | null;
+  depotName: string | null;
+  depotAddress: string | null;
+  missionTeamId: number | null;
   target: string;
   items: unknown | null;
-  suppliesToCollect: ClusterSupplyCollection[] | null;
+  suppliesToCollect: MissionSupplyItem[] | null;
   targetLatitude: number;
   targetLongitude: number;
   status: ActivityStatus;
@@ -57,13 +84,13 @@ export interface MissionActivity {
 export interface MissionEntity {
   id: number;
   clusterId: number;
-  missionType: MissionType;
+  missionType: MissionType | "Rescue" | "Rescuer";
   priorityScore: number;
   status: MissionStatus;
   startTime: string;
   expectedEndTime: string;
-  isCompleted: boolean | null;
-  createdById: string;
+  isCompleted?: boolean | null;
+  createdById?: string;
   createdAt: string;
   completedAt: string | null;
   activityCount: number;
@@ -72,17 +99,17 @@ export interface MissionEntity {
   // AI suggestion fields (flat from backend)
   aiSuggestionId: number | null;
   suggestedMissionTitle: string | null;
-  modelName: string | null;
+  modelName?: string | null;
   suggestedMissionType: string | null;
   suggestedPriorityScore: number | null;
   suggestedSeverityLevel: string | null;
-  aiConfidenceScore: number | null;
-  overallAssessment: string | null;
-  estimatedDuration: string | null;
-  specialNotes: string | null;
+  aiConfidenceScore?: number | null;
+  overallAssessment?: string | null;
+  estimatedDuration?: string | null;
+  specialNotes?: string | null;
   suggestedActivities?: ClusterSuggestedActivity[] | null;
-  suggestedResources: ClusterSuggestedResource[];
-  aiCreatedAt: string | null;
+  suggestedResources?: ClusterSuggestedResource[];
+  aiCreatedAt?: string | null;
 }
 
 export interface GetMissionsResponse {
@@ -123,11 +150,24 @@ export interface CreateMissionActivityRequest {
   activityCode: string;
   activityType: string;
   description: string;
+  priority: string;
+  estimatedTime: number;
+  sosRequestId: number;
+  depotId: number;
+  depotName: string;
+  depotAddress: string;
+  suppliesToCollect: CreateMissionSupplyRequest[];
   target: string;
-  items: string;
   targetLatitude: number;
   targetLongitude: number;
   rescueTeamId?: number | null;
+}
+
+export interface CreateMissionSupplyRequest {
+  id: number;
+  name: string;
+  quantity: number;
+  unit: string;
 }
 
 export type CreateActivityResponse = MissionActivity;

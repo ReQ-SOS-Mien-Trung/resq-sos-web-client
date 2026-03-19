@@ -98,7 +98,7 @@ export default function LocationPickerMap({
     return (
       <div
         style={{ height: 300 }}
-        className="w-full animate-pulse bg-muted rounded-lg"
+        className="w-full animate-pulse bg-white border-2 border-black"
       />
     );
   }
@@ -107,7 +107,7 @@ export default function LocationPickerMap({
     <MapContainer
       center={center}
       zoom={zoom}
-      className="w-full z-0"
+      className="w-full z-0 border-2 border-black"
       style={{ height: 300 }}
       zoomControl={true}
     >

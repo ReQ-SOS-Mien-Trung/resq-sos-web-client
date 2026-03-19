@@ -7,7 +7,6 @@ import {
   Eye,
   EyeSlash,
   ArrowRight,
-
   EnvelopeSimple,
   X,
 } from "@phosphor-icons/react";
@@ -56,7 +55,7 @@ const SignIn = () => {
       gsap.fromTo(
         formRef.current,
         { y: 30, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, ease: "power2.out" }
+        { y: 0, opacity: 1, duration: 0.6, ease: "power2.out" },
       );
     }, containerRef);
     return () => ctx.revert();
@@ -204,11 +203,9 @@ const SignIn = () => {
                   "w-full pl-12 pr-12 py-4 border-2 focus:border-black outline-none text-sm transition-all rounded-lg",
                   errors.username && usernameTouched
                     ? "border-red-500 focus:border-red-500"
-                    : formData.username &&
-                      !errors.username &&
-                      usernameTouched
+                    : formData.username && !errors.username && usernameTouched
                       ? "border-green-500"
-                      : "border-black/20"
+                      : "border-black/20",
                 )}
               />
               <AnimatePresence>
@@ -303,9 +300,7 @@ const SignIn = () => {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={
-              isLoading || !formData.username || !formData.password
-            }
+            disabled={isLoading || !formData.username || !formData.password}
             className="w-full px-6 py-4 bg-black text-white text-sm font-bold uppercase tracking-wider hover:bg-[#FF5722] transition-colors flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed rounded-lg"
           >
             {isLoading ? (

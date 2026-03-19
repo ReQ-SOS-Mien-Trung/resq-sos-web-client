@@ -44,36 +44,48 @@ export default function RescueTeamsPage() {
     AwaitingAcceptance: {
       label: "Chờ xác nhận",
       variant: "outline",
-      className: "bg-gray-100 text-gray-700",
+      className: "border-black bg-white text-black",
     },
     Ready: {
       label: "Sẵn sàng",
       variant: "default",
-      className: "bg-green-500 hover:bg-green-600",
+      className: "bg-black text-white hover:bg-black/90",
     },
     Gathering: {
       label: "Đang tập hợp",
       variant: "default",
-      className: "bg-yellow-500 hover:bg-yellow-600",
+      className: "bg-black text-white hover:bg-black/90",
     },
     Available: {
       label: "Trống",
       variant: "default",
-      className: "bg-green-500 hover:bg-green-600",
+      className: "bg-black text-white hover:bg-black/90",
     },
     Assigned: {
       label: "Đã phân công",
       variant: "default",
-      className: "bg-yellow-500 hover:bg-yellow-600",
+      className: "bg-black text-white hover:bg-black/90",
     },
     OnMission: {
       label: "Đang làm nhiệm vụ",
       variant: "default",
-      className: "bg-blue-500 hover:bg-blue-600",
+      className: "bg-black text-white hover:bg-black/90",
     },
-    Stuck: { label: "Mắc kẹt", variant: "destructive" },
-    Unavailable: { label: "Không khả dụng", variant: "destructive" },
-    Disbanded: { label: "Đã giải tán", variant: "secondary" },
+    Stuck: {
+      label: "Mắc kẹt",
+      variant: "outline",
+      className: "border-black bg-white text-black",
+    },
+    Unavailable: {
+      label: "Không khả dụng",
+      variant: "outline",
+      className: "border-black bg-white text-black",
+    },
+    Disbanded: {
+      label: "Đã giải tán",
+      variant: "outline",
+      className: "border-black bg-white text-black",
+    },
   };
 
   const getStatusBadge = (status: RescueTeamStatusKey) => {
@@ -91,19 +103,19 @@ export default function RescueTeamsPage() {
   > = {
     Rescue: {
       label: "Cứu hộ",
-      className: "text-orange-500 bg-orange-50 hover:bg-orange-100",
+      className: "border border-black bg-white text-black",
     },
     Medical: {
       label: "Y tế",
-      className: "text-red-500 bg-red-50 hover:bg-red-100",
+      className: "border border-black bg-white text-black",
     },
     Transportation: {
       label: "Vận chuyển",
-      className: "text-blue-500 bg-blue-50 hover:bg-blue-100",
+      className: "border border-black bg-white text-black",
     },
     Mixed: {
       label: "Hỗn hợp",
-      className: "text-purple-500 bg-purple-50 hover:bg-purple-100",
+      className: "border border-black bg-white text-black",
     },
   };
 
@@ -148,20 +160,20 @@ export default function RescueTeamsPage() {
     {
       key: "todo",
       title: "Chờ điều phối",
-      dotClassName: "bg-orange-500",
-      cardClassName: "bg-orange-50/30 border-orange-100",
+      dotClassName: "bg-[#FF5722]",
+      cardClassName: "bg-white border-black",
     },
     {
       key: "in-progress",
       title: "Đang triển khai",
-      dotClassName: "bg-blue-500",
-      cardClassName: "bg-blue-50/30 border-blue-100",
+      dotClassName: "bg-black",
+      cardClassName: "bg-white border-black",
     },
     {
       key: "completed",
       title: "Hoàn tất / Ngưng",
-      dotClassName: "bg-emerald-500",
-      cardClassName: "bg-emerald-50/30 border-emerald-100",
+      dotClassName: "bg-black",
+      cardClassName: "bg-white border-black",
     },
   ] as const;
 
@@ -180,28 +192,31 @@ export default function RescueTeamsPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-[1480px] p-4 md:p-6">
+      <div className="mx-auto w-full max-w-[1480px] p-4 tracking-tighter md:p-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+            <h1 className="text-2xl font-bold uppercase md:text-3xl">
               Quản lý Đội Cứu Hộ
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="mt-1 text-black/70">
               Theo dõi đội theo trạng thái xử lý theo dạng Kanban trực quan
             </p>
           </div>
-          <Button disabled className="gap-2">
+          <Button
+            disabled
+            className="gap-2 rounded-none bg-[#FF5722] text-white"
+          >
             <Plus className="h-4 w-4" />
             Thêm đội cứu hộ
           </Button>
         </div>
 
-        <div className="rounded-3xl border bg-slate-50/80 p-3 md:p-4">
+        <div className="border border-black bg-white p-3 md:p-4">
           <div className="grid gap-4 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, columnIndex) => (
               <div
                 key={columnIndex}
-                className="rounded-2xl border bg-white/70 p-3"
+                className="border border-black bg-white p-3"
               >
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -213,7 +228,7 @@ export default function RescueTeamsPage() {
 
                 <div className="space-y-3">
                   {Array.from({ length: 3 }).map((_, i) => (
-                    <Card key={i} className="border-slate-200/80 shadow-sm">
+                    <Card key={i} className="border-black shadow-none">
                       <CardHeader className="space-y-2 pb-2">
                         <Skeleton className="h-4 w-1/3" />
                         <Skeleton className="h-5 w-3/4" />
@@ -247,27 +262,27 @@ export default function RescueTeamsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1480px] p-4 md:p-6">
+    <div className="mx-auto w-full max-w-[1480px] bg-white p-4 tracking-tighter md:p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+          <h1 className="text-2xl font-bold uppercase md:text-3xl">
             Quản lý Đội Cứu Hộ
           </h1>
-          <p className="mt-1 text-muted-foreground">
+          <p className="mt-1 text-black/70">
             Theo dõi, điều phối và cập nhật trạng thái đội cứu hộ theo luồng
             công việc
           </p>
         </div>
 
         <Link href="/dashboard/coordinator/rescue-teams/create">
-          <Button className="gap-2 rounded-xl px-4">
+          <Button className="gap-2 rounded-none bg-[#FF5722] px-4 text-white hover:bg-[#e64a19]">
             <UserPlus className="h-4 w-4" />
             Thêm đội cứu hộ
           </Button>
         </Link>
       </div>
 
-      <div className="rounded-3xl border bg-slate-50/80 p-3 md:p-4">
+      <div className="border border-black bg-[linear-gradient(to_right,rgba(0,0,0,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.08)_1px,transparent_1px)] bg-[size:32px_32px] p-3 md:p-4">
         <div className="grid gap-4 lg:grid-cols-3">
           {columns.map((column) => {
             const columnTeams = teamsByColumn[column.key];
@@ -275,7 +290,7 @@ export default function RescueTeamsPage() {
             return (
               <div
                 key={column.key}
-                className={`rounded-2xl border p-3 ${column.cardClassName}`}
+                className={`border p-3 ${column.cardClassName}`}
               >
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -299,7 +314,7 @@ export default function RescueTeamsPage() {
                     return (
                       <Card
                         key={team.id}
-                        className="border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                        className="border-black bg-white shadow-none transition hover:-translate-y-0.5"
                       >
                         <CardHeader className="pb-2">
                           <div className="flex items-start justify-between gap-3">
@@ -317,9 +332,9 @@ export default function RescueTeamsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 shrink-0 rounded-md"
+                              className="h-8 w-8 shrink-0 rounded-none border border-black"
                             >
-                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                              <MoreVertical className="h-4 w-4 text-black/70" />
                             </Button>
                           </div>
                         </CardHeader>
@@ -374,7 +389,7 @@ export default function RescueTeamsPage() {
                           >
                             <Button
                               variant="outline"
-                              className="w-full gap-1.5 rounded-lg"
+                              className="w-full gap-1.5 rounded-none border-black"
                             >
                               Xem chi tiết
                               <ArrowRight className="h-4 w-4" />
@@ -386,7 +401,7 @@ export default function RescueTeamsPage() {
                   })}
 
                   {columnTeams.length === 0 && (
-                    <div className="rounded-xl border border-dashed bg-white/70 px-4 py-10 text-center text-sm text-muted-foreground">
+                    <div className="border border-dashed border-black bg-white px-4 py-10 text-center text-sm text-black/70">
                       Không có đội trong cột này.
                     </div>
                   )}
@@ -403,12 +418,12 @@ export default function RescueTeamsPage() {
             variant="outline"
             disabled={!data.hasPreviousPage}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="rounded-lg"
+            className="rounded-none border-black"
           >
             Trước
           </Button>
 
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-black/70">
             Trang {data.pageNumber} / {data.totalPages}
           </span>
 
@@ -416,7 +431,7 @@ export default function RescueTeamsPage() {
             variant="outline"
             disabled={!data.hasNextPage}
             onClick={() => setPage((p) => p + 1)}
-            className="rounded-lg"
+            className="rounded-none border-black"
           >
             Sau
           </Button>
