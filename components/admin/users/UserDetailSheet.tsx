@@ -16,6 +16,7 @@ import { useAdminUserById, useUpdateAdminUser, ADMIN_USERS_QUERY_KEY } from "@/s
 import { useAuthStore } from "@/stores/auth.store";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { uploadImageToCloudinary } from "@/utils/uploadFile";
 import {
   Phone,
   EnvelopeSimple,
@@ -76,26 +77,11 @@ interface FieldRowProps {
 
 const FieldRow = ({ label, value }: FieldRowProps) => (
   <div className="grid grid-cols-[130px_1fr] gap-3 items-start py-2.5 border-b border-border/25 last:border-0">
-    <span className="text-sm text-muted-foreground leading-5">{label}</span>
-    <span className="text-sm text-foreground leading-5">{value ?? "—"}</span>
+    <span className="text-sm tracking-tighter text-muted-foreground leading-5">{label}</span>
+    <span className="text-sm tracking-tighter text-foreground leading-5">{value ?? "—"}</span>
   </div>
 );
 
-interface StatusDotProps {
-  active: boolean;
-  label: string;
-}
-
-const StatusDot = ({ active, label }: StatusDotProps) => (
-  <div className="flex items-center gap-2">
-    <span
-      className={`h-1.5 w-1.5 rounded-full shrink-0 ${
-        active ? "bg-emerald-500" : "bg-muted-foreground/30"
-      }`}
-    />
-    <span className="text-sm text-foreground">{label}</span>
-  </div>
-);
 
 const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   <p className="text-[14px] font-bold text-primary tracking-tight mb-3">
@@ -280,19 +266,11 @@ const UserDetailSheet = ({
     if (avatarFile) {
       setIsUploading(true);
       toast.loading("Đang tải ảnh lên...");
-      const fd = new FormData();
-      fd.append("file", avatarFile);
-      fd.append("upload_preset", process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "ResQ_SOS");
-      fetch(
-        `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dezgwdrfs"}/image/upload`,
-        { method: "POST", body: fd }
-      )
-        .then((r) => r.json())
-        .then((d) => {
+      uploadImageToCloudinary(avatarFile)
+        .then((url) => {
           toast.dismiss();
           setIsUploading(false);
-          if (d.secure_url) proceed(d.secure_url);
-          else throw new Error("No URL");
+          proceed(url);
         })
         .catch(() => {
           toast.dismiss();
@@ -317,7 +295,7 @@ const UserDetailSheet = ({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-115 overflow-y-auto p-0 flex flex-col">
         {/* ── header ── */}
-        <div className="px-6 pt-8 pb-6 border-b border-border/30">
+        <div className="px-6 pt-10 pb-6 border-b border-border/30">
           <SheetHeader className="mb-5">
             <div className="flex items-center justify-between">
               <SheetTitle className="text-xl sm:text-2xl font-black tracking-tight">
@@ -420,25 +398,37 @@ const UserDetailSheet = ({
                       onChange={(e) => setForm((p) => ({ ...p, username: e.target.value }))}
                       className="h-8 text-sm"
                     />
-                    <Badge className={`${role.className} text-xs font-medium px-2 py-0.5 pointer-events-none`}>
+                    <Badge className={`${role.className} text-sm tracking-tighter font-medium px-2 py-1 pointer-events-none`}>
                       {role.label}
                     </Badge>
                   </div>
                 ) : (
                   <>
-                    <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
-                      {fullName}
-                    </h2>
-                    <p className="text-sm text-muted-foreground mt-0.5">@{user?.username}</p>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-[15px] font-semibold tracking-tighter text-foreground">
+                        {fullName}
+                      </h2>
+                      <span
+                        className={`relative flex size-2.5 shrink-0`}
+                        title={user?.isBanned ? "Bị cấm" : "Đang hoạt động"}
+                      >
+                        <span
+                          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                            user?.isBanned ? "bg-rose-500" : "bg-emerald-500"
+                          }`}
+                        />
+                        <span
+                          className={`relative inline-flex rounded-full size-2.5 ${
+                            user?.isBanned ? "bg-rose-500" : "bg-emerald-500"
+                          }`}
+                        />
+                      </span>
+                    </div>
+                    <p className="text-sm tracking-tighter text-muted-foreground mt-0.5">@{user?.username}</p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                      <Badge className={`${role.className} text-xs font-medium px-2 py-0.5`}>
+                      <Badge className={`${role.className} text-xs tracking-tighter font-medium px-2 py-0.5`}>
                         {role.label}
                       </Badge>
-                      {user?.isBanned && (
-                        <Badge className="bg-rose-500/10 text-rose-600 border border-rose-200/60 text-xs font-medium px-2 py-0.5">
-                          Bị cấm
-                        </Badge>
-                      )}
                     </div>
                   </>
                 )}
@@ -448,7 +438,7 @@ const UserDetailSheet = ({
         </div>
 
         {/* ── liên hệ ── */}
-        <div className="px-6 py-4 border-b border-border/30">
+        <div className="px-6 py-2 border-b border-border/30">
           <SectionLabel>THÔNG TIN LIÊN HỆ</SectionLabel>
           {isLoading ? (
             <div className="space-y-3">
@@ -458,40 +448,40 @@ const UserDetailSheet = ({
           ) : isEditing ? (
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Số điện thoại</label>
+                <label className="text-sm tracking-tighter text-muted-foreground">Số điện thoại</label>
                 <Input
                   value={form.phone}
                   onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
                   placeholder="0912345678"
-                  className="h-8 text-sm"
+                  className="h-8 mt-1.5 text-sm tracking-tighter"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Email</label>
+                <label className="text-sm tracking-tighter text-muted-foreground">Email</label>
                 <Input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                   placeholder="example@resq.com"
-                  className="h-8 text-sm"
+                  className="h-8 mt-1.5 text-sm tracking-tighter"
                 />
               </div>
               {user?.roleId === 3 && (
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Loại cứu hộ (Rescuer Type)</label>
+                  <label className="text-sm tracking-tighter text-muted-foreground">Loại cứu hộ</label>
                   <div className="flex gap-2">
-                    {["core", "normal"].map((t) => (
+                    {(["Core", "Volunteer"] as const).map((t) => (
                       <button
                         key={t}
                         type="button"
                         onClick={() => setForm((p) => ({ ...p, rescuerType: t }))}
-                        className={`flex-1 py-1.5 text-xs font-medium border rounded transition-colors ${
+                        className={`flex-1 py-1.5 mt-1.5 text-sm tracking-tighter font-medium border transition-colors ${
                           form.rescuerType === t
                             ? "bg-primary text-primary-foreground border-primary"
                             : "border-border hover:bg-muted/50"
                         }`}
                       >
-                        {t === "core" ? "Core (Nòng cốt)" : "Normal (Thông thường)"}
+                        {t === "Core" ? "Cứu hộ hệ thống" : "Tình nguyện viên"}
                       </button>
                     ))}
                   </div>
@@ -519,14 +509,23 @@ const UserDetailSheet = ({
                 }
               />
               {user?.roleId === 3 && (
-                <FieldRow label="Loại cứu hộ" value={user.rescuerType ?? "—"} />
+                <FieldRow
+                  label="Loại cứu hộ"
+                  value={
+                    user.rescuerType === "Core"
+                      ? "Cứu hộ hệ thống"
+                      : user.rescuerType === "Volunteer"
+                      ? "Tình nguyện viên"
+                      : user.rescuerType ?? "—"
+                  }
+                />
               )}
             </>
           )}
         </div>
 
         {/* ── địa chỉ ── */}
-        <div className="px-6 py-4 border-b border-border/30">
+        <div className="px-6 py-2 border-b border-border/30">
           <SectionLabel>ĐỊA CHỈ</SectionLabel>
           {isLoading ? (
             <div className="space-y-3">
@@ -537,18 +536,18 @@ const UserDetailSheet = ({
           ) : isEditing ? (
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Địa chỉ</label>
+                <label className="text-sm tracking-tighter text-muted-foreground">Địa chỉ</label>
                 <Input
                   value={form.address}
                   onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
                   placeholder="Số nhà, tên đường"
-                  className="h-8 text-sm"
+                  className="h-8 mt-1.5 text-sm"
                 />
               </div>
 
               {/* Province dropdown */}
               <div className="space-y-1" ref={cityDropdownRef}>
-                <label className="text-xs text-muted-foreground">Tỉnh / Thành phố</label>
+                <label className="text-sm tracking-tighter text-muted-foreground">Tỉnh / Thành phố</label>
                 <div className="relative">
                   <Input
                     value={citySearch || form.province}
@@ -562,7 +561,7 @@ const UserDetailSheet = ({
                     onFocus={() => { setCityOpen(true); setCitySearch(""); }}
                     readOnly={!!form.province && !cityOpen}
                     placeholder="Chọn tỉnh/thành phố"
-                    className="h-8 text-sm pr-7 cursor-pointer"
+                    className="h-8 mt-1.5 text-sm pr-7 cursor-pointer"
                   />
                   <CaretDown
                     size={13}
@@ -570,7 +569,7 @@ const UserDetailSheet = ({
                   />
                   {cityOpen && (
                     <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border border-border/60 shadow-xl overflow-y-auto rounded-md" style={{ maxHeight: 200 }}>
-                      {provinces.length === 0 && <p className="text-xs text-muted-foreground px-4 py-3 text-center">Đang tải...</p>}
+                      {provinces.length === 0 && <p className="text-xs tracking-tighter text-muted-foreground px-4 py-3 text-center">Đang tải...</p>}
                       {provinces
                         .filter((p) => p.name.toLowerCase().includes((citySearch || "").toLowerCase()))
                         .map((p) => (
@@ -585,7 +584,7 @@ const UserDetailSheet = ({
                               setCityOpen(false);
                               setCitySearch("");
                             }}
-                            className={`w-full text-left px-4 py-2 text-xs hover:bg-muted/50 transition-colors ${form.province === p.name ? "bg-primary/5 text-primary font-bold" : ""}`}
+                            className={`w-full tracking-tighter text-left px-4 py-2 text-xs hover:bg-muted/50 transition-colors ${form.province === p.name ? "bg-primary/5 text-primary font-bold" : ""}`}
                           >
                             {p.name}
                           </button>
@@ -597,7 +596,7 @@ const UserDetailSheet = ({
 
               {/* Ward dropdown */}
               <div className="space-y-1" ref={wardDropdownRef}>
-                <label className="text-xs text-muted-foreground">Phường / Xã</label>
+                <label className="text-sm tracking-tighter text-muted-foreground">Phường / Xã</label>
                 <div className="relative">
                   <Input
                     value={wardSearch || form.ward}
@@ -610,7 +609,7 @@ const UserDetailSheet = ({
                     onFocus={() => { setWardOpen(true); setWardSearch(""); }}
                     readOnly={!!form.ward && !wardOpen}
                     placeholder={selectedProvinceCode ? "Chọn phường/xã" : "Chọn tỉnh trước"}
-                    className="h-8 text-sm pr-7 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-8 mt-1.5 text-sm pr-7 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <CaretDown
                     size={13}
@@ -630,7 +629,7 @@ const UserDetailSheet = ({
                               setWardOpen(false);
                               setWardSearch("");
                             }}
-                            className={`w-full text-left px-4 py-2 text-xs hover:bg-muted/50 transition-colors ${form.ward === w.name ? "bg-primary/5 text-primary font-bold" : ""}`}
+                            className={`w-full tracking-tighter text-left px-4 py-2 text-xs hover:bg-muted/50 transition-colors ${form.ward === w.name ? "bg-primary/5 text-primary font-bold" : ""}`}
                           >
                             {w.name}
                           </button>
@@ -652,35 +651,7 @@ const UserDetailSheet = ({
           )}
         </div>
 
-        {/* ── trạng thái tài khoản (view only) ── */}
-        {!isEditing && (
-          <div className="px-6 py-3 border-b border-border/30">
-            <SectionLabel>TRẠNG THÁI TÀI KHOẢN</SectionLabel>
-            {isLoading ? (
-              <div className="grid grid-cols-2 gap-3">
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-5 rounded" />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <StatusDot active={user?.isEmailVerified ?? false} label="Email xác minh" />
-                <StatusDot active={user?.isOnboarded ?? false} label="Đã onboarded" />
-                <StatusDot active={user?.isEligibleRescuer ?? false} label="Đủ điều kiện cứu hộ" />
-                <StatusDot
-                  active={!(user?.isBanned ?? false)}
-                  label={user?.isBanned ? "Tài khoản bị cấm" : "Đang hoạt động"}
-                />
-              </div>
-            )}
-            {!isLoading && user?.isBanned && (
-              <div className="mt-3 p-3 bg-rose-500/5 border border-rose-200/40 rounded">
-                <p className="text-[11px] text-muted-foreground mb-0.5">Lý do cấm</p>
-                <p className="text-sm text-rose-600">{user.banReason ?? "Không có lý do"}</p>
-              </div>
-            )}
-          </div>
-        )}
+
 
         {/* ── thời gian (view only) ── */}
         {!isEditing && (
@@ -694,11 +665,11 @@ const UserDetailSheet = ({
             ) : (
               <>
                 <FieldRow
-                  label="Tạo lúc"
+                  label="Thời gian tạo"
                   value={user?.createdAt ? formatDateTime(user.createdAt) : "—"}
                 />
                 <FieldRow
-                  label="Cập nhật"
+                  label="Cập nhật lần cuối"
                   value={user?.updatedAt ? formatDateTime(user.updatedAt) : "—"}
                 />
                 {user?.approvedAt && (

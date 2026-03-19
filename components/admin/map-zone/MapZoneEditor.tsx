@@ -13,6 +13,7 @@ interface MapZoneEditorProps {
   onCoordinatesChange: (coords: Coordinate[] | null) => void;
   sidebarOpen?: boolean;
   allZones?: ServiceZoneEntity[];
+  highlightedZoneId?: number | null;
 }
 
 // ─── Draw style ───
@@ -75,17 +76,24 @@ function applyI18n() {
   L.drawLocal.edit.toolbar.actions.clearAll.text = "Xóa tất cả";
 }
 
+// ─── Zone colors ───
+const ACTIVE_COLOR = "#16A34A";    // dark green for active zones
+const INACTIVE_COLOR = "#94a3b8";  // gray for inactive zones
+const HIGHLIGHT_COLOR = "#FF5722"; // orange when hovered from sidebar
+
 // ─── Component ───
 export default function MapZoneEditor({
   existingCoordinates,
   onCoordinatesChange,
   sidebarOpen,
   allZones,
+  highlightedZoneId,
 }: MapZoneEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const featureGroupRef = useRef<L.FeatureGroup | null>(null);
   const bgLayersRef = useRef<L.Layer[]>([]);
+  const bgPolygonsRef = useRef<Map<number, { polygon: L.Polygon; isActive: boolean }>>(new Map());
 
   // Keep latest callback in ref — avoids re-initializing map when callback changes
   const onChangeRef = useRef(onCoordinatesChange);
@@ -197,7 +205,7 @@ export default function MapZoneEditor({
     }
   }, [existingCoordinates]);
 
-  // ── Render background (all other active zones) ──
+  // ── Render background (all other zones) with tooltips + hover highlight ──
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -210,24 +218,119 @@ export default function MapZoneEditor({
       }
     });
     bgLayersRef.current = [];
+    bgPolygonsRef.current.clear();
 
     allZones?.forEach((zone) => {
       if (!zone.coordinates?.length) return;
+
+      const baseColor = zone.isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
+      const normalStyle: L.PathOptions = {
+        color: baseColor,
+        weight: 2,
+        fillColor: baseColor,
+        fillOpacity: 0.12,
+        dashArray: zone.isActive ? undefined : "6 4",
+      };
+
       const polygon = L.polygon(
         zone.coordinates.map(
           (c) => [c.latitude, c.longitude] as [number, number],
         ),
+        normalStyle,
+      );
+
+      // Store polygon ref for sidebar hover highlight
+      bgPolygonsRef.current.set(zone.id, { polygon, isActive: zone.isActive });
+
+      // Sticky tooltip with zone info
+      const statusText = zone.isActive ? "🟢 Hoạt động" : "⚫ Tắt";
+      polygon.bindTooltip(
+        `<div style="font-size:14px;line-height:1.5;min-width:140px">
+          <div style="font-weight:700;font-size:15px;margin-bottom:3px">${zone.name}</div>
+          <div style="color:#888;font-size:12px">ID: ${zone.id} · ${zone.coordinates.length} điểm</div>
+          <div style="font-size:13px;margin-top:3px">${statusText}</div>
+        </div>`,
         {
-          color: zone.isActive ? "#FF5722" : "#94a3b8",
-          weight: 2,
-          fillColor: zone.isActive ? "#FF5722" : "#94a3b8",
-          fillOpacity: 0.13,
+          sticky: true,
+          direction: "top",
+          offset: [0, -8],
+          className: "zone-tooltip",
         },
       );
+
+      // Hover highlight on map polygon itself
+      polygon.on("mouseover", () => {
+        polygon.setStyle({
+          color: HIGHLIGHT_COLOR,
+          weight: 4,
+          fillColor: HIGHLIGHT_COLOR,
+          fillOpacity: 0.28,
+          dashArray: undefined,
+        });
+      });
+      polygon.on("mouseout", () => {
+        // Only reset if this zone is NOT the one highlighted from sidebar
+        if (highlightedZoneId !== zone.id) {
+          polygon.setStyle(normalStyle);
+        }
+      });
+
       polygon.addTo(map);
       bgLayersRef.current.push(polygon);
+
+      // Center label marker (always visible — helps distinguish overlapping zones)
+      const bounds = polygon.getBounds();
+      const center = bounds.getCenter();
+      const label = L.marker(center, {
+        icon: L.divIcon({
+          className: "",
+          html: `<div style="
+            background:${baseColor};
+            color:#fff;
+            font-size:11px;
+            font-weight:600;
+            padding:4px 10px;
+            border-radius:9999px;
+            white-space:nowrap;
+            box-shadow:0 2px 6px rgba(0,0,0,.3);
+            pointer-events:none;
+            opacity:0.9;
+            line-height:1.4;
+            text-align:center;
+          ">#${zone.id} ${zone.name}</div>`,
+          iconAnchor: [0, 0],
+        }),
+        interactive: false,
+      });
+      label.addTo(map);
+      bgLayersRef.current.push(label);
     });
-  }, [allZones]);
+  }, [allZones, highlightedZoneId]);
+
+  // ── Highlight zone from sidebar hover ──
+  useEffect(() => {
+    bgPolygonsRef.current.forEach(({ polygon, isActive }, zoneId) => {
+      const baseColor = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
+      if (zoneId === highlightedZoneId) {
+        polygon.setStyle({
+          color: HIGHLIGHT_COLOR,
+          weight: 4,
+          fillColor: HIGHLIGHT_COLOR,
+          fillOpacity: 0.28,
+          dashArray: undefined,
+        });
+        polygon.bringToFront();
+      } else {
+        polygon.setStyle({
+          color: baseColor,
+          weight: 2,
+          fillColor: baseColor,
+          fillOpacity: 0.12,
+          dashArray: isActive ? undefined : "6 4",
+        });
+      }
+    });
+  }, [highlightedZoneId]);
 
   // ── Invalidate map size whenever the container resizes (covers ALL sidebar toggles) ──
   useEffect(() => {

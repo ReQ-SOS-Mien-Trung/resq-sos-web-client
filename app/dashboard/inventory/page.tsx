@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import {
   mockInventoryItems,
   mockSupplyRequests,
@@ -10,6 +10,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,8 +32,10 @@ import {
   Moon,
   Plus,
   FileArrowDown,
-  Warehouse,
   SignOut,
+  Buildings,
+  CaretDown,
+  Package,
 } from "@phosphor-icons/react";
 import {
   CategoryOverview,
@@ -40,10 +44,17 @@ import {
   ItemDetailsSheet,
   LowStockAlerts,
   RecentActivity,
+  SupplyRequestSection,
+  SupplyRequestTracker,
 } from "@/components/inventory";
+import IncomingRequestsSection from "@/components/inventory/IncomingRequestsSection";
 import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
-import { InventoryItemEntity } from "@/services/inventory/type";
+import {
+  InventoryItemEntity,
+  SupplyRequestListItem,
+} from "@/services/inventory/type";
+import { useSupplyRequests } from "@/services/inventory/hooks";
 import {
   DepotInfo,
   InventoryItem,
@@ -58,6 +69,7 @@ import { useDepots } from "@/services/depot/hooks";
 import { DepotEntity } from "@/services/depot/type";
 import { useItemCategories } from "@/services/item_categories/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FileTextIcon } from "lucide-react";
 
 // --- Helpers ---
 
@@ -66,6 +78,7 @@ const mapDepotEntityToInfo = (
   depot: DepotEntity,
   managerName: string,
   totalCategories: number,
+  pendingRequests: number,
 ): DepotInfo => ({
   id: String(depot.id),
   name: depot.name,
@@ -78,8 +91,7 @@ const mapDepotEntityToInfo = (
     .length,
   lowStockAlerts: mockInventoryItems.filter((i) => i.stockLevel === "LOW")
     .length,
-  pendingRequests: mockSupplyRequests.filter((r) => r.status === "PENDING")
-    .length,
+  pendingRequests,
   activeShipments: mockShipments.filter(
     (s) => s.status === "PREPARING" || s.status === "IN_TRANSIT",
   ).length,
@@ -120,6 +132,75 @@ const computeStats = (
   };
 };
 
+const mapApiSupplyRequestToSidebar = (
+  request: SupplyRequestListItem,
+): SupplyRequest => {
+  let status: SupplyRequest["status"] = "PENDING";
+
+  if (
+    request.sourceStatus === "Shipping" &&
+    request.requestingStatus === "InTransit"
+  ) {
+    status = "IN_TRANSIT";
+  } else if (
+    request.sourceStatus === "Pending" &&
+    request.requestingStatus === "WaitingForApproval"
+  ) {
+    status = "PENDING";
+  } else if (
+    request.requestingStatus === "Received" ||
+    request.sourceStatus === "Completed"
+  ) {
+    status = "DELIVERED";
+  } else if (
+    request.requestingStatus === "Rejected" ||
+    request.sourceStatus === "Rejected"
+  ) {
+    status = "CANCELLED";
+  } else if (
+    request.requestingStatus === "Approved" ||
+    request.sourceStatus === "Accepted" ||
+    request.sourceStatus === "Preparing"
+  ) {
+    status = "APPROVED";
+  }
+
+  return {
+    id: `req-${request.id}`,
+    type: request.role === "Requester" ? "INBOUND" : "OUTBOUND",
+    status,
+    items: request.items.map((item) => ({
+      itemId: String(item.itemModelId),
+      itemName: item.itemModelName,
+      quantity: item.quantity,
+      unit: item.unit,
+    })),
+    requestedBy:
+      request.role === "Requester"
+        ? request.sourceDepotName
+        : request.requestingDepotName,
+    requestedAt: new Date(request.createdAt),
+    priority: "MEDIUM",
+    notes: request.note ?? undefined,
+    destinationDepot:
+      request.role === "Requester"
+        ? request.requestingDepotName
+        : request.sourceDepotName,
+    sourceDepot:
+      request.role === "Requester"
+        ? request.sourceDepotName
+        : request.requestingDepotName,
+  };
+};
+
+const requestingStatusLabels: Record<string, string> = {
+  WaitingForApproval: "Chờ phê duyệt",
+  Approved: "Đã duyệt",
+  InTransit: "Đang được chi viện đến",
+  Received: "Đã nhận",
+  Rejected: "Từ chối",
+};
+
 // --- Page Component ---
 
 const InventoryDashboardPage = () => {
@@ -135,6 +216,14 @@ const InventoryDashboardPage = () => {
   const [activeTab, setActiveTab] = useState("inventory");
   const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+  const panelWidthRef = useRef(480);
+  const [requestsPageNumber, setRequestsPageNumber] = useState(1);
+  const requestsPageSize = 8;
+  const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
+  const [trackerOpen, setTrackerOpen] = useState(false);
+
+  const router = useRouter();
 
   // ── Auth ──
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -168,6 +257,29 @@ const InventoryDashboardPage = () => {
     refetch: refetchCategories,
   } = useItemCategories({ params: { pageNumber: 1, pageSize: 50 } });
 
+  const {
+    data: supplyRequestsData,
+    isLoading: isSupplyRequestsLoading,
+    refetch: refetchSupplyRequests,
+  } = useSupplyRequests(
+    { pageNumber: 1, pageSize: 50 },
+    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+  );
+
+  const {
+    data: allRequestsPagedData,
+    isLoading: isAllRequestsLoading,
+    isFetching: isAllRequestsFetching,
+    refetch: refetchAllRequests,
+  } = useSupplyRequests(
+    { pageNumber: requestsPageNumber, pageSize: requestsPageSize },
+    {
+      enabled: activeTab === "shipments",
+      refetchInterval: 10_000,
+      refetchOnWindowFocus: true,
+    },
+  );
+
   // Use the first depot as the current managed depot
   const currentDepot = depotsData?.items?.[0] ?? null;
 
@@ -176,13 +288,71 @@ const InventoryDashboardPage = () => {
 
   // Map API depot to DepotInfo for sidebar
   const depotInfo = useMemo<DepotInfo | null>(() => {
-    if (!currentDepot) return null;
-    return mapDepotEntityToInfo(
-      currentDepot,
-      displayName,
+    if (!currentDepot && !user?.depotName) return null;
+
+    const pendingCount = (supplyRequestsData?.items ?? []).filter(
+      (request) =>
+        request.sourceStatus === "Pending" &&
+        request.requestingStatus === "WaitingForApproval",
+    ).length;
+
+    // Use auth store depotName as primary, fallback to depot API
+    const resolvedName = user?.depotName ?? currentDepot?.name ?? "—";
+
+    if (currentDepot) {
+      const info = mapDepotEntityToInfo(
+        currentDepot,
+        displayName,
+        totalCategories,
+        pendingCount,
+      );
+      return { ...info, name: resolvedName };
+    }
+
+    // Minimal depotInfo built only from auth store data (no depot API yet)
+    return {
+      id: String(user?.depotId ?? ""),
+      name: resolvedName,
+      address: "",
+      phone: "—",
+      manager: displayName,
+      totalItems: 0,
       totalCategories,
+      criticalAlerts: 0,
+      lowStockAlerts: 0,
+      pendingRequests: pendingCount,
+      activeShipments: 0,
+    };
+  }, [currentDepot, user, displayName, totalCategories, supplyRequestsData]);
+
+  const sidebarSupplyRequests = useMemo(
+    () => (supplyRequestsData?.items ?? []).map(mapApiSupplyRequestToSidebar),
+    [supplyRequestsData],
+  );
+
+  const allSupplyRequestsSorted = useMemo(
+    () =>
+      [...(allRequestsPagedData?.items ?? [])].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
+    [allRequestsPagedData],
+  );
+
+  // Find the live request from sidebar or table data for the tracker
+  const trackerRequest = useMemo(() => {
+    if (trackerRequestId === null) return null;
+    return (
+      supplyRequestsData?.items?.find((r) => r.id === trackerRequestId) ??
+      allRequestsPagedData?.items?.find((r) => r.id === trackerRequestId) ??
+      null
     );
-  }, [currentDepot, displayName, totalCategories]);
+  }, [trackerRequestId, supplyRequestsData, allRequestsPagedData]);
+
+  const canPrevRequestsPage =
+    allRequestsPagedData?.hasPreviousPage ?? requestsPageNumber > 1;
+  const canNextRequestsPage =
+    allRequestsPagedData?.hasNextPage ??
+    (allRequestsPagedData?.items?.length ?? 0) >= requestsPageSize;
 
   // ── Compute stats (will use real item APIs when available) ──
   const stats = useMemo<IInventoryStats>(
@@ -217,7 +387,8 @@ const InventoryDashboardPage = () => {
   const handleRefresh = useCallback(() => {
     refetchDepots();
     refetchCategories();
-  }, [refetchDepots, refetchCategories]);
+    refetchSupplyRequests();
+  }, [refetchDepots, refetchCategories, refetchSupplyRequests]);
 
   const toggleDarkMode = () => {
     setIsDarkMode((prev) => !prev);
@@ -225,7 +396,7 @@ const InventoryDashboardPage = () => {
   };
 
   // ── Loading state ──
-  if (isDepotsLoading || isCategoriesLoading) {
+  if (isDepotsLoading || isCategoriesLoading || isSupplyRequestsLoading) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         {/* Header Skeleton */}
@@ -333,13 +504,48 @@ const InventoryDashboardPage = () => {
 
         <div className="flex items-center gap-2">
           {/* Quick Actions */}
-          <Button variant="outline" size="sm" className="hidden md:flex gap-2">
-            <Plus className="h-4 w-4" />
-            Nhập kho
-          </Button>
-          <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+                <Plus className="h-4 w-4" />
+                Nhập kho
+                <CaretDown className="h-3.5 w-3.5 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer tracking-tighter"
+                onClick={() => router.push("/dashboard/inventory/import")}
+              >
+                <Buildings className="h-4 w-4" />
+                Nhập kho từ thiện
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer tracking-tighter"
+                onClick={() => router.push("/dashboard/inventory/import-regular")}
+              >
+                <Package className="h-4 w-4" />
+                Nhập kho thường
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden md:flex gap-2"
+            onClick={() => router.push("/dashboard/inventory/export-report")}
+          >
             <FileArrowDown className="h-4 w-4" />
             Xuất báo cáo
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="hidden md:flex gap-2"
+            onClick={() => router.push("/dashboard/inventory/transactions")}
+          >
+            <FileTextIcon className="h-4 w-4" />
+            Truy xuất
           </Button>
 
           {/* Notifications */}
@@ -431,7 +637,7 @@ const InventoryDashboardPage = () => {
             <DepotSidebar
               depotInfo={depotInfo}
               inventoryItems={mockInventoryItems}
-              supplyRequests={mockSupplyRequests}
+              supplyRequests={sidebarSupplyRequests}
               shipments={mockShipments}
               onItemSelect={handleItemSelect}
               onRequestSelect={handleRequestSelect}
@@ -442,39 +648,186 @@ const InventoryDashboardPage = () => {
               onCategorySelect={handleCategorySelect}
               apiCategories={categoriesData?.items}
               activeTab={activeTab}
-              onActiveTabChange={setActiveTab}
+              onActiveTabChange={(tab) => {
+                setActiveTab(tab);
+                if (tab === "shipments") {
+                  setRequestsPageNumber(1);
+                }
+              }}
             />
           )}
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto bg-muted/30">
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-auto bg-muted/30"
+        >
           <div className="p-6 space-y-6">
-            {/* Page Title */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tighter">Dashboard Kho Hàng</h1>
-                <p className="text-muted-foreground tracking-tighter">
-                  {depotInfo?.name ?? "Đang tải..."} • Quản lý bởi {displayName}
-                </p>
+            {/* Page Title — hidden on incoming tab (it has its own header) */}
+            {activeTab !== "incoming" && (
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-semibold tracking-tighter">Dashboard Kho Hàng</h1>
+                  <p className="text-muted-foreground tracking-tighter">
+                    {user?.depotName ?? depotInfo?.name ?? "Đang tải..."} • Quản lý bởi {displayName}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={handleRefresh}
+                >
+                  <ArrowsClockwise className="h-4 w-4" />
+                  Làm mới
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={handleRefresh}
-               
-              >
-                <ArrowsClockwise className="h-4 w-4" />
-                Làm mới
-              </Button>
-            </div>
+            )}
 
-            {activeTab === "vattu" ? (
+            {activeTab === "incoming" ? (
+              <IncomingRequestsSection />
+            ) : activeTab === "vattu" ? (
               <VatTuSection onItemSelect={(item) => {
                 setVatTuSelectedItem(item);
                 setVatTuSheetOpen(true);
               }} />
+            ) : activeTab === "shipments" ? (
+                <div className="space-y-4">
+                  {allSupplyRequestsSorted.length === 0 ? (
+                    <Card className="border-border/60">
+                      <CardContent className="p-4 text-sm text-muted-foreground tracking-tighter">
+                        Chưa có yêu cầu nào.
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card className="border-border/60">
+                      <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-230 text-sm tracking-tighter">
+                            <thead className="bg-muted/40">
+                              <tr className="border-b border-border/60 text-left">
+                                <th className="px-4 py-3 font-semibold">Mã yêu cầu</th>
+                                <th className="px-4 py-3 font-semibold">Kho nguồn</th>
+                                <th className="px-4 py-3 font-semibold">Trạng thái</th>
+                                <th className="px-4 py-3 font-semibold">Vật tư</th>
+                                <th className="px-4 py-3 font-semibold">Thời gian tạo</th>
+                                <th className="px-4 py-3 font-semibold w-44">Ghi chú</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {allSupplyRequestsSorted.map((request) => (
+                                <tr
+                                  key={request.id}
+                                  className="border-b border-border/50 align-top cursor-pointer hover:bg-muted/40 transition-colors"
+                                  onClick={() => {
+                                    setTrackerRequestId(request.id);
+                                    setTrackerOpen(true);
+                                  }}
+                                >
+                                  <td className="px-4 py-3 font-semibold">Đơn yêu cầu số {request.id}</td>
+                                  <td className="px-4 py-3">{request.sourceDepotName}</td>
+                                  <td className="px-4 py-3">
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {/* <Badge variant="warning">
+                                        {sourceStatusLabels[request.sourceStatus] ?? request.sourceStatus}
+                                      </Badge> */}
+                                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                                        {requestingStatusLabels[request.requestingStatus] ?? request.requestingStatus}
+                                      </Badge>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="space-y-1.5">
+                                      {request.items.map((item) => (
+                                        <div key={`${request.id}-${item.itemModelId}`} className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5">
+                                          <span>{item.itemModelName}</span>
+                                          <span className="font-semibold text-primary whitespace-nowrap">
+                                            {item.quantity.toLocaleString("vi-VN")} {item.unit}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    {new Date(request.createdAt).toLocaleString("vi-VN")}
+                                  </td>
+                                  <td className="px-4 py-3 text-muted-foreground w-44 max-w-44 whitespace-normal wrap-break-word leading-snug">
+                                    {request.note || "-"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground tracking-tighter">
+                      Trang {requestsPageNumber}
+                      {allRequestsPagedData?.totalPages
+                        ? ` / ${allRequestsPagedData.totalPages}`
+                        : ""}
+                      {allRequestsPagedData?.totalCount !== undefined
+                        ? ` • ${allRequestsPagedData.totalCount} yêu cầu`
+                        : ""}
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!canPrevRequestsPage || isAllRequestsFetching}
+                        onClick={() =>
+                          setRequestsPageNumber((prev) => Math.max(1, prev - 1))
+                        }
+                      >
+                        Trước
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!canNextRequestsPage || isAllRequestsFetching}
+                        onClick={() => setRequestsPageNumber((prev) => prev + 1)}
+                      >
+                        Sau
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => refetchAllRequests()}
+                        disabled={isAllRequestsFetching || isAllRequestsLoading}
+                      >
+                        <ArrowsClockwise
+                          size={15}
+                          className={isAllRequestsFetching ? "animate-spin" : ""}
+                        />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+            ) : activeTab === "requests" ? (
+                <SupplyRequestSection
+                  onSelectionSidebarOpen={() => {
+                    if (sidebarOpen) setSidebarOpen(false);
+                  }}
+                  onSelectionSidebarChange={(open) => {
+                    if (mainRef.current) {
+                      mainRef.current.style.marginRight = open ? `${panelWidthRef.current}px` : "0px";
+                    }
+                  }}
+                  onPanelWidthChange={(w) => {
+                    panelWidthRef.current = w;
+                    if (mainRef.current) {
+                      mainRef.current.style.marginRight = `${w}px`;
+                    }
+                  }}
+                />
             ) : (
               <>
                 {/* Stats Overview */}
@@ -527,6 +880,18 @@ const InventoryDashboardPage = () => {
         open={vatTuSheetOpen}
         onOpenChange={setVatTuSheetOpen}
       />
+
+      {/* Supply Request Tracker Sheet */}
+      <SupplyRequestTracker
+        request={trackerRequest}
+        open={trackerOpen}
+        onOpenChange={setTrackerOpen}
+        onActionSuccess={() => {
+          refetchSupplyRequests();
+          refetchAllRequests();
+        }}
+      />
+
     </div>
   );
 };

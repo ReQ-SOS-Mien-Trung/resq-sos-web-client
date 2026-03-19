@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   CaretDown,
@@ -14,12 +14,35 @@ import {
   Question,
 } from "@phosphor-icons/react";
 import { SidebarProps } from "@/type";
-import { getFavoriteIcon, navigationItems } from "@/lib/constants";
+import { getFavoriteHref, getFavoriteIcon, navigationItems } from "@/lib/constants";
 
 const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
   const pathname = usePathname();
+  const router = useRouter();
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
+
+  const handleFavoriteClick = (e: React.MouseEvent, name: string) => {
+    e.preventDefault();
+    const href = getFavoriteHref(name);
+    const [basePath, hash] = href.split("#");
+    const isOnPage = pathname === basePath;
+
+    const scrollTo = () => {
+      if (hash) {
+        const el = document.getElementById(hash);
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+
+    if (isOnPage) {
+      scrollTo();
+    } else {
+      router.push(basePath);
+      // Wait for page to mount then scroll
+      setTimeout(scrollTo, 600);
+    }
+  };
 
   return (
     <aside
@@ -65,7 +88,7 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                   key={item.label}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-none text-sm font-medium transition-all duration-200",
                     isActive
                       ? "bg-linear-to-r from-red-500/10 to-orange-500/10 text-red-600 dark:text-red-400 shadow-sm border border-red-500/10"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1",
@@ -79,7 +102,7 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                       isActive && "text-red-500",
                     )}
                   />
-                  <span className="truncate">{item.label}</span>
+                  <span className="truncate tracking-tighter">{item.label}</span>
                   {isActive && (
                     <div className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
                   )}
@@ -123,7 +146,8 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                     return (
                       <Link
                         key={favorite.id}
-                        href="#"
+                        href={getFavoriteHref(favorite.name)}
+                        onClick={(e) => handleFavoriteClick(e, favorite.name)}
                         className="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-all duration-200 group"
                         style={{ animationDelay: `${index * 50}ms` }}
                       >

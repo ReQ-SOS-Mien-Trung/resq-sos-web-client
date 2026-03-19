@@ -32,36 +32,65 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User, UserTableProps } from "@/type";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 15;
 
 type SortColumn = "name" | "email" | "role" | "region" | "status" | "createdAt";
 type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
 
-const ROLES: { value: User["role"]; label: string }[] = [
+const ROLE_OPTIONS: { value: User["role"]; label: string }[] = [
   { value: "admin", label: "Quản trị viên" },
+  { value: "manager", label: "Quản lý kho" },
   { value: "coordinator", label: "Điều phối viên" },
-  { value: "rescuer", label: "Cứu hộ viên" },
   { value: "victim", label: "Công dân" },
 ];
 
-const STATUSES: { value: User["status"]; label: string }[] = [
+const STATUS_OPTIONS: { value: "active" | "banned"; label: string }[] = [
   { value: "active", label: "Hoạt động" },
   { value: "banned", label: "Bị cấm" },
 ];
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const getRoleBadge = (role: User["role"]) => {
+  const map: Record<User["role"], { label: string; className: string }> = {
+    admin: {
+      label: "Quản trị viên",
+      className: "bg-red-500/10 text-red-700 dark:text-red-400",
+    },
+    manager: {
+      label: "Quản lý kho",
+      className: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+    },
+    coordinator: {
+      label: "Điều phối viên",
+      className: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
+    },
+    rescuer: {
+      label: "Cứu hộ viên",
+      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    },
+    victim: {
+      label: "Công dân",
+      className: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+    },
+  };
+  return map[role] ?? map.victim;
+};
+
+const getStatusBadge = (status: User["status"]) =>
+  status === "banned"
+    ? { label: "Bị cấm", className: "bg-rose-500/10 text-rose-700 dark:text-rose-400" }
+    : { label: "Hoạt động", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" };
+
+// ─── Sort icons & header ──────────────────────────────────────────────────────
+
 const SortIcon = ({ column, sort }: { column: SortColumn; sort: SortState }) => {
-  if (sort?.column === column) {
+  if (sort?.column === column)
     return sort.dir === "asc"
       ? <ArrowUp size={13} className="text-primary shrink-0" />
       : <ArrowDown size={13} className="text-primary shrink-0" />;
-  }
-  return (
-    <ArrowsDownUp
-      size={13}
-      className="text-muted-foreground/30 shrink-0"
-    />
-  );
+  return <ArrowsDownUp size={13} className="text-muted-foreground/30 shrink-0" />;
 };
 
 const SortHeader = ({
@@ -78,13 +107,15 @@ const SortHeader = ({
   <th className="text-left p-3">
     <button
       onClick={() => onSort(column)}
-      className="flex items-center gap-1 text-sm font-semibold text-foreground hover:text-foreground/70 transition-colors"
+      className="flex items-center gap-1 text-sm font-semibold text-foreground tracking-tighter hover:text-foreground/70 transition-colors"
     >
       {label}
       <SortIcon column={column} sort={sort} />
     </button>
   </th>
 );
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 const UserTable = ({
   users,
@@ -100,9 +131,23 @@ const UserTable = ({
   const [sort, setSort] = useState<SortState>(null);
   const [search, setSearch] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<User["role"][]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<User["status"][]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<("active" | "banned")[]>([]);
   const [roleOpen, setRoleOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+
+  const toggleRole = (role: User["role"]) => {
+    setPage(1);
+    setSelectedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+    );
+  };
+
+  const toggleStatus = (status: "active" | "banned") => {
+    setPage(1);
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    );
+  };
 
   const handleSort = (column: SortColumn) => {
     setPage(1);
@@ -113,21 +158,7 @@ const UserTable = ({
     });
   };
 
-  const toggleRole = (role: User["role"]) => {
-    setPage(1);
-    setSelectedRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
-    );
-  };
-
-  const toggleStatus = (status: User["status"]) => {
-    setPage(1);
-    setSelectedStatuses((prev) =>
-      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
-    );
-  };
-
-  const hasFilters = !!(search || selectedRoles.length || selectedStatuses.length);
+  const hasFilters = !!(search || selectedRoles.length > 0 || selectedStatuses.length > 0);
 
   const clearFilters = () => {
     setSearch("");
@@ -136,26 +167,28 @@ const UserTable = ({
     setPage(1);
   };
 
+  // ── Client-side filter + sort ─────────────────────────────────────────────
   const filteredAndSorted = useMemo(() => {
     let result = users;
 
-    // Search by name or email
+    // Search by name, email, phone
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       result = result.filter(
         (u) =>
           u.name.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q)
+          u.email.toLowerCase().includes(q) ||
+          (u.phone && u.phone.toLowerCase().includes(q))
       );
     }
 
     // Role filter
-    if (selectedRoles.length) {
+    if (selectedRoles.length > 0) {
       result = result.filter((u) => selectedRoles.includes(u.role));
     }
 
     // Status filter
-    if (selectedStatuses.length) {
+    if (selectedStatuses.length > 0) {
       result = result.filter((u) => selectedStatuses.includes(u.status));
     }
 
@@ -178,52 +211,44 @@ const UserTable = ({
     return result;
   }, [users, search, selectedRoles, selectedStatuses, sort]);
 
-  const totalPages = Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE);
-  const safePage = Math.min(page, Math.max(1, totalPages));
-  const paginatedUsers = filteredAndSorted.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+  // ── Pagination ────────────────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedUsers = filteredAndSorted.slice(
+    (safePage - 1) * ITEMS_PER_PAGE,
+    safePage * ITEMS_PER_PAGE
+  );
   const startItem = filteredAndSorted.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1;
   const endItem = Math.min(safePage * ITEMS_PER_PAGE, filteredAndSorted.length);
   const displayTotal = totalCount ?? filteredAndSorted.length;
 
-  const getRoleBadge = (role: User["role"]) => {
-    const variants: Record<User["role"], { label: string; className: string }> = {
-      admin: { label: "Quản trị viên", className: "bg-red-500/10 text-red-700 dark:text-red-400" },
-      coordinator: { label: "Điều phối viên", className: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400" },
-      rescuer: { label: "Cứu hộ viên", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" },
-      victim: { label: "Công dân", className: "bg-blue-500/10 text-blue-700 dark:text-blue-400" },
-    };
-    return variants[role];
-  };
-
-  const getStatusBadge = (status: User["status"]) => {
-    if (status === "banned") {
-      return { label: "Bị cấm", className: "bg-rose-500/10 text-rose-700 dark:text-rose-400" };
-    }
-    return { label: "Hoạt động", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" };
-  };
-
   return (
     <Card className="border border-border/50">
       <CardContent>
-        {/* Toolbar: search + filters */}
+        {/* ── Toolbar ──────────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-border/40">
+          {/* Search */}
           <div className="relative flex-1 min-w-52">
             
             <Input
-              placeholder="Tìm theo tên hoặc email..."
+              placeholder="Tìm theo tên, email, số điện thoại..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="pl-9 h-9 text-sm"
               autoComplete="off"
             />
+            <MagnifyingGlass
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
           </div>
 
-          {/* Role multi-select */}
+          {/* Role filter */}
           <Popover open={roleOpen} onOpenChange={setRoleOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-9 gap-1.5 font-normal text-sm">
                 Vai trò
-                {selectedRoles.length ? (
+                {selectedRoles.length > 0 ? (
                   <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
                     {selectedRoles.length}
                   </Badge>
@@ -233,25 +258,45 @@ const UserTable = ({
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-52 p-1.5" align="start">
-              {ROLES.map(({ value, label }) => (
+              {ROLE_OPTIONS.map(({ value, label }) => {
+                const checked = selectedRoles.includes(value);
+                return (
+                  <button
+                    key={value}
+                    onClick={() => toggleRole(value)}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-md hover:bg-muted/60 transition-colors"
+                  >
+                    <span
+                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
+                        checked
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : "border-border bg-background"
+                      }`}
+                    >
+                      {checked && <Check size={11} weight="bold" />}
+                    </span>
+                    <span className={checked ? "font-medium" : ""}>{label}</span>
+                  </button>
+                );
+              })}
+              {selectedRoles.length > 0 && (
                 <button
-                  key={value}
-                  onClick={() => toggleRole(value)}
-                  className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-md hover:bg-muted/60 transition-colors"
+                  onClick={() => { setSelectedRoles([]); setPage(1); }}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
                 >
-                  <span className={selectedRoles.includes(value) ? "font-medium" : ""}>{label}</span>
-                  {selectedRoles.includes(value) && <Check size={14} className="text-primary shrink-0" />}
+                  <X size={11} />
+                  Xóa lọc vai trò
                 </button>
-              ))}
+              )}
             </PopoverContent>
           </Popover>
 
-          {/* Status multi-select */}
+          {/* Status filter */}
           <Popover open={statusOpen} onOpenChange={setStatusOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="h-9 gap-1.5 font-normal text-sm">
                 Trạng thái
-                {selectedStatuses.length ? (
+                {selectedStatuses.length > 0 ? (
                   <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
                     {selectedStatuses.length}
                   </Badge>
@@ -261,16 +306,36 @@ const UserTable = ({
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-44 p-1.5" align="start">
-              {STATUSES.map(({ value, label }) => (
+              {STATUS_OPTIONS.map(({ value, label }) => {
+                const checked = selectedStatuses.includes(value);
+                return (
+                  <button
+                    key={value}
+                    onClick={() => toggleStatus(value)}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-md hover:bg-muted/60 transition-colors"
+                  >
+                    <span
+                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
+                        checked
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : "border-border bg-background"
+                      }`}
+                    >
+                      {checked && <Check size={11} weight="bold" />}
+                    </span>
+                    <span className={checked ? "font-medium" : ""}>{label}</span>
+                  </button>
+                );
+              })}
+              {selectedStatuses.length > 0 && (
                 <button
-                  key={value}
-                  onClick={() => toggleStatus(value)}
-                  className="flex items-center justify-between w-full px-3 py-2 text-sm rounded-md hover:bg-muted/60 transition-colors"
+                  onClick={() => { setSelectedStatuses([]); setPage(1); }}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
                 >
-                  <span className={selectedStatuses.includes(value) ? "font-medium" : ""}>{label}</span>
-                  {selectedStatuses.includes(value) && <Check size={14} className="text-primary shrink-0" />}
+                  <X size={11} />
+                  Xóa lọc trạng thái
                 </button>
-              ))}
+              )}
             </PopoverContent>
           </Popover>
 
@@ -287,23 +352,25 @@ const UserTable = ({
           )}
 
           <div className="ml-auto text-sm text-muted-foreground whitespace-nowrap">
-            {filteredAndSorted.length} người dùng
+            {hasFilters
+              ? `${filteredAndSorted.length} / ${displayTotal?.toLocaleString("vi-VN")} người dùng`
+              : `${displayTotal?.toLocaleString("vi-VN")} người dùng`}
           </div>
         </div>
 
-        {/* Table */}
+        {/* ── Table ────────────────────────────────────────────────────────── */}
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border/50">
-                <SortHeader column="name" label="Tên" sort={sort} onSort={handleSort} />
+                <SortHeader column="name" label="Họ và tên" sort={sort} onSort={handleSort} />
                 <SortHeader column="email" label="Email" sort={sort} onSort={handleSort} />
-                <th className="text-left p-3 text-sm font-semibold text-foreground">Số điện thoại</th>
+                <th className="text-left tracking-tighter p-3 text-sm font-semibold text-foreground">Số điện thoại</th>
                 <SortHeader column="role" label="Vai trò" sort={sort} onSort={handleSort} />
                 <SortHeader column="region" label="Khu vực" sort={sort} onSort={handleSort} />
                 <SortHeader column="status" label="Trạng thái" sort={sort} onSort={handleSort} />
                 <SortHeader column="createdAt" label="Ngày tạo" sort={sort} onSort={handleSort} />
-                <th className="text-right p-3 text-sm font-semibold text-foreground">Thao tác</th>
+                <th className="text-right tracking-tighter p-3 text-sm font-semibold text-foreground">Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -319,7 +386,7 @@ const UserTable = ({
                 ))
               ) : paginatedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={8} className="p-10 text-center tracking-tighter text-muted-foreground text-sm">
                     Không tìm thấy người dùng nào
                   </td>
                 </tr>
@@ -335,18 +402,18 @@ const UserTable = ({
                       className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
                     >
                       <td className="p-3">
-                        <div className="font-regular text-sm text-foreground">{user.name}</div>
+                        <div className="text-sm font-medium text-foreground">{user.name}</div>
                       </td>
-                      <td className="p-3 text-sm text-foreground/70">{user.email}</td>
-                      <td className="p-3 text-sm text-foreground/80">{user.phone}</td>
+                      <td className="p-3 text-sm tracking-tighter text-foreground/70">{user.email}</td>
+                      <td className="p-3 text-sm tracking-tighter text-foreground/80">{user.phone || "—"}</td>
                       <td className="p-3">
                         <Badge className={roleBadge.className}>{roleBadge.label}</Badge>
                       </td>
-                      <td className="p-3 text-sm text-foreground/80">{user.region}</td>
+                      <td className="p-3 text-sm tracking-tighter text-foreground/80">{user.region}</td>
                       <td className="p-3">
                         <Badge className={statusBadge.className}>{statusBadge.label}</Badge>
                       </td>
-                      <td className="p-3 text-sm text-foreground/60">
+                      <td className="p-3 text-sm tracking-tighter text-foreground/60">
                         {new Date(user.createdAt).toLocaleDateString("vi-VN")}
                       </td>
                       <td className="p-3">
@@ -359,13 +426,13 @@ const UserTable = ({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => onEdit?.(user)}>
-                                <PencilSimple size={16} className="mr-2" />
+                                <PencilSimple size={16} className="mr-1" />
                                 Chỉnh sửa
                               </DropdownMenuItem>
                               {user.status === "active" ? (
                                 <DropdownMenuItem onClick={() => onBan?.(user)}>
-                                  <Prohibit size={16} className="mr-2" />
-                                  Cấm
+                                  <Prohibit size={16} className="mr-1" />
+                                  Cấm tài khoản
                                 </DropdownMenuItem>
                               ) : (
                                 <DropdownMenuItem onClick={() => onActivate?.(user)}>
@@ -385,10 +452,11 @@ const UserTable = ({
           </table>
         </div>
 
+        {/* ── Pagination ───────────────────────────────────────────────────── */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
-            <div className="text-sm text-muted-foreground">
-              Hiển thị {startItem}–{endItem} trong tổng số {displayTotal} người dùng
+            <div className="text-sm tracking-tighter text-muted-foreground">
+              Hiển thị {startItem}–{endItem} trong {filteredAndSorted.length} người dùng
             </div>
             <div className="flex gap-2">
               <Button
@@ -411,7 +479,7 @@ const UserTable = ({
                   }, [])
                   .map((p, i) =>
                     p === "..." ? (
-                      <span key={`ellipsis-${i}`} className="px-1 text-muted-foreground text-sm">…</span>
+                      <span key={`ellipsis-${i}`} className="px-1 text-muted-foreground text-sm tracking-tighter">…</span>
                     ) : (
                       <Button
                         key={p}

@@ -3,10 +3,14 @@ import {
   UserMeResponse,
   GetUsersParams,
   GetUsersResponse,
+  GetRescuersParams,
+  GetRescuersResponse,
   BanUserRequest,
   AdminCreateUserRequest,
   AdminUpdateUserRequest,
   UserEntity,
+  GetUsersForPermissionParams,
+  GetUsersForPermissionResponse,
 } from "./type";
 
 export async function getUserMe(): Promise<UserMeResponse> {
@@ -28,6 +32,13 @@ export async function getAdminUsers(
   params?: GetUsersParams,
 ): Promise<GetUsersResponse> {
   const { data } = await api.get("/identity/admin/users", { params });
+  return data;
+}
+
+export async function getAdminRescuers(
+  params?: GetRescuersParams,
+): Promise<GetRescuersResponse> {
+  const { data } = await api.get("/identity/admin/users/rescuers", { params });
   return data;
 }
 
@@ -60,4 +71,13 @@ export async function updateAdminUser(
 ): Promise<UserEntity> {
   const response = await api.put(`/identity/admin/users/${userId}`, data);
   return response.data;
+}
+
+export async function getUsersForPermission(
+  params?: GetUsersForPermissionParams,
+): Promise<GetUsersForPermissionResponse> {
+  const { data } = await api.get("/identity/admin/users/for-permission", {
+    params,
+  });
+  return data;
 }

@@ -26,10 +26,14 @@ const DashboardLayout = ({
           cloudStorage={cloudStorage}
           isOpen={sidebarOpen}
         />
-        <main className="flex-1 overflow-y-auto bg-linear-to-br from-muted/30 via-background to-muted/20 p-6 relative">
-          {/* Subtle background pattern */}
-          <div className="absolute inset-0 bg-grid-pattern opacity-[0.02] pointer-events-none" />
-          <div className="relative z-10">{children}</div>
+        <main
+          className="flex-1 overflow-y-auto bg-muted/20 p-6"
+          style={{
+            backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.015) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.015) 1px, transparent 1px)`,
+            backgroundSize: "24px 24px",
+          }}
+        >
+          {children}
         </main>
       </div>
     </div>

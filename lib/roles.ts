@@ -15,11 +15,11 @@ export type RoleId = (typeof ROLES)[keyof typeof ROLES];
  * Role names for display purposes
  */
 export const ROLE_NAMES: Record<RoleId, string> = {
-  [ROLES.ADMIN]: "Admin",
-  [ROLES.COORDINATOR]: "Coordinator",
-  [ROLES.RESCUER]: "Rescuer",
-  [ROLES.MANAGER]: "Manager",
-  [ROLES.VICTIM]: "Victim",
+  [ROLES.ADMIN]: "Quản trị viên",
+  [ROLES.COORDINATOR]: "Điều phối viên",
+  [ROLES.RESCUER]: "Cứu hộ viên",
+  [ROLES.MANAGER]: "Quản lý kho",
+  [ROLES.VICTIM]: "Công dân",
 };
 
 /**
