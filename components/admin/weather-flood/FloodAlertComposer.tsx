@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   ArrowsCounterClockwise,
   BellRinging,
@@ -31,10 +32,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   BROADCAST_NOTIFICATION_TYPES,
+  BroadcastNotificationPayload,
   BroadcastNotificationType,
   useBroadcastNotification,
 } from "@/services/noti_alert";
 import { WeatherApiCurrentPoint } from "@/type";
+import { geocodeCity } from "./geocode";
+
+const LocationPickerMap = dynamic(() => import("./LocationPickerMap"), {
+  ssr: false,
+});
 
 type ComposerMode = "weather_api" | "manual";
 type WeatherPointOk = Extract<WeatherApiCurrentPoint, { lat: number }>;
@@ -101,12 +108,73 @@ const MANUAL_PRESETS: Array<{
   },
 ];
 
-function isWeatherPointOk(point: WeatherApiCurrentPoint): point is WeatherPointOk {
+function isWeatherPointOk(
+  point: WeatherApiCurrentPoint,
+): point is WeatherPointOk {
   return "lat" in point && "lon" in point;
 }
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("vi-VN");
+}
+
+const ALERT_SEVERITY_BY_TYPE: Record<BroadcastNotificationType, string> = {
+  FLOOD_WARNING: "MEDIUM",
+  FLOOD_EMERGENCY: "HIGH",
+  EVACUATION: "CRITICAL",
+};
+
+const ALERT_CHECKLIST_BY_TYPE: Record<BroadcastNotificationType, string[]> = {
+  FLOOD_WARNING: [
+    "Theo doi muc nuoc va luu luong mua",
+    "Thong bao canh bao som cho nguoi dan",
+    "Ra soat cac diem co nguy co ngap",
+  ],
+  FLOOD_EMERGENCY: [
+    "Kich hoat luc luong ung cuu dia phuong",
+    "Han che di chuyen qua diem ngap sau",
+    "Thong tin lien tuc den cong dong bi anh huong",
+  ],
+  EVACUATION: [
+    "Thong bao so tan bat buoc khu vuc nguy hiem",
+    "Mo diem tap ket tam thoi",
+    "Uu tien ho tro nhom de bi ton thuong",
+  ],
+};
+
+function buildBroadcastPayload(params: {
+  title: string;
+  body: string;
+  type: BroadcastNotificationType;
+  city: string;
+  lat: number;
+  lon: number;
+}): BroadcastNotificationPayload {
+  const now = new Date();
+  const endTime = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+  const cityName = params.city.trim() || "Pinned Location";
+
+  return {
+    location: {
+      city: cityName,
+      lat: params.lat,
+      lon: params.lon,
+    },
+    activeAlerts: [
+      {
+        id: globalThis.crypto?.randomUUID?.() ?? `alert-${Date.now()}`,
+        eventType: params.type,
+        title: params.title.trim(),
+        severity: ALERT_SEVERITY_BY_TYPE[params.type],
+        areasAffected: [cityName],
+        startTime: now.toISOString(),
+        endTime: endTime.toISOString(),
+        description: params.body.trim(),
+        instructionChecklist: ALERT_CHECKLIST_BY_TYPE[params.type],
+        source: "RESQ SOS Weather Flood",
+      },
+    ],
+  };
 }
 
 function buildWeatherDraft(point: WeatherPointOk): {
@@ -131,7 +199,8 @@ function buildWeatherDraft(point: WeatherPointOk): {
       severityLabel: "Rất cao",
       title: `🚨 ĐỀ NGHỊ SƠ TÁN KHẨN TẠI ${point.name.toUpperCase()}`,
       body: `WeatherAPI ghi nhận tại ${point.name} lúc ${formatDateTime(point.last_updated)}: ${point.condition_text}, mưa ${point.precip_mm}mm, độ ẩm ${point.humidity}%, gió ${point.wind_kph} km/h (${point.wind_dir}). Nguy cơ ngập sâu tăng nhanh, đề nghị sơ tán người dân khỏi khu vực trũng thấp và chuẩn bị lực lượng ứng cứu.`,
-      advisory: "Ưu tiên sơ tán khu vực thấp trũng và cảnh báo người dân rời khỏi vùng nguy cơ cao.",
+      advisory:
+        "Ưu tiên sơ tán khu vực thấp trũng và cảnh báo người dân rời khỏi vùng nguy cơ cao.",
     };
   }
 
@@ -141,7 +210,8 @@ function buildWeatherDraft(point: WeatherPointOk): {
       severityLabel: "Cao",
       title: `🚨 KHẨN CẤP NGẬP LỤT TẠI ${point.name.toUpperCase()}`,
       body: `WeatherAPI ghi nhận tại ${point.name} lúc ${formatDateTime(point.last_updated)}: ${point.condition_text}, mưa ${point.precip_mm}mm, độ ẩm ${point.humidity}%, gió ${point.wind_kph} km/h (${point.wind_dir}). Nguy cơ lũ và ngập đô thị đang ở mức cao, đề nghị lực lượng tại chỗ trực chiến và người dân hạn chế di chuyển qua khu vực ven sông, ngầm tràn.`,
-      advisory: "Tăng cường theo dõi mực nước, chuẩn bị lực lượng ứng cứu và hạn chế di chuyển qua điểm ngập.",
+      advisory:
+        "Tăng cường theo dõi mực nước, chuẩn bị lực lượng ứng cứu và hạn chế di chuyển qua điểm ngập.",
     };
   }
 
@@ -150,7 +220,8 @@ function buildWeatherDraft(point: WeatherPointOk): {
     severityLabel: "Theo dõi",
     title: `🌧️ THEO DÕI MƯA LŨ TẠI ${point.name.toUpperCase()}`,
     body: `WeatherAPI ghi nhận tại ${point.name} lúc ${formatDateTime(point.last_updated)}: ${point.condition_text}, mưa ${point.precip_mm}mm, độ ẩm ${point.humidity}%, gió ${point.wind_kph} km/h (${point.wind_dir}). Khu vực cần tiếp tục theo dõi sát diễn biến thời tiết và chủ động phương án phòng chống ngập cục bộ.`,
-    advisory: "Tiếp tục theo dõi mưa, thông báo sớm cho người dân tại các khu vực ven sông và vùng trũng.",
+    advisory:
+      "Tiếp tục theo dõi mưa, thông báo sớm cho người dân tại các khu vực ven sông và vùng trũng.",
   };
 }
 
@@ -165,6 +236,12 @@ export default function FloodAlertComposer({
   const [selectedRegion, setSelectedRegion] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [city, setCity] = useState("");
+  const [manualLocation, setManualLocation] = useState<{
+    lat: number;
+    lon: number;
+  } | null>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
   const [type, setType] = useState<BroadcastNotificationType>(
     BROADCAST_NOTIFICATION_TYPES[0],
   );
@@ -190,12 +267,14 @@ export default function FloodAlertComposer({
 
   const selectedWeatherPoint = useMemo(
     () =>
-      weatherOptions.find((point) => point.name === selectedRegionValue) ?? null,
+      weatherOptions.find((point) => point.name === selectedRegionValue) ??
+      null,
     [selectedRegionValue, weatherOptions],
   );
 
   const suggestedDraft = useMemo(
-    () => (selectedWeatherPoint ? buildWeatherDraft(selectedWeatherPoint) : null),
+    () =>
+      selectedWeatherPoint ? buildWeatherDraft(selectedWeatherPoint) : null,
     [selectedWeatherPoint],
   );
 
@@ -220,22 +299,86 @@ export default function FloodAlertComposer({
   const resetComposer = () => {
     setTitle("");
     setBody("");
+    setCity("");
+    setManualLocation(null);
     setType(BROADCAST_NOTIFICATION_TYPES[0]);
     setConfirmed(false);
   };
 
+  useEffect(() => {
+    if (effectiveMode !== "weather_api" || !selectedWeatherPoint) {
+      return;
+    }
+
+    setCity(selectedWeatherPoint.name);
+    setManualLocation({
+      lat: selectedWeatherPoint.lat,
+      lon: selectedWeatherPoint.lon,
+    });
+  }, [effectiveMode, selectedWeatherPoint]);
+
+  const handleSearchCity = async () => {
+    const query = city.trim();
+    if (!query) {
+      toast.error("Vui lòng nhập thành phố cần tìm");
+      return;
+    }
+
+    setIsGeocoding(true);
+    try {
+      const result = await geocodeCity(query);
+      if (!result) {
+        toast.error("Không tìm thấy thành phố, vui lòng thử từ khóa khác");
+        return;
+      }
+
+      setManualLocation({ lat: result.lat, lon: result.lon });
+      toast.success(`Đã định vị: ${result.displayName}`);
+    } catch {
+      toast.error("Không thể tìm vị trí thành phố, vui lòng thử lại");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
   const handleSend = () => {
-    if (!title.trim() || !body.trim()) {
+    if (!title.trim() || !body.trim() || !city.trim()) {
       toast.error("Vui lòng điền đầy đủ tiêu đề và nội dung");
       return;
     }
 
+    const locationCity =
+      effectiveMode === "weather_api" && selectedWeatherPoint
+        ? city.trim() || selectedWeatherPoint.name
+        : city.trim();
+    const locationLat =
+      effectiveMode === "weather_api" && selectedWeatherPoint
+        ? selectedWeatherPoint.lat
+        : manualLocation?.lat;
+    const locationLon =
+      effectiveMode === "weather_api" && selectedWeatherPoint
+        ? selectedWeatherPoint.lon
+        : manualLocation?.lon;
+
+    if (
+      typeof locationLat !== "number" ||
+      typeof locationLon !== "number" ||
+      !Number.isFinite(locationLat) ||
+      !Number.isFinite(locationLon)
+    ) {
+      toast.error("Vui lòng chọn vị trí cảnh báo trên bản đồ");
+      return;
+    }
+
     broadcast(
-      {
-        title: title.trim(),
-        body: body.trim(),
+      buildBroadcastPayload({
+        title,
+        body,
         type,
-      },
+        city: locationCity,
+        lat: locationLat,
+        lon: locationLon,
+      }),
       {
         onSuccess: () => {
           toast.success("Đã phát cảnh báo đến toàn bộ người dùng");
@@ -249,7 +392,18 @@ export default function FloodAlertComposer({
     );
   };
 
-  const canSend = title.trim().length > 0 && body.trim().length > 0 && confirmed;
+  const hasValidManualLocation = !!manualLocation;
+
+  const hasResolvedLocation =
+    (effectiveMode === "weather_api" && !!selectedWeatherPoint) ||
+    hasValidManualLocation;
+
+  const canSend =
+    title.trim().length > 0 &&
+    body.trim().length > 0 &&
+    city.trim().length > 0 &&
+    hasResolvedLocation &&
+    confirmed;
 
   return (
     <div className="space-y-5">
@@ -369,7 +523,8 @@ export default function FloodAlertComposer({
                       </div>
                     </div>
                     <p className="mt-3 text-xs text-muted-foreground">
-                      Cập nhật: {formatDateTime(selectedWeatherPoint.last_updated)}
+                      Cập nhật:{" "}
+                      {formatDateTime(selectedWeatherPoint.last_updated)}
                     </p>
                   </div>
 
@@ -381,7 +536,8 @@ export default function FloodAlertComposer({
                             Gợi ý nội dung cảnh báo
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Mức cảnh báo suy luận: {suggestedDraft.severityLabel}
+                            Mức cảnh báo suy luận:{" "}
+                            {suggestedDraft.severityLabel}
                           </p>
                         </div>
                         <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
@@ -453,7 +609,9 @@ export default function FloodAlertComposer({
 
       <div className="space-y-4 rounded-xl border border-border/60 bg-background p-4">
         <div>
-          <Label className="mb-2 block text-sm font-medium">Loại cảnh báo</Label>
+          <Label className="mb-2 block text-sm font-medium">
+            Loại cảnh báo
+          </Label>
           <div className="grid gap-2 md:grid-cols-3">
             {BROADCAST_NOTIFICATION_TYPES.map((item) => {
               const meta = ALERT_TYPE_META[item];
@@ -464,7 +622,9 @@ export default function FloodAlertComposer({
                   onClick={() => setType(item)}
                   className={cn(
                     "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-all",
-                    type === item ? meta.activeClassName : meta.inactiveClassName,
+                    type === item
+                      ? meta.activeClassName
+                      : meta.inactiveClassName,
                   )}
                 >
                   {meta.icon}
@@ -476,7 +636,10 @@ export default function FloodAlertComposer({
         </div>
 
         <div>
-          <Label htmlFor="flood-alert-title" className="mb-1.5 block text-sm font-medium">
+          <Label
+            htmlFor="flood-alert-title"
+            className="mb-1.5 block text-sm font-medium"
+          >
             Tiêu đề <span className="text-red-500">*</span>
           </Label>
           <Input
@@ -492,7 +655,10 @@ export default function FloodAlertComposer({
         </div>
 
         <div>
-          <Label htmlFor="flood-alert-body" className="mb-1.5 block text-sm font-medium">
+          <Label
+            htmlFor="flood-alert-body"
+            className="mb-1.5 block text-sm font-medium"
+          >
             Nội dung <span className="text-red-500">*</span>
           </Label>
           <Textarea
@@ -508,6 +674,46 @@ export default function FloodAlertComposer({
           </p>
         </div>
 
+        <div>
+          <Label className="mb-1.5 block text-sm font-medium">
+            Vị trí cảnh báo <span className="text-red-500">*</span>
+          </Label>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nhập thành phố (VD: Da Nang, Quang Nam...)"
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleSearchCity();
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleSearchCity()}
+                disabled={isPending || isGeocoding}
+                className="shrink-0"
+              >
+                {isGeocoding ? "Đang tìm..." : "Tìm"}
+              </Button>
+            </div>
+            <LocationPickerMap
+              lat={manualLocation?.lat}
+              lon={manualLocation?.lon}
+              onPick={(lat, lon) => setManualLocation({ lat, lon })}
+            />
+            <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              {manualLocation
+                ? "Đã chọn vị trí trên bản đồ"
+                : "Nhập thành phố để tìm nhanh hoặc nhấn trực tiếp vào bản đồ"}
+            </div>
+          </div>
+        </div>
+
         <label className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
           <input
             type="checkbox"
@@ -516,8 +722,8 @@ export default function FloodAlertComposer({
             className="mt-0.5 h-4 w-4 rounded border-border accent-red-600"
           />
           <span className="text-xs leading-relaxed text-amber-900">
-            Tôi xác nhận phát thông báo này đến toàn bộ người dùng. Hành động này
-            sẽ gửi push notification ngay và không thể hoàn tác.
+            Tôi xác nhận phát thông báo này đến toàn bộ người dùng. Hành động
+            này sẽ gửi push notification ngay và không thể hoàn tác.
           </span>
         </label>
 
