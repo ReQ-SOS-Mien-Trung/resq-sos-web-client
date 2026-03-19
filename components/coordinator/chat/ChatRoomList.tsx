@@ -22,6 +22,28 @@ function getConversationStatusLabel(
     : "Đang chờ điều phối viên";
 }
 
+function getTopicDisplayLabel(topicLabel: string) {
+  const normalized = topicLabel.trim().toLowerCase();
+
+  if (!normalized) {
+    return "Chưa chọn chủ đề";
+  }
+
+  if (normalized === "medicalhelp") {
+    return "Hỗ trợ y tế";
+  }
+
+  if (normalized === "sosrequestsupport") {
+    return "Hỗ trợ yêu cầu SOS";
+  }
+
+  if (normalized === "general support" || normalized === "general_support") {
+    return "Hỗ trợ chung";
+  }
+
+  return topicLabel;
+}
+
 function RoomTime({ updatedAt }: { updatedAt: string }) {
   return (
     <span className="text-xs text-muted-foreground">
@@ -106,7 +128,7 @@ export default function ChatRoomList({
 
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground truncate">
-                    {room.topicLabel}
+                    Chủ đề: {getTopicDisplayLabel(room.topicLabel)}
                   </p>
                   <RoomTime updatedAt={room.updatedAt} />
                 </div>

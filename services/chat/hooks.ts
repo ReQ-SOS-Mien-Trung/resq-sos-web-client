@@ -6,16 +6,19 @@ import {
   getConversationMessages,
   getWaitingConversations,
   joinConversation,
+  leaveConversation,
   toCoordinatorChatRoomViewModel,
 } from "./api";
 import {
   CHAT_EVENTS,
   ConversationMessageEntity,
+  CoordinatorLeftEvent,
   CoordinatorChatConnectionState,
   JoinedConversationEvent,
   CoordinatorJoinedEvent,
   GetConversationMessagesResponse,
   JoinConversationResponse,
+  LeaveConversationResponse,
   LeftConversationEvent,
   MessageQueryParams,
   ReceiveMessageEvent,
@@ -51,6 +54,12 @@ export function useJoinConversation() {
   });
 }
 
+export function useLeaveConversation() {
+  return useMutation<LeaveConversationResponse, Error, number>({
+    mutationFn: (conversationId: number) => leaveConversation(conversationId),
+  });
+}
+
 export function useConversationMessages(
   conversationId: number | null,
   params?: MessageQueryParams,
@@ -77,6 +86,7 @@ export interface UseCoordinatorChatConnectionOptions {
   onJoinedConversation?: (event: JoinedConversationEvent) => void;
   onReceiveMessage?: (message: ReceiveMessageEvent) => void;
   onCoordinatorJoined?: (event: CoordinatorJoinedEvent) => void;
+  onCoordinatorLeft?: (event: CoordinatorLeftEvent) => void;
   onLeftConversation?: (event: LeftConversationEvent) => void;
   onError?: (errorMessage: string) => void;
   onResyncRequested?: () => void;
@@ -91,6 +101,7 @@ export function useCoordinatorChatConnection(
     onJoinedConversation,
     onReceiveMessage,
     onCoordinatorJoined,
+    onCoordinatorLeft,
     onLeftConversation,
     onError,
     onResyncRequested,
@@ -104,6 +115,7 @@ export function useCoordinatorChatConnection(
   const onJoinedConversationRef = useRef(options.onJoinedConversation);
   const onReceiveMessageRef = useRef(options.onReceiveMessage);
   const onCoordinatorJoinedRef = useRef(options.onCoordinatorJoined);
+  const onCoordinatorLeftRef = useRef(options.onCoordinatorLeft);
   const onLeftConversationRef = useRef(options.onLeftConversation);
   const onErrorRef = useRef(options.onError);
   const onResyncRequestedRef = useRef(options.onResyncRequested);
@@ -119,6 +131,10 @@ export function useCoordinatorChatConnection(
   useEffect(() => {
     onCoordinatorJoinedRef.current = onCoordinatorJoined;
   }, [onCoordinatorJoined]);
+
+  useEffect(() => {
+    onCoordinatorLeftRef.current = onCoordinatorLeft;
+  }, [onCoordinatorLeft]);
 
   useEffect(() => {
     onLeftConversationRef.current = onLeftConversation;
@@ -155,12 +171,15 @@ export function useCoordinatorChatConnection(
       onCoordinatorJoinedRef.current?.(event);
     };
 
+    const handleCoordinatorLeft = (event: CoordinatorLeftEvent) => {
+      onCoordinatorLeftRef.current?.(event);
+    };
+
     const handleLeftConversation = (event: LeftConversationEvent) => {
       onLeftConversationRef.current?.(event);
     };
 
     const handleHubError = (errorMessage: string) => {
-      setTransportError(errorMessage);
       onErrorRef.current?.(errorMessage);
     };
 
@@ -175,6 +194,10 @@ export function useCoordinatorChatConnection(
     coordinatorChatTransport.on<CoordinatorJoinedEvent>(
       CHAT_EVENTS.CoordinatorJoined,
       handleCoordinatorJoined,
+    );
+    coordinatorChatTransport.on<CoordinatorLeftEvent>(
+      CHAT_EVENTS.CoordinatorLeft,
+      handleCoordinatorLeft,
     );
     coordinatorChatTransport.on<LeftConversationEvent>(
       CHAT_EVENTS.LeftConversation,
@@ -241,6 +264,10 @@ export function useCoordinatorChatConnection(
         CHAT_EVENTS.CoordinatorJoined,
         handleCoordinatorJoined,
       );
+      coordinatorChatTransport.off<CoordinatorLeftEvent>(
+        CHAT_EVENTS.CoordinatorLeft,
+        handleCoordinatorLeft,
+      );
       coordinatorChatTransport.off<LeftConversationEvent>(
         CHAT_EVENTS.LeftConversation,
         handleLeftConversation,
@@ -294,6 +321,13 @@ export function useCoordinatorChatConnection(
     setConnectionState("disconnected");
   }, []);
 
+  const leaveConversationGroup = useCallback(async (conversationId: number) => {
+    await coordinatorChatTransport.leaveConversation(conversationId);
+    if (joinedConversationRef.current === conversationId) {
+      joinedConversationRef.current = null;
+    }
+  }, []);
+
   const retryConnection = useCallback(async () => {
     setTransportError(null);
 
@@ -327,6 +361,7 @@ export function useCoordinatorChatConnection(
     retryAttempts,
     retryConnection,
     disconnect,
+    leaveConversationGroup,
   };
 }
 

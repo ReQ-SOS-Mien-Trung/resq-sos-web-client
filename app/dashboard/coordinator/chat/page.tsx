@@ -7,6 +7,7 @@ import {
   ArrowClockwise,
   ArrowLeft,
   MagnifyingGlass,
+  SignOut,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ import {
   useCoordinatorChatConnection,
   useCoordinatorChatRooms,
   useJoinConversation,
+  useLeaveConversation,
   useSendConversationMessage,
 } from "@/services/chat/hooks";
 import { ReceiveMessageEvent } from "@/services/chat/type";
@@ -45,9 +47,13 @@ function isVictimFacingCoordinatorJoinNotice(message: ReceiveMessageEvent) {
     return false;
   }
 
-  return message.content
-    .toLowerCase()
-    .includes("coordinator đã tham gia hỗ trợ bạn");
+  const normalized = message.content.toLowerCase();
+
+  return (
+    normalized.includes("coordinator đã tham gia hỗ trợ bạn") ||
+    normalized.includes("đã tham gia hỗ trợ bạn") ||
+    normalized.includes("bạn có thể mô tả thêm nhu cầu và trao đổi trực tiếp")
+  );
 }
 
 export default function CoordinatorChatPage() {
@@ -147,6 +153,7 @@ export default function CoordinatorChatPage() {
   }, [activeConversationId, rooms]);
 
   const joinMutation = useJoinConversation();
+  const leaveConversationMutation = useLeaveConversation();
   const sendMessageMutation = useSendConversationMessage();
 
   const messagesQuery = useConversationMessages(
@@ -200,6 +207,7 @@ export default function CoordinatorChatPage() {
     retryAttempts,
     retryConnection,
     disconnect,
+    leaveConversationGroup,
   } = useCoordinatorChatConnection({
     enabled: true,
     activeConversationId,
@@ -211,8 +219,24 @@ export default function CoordinatorChatPage() {
       setActiveStatus("CoordinatorActive");
       void refetchRooms();
     },
+    onCoordinatorLeft: (event) => {
+      if (event.conversationId === activeConversationId) {
+        setActiveStatus("WaitingCoordinator");
+      }
+      void refetchRooms();
+    },
     onLeftConversation: () => {
       void refetchRooms();
+    },
+    onError: (errorMessage) => {
+      const normalized = errorMessage.trim().toLowerCase();
+      if (
+        normalized.includes("victim chưa chọn chủ đề hỗ trợ") ||
+        normalized.includes("vui lòng chờ victim xác nhận yêu cầu")
+      ) {
+        return;
+      }
+      toast.error(errorMessage);
     },
     onResyncRequested: handleResyncRequested,
   });
@@ -223,31 +247,37 @@ export default function CoordinatorChatPage() {
     };
   }, [disconnect]);
 
-  const roomsForView = useMemo(() => {
-    if (!activeConversationId) {
-      return rooms;
-    }
+  const roomsForView = rooms;
 
-    const hasActiveInList = rooms.some(
+  useEffect(() => {
+    if (!activeConversationId) return;
+
+    const hasActiveInRooms = rooms.some(
       (room) => room.conversationId === activeConversationId,
     );
 
-    if (hasActiveInList) {
-      return rooms;
-    }
+    if (hasActiveInRooms) return;
+    if (waitingLoading || roomsRefreshing) return;
+    if (messagesQuery.isLoading || messagesQuery.isFetching) return;
+    if (!messagesQuery.isError) return;
 
-    return [
-      {
-        conversationId: activeConversationId,
-        participantLabel: activePartnerLabel || "Người dân",
-        topicLabel: "Cuộc trò chuyện đang diễn ra",
-        linkedSosRequestId: null,
-        updatedAt: new Date().toISOString(),
-        statusLabel: activeStatus,
-      },
-      ...rooms,
-    ];
-  }, [activeConversationId, activePartnerLabel, activeStatus, rooms]);
+    // Cached conversation is stale (exists in local storage but no longer valid on server).
+    const staleConversationId = activeConversationId;
+    setActiveConversationId(null);
+    setActivePartnerLabel(null);
+    setActiveStatus("WaitingCoordinator");
+    setRealtimeMessages((prev) =>
+      prev.filter((message) => message.conversationId !== staleConversationId),
+    );
+  }, [
+    activeConversationId,
+    messagesQuery.isError,
+    messagesQuery.isFetching,
+    messagesQuery.isLoading,
+    rooms,
+    roomsRefreshing,
+    waitingLoading,
+  ]);
 
   const filteredRooms = useMemo(() => {
     const keyword = searchText.trim().toLowerCase();
@@ -359,6 +389,48 @@ export default function CoordinatorChatPage() {
 
   const isConnectionHealthy =
     connectionState === "connected" && !transportError;
+
+  const handleLeaveConversation = async () => {
+    if (!activeConversationId) {
+      toast.error("Chưa có cuộc trò chuyện nào được chọn.");
+      return;
+    }
+
+    const shouldLeave = window.confirm(
+      "Bạn có chắc muốn rời cuộc trò chuyện này không?",
+    );
+
+    if (!shouldLeave) {
+      return;
+    }
+
+    const conversationId = activeConversationId;
+
+    try {
+      await leaveConversationMutation.mutateAsync(conversationId);
+      try {
+        await leaveConversationGroup(conversationId);
+      } catch {
+        // REST leave already succeeds even if client-side group cleanup fails.
+      }
+
+      setActiveConversationId(null);
+      setActivePartnerLabel(null);
+      setActiveStatus("WaitingCoordinator");
+      setRealtimeMessages((prev) =>
+        prev.filter((message) => message.conversationId !== conversationId),
+      );
+      markConversationAsRead(conversationId);
+      void refetchRooms();
+      toast.success("Đã rời cuộc trò chuyện.");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Không thể rời cuộc trò chuyện.",
+      );
+    }
+  };
 
   const handleSendMessage = async (content: string) => {
     if (!activeConversationId) {
@@ -500,9 +572,27 @@ export default function CoordinatorChatPage() {
           {activeConversationId ? (
             <>
               <div className="border-b border-black bg-white px-4 py-3">
-                <p className="text-sm font-semibold uppercase">
-                  Conversation #{activeConversationId}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold uppercase">
+                    Conversation #{activeConversationId}
+                  </p>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 rounded-none border-black text-black hover:bg-black hover:text-white"
+                    onClick={() => {
+                      void handleLeaveConversation();
+                    }}
+                    disabled={leaveConversationMutation.isPending}
+                  >
+                    <SignOut className="h-4 w-4" />
+                    {leaveConversationMutation.isPending
+                      ? "Đang rời..."
+                      : "Rời cuộc trò chuyện"}
+                  </Button>
+                </div>
               </div>
 
               <div className="flex-1 min-h-0">
@@ -518,7 +608,10 @@ export default function CoordinatorChatPage() {
               </div>
 
               <ChatComposer
-                disabled={sendMessageMutation.isPending}
+                disabled={
+                  sendMessageMutation.isPending ||
+                  leaveConversationMutation.isPending
+                }
                 onSend={(content) => {
                   void handleSendMessage(content);
                 }}
