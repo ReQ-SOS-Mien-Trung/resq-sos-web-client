@@ -14,6 +14,14 @@ interface ChatRoomListProps {
   onSelectRoom: (conversationId: number) => void;
 }
 
+function getConversationStatusLabel(
+  status: "WaitingCoordinator" | "CoordinatorActive",
+) {
+  return status === "CoordinatorActive"
+    ? "Điều phối viên đang hỗ trợ"
+    : "Đang chờ điều phối viên";
+}
+
 function RoomTime({ updatedAt }: { updatedAt: string }) {
   return (
     <span className="text-xs text-muted-foreground">
@@ -89,7 +97,9 @@ export default function ChatRoomList({
                       </Badge>
                     ) : null}
                     <Badge variant="secondary" className="shrink-0">
-                      {isActive ? "CoordinatorActive" : room.statusLabel}
+                      {getConversationStatusLabel(
+                        isActive ? "CoordinatorActive" : room.statusLabel,
+                      )}
                     </Badge>
                   </div>
                 </div>

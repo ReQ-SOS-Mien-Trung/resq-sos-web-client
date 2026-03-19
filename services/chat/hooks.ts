@@ -268,6 +268,10 @@ export function useCoordinatorChatConnection(
         return;
       }
 
+      if (joinedConversationRef.current === activeConversationId) {
+        return;
+      }
+
       if (
         joinedConversationRef.current &&
         joinedConversationRef.current !== activeConversationId

@@ -32,6 +32,24 @@ const ACTIVE_CONVERSATION_STORAGE_KEY =
 const ACTIVE_PARTNER_LABEL_STORAGE_KEY =
   "coordinator-chat-active-partner-label";
 
+function getConversationStatusLabel(
+  status: "WaitingCoordinator" | "CoordinatorActive",
+) {
+  return status === "CoordinatorActive"
+    ? "Điều phối viên đang hỗ trợ"
+    : "Đang chờ điều phối viên";
+}
+
+function isVictimFacingCoordinatorJoinNotice(message: ReceiveMessageEvent) {
+  if (message.messageType !== "SystemMessage") {
+    return false;
+  }
+
+  return message.content
+    .toLowerCase()
+    .includes("coordinator đã tham gia hỗ trợ bạn");
+}
+
 export default function CoordinatorChatPage() {
   const router = useRouter();
   const [searchText, setSearchText] = useState("");
@@ -279,7 +297,9 @@ export default function CoordinatorChatPage() {
       (message) => message.conversationId === activeConversationId,
     );
 
-    return mergeConversationMessages(historyMessages, realtimeInRoom);
+    return mergeConversationMessages(historyMessages, realtimeInRoom).filter(
+      (message) => !isVictimFacingCoordinatorJoinNotice(message),
+    );
   }, [activeConversationId, messagesQuery.data?.messages, realtimeMessages]);
 
   const unreadByConversationView = useMemo(() => {
@@ -391,9 +411,7 @@ export default function CoordinatorChatPage() {
               variant="secondary"
               className="rounded-none border border-black bg-black text-white"
             >
-              {activeStatus === "CoordinatorActive"
-                ? "CoordinatorActive"
-                : "WaitingCoordinator"}
+              {getConversationStatusLabel(activeStatus)}
             </Badge>
             <ChatConnectionBadge state={connectionState} />
             <Button
