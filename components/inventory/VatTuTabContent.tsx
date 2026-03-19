@@ -184,22 +184,23 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {inventoryData?.items
-                .filter(item => (item.itemModelName ?? item.reliefItemName ?? "").toLowerCase().includes(search.toLowerCase()))
+                .filter(item => item.itemModelName.toLowerCase().includes(search.toLowerCase()))
                 .sort((a, b) => {
-                  const nameA = a.itemModelName ?? a.reliefItemName ?? "";
-                  const nameB = b.itemModelName ?? b.reliefItemName ?? "";
+                  const nameA = a.itemModelName;
+                  const nameB = b.itemModelName;
                   if (sortBy === "name_asc") return nameA.localeCompare(nameB);
                   if (sortBy === "name_desc") return nameB.localeCompare(nameA);
                   return 0;
                 })
                 .map((item) => {
                   // Determine stock status for border/color accents
-                  const isOutOfStock = item.availableQuantity <= 0;
-                  const isLowStock = item.availableQuantity > 0 && item.availableQuantity < 50; // Mock threshold
+                  const availQty = item.itemType === "Reusable" ? item.availableUnit : item.availableQuantity;
+                  const isOutOfStock = availQty <= 0;
+                  const isLowStock = availQty > 0 && availQty < 50; // Mock threshold
 
                   return (
                     <div
-                      key={item.itemModelId ?? item.reliefItemId}
+                      key={item.itemModelId}
                       onClick={() => onItemSelect?.(item)}
                       className="group border border-black/10 dark:border-white/10 p-3 hover:border-[#FF5722] hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between aspect-square relative bg-card shadow-sm hover:shadow-md"
                     >
@@ -213,7 +214,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
                       {/* Item Name */}
                       <h3 className="text-lg font-bold tracking-tighter leading-tight group-hover:text-[#FF5722] transition-colors mb-2 line-clamp-3">
-                        {item.itemModelName ?? item.reliefItemName}
+                        {item.itemModelName}
                       </h3>
 
                       {/* Bottom Quantity Section */}
@@ -221,7 +222,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                         <span className="text-[12px] tracking-tighter text-muted-foreground uppercase mb-0.5 max-w-full truncate">
                           {itemTypesData?.find((t) => t.key === item.itemType)?.value ?? item.itemType}
                         </span>
-                        {item.itemType === "Reusable" && item.reusableBreakdown ? (
+                        {item.itemType === "Reusable" ? (
                           <div className="flex items-end justify-between gap-1">
                             <div className="flex flex-col">
                               <span className="text-base font-black tracking-tighter">

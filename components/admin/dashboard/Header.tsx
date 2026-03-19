@@ -26,13 +26,16 @@ import {
   SquaresFour,
   Sparkle,
   ShareNetwork,
+  Warning,
 } from "@phosphor-icons/react";
 import { HeaderProps } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import { FloodAlertModal } from "./FloodAlertModal";
 
 const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
   const [notificationCount] = useState(3);
+  const [floodAlertOpen, setFloodAlertOpen] = useState(false);
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
 
@@ -154,12 +157,25 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* Flood Alert Button */}
+        <Button
+          size="sm"
+          onClick={() => setFloodAlertOpen(true)}
+          className="hidden md:flex gap-1.5 h-9 rounded-lg bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-200"
+        >
+          <Warning size={16} weight="fill" />
+          Phát cảnh báo lũ
+        </Button>
+
+        <FloodAlertModal open={floodAlertOpen} onOpenChange={setFloodAlertOpen} />
+
         {/* Exports Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
+              variant="outline"
               size="sm"
-              className="bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 h-9 rounded-lg gap-1.5 transition-all duration-200"
+              className="hidden md:flex gap-1.5 h-9 rounded-lg border-border/50 hover:border-red-500/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-200"
             >
               Xuất dữ liệu
               <CaretDown size={14} />

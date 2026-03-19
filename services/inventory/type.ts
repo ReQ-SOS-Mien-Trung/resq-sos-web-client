@@ -18,6 +18,8 @@ export type InventoryReliefItem = InventoryCategory;
 export interface ReusableBreakdown {
   totalUnits: number;
   availableUnits: number;
+  reservedUnits: number;
+  inTransitUnits: number;
   inUseUnits: number;
   maintenanceUnits: number;
   decommissionedUnits: number;
@@ -26,24 +28,33 @@ export interface ReusableBreakdown {
   poorCount: number;
 }
 
-export interface InventoryItemEntity {
+interface InventoryItemEntityBase {
   itemModelId: number;
-  /** @alias itemModelId — kept for backward compatibility */
-  reliefItemId: number;
   itemModelName: string;
-  /** @alias itemModelName — kept for backward compatibility */
-  reliefItemName: string;
   categoryId: number;
   categoryName: string;
-  itemType: string;
   targetGroup: string;
+  lastStockedAt: string;
+}
+
+export interface ConsumableItemEntity extends InventoryItemEntityBase {
+  itemType: "Consumable";
   quantity: number;
   reservedQuantity: number;
   availableQuantity: number;
-  lastStockedAt: string;
-  /** Only present when itemType === "Reusable" */
-  reusableBreakdown: ReusableBreakdown | null;
+  reusableBreakdown: null;
 }
+
+export interface ReusableItemEntity extends InventoryItemEntityBase {
+  itemType: "Reusable";
+  /** Total unit count */
+  unit: number;
+  reservedUnit: number;
+  availableUnit: number;
+  reusableBreakdown: ReusableBreakdown;
+}
+
+export type InventoryItemEntity = ConsumableItemEntity | ReusableItemEntity;
 
 export interface GetMyDepotInventoryParams {
   categoryCode?: string[];

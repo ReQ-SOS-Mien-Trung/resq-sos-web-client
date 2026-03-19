@@ -49,8 +49,14 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
     }).format(new Date(dateString));
   };
 
-  const reservedPercent = item.quantity > 0 ? (item.reservedQuantity / item.quantity) * 100 : 0;
-  const availablePercent = item.quantity > 0 ? (item.availableQuantity / item.quantity) * 100 : 0;
+  // Normalize qty fields: Consumable uses quantity/reservedQuantity/availableQuantity;
+  // Reusable uses unit/reservedUnit/availableUnit
+  const totalQty = item.itemType === "Reusable" ? item.unit : item.quantity;
+  const reservedQty = item.itemType === "Reusable" ? item.reservedUnit : item.reservedQuantity;
+  const availableQty = item.itemType === "Reusable" ? item.availableUnit : item.availableQuantity;
+
+  const reservedPercent = totalQty > 0 ? (reservedQty / totalQty) * 100 : 0;
+  const availablePercent = totalQty > 0 ? (availableQty / totalQty) * 100 : 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -61,7 +67,7 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
               <Package className="h-6 w-6" weight="fill" />
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <SheetTitle className="text-2xl tracking-tighter">{item.itemModelName ?? item.reliefItemName}</SheetTitle>
+              <SheetTitle className="text-2xl tracking-tighter">{item.itemModelName}</SheetTitle>
               <SheetDescription className="flex tracking-tighter items-center gap-2 mt-1">
                 Danh mục: <span className="font-medium text-sm text-black dark:text-white uppercase tracking-tight">{item.categoryName}</span>
               </SheetDescription>
@@ -69,8 +75,8 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
           </div>
           <div className="flex flex-wrap gap-2 text-left">
             {/* <Badge variant="outline" className="rounded-none tracking-tighter border-black/20 text-sm">{targetGroupLabel(item.targetGroup)}</Badge> */}
-            <Badge className={cn("rounded-none tracking-tighter text-sm text-white", item.availableQuantity > 0 ? "bg-[#FF5722] hover:bg-[#FF5722]/90 border-transparent" : "bg-red-500 hover:bg-red-500/90 border-transparent")}>
-              {item.availableQuantity > 0 ? "Còn Hàng" : "Hết Hàng"}
+            <Badge className={cn("rounded-none tracking-tighter text-sm text-white", availableQty > 0 ? "bg-[#FF5722] hover:bg-[#FF5722]/90 border-transparent" : "bg-red-500 hover:bg-red-500/90 border-transparent")}>
+              {availableQty > 0 ? "Còn Hàng" : "Hết Hàng"}
             </Badge>
           </div>
         </SheetHeader>
@@ -84,10 +90,10 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
             <div className="bg-muted/50 rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-3xl tracking-tighter font-bold">
-                  {item.availableQuantity.toLocaleString()}
+                  {availableQty.toLocaleString()}
                 </span>
                 <span className="text-muted-foreground tracking-tighter font-medium">
-                  / {item.quantity.toLocaleString()} (Tổng)
+                  / {totalQty.toLocaleString()} (Tổng)
                 </span>
               </div>
 
@@ -96,18 +102,18 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
                 <div
                   className="h-full bg-[#FF5722] tracking-tighter transition-all"
                   style={{ width: `${availablePercent}%` }}
-                  title={`Có sẵn: ${item.availableQuantity.toLocaleString()}`}
+                  title={`Có sẵn: ${availableQty.toLocaleString()}`}
                 />
                 <div
                   className="h-full bg-orange-300 tracking-tighter transition-all"
                   style={{ width: `${reservedPercent}%` }}
-                  title={`Đã cọc: ${item.reservedQuantity.toLocaleString()}`}
+                  title={`Đã cọc: ${reservedQty.toLocaleString()}`}
                 />
               </div>
 
               <div className="flex justify-between text-sm text-muted-foreground mt-2">
-                <span className="text-[#FF5722] tracking-tighter font-semibold">Khả dụng: {item.availableQuantity.toLocaleString()}</span>
-                <span className="text-orange-500 tracking-tighter font-semibold">Đã phân bổ: {item.reservedQuantity.toLocaleString()}</span>
+                <span className="text-[#FF5722] tracking-tighter font-semibold">Khả dụng: {availableQty.toLocaleString()}</span>
+                <span className="text-orange-500 tracking-tighter font-semibold">Đã phân bổ: {reservedQty.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -115,7 +121,7 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
           <Separator />
 
           {/* Reusable Breakdown */}
-          {item.itemType === "Reusable" && item.reusableBreakdown && (() => {
+          {item.itemType === "Reusable" && (() => {
             const rb = item.reusableBreakdown;
             return (
               <div className="space-y-3">
@@ -178,7 +184,7 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
             );
           })()}
 
-          {item.itemType === "Reusable" && item.reusableBreakdown && <Separator />}
+          {item.itemType === "Reusable" && <Separator />}
           <div className="space-y-3">
             <h3 className="text-sm tracking-tighter font-semibold">Chi Tiết</h3>
             <div className="grid gap-3">
