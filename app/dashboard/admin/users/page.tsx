@@ -13,14 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ShieldCheck } from "lucide-react";
-import { ArrowRight } from "@phosphor-icons/react";
+import { ShieldCheck, ArrowRight } from "@phosphor-icons/react";
 
 function mapUserEntityToUser(entity: UserEntity): User {
   let role: User["role"] = "victim";
-  if (entity.roleId === 1 || entity.roleId === 4) role = "admin";
+  if (entity.roleId === 1) role = "admin";
+  else if (entity.roleId === 4) role = "manager";
   else if (entity.roleId === 2) role = "coordinator";
   else if (entity.roleId === 3) role = "rescuer";
+  // roleId 5 → victim (default)
 
   const status: User["status"] = entity.isBanned ? "banned" : "active";
 
@@ -40,7 +41,6 @@ function mapUserEntityToUser(entity: UserEntity): User {
 
 const UsersPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
   const queryClient = useQueryClient();
   const banMutation = useBanUser();
@@ -53,34 +53,23 @@ const UsersPage = () => {
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [detailSheetMode, setDetailSheetMode] = useState<"view" | "edit">("view");
 
-  // Fetch all users; search & filtering are done client-side inside UserTable
-  const apiParams = {
+  // Load sidebar layout data
+  useEffect(() => {
+    getDashboardData().then(setDashboardData).catch(console.error);
+  }, []);
+
+  // Fetch all users once – filtering & pagination handled client-side in UserTable
+  const { data: usersData, isLoading: isLoadingUsers } = useAdminUsers({
     pageNumber: 1,
     pageSize: 1000,
-  };
-
-  const { data: usersData, isLoading: isLoadingUsers } = useAdminUsers(apiParams);
+  });
 
   const dynamicStats = {
-    total: usersData?.totalCount || 0,
-    active: (usersData?.totalCount || 0) - (usersData?.items?.filter(u => u.isBanned).length || 0),
+    total: usersData?.totalCount ?? 0,
+    active: (usersData?.items?.filter((u) => !u.isBanned).length) ?? 0,
     pending: 0,
-    banned: usersData?.items?.filter(u => u.isBanned).length || 0,
+    banned: usersData?.items?.filter((u) => u.isBanned).length ?? 0,
   };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await getDashboardData();
-        setDashboardData(data);
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
 
   const handleEditClick = (user: User) => {
     setSelectedUserId(user.id);
@@ -129,37 +118,25 @@ const UsersPage = () => {
     });
   };
 
-  if (loading || !dashboardData) {
-    return (
-      <DashboardLayout
-        favorites={[]}
-        projects={[]}
-        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
-      >
-        <DashboardSkeleton variant="table" />
-      </DashboardLayout>
-    );
-  }
-
   return (
     <DashboardLayout
-      favorites={dashboardData.favorites}
-      projects={dashboardData.projects}
-      cloudStorage={dashboardData.cloudStorage}
+      favorites={dashboardData?.favorites ?? []}
+      projects={dashboardData?.projects ?? []}
+      cloudStorage={dashboardData?.cloudStorage ?? { used: 0, total: 0, percentage: 0, unit: "GB" }}
     >
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5 mb-1">
-              <ShieldCheck size={20} className="text-foreground" />
-              <p className="text-xs font-semibold uppercase tracking-tighter text-muted-foreground">
+              <ShieldCheck size={24} className="text-foreground" />
+              <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
                 Quản lý hồ sơ
               </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tighter text-foreground leading-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter text-foreground leading-tight">
               Quản lý người dùng
             </h1>
-            <p className="text-sm tracking-tighter text-muted-foreground mt-1">
+            <p className="text-[16px] tracking-tighter text-muted-foreground mt-1.5">
               Xem xét và quản lý tài khoản của người dùng
             </p>
           </div>
@@ -185,8 +162,8 @@ const UsersPage = () => {
             setDetailSheetMode("view");
             setDetailSheetOpen(true);
           }}
-          totalCount={usersData?.totalCount}
           isLoading={isLoadingUsers}
+          totalCount={usersData?.totalCount}
         />
       </div>
 

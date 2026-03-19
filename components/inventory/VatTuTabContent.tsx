@@ -1,11 +1,8 @@
 import { useState } from "react";
 import { useMyDepotInventory, useInventoryCategories, useInventoryItemTypes, useInventoryTargetGroups } from "@/services/inventory/hooks";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MagnifyingGlass, Package, SlidersHorizontal, ArrowDown, ArrowUp } from "@phosphor-icons/react";
+import { MagnifyingGlass, Package, ArrowDown, ArrowUp } from "@phosphor-icons/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InventoryItemEntity } from "@/services/inventory/type";
 
@@ -15,7 +12,7 @@ interface VatTuSectionProps {
 
 export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
   const [page, setPage] = useState(1);
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [selectedCategoryCodes, setSelectedCategoryCodes] = useState<string[]>([]);
   const [selectedItemTypes, setSelectedItemTypes] = useState<string[]>([]);
   const [selectedTargetGroups, setSelectedTargetGroups] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -28,14 +25,15 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
   const { data: inventoryData, isLoading, isError } = useMyDepotInventory({
     pageNumber: page,
     pageSize: 10,
-    categoryIds: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
+    categoryCode:
+      selectedCategoryCodes.length > 0 ? selectedCategoryCodes : undefined,
     itemTypes: selectedItemTypes.length > 0 ? selectedItemTypes : undefined,
     targetGroups: selectedTargetGroups.length > 0 ? selectedTargetGroups : undefined,
   });
 
-  const toggleCategory = (id: number) => {
-    setSelectedCategoryIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  const toggleCategory = (code: string) => {
+    setSelectedCategoryCodes((prev) =>
+      prev.includes(code) ? prev.filter((x) => x !== code) : [...prev, code],
     );
     setPage(1);
   };
@@ -73,14 +71,14 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
         <div className="space-y-2">
           {/* Category chips */}
           <div className="flex flex-wrap gap-0">
-            <span className="text-[14px] text-primary font-semibold mr-2 self-center">Danh mục:</span>
+            <span className="text-[14px] text-primary tracking-tighter font-semibold mr-2 self-center">Danh mục:</span>
             {categories?.map((cat) => {
-              const isActive = selectedCategoryIds.includes(parseInt(cat.key));
+              const isActive = selectedCategoryCodes.includes(cat.key);
               return (
                 <button
                   key={cat.key}
-                  onClick={() => toggleCategory(parseInt(cat.key))}
-                  className={`px-3 py-2 text-sm border transition-all ${isActive
+                  onClick={() => toggleCategory(cat.key)}
+                  className={`px-3 py-2 text-sm tracking-tighter border transition-all ${isActive
                     ? "bg-[#FF5722] text-white border-[#FF5722]"
                     : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
                     }`}
@@ -93,14 +91,14 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
           {/* Item type chips */}
           <div className="flex flex-wrap gap-0">
-            <span className="text-[14px] text-primary font-semibold mr-2 self-center">Loại:</span>
+            <span className="text-[14px] text-primary tracking-tighter font-semibold mr-2 self-center">Loại:</span>
             {itemTypesData?.map((type) => {
               const isActive = selectedItemTypes.includes(type.key);
               return (
                 <button
                   key={type.key}
                   onClick={() => toggleItemType(type.key)}
-                  className={`px-3 py-2 text-sm border transition-all ${isActive
+                  className={`px-3 py-2 text-sm tracking-tighter border transition-all ${isActive
                     ? "bg-[#FF5722] text-white border-[#FF5722]"
                     : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
                     }`}
@@ -113,14 +111,14 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
           {/* Target group chips */}
           <div className="flex flex-wrap gap-0">
-            <span className="text-[14px] text-primary font-semibold mr-2 self-center">Đối tượng:</span>
+            <span className="text-[14px] text-primary tracking-tighter font-semibold mr-2 self-center">Đối tượng:</span>
             {targetGroupsData?.map((group) => {
               const isActive = selectedTargetGroups.includes(group.key);
               return (
                 <button
                   key={group.key}
                   onClick={() => toggleTargetGroup(group.key)}
-                  className={`px-3 py-2 text-sm border transition-all ${isActive
+                  className={`px-3 py-2 tracking-tighter text-sm border transition-all ${isActive
                     ? "bg-[#FF5722] text-white border-[#FF5722]"
                     : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
                     }`}
@@ -134,8 +132,8 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
         {/* Sort & Pagination Header */}
         <div className="flex items-center justify-between pt-2">
-          <span className="text-[14px] font-medium text-muted-foreground">
-            {inventoryData?.totalCount || 0} Kết quả
+          <span className="text-[14px] tracking-tighter font-medium text-muted-foreground">
+            {inventoryData?.totalCount || 0} kết quả
           </span>
 
           <div className="flex gap-1">
@@ -175,57 +173,79 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
               ))}
             </div>
           ) : isError ? (
-            <div className="text-center text-red-500 py-8 text-xs font-regular uppercase">
-              LỖI TẢI DỮ LIỆU
+            <div className="text-center tracking-tighter text-red-500 py-8 text-xs font-medium uppercase">
+              Lỗi tải dữ liệu
             </div>
           ) : inventoryData?.items.length === 0 ? (
             <div className="text-center text-muted-foreground py-10 space-y-2">
               <Package className="h-8 w-8 mx-auto opacity-20" weight="thin" />
-              <p className="text-sm font-regular opacity-50">Không có dữ liệu</p>
+              <p className="text-sm tracking-tighter font-regular opacity-50">Không có dữ liệu</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {inventoryData?.items
-                .filter(item => item.reliefItemName.toLowerCase().includes(search.toLowerCase()))
+                .filter(item => item.itemModelName.toLowerCase().includes(search.toLowerCase()))
                 .sort((a, b) => {
-                  if (sortBy === "name_asc") return a.reliefItemName.localeCompare(b.reliefItemName);
-                  if (sortBy === "name_desc") return b.reliefItemName.localeCompare(a.reliefItemName);
+                  const nameA = a.itemModelName;
+                  const nameB = b.itemModelName;
+                  if (sortBy === "name_asc") return nameA.localeCompare(nameB);
+                  if (sortBy === "name_desc") return nameB.localeCompare(nameA);
                   return 0;
                 })
                 .map((item) => {
                   // Determine stock status for border/color accents
-                  const isOutOfStock = item.availableQuantity <= 0;
-                  const isLowStock = item.availableQuantity > 0 && item.availableQuantity < 50; // Mock threshold
+                  const availQty = item.itemType === "Reusable" ? item.availableUnit : item.availableQuantity;
+                  const isOutOfStock = availQty <= 0;
+                  const isLowStock = availQty > 0 && availQty < 50; // Mock threshold
 
                   return (
                     <div
-                      key={item.reliefItemId}
+                      key={item.itemModelId}
                       onClick={() => onItemSelect?.(item)}
                       className="group border border-black/10 dark:border-white/10 p-3 hover:border-[#FF5722] hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between aspect-square relative bg-card shadow-sm hover:shadow-md"
                     >
                       {/* Minimalist Top Indicator */}
                       <div className="flex justify-between items-start mb-2">
-                        <span className="text-[12px] font-medium uppercase text-muted-foreground truncate max-w-[70%]">
+                        <span className="text-[12px] font-medium tracking-tighter uppercase text-muted-foreground truncate max-w-[70%]">
                           {item.categoryName}
                         </span>
                         <div className={`h-1.5 w-1.5 rounded-full ${isOutOfStock ? "bg-red-500" : isLowStock ? "bg-[#FF5722]" : "bg-black dark:bg-white"}`} />
                       </div>
 
                       {/* Item Name */}
-                      <h3 className="text-sm font-bold leading-tight group-hover:text-[#FF5722] transition-colors mb-2 line-clamp-3">
-                        {item.reliefItemName}
+                      <h3 className="text-lg font-bold tracking-tighter leading-tight group-hover:text-[#FF5722] transition-colors mb-2 line-clamp-3">
+                        {item.itemModelName}
                       </h3>
 
                       {/* Bottom Quantity Section */}
                       <div className="mt-auto border-t border-black/5 dark:border-white/5 pt-2 flex flex-col">
-                        <span className="text-[12px] text-muted-foreground uppercase mb-0.5 max-w-full truncate">
+                        <span className="text-[12px] tracking-tighter text-muted-foreground uppercase mb-0.5 max-w-full truncate">
                           {itemTypesData?.find((t) => t.key === item.itemType)?.value ?? item.itemType}
                         </span>
-                        <div className="flex items-end justify-between">
-                          <span className="text-md font-black tracking-tighter">
-                            {item.availableQuantity.toLocaleString()} <span className="text-[14px] font-normal text-muted-foreground uppercase">SL</span>
-                          </span>
-                        </div>
+                        {item.itemType === "Reusable" ? (
+                          <div className="flex items-end justify-between gap-1">
+                            <div className="flex flex-col">
+                              <span className="text-base font-black tracking-tighter">
+                                {item.reusableBreakdown.availableUnits}
+                                <span className="text-[11px] font-normal text-muted-foreground ml-0.5">/ {item.reusableBreakdown.totalUnits}</span>
+                              </span>
+                            </div>
+                            <div className="flex gap-0.5 items-center">
+                              {item.reusableBreakdown.inUseUnits > 0 && (
+                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded tracking-tighter">{item.reusableBreakdown.inUseUnits} đang dùng</span>
+                              )}
+                              {item.reusableBreakdown.maintenanceUnits > 0 && (
+                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded tracking-tighter">{item.reusableBreakdown.maintenanceUnits} bảo trì</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-end justify-between">
+                            <span className="text-base font-black tracking-tighter">
+                              {item.availableQuantity.toLocaleString()} <span className="text-[14px] font-normal text-muted-foreground uppercase">SL</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Editorial Accent */}

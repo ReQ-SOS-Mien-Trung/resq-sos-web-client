@@ -10,46 +10,44 @@ import {
 } from "@/type";
 import {
   ArrowsCounterClockwise,
+  IdentificationCardIcon,
+  Bell,
+  Boat,
   ChartBar,
   ChatCircle,
   CheckCircle,
   Clock,
-  Cloud as CloudIcon,
+  Cloud,
   CloudSun,
   Drop,
+  FirstAid,
+  ForkKnife,
+  Heart,
+  LockKey,
+  MapPin,
+  MapTrifold,
   Package,
   Pulse,
+  Radio,
   Robot,
+  Shield,
   SquaresFour,
+  Stethoscope,
   Target,
+  Tent,
   Thermometer,
   TShirt,
+  Truck,
   UserCheck,
+  Users,
   Warning,
   WarningCircle,
-  Wind,
-  XCircle,
-  Boat,
-  FirstAid,
-  Truck,
-  Wrench,
-  Users as UsersIcon,
-  MapTrifold,
-} from "@phosphor-icons/react";
-import {
-  Bell,
-  Cloud,
-  Heart,
-  MapPin,
-  Shield,
-  Users,
   Warehouse,
-  Radio,
-  BarChart3,
-  Stethoscope,
-  ForkKnife,
-  Tent,
-} from "lucide-react";
+  Wind,
+  Wrench,
+  XCircle,
+  FadersIcon,
+} from "@phosphor-icons/react";
 
 export const navLinks = [
   { href: "#features", label: "Tính năng" },
@@ -159,7 +157,7 @@ export const features = [
     label: "Điều phối",
   },
   {
-    icon: <BarChart3 className="w-5 h-5" />,
+    icon: <ChartBar className="w-5 h-5" />,
     label: "Báo cáo",
   },
   {
@@ -337,6 +335,20 @@ export const navigationItems = [
     href: "/dashboard/admin",
   },
   { icon: Users, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
+  {    icon: UserCheck,
+    label: "Quản lý cứu hộ viên",
+    href: "/dashboard/admin/rescuers",
+  },
+  {
+    icon: IdentificationCardIcon,
+    label: "Quản lý hồ sơ cứu hộ viên",
+    href: "/dashboard/admin/rescuer-verification",
+  },
+  {
+    icon: FadersIcon,
+    label: "Điều chỉnh tham số hệ thống",
+    href: "/dashboard/admin/config",
+  },
   {
     icon: CloudSun,
     label: "Bài đăng thời tiết",
@@ -348,11 +360,7 @@ export const navigationItems = [
     href: "/dashboard/admin/weather-flood",
   },
   { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
-  {
-    icon: UserCheck,
-    label: "Quản lý cứu hộ viên",
-    href: "/dashboard/admin/rescuer-verification",
-  },
+  
   {
     icon: Robot,
     label: "Cấu hình AI Prompt",
@@ -362,6 +370,11 @@ export const navigationItems = [
     icon: ChatCircle,
     label: "Cấu hình phòng chat",
     href: "/dashboard/admin/chat-config",
+  },
+  {
+    icon: LockKey,
+    label: "Phân quyền người dùng",
+    href: "/dashboard/admin/permissions",
   },
   {
     icon: MapTrifold,
@@ -380,6 +393,19 @@ export const getFavoriteIcon = (name: string) => {
       return Pulse;
     default:
       return Shield;
+  }
+};
+
+export const getFavoriteHref = (name: string): string => {
+  switch (name) {
+    case "Cứu hộ viên":
+      return "/dashboard/admin#rescuer-overview";
+    case "Cảnh báo":
+      return "/dashboard/admin#sos-overview";
+    case "Hoạt động":
+      return "/dashboard/admin#sos-overview";
+    default:
+      return "/dashboard/admin";
   }
 };
 
@@ -481,7 +507,7 @@ export const WINDY_LAYERS: {
     label: "Mưa",
     icon: <Drop className="h-4 w-4" weight="fill" />,
   },
-  { id: "clouds", label: "Mây", icon: <CloudIcon className="h-4 w-4" /> },
+  { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
 ];
 
 // ════════════════════════════════
@@ -583,7 +609,7 @@ export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
 };
 
 export const resourceTypeIcons: Record<string, React.ReactNode> = {
-  TEAM: <UsersIcon className="h-5 w-5" weight="fill" />,
+  TEAM: <Users className="h-5 w-5" weight="fill" />,
   BOAT: <Boat className="h-5 w-5" weight="fill" />,
   MEDICAL_KIT: <FirstAid className="h-5 w-5" weight="fill" />,
   EQUIPMENT: <Wrench className="h-5 w-5" weight="fill" />,

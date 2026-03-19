@@ -1,12 +1,9 @@
 "use client";
 
 import { useState } from "react";
-
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Warehouse,
@@ -25,52 +22,45 @@ import {
   ArrowLineUp,
   Clock,
   CheckCircle,
-  XCircle,
-  CaretRight,
+  ArrowRight,
+  ChartBar,
+  ListBullets,
+  Cube,
+  ShieldWarning,
+  ArrowFatLinesRight,
+  BellRinging,
 } from "@phosphor-icons/react";
-import { getStockLevelBadgeVariant } from "@/lib/mock-data";
 import {
   DepotSidebarProps,
   InventoryItem,
-  Shipment,
   SupplyRequest,
 } from "@/type";
 
-// Category icon mapping (fallback for legacy keys + API codes)
+// ── Category icon map ─────────────────────────────────────────────────────────
 const categoryIcons: Record<string, React.ReactNode> = {
-  // Legacy UPPER_CASE keys (used by mock InventoryItem.category)
-  MEDICAL: <Stethoscope className="h-4 w-4" weight="fill" />,
-  FOOD: <ForkKnife className="h-4 w-4" weight="fill" />,
-  WATER: <Drop className="h-4 w-4" weight="fill" />,
-  EQUIPMENT: <Wrench className="h-4 w-4" weight="fill" />,
-  SHELTER: <Tent className="h-4 w-4" weight="fill" />,
-  CLOTHING: <TShirt className="h-4 w-4" weight="fill" />,
-  // API code keys (from ItemCategoryEntity.code)
-  Food: <ForkKnife className="h-4 w-4" weight="fill" />,
-  Water: <Drop className="h-4 w-4" weight="fill" />,
-  Medical: <Stethoscope className="h-4 w-4" weight="fill" />,
-  Hygiene: <Drop className="h-4 w-4" />,
-  Shelter: <Tent className="h-4 w-4" weight="fill" />,
-  Clothing: <TShirt className="h-4 w-4" weight="fill" />,
-  RescueEquipment: <Wrench className="h-4 w-4" weight="fill" />,
-  Others: <Package className="h-4 w-4" />,
+  MEDICAL: <Stethoscope className="h-3.5 w-3.5" weight="fill" />,
+  FOOD: <ForkKnife className="h-3.5 w-3.5" weight="fill" />,
+  WATER: <Drop className="h-3.5 w-3.5" weight="fill" />,
+  EQUIPMENT: <Wrench className="h-3.5 w-3.5" weight="fill" />,
+  SHELTER: <Tent className="h-3.5 w-3.5" weight="fill" />,
+  CLOTHING: <TShirt className="h-3.5 w-3.5" weight="fill" />,
+  Food: <ForkKnife className="h-3.5 w-3.5" weight="fill" />,
+  Water: <Drop className="h-3.5 w-3.5" weight="fill" />,
+  Medical: <Stethoscope className="h-3.5 w-3.5" weight="fill" />,
+  Hygiene: <Drop className="h-3.5 w-3.5" />,
+  Shelter: <Tent className="h-3.5 w-3.5" weight="fill" />,
+  Clothing: <TShirt className="h-3.5 w-3.5" weight="fill" />,
+  RescueEquipment: <Wrench className="h-3.5 w-3.5" weight="fill" />,
+  Others: <Package className="h-3.5 w-3.5" />,
 };
 
-const stockLevelNames: Record<string, string> = {
-  CRITICAL: "Cực Kỳ Thiếu",
-  LOW: "Sắp Hết",
-  NORMAL: "Bình Thường",
-  OVERSTOCKED: "Dư Thừa",
-};
-
+// ── Main component ────────────────────────────────────────────────────────────
 const DepotSidebar = ({
   depotInfo,
   inventoryItems,
   supplyRequests,
-  shipments,
   onItemSelect,
   onRequestSelect,
-  onShipmentSelect,
   selectedItem,
   selectedRequest,
   selectedCategory,
@@ -81,7 +71,7 @@ const DepotSidebar = ({
 }: DepotSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Filter items
+  // ── Derived data ─────────────────────────────────────────────────────────
   const filteredItems = inventoryItems.filter((item) => {
     const matchesSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -92,296 +82,293 @@ const DepotSidebar = ({
     return matchesSearch && matchesCategory;
   });
 
-  // Categorize items
-  const criticalItems = filteredItems.filter(
-    (item) => item.stockLevel === "CRITICAL",
-  );
-  const lowStockItems = filteredItems.filter(
-    (item) => item.stockLevel === "LOW",
-  );
+  const criticalItems = filteredItems.filter((i) => i.stockLevel === "CRITICAL");
+  const lowStockItems = filteredItems.filter((i) => i.stockLevel === "LOW");
   const normalItems = filteredItems.filter(
-    (item) => item.stockLevel === "NORMAL" || item.stockLevel === "OVERSTOCKED",
+    (i) => i.stockLevel === "NORMAL" || i.stockLevel === "OVERSTOCKED",
   );
 
-  // Filter requests
-  const pendingRequests = supplyRequests.filter(
-    (req) => req.status === "PENDING",
-  );
-  const inProgressRequests = supplyRequests.filter(
-    (req) => req.status === "APPROVED" || req.status === "IN_TRANSIT",
-  );
+  const pendingRequestsAll = supplyRequests.filter((r) => r.status === "PENDING");
+  const inProgressRequestsAll = supplyRequests.filter((r) => r.status === "IN_TRANSIT");
 
-  // Filter shipments
-  const activeShipments = shipments.filter(
-    (ship) => ship.status === "PREPARING" || ship.status === "IN_TRANSIT",
+  // "Tiếp nhận yêu cầu" dot — show when there are cards in that section
+  // (Source role = all statuses, Requester+InTransit)
+  const hasIncomingItems = supplyRequests.some(
+    (r) => r.type === "OUTBOUND" || (r.type === "INBOUND" && r.status === "IN_TRANSIT"),
   );
+  // "Theo dõi tiến trình" dot — show when any requests exist in the table
+  const hasAnyRequests = supplyRequests.length > 0;
+
+  const pendingRequests = [...pendingRequestsAll]
+    .sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime())
+    .slice(0, 2);
+
+  const inProgressRequests = [...inProgressRequestsAll]
+    .sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime())
+    .slice(0, 2);
+
+  const hasUrgent = criticalItems.length > 0 || lowStockItems.length > 0;
+  const hasPendingReqs = pendingRequestsAll.length > 0;
 
   return (
-    <div className="h-full flex flex-col bg-background border-r">
-      {/* Header */}
-      <div className="p-4 border-b">
-        <h2 className="font-regular tracking-tighter text-lg flex items-center gap-2">
-          <Warehouse className="h-5 w-5 text-primary" />
-          {depotInfo.name}
-        </h2>
-       
-      </div>
+    <div className="h-full flex flex-col bg-background border-r overflow-hidden">
 
-      {/* Stats Bar */}
-      <div className="grid grid-cols-3 gap-2 p-3 border-b bg-muted/30">
-        <div className="text-center">
-          <div className="text-2xl font-bold text-red-500">
-            {depotInfo.criticalAlerts}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="relative px-4 pt-4 pb-3 border-b bg-linear-to-br from-primary/5 via-background to-orange-500/5 shrink-0">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+            <Warehouse className="h-4 w-4 text-primary" weight="fill" />
           </div>
-          <div className="text-xs text-muted-foreground">Cảnh báo</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-orange-500">
-            {depotInfo.lowStockAlerts}
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold tracking-tighter text-sm leading-snug line-clamp-2">
+              {depotInfo.name}
+            </h2>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              <span className="text-[10px] font-medium text-green-600 tracking-wide uppercase">
+                Hệ thống hoạt động
+              </span>
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">Sắp hết</div>
-        </div>
-        <div className="text-center">
-          <div className="text-2xl font-bold text-blue-500">
-            {depotInfo.pendingRequests}
-          </div>
-          <div className="text-xs text-muted-foreground">Chờ duyệt</div>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ── KPI Strip ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 shrink-0 bg-muted/20 border-b">
+        <KpiCell
+          value={depotInfo.criticalAlerts}
+          label="Cảnh báo"
+          valueClass="text-red-500"
+          icon={<ShieldWarning className="h-3.5 w-3.5" weight="fill" />}
+          iconClass="text-red-400"
+          pulse={depotInfo.criticalAlerts > 0}
+        />
+        <KpiCell
+          value={depotInfo.lowStockAlerts}
+          label="Sắp hết"
+          valueClass="text-orange-500"
+          icon={<Warning className="h-3.5 w-3.5" weight="fill" />}
+          iconClass="text-orange-400"
+          border
+        />
+        <KpiCell
+          value={depotInfo.pendingRequests}
+          label="Chờ duyệt"
+          valueClass="text-blue-500"
+          icon={<Clock className="h-3.5 w-3.5" />}
+          iconClass="text-blue-400"
+          border
+          pulse={depotInfo.pendingRequests > 0}
+        />
+      </div>
+
+      {/* ── Tabs ───────────────────────────────────────────────────────────── */}
       <Tabs
         value={activeTab}
         onValueChange={onActiveTabChange}
-        className="flex-1 flex flex-col overflow-hidden"
+        className="flex-1 flex flex-col overflow-hidden min-h-0"
       >
-        <TabsList className="mx-3 mt-3 grid grid-cols-2 h-auto gap-1 bg-muted/50 p-1 w-[calc(100%-24px)] shrink-0">
-          <TabsTrigger value="inventory" className="text-xs py-1.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            Kho
-          </TabsTrigger>
-          <TabsTrigger value="requests" className="text-xs py-1.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            Yêu cầu
-          </TabsTrigger>
-          <TabsTrigger value="shipments" className="text-xs py-1.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            Vận chuyển
-          </TabsTrigger>
-          <TabsTrigger value="vattu" className="text-xs py-1.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">
-            Vật tư
-          </TabsTrigger>
+        <TabsList className="w-full mt-3 mb-1 flex flex-col h-auto bg-transparent p-0 px-3 rounded-none shrink-0 gap-0.5">
+          <TabTriggerWithDot value="inventory" dot={hasUrgent} label="Kho hàng" icon={<ChartBar className="h-4 w-4" />} />
+          <TabTriggerWithDot value="vattu" dot={false} label="Vật tư" icon={<Cube className="h-4 w-4" />} />
+          <TabTriggerWithDot value="requests" dot={hasPendingReqs} label="Tạo yêu cầu" icon={<ClipboardText className="h-4 w-4" />} />
+          <TabTriggerWithDot value="incoming" dot={hasIncomingItems} label="Tiếp nhận yêu cầu" icon={<BellRinging className="h-4 w-4" />} />
+          <TabTriggerWithDot value="shipments" dot={hasAnyRequests} label="Theo dõi tiến trình" icon={<Truck className="h-4 w-4" />} />
         </TabsList>
 
-        {/* Inventory Tab */}
-        <TabsContent
-          value="inventory"
-          className="flex-1 overflow-hidden m-0 mt-3"
-        >
-          {/* Search */}
-          <div className="px-3 pb-3">
+        {/* ── Inventory Tab ─────────────────────────────────────────────── */}
+        <TabsContent value="inventory" className="flex-1 overflow-hidden m-0 flex flex-col min-h-0">
+          <div className="px-3 pt-2 pb-2 shrink-0">
             <div className="relative">
-              <MagnifyingGlass className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 placeholder="Tìm kiếm hàng hóa..."
-                className="pl-9 h-9"
+                className="pl-8 h-8 text-xs bg-muted/30 border-border/50 focus-visible:ring-primary/30"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
 
-          {/* Category Filter */}
-          <div className="px-3 pb-3 flex gap-1 flex-wrap">
-            <Badge
-              variant={selectedCategory === null ? "default" : "outline"}
-              className="cursor-pointer text-xs"
-              onClick={() => onCategorySelect?.(null)}
-            >
-              Tất cả
-            </Badge>
-            {apiCategories && apiCategories.length > 0
-              ? apiCategories.map((cat) => (
-                <Badge
+          {apiCategories && apiCategories.length > 0 && (
+            <div className="px-3 pb-2 flex gap-1 flex-wrap shrink-0">
+              <CategoryChip
+                active={selectedCategory === null}
+                onClick={() => onCategorySelect?.(null)}
+                label="Tất cả"
+              />
+              {apiCategories.map((cat) => (
+                <CategoryChip
                   key={cat.id}
-                  variant={
-                    selectedCategory === cat.code ? "default" : "outline"
-                  }
-                  className="cursor-pointer text-xs"
+                  active={selectedCategory === cat.code}
                   onClick={() => onCategorySelect?.(cat.code)}
-                >
-                  {categoryIcons[cat.code] ?? <Package className="h-4 w-4" />}
-                  <span className="ml-1">{cat.name}</span>
-                </Badge>
-              ))
-              : null}
-          </div>
+                  label={cat.name}
+                  icon={categoryIcons[cat.code]}
+                />
+              ))}
+            </div>
+          )}
 
-          <ScrollArea className="flex-1 h-full">
-            <div className="p-3 space-y-3">
-              {/* Critical Items */}
-              {criticalItems.length > 0 && (
-                <>
-                  <div className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-2 flex items-center gap-1">
-                    <Warning className="h-3 w-3" weight="fill" />
-                    Cần Bổ Sung Gấp ({criticalItems.length})
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="px-3 pb-4 space-y-4">
+              {(criticalItems.length > 0 || lowStockItems.length > 0) && (
+                <div>
+                  <SectionHeader
+                    label={`Cần bổ sung (${criticalItems.length + lowStockItems.length})`}
+                    color="text-red-500"
+                    icon={<ShieldWarning className="h-3 w-3" weight="fill" />}
+                  />
+                  <div className="space-y-1.5 mt-2">
+                    {[...criticalItems, ...lowStockItems].map((item) => (
+                      <InventoryItemRow
+                        key={item.id}
+                        item={item}
+                        isSelected={selectedItem?.id === item.id}
+                        onClick={() => onItemSelect(item)}
+                      />
+                    ))}
                   </div>
-                  {criticalItems.map((item) => (
-                    <InventoryItemCard
-                      key={item.id}
-                      item={item}
-                      isSelected={selectedItem?.id === item.id}
-                      onClick={() => onItemSelect(item)}
-                    />
-                  ))}
-                </>
+                </div>
               )}
 
-              {/* Low Stock Items */}
-              {lowStockItems.length > 0 && (
-                <>
-                  <div className="text-xs font-semibold text-orange-500 uppercase tracking-wide mb-2 mt-4">
-                    Sắp Hết Hàng ({lowStockItems.length})
-                  </div>
-                  {lowStockItems.map((item) => (
-                    <InventoryItemCard
-                      key={item.id}
-                      item={item}
-                      isSelected={selectedItem?.id === item.id}
-                      onClick={() => onItemSelect(item)}
-                    />
-                  ))}
-                </>
-              )}
-
-              {/* Normal Items */}
               {normalItems.length > 0 && (
-                <>
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-4">
-                    Đủ Hàng ({normalItems.length})
+                <div>
+                  <SectionHeader
+                    label={`Bình thường (${normalItems.length})`}
+                    color="text-muted-foreground"
+                    icon={<CheckCircle className="h-3 w-3" weight="fill" />}
+                  />
+                  <div className="space-y-1.5 mt-2">
+                    {normalItems.map((item) => (
+                      <InventoryItemRow
+                        key={item.id}
+                        item={item}
+                        isSelected={selectedItem?.id === item.id}
+                        onClick={() => onItemSelect(item)}
+                      />
+                    ))}
                   </div>
-                  {normalItems.map((item) => (
-                    <InventoryItemCard
-                      key={item.id}
-                      item={item}
-                      isSelected={selectedItem?.id === item.id}
-                      onClick={() => onItemSelect(item)}
-                    />
-                  ))}
-                </>
+                </div>
               )}
 
               {filteredItems.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
-                  <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Không tìm thấy hàng hóa</p>
-                </div>
+                <EmptyState icon={<Package className="h-7 w-7" />} label="Không tìm thấy hàng hóa" />
               )}
             </div>
           </ScrollArea>
         </TabsContent>
 
-        {/* Requests Tab */}
-        <TabsContent
-          value="requests"
-          className="flex-1 overflow-hidden m-0 mt-3"
-        >
+        {/* ── Requests Tab ──────────────────────────────────────────────── */}
+        <TabsContent value="requests" className="flex-1 overflow-hidden m-0 min-h-0">
           <ScrollArea className="h-full">
-            <div className="p-3 space-y-3">
-              {/* Pending Requests */}
+            <div className="px-3 py-3 space-y-4">
               {pendingRequests.length > 0 && (
-                <>
-                  <div className="text-xs font-semibold text-yellow-600 uppercase tracking-wide mb-2 flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Chờ Phê Duyệt ({pendingRequests.length})
+                <div>
+                  <SectionHeader
+                    label={`Chờ phê duyệt (${pendingRequestsAll.length})`}
+                    color="text-amber-600"
+                    icon={<Clock className="h-3 w-3" />}
+                  />
+                  <div className="space-y-1.5 mt-2">
+                    {pendingRequests.map((req) => (
+                      <RequestRow
+                        key={req.id}
+                        request={req}
+                        isSelected={selectedRequest?.id === req.id}
+                        onClick={() => onRequestSelect(req)}
+                        accentColor="amber"
+                      />
+                    ))}
                   </div>
-                  {pendingRequests.map((request) => (
-                    <RequestCard
-                      key={request.id}
-                      request={request}
-                      isSelected={selectedRequest?.id === request.id}
-                      onClick={() => onRequestSelect(request)}
-                    />
-                  ))}
-                </>
+                </div>
               )}
 
-              {/* In Progress Requests */}
               {inProgressRequests.length > 0 && (
-                <>
-                  <div className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-2 mt-4">
-                    Đang Xử Lý ({inProgressRequests.length})
+                <div>
+                  <SectionHeader
+                    label={`Đang chi viện đến (${inProgressRequestsAll.length})`}
+                    color="text-blue-600"
+                    icon={<Truck className="h-3 w-3" weight="fill" />}
+                  />
+                  <div className="space-y-1.5 mt-2">
+                    {inProgressRequests.map((req) => (
+                      <RequestRow
+                        key={req.id}
+                        request={req}
+                        isSelected={selectedRequest?.id === req.id}
+                        onClick={() => onRequestSelect(req)}
+                        accentColor="blue"
+                      />
+                    ))}
                   </div>
-                  {inProgressRequests.map((request) => (
-                    <RequestCard
-                      key={request.id}
-                      request={request}
-                      isSelected={selectedRequest?.id === request.id}
-                      onClick={() => onRequestSelect(request)}
-                    />
-                  ))}
-                </>
+                </div>
               )}
 
               {supplyRequests.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
-                  <ClipboardText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Không có yêu cầu nào</p>
-                </div>
+                <EmptyState icon={<ClipboardText className="h-7 w-7" />} label="Không có yêu cầu nào" />
               )}
             </div>
           </ScrollArea>
         </TabsContent>
 
-        {/* Shipments Tab */}
-        <TabsContent
-          value="shipments"
-          className="flex-1 overflow-hidden m-0 mt-3"
-        >
-          <ScrollArea className="h-full">
-            <div className="p-3 space-y-3">
-              {activeShipments.length > 0 ? (
-                <>
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Đang Vận Chuyển ({activeShipments.length})
-                  </div>
-                  {activeShipments.map((shipment) => (
-                    <ShipmentCard
-                      key={shipment.id}
-                      shipment={shipment}
-                      onClick={() => onShipmentSelect(shipment)}
-                    />
-                  ))}
-                </>
-              ) : (
-                <div className="text-center text-muted-foreground py-8">
-                  <Truck className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Không có vận chuyển đang thực hiện</p>
-                </div>
-              )}
-
-              {/* Completed shipments */}
-              {shipments.filter((s) => s.status === "DELIVERED").length > 0 && (
-                <>
-                  <div className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-2 mt-4 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" weight="fill" />
-                    Đã Hoàn Thành
-                  </div>
-                  {shipments
-                    .filter((s) => s.status === "DELIVERED")
-                    .map((shipment) => (
-                      <ShipmentCard
-                        key={shipment.id}
-                        shipment={shipment}
-                        onClick={() => onShipmentSelect(shipment)}
-                      />
-                    ))}
-                </>
-              )}
+        {/* ── Shipments / Theo dõi Tab ───────────────────────────────────── */}
+        <TabsContent value="shipments" className="flex-1 m-0 min-h-0 flex flex-col items-center justify-center p-6 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <ListBullets className="h-6 w-6 text-primary" weight="fill" />
             </div>
-          </ScrollArea>
+            <div>
+              <p className="text-sm font-semibold tracking-tighter">Bảng theo dõi tiến trình</p>
+              <p className="text-xs text-muted-foreground tracking-tighter mt-1 leading-relaxed">
+                Toàn bộ yêu cầu tiếp tế đang hiển thị tại khu vực bên phải
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-primary tracking-wide uppercase mt-1">
+              <ArrowFatLinesRight className="h-3.5 w-3.5" weight="fill" />
+              Xem bảng bên phải
+            </div>
+          </div>
         </TabsContent>
 
-        {/* Empty Content for Vattu (forces sidebar to be empty below tabs when vat tu is active) */}
-        <TabsContent value="vattu" className="flex-1 m-0 mt-3 p-4 text-center text-sm text-muted-foreground font-medium">
-          Chi tiết vật tư hiển thị ở bên phải
+        {/* ── Vattu Tab ─────────────────────────────────────────────────── */}
+        <TabsContent value="vattu" className="flex-1 m-0 min-h-0 flex flex-col items-center justify-center p-6 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-14 w-14 rounded-2xl bg-muted/60 border flex items-center justify-center">
+              <Cube className="h-6 w-6 text-muted-foreground" weight="fill" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold tracking-tighter">Chi tiết vật tư</p>
+              <p className="text-xs text-muted-foreground tracking-tighter mt-1 leading-relaxed">
+                Thông tin vật tư đang hiển thị tại khu vực bên phải
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground tracking-wide uppercase mt-1">
+              <ArrowFatLinesRight className="h-3.5 w-3.5" />
+              Xem chi tiết bên phải
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ── Incoming Tab ──────────────────────────────────────────────── */}
+        <TabsContent value="incoming" className="flex-1 m-0 min-h-0 flex flex-col items-center justify-center p-6 text-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <BellRinging className="h-6 w-6 text-primary" weight="fill" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold tracking-tighter">Tiếp nhận yêu cầu</p>
+              <p className="text-xs text-muted-foreground tracking-tighter mt-1 leading-relaxed">
+                Trang quản lý và xử lý yêu cầu đang hiển thị bên phải
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-primary tracking-wide uppercase mt-1">
+              <ArrowFatLinesRight className="h-3.5 w-3.5" weight="fill" />
+              Xem trang bên phải
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
@@ -390,8 +377,128 @@ const DepotSidebar = ({
 
 export default DepotSidebar;
 
-// Inventory Item Card Component
-function InventoryItemCard({
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function KpiCell({
+  value,
+  label,
+  valueClass,
+  icon,
+  iconClass,
+  border,
+  pulse,
+}: {
+  value: number;
+  label: string;
+  valueClass: string;
+  icon: React.ReactNode;
+  iconClass: string;
+  border?: boolean;
+  pulse?: boolean;
+}) {
+  return (
+    <div className={cn("flex flex-col items-center py-3 gap-0.5 relative", border && "border-l border-border/50")}>
+      <div className={cn("flex items-center gap-1", iconClass)}>
+        {icon}
+        {pulse && value > 0 && (
+          <span className="relative flex h-1.5 w-1.5 ml-0.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-current" />
+          </span>
+        )}
+      </div>
+      <span className={cn("text-xl tracking-tighter font-bold leading-tight tabular-nums", valueClass)}>
+        {value}
+      </span>
+      <span className="text-[12px] tracking-tighter font-semibold text-muted-foreground">{label}</span>
+    </div>
+  );
+}
+
+function TabTriggerWithDot({
+  value,
+  label,
+  icon,
+  dot,
+}: {
+  value: string;
+  label: string;
+  icon: React.ReactNode;
+  dot: boolean;
+}) {
+  return (
+    <TabsTrigger
+      value={value}
+      className="relative w-full flex flex-row items-center gap-3 px-3 py-2.5 text-sm font-medium tracking-tight text-left justify-start data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none hover:bg-muted/60 transition-colors leading-none"
+    >
+      <span className="shrink-0 text-muted-foreground data-[state=active]:text-primary">{icon}</span>
+      <span className="flex-1">{label}</span>
+      {dot && (
+        <span className="relative flex h-2 w-2 shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+        </span>
+      )}
+    </TabsTrigger>
+  );
+}
+
+function CategoryChip({
+  active,
+  onClick,
+  label,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide transition-colors",
+        active
+          ? "bg-primary text-primary-foreground"
+          : "bg-muted text-muted-foreground hover:bg-muted/80",
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function SectionHeader({
+  label,
+  color,
+  icon,
+}: {
+  label: string;
+  color: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className={cn("flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest", color)}>
+      {icon}
+      <span>{label}</span>
+      <div className="flex-1 h-px bg-current opacity-20 ml-1" />
+    </div>
+  );
+}
+
+function EmptyState({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 text-muted-foreground/50 gap-2">
+      <div className="opacity-40">{icon}</div>
+      <p className="text-xs tracking-tighter">{label}</p>
+    </div>
+  );
+}
+
+function InventoryItemRow({
   item,
   isSelected,
   onClick,
@@ -400,230 +507,109 @@ function InventoryItemCard({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const stockPercentage = Math.min((item.quantity / item.maxStock) * 100, 100);
+  const pct = Math.min((item.quantity / item.maxStock) * 100, 100);
+  const barColor =
+    item.stockLevel === "CRITICAL"
+      ? "bg-red-500"
+      : item.stockLevel === "LOW"
+        ? "bg-orange-400"
+        : item.stockLevel === "OVERSTOCKED"
+          ? "bg-blue-500"
+          : "bg-green-500";
+
+  const borderColor =
+    item.stockLevel === "CRITICAL"
+      ? "border-l-red-500"
+      : item.stockLevel === "LOW"
+        ? "border-l-orange-400"
+        : "border-l-transparent";
 
   return (
-    <Card
-      className={cn(
-        "cursor-pointer transition-all hover:shadow-md",
-        isSelected && "ring-2 ring-primary",
-        item.stockLevel === "CRITICAL" && "border-l-4 border-l-red-500",
-        item.stockLevel === "LOW" && "border-l-4 border-l-orange-500",
-      )}
+    <button
+      type="button"
       onClick={onClick}
+      className={cn(
+        "w-full text-left rounded-lg border bg-card px-3 py-2.5 transition-all hover:bg-muted/50 hover:shadow-sm border-l-2 group",
+        borderColor,
+        isSelected && "ring-1 ring-primary bg-primary/5",
+      )}
     >
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="p-1.5 rounded-md bg-muted">
-              {categoryIcons[item.category]}
-            </div>
-            <div className="min-w-0">
-              <h4 className="font-medium text-sm truncate">{item.name}</h4>
-              <p className="text-xs text-muted-foreground">
-                {item.sku} • {item.location}
-              </p>
-            </div>
-          </div>
-          <Badge
-            variant={getStockLevelBadgeVariant(item.stockLevel)}
-            className="shrink-0 text-xs"
-          >
-            {stockLevelNames[item.stockLevel]}
-          </Badge>
-        </div>
-
-        {/* Stock Progress */}
-        <div className="mt-3">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-muted-foreground">Tồn kho</span>
-            <span className="font-medium">
-              {item.quantity} / {item.maxStock} {item.unit}
-            </span>
-          </div>
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all",
-                item.stockLevel === "CRITICAL" && "bg-red-500",
-                item.stockLevel === "LOW" && "bg-orange-500",
-                item.stockLevel === "NORMAL" && "bg-green-500",
-                item.stockLevel === "OVERSTOCKED" && "bg-blue-500",
-              )}
-              style={{ width: `${stockPercentage}%` }}
-            />
-          </div>
-          {item.quantity < item.minStock && (
-            <p className="text-xs text-red-500 mt-1">
-              Cần bổ sung: {item.minStock - item.quantity} {item.unit}
-            </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold tracking-tighter truncate flex-1">{item.name}</p>
+        <span
+          className={cn(
+            "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
+            item.stockLevel === "CRITICAL"
+              ? "bg-red-100 text-red-600"
+              : item.stockLevel === "LOW"
+                ? "bg-orange-100 text-orange-600"
+                : "bg-green-100 text-green-600",
           )}
-        </div>
-      </CardContent>
-    </Card>
+        >
+          {item.quantity}
+          <span className="font-normal opacity-70"> {item.unit}</span>
+        </span>
+      </div>
+      <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
+        <div
+          className={cn("h-full rounded-full transition-all", barColor)}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-[10px] text-muted-foreground mt-1 tracking-tighter">
+        {item.sku} · {item.location}
+      </p>
+    </button>
   );
 }
 
-// Request Card Component
-function RequestCard({
+function RequestRow({
   request,
   isSelected,
   onClick,
+  accentColor,
 }: {
   request: SupplyRequest;
   isSelected: boolean;
   onClick: () => void;
+  accentColor: "amber" | "blue";
 }) {
-  const statusConfig: Record<
-    string,
-    {
-      label: string;
-      variant: "default" | "warning" | "info" | "success" | "destructive";
-    }
-  > = {
-    PENDING: { label: "Chờ duyệt", variant: "warning" },
-    APPROVED: { label: "Đã duyệt", variant: "info" },
-    IN_TRANSIT: { label: "Đang giao", variant: "info" },
-    DELIVERED: { label: "Hoàn thành", variant: "success" },
-    CANCELLED: { label: "Đã hủy", variant: "destructive" },
-  };
-
-  const priorityConfig: Record<string, { label: string; color: string }> = {
-    HIGH: { label: "Cao", color: "text-red-500" },
-    MEDIUM: { label: "TB", color: "text-orange-500" },
-    LOW: { label: "Thấp", color: "text-green-500" },
-  };
+  const isInbound = request.type === "INBOUND";
 
   return (
-    <Card
-      className={cn(
-        "cursor-pointer transition-all hover:shadow-md",
-        isSelected && "ring-2 ring-primary",
-        request.priority === "HIGH" && "border-l-4 border-l-red-500",
-      )}
+    <button
+      type="button"
       onClick={onClick}
+      className={cn(
+        "w-full text-left rounded-lg border bg-card px-3 py-2.5 transition-all hover:bg-muted/50 hover:shadow-sm border-l-2 group",
+        accentColor === "amber" ? "border-l-amber-400" : "border-l-blue-400",
+        isSelected && "ring-1 ring-primary bg-primary/5",
+      )}
     >
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {request.type === "INBOUND" ? (
-              <ArrowLineDown className="h-4 w-4 text-green-500" />
-            ) : (
-              <ArrowLineUp className="h-4 w-4 text-blue-500" />
-            )}
-            <div>
-              <h4 className="font-medium text-sm">
-                {request.type === "INBOUND" ? "Nhập kho" : "Xuất kho"}
-              </h4>
-              <p className="text-xs text-muted-foreground">{request.id}</p>
-            </div>
-          </div>
-          <Badge
-            variant={statusConfig[request.status].variant}
-            className="text-xs"
-          >
-            {statusConfig[request.status].label}
-          </Badge>
-        </div>
-
-        <div className="mt-2 text-xs text-muted-foreground">
-          <p className="truncate">{request.requestedBy}</p>
-          <p className="flex items-center gap-1 mt-1">
-            <span className={priorityConfig[request.priority].color}>
-              ● {priorityConfig[request.priority].label}
-            </span>
-            <span>• {request.items.length} mặt hàng</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {isInbound ? (
+            <ArrowLineDown className="h-3.5 w-3.5 text-green-500 shrink-0" weight="bold" />
+          ) : (
+            <ArrowLineUp className="h-3.5 w-3.5 text-blue-500 shrink-0" weight="bold" />
+          )}
+          <p className="text-xs font-semibold tracking-tighter truncate">
+            {isInbound ? "Nhập kho" : "Xuất kho"}
           </p>
         </div>
-
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-xs text-muted-foreground">
-            {request.notes ? request.notes.substring(0, 30) + "..." : ""}
+        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+      </div>
+      <p className="text-[11px] text-muted-foreground truncate mt-1 tracking-tighter">
+        {request.requestedBy}
+      </p>
+      <div className="flex items-center justify-between mt-1.5">
+        <span className="text-[10px] text-muted-foreground">{request.items.length} mặt hàng</span>
+        {request.notes && (
+          <span className="text-[10px] text-muted-foreground truncate max-w-24">
+            {request.notes.substring(0, 20)}…
           </span>
-          <CaretRight className="h-4 w-4 text-muted-foreground" weight="bold" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// Shipment Card Component
-function ShipmentCard({
-  shipment,
-  onClick,
-}: {
-  shipment: Shipment;
-  onClick: () => void;
-}) {
-  const statusConfig: Record<
-    string,
-    { label: string; icon: React.ReactNode; color: string }
-  > = {
-    PREPARING: {
-      label: "Đang chuẩn bị",
-      icon: <Package className="h-3 w-3" />,
-      color: "text-yellow-500",
-    },
-    IN_TRANSIT: {
-      label: "Đang vận chuyển",
-      icon: <Truck className="h-3 w-3" />,
-      color: "text-blue-500",
-    },
-    DELIVERED: {
-      label: "Đã giao",
-      icon: <CheckCircle className="h-3 w-3" weight="fill" />,
-      color: "text-green-500",
-    },
-    RETURNED: {
-      label: "Đã trả",
-      icon: <XCircle className="h-3 w-3" weight="fill" />,
-      color: "text-red-500",
-    },
-  };
-
-  return (
-    <Card
-      className="cursor-pointer transition-all hover:shadow-md"
-      onClick={onClick}
-    >
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Truck className="h-4 w-4 text-primary" />
-            <div>
-              <h4 className="font-medium text-sm">{shipment.id}</h4>
-              <p className="text-xs text-muted-foreground">
-                {shipment.carrier}
-              </p>
-            </div>
-          </div>
-          <div
-            className={cn(
-              "flex items-center gap-1 text-xs",
-              statusConfig[shipment.status].color,
-            )}
-          >
-            {statusConfig[shipment.status].icon}
-            {statusConfig[shipment.status].label}
-          </div>
-        </div>
-
-        <div className="mt-2 text-xs">
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <span className="font-medium">Từ:</span> {shipment.origin}
-          </div>
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <span className="font-medium">Đến:</span> {shipment.destination}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-xs text-muted-foreground">
-            {shipment.items.length} mặt hàng
-          </span>
-          <CaretRight className="h-4 w-4 text-muted-foreground" weight="bold" />
-        </div>
-      </CardContent>
-    </Card>
+        )}
+      </div>
+    </button>
   );
 }

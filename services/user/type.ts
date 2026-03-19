@@ -72,6 +72,29 @@ export interface GetUsersParams {
   search?: string;
 }
 
+// Response for rescuers list (no pagination metadata)
+export interface GetRescuersResponse {
+  items: UserEntity[];
+}
+
+// Query params for fetching rescuers
+export interface GetRescuersParams {
+  isBanned?: boolean;
+  search?: string;
+}
+
+// For permission assignment search
+export interface GetUsersForPermissionParams {
+  search?: string;
+  pageSize?: number;
+  roleId?: number;
+}
+
+export interface GetUsersForPermissionResponse {
+  items: UserEntity[];
+  totalCount: number;
+}
+
 export interface AdminUpdateUserRequest {
   firstName?: string;
   lastName?: string;
