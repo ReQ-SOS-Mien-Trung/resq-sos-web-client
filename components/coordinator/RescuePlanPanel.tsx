@@ -129,15 +129,44 @@ const formatTeamTypeLabel = (teamType?: string | null) => {
   return TEAM_TYPE_LABELS[normalized] ?? teamType;
 };
 
+const buildLeafletMapKey = (points: [number, number][]) =>
+  points.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join("|");
+
 const RoutePreviewFitBounds = ({ points }: { points: [number, number][] }) => {
   const map = useMap();
 
   useEffect(() => {
-    if (!map || points.length < 2) return;
-    map.fitBounds(points, {
-      padding: [30, 30],
-      maxZoom: 15,
+    if (!map || points.length === 0) return;
+
+    let cancelled = false;
+    const frame = requestAnimationFrame(() => {
+      if (cancelled) return;
+
+      try {
+        const container = map.getContainer();
+        if (!container || !map._loaded) return;
+
+        map.invalidateSize(false);
+
+        if (points.length < 2) {
+          map.setView(points[0], 15, { animate: false });
+          return;
+        }
+
+        map.fitBounds(points, {
+          padding: [30, 30],
+          maxZoom: 15,
+          animate: false,
+        });
+      } catch {
+        // Ignore transient Leaflet teardown/re-init races during HMR or remount.
+      }
     });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
   }, [map, points]);
 
   return null;
@@ -182,9 +211,12 @@ const RoutePreviewMap = ({
   origin: { lat: number; lng: number };
   destination: { lat: number; lng: number };
 }) => {
+  const mapKey = buildLeafletMapKey(points);
+
   return (
     <div className="h-72 overflow-hidden rounded-lg border bg-background">
       <MapContainer
+        key={mapKey}
         center={points[0]}
         zoom={10}
         scrollWheelZoom={true}
@@ -417,64 +449,80 @@ const DepotInventoryCard = ({
           ))
         ) : data?.items && data.items.length > 0 ? (
           data.items
-            .filter((item) => item.availableQuantity > 0)
-            .map((item) => (
-              <div
-                key={item.reliefItemId}
-                draggable={isDraggable}
-                onDragStart={
-                  isDraggable
-                    ? (e) => {
-                        const itemWithUnit = item as typeof item & {
-                          unit?: string;
-                          unitName?: string;
-                        };
-                        const rawUnit =
-                          (typeof itemWithUnit.unit === "string"
-                            ? itemWithUnit.unit.trim()
-                            : "") ||
-                          (typeof itemWithUnit.unitName === "string"
-                            ? itemWithUnit.unitName.trim()
-                            : "");
+            .filter((item) =>
+              item.itemType === "Reusable"
+                ? item.availableUnit > 0
+                : item.availableQuantity > 0,
+            )
+            .map((item, index) =>
+              // Inventory API returns a union shape. Normalize fields for rendering and DnD.
+              (() => {
+                const availableQuantity =
+                  item.itemType === "Reusable"
+                    ? item.availableUnit
+                    : item.availableQuantity;
+                const itemId = item.itemModelId;
+                const itemName = item.itemModelName;
 
-                        e.dataTransfer.setData(
-                          "application/inventory-item",
-                          JSON.stringify({
-                            itemId: item.reliefItemId,
-                            itemName: item.reliefItemName,
-                            availableQuantity: item.availableQuantity,
-                            categoryName: item.categoryName,
-                            unit: rawUnit || null,
-                          }),
-                        );
-                        e.dataTransfer.effectAllowed = "copy";
-                      }
-                    : undefined
-                }
-                className={cn(
-                  "flex items-center gap-2 p-1.5 rounded border bg-background transition-colors",
-                  isDraggable
-                    ? "hover:bg-accent/30 cursor-grab active:cursor-grabbing"
-                    : "cursor-default",
-                )}
-              >
-                <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-medium truncate">
-                    {item.reliefItemName}
-                  </p>
-                  <p className="text-[9px] text-muted-foreground">
-                    {item.categoryName}
-                  </p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className="text-[9px] h-4 px-1 shrink-0 font-bold"
-                >
-                  {item.availableQuantity}
-                </Badge>
-              </div>
-            ))
+                return (
+                  <div
+                    key={`${depotId}-${itemId}-${item.itemType}-${index}`}
+                    draggable={isDraggable}
+                    onDragStart={
+                      isDraggable
+                        ? (e) => {
+                            const itemWithUnit = item as typeof item & {
+                              unit?: string;
+                              unitName?: string;
+                            };
+                            const rawUnit =
+                              (typeof itemWithUnit.unit === "string"
+                                ? itemWithUnit.unit.trim()
+                                : "") ||
+                              (typeof itemWithUnit.unitName === "string"
+                                ? itemWithUnit.unitName.trim()
+                                : "");
+
+                            e.dataTransfer.setData(
+                              "application/inventory-item",
+                              JSON.stringify({
+                                itemId,
+                                itemName,
+                                availableQuantity,
+                                categoryName: item.categoryName,
+                                unit: rawUnit || null,
+                              }),
+                            );
+                            e.dataTransfer.effectAllowed = "copy";
+                          }
+                        : undefined
+                    }
+                    className={cn(
+                      "flex items-center gap-2 p-1.5 rounded border bg-background transition-colors",
+                      isDraggable
+                        ? "hover:bg-accent/30 cursor-grab active:cursor-grabbing"
+                        : "cursor-default",
+                    )}
+                  >
+                    <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium truncate">
+                        {itemName}
+                      </p>
+                      <p className="text-[9px] text-muted-foreground">
+                        {item.categoryName}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] h-4 px-1 shrink-0 font-bold"
+                    >
+                      {availableQuantity}
+                    </Badge>
+                  </div>
+                );
+              })(),
+            )
         ) : (
           <p className="text-[10px] text-muted-foreground text-center py-2">
             Kho trống
@@ -1487,6 +1535,7 @@ const MissionRoutePreview = ({
   }
 
   const allPoints = segments.flatMap((s) => s.points);
+  const missionRouteMapKey = buildLeafletMapKey(allPoints);
 
   const formatDuration = (seconds: number) => {
     if (seconds < 60) return `${seconds}s`;
@@ -1590,6 +1639,7 @@ const MissionRoutePreview = ({
           {originCoords && allPoints.length > 1 && (
             <div className="h-[28rem] overflow-hidden rounded-lg border bg-background">
               <MapContainer
+                key={missionRouteMapKey}
                 center={allPoints[0]}
                 zoom={10}
                 scrollWheelZoom={true}

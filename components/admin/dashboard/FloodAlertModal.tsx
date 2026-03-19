@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import {
   Dialog,
   DialogContent,
@@ -22,18 +23,92 @@ import {
   Lightning,
 } from "@phosphor-icons/react";
 import {
+  BroadcastNotificationPayload,
   BroadcastNotificationType,
   useBroadcastNotification,
 } from "@/services/noti_alert";
 import { toast } from "sonner";
+import { geocodeCity } from "@/components/admin/weather-flood/geocode";
+
+const LocationPickerMap = dynamic(
+  () => import("@/components/admin/weather-flood/LocationPickerMap"),
+  { ssr: false },
+);
+
+const ALERT_SEVERITY_BY_TYPE: Record<BroadcastNotificationType, string> = {
+  FLOOD_WARNING: "MEDIUM",
+  FLOOD_EMERGENCY: "HIGH",
+  EVACUATION: "CRITICAL",
+};
+
+const ALERT_CHECKLIST_BY_TYPE: Record<BroadcastNotificationType, string[]> = {
+  FLOOD_WARNING: [
+    "Theo doi muc nuoc trong 6 gio tiep theo",
+    "Thong bao som cho ho dan khu vuc ven song",
+    "Kiem tra san sang vat tu phong chong lu",
+  ],
+  FLOOD_EMERGENCY: [
+    "Han che di chuyen qua khu vuc ngap",
+    "Kich hoat doi ung cuu dia phuong",
+    "Thong bao khan cho cac khu vuc co nguy co cao",
+  ],
+  EVACUATION: [
+    "Trien khai so tan nguoi dan khu vuc nguy hiem",
+    "Mo diem tap ket tam thoi va huong dan luu thong",
+    "Uu tien ho tro nguoi gia, tre em va nguoi khuyet tat",
+  ],
+};
+
+function buildBroadcastPayload(params: {
+  title: string;
+  body: string;
+  type: BroadcastNotificationType;
+  city: string;
+  lat: number;
+  lon: number;
+}): BroadcastNotificationPayload {
+  const now = new Date();
+  const endTime = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+  const cityName = params.city.trim() || "Pinned Location";
+
+  return {
+    location: {
+      city: cityName,
+      lat: params.lat,
+      lon: params.lon,
+    },
+    activeAlerts: [
+      {
+        id: globalThis.crypto?.randomUUID?.() ?? `alert-${Date.now()}`,
+        eventType: params.type,
+        title: params.title.trim(),
+        severity: ALERT_SEVERITY_BY_TYPE[params.type],
+        areasAffected: [cityName],
+        startTime: now.toISOString(),
+        endTime: endTime.toISOString(),
+        description: params.body.trim(),
+        instructionChecklist: ALERT_CHECKLIST_BY_TYPE[params.type],
+        source: "RESQ SOS Admin Dashboard",
+      },
+    ],
+  };
+}
 
 const PRESET_TYPES: Array<{
   value: BroadcastNotificationType;
   label: string;
   icon: ReactNode;
 }> = [
-  { value: "FLOOD_WARNING", label: "Cảnh báo lũ", icon: <WaveSine size={14} /> },
-  { value: "FLOOD_EMERGENCY", label: "Khẩn cấp lũ", icon: <Lightning size={14} /> },
+  {
+    value: "FLOOD_WARNING",
+    label: "Cảnh báo lũ",
+    icon: <WaveSine size={14} />,
+  },
+  {
+    value: "FLOOD_EMERGENCY",
+    label: "Khẩn cấp lũ",
+    icon: <Lightning size={14} />,
+  },
   { value: "EVACUATION", label: "Sơ tán", icon: <BellRinging size={14} /> },
 ];
 
@@ -67,6 +142,12 @@ interface Props {
 export function FloodAlertModal({ open, onOpenChange }: Props) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [city, setCity] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState<{
+    lat: number;
+    lon: number;
+  } | null>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
   const [type, setType] = useState<BroadcastNotificationType>("FLOOD_WARNING");
   const [confirmed, setConfirmed] = useState(false);
 
@@ -75,6 +156,9 @@ export function FloodAlertModal({ open, onOpenChange }: Props) {
   const reset = () => {
     setTitle("");
     setBody("");
+    setCity("");
+    setSelectedLocation(null);
+    setIsGeocoding(false);
     setType("FLOOD_WARNING");
     setConfirmed(false);
   };
@@ -91,12 +175,25 @@ export function FloodAlertModal({ open, onOpenChange }: Props) {
   };
 
   const handleSend = () => {
-    if (!title.trim() || !body.trim()) {
-      toast.error("Vui lòng điền đầy đủ tiêu đề và nội dung");
+    if (!title.trim() || !body.trim() || !city.trim()) {
+      toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
       return;
     }
+
+    if (!selectedLocation) {
+      toast.error("Vui lòng chọn vị trí trên bản đồ");
+      return;
+    }
+
     broadcast(
-      { title: title.trim(), body: body.trim(), type },
+      buildBroadcastPayload({
+        title,
+        body,
+        type,
+        city,
+        lat: selectedLocation.lat,
+        lon: selectedLocation.lon,
+      }),
       {
         onSuccess: () => {
           toast.success("Đã phát cảnh báo đến toàn bộ người dùng!");
@@ -109,11 +206,40 @@ export function FloodAlertModal({ open, onOpenChange }: Props) {
     );
   };
 
-  const canSend = title.trim().length > 0 && body.trim().length > 0 && confirmed;
+  const canSend =
+    title.trim().length > 0 &&
+    body.trim().length > 0 &&
+    city.trim().length > 0 &&
+    !!selectedLocation &&
+    confirmed;
+
+  const handleSearchCity = async () => {
+    const query = city.trim();
+    if (!query) {
+      toast.error("Vui lòng nhập thành phố cần tìm");
+      return;
+    }
+
+    setIsGeocoding(true);
+    try {
+      const result = await geocodeCity(query);
+      if (!result) {
+        toast.error("Không tìm thấy thành phố, vui lòng thử từ khóa khác");
+        return;
+      }
+
+      setSelectedLocation({ lat: result.lat, lon: result.lon });
+      toast.success(`Đã định vị: ${result.displayName}`);
+    } catch {
+      toast.error("Không thể tìm vị trí thành phố, vui lòng thử lại");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg p-0 overflow-hidden gap-0">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
         {/* Header */}
         <div className="bg-linear-to-r from-red-600 to-orange-500 px-6 py-5 text-white">
           <DialogHeader>
@@ -133,7 +259,7 @@ export function FloodAlertModal({ open, onOpenChange }: Props) {
           </DialogHeader>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="flex-1 space-y-5 overflow-y-auto p-6">
           {/* Preset templates */}
           <div>
             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 block">
@@ -185,7 +311,10 @@ export function FloodAlertModal({ open, onOpenChange }: Props) {
 
           {/* Title */}
           <div>
-            <Label htmlFor="alert-title" className="text-sm font-medium tracking-tight mb-1.5 block">
+            <Label
+              htmlFor="alert-title"
+              className="text-sm font-medium tracking-tight mb-1.5 block"
+            >
               Tiêu đề <span className="text-red-500">*</span>
             </Label>
             <Input
@@ -196,12 +325,17 @@ export function FloodAlertModal({ open, onOpenChange }: Props) {
               className="tracking-tight"
               maxLength={100}
             />
-            <p className="text-[11px] text-muted-foreground mt-1 text-right">{title.length}/100</p>
+            <p className="text-[11px] text-muted-foreground mt-1 text-right">
+              {title.length}/100
+            </p>
           </div>
 
           {/* Body */}
           <div>
-            <Label htmlFor="alert-body" className="text-sm font-medium tracking-tight mb-1.5 block">
+            <Label
+              htmlFor="alert-body"
+              className="text-sm font-medium tracking-tight mb-1.5 block"
+            >
               Nội dung <span className="text-red-500">*</span>
             </Label>
             <Textarea
@@ -212,7 +346,53 @@ export function FloodAlertModal({ open, onOpenChange }: Props) {
               className="tracking-tight resize-none min-h-24"
               maxLength={500}
             />
-            <p className="text-[11px] text-muted-foreground mt-1 text-right">{body.length}/500</p>
+            <p className="text-[11px] text-muted-foreground mt-1 text-right">
+              {body.length}/500
+            </p>
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium tracking-tight mb-1.5 block">
+              Vị trí cảnh báo <span className="text-red-500">*</span>
+            </Label>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nhập thành phố (VD: Da Nang, Quang Nam...)"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleSearchCity();
+                    }
+                  }}
+                  className="tracking-tight"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleSearchCity()}
+                  disabled={isPending || isGeocoding}
+                  className="shrink-0"
+                >
+                  {isGeocoding ? "Đang tìm..." : "Tìm"}
+                </Button>
+              </div>
+              <LocationPickerMap
+                lat={selectedLocation?.lat}
+                lon={selectedLocation?.lon}
+                onPick={(pickedLat, pickedLon) =>
+                  setSelectedLocation({ lat: pickedLat, lon: pickedLon })
+                }
+                heightClassName="h-56"
+              />
+              <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                {selectedLocation
+                  ? "Đã chọn vị trí trên bản đồ"
+                  : "Nhập thành phố để tìm nhanh hoặc nhấn trực tiếp vào bản đồ"}
+              </div>
+            </div>
           </div>
 
           {/* Confirm checkbox */}
@@ -226,15 +406,24 @@ export function FloodAlertModal({ open, onOpenChange }: Props) {
               />
             </div>
             <p className="text-xs text-muted-foreground tracking-tight leading-relaxed group-hover:text-foreground transition-colors">
-              Tôi xác nhận phát thông báo này đến <span className="font-semibold text-foreground">toàn bộ người dùng</span> trong hệ thống. Hành động này không thể hoàn tác.
+              Tôi xác nhận phát thông báo này đến{" "}
+              <span className="font-semibold text-foreground">
+                toàn bộ người dùng
+              </span>{" "}
+              trong hệ thống. Hành động này không thể hoàn tác.
             </p>
           </label>
 
           {/* Warning banner */}
           <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-            <Warning size={16} className="text-amber-600 mt-0.5 shrink-0" weight="fill" />
+            <Warning
+              size={16}
+              className="text-amber-600 mt-0.5 shrink-0"
+              weight="fill"
+            />
             <p className="text-xs text-amber-800 tracking-tight leading-relaxed">
-              Cảnh báo sẽ được đẩy thông báo ngay lập tức. Đảm bảo thông tin chính xác trước khi gửi.
+              Cảnh báo sẽ được đẩy thông báo ngay lập tức. Đảm bảo thông tin
+              chính xác trước khi gửi.
             </p>
           </div>
 
