@@ -14,7 +14,7 @@ export interface AssemblyPointEntity {
   name: string;
   latitude: number;
   longitude: number;
-  capacityTeams: number;
+  maxCapacity: number;
   status: AssemblyPointStatus;
   lastUpdatedAt: string;
 }
@@ -78,7 +78,7 @@ export interface CreateAssemblyPointRequest {
   name: string;
   latitude: number;
   longitude: number;
-  capacityTeams: number;
+  maxCapacity: number;
 }
 
 // Create Assembly Point Response
@@ -86,7 +86,7 @@ export interface CreateAssemblyPointResponse {
   id: number;
   code: string;
   name: string;
-  capacityTeams: number;
+  maxCapacity: number;
   status: AssemblyPointStatus;
 }
 
@@ -96,7 +96,7 @@ export interface UpdateAssemblyPointRequest {
   name: string;
   latitude: number;
   longitude: number;
-  capacityTeams: number;
+  maxCapacity: number;
 }
 
 // Update Assembly Point Response
@@ -106,7 +106,7 @@ export interface UpdateAssemblyPointResponse {
   name: string;
   latitude: number;
   longitude: number;
-  capacityTeams: number;
+  maxCapacity: number;
   status: AssemblyPointStatus;
   lastUpdatedAt: string;
 }

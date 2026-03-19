@@ -36,6 +36,7 @@ import {
   Buildings,
   CaretDown,
   Package,
+  Wallet,
 } from "@phosphor-icons/react";
 import {
   CategoryOverview,
@@ -546,6 +547,15 @@ const InventoryDashboardPage = () => {
           >
             <FileTextIcon className="h-4 w-4" />
             Truy xuất
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden md:flex gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+            onClick={() => router.push("/dashboard/inventory/funding-request")}
+          >
+            <Wallet className="h-4 w-4" />
+            Yêu cầu cấp quỹ
           </Button>
 
           {/* Notifications */}

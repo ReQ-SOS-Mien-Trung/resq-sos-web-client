@@ -868,7 +868,7 @@ export interface CoordinatorMapProps {
     name: string;
     latitude: number;
     longitude: number;
-    capacityTeams: number;
+    maxCapacity: number;
     status: "Active" | "Overloaded" | "Unavailable";
     lastUpdatedAt: string;
   }[];
@@ -914,7 +914,7 @@ export interface AssemblyPoint {
   name: string;
   latitude: number;
   longitude: number;
-  capacityTeams: number;
+  maxCapacity: number;
   status: "Active" | "Overloaded" | "Unavailable";
   lastUpdatedAt: string;
 }

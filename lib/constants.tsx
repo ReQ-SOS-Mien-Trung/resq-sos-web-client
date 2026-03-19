@@ -345,22 +345,16 @@ export const navigationItems = [
     href: "/dashboard/admin/rescuer-verification",
   },
   {
+    icon: IdentificationCardIcon,
+    label: "Quản lý điểm tập kết",
+    href: "/dashboard/admin/assembly-points",
+  },
+  {
     icon: FadersIcon,
     label: "Điều chỉnh tham số hệ thống",
     href: "/dashboard/admin/config",
   },
-  {
-    icon: CloudSun,
-    label: "Bài đăng thời tiết",
-    href: "/dashboard/admin/weather-posts",
-  },
-  {
-    icon: Drop,
-    label: "Thời tiết & Lũ lụt",
-    href: "/dashboard/admin/weather-flood",
-  },
-  { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
-  
+  { icon: ChartBar, label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
   {
     icon: Robot,
     label: "Cấu hình AI Prompt",
@@ -381,6 +375,16 @@ export const navigationItems = [
     label: "Khoanh vùng cứu hộ",
     href: "/dashboard/admin/map-zone",
   },
+  {
+    icon: CloudSun,
+    label: "Bài đăng thời tiết",
+    href: "/dashboard/admin/weather-posts",
+  },
+  {
+    icon: Drop,
+    label: "Thời tiết & Lũ lụt",
+    href: "/dashboard/admin/weather-flood",
+  }
 ];
 
 export const getFavoriteIcon = (name: string) => {

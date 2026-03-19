@@ -631,7 +631,7 @@ function AssemblyPointDetails({
         {/* Capacity */}
         <InfoRow
           icon={<Users className="h-5 w-5" />}
-          primary={`${displayAssemblyPoint.capacityTeams} đội`}
+          primary={`${displayAssemblyPoint.maxCapacity} người`}
           secondary="Sức chứa đội cứu hộ"
         />
 
@@ -758,7 +758,7 @@ function AssemblyPointDetails({
             />
             <StatCard
               label="Sức chứa"
-              value={`${displayAssemblyPoint.capacityTeams} đội`}
+              value={`${displayAssemblyPoint.maxCapacity} người`}
               icon={<Users className="h-4 w-4" />}
             />
             <StatCard

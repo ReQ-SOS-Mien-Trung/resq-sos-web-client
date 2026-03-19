@@ -7,6 +7,12 @@ export interface DepotStatusMetadata {
   label: string;
 }
 
+// Depot Metadata (from /logistics/depot/metadata/depots) - key/value pairs
+export interface DepotMetadataItem {
+  key: number;
+  value: string;
+}
+
 // Depot Manager
 export interface DepotManager {
   id: string;
@@ -76,4 +82,12 @@ export interface UpdateDepotStatusResponse {
   id: number;
   status: DepotStatus;
   message: string;
+}
+
+// Depot Fund (from /logistics/depot/funds & /logistics/depot/my-fund)
+export interface DepotFund {
+  depotId: number;
+  depotName: string;
+  balance: number;
+  lastUpdatedAt: string;
 }

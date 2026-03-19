@@ -783,7 +783,7 @@ export default function CreateRescueTeamPage() {
                           (p) => String(p.id) === assemblyPointId,
                         );
                         return point
-                          ? `Sức chứa khả dụng: ${point.capacityTeams} đội`
+                          ? `Sức chứa khả dụng: ${point.maxCapacity} người`
                           : null;
                       })()}
                     </span>

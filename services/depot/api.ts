@@ -5,6 +5,8 @@ import {
   CreateDepotRequest,
   DepotEntity,
   DepotStatusMetadata,
+  DepotMetadataItem,
+  DepotFund,
   UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
@@ -45,6 +47,15 @@ export async function getDepotStatuses(): Promise<DepotStatusMetadata[]> {
 }
 
 /**
+ * Get depot metadata (key-value pairs for dropdown)
+ * GET /logistics/depot/metadata/depots
+ */
+export async function getDepotMetadata(): Promise<DepotMetadataItem[]> {
+  const { data } = await api.get("/logistics/depot/metadata/depots");
+  return data;
+}
+
+/**
  * Create a new depot
  * POST /logistics/depot
  */
@@ -81,5 +92,23 @@ export async function updateDepotStatus(
       params: { Status: request.status },
     },
   );
+  return data;
+}
+
+/**
+ * [Admin] Get all depot funds
+ * GET /logistics/depot/funds
+ */
+export async function getDepotFunds(): Promise<DepotFund[]> {
+  const { data } = await api.get("/logistics/depot/funds");
+  return data;
+}
+
+/**
+ * [Manager] Get my depot fund
+ * GET /logistics/depot/my-fund
+ */
+export async function getMyDepotFund(): Promise<DepotFund> {
+  const { data } = await api.get("/logistics/depot/my-fund");
   return data;
 }
