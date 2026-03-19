@@ -13,6 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ChatComposer,
   ChatConnectionBadge,
   ChatMessageThread,
@@ -68,6 +76,7 @@ export default function CoordinatorChatPage() {
   const [activeStatus, setActiveStatus] = useState<
     "WaitingCoordinator" | "CoordinatorActive"
   >("WaitingCoordinator");
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [unreadByConversation, setUnreadByConversation] = useState<
     Record<number, number>
   >({});
@@ -396,14 +405,6 @@ export default function CoordinatorChatPage() {
       return;
     }
 
-    const shouldLeave = window.confirm(
-      "Bạn có chắc muốn rời cuộc trò chuyện này không?",
-    );
-
-    if (!shouldLeave) {
-      return;
-    }
-
     const conversationId = activeConversationId;
 
     try {
@@ -421,6 +422,7 @@ export default function CoordinatorChatPage() {
         prev.filter((message) => message.conversationId !== conversationId),
       );
       markConversationAsRead(conversationId);
+      setLeaveDialogOpen(false);
       void refetchRooms();
       toast.success("Đã rời cuộc trò chuyện.");
     } catch (error: unknown) {
@@ -583,7 +585,7 @@ export default function CoordinatorChatPage() {
                     size="sm"
                     className="gap-1.5 rounded-none border-black text-black hover:bg-black hover:text-white"
                     onClick={() => {
-                      void handleLeaveConversation();
+                      setLeaveDialogOpen(true);
                     }}
                     disabled={leaveConversationMutation.isPending}
                   >
@@ -624,6 +626,36 @@ export default function CoordinatorChatPage() {
           )}
         </section>
       </div>
+
+      <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Rời cuộc trò chuyện</DialogTitle>
+            <DialogDescription>
+              Bạn có chắc muốn rời cuộc trò chuyện này không? Sau khi rời, phòng
+              sẽ quay về trạng thái chờ điều phối viên.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setLeaveDialogOpen(false)}
+              disabled={leaveConversationMutation.isPending}
+            >
+              Ở lại
+            </Button>
+            <Button
+              className="bg-[#FF5722] text-white hover:bg-[#e64a19]"
+              onClick={() => {
+                void handleLeaveConversation();
+              }}
+              disabled={leaveConversationMutation.isPending}
+            >
+              {leaveConversationMutation.isPending ? "Đang rời..." : "Rời chat"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
