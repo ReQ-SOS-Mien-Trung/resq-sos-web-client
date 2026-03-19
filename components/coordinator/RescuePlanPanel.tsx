@@ -425,6 +425,18 @@ const DepotInventoryCard = ({
                 onDragStart={
                   isDraggable
                     ? (e) => {
+                        const itemWithUnit = item as typeof item & {
+                          unit?: string;
+                          unitName?: string;
+                        };
+                        const rawUnit =
+                          (typeof itemWithUnit.unit === "string"
+                            ? itemWithUnit.unit.trim()
+                            : "") ||
+                          (typeof itemWithUnit.unitName === "string"
+                            ? itemWithUnit.unitName.trim()
+                            : "");
+
                         e.dataTransfer.setData(
                           "application/inventory-item",
                           JSON.stringify({
@@ -432,6 +444,7 @@ const DepotInventoryCard = ({
                             itemName: item.reliefItemName,
                             availableQuantity: item.availableQuantity,
                             categoryName: item.categoryName,
+                            unit: rawUnit || null,
                           }),
                         );
                         e.dataTransfer.effectAllowed = "copy";
@@ -731,6 +744,8 @@ interface WaypointMeta {
   labels: string[];
   hasSOS: boolean;
   hasDepot: boolean;
+  stepNumbers: number[];
+  stepRangeLabel: string;
 }
 
 type SupplyDisplayItem = {
@@ -790,6 +805,11 @@ function extractSOSLabel(activity: MissionActivity): string | null {
 }
 
 function extractDepotLabel(activity: MissionActivity): string | null {
+  // Only pickup steps should be labeled as depot points on the consolidated route.
+  if (activity.activityType !== "COLLECT_SUPPLIES") {
+    return null;
+  }
+
   const depotName =
     typeof activity.depotName === "string" ? activity.depotName.trim() : "";
   if (depotName) return depotName;
@@ -797,9 +817,7 @@ function extractDepotLabel(activity: MissionActivity): string | null {
   const target =
     typeof activity.target === "string" ? activity.target.trim() : "";
   const hasDepotKeyword = /\b(kho|depot)\b/i.test(target);
-  const isDepotActivity = activity.activityType === "COLLECT_SUPPLIES";
-
-  if (!isDepotActivity && !hasDepotKeyword) return null;
+  if (!hasDepotKeyword) return null;
   if (target && !SOS_TARGET_REGEX.test(target)) return target;
   return "Kho tiếp tế";
 }
@@ -1105,41 +1123,69 @@ function getWaypointMeta(
   waypoint: UniqueWaypoint,
   sosRequests: SOSRequest[],
 ): WaypointMeta {
-  const labels = new Set<string>();
+  const sosIds = new Set<string>();
   let hasSOS = false;
   let hasDepot = false;
-  const waypointHasDepot = waypoint.activities.some(
-    (activity) => !!extractDepotLabel(activity),
-  );
+
+  const pushSosId = (value: string | null | undefined) => {
+    if (!value) return;
+    const match = value.match(/(\d+)/);
+    if (!match?.[1]) return;
+    sosIds.add(match[1]);
+    hasSOS = true;
+  };
 
   for (const activity of waypoint.activities) {
     const depotLabel = extractDepotLabel(activity);
     if (depotLabel) {
-      labels.add(depotLabel);
       hasDepot = true;
+    }
+
+    if (typeof activity.sosRequestId === "number") {
+      pushSosId(String(activity.sosRequestId));
+      continue;
     }
 
     const sosLabel = extractSOSLabel(activity);
     if (sosLabel) {
-      labels.add(sosLabel);
-      hasSOS = true;
-    } else if (!waypointHasDepot && !depotLabel) {
+      pushSosId(sosLabel);
+    } else if (!depotLabel) {
       const inferredFromCoords = inferSOSLabelFromCoords(
         activity.targetLatitude,
         activity.targetLongitude,
         sosRequests,
       );
       if (inferredFromCoords) {
-        labels.add(inferredFromCoords);
-        hasSOS = true;
+        pushSosId(inferredFromCoords);
       }
     }
   }
 
+  const orderedLabels = Array.from(sosIds)
+    .sort((a, b) => Number(a) - Number(b))
+    .map((id) => `SOS ${id}`);
+
+  const stepNumbers = waypoint.activities
+    .map((activity) => activity.step)
+    .filter((step) => Number.isFinite(step))
+    .sort((a, b) => a - b);
+
+  const uniqueStepNumbers = Array.from(new Set(stepNumbers));
+  const firstStep = uniqueStepNumbers[0];
+  const lastStep = uniqueStepNumbers[uniqueStepNumbers.length - 1];
+  const stepRangeLabel =
+    uniqueStepNumbers.length === 0
+      ? ""
+      : firstStep === lastStep
+        ? `Bước ${firstStep}`
+        : `Bước ${firstStep}-${lastStep}`;
+
   return {
-    labels: Array.from(labels),
+    labels: orderedLabels,
     hasSOS,
     hasDepot,
+    stepNumbers: uniqueStepNumbers,
+    stepRangeLabel,
   };
 }
 
@@ -1586,10 +1632,10 @@ const MissionRoutePreview = ({
 
                   const markerColor = isLast
                     ? "#dc2626"
-                    : meta?.hasDepot
-                      ? "#a16207"
-                      : meta?.hasSOS
-                        ? "#2563eb"
+                    : meta?.hasSOS
+                      ? "#2563eb"
+                      : meta?.hasDepot
+                        ? "#a16207"
                         : segmentColors[idx % segmentColors.length];
 
                   return (
@@ -1936,6 +1982,7 @@ const RescuePlanPanel = ({
   const [editStartTime, setEditStartTime] = useState("");
   const [editExpectedEndTime, setEditExpectedEndTime] = useState("");
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
+  const supplyUnitByItemIdRef = useRef<Record<number, string>>({});
 
   const { mutate: createMission, isPending: isCreatingMission } =
     useCreateMission();
@@ -2002,22 +2049,61 @@ const RescuePlanPanel = ({
     });
   }, []);
 
+  useEffect(() => {
+    const next = { ...supplyUnitByItemIdRef.current };
+
+    for (const activity of editActivities) {
+      for (const supply of activity.suppliesToCollect ?? []) {
+        if (typeof supply.itemId !== "number") continue;
+        const unit = typeof supply.unit === "string" ? supply.unit.trim() : "";
+        if (unit) {
+          next[supply.itemId] = unit;
+        }
+      }
+    }
+
+    supplyUnitByItemIdRef.current = next;
+  }, [editActivities]);
+
   // ── Supply management for edit mode ──
   const handleAddSupply = useCallback(
     (
       activityId: string,
-      item: { itemId: number; itemName: string; availableQuantity: number },
+      item: {
+        itemId: number;
+        itemName: string;
+        availableQuantity: number;
+        unit?: string | null;
+      },
     ) => {
       setEditActivities((prev) =>
         prev.map((a) => {
           if (a._id !== activityId) return a;
+
+          const dragUnit =
+            typeof item.unit === "string" ? item.unit.trim() : "";
+          const cachedUnit =
+            supplyUnitByItemIdRef.current[item.itemId]?.trim() ?? "";
+          const resolvedUnit = dragUnit || cachedUnit || "đơn vị";
+          if (resolvedUnit) {
+            supplyUnitByItemIdRef.current[item.itemId] = resolvedUnit;
+          }
+
           const existing = a.suppliesToCollect ?? [];
           const foundIdx = existing.findIndex((s) => s.itemId === item.itemId);
           if (foundIdx >= 0) {
             const next = [...existing];
+            const currentUnit =
+              typeof next[foundIdx].unit === "string"
+                ? next[foundIdx].unit.trim()
+                : "";
+            const shouldUpgradeUnit =
+              (!currentUnit || currentUnit === "đơn vị") &&
+              resolvedUnit !== "đơn vị";
             next[foundIdx] = {
               ...next[foundIdx],
               quantity: next[foundIdx].quantity + 1,
+              unit: shouldUpgradeUnit ? resolvedUnit : next[foundIdx].unit,
             };
             return { ...a, suppliesToCollect: next };
           }
@@ -2029,7 +2115,7 @@ const RescuePlanPanel = ({
                 itemId: item.itemId,
                 itemName: item.itemName,
                 quantity: 1,
-                unit: "đơn vị",
+                unit: resolvedUnit,
               },
             ],
           };
@@ -3038,11 +3124,11 @@ const RescuePlanPanel = ({
                                       });
 
                                       for (const act of sortedActivities) {
+                                        // Only pickup steps belong to depot groups.
+                                        // Delivery steps should stay in SOS groups even if they contain depot info.
                                         const isDepot =
                                           act.activityType ===
-                                            "COLLECT_SUPPLIES" ||
-                                          !!act.depotId ||
-                                          !!act.depotName;
+                                          "COLLECT_SUPPLIES";
                                         let targetType = "sos";
                                         let sosRequestId = undefined;
                                         let depotName = undefined;
@@ -3777,8 +3863,8 @@ const RescuePlanPanel = ({
 
                                   {/* Time + Priority */}
                                   <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                      <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                                    <div className="space-y-1">
+                                      <Label className="block h-4 text-[10px] leading-none text-muted-foreground uppercase tracking-wider">
                                         Thời gian ước tính
                                       </Label>
                                       <Input
@@ -3791,11 +3877,11 @@ const RescuePlanPanel = ({
                                           )
                                         }
                                         placeholder="VD: 30 phút"
-                                        className="h-7 text-xs mt-1"
+                                        className="h-10 w-full text-xs"
                                       />
                                     </div>
-                                    <div>
-                                      <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                                    <div className="space-y-1">
+                                      <Label className="block h-4 text-[10px] leading-none text-muted-foreground uppercase tracking-wider">
                                         Độ ưu tiên
                                       </Label>
                                       <Select
@@ -3808,7 +3894,7 @@ const RescuePlanPanel = ({
                                           )
                                         }
                                       >
-                                        <SelectTrigger className="h-7 text-xs mt-1">
+                                        <SelectTrigger className="h-10 w-full text-xs">
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="z-[1200]">
@@ -3887,12 +3973,23 @@ const RescuePlanPanel = ({
                                             (supply, sIdx) => (
                                               <div
                                                 key={sIdx}
-                                                className="flex items-center gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
+                                                className="grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
                                               >
-                                                <Package className="h-3 w-3 text-blue-500 shrink-0" />
-                                                <span className="font-medium truncate flex-1 min-w-0">
-                                                  {getSupplyDisplayName(supply)}
-                                                </span>
+                                                <div className="flex min-w-0 items-center gap-1.5">
+                                                  <Package className="h-3 w-3 text-blue-500 shrink-0" />
+                                                  <span
+                                                    className="truncate font-medium text-foreground"
+                                                    title={
+                                                      getSupplyDisplayName(
+                                                        supply,
+                                                      ) || "Vật tư chưa rõ tên"
+                                                    }
+                                                  >
+                                                    {getSupplyDisplayName(
+                                                      supply,
+                                                    ) || "Vật tư chưa rõ tên"}
+                                                  </span>
+                                                </div>
                                                 <Input
                                                   type="number"
                                                   min={1}
@@ -3906,15 +4003,15 @@ const RescuePlanPanel = ({
                                                       ) || 1,
                                                     )
                                                   }
-                                                  className="h-6 w-16 text-[11px] text-center px-1"
+                                                  className="h-6 w-full text-[11px] text-center px-1"
                                                 />
-                                                <span className="text-[10px] text-muted-foreground shrink-0">
+                                                <span className="text-right text-[10px] text-muted-foreground">
                                                   {supply.unit}
                                                 </span>
                                                 <Button
                                                   variant="ghost"
                                                   size="icon"
-                                                  className="h-5 w-5 shrink-0 text-muted-foreground hover:text-red-500"
+                                                  className="h-5 w-5 text-muted-foreground hover:text-red-500"
                                                   onClick={() =>
                                                     handleRemoveSupply(
                                                       activity._id,
