@@ -517,6 +517,10 @@ export interface PostEditorProps {
 
 export interface WeatherMapProps {
   floodAlerts: FloodAlert[];
+  liveWeather: WeatherApiCurrentPoint[];
+  weatherLoading: boolean;
+  weatherError: string | null;
+  onRefreshWeather: () => void;
 }
 
 export type WeatherApiCurrentPoint =

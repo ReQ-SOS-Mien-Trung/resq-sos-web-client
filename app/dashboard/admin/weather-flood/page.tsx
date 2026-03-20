@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockFloodAlerts } from "@/lib/mock-data/admin-weather-flood";
 import { DashboardSkeleton } from "@/components/admin";
-import { FloodAlert, WeatherData } from "@/type";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FloodAlert, WeatherApiCurrentPoint } from "@/type";
 import { DashboardLayout } from "@/components/admin/dashboard";
 
 const WeatherMap = dynamic(
@@ -16,18 +17,10 @@ const WeatherMap = dynamic(
   { ssr: false },
 );
 
-const FloodAlerts = dynamic(
+const FloodAlertComposer = dynamic(
   () =>
     import("@/components/admin/weather-flood").then((mod) => ({
-      default: mod.FloodAlerts,
-    })),
-  { ssr: false },
-);
-
-const WeatherChart = dynamic(
-  () =>
-    import("@/components/admin/weather-flood").then((mod) => ({
-      default: mod.WeatherChart,
+      default: mod.FloodAlertComposer,
     })),
   { ssr: false },
 );
@@ -35,88 +28,54 @@ const WeatherChart = dynamic(
 const WeatherFloodPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [floodAlerts] = useState<FloodAlert[]>(mockFloodAlerts);
-  const [weatherData, setWeatherData] = useState<WeatherData[]>([]);
+  const [liveWeather, setLiveWeather] = useState<WeatherApiCurrentPoint[]>([]);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const loadWeather = useCallback(async () => {
+    try {
+      setWeatherLoading(true);
+      setWeatherError(null);
+      const weatherRes = await fetch("/api/weather/current", {
+        cache: "no-store",
+      });
+      const json = await weatherRes.json().catch(() => null);
+
+      if (!weatherRes.ok) {
+        throw new Error(
+          json?.error ||
+            `Không lấy được dữ liệu thời tiết (HTTP ${weatherRes.status})`,
+        );
+      }
+
+      setLiveWeather((json?.locations as WeatherApiCurrentPoint[]) || []);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown weather error";
+      setWeatherError(message);
+      setLiveWeather([]);
+      console.error("Failed to fetch weather current:", error);
+    } finally {
+      setWeatherLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dashboardRes, weatherRes] = await Promise.all([
-          getDashboardData(),
-          fetch("/api/weather/current"),
-        ]);
-
+        const dashboardRes = await getDashboardData();
         setDashboardData(dashboardRes);
-
-        if (weatherRes.ok) {
-          const json = await weatherRes.json().catch(() => null);
-          type WeatherLocationOk = {
-            name: string;
-            temp_c: number;
-            humidity: number;
-            precip_mm: number;
-            wind_kph: number;
-            condition_text: string;
-            last_updated: string;
-          };
-          type WeatherLocationErr = { error: string };
-          type WeatherLocation = WeatherLocationOk | WeatherLocationErr;
-
-          const locations = (json?.locations as WeatherLocation[]) || [];
-
-          const isOk = (loc: WeatherLocation): loc is WeatherLocationOk =>
-            !!loc &&
-            !("error" in loc) &&
-            typeof (loc as WeatherLocationOk).condition_text === "string";
-
-          const mappedWeather: WeatherData[] = locations
-            .filter(isOk)
-            .map((loc) => {
-              const conditionText = loc.condition_text.toLowerCase();
-              let condition: WeatherData["condition"] = "sunny";
-              if (
-                conditionText.includes("rain") ||
-                conditionText.includes("mưa")
-              ) {
-                condition = "rainy";
-              } else if (
-                conditionText.includes("storm") ||
-                conditionText.includes("bão")
-              ) {
-                condition = "stormy";
-              } else if (
-                conditionText.includes("cloud") ||
-                conditionText.includes("mây")
-              ) {
-                condition = "cloudy";
-              }
-
-              return {
-                region: loc.name,
-                temperature: loc.temp_c,
-                humidity: loc.humidity,
-                rainfall: loc.precip_mm,
-                windSpeed: loc.wind_kph,
-                condition,
-                timestamp: loc.last_updated,
-              };
-            });
-
-          setWeatherData(mappedWeather);
-        } else {
-          console.error(
-            "Failed to fetch weather current:",
-            await weatherRes.text(),
-          );
-        }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
-  }, []);
+    loadWeather();
+  }, [loadWeather]);
 
   if (loading || !dashboardData) {
     return (
@@ -146,14 +105,30 @@ const WeatherFloodPage = () => {
           </p>
         </div>
 
-        <WeatherMap floodAlerts={floodAlerts} />
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(360px,0.95fr)]">
+          <WeatherMap
+            floodAlerts={floodAlerts}
+            liveWeather={liveWeather}
+            weatherLoading={weatherLoading}
+            weatherError={weatherError}
+            onRefreshWeather={loadWeather}
+          />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <FloodAlerts alerts={floodAlerts} />
-          <div className="space-y-6">
-            <WeatherChart data={weatherData} />
-          </div>
+          <Card className="border border-border/50">
+            <CardHeader>
+              <CardTitle>Phát cảnh báo lũ</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <FloodAlertComposer
+                liveWeather={liveWeather}
+                weatherLoading={weatherLoading}
+                weatherError={weatherError}
+                onRefreshWeather={loadWeather}
+              />
+            </CardContent>
+          </Card>
         </div>
+
       </div>
     </DashboardLayout>
   );
