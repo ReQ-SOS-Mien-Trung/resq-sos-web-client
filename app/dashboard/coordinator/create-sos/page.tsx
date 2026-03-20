@@ -400,12 +400,12 @@ function CreateSOSContent() {
                   <span className="text-red-500">*</span>
                 </p>
 
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+                <div className="grid grid-cols-1 items-stretch gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
                   <Input
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="Tìm nhanh địa chỉ: số nhà, đường, xã/phường..."
-                    className={EDITORIAL_INPUT}
+                    className={`${EDITORIAL_INPUT} h-14 text-[20px]`}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -418,7 +418,7 @@ function CreateSOSContent() {
                     variant="outline"
                     onClick={geocodeAddress}
                     disabled={isGeocoding}
-                    className="gap-1.5 rounded-none border-black bg-white hover:bg-black hover:text-white"
+                    className="h-14 gap-1.5 rounded-none border-black bg-white px-7 text-[20px] font-semibold hover:bg-black hover:text-white"
                   >
                     <MagnifyingGlass size={14} />
                     {isGeocoding ? "Đang tìm..." : "Tìm vị trí"}
