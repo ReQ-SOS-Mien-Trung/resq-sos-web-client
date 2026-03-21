@@ -2024,6 +2024,20 @@ const RescuePlanPanel = ({
   const [isEditMode, setIsEditMode] = useState(false);
 
   type EditableActivity = ClusterSuggestedActivity & { _id: string };
+  type PendingRemoval =
+    | {
+        type: "activity";
+        activityId: string;
+        displayStep: number;
+        hasSupplyItems: boolean;
+      }
+    | {
+        type: "supply";
+        activityId: string;
+        supplyIndex: number;
+        supplyName: string;
+      };
+
   const [editActivities, setEditActivities] = useState<EditableActivity[]>([]);
   const [editMissionType, setEditMissionType] = useState<"RESCUE" | "RESCUER">(
     "RESCUE",
@@ -2032,6 +2046,10 @@ const RescuePlanPanel = ({
   const [editStartTime, setEditStartTime] = useState("");
   const [editExpectedEndTime, setEditExpectedEndTime] = useState("");
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
+  const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(
+    null,
+  );
   const supplyUnitByItemIdRef = useRef<Record<number, string>>({});
 
   const { mutate: createMission, isPending: isCreatingMission } =
@@ -2207,6 +2225,52 @@ const RescuePlanPanel = ({
     },
     [],
   );
+
+  const handleRemoveActivityWithConfirm = useCallback(
+    (activity: EditableActivity, displayStep: number) => {
+      setPendingRemoval({
+        type: "activity",
+        activityId: activity._id,
+        displayStep,
+        hasSupplyItems: (activity.suppliesToCollect?.length ?? 0) > 0,
+      });
+      setRemoveConfirmOpen(true);
+    },
+    [],
+  );
+
+  const handleRemoveSupplyWithConfirm = useCallback(
+    (activityId: string, supplyIndex: number, supplyName: string) => {
+      setPendingRemoval({
+        type: "supply",
+        activityId,
+        supplyIndex,
+        supplyName,
+      });
+      setRemoveConfirmOpen(true);
+    },
+    [],
+  );
+
+  const handleRemoveConfirmOpenChange = useCallback((open: boolean) => {
+    setRemoveConfirmOpen(open);
+    if (!open) {
+      setPendingRemoval(null);
+    }
+  }, []);
+
+  const handleConfirmRemove = useCallback(() => {
+    if (!pendingRemoval) return;
+
+    if (pendingRemoval.type === "activity") {
+      removeEditActivity(pendingRemoval.activityId);
+    } else {
+      handleRemoveSupply(pendingRemoval.activityId, pendingRemoval.supplyIndex);
+    }
+
+    setRemoveConfirmOpen(false);
+    setPendingRemoval(null);
+  }, [pendingRemoval, removeEditActivity, handleRemoveSupply]);
 
   const validateEditMission = useCallback(() => {
     if (!clusterId) return false;
@@ -2594,6 +2658,20 @@ const RescuePlanPanel = ({
 
   // Early returns AFTER all hooks
   if (!activeSuggestion && !clusterId) return null;
+
+  const removeDialogTitle =
+    pendingRemoval?.type === "activity"
+      ? "Xác nhận xóa bước trong kế hoạch"
+      : "Xác nhận xóa vật tư khỏi gợi ý AI";
+
+  const removeDialogDescription =
+    pendingRemoval?.type === "activity"
+      ? pendingRemoval.hasSupplyItems
+        ? `Bạn sắp xóa Bước ${pendingRemoval.displayStep} trong kế hoạch AI. Toàn bộ vật tư và nội dung thuộc bước này sẽ bị loại khỏi kế hoạch khi xác nhận nhiệm vụ.`
+        : `Bạn sắp xóa Bước ${pendingRemoval.displayStep} trong kế hoạch AI. Bước này sẽ không còn trong nhiệm vụ khi bạn xác nhận.`
+      : pendingRemoval?.type === "supply"
+        ? `Bạn có chắc chắn muốn xóa vật tư \"${pendingRemoval.supplyName}\" khỏi gợi ý AI này không? Vật tư này sẽ bị loại khỏi kế hoạch khi bạn xác nhận nhiệm vụ.`
+        : "";
 
   return (
     <div
@@ -3657,6 +3735,19 @@ const RescuePlanPanel = ({
                               </>
                             )}
                           </p>
+                          {activeSuggestion && (
+                            <div className="mt-2 rounded-md border border-orange-300/80 bg-orange-100/70 dark:border-orange-700/60 dark:bg-orange-900/20 px-2 py-1.5">
+                              <p className="text-[11px] text-orange-800 dark:text-orange-300 flex items-start gap-1.5 leading-relaxed">
+                                <Warning
+                                  className="h-3.5 w-3.5 mt-0.5 shrink-0"
+                                  weight="fill"
+                                />
+                                Khi xóa vật tư hoặc xóa bước trong phần chỉnh
+                                sửa, dữ liệu đó sẽ bị loại khỏi nhiệm vụ lúc xác
+                                nhận.
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         {/* Mission config */}
@@ -3877,7 +3968,10 @@ const RescuePlanPanel = ({
                                         size="icon"
                                         className="h-6 w-6 text-muted-foreground hover:text-red-500"
                                         onClick={() =>
-                                          removeEditActivity(activity._id)
+                                          handleRemoveActivityWithConfirm(
+                                            activity,
+                                            idx + 1,
+                                          )
                                         }
                                       >
                                         <Trash className="h-3 w-3" />
@@ -4063,9 +4157,12 @@ const RescuePlanPanel = ({
                                                   size="icon"
                                                   className="h-5 w-5 text-muted-foreground hover:text-red-500"
                                                   onClick={() =>
-                                                    handleRemoveSupply(
+                                                    handleRemoveSupplyWithConfirm(
                                                       activity._id,
                                                       sIdx,
+                                                      getSupplyDisplayName(
+                                                        supply,
+                                                      ),
                                                     )
                                                   }
                                                 >
@@ -4807,6 +4904,32 @@ const RescuePlanPanel = ({
             ) : null}
           </div>
         </div>
+
+        <Dialog
+          open={removeConfirmOpen}
+          onOpenChange={handleRemoveConfirmOpenChange}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{removeDialogTitle}</DialogTitle>
+              <DialogDescription>{removeDialogDescription}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => handleRemoveConfirmOpenChange(false)}
+              >
+                Giữ lại
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={handleConfirmRemove}
+              >
+                Xóa khỏi kế hoạch
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
           <DialogContent className="sm:max-w-md">
