@@ -7,6 +7,12 @@ export interface AssemblyPointStatusMetadata {
   label: string;
 }
 
+// Assembly Point Metadata option (for dropdown)
+export interface AssemblyPointMetadataOption {
+  key: string;
+  value: string;
+}
+
 // Assembly Point Entity
 export interface AssemblyPointEntity {
   id: number;
@@ -14,7 +20,7 @@ export interface AssemblyPointEntity {
   name: string;
   latitude: number;
   longitude: number;
-  capacityTeams: number;
+  maxCapacity: number;
   status: AssemblyPointStatus;
   lastUpdatedAt: string;
 }
@@ -78,7 +84,7 @@ export interface CreateAssemblyPointRequest {
   name: string;
   latitude: number;
   longitude: number;
-  capacityTeams: number;
+  maxCapacity: number;
 }
 
 // Create Assembly Point Response
@@ -86,7 +92,7 @@ export interface CreateAssemblyPointResponse {
   id: number;
   code: string;
   name: string;
-  capacityTeams: number;
+  maxCapacity: number;
   status: AssemblyPointStatus;
 }
 
@@ -96,7 +102,7 @@ export interface UpdateAssemblyPointRequest {
   name: string;
   latitude: number;
   longitude: number;
-  capacityTeams: number;
+  maxCapacity: number;
 }
 
 // Update Assembly Point Response
@@ -106,7 +112,7 @@ export interface UpdateAssemblyPointResponse {
   name: string;
   latitude: number;
   longitude: number;
-  capacityTeams: number;
+  maxCapacity: number;
   status: AssemblyPointStatus;
   lastUpdatedAt: string;
 }
@@ -122,4 +128,35 @@ export interface UpdateAssemblyPointStatusResponse {
   id: number;
   status: AssemblyPointStatus;
   message: string;
+}
+
+// Assign or unassign rescuer to assembly point request
+export interface UpdateRescuerAssemblyPointAssignmentRequest {
+  userId: string;
+  assemblyPointId: number | null;
+}
+
+// Schedule gathering at an assembly point request
+export interface ScheduleAssemblyPointGatheringRequest {
+  id: number;
+  assemblyDate: string;
+}
+
+// Schedule gathering success response
+export interface ScheduleAssemblyPointGatheringResponse {
+  eventId: number;
+}
+
+// Schedule gathering validation error response (HTTP 400)
+export interface ScheduleAssemblyPointGatheringErrorResponse {
+  message: string;
+  errors?: {
+    AssemblyDate?: string[];
+    [key: string]: string[] | undefined;
+  };
+}
+
+// Start gathering by assembly event id request
+export interface StartAssemblyPointGatheringRequest {
+  eventId: number;
 }

@@ -8,10 +8,14 @@ import {
   getAssemblyPoints,
   getAssemblyPointById,
   getAssemblyPointStatuses,
+  getAssemblyPointMetadata,
   createAssemblyPoint,
   updateAssemblyPoint,
   updateAssemblyPointStatus,
   deleteAssemblyPoint,
+  updateRescuerAssemblyPointAssignment,
+  scheduleAssemblyPointGathering,
+  startAssemblyPointGathering,
 } from "./api";
 import {
   GetAssemblyPointsResponse,
@@ -21,15 +25,25 @@ import {
   CreateAssemblyPointRequest,
   CreateAssemblyPointResponse,
   AssemblyPointStatusMetadata,
+  AssemblyPointMetadataOption,
   UpdateAssemblyPointRequest,
   UpdateAssemblyPointResponse,
   UpdateAssemblyPointStatusRequest,
   UpdateAssemblyPointStatusResponse,
+  UpdateRescuerAssemblyPointAssignmentRequest,
+  ScheduleAssemblyPointGatheringRequest,
+  ScheduleAssemblyPointGatheringResponse,
+  ScheduleAssemblyPointGatheringErrorResponse,
+  StartAssemblyPointGatheringRequest,
 } from "./type";
+import { AxiosError } from "axios";
 
 export const ASSEMBLY_POINTS_QUERY_KEY = ["assembly-points"] as const;
 export const ASSEMBLY_POINT_STATUSES_QUERY_KEY = [
   "assembly-point-statuses",
+] as const;
+export const ASSEMBLY_POINT_METADATA_QUERY_KEY = [
+  "assembly-point-metadata",
 ] as const;
 
 export interface UseAssemblyPointsOptions {
@@ -42,6 +56,10 @@ export interface UseAssemblyPointByIdOptions {
 }
 
 export interface UseAssemblyPointStatusesOptions {
+  enabled?: boolean;
+}
+
+export interface UseAssemblyPointMetadataOptions {
   enabled?: boolean;
 }
 
@@ -105,6 +123,19 @@ export function useAssemblyPointStatuses(
   return useQuery<AssemblyPointStatusMetadata[]>({
     queryKey: ASSEMBLY_POINT_STATUSES_QUERY_KEY,
     queryFn: getAssemblyPointStatuses,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Hook to fetch assembly point metadata for dropdowns
+ */
+export function useAssemblyPointMetadata(
+  options?: UseAssemblyPointMetadataOptions,
+) {
+  return useQuery<AssemblyPointMetadataOption[]>({
+    queryKey: ASSEMBLY_POINT_METADATA_QUERY_KEY,
+    queryFn: getAssemblyPointMetadata,
     enabled: options?.enabled ?? true,
   });
 }
@@ -184,6 +215,56 @@ export function useDeleteAssemblyPoint() {
     mutationFn: deleteAssemblyPoint,
     onSuccess: () => {
       // Invalidate assembly points query to refetch the list
+      queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Hook to assign or unassign rescuer to assembly point
+ */
+export function useUpdateRescuerAssemblyPointAssignment() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, UpdateRescuerAssemblyPointAssignmentRequest>({
+    mutationFn: updateRescuerAssemblyPointAssignment,
+    onSuccess: () => {
+      // Invalidate assembly points query to refetch the list
+      queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Hook to schedule gathering at assembly point
+ */
+export function useScheduleAssemblyPointGathering() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    ScheduleAssemblyPointGatheringResponse,
+    AxiosError<ScheduleAssemblyPointGatheringErrorResponse>,
+    ScheduleAssemblyPointGatheringRequest
+  >({
+    mutationFn: scheduleAssemblyPointGathering,
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, variables.id],
+      });
+    },
+  });
+}
+
+/**
+ * Hook to start gathering for assembly event
+ */
+export function useStartAssemblyPointGathering() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, StartAssemblyPointGatheringRequest>({
+    mutationFn: startAssemblyPointGathering,
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
     },
   });

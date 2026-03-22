@@ -1,18 +1,23 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { DepotEntity } from "@/services/depot/type";
-import { useAssemblyPointById } from "@/services/assembly_points/hooks";
+import {
+  useAssemblyPointById,
+  useScheduleAssemblyPointGathering,
+} from "@/services/assembly_points/hooks";
 import type {
   AssemblyPointEntity,
   AssemblyPointDetailEntity,
   AssemblyPointTeam,
   AssemblyPointTeamMember,
+  ScheduleAssemblyPointGatheringErrorResponse,
 } from "@/services/assembly_points/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import {
   X,
@@ -31,7 +36,9 @@ import {
   Users,
   Hash,
   Info,
+  CalendarBlank,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { LocationDetailsPanelProps } from "@/type";
 import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
 
@@ -95,6 +102,16 @@ function formatLastUpdated(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+function formatDateTimeLocal(date: Date): string {
+  const offsetMs = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function minGatheringTimeLocal(): string {
+  const minDate = new Date(Date.now() + 48 * 60 * 60 * 1000);
+  return formatDateTimeLocal(minDate);
 }
 
 const LocationDetailsPanel = ({
@@ -516,20 +533,78 @@ function AssemblyPointDetails({
   assemblyPoint: AssemblyPointEntity;
   onClose: () => void;
 }) {
+  const [assemblyDateInput, setAssemblyDateInput] = useState("");
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+
   const {
     data: assemblyPointDetail,
     isLoading: isAssemblyPointDetailLoading,
     isError: isAssemblyPointDetailError,
   } = useAssemblyPointById(assemblyPoint.id, { enabled: true });
 
+  const { mutateAsync: scheduleGathering, isPending: isSchedulingGathering } =
+    useScheduleAssemblyPointGathering();
+
   const displayAssemblyPoint: AssemblyPointDetailEntity | AssemblyPointEntity =
     assemblyPointDetail ?? assemblyPoint;
 
-  const teams =
-    "teams" in displayAssemblyPoint ? displayAssemblyPoint.teams : [];
+  const teams: AssemblyPointTeam[] =
+    "teams" in displayAssemblyPoint && Array.isArray(displayAssemblyPoint.teams)
+      ? displayAssemblyPoint.teams
+      : [];
 
-  const statusConfig = assemblyPointStatusConfig[assemblyPoint.status];
+  const statusConfig = assemblyPointStatusConfig[
+    displayAssemblyPoint.status as keyof typeof assemblyPointStatusConfig
+  ] ?? {
+    label: String(displayAssemblyPoint.status ?? "Không xác định"),
+    color: "bg-slate-500",
+    textColor: "text-slate-700 dark:text-slate-300",
+    bgColor: "bg-slate-50 dark:bg-slate-900/30",
+    icon: Info,
+  };
   const StatusIcon = statusConfig.icon;
+
+  const handleScheduleGathering = async () => {
+    if (!assemblyDateInput) {
+      toast.error("Vui lòng chọn thời gian tập trung.");
+      return;
+    }
+
+    const assemblyDate = new Date(assemblyDateInput);
+    if (Number.isNaN(assemblyDate.getTime())) {
+      toast.error("Thời gian không hợp lệ.");
+      return;
+    }
+
+    try {
+      const result = await scheduleGathering({
+        id: assemblyPoint.id,
+        assemblyDate: assemblyDate.toISOString(),
+      });
+      toast.success(
+        `Đã lên lịch tập trung thành công (Event #${result.eventId}).`,
+      );
+      setAssemblyDateInput("");
+    } catch (error) {
+      const err = error as {
+        response?: {
+          data?: ScheduleAssemblyPointGatheringErrorResponse;
+        };
+      };
+
+      const backendErrors = err.response?.data?.errors;
+      const firstBackendError = backendErrors
+        ? Object.values(backendErrors).find(
+            (messages) => Array.isArray(messages) && messages.length > 0,
+          )?.[0]
+        : undefined;
+      const backendMessage = err.response?.data?.message;
+
+      if (firstBackendError || backendMessage) {
+        toast.error(firstBackendError || backendMessage);
+      }
+    }
+  };
 
   return (
     <>
@@ -610,11 +685,55 @@ function AssemblyPointDetails({
             color="text-purple-600 dark:text-purple-400"
           />
           <ActionButton
-            icon={<DotsThree className="h-5 w-5" weight="bold" />}
-            label="Thêm"
-            color="text-purple-600 dark:text-purple-400"
+            icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
+            label="Triệu tập"
+            color="text-[#FF5722]"
+            active={showScheduleForm}
+            onClick={() => setShowScheduleForm((prev) => !prev)}
           />
         </div>
+
+        {showScheduleForm && (
+          <div className="mt-3 rounded-lg border border-[#FF5722]/25 bg-[#FF5722]/5 p-3 space-y-2">
+            <Input
+              type="datetime-local"
+              value={assemblyDateInput}
+              min={minGatheringTimeLocal()}
+              onChange={(e) => setAssemblyDateInput(e.target.value)}
+              className="h-9 border-[#FF5722]/35 focus-visible:ring-[#FF5722]/40"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Điều kiện: thời điểm triệu tập phải từ 48 giờ trở lên kể từ hiện
+              tại.
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-[#FF5722]/40 text-[#FF5722] hover:bg-[#FF5722]/10"
+                onClick={() =>
+                  setAssemblyDateInput(
+                    formatDateTimeLocal(
+                      new Date(Date.now() + 48 * 60 * 60 * 1000),
+                    ),
+                  )
+                }
+              >
+                Gợi ý +48h
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="bg-[#FF5722] hover:bg-[#E64A19] text-white"
+                onClick={handleScheduleGathering}
+                disabled={isSchedulingGathering || !assemblyDateInput}
+              >
+                {isSchedulingGathering ? "Đang lên lịch..." : "Lên lịch"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Content */}
@@ -631,8 +750,8 @@ function AssemblyPointDetails({
         {/* Capacity */}
         <InfoRow
           icon={<Users className="h-5 w-5" />}
-          primary={`${displayAssemblyPoint.capacityTeams} đội`}
-          secondary="Sức chứa đội cứu hộ"
+          primary={`${displayAssemblyPoint.maxCapacity} người`}
+          secondary="Sức chứa người tại điểm tập kết"
         />
 
         <div className="h-px bg-border mx-5" />
@@ -758,7 +877,7 @@ function AssemblyPointDetails({
             />
             <StatCard
               label="Sức chứa"
-              value={`${displayAssemblyPoint.capacityTeams} đội`}
+              value={`${displayAssemblyPoint.maxCapacity} người`}
               icon={<Users className="h-4 w-4" />}
             />
             <StatCard
@@ -781,16 +900,28 @@ function ActionButton({
   icon,
   label,
   color,
+  onClick,
+  active,
 }: {
   icon: React.ReactNode;
   label: string;
   color: string;
+  onClick?: () => void;
+  active?: boolean;
 }) {
   return (
-    <button className="flex flex-col items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-accent transition-colors group">
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors group",
+        active ? "bg-accent/70" : "hover:bg-accent",
+      )}
+    >
       <div
         className={cn(
           "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all group-hover:scale-105",
+          active && "scale-105",
           color,
           "border-current",
         )}

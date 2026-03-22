@@ -7,10 +7,15 @@ import {
   CreateAssemblyPointRequest,
   CreateAssemblyPointResponse,
   AssemblyPointStatusMetadata,
+  AssemblyPointMetadataOption,
   UpdateAssemblyPointRequest,
   UpdateAssemblyPointResponse,
   UpdateAssemblyPointStatusRequest,
   UpdateAssemblyPointStatusResponse,
+  UpdateRescuerAssemblyPointAssignmentRequest,
+  ScheduleAssemblyPointGatheringRequest,
+  ScheduleAssemblyPointGatheringResponse,
+  StartAssemblyPointGatheringRequest,
 } from "./type";
 
 /**
@@ -48,6 +53,17 @@ export async function getAssemblyPointStatuses(): Promise<
   AssemblyPointStatusMetadata[]
 > {
   const { data } = await api.get("/personnel/assembly-point/status-metadata");
+  return data;
+}
+
+/**
+ * Get assembly point metadata for dropdown options
+ * GET /personnel/assembly-point/metadata
+ */
+export async function getAssemblyPointMetadata(): Promise<
+  AssemblyPointMetadataOption[]
+> {
+  const { data } = await api.get("/personnel/assembly-point/metadata");
   return data;
 }
 
@@ -94,4 +110,45 @@ export async function updateAssemblyPointStatus(
  */
 export async function deleteAssemblyPoint(id: number): Promise<void> {
   await api.delete(`/personnel/assembly-point/${id}`);
+}
+
+/**
+ * Assign or unassign a rescuer to an assembly point
+ * PUT /personnel/assembly-point/rescuers/{userId}/assignment
+ */
+export async function updateRescuerAssemblyPointAssignment(
+  payload: UpdateRescuerAssemblyPointAssignmentRequest,
+): Promise<void> {
+  const { userId, assemblyPointId } = payload;
+  await api.put(`/personnel/assembly-point/rescuers/${userId}/assignment`, {
+    assemblyPointId,
+  });
+}
+
+/**
+ * Schedule gathering time at assembly point
+ * POST /personnel/assembly-point/{id}/schedule-gathering
+ */
+export async function scheduleAssemblyPointGathering(
+  payload: ScheduleAssemblyPointGatheringRequest,
+): Promise<ScheduleAssemblyPointGatheringResponse> {
+  const { id, assemblyDate } = payload;
+  const { data } = await api.post(
+    `/personnel/assembly-point/${id}/schedule-gathering`,
+    {
+      assemblyDate,
+    },
+  );
+  return data;
+}
+
+/**
+ * Start gathering for an assembly event
+ * POST /personnel/assembly-point/events/{eventId}/start-gathering
+ */
+export async function startAssemblyPointGathering(
+  payload: StartAssemblyPointGatheringRequest,
+): Promise<void> {
+  const { eventId } = payload;
+  await api.post(`/personnel/assembly-point/events/${eventId}/start-gathering`);
 }
