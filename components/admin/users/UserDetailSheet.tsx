@@ -481,7 +481,7 @@ const UserDetailSheet = ({
                             : "border-border hover:bg-muted/50"
                         }`}
                       >
-                        {t === "Core" ? "Cứu hộ hệ thống" : "Tình nguyện viên"}
+                        {t === "Core" ? "Core" : "Volunteer"}
                       </button>
                     ))}
                   </div>
@@ -513,9 +513,9 @@ const UserDetailSheet = ({
                   label="Loại cứu hộ"
                   value={
                     user.rescuerType === "Core"
-                      ? "Cứu hộ hệ thống"
+                      ? "Core"
                       : user.rescuerType === "Volunteer"
-                      ? "Tình nguyện viên"
+                      ? "Volunteer"
                       : user.rescuerType ?? "—"
                   }
                 />

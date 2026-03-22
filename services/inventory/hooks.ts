@@ -27,6 +27,7 @@ import {
   importRegularInventory,
   getDepotTransactions,
   exportInventoryMovements,
+  getInventoryLots,
 } from "./api";
 import {
   GetDepotInventoryParams,
@@ -51,6 +52,7 @@ import {
   GetDepotTransactionsParams,
   GetDepotTransactionsResponse,
   ExportMovementsParams,
+  GetInventoryLotsResponse,
 } from "./type";
 
 export const INVENTORY_KEYS = {
@@ -73,6 +75,8 @@ export const INVENTORY_KEYS = {
   organizations: () => [...INVENTORY_KEYS.all, "organizations"] as const,
   transactions: (params: GetDepotTransactionsParams) =>
     [...INVENTORY_KEYS.all, "transactions", params] as const,
+  lots: (itemModelId: number) =>
+    [...INVENTORY_KEYS.all, "lots", itemModelId] as const,
 };
 
 export function useDepotInventory(
@@ -346,5 +350,19 @@ export function useRejectSupplyRequest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
     },
+  });
+}
+
+export function useInventoryLots(
+  itemModelId: number,
+  options?: Omit<
+    UseQueryOptions<GetInventoryLotsResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<GetInventoryLotsResponse>({
+    queryKey: INVENTORY_KEYS.lots(itemModelId),
+    queryFn: () => getInventoryLots(itemModelId),
+    ...options,
   });
 }

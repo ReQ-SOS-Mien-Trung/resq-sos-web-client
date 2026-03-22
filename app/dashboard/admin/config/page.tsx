@@ -100,6 +100,7 @@ function mapEntityToForm(
   };
 }
 
+// ─── Main Page ────────────────────────────────────────────────────────────────
 const AdminConfigPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
@@ -231,113 +232,109 @@ const AdminConfigPage = () => {
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         {/* Header */}
         <div className="flex flex-col xl:flex-row items-start justify-between gap-4">
-          <div className="flex-1 flex flex-col xl:flex-row xl:items-stretch gap-4">
-            <div>
-              <div className="flex items-center gap-2.5 mb-1">
-                <FadersIcon size={24} className="text-foreground" />
-                <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
-                  Cấu hình hệ thống
-                </p>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter text-foreground leading-tight">
-                Điều chỉnh tham số ưu tiên SOS
-              </h1>
-              <p className="text-[16px] tracking-tighter text-muted-foreground mt-1.5">
-                Chỉnh sửa JSONB rules để tính điểm và phân tầng mức độ ưu tiên
+          <div>
+            <div className="flex items-center gap-2.5 mb-1">
+              <FadersIcon size={24} className="text-foreground" />
+              <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
+                Cấu hình hệ thống
               </p>
             </div>
-
-            <Card className="border-red-200/80 bg-red-50 dark:bg-red-950/20 py-2 w-full md:max-w-sm xl:max-w-md">
-              <CardHeader className="px-3 py-3">
-                <CardTitle className="text-[15px] tracking-tighter text-red-700 dark:text-red-300">
-                  Lưu ý dữ liệu
-                </CardTitle>
-                <CardDescription className="tracking-tighter text-[14px] text-red-700/90 dark:text-red-200/90">
-                  Các trường dưới đây được lưu dưới dạng JSONB. Vui lòng nhập
-                  JSON hợp lệ (object hoặc array) trước khi lưu.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
-          <div className="flex items-center gap-2 xl:shrink-0 xl:self-start">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setDraft({});
-                refetch();
-              }}
-              disabled={configLoading || configFetching}
-            >
-              <ArrowCounterClockwise
-                size={14}
-                className={`mr-1.5 ${configFetching ? "animate-spin" : ""}`}
-              />
-              Làm mới
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={updateMutation.isPending || configLoading}
-            >
-              <FloppyDisk size={14} className="mr-1.5" />
-              Lưu cấu hình
-            </Button>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter text-foreground leading-tight">
+              Tham số hệ thống
+            </h1>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {JSON_FIELDS.map((field) => {
-            const isValid = validationMap[field.key];
-            return (
-              <Card key={field.key} className="border-border/60">
-                <CardHeader className="">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <CardTitle className="text-[16px] tracking-tighter">
-                        {field.label}
-                      </CardTitle>
-                      <CardDescription className="tracking-tighter text-[14px]">
-                        {field.description}
-                      </CardDescription>
-                    </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="h-8 text-sm"
-                      onClick={() => handleFormatField(field.key)}
-                    >
-                      Format
-                    </Button>
-                  </div>
+            <div className="flex flex-col xl:flex-row items-start gap-4">
+              <Card className="border-red-200/80 bg-red-50 dark:bg-red-950/20 py-2 w-full md:max-w-sm xl:max-w-md">
+                <CardHeader className="px-3 py-3">
+                  <CardTitle className="text-[15px] tracking-tighter text-red-700 dark:text-red-300">
+                    Lưu ý dữ liệu
+                  </CardTitle>
+                  <CardDescription className="tracking-tighter text-[14px] text-red-700/90 dark:text-red-200/90">
+                    Các trường dưới đây được lưu dưới dạng JSONB. Vui lòng nhập
+                    JSON hợp lệ (object hoặc array) trước khi lưu.
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-1">
-                  <Label className="text-sm tracking-tighter">
-                    Nội dung Json
-                  </Label>
-                  <Textarea
-                    value={getFieldValue(field.key)}
-                    onChange={(e) =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        [field.key]: e.target.value,
-                      }))
-                    }
-                    className="min-h-60 resize-y font-regular text-[14px] tracking-tighter leading-relaxed"
-                    placeholder={`{\n  "key": "value"\n}`}
-                  />
-                  <p
-                    className={`text-xs tracking-tighter ${
-                      isValid ? "text-emerald-600" : "text-rose-600"
-                    }`}
-                  >
-                    {isValid ? "JSON hợp lệ" : "JSON không hợp lệ"}
-                  </p>
-                </CardContent>
               </Card>
-            );
-          })}
-        </div>
+              <div className="flex items-center gap-2 xl:ml-auto xl:self-start">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDraft({});
+                    refetch();
+                  }}
+                  disabled={configLoading || configFetching}
+                >
+                  <ArrowCounterClockwise
+                    size={14}
+                    className={`mr-1.5 ${configFetching ? "animate-spin" : ""}`}
+                  />
+                  Làm mới
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={updateMutation.isPending || configLoading}
+                >
+                  <FloppyDisk size={14} className="mr-1.5" />
+                  Lưu cấu hình
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {JSON_FIELDS.map((field) => {
+                const isValid = validationMap[field.key];
+                return (
+                  <Card key={field.key} className="border-border/60">
+                    <CardHeader className="">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-[16px] tracking-tighter">
+                            {field.label}
+                          </CardTitle>
+                          <CardDescription className="tracking-tighter text-[14px]">
+                            {field.description}
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="h-8 text-sm"
+                          onClick={() => handleFormatField(field.key)}
+                        >
+                          Format
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-1">
+                      <Label className="text-sm tracking-tighter">
+                        Nội dung Json
+                      </Label>
+                      <Textarea
+                        value={getFieldValue(field.key)}
+                        onChange={(e) =>
+                          setDraft((prev) => ({
+                            ...prev,
+                            [field.key]: e.target.value,
+                          }))
+                        }
+                        className="min-h-60 resize-y font-regular text-[14px] tracking-tighter leading-relaxed"
+                        placeholder={`{\n  "key": "value"\n}`}
+                      />
+                      <p
+                        className={`text-xs tracking-tighter ${
+                          isValid ? "text-emerald-600" : "text-rose-600"
+                        }`}
+                      >
+                        {isValid ? "JSON hợp lệ" : "JSON không hợp lệ"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
       </div>
     </DashboardLayout>
   );

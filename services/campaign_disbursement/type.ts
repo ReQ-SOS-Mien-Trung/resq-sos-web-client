@@ -51,7 +51,12 @@ export interface GetCampaignSpendingResponse {
 
 /* ── GET /finance/campaigns ── */
 
-export type CampaignStatus = "Active" | "Closed";
+export type CampaignStatus =
+  | "Draft"
+  | "Active"
+  | "Suspended"
+  | "Closed"
+  | "Archived";
 
 export interface CampaignEntity {
   id: number;
@@ -68,6 +73,7 @@ export interface CampaignEntity {
 export interface GetCampaignsParams {
   pageNumber?: number;
   pageSize?: number;
+  statuses?: CampaignStatus[];
 }
 
 export interface GetCampaignsResponse {
@@ -78,4 +84,11 @@ export interface GetCampaignsResponse {
   totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
+}
+
+/* ── GET /finance/campaigns/metadata/statuses ── */
+
+export interface CampaignStatusMetadata {
+  key: CampaignStatus;
+  value: string;
 }

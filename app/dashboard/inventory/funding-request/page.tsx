@@ -134,6 +134,40 @@ const statusConfig: Record<
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
+function parseExcelDate(val: unknown): string {
+  if (!val) return "";
+  // Excel serial number
+  if (typeof val === "number") {
+    const date = XLSX.SSF.parse_date_code(val);
+    if (date) {
+      return `${String(date.y).padStart(4, "0")}-${String(date.m).padStart(2, "0")}-${String(date.d).padStart(2, "0")}`;
+    }
+  }
+  const str = String(val).trim();
+  if (!str) return "";
+  // yyyy-mm-dd, yyyy/mm/dd, yyyy.mm.dd
+  const ymd = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (ymd) {
+    return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`;
+  }
+  // dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy, d/m/yyyy (Vietnamese format)
+  const dmy = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (dmy) {
+    const day = parseInt(dmy[1]);
+    const month = parseInt(dmy[2]);
+    const year = dmy[3];
+    // If month > 12 and day <= 12, it's likely mm/dd/yyyy — swap
+    if (month > 12 && day <= 12) {
+      return `${year}-${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
+    }
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  // Fallback: ISO strings with time component, etc.
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+  return str;
+}
+
 function formatMoney(value: number) {
   return value.toLocaleString("vi-VN") + "đ";
 }
@@ -146,6 +180,22 @@ function formatMoneyInput(value: string | number): string {
   const n = parseInt(raw, 10);
   if (!raw || isNaN(n)) return "";
   return n.toLocaleString("vi-VN");
+}
+
+/** Auto-detects the real header row (skips title/note rows) and returns parsed data rows. */
+function getSheetRows(sheet: XLSX.WorkSheet): Record<string, unknown>[] {
+  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 });
+  const headerRowIndex = rawRows.findIndex(
+    (row) =>
+      Array.isArray(row) &&
+      row.some(
+        (cell) =>
+          String(cell ?? "").trim() === "STT" ||
+          String(cell ?? "").trim() === "Tên vật phẩm",
+      ),
+  );
+  const range = headerRowIndex >= 0 ? headerRowIndex : 0;
+  return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { range, defval: "" });
 }
 
 type TabType = "create" | "history";
@@ -276,8 +326,7 @@ export default function FundingRequestPage() {
           );
           const workbook = XLSX.read(data, { type: "array" });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData =
-            XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+          const jsonData = getSheetRows(sheet);
           if (jsonData.length === 0) {
             toast.error("File Excel không có dữ liệu");
             return;
@@ -308,15 +357,14 @@ export default function FundingRequestPage() {
                     : 0,
                 totalPrice: 0,
                 itemType: String(raw[COL.LOAI] ?? "").trim(),
-                targetGroup: String(
-                  raw[COL.DOITUONG] ?? "",
-                ).trim(),
-                receivedDate: String(
-                  raw[COL.NGAYNHAN] ?? "",
-                ).trim(),
-                expiredDate: String(
-                  raw[COL.NGAYHETHAN] ?? "",
-                ).trim(),
+                targetGroup: (() => {
+                  const rawType = String(raw[COL.LOAI] ?? "").trim().toLowerCase();
+                  const isReusable = rawType === "reusable" || rawType === "tái sử dụng";
+                  if (isReusable) return "Rescuer";
+                  return String(raw[COL.DOITUONG] ?? "").trim();
+                })(),
+                receivedDate: parseExcelDate(raw[COL.NGAYNHAN]),
+                expiredDate: parseExcelDate(raw[COL.NGAYHETHAN]),
                 notes: String(raw[COL.GHICHU] ?? "").trim(),
               };
               rowData.totalPrice =
@@ -722,9 +770,23 @@ export default function FundingRequestPage() {
                     <Skeleton className="h-8 w-32 rounded" />
                   ) : myFund ? (
                     <>
-                      <p className="text-2xl font-bold tracking-tighter text-emerald-600">
+                      <p className={`text-2xl font-bold tracking-tighter ${
+                        myFund.balance < 0
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}>
                         {formatMoney(myFund.balance)}
                       </p>
+                      {myFund.balance < 0 && (
+                        <p className="text-xs font-medium text-red-500 tracking-tighter mt-1">
+                          ⚠️ Kho đang ứng trước — hạn mức: {formatMoney(myFund.maxAdvanceLimit)}
+                        </p>
+                      )}
+                      {myFund.balance >= 0 && (
+                        <p className="text-xs text-muted-foreground tracking-tighter mt-1">
+                          Hạn mức ứng trước: {formatMoney(myFund.maxAdvanceLimit)}
+                        </p>
+                      )}
                       <p className="text-xs tracking-tighter mt-2">
                         Cập nhật:{" "}
                         {new Date(

@@ -23,6 +23,7 @@ import {
   GetDepotTransactionsParams,
   GetDepotTransactionsResponse,
   ExportMovementsParams,
+  GetInventoryLotsResponse,
 } from "./type";
 
 /**
@@ -267,6 +268,17 @@ export async function getDepotTransactions(
       },
     },
   );
+  return data;
+}
+
+/**
+ * Get inventory lots (FEFO) for a specific item model
+ * GET /logistics/inventory/{itemModelId}/lots
+ */
+export async function getInventoryLots(
+  itemModelId: number,
+): Promise<GetInventoryLotsResponse> {
+  const { data } = await api.get(`/logistics/inventory/${itemModelId}/lots`);
   return data;
 }
 

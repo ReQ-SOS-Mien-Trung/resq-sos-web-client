@@ -89,5 +89,7 @@ export interface DepotFund {
   depotId: number;
   depotName: string;
   balance: number;
+  /** Giới hạn ứng trước tối đa (số dư có thể xuống đến −maxAdvanceLimit) */
+  maxAdvanceLimit: number;
   lastUpdatedAt: string;
 }

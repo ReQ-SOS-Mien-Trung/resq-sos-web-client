@@ -124,6 +124,7 @@ type Step = "upload" | "review";
 // ─── Date helper ───
 function parseExcelDate(val: unknown): string {
   if (!val) return "";
+  // Excel serial number
   if (typeof val === "number") {
     const date = XLSX.SSF.parse_date_code(val);
     if (date) {
@@ -131,11 +132,44 @@ function parseExcelDate(val: unknown): string {
     }
   }
   const str = String(val).trim();
-  const d = new Date(str);
-  if (!isNaN(d.getTime())) {
-    return d.toISOString().split("T")[0];
+  if (!str) return "";
+  // yyyy-mm-dd, yyyy/mm/dd, yyyy.mm.dd
+  const ymd = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (ymd) {
+    return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`;
   }
+  // dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy, d/m/yyyy (Vietnamese format)
+  const dmy = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (dmy) {
+    const day = parseInt(dmy[1]);
+    const month = parseInt(dmy[2]);
+    const year = dmy[3];
+    // If month > 12 and day <= 12, it's likely mm/dd/yyyy — swap
+    if (month > 12 && day <= 12) {
+      return `${year}-${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
+    }
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  // Fallback: ISO strings with time component, etc.
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
   return str;
+}
+
+/** Auto-detects the real header row (skips title/note rows) and returns parsed data rows. */
+function getSheetRows(sheet: XLSX.WorkSheet): Record<string, unknown>[] {
+  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 });
+  const headerRowIndex = rawRows.findIndex(
+    (row) =>
+      Array.isArray(row) &&
+      row.some(
+        (cell) =>
+          String(cell ?? "").trim() === "STT" ||
+          String(cell ?? "").trim() === "Tên vật phẩm",
+      ),
+  );
+  const range = headerRowIndex >= 0 ? headerRowIndex : 0;
+  return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { range, defval: "" });
 }
 
 // ─── Component ───
@@ -186,6 +220,8 @@ export default function ExcelImportFromOrg() {
     if (!row.unit) errors.unit = "Đơn vị không được trống";
     if (!row.itemType) errors.itemType = "Loại vật phẩm không được trống";
     if (!row.targetGroup) errors.targetGroup = "Đối tượng không được trống";
+    if (row.itemType === "Reusable" && row.targetGroup !== "Rescuer")
+      errors.targetGroup = "Đối với vật phẩm ‘Tái sử dụng’, đối tượng áp dụng là ‘Lực lượng cứu hộ’.";
     if (!row.receivedDate) errors.receivedDate = "Ngày nhận không được trống";
     else if (row.receivedDate > new Date().toISOString().slice(0, 10)) errors.receivedDate = "Ngày nhận không được là ngày trong tương lai";
     return errors;
@@ -201,7 +237,7 @@ export default function ExcelImportFromOrg() {
           const workbook = XLSX.read(data, { type: "array" });
           const sheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+          const jsonData = getSheetRows(sheet);
 
           if (jsonData.length === 0) {
             toast.error("File Excel không có dữ liệu");
@@ -218,13 +254,16 @@ export default function ExcelImportFromOrg() {
             const matchedTargetGroup = targetGroups.find(
               (t) => t.value.toLowerCase() === rawTargetGroup.toLowerCase() || t.key.toLowerCase() === rawTargetGroup.toLowerCase(),
             );
-            const targetGroup = matchedTargetGroup?.key ?? rawTargetGroup;
+            const targetGroupRaw = matchedTargetGroup?.key ?? rawTargetGroup;
 
             const rawItemType = String(raw[COL.LOAI] ?? "").trim();
             const matchedItemType = itemTypes.find(
               (t) => t.value.toLowerCase() === rawItemType.toLowerCase() || t.key.toLowerCase() === rawItemType.toLowerCase(),
             );
             const itemType = matchedItemType?.key ?? rawItemType;
+
+            // Auto-set targetGroup to Rescuer when item is Reusable
+            const targetGroup = itemType === "Reusable" ? "Rescuer" : targetGroupRaw;
 
             const unit = String(raw[COL.DONVI] ?? "").trim();
             const quantity = Number(raw[COL.SOLUONG] ?? 0);
@@ -347,7 +386,7 @@ export default function ExcelImportFromOrg() {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+          const jsonData = getSheetRows(sheet);
           if (jsonData.length === 0) { toast.error("File Excel không có dữ liệu"); return; }
           setRows((prev) => {
             const offset = prev.length;
@@ -359,13 +398,16 @@ export default function ExcelImportFromOrg() {
               const matchedTargetGroup = targetGroups.find(
                 (t) => t.value.toLowerCase() === rawTargetGroup.toLowerCase() || t.key.toLowerCase() === rawTargetGroup.toLowerCase(),
               );
-              const targetGroup = matchedTargetGroup?.key ?? rawTargetGroup;
+              const targetGroupRaw = matchedTargetGroup?.key ?? rawTargetGroup;
 
               const rawItemType = String(raw[COL.LOAI] ?? "").trim();
               const matchedItemType = itemTypes.find(
                 (t) => t.value.toLowerCase() === rawItemType.toLowerCase() || t.key.toLowerCase() === rawItemType.toLowerCase(),
               );
               const itemType = matchedItemType?.key ?? rawItemType;
+
+              // Auto-set targetGroup to Rescuer when item is Reusable
+              const targetGroup = itemType === "Reusable" ? "Rescuer" : targetGroupRaw;
 
               const rowData = {
                 id: `row-${offset + idx}-${Date.now()}`,
@@ -403,6 +445,10 @@ export default function ExcelImportFromOrg() {
         prev.map((row) => {
           if (row.id !== id) return row;
           const updated = { ...row, [field]: value };
+          // Auto-set targetGroup when itemType changes to Reusable
+          if (field === "itemType" && value === "Reusable") {
+            updated.targetGroup = "Rescuer";
+          }
           updated.errors = validateRow(updated);
           return updated;
         }),
@@ -994,6 +1040,9 @@ export default function ExcelImportFromOrg() {
                           {targetGroupOptions.length > 0
                             ? renderSelectCell(row, "targetGroup", targetGroupOptions, "Chọn đối tượng")
                             : renderInputCell(row, "targetGroup", "Đối tượng")}
+                          {row.itemType === "Reusable" && row.targetGroup === "Rescuer" && !row.errors.targetGroup && (
+                            <p className="text-[11px] text-blue-500 mt-0.5">Mặc định chọn với loại Tái sử dụng</p>
+                          )}
                         </TableCell>
 
                         {/* Loại vật phẩm */}

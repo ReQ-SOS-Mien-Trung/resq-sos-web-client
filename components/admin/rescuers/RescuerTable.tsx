@@ -39,8 +39,8 @@ type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
 
 const RESCUER_TYPE_OPTIONS: { value: string; label: string; subLabel: string }[] = [
-  { value: "Core", label: "Cứu hộ hệ thống", subLabel: "Core" },
-  { value: "Volunteer", label: "Tình nguyện viên", subLabel: "Volunteer" },
+  { value: "Core", label: "Core", subLabel: "Core" },
+  { value: "Volunteer", label: "Volunteer", subLabel: "Volunteer" },
 ];
 
 const STATUS_OPTIONS: { value: "active" | "banned"; label: string }[] = [
@@ -63,12 +63,12 @@ export interface RescuerTableProps {
 const getRescuerTypeBadge = (type: string | null) => {
   if (type === "Core")
     return {
-      label: "Cứu hộ hệ thống",
+      label: "Core",
       className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     };
   if (type === "Volunteer")
     return {
-      label: "Tình nguyện viên",
+      label: "Volunteer",
       className: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
     };
   return {

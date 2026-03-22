@@ -49,6 +49,8 @@ import {
   useInventorySourceTypes,
   type GetDepotTransactionsParams,
 } from '@/services/inventory';
+import { type TransactionEntity } from '@/services/inventory/type';
+import { TransactionDetailSheet } from './TransactionDetailSheet';
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
@@ -61,6 +63,8 @@ const TransactionTable: React.FC = () => {
   const [selectedSourceTypes, setSelectedSourceTypes] = useState<string[]>([]);
   const [selectedSourceNames, setSelectedSourceNames] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [selectedTransaction, setSelectedTransaction] = useState<TransactionEntity | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -122,6 +126,9 @@ const TransactionTable: React.FC = () => {
           updatedAt: transaction.createdAt,
           createdBy: transaction.performedByName,
           createdByName: transaction.performedByName,
+          receivedDate: item.receivedDate ?? null,
+          expiredDate: item.expiredDate ?? null,
+          rawTransaction: transaction,
         }))
       ),
       totalElements: transactionsData.totalCount,
@@ -453,7 +460,6 @@ const TransactionTable: React.FC = () => {
                       <TableHead>Vật tư</TableHead>
                       <TableHead className="text-right">Số lượng</TableHead>
                       <TableHead>Thời gian</TableHead>                   
-                      <TableHead>Ghi chú</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -494,7 +500,14 @@ const TransactionTable: React.FC = () => {
                       </TableRow>
                     ) : (
                       displayTransactions.content.map((transaction) => (
-                        <TableRow key={transaction.id} className="hover:bg-muted/50">
+                        <TableRow
+                          key={transaction.id}
+                          className="hover:bg-muted/50 cursor-pointer"
+                          onClick={() => {
+                            setSelectedTransaction(transaction.rawTransaction as TransactionEntity);
+                            setSheetOpen(true);
+                          }}
+                        >
                           <TableCell className="font-regular text-sm">
                             {transaction.transactionId}
                           </TableCell>
@@ -517,11 +530,6 @@ const TransactionTable: React.FC = () => {
                           </TableCell>
                           <TableCell className="text-sm">
                             {formatDate(transaction.createdAt)}
-                          </TableCell>
-                          <TableCell className="max-w-xs">
-                            <p className="text-sm font-regular truncate">
-                              {transaction.notes || '-'}
-                            </p>
                           </TableCell>
                         </TableRow>
                       ))
@@ -586,6 +594,11 @@ const TransactionTable: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+      <TransactionDetailSheet
+        transaction={selectedTransaction}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+      />
     </div>
   );
 };

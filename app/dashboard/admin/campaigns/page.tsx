@@ -8,6 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   ArrowLeft,
   MagnifyingGlass,
   Money,
@@ -19,10 +24,15 @@ import {
   CheckCircle,
   XCircle,
   ArrowClockwise,
+  CaretDown,
+  Check,
+  X,
+  Funnel,
 } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import { useCampaigns } from "@/services/campaign_disbursement";
+import { useCampaigns, useCampaignStatuses } from "@/services/campaign_disbursement";
+import type { CampaignStatus } from "@/services/campaign_disbursement";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -45,13 +55,13 @@ export default function CampaignsPage() {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "Active" | "Closed"
-  >("all");
+  const [selectedStatuses, setSelectedStatuses] = useState<CampaignStatus[]>([]);
+  const [statusFilterOpen, setStatusFilterOpen] = useState(false);
 
   const { data, isLoading } = useCampaigns({
     params: { pageNumber: 1, pageSize: 200 },
   });
+  const { data: campaignStatuses = [] } = useCampaignStatuses();
 
   const campaigns = useMemo(() => data?.items ?? [], [data]);
 
@@ -65,11 +75,19 @@ export default function CampaignsPage() {
           c.region.toLowerCase().includes(q),
       );
     }
-    if (statusFilter !== "all") {
-      result = result.filter((c) => c.status === statusFilter);
+    if (selectedStatuses.length > 0) {
+      result = result.filter((c) => selectedStatuses.includes(c.status));
     }
     return result;
-  }, [campaigns, search, statusFilter]);
+  }, [campaigns, search, selectedStatuses]);
+
+  const statusCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const c of campaigns) {
+      map[c.status] = (map[c.status] ?? 0) + 1;
+    }
+    return map;
+  }, [campaigns]);
 
   const stats = useMemo(
     () => ({
@@ -191,25 +209,66 @@ export default function CampaignsPage() {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
           </div>
-          <div className="flex gap-1 bg-muted/40 rounded-lg p-0.5">
-            {(["all", "Active", "Closed"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1.5 text-xs font-medium tracking-tighter rounded-md transition-colors ${
-                  statusFilter === s
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+          <Popover open={statusFilterOpen} onOpenChange={setStatusFilterOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 font-normal text-sm"
               >
-                {s === "all"
-                  ? "Tất cả"
-                  : s === "Active"
-                    ? "Đang hoạt động"
-                    : "Đã đóng"}
-              </button>
-            ))}
-          </div>
+                <Funnel size={13} />
+                Trạng thái
+                {selectedStatuses.length > 0 ? (
+                  <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
+                    {selectedStatuses.length}
+                  </Badge>
+                ) : (
+                  <CaretDown size={13} className="text-muted-foreground" />
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-52 p-1.5" align="start">
+              {campaignStatuses.map((s) => {
+                const checked = selectedStatuses.includes(s.key);
+                return (
+                  <button
+                    key={s.key}
+                    onClick={() =>
+                      setSelectedStatuses((prev) =>
+                        checked ? prev.filter((v) => v !== s.key) : [...prev, s.key],
+                      )
+                    }
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
+                  >
+                    <span
+                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
+                        checked
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : "border-border bg-background"
+                      }`}
+                    >
+                      {checked && <Check size={11} weight="bold" />}
+                    </span>
+                    <span className={checked ? "font-medium" : ""}>
+                      {s.value}
+                    </span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {statusCounts[s.key] ?? 0}
+                    </span>
+                  </button>
+                );
+              })}
+              {selectedStatuses.length > 0 && (
+                <button
+                  onClick={() => setSelectedStatuses([])}
+                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
+                >
+                  <X size={11} />
+                  Xóa bộ lọc
+                </button>
+              )}
+            </PopoverContent>
+          </Popover>
           <Button
             variant="ghost"
             size="sm"

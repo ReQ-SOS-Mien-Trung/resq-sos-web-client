@@ -32,6 +32,7 @@ import {
   CaretRight,
   Spinner,
   ArrowClockwise,
+  GarageIcon,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -186,13 +187,16 @@ export default function AssemblyPointsPage() {
         {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+             <div className="flex items-center gap-2.5 mb-1">
+               <GarageIcon size={24} className="text-foreground" />
+            <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Quản lý
             </p>
-            <h1 className="text-[26px] font-bold tracking-tighter">
+             </div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter text-foreground leading-tight">
               Điểm tập kết
             </h1>
-            <p className="text-base text-muted-foreground tracking-tight mt-0.5">
+            <p className="text-base tracking-tighter text-muted-foreground mt-1.5">
               Quản lý các điểm tập kết cho đội cứu hộ
             </p>
           </div>

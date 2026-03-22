@@ -112,3 +112,16 @@ export async function getMyDepotFund(): Promise<DepotFund> {
   const { data } = await api.get("/logistics/depot/my-fund");
   return data;
 }
+
+/**
+ * [Admin] Cấu hình hạn mức ứng trước (balance âm tối đa) cho một kho
+ * PUT /finance/depot-funds/{depotId}/advance-limit
+ */
+export async function updateDepotAdvanceLimit(
+  depotId: number,
+  maxAdvanceLimit: number,
+): Promise<void> {
+  await api.put(`/finance/depot-funds/${depotId}/advance-limit`, {
+    maxAdvanceLimit,
+  });
+}

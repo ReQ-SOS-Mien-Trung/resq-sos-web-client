@@ -79,8 +79,8 @@ const STATUS_OPTIONS = [
 ];
 
 const RESCUER_TYPE_OPTIONS = [
-  { value: "Core", label: "Cứu hộ hệ thống" },
-  { value: "Volunteer", label: "Tình nguyện viên" },
+  { value: "Core", label: "Core" },
+  { value: "Volunteer", label: "Volunteer" },
 ];
 
 // ─── Sort helpers ───────────────────────────────────────────────────────────
@@ -1280,9 +1280,9 @@ const RescuerVerificationPage = () => {
                         const statusConfig = getStatusConfig(item.status);
                         const typeBadge =
                           item.rescuerType === "Core"
-                            ? { label: "Cứu hộ hệ thống", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" }
+                            ? { label: "Core", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" }
                             : item.rescuerType === "Volunteer"
-                            ? { label: "Tình nguyện viên", className: "bg-violet-500/10 text-violet-700 dark:text-violet-400" }
+                            ? { label: "Volunteer", className: "bg-violet-500/10 text-violet-700 dark:text-violet-400" }
                             : { label: item.rescuerType ?? "—", className: "bg-gray-500/10 text-gray-700 dark:text-gray-400" };
                         return (
                           <tr

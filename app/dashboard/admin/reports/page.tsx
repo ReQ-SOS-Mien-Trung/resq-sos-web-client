@@ -2,10 +2,17 @@
 
 import { useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -38,6 +45,8 @@ import {
 import {
   MagnifyingGlass,
   Wallet,
+  FloppyDisk,
+  Warehouse,
   ClockCountdown,
   CheckCircle,
   XCircle,
@@ -54,6 +63,7 @@ import {
   Money,
   Storefront,
   ArrowClockwise,
+  PiggyBankIcon,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -67,7 +77,7 @@ import type {
   FundingRequestEntity,
   FundingRequestStatus,
 } from "@/services/funding_request";
-import { useDepotMetadata, useDepotFunds } from "@/services/depot/hooks";
+import { useDepotMetadata, useDepotFunds, useUpdateDepotAdvanceLimit } from "@/services/depot/hooks";
 import { useInventoryCategories } from "@/services/inventory/hooks";
 import { useCampaigns, useAllocateDisbursement } from "@/services/campaign_disbursement";
 import { useQueryClient } from "@tanstack/react-query";
@@ -111,6 +121,129 @@ function formatMoney(value: number) {
   return value.toLocaleString("vi-VN") + "đ";
 }
 
+/* ── Advance Limit Section ───────────────────────────────── */
+
+function AdvanceLimitSection() {
+  const { data: depotMetadata = [], isLoading: loadingMeta } = useDepotMetadata();
+  const { data: depotFunds = [], isLoading: loadingFunds } = useDepotFunds();
+  const updateLimit = useUpdateDepotAdvanceLimit();
+  const [selectedDepotId, setSelectedDepotId] = useState<string>("");
+  const [limitInput, setLimitInput] = useState<string>("");
+
+  const currentFund = useMemo(
+    () => depotFunds.find((f) => f.depotId === Number(selectedDepotId)),
+    [depotFunds, selectedDepotId],
+  );
+
+  const handleSelectDepot = (val: string) => {
+    setSelectedDepotId(val);
+    const fund = depotFunds.find((f) => f.depotId === Number(val));
+    setLimitInput(fund ? String(fund.maxAdvanceLimit) : "");
+  };
+
+  const handleSaveLimit = () => {
+    const id = Number(selectedDepotId);
+    const limit = Number(limitInput);
+    if (!id) { toast.error("Vui lòng chọn kho"); return; }
+    if (isNaN(limit) || limit < 0) { toast.error("Hạn mức phải là số ≥ 0"); return; }
+    const toastId = toast.loading("Đang cập nhật...");
+    updateLimit.mutate(
+      { depotId: id, maxAdvanceLimit: limit },
+      {
+        onSuccess: () => {
+          toast.dismiss(toastId);
+          toast.success("Cập nhật hạn mức thành công");
+        },
+        onError: () => {
+          toast.dismiss(toastId);
+          toast.error("Không thể cập nhật hạn mức");
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="max-w-lg">
+      <Card className="border-border/60">
+        <CardHeader>
+          <CardTitle className="text-[16px] tracking-tighter flex items-center gap-1.5">
+            <Warehouse size={16} />
+            Cấu hình hạn mức ứng trước
+          </CardTitle>
+          <CardDescription className="tracking-tighter text-[14px]">
+            Hạn mức ứng trước là số tiền tối đa kho được phép âm (chi trước khi chưa có quỹ)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-sm tracking-tighter">Kho</Label>
+            <Select
+              value={selectedDepotId}
+              onValueChange={handleSelectDepot}
+              disabled={loadingMeta || loadingFunds}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Chọn kho..." />
+              </SelectTrigger>
+              <SelectContent>
+                {depotMetadata.map((d) => (
+                  <SelectItem key={d.key} value={String(d.key)}>
+                    {d.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedDepotId && currentFund && (
+            <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-sm tracking-tighter space-y-0.5">
+              <p className="text-muted-foreground">
+                Số dư hiện tại:{" "}
+                <span className={currentFund.balance < 0 ? "font-semibold text-red-600" : "font-semibold text-emerald-600"}>
+                  {currentFund.balance.toLocaleString("vi-VN", { style: "currency", currency: "VND" })}
+                </span>
+              </p>
+              <p className="text-muted-foreground">
+                Hạn mức hiện tại:{" "}
+                <span className="font-semibold">
+                  {currentFund.maxAdvanceLimit.toLocaleString("vi-VN", { style: "currency", currency: "VND" })}
+                </span>
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label className="text-sm tracking-tighter">
+              Hạn mức ứng trước mới (VNĐ)
+            </Label>
+            <Input
+              type="number"
+              min={0}
+              placeholder="VD: 10000000"
+              value={limitInput}
+              onChange={(e) => setLimitInput(e.target.value)}
+              className="text-sm"
+            />
+            <p className="text-xs text-muted-foreground tracking-tighter">
+              Kho sẽ được phép nhập mua khi số dư quỹ ≥ −{Number(limitInput || 0).toLocaleString("vi-VN")} VNĐ
+            </p>
+          </div>
+
+          <Button
+            size="sm"
+            onClick={handleSaveLimit}
+            disabled={updateLimit.isPending || !selectedDepotId}
+            className="w-full"
+          >
+            <FloppyDisk size={14} className="mr-1.5" />
+            Lưu hạn mức
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 /* ── Main Page ────────────────────────────────────────────── */
 
 export default function FundingRequestsPage() {
@@ -149,6 +282,7 @@ export default function FundingRequestsPage() {
   const [allocateDepotId, setAllocateDepotId] = useState("");
   const [allocateAmount, setAllocateAmount] = useState("");
   const [allocatePurpose, setAllocatePurpose] = useState("");
+  const [activeTab, setActiveTab] = useState<"requests" | "advance-limit">("requests");
 
   // API
   const { data, isLoading } = useFundingRequests({
@@ -363,7 +497,7 @@ export default function FundingRequestsPage() {
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5 mb-1">
-              <Wallet size={20} weight="bold" className="text-foreground" />
+              <PiggyBankIcon size={24} className="text-foreground" />
               <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                 Tài chính
               </p>
@@ -407,6 +541,31 @@ export default function FundingRequestsPage() {
           </div>
         </div>
 
+        {/* ── Tabs ──────────────────────────────────────── */}
+        <div className="flex gap-1 border-b border-border/50">
+          <button
+            onClick={() => setActiveTab("requests")}
+            className={`px-4 py-2.5 text-sm font-medium tracking-tighter transition-colors border-b-2 -mb-px ${
+              activeTab === "requests"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Yêu cầu cấp quỹ
+          </button>
+          <button
+            onClick={() => setActiveTab("advance-limit")}
+            className={`px-4 py-2.5 text-sm font-medium tracking-tighter transition-colors border-b-2 -mb-px ${
+              activeTab === "advance-limit"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Cấu hình hạn mức ứng trước
+          </button>
+        </div>
+
+        {activeTab === "requests" && (<>
         {/* ── Stats ──────────────────────────────────────── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
@@ -499,9 +658,23 @@ export default function FundingRequestsPage() {
                     <p className="text-xs font-semibold tracking-tighter text-muted-foreground truncate mb-1.5">
                       {fund.depotName}
                     </p>
-                    <p className="text-lg font-bold tracking-tighter text-emerald-600">
+                    <p className={`text-lg font-bold tracking-tighter ${
+                      fund.balance < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-emerald-600 dark:text-emerald-400"
+                    }`}>
                       {formatMoney(fund.balance)}
                     </p>
+                    {fund.balance < 0 && (
+                      <p className="text-[10px] text-red-500 tracking-tight font-medium mt-0.5">
+                        Ứng trước • Hạn mức: {formatMoney(fund.maxAdvanceLimit)}
+                      </p>
+                    )}
+                    {fund.balance >= 0 && (
+                      <p className="text-[10px] text-muted-foreground tracking-tight mt-0.5">
+                        Hạn ứng: {formatMoney(fund.maxAdvanceLimit)}
+                      </p>
+                    )}
                     <p className="text-[10px] text-muted-foreground tracking-tight mt-1">
                       Cập nhật: {new Date(fund.lastUpdatedAt).toLocaleDateString("vi-VN")}
                     </p>
@@ -811,6 +984,9 @@ export default function FundingRequestsPage() {
             )}
           </CardContent>
         </Card>
+        </>)}
+
+        {activeTab === "advance-limit" && <AdvanceLimitSection />}
       </div>
 
       {/* ── Detail Panel ─────────────────────────────────── */}

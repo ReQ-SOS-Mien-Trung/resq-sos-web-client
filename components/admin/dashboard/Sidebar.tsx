@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -21,6 +21,31 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
   const router = useRouter();
   const [favoritesExpanded, setFavoritesExpanded] = useState(true);
   const [projectsExpanded, setProjectsExpanded] = useState(false);
+  // Track which parent nav groups are open (by label)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    // Auto-open any group whose child matches current pathname
+    const initial: Record<string, boolean> = {};
+    navigationItems.forEach((item) => {
+      if ("children" in item && item.children) {
+        const hasActive = item.children.some((c) => pathname === c.href || pathname?.startsWith(c.href));
+        if (hasActive) initial[item.label] = true;
+      }
+    });
+    return initial;
+  });
+
+  // Re-sync when pathname changes
+  useEffect(() => {
+    navigationItems.forEach((item) => {
+      if ("children" in item && item.children) {
+        const hasActive = item.children.some((c) => pathname === c.href || pathname?.startsWith(c.href));
+        if (hasActive) setOpenGroups((prev) => ({ ...prev, [item.label]: true }));
+      }
+    });
+  }, [pathname]);
+
+  const toggleGroup = (label: string) =>
+    setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
 
   const handleFavoriteClick = (e: React.MouseEvent, name: string) => {
     e.preventDefault();
@@ -79,14 +104,90 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
           <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
             {navigationItems.map((item, index) => {
               const Icon = item.icon;
+
+              // ── Group with children ──────────────────────────────────
+              if ("children" in item && item.children) {
+                const isGroupOpen = !!openGroups[item.label];
+                const hasActiveChild = item.children.some(
+                  (c) => pathname === c.href || pathname?.startsWith(c.href),
+                );
+                return (
+                  <div key={item.label}>
+                    {/* Parent button */}
+                    <button
+                      onClick={() => toggleGroup(item.label)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-none text-sm font-medium transition-all duration-200",
+                        hasActiveChild
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1",
+                      )}
+                      style={{ animationDelay: `${index * 50}ms` }}
+                    >
+                      <Icon
+                        size={20}
+                        className={cn("transition-colors shrink-0", hasActiveChild && "text-red-500")}
+                      />
+                      <span className="truncate tracking-tighter flex-1 text-left">{item.label}</span>
+                      <CaretDown
+                        size={14}
+                        className={cn(
+                          "shrink-0 transition-transform duration-200",
+                          isGroupOpen ? "rotate-0" : "-rotate-90",
+                        )}
+                      />
+                    </button>
+
+                    {/* Children */}
+                    <div
+                      className={cn(
+                        "overflow-hidden transition-all duration-300",
+                        isGroupOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0",
+                      )}
+                    >
+                      <div className="ml-3 mt-0.5 border-l border-sidebar-border/60 pl-2 space-y-0.5">
+                        {item.children.map((child, cIdx) => {
+                          const ChildIcon = child.icon;
+                          const isActive =
+                            pathname === child.href ||
+                            (child.href !== "/dashboard/admin" && pathname?.startsWith(child.href));
+                          return (
+                            <Link
+                              key={child.label}
+                              href={child.href}
+                              className={cn(
+                                "flex items-center gap-3 px-3 py-2 rounded-none text-sm font-medium transition-all duration-200",
+                                isActive
+                                  ? "bg-linear-to-r from-red-500/10 to-orange-500/10 text-red-600 dark:text-red-400 shadow-sm border border-red-500/10"
+                                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1",
+                              )}
+                              style={{ animationDelay: `${cIdx * 40}ms` }}
+                            >
+                              <ChildIcon
+                                size={16}
+                                className={cn("transition-colors shrink-0", isActive && "text-red-500")}
+                              />
+                              <span className="truncate tracking-tighter">{child.label}</span>
+                              {isActive && (
+                                <div className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // ── Regular flat item ────────────────────────────────────
               const isActive =
                 pathname === item.href ||
-                (item.href !== "/dashboard/admin" &&
-                  pathname?.startsWith(item.href));
+                (item.href !== "/dashboard/admin" && pathname?.startsWith(item.href as string));
               return (
                 <Link
                   key={item.label}
-                  href={item.href}
+                  href={item.href as string}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-none text-sm font-medium transition-all duration-200",
                     isActive
@@ -97,10 +198,7 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                 >
                   <Icon
                     size={20}
-                    className={cn(
-                      "transition-colors shrink-0",
-                      isActive && "text-red-500",
-                    )}
+                    className={cn("transition-colors shrink-0", isActive && "text-red-500")}
                   />
                   <span className="truncate tracking-tighter">{item.label}</span>
                   {isActive && (

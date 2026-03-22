@@ -42,7 +42,13 @@ export interface ConsumableItemEntity extends InventoryItemEntityBase {
   quantity: number;
   reservedQuantity: number;
   availableQuantity: number;
-  reusableBreakdown: null;
+  reusableBreakdown?: null;
+  /** Số lô hiện tại */
+  lotCount: number;
+  /** Ngày hết hạn gần nhất trong các lô */
+  nearestExpiryDate?: string | null;
+  /** true nếu có lô sắp hết hạn */
+  isExpiringSoon?: boolean;
 }
 
 export interface ReusableItemEntity extends InventoryItemEntityBase {
@@ -51,7 +57,7 @@ export interface ReusableItemEntity extends InventoryItemEntityBase {
   unit: number;
   reservedUnit: number;
   availableUnit: number;
-  reusableBreakdown: ReusableBreakdown;
+  reusableBreakdown?: ReusableBreakdown;
 }
 
 export type InventoryItemEntity = ConsumableItemEntity | ReusableItemEntity;
@@ -148,6 +154,12 @@ export interface TransactionItem {
   itemType: string;
   targetGroup: string;
   categoryName: string;
+  /** Ngày nhập lô (chỉ có với Consumable) */
+  receivedDate?: string | null;
+  /** Ngày hết hạn lô (chỉ có với Consumable) */
+  expiredDate?: string | null;
+  /** ID lô hàng gắn kết */
+  supplyInventoryLotId?: number | null;
 }
 
 export interface TransactionEntity {
@@ -195,6 +207,24 @@ export interface GetDepotTransactionsResponse {
   totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
+}
+
+// ─── Inventory Lots (FEFO) ───
+
+export interface InventoryLotItem {
+  lotId: number;
+  quantity: number;
+  remainingQuantity: number;
+  receivedDate: string;
+  expiredDate: string;
+  sourceType: string;
+  createdAt: string;
+  isExpiringSoon: boolean;
+  isExpired: boolean;
+}
+
+export interface GetInventoryLotsResponse {
+  items: InventoryLotItem[];
 }
 
 // ─── Search Depots by Relief Items ───

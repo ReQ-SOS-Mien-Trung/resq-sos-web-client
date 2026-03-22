@@ -9,6 +9,7 @@ import {
   createDepot,
   updateDepot,
   updateDepotStatus,
+  updateDepotAdvanceLimit,
 } from "./api";
 import {
   GetDepotsResponse,
@@ -110,6 +111,22 @@ export function useMyDepotFund(options?: { enabled?: boolean }) {
     queryFn: getMyDepotFund,
     enabled: options?.enabled ?? true,
   });
+}
+
+/**
+ * [Admin] Hook to update advance limit for a depot
+ */
+export function useUpdateDepotAdvanceLimit() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { depotId: number; maxAdvanceLimit: number }>(
+    {
+      mutationFn: ({ depotId, maxAdvanceLimit }) =>
+        updateDepotAdvanceLimit(depotId, maxAdvanceLimit),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: DEPOT_FUNDS_QUERY_KEY });
+      },
+    },
+  );
 }
 
 /**

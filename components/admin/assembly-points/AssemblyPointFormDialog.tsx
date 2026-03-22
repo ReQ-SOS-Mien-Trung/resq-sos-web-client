@@ -104,7 +104,7 @@ export function AssemblyPointFormDialog({
       return;
     }
     if (capNum > 10000) {
-      toast.error("Sức chứa không được vượt quá 10.000 đội");
+      toast.error("Sức chứa không được vượt quá 10.000 người");
       return;
     }
 
@@ -219,7 +219,7 @@ export function AssemblyPointFormDialog({
           <div className="space-y-2">
             <Label htmlFor="ap-capacity" className="text-base font-medium tracking-tight flex items-center gap-1.5">
               <UsersThree size={14} className="text-blue-500" />
-              Sức chứa đội <span className="text-red-500">*</span>
+              Sức chứa người <span className="text-red-500">*</span>
               <span className="text-sm text-muted-foreground font-normal">(tối đa 10.000)</span>
             </Label>
             <div className="flex gap-2 flex-wrap">
@@ -232,7 +232,7 @@ export function AssemblyPointFormDialog({
                   className="h-8 text-sm tracking-tight"
                   onClick={() => setCapacity(String(preset))}
                 >
-                  {preset} đội
+                  {preset} người
                 </Button>
               ))}
             </div>

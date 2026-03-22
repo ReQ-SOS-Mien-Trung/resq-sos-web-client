@@ -1,7 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { allocateDisbursement, getCampaignSpending, getCampaigns } from "./api";
+import {
+  allocateDisbursement,
+  getCampaignSpending,
+  getCampaigns,
+  getCampaignStatuses,
+} from "./api";
 import type {
   AllocateDisbursementRequest,
+  CampaignStatusMetadata,
   GetCampaignSpendingParams,
   GetCampaignSpendingResponse,
   GetCampaignsParams,
@@ -10,6 +16,7 @@ import type {
 
 export const CAMPAIGN_SPENDING_QUERY_KEY = ["campaign-spending"] as const;
 export const CAMPAIGNS_QUERY_KEY = ["campaigns"] as const;
+export const CAMPAIGN_STATUSES_QUERY_KEY = ["campaign-statuses"] as const;
 
 /* ── GET campaign spending ── */
 
@@ -60,5 +67,18 @@ export function useCampaigns(options?: UseCampaignsOptions) {
     queryKey: [...CAMPAIGNS_QUERY_KEY, options?.params],
     queryFn: () => getCampaigns(options?.params),
     enabled: options?.enabled ?? true,
+  });
+}
+
+/* ── GET campaign status metadata ── */
+
+/**
+ * Hook to fetch campaign status options (key/value pairs for filter)
+ */
+export function useCampaignStatuses() {
+  return useQuery<CampaignStatusMetadata[]>({
+    queryKey: CAMPAIGN_STATUSES_QUERY_KEY,
+    queryFn: getCampaignStatuses,
+    staleTime: Infinity,
   });
 }
