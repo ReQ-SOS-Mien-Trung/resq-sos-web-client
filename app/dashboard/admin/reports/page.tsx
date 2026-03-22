@@ -666,16 +666,16 @@ export default function FundingRequestsPage() {
                       {formatMoney(fund.balance)}
                     </p>
                     {fund.balance < 0 && (
-                      <p className="text-[10px] text-red-500 tracking-tight font-medium mt-0.5">
+                      <p className="text-xs text-red-500 tracking-tight font-medium mt-0.5">
                         Ứng trước • Hạn mức: {formatMoney(fund.maxAdvanceLimit)}
                       </p>
                     )}
                     {fund.balance >= 0 && (
-                      <p className="text-[10px] text-muted-foreground tracking-tight mt-0.5">
+                      <p className="text-xs text-muted-foreground tracking-tight mt-0.5">
                         Hạn ứng: {formatMoney(fund.maxAdvanceLimit)}
                       </p>
                     )}
-                    <p className="text-[10px] text-muted-foreground tracking-tight mt-1">
+                    <p className="text-xs text-muted-foreground tracking-tight mt-1">
                       Cập nhật: {new Date(fund.lastUpdatedAt).toLocaleDateString("vi-VN")}
                     </p>
                   </div>

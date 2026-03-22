@@ -57,7 +57,7 @@ const PAGE_SIZES = [10, 25, 50, 100];
 const TransactionTable: React.FC = () => {
   // State for filters
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [selectedActionTypes, setSelectedActionTypes] = useState<string[]>([]);
   const [selectedSourceTypes, setSelectedSourceTypes] = useState<string[]>([]);
@@ -100,37 +100,24 @@ const TransactionTable: React.FC = () => {
 
   const { data: sourceTypes = [] } = useInventorySourceTypes();
 
-  // Transform data to match expected structure
+  // Transform data — one row per transaction
   const transactions = useMemo(() => {
     if (!transactionsData) return null;
-    
+
     return {
-      content: transactionsData.items.flatMap(transaction => 
-        transaction.items.map(item => ({
-          id: `${transaction.transactionId}-${item.itemId}`,
-          transactionId: transaction.transactionId,
-          actionType: transaction.actionType,
-          actionTypeId: transaction.actionType,
-          sourceType: transaction.sourceType,
-          sourceTypeId: transaction.sourceType,
-          sourceName: transaction.sourceName,
-          sourceId: transaction.sourceId?.toString() || '',
-          itemName: item.itemName,
-          itemId: item.itemId.toString(),
-          categoryName: item.categoryName,
-          categoryId: item.categoryName,
-          quantity: Math.abs(item.quantityChange),
-          unit: item.unit,
-          notes: transaction.note,
-          createdAt: transaction.createdAt,
-          updatedAt: transaction.createdAt,
-          createdBy: transaction.performedByName,
-          createdByName: transaction.performedByName,
-          receivedDate: item.receivedDate ?? null,
-          expiredDate: item.expiredDate ?? null,
-          rawTransaction: transaction,
-        }))
-      ),
+      content: transactionsData.items.map((transaction, idx) => ({
+        id: `${transaction.transactionId}-${idx}`,
+        transactionId: transaction.transactionId,
+        actionType: transaction.actionType,
+        sourceType: transaction.sourceType,
+        sourceName: transaction.sourceName,
+        sourceId: transaction.sourceId?.toString() || '',
+        notes: transaction.note,
+        createdAt: transaction.createdAt,
+        createdByName: transaction.performedByName,
+        items: transaction.items,
+        rawTransaction: transaction,
+      })),
       totalElements: transactionsData.totalCount,
       totalPages: transactionsData.totalPages,
       size: transactionsData.pageSize,
@@ -155,9 +142,10 @@ const TransactionTable: React.FC = () => {
     
     // Filter by search term
     if (debouncedSearch.trim()) {
-      filtered = filtered.filter(t => 
-        t.sourceName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        t.itemName.toLowerCase().includes(debouncedSearch.toLowerCase())
+      const term = debouncedSearch.toLowerCase();
+      filtered = filtered.filter(t =>
+        t.sourceName.toLowerCase().includes(term) ||
+        t.items.some(i => i.itemName.toLowerCase().includes(term))
       );
     }
     
@@ -211,11 +199,6 @@ const TransactionTable: React.FC = () => {
   // Format date for display
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), 'dd/MM/yyyy HH:mm', { locale: vi });
-  };
-
-  // Format quantity with unit
-  const formatQuantity = (quantity: number, unit: string) => {
-    return `${quantity.toLocaleString('vi-VN')} ${unit}`;
   };
 
   // Get action type badge with Vietnamese label + proper color
@@ -454,11 +437,10 @@ const TransactionTable: React.FC = () => {
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
-                      <TableHead>Mã</TableHead>
+                      <TableHead className="pl-6">Mã</TableHead>
                       <TableHead>Loại hành động</TableHead>
                       <TableHead>Nguồn</TableHead>
                       <TableHead>Vật tư</TableHead>
-                      <TableHead className="text-right">Số lượng</TableHead>
                       <TableHead>Thời gian</TableHead>                   
                     </TableRow>
                   </TableHeader>
@@ -508,7 +490,7 @@ const TransactionTable: React.FC = () => {
                             setSheetOpen(true);
                           }}
                         >
-                          <TableCell className="font-regular text-sm">
+                          <TableCell className="font-regular text-sm pl-6">
                             {transaction.transactionId}
                           </TableCell>
                           <TableCell>
@@ -518,15 +500,28 @@ const TransactionTable: React.FC = () => {
                             {transaction.sourceName || "—"}
                           </TableCell>
                           <TableCell>
-                            <div>
-                              <p className="font-medium">{transaction.itemName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {transaction.categoryName}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatQuantity(transaction.quantity, transaction.unit)}
+                            {transaction.items.length === 1 ? (
+                              <div>
+                                <p className="font-medium text-sm">{transaction.items[0].itemName}</p>
+                                <p className="text-xs text-muted-foreground">{transaction.items[0].categoryName}</p>
+                                {transaction.items[0].receivedDate && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    Nhập: {format(new Date(transaction.items[0].receivedDate), "dd/MM/yyyy", { locale: vi })}
+                                    {transaction.items[0].expiredDate && (
+                                      <> • Hết hạn: <span className={new Date(transaction.items[0].expiredDate) < new Date() ? "text-red-500 font-medium" : ""}>
+                                        {format(new Date(transaction.items[0].expiredDate), "dd/MM/yyyy", { locale: vi })}
+                                      </span></>
+                                    )}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="font-medium text-sm">{transaction.items[0].itemName}</p>
+                                <p className="text-xs text-muted-foreground">{transaction.items[0].categoryName}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5 italic">+{transaction.items.length - 1} mặt hàng khác</p>
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm">
                             {formatDate(transaction.createdAt)}
