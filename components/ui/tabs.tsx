@@ -9,7 +9,7 @@ interface TabsContextValue {
 }
 
 const TabsContext = React.createContext<TabsContextValue | undefined>(
-  undefined
+  undefined,
 );
 
 function useTabs() {
@@ -35,7 +35,7 @@ function Tabs({
   ...props
 }: TabsProps) {
   const [uncontrolledValue, setUncontrolledValue] = React.useState(
-    defaultValue ?? ""
+    defaultValue ?? "",
   );
 
   const isControlled = controlledValue !== undefined;
@@ -48,7 +48,7 @@ function Tabs({
       }
       onValueChange?.(newValue);
     },
-    [isControlled, onValueChange]
+    [isControlled, onValueChange],
   );
 
   return (
@@ -70,8 +70,8 @@ function TabsList({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="tabs-list"
       role="tablist"
       className={cn(
-        "bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center p-1",
-        className
+        "bg-muted text-muted-foreground inline-flex h-9 items-center justify-center p-1",
+        className,
       )}
       {...props}
     />
@@ -99,7 +99,7 @@ function TabsTrigger({ className, value, ...props }: TabsTriggerProps) {
         isSelected
           ? "bg-background text-foreground shadow"
           : "hover:bg-background/50 hover:text-foreground",
-        className
+        className,
       )}
       {...props}
     />
@@ -123,7 +123,7 @@ function TabsContent({ className, value, ...props }: TabsContentProps) {
       data-state={isSelected ? "active" : "inactive"}
       className={cn(
         "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        className
+        className,
       )}
       {...props}
     />

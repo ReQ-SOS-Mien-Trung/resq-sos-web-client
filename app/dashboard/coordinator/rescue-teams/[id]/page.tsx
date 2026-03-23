@@ -10,7 +10,7 @@ import {
   useAddRescueTeamMember,
   useRemoveRescueTeamMember,
 } from "@/services/rescue_teams/hooks";
-import { useFreeRescuers } from "@/services/rescuers/hooks";
+import { useRescuers } from "@/services/rescuers/hooks";
 import type {
   RescueTeamStatusKey,
   RescueTeamTypeKey,
@@ -294,10 +294,11 @@ export default function RescueTeamDetailPage() {
     enabled: Number.isFinite(teamId) && teamId > 0,
   });
   const { data: freeRescuersData, isLoading: isLoadingFreeRescuers } =
-    useFreeRescuers({
+    useRescuers({
       params: {
         pageNumber: 1,
         pageSize: 100,
+        hasTeam: false,
       },
       enabled: Number.isFinite(teamId) && teamId > 0,
     });

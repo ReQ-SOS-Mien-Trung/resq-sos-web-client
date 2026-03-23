@@ -49,8 +49,8 @@ import type {
   RescueTeamMember,
 } from "@/services/rescue_teams/type";
 import { useInfiniteAssemblyPoints } from "@/services/assembly_points/hooks";
-import { useInfiniteFreeRescuers } from "@/services/rescuers/hooks";
-import type { FreeRescuerEntity, RescuerType } from "@/services/rescuers/type";
+import { useInfiniteRescuers } from "@/services/rescuers/hooks";
+import type { RescuerEntity, RescuerType } from "@/services/rescuers/type";
 
 const DEFAULT_RESCUER_AVATAR =
   "https://res.cloudinary.com/dezgwdrfs/image/upload/v1773504004/611251674_1432765175119052_6622750233977483141_n_sgxqxd.png";
@@ -168,7 +168,7 @@ function RescuerCard({
   onToggleSelect,
   onToggleLeader,
 }: {
-  user: FreeRescuerEntity;
+  user: RescuerEntity;
   selected: boolean;
   isLeader: boolean;
   canBeLeader: boolean;
@@ -382,8 +382,11 @@ export default function CreateRescueTeamPage() {
 
   const rescuerFilters = useMemo(() => {
     const filters: {
+      hasTeam: boolean;
       rescuerType?: Exclude<RescuerType, null>;
-    } = {};
+    } = {
+      hasTeam: false,
+    };
 
     if (rescuerTypeFilter !== "all") {
       filters.rescuerType = rescuerTypeFilter;
@@ -398,7 +401,7 @@ export default function CreateRescueTeamPage() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useInfiniteFreeRescuers({
+  } = useInfiniteRescuers({
     pageSize: 10,
     params: rescuerFilters,
   });
@@ -783,7 +786,7 @@ export default function CreateRescueTeamPage() {
                           (p) => String(p.id) === assemblyPointId,
                         );
                         return point
-                          ? `Sức chứa khả dụng: ${point.capacityTeams} đội`
+                          ? `Sức chứa khả dụng: ${point.maxCapacity} người`
                           : null;
                       })()}
                     </span>

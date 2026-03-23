@@ -100,6 +100,86 @@ const CoordinatorMap = ({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [currentZoom, setCurrentZoom] = useState(13);
 
+  const markerDisplayPositions = useMemo(() => {
+    type MarkerSeed = {
+      type: "depot" | "assemblyPoint";
+      id: number;
+      lat: number;
+      lng: number;
+    };
+
+    const toGroupKey = (lat: number, lng: number) =>
+      `${lat.toFixed(5)}:${lng.toFixed(5)}`;
+
+    const toOffsetPosition = (
+      lat: number,
+      lng: number,
+      index: number,
+      total: number,
+    ): [number, number] => {
+      if (total <= 1) return [lat, lng];
+
+      const radiusMeters = 14;
+      const angle = (2 * Math.PI * index) / total;
+      const dx = Math.cos(angle) * radiusMeters;
+      const dy = Math.sin(angle) * radiusMeters;
+
+      // Approximate meter-to-degree conversion; sufficient for tiny visual offsets.
+      const latDelta = dy / 111_320;
+      const lngDelta = dx / (111_320 * Math.cos((lat * Math.PI) / 180) || 1);
+
+      return [lat + latDelta, lng + lngDelta];
+    };
+
+    const seeds: MarkerSeed[] = [
+      ...depots.map((depot) => ({
+        type: "depot" as const,
+        id: depot.id,
+        lat: depot.latitude,
+        lng: depot.longitude,
+      })),
+      ...assemblyPoints.map((point) => ({
+        type: "assemblyPoint" as const,
+        id: point.id,
+        lat: point.latitude,
+        lng: point.longitude,
+      })),
+    ];
+
+    const groups = new Map<string, MarkerSeed[]>();
+    seeds.forEach((seed) => {
+      const key = toGroupKey(seed.lat, seed.lng);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(seed);
+    });
+
+    const depotPositions = new Map<number, [number, number]>();
+    const assemblyPointPositions = new Map<number, [number, number]>();
+
+    groups.forEach((group) => {
+      const sorted = [...group].sort((a, b) => {
+        if (a.type === b.type) return a.id - b.id;
+        return a.type === "depot" ? -1 : 1;
+      });
+
+      sorted.forEach((item, index) => {
+        const position = toOffsetPosition(
+          item.lat,
+          item.lng,
+          index,
+          sorted.length,
+        );
+        if (item.type === "depot") {
+          depotPositions.set(item.id, position);
+        } else {
+          assemblyPointPositions.set(item.id, position);
+        }
+      });
+    });
+
+    return { depotPositions, assemblyPointPositions };
+  }, [depots, assemblyPoints]);
+
   useEffect(() => {
     // Use setTimeout to avoid React 19 strict mode warning
     const timer = setTimeout(() => setIsMounted(true), 0);
@@ -684,6 +764,12 @@ const CoordinatorMap = ({
           <DepotMarker
             key={depot.id}
             depot={depot}
+            position={
+              markerDisplayPositions.depotPositions.get(depot.id) ?? [
+                depot.latitude,
+                depot.longitude,
+              ]
+            }
             onClick={() => onDepotSelect?.(depot)}
           />
         ))}
@@ -693,6 +779,12 @@ const CoordinatorMap = ({
           <AssemblyPointMarker
             key={point.id}
             assemblyPoint={point}
+            position={
+              markerDisplayPositions.assemblyPointPositions.get(point.id) ?? [
+                point.latitude,
+                point.longitude,
+              ]
+            }
             onClick={() => onAssemblyPointSelect?.(point)}
           />
         ))}
@@ -946,9 +1038,11 @@ function RescuerMarker({
 // Depot Marker Component
 function DepotMarker({
   depot,
+  position,
   onClick,
 }: {
   depot: DepotEntity;
+  position: [number, number];
   onClick?: () => void;
 }) {
   const statusColors = {
@@ -993,7 +1087,7 @@ function DepotMarker({
 
   return (
     <Marker
-      position={[depot.latitude, depot.longitude]}
+      position={position}
       icon={iconEl}
       eventHandlers={{ click: () => onClick?.() }}
     />
@@ -1003,24 +1097,20 @@ function DepotMarker({
 // Assembly Point Marker Component
 function AssemblyPointMarker({
   assemblyPoint,
+  position,
   onClick,
 }: {
   assemblyPoint: AssemblyPointEntity;
+  position: [number, number];
   onClick?: () => void;
 }) {
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     Active: "#22c55e", // green-500
     Overloaded: "#f97316", // orange-500
     Unavailable: "#ef4444", // red-500
   };
 
-  const statusLabels = {
-    Active: "Hoạt động",
-    Overloaded: "Quá tải",
-    Unavailable: "Không khả dụng",
-  };
-
-  const color = statusColors[assemblyPoint.status];
+  const color = statusColors[assemblyPoint.status] ?? "#64748b";
 
   const iconEl = useMemo(() => {
     if (typeof window === "undefined") return undefined;
@@ -1048,8 +1138,9 @@ function AssemblyPointMarker({
 
   return (
     <Marker
-      position={[assemblyPoint.latitude, assemblyPoint.longitude]}
+      position={position}
       icon={iconEl}
+      zIndexOffset={150}
       eventHandlers={{ click: () => onClick?.() }}
     />
   );

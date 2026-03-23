@@ -77,8 +77,28 @@ export default function ChatMessageThread({
                       : "bg-muted text-foreground",
                 )}
               >
-                <div className="text-sm break-words [&_a]:underline [&_code]:rounded [&_code]:bg-black/10 [&_code]:px-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-black/15 [&_pre]:p-2 [&_ul]:list-disc [&_ul]:pl-5">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <div className="text-sm wrap-break-word [&_a]:underline [&_code]:rounded [&_code]:bg-black/10 [&_code]:px-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-black/15 [&_pre]:p-2 [&_ul]:list-disc [&_ul]:pl-5">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      a: (props) => (
+                        <a
+                          {...props}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        />
+                      ),
+                      img: (props) => (
+                        // Render uploaded markdown images as responsive thumbnails.
+                        <img
+                          {...props}
+                          alt={props.alt ?? "chat-image"}
+                          className="mt-1 max-h-64 w-auto max-w-full rounded-lg border border-black/10 object-cover"
+                          loading="lazy"
+                        />
+                      ),
+                    }}
+                  >
                     {message.content}
                   </ReactMarkdown>
                 </div>

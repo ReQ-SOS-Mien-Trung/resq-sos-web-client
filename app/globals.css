@@ -161,7 +161,8 @@
 
 /* Smooth animations */
 @keyframes bounceX {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateX(0);
   }
   50% {
@@ -418,7 +419,8 @@
 /* Leaflet Custom Marker Styles */
 .custom-cluster-marker,
 .custom-rescuer-marker,
-.custom-depot-marker {
+.custom-depot-marker,
+.custom-assembly-point-marker {
   background: transparent !important;
   border: none !important;
 }
