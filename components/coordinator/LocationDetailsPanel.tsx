@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DepotEntity } from "@/services/depot/type";
 import {
   useAssemblyPointById,
@@ -17,9 +17,22 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import type { InventoryItemEntity } from "@/services/inventory/type";
+import { vi } from "date-fns/locale";
 import {
   X,
   MapPin,
@@ -134,8 +147,11 @@ function getMinimumGatheringDate(now = new Date()): Date {
   return minDate;
 }
 
-function minGatheringTimeLocal(): string {
-  return formatDateTimeLocal(getMinimumGatheringDate());
+function clampToMinimumDate(date: Date, minDate: Date): Date {
+  if (date.getTime() < minDate.getTime()) {
+    return new Date(minDate);
+  }
+  return date;
 }
 
 function getInventoryQuantities(item: InventoryItemEntity): {
@@ -555,7 +571,7 @@ function AssemblyPointDetails({
   assemblyPoint: AssemblyPointEntity;
   onClose: () => void;
 }) {
-  const [assemblyDateInput, setAssemblyDateInput] = useState("");
+  const [assemblyDateInput, setAssemblyDateInput] = useState<Date | null>(null);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
 
   const {
@@ -614,7 +630,7 @@ function AssemblyPointDetails({
       toast.success(
         `Đã lên lịch tập trung thành công (Event #${result.eventId}).`,
       );
-      setAssemblyDateInput("");
+      setAssemblyDateInput(null);
     } catch (error) {
       const err = error as {
         response?: {
@@ -725,12 +741,9 @@ function AssemblyPointDetails({
 
         {showScheduleForm && (
           <div className="mt-3 rounded-lg border border-[#FF5722]/25 bg-[#FF5722]/5 p-3 space-y-2">
-            <Input
-              type="datetime-local"
+            <AssemblyDateTimePicker
               value={assemblyDateInput}
-              min={minGatheringTimeLocal()}
-              onChange={(e) => setAssemblyDateInput(e.target.value)}
-              className="h-9 border-[#FF5722]/35 focus-visible:ring-[#FF5722]/40"
+              onChange={setAssemblyDateInput}
             />
             <p className="text-[11px] text-muted-foreground">
               Điều kiện: thời điểm triệu tập phải từ 48 giờ trở lên kể từ hiện
@@ -743,7 +756,7 @@ function AssemblyPointDetails({
                 variant="outline"
                 size="sm"
                 className="border-[#FF5722]/40 text-[#FF5722] hover:bg-[#FF5722]/10"
-                onClick={() => setAssemblyDateInput(minGatheringTimeLocal())}
+                onClick={() => setAssemblyDateInput(getMinimumGatheringDate())}
               >
                 Gợi ý an toàn
               </Button>
@@ -884,6 +897,174 @@ function AssemblyPointDetails({
         </div>
       </div>
     </>
+  );
+}
+
+function AssemblyDateTimePicker({
+  value,
+  onChange,
+}: {
+  value: Date | null;
+  onChange: (value: Date | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const minAllowedDate = getMinimumGatheringDate();
+  const [draft, setDraft] = useState<Date>(value ?? minAllowedDate);
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft(value ?? getMinimumGatheringDate());
+  }, [open, value]);
+
+  const hourValue = String(draft.getHours()).padStart(2, "0");
+  const minuteValue = String(draft.getMinutes()).padStart(2, "0");
+
+  const updateHour = (hour: string) => {
+    const base = new Date(draft);
+    base.setHours(Number(hour), base.getMinutes(), 0, 0);
+    setDraft(clampToMinimumDate(base, minAllowedDate));
+  };
+
+  const updateMinute = (minute: string) => {
+    const base = new Date(draft);
+    base.setHours(base.getHours(), Number(minute), 0, 0);
+    setDraft(clampToMinimumDate(base, minAllowedDate));
+  };
+
+  const applySelection = () => {
+    onChange(clampToMinimumDate(draft, minAllowedDate));
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(
+            "h-9 w-full justify-between border-[#FF5722]/35 px-3 text-left font-normal",
+            "hover:bg-[#FF5722]/10",
+            !value && "text-muted-foreground",
+          )}
+        >
+          <span>
+            {value
+              ? formatDateTimeVi(value)
+              : `Chọn ngày giờ (từ ${formatDateTimeVi(minAllowedDate)})`}
+          </span>
+          <CalendarBlank className="h-4 w-4 text-[#FF5722]" weight="fill" />
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        className="z-[1200] w-[340px] space-y-3 p-3"
+        align="start"
+        side="bottom"
+        sideOffset={8}
+        avoidCollisions={false}
+      >
+        <Calendar
+          mode="single"
+          selected={draft}
+          onSelect={(date) => {
+            if (!date) return;
+            const next = new Date(date);
+            next.setHours(draft.getHours(), draft.getMinutes(), 0, 0);
+            setDraft(clampToMinimumDate(next, minAllowedDate));
+          }}
+          locale={vi}
+          disabled={(date) => {
+            const dayEnd = new Date(date);
+            dayEnd.setHours(23, 59, 59, 999);
+            return dayEnd.getTime() < minAllowedDate.getTime();
+          }}
+          initialFocus
+        />
+
+        <div className="grid grid-cols-2 gap-2">
+          <Select value={hourValue} onValueChange={updateHour}>
+            <SelectTrigger className="h-8 w-full border-border/60 bg-white text-xs">
+              <SelectValue placeholder="Giờ" />
+            </SelectTrigger>
+            <SelectContent className="z-[1250]">
+              {Array.from({ length: 24 }, (_, hour) => {
+                const value = String(hour).padStart(2, "0");
+                return (
+                  <SelectItem key={value} value={value}>
+                    {value} giờ
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+
+          <Select value={minuteValue} onValueChange={updateMinute}>
+            <SelectTrigger className="h-8 w-full border-border/60 bg-white text-xs">
+              <SelectValue placeholder="Phút" />
+            </SelectTrigger>
+            <SelectContent className="z-[1250]">
+              {Array.from({ length: 60 }, (_, minute) => {
+                const value = String(minute).padStart(2, "0");
+                return (
+                  <SelectItem key={value} value={value}>
+                    {value} phút
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between border-t pt-2">
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs text-muted-foreground"
+              onClick={() => {
+                onChange(null);
+                setOpen(false);
+              }}
+            >
+              Xóa
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs text-muted-foreground"
+              onClick={() => setOpen(false)}
+            >
+              Hủy
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs text-[#FF5722] hover:bg-[#FF5722]/10"
+              onClick={() => setDraft(getMinimumGatheringDate())}
+            >
+              Mốc an toàn
+            </Button>
+
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 bg-[#FF5722] px-2 text-xs text-white hover:bg-[#E64A19]"
+              onClick={applySelection}
+            >
+              Áp dụng
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

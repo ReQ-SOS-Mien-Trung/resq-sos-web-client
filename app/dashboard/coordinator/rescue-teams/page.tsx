@@ -48,10 +48,12 @@ export default function RescueTeamsPage() {
   const [columnFilter, setColumnFilter] = useState<
     "all" | "todo" | "in-progress" | "completed"
   >("all");
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | RescueTeamStatusKey
-  >("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | RescueTeamTypeKey>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | RescueTeamStatusKey>(
+    "all",
+  );
+  const [typeFilter, setTypeFilter] = useState<"all" | RescueTeamTypeKey>(
+    "all",
+  );
   const [occupancyFilter, setOccupancyFilter] = useState<
     "all" | "empty" | "low" | "medium" | "full"
   >("all");
@@ -190,7 +192,8 @@ export default function RescueTeamsPage() {
       return {
         label: "Đủ quân số",
         hint: "100% - sẵn sàng triển khai",
-        chipClassName: "border border-emerald-200 bg-emerald-50 text-emerald-800",
+        chipClassName:
+          "border border-emerald-200 bg-emerald-50 text-emerald-800",
         trackClassName: "border-emerald-200 bg-emerald-50/70",
         fillClassName:
           "bg-[linear-gradient(90deg,#16a34a_0%,#22c55e_55%,#4ade80_100%)]",
@@ -309,7 +312,8 @@ export default function RescueTeamsPage() {
     {
       key: "in-progress",
       title: "Đang triển khai",
-      description: "Đội đang tập hợp, đã được phân công hoặc đang làm nhiệm vụ.",
+      description:
+        "Đội đang tập hợp, đã được phân công hoặc đang làm nhiệm vụ.",
       dotClassName: "bg-sky-500",
       cardClassName:
         "border-sky-200/80 bg-gradient-to-b from-sky-50/80 to-white",
@@ -371,12 +375,15 @@ export default function RescueTeamsPage() {
           columnFilter === "all" || getColumnKey(team.status) === columnFilter;
         const matchesStatus =
           statusFilter === "all" || team.status === statusFilter;
-        const matchesType = typeFilter === "all" || team.teamType === typeFilter;
+        const matchesType =
+          typeFilter === "all" || team.teamType === typeFilter;
         const matchesOccupancy =
           occupancyFilter === "all" ||
           (occupancyFilter === "empty" && occupancy === 0) ||
           (occupancyFilter === "low" && occupancy > 0 && occupancy < 50) ||
-          (occupancyFilter === "medium" && occupancy >= 50 && occupancy < 100) ||
+          (occupancyFilter === "medium" &&
+            occupancy >= 50 &&
+            occupancy < 100) ||
           (occupancyFilter === "full" && occupancy >= 100);
 
         return (
@@ -387,7 +394,14 @@ export default function RescueTeamsPage() {
           matchesOccupancy
         );
       }),
-    [teams, normalizedSearch, columnFilter, statusFilter, typeFilter, occupancyFilter],
+    [
+      teams,
+      normalizedSearch,
+      columnFilter,
+      statusFilter,
+      typeFilter,
+      occupancyFilter,
+    ],
   );
 
   const filteredTeamsByColumn = useMemo(
@@ -479,8 +493,8 @@ export default function RescueTeamsPage() {
                 Quản lý Đội Cứu Hộ
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 md:text-base">
-                Theo dõi đội theo trạng thái xử lý theo dạng Kanban trực quan
-                và dễ quét thông tin.
+                Theo dõi đội theo trạng thái xử lý theo dạng Kanban trực quan và
+                dễ quét thông tin.
               </p>
             </div>
             <Button
@@ -507,7 +521,7 @@ export default function RescueTeamsPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, columnIndex) => (
             <div
               key={columnIndex}
@@ -524,11 +538,11 @@ export default function RescueTeamsPage() {
                 <Skeleton className="h-7 w-10 rounded-full" />
               </div>
 
-              <div className="space-y-4">
+              <div className="flex gap-4 overflow-x-auto pb-2 pr-1">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Card
                     key={i}
-                    className="rounded-2xl border border-slate-200 shadow-none"
+                    className="min-w-[320px] max-w-[360px] shrink-0 rounded-2xl border border-slate-200 shadow-none"
                   >
                     <CardHeader className="space-y-3 pb-3">
                       <div className="flex gap-2">
@@ -790,7 +804,7 @@ export default function RescueTeamsPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="space-y-4">
         {visibleColumns.map((column) => {
           const columnTeams = [...filteredTeamsByColumn[column.key]].sort(
             compareTeams,
@@ -834,7 +848,7 @@ export default function RescueTeamsPage() {
                 </span>
               </div>
 
-              <div className="space-y-4">
+              <div className="flex gap-4 overflow-x-auto pb-2 pr-1">
                 {columnTeams.map((team) => {
                   const occupancy = getOccupancyPercent(
                     team.currentMemberCount,
@@ -845,7 +859,7 @@ export default function RescueTeamsPage() {
                   return (
                     <Card
                       key={team.id}
-                      className="rounded-2xl border border-slate-200 bg-white shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                      className="min-w-[340px] max-w-[390px] shrink-0 rounded-2xl border border-slate-200 bg-white shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
                     >
                       <CardHeader className="space-y-3 pb-3">
                         <div className="flex flex-wrap items-center gap-2">
@@ -873,7 +887,10 @@ export default function RescueTeamsPage() {
                         <div className="rounded-2xl border border-slate-200 bg-slate-50/85 p-3">
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <span className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
-                              <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                              <Users
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                              />
                               Quân số hiện tại
                             </span>
                             <div className="flex items-center gap-2">
@@ -998,7 +1015,8 @@ export default function RescueTeamsPage() {
                                 className="mt-1 line-clamp-2 break-words text-sm leading-5 text-slate-700"
                                 title={team.assemblyPointName}
                               >
-                                {team.assemblyPointName || "Chưa có điểm tập kết"}
+                                {team.assemblyPointName ||
+                                  "Chưa có điểm tập kết"}
                               </p>
                             </div>
                           </div>
@@ -1016,7 +1034,10 @@ export default function RescueTeamsPage() {
                             className="w-full"
                           >
                             Xem chi tiết
-                            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                            <ArrowRight
+                              className="h-4 w-4"
+                              aria-hidden="true"
+                            />
                           </Link>
                         </Button>
                       </CardFooter>
@@ -1025,7 +1046,7 @@ export default function RescueTeamsPage() {
                 })}
 
                 {columnTeams.length === 0 && (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-8 text-center">
+                  <div className="min-w-[320px] rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-8 text-center">
                     <p className="text-sm font-medium text-slate-700">
                       {hasActiveFilters
                         ? "Không có đội phù hợp trong nhóm này"

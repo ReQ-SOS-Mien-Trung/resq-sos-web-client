@@ -175,14 +175,23 @@ const SOSSidebar = ({
         onValueChange={setActiveTab}
         className="flex-1 flex flex-col overflow-hidden"
       >
-        <TabsList className="mx-3 mt-3 grid grid-cols-3">
-          <TabsTrigger value="incoming" className="text-xs">
+        <TabsList className="mx-3 mt-3 grid h-auto w-auto grid-cols-3 rounded-2xl border border-black/10 bg-black/4 p-1 shadow-inner">
+          <TabsTrigger
+            value="incoming"
+            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=inactive]:text-black/55"
+          >
             SOS Mới
           </TabsTrigger>
-          <TabsTrigger value="missions" className="text-xs">
+          <TabsTrigger
+            value="missions"
+            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=inactive]:text-black/55"
+          >
             Nhiệm vụ
           </TabsTrigger>
-          <TabsTrigger value="rescuers" className="text-xs">
+          <TabsTrigger
+            value="rescuers"
+            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=inactive]:text-black/55"
+          >
             Đội cứu hộ
           </TabsTrigger>
         </TabsList>
