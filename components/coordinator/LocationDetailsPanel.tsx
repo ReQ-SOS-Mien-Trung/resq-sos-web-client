@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { useDepotInventory } from "@/services/inventory/hooks";
+import type { InventoryItemEntity } from "@/services/inventory/type";
 import {
   X,
   MapPin,
@@ -44,6 +45,8 @@ import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
 
 // Panel width
 const PANEL_WIDTH = 420;
+const MIN_GATHERING_HOURS = 48;
+const GATHERING_SUBMIT_BUFFER_MINUTES = 5;
 
 const assemblyTeamTypeLabel: Record<AssemblyPointTeam["teamType"], string> = {
   Rescue: "Cứu hộ",
@@ -109,9 +112,50 @@ function formatDateTimeLocal(date: Date): string {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
+function formatDateTimeVi(date: Date): string {
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getMinimumGatheringDate(now = new Date()): Date {
+  const minDate = new Date(
+    now.getTime() +
+      MIN_GATHERING_HOURS * 60 * 60 * 1000 +
+      GATHERING_SUBMIT_BUFFER_MINUTES * 60 * 1000,
+  );
+
+  // Input datetime-local uses minute precision, so normalize seconds.
+  minDate.setSeconds(0, 0);
+  return minDate;
+}
+
 function minGatheringTimeLocal(): string {
-  const minDate = new Date(Date.now() + 48 * 60 * 60 * 1000);
-  return formatDateTimeLocal(minDate);
+  return formatDateTimeLocal(getMinimumGatheringDate());
+}
+
+function getInventoryQuantities(item: InventoryItemEntity): {
+  total: number;
+  reserved: number;
+  available: number;
+} {
+  if (item.itemType === "Consumable") {
+    return {
+      total: item.quantity,
+      reserved: item.reservedQuantity,
+      available: item.availableQuantity,
+    };
+  }
+
+  return {
+    total: item.unit,
+    reserved: item.reservedUnit,
+    available: item.availableUnit,
+  };
 }
 
 const LocationDetailsPanel = ({
@@ -199,9 +243,10 @@ function DepotDetails({
 
     return inventoryData.items.reduce(
       (acc, item) => {
-        acc.totalStock += item.quantity;
-        acc.reservedStock += item.reservedQuantity;
-        acc.availableStock += item.availableQuantity;
+        const qty = getInventoryQuantities(item);
+        acc.totalStock += qty.total;
+        acc.reservedStock += qty.reserved;
+        acc.availableStock += qty.available;
         return acc;
       },
       {
@@ -435,88 +480,65 @@ function DepotDetails({
                 </div>
               </div>
 
-              {inventoryData.items.map((item) => (
-                <div
-                  key={item.reliefItemId}
-                  className="rounded-lg border border-border/60 bg-card px-3 py-2"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium truncate">
-                      {item.reliefItemName}
-                    </p>
-                    <Badge variant="secondary" className="text-[10px] shrink-0">
-                      {item.itemType === "Consumable"
-                        ? "Tiêu thụ"
-                        : "Tái sử dụng"}
-                    </Badge>
-                  </div>
+              {inventoryData.items.map((item) => {
+                const qty = getInventoryQuantities(item);
 
-                  <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{item.categoryName}</span>
-                    <span>•</span>
-                    <span>{item.targetGroup}</span>
-                  </div>
+                return (
+                  <div
+                    key={item.itemModelId}
+                    className="rounded-lg border border-border/60 bg-card px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium truncate">
+                        {item.itemModelName}
+                      </p>
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] shrink-0"
+                      >
+                        {item.itemType === "Consumable"
+                          ? "Tiêu thụ"
+                          : "Tái sử dụng"}
+                      </Badge>
+                    </div>
 
-                  <div className="mt-2 grid grid-cols-3 gap-1.5">
-                    <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
-                      <p className="text-[10px] text-slate-600">Tổng tồn</p>
-                      <p className="text-sm font-semibold leading-none text-slate-800">
-                        {item.quantity.toLocaleString("vi-VN")}
-                      </p>
+                    <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{item.categoryName}</span>
+                      <span>•</span>
+                      <span>{item.targetGroup}</span>
                     </div>
-                    <div className="min-w-0 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-                      <p className="text-[10px] text-amber-700">Đã giữ</p>
-                      <p className="text-sm font-semibold leading-none text-amber-800">
-                        {item.reservedQuantity.toLocaleString("vi-VN")}
-                      </p>
-                    </div>
-                    <div className="min-w-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5">
-                      <p className="text-[10px] text-emerald-700">
-                        Còn khả dụng
-                      </p>
-                      <p className="text-sm font-semibold leading-none text-emerald-800">
-                        {item.availableQuantity.toLocaleString("vi-VN")}
-                      </p>
+
+                    <div className="mt-2 grid grid-cols-3 gap-1.5">
+                      <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
+                        <p className="text-[10px] text-slate-600">Tổng tồn</p>
+                        <p className="text-sm font-semibold leading-none text-slate-800">
+                          {qty.total.toLocaleString("vi-VN")}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+                        <p className="text-[10px] text-amber-700">Đã giữ</p>
+                        <p className="text-sm font-semibold leading-none text-amber-800">
+                          {qty.reserved.toLocaleString("vi-VN")}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5">
+                        <p className="text-[10px] text-emerald-700">
+                          Còn khả dụng
+                        </p>
+                        <p className="text-sm font-semibold leading-none text-emerald-800">
+                          {qty.available.toLocaleString("vi-VN")}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               Kho chưa có dữ liệu vật tư.
             </div>
           )}
-        </div>
-
-        {/* Additional Info Section */}
-        <div className="h-2 bg-muted/50" />
-
-        <div className="px-5 py-4">
-          <h4 className="text-sm font-semibold mb-3">Thông tin bổ sung</h4>
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard
-              label="ID"
-              value={`#${depot.id}`}
-              icon={<Hash className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Tình trạng"
-              value={statusConfig.label}
-              icon={<StatusIcon className="h-4 w-4" />}
-              statusColor={statusConfig.textColor}
-            />
-            <StatCard
-              label="Sức chứa"
-              value={`${depot.capacity}`}
-              icon={<Package className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Đang dùng"
-              value={`${depot.currentUtilization}`}
-              icon={<ChartBar className="h-4 w-4" />}
-            />
-          </div>
         </div>
       </div>
     </>
@@ -573,6 +595,14 @@ function AssemblyPointDetails({
     const assemblyDate = new Date(assemblyDateInput);
     if (Number.isNaN(assemblyDate.getTime())) {
       toast.error("Thời gian không hợp lệ.");
+      return;
+    }
+
+    const minAllowedDate = getMinimumGatheringDate();
+    if (assemblyDate.getTime() < minAllowedDate.getTime()) {
+      toast.error(
+        `Thời điểm triệu tập phải từ 48 giờ trở lên. Vui lòng chọn từ ${formatDateTimeVi(minAllowedDate)} (giờ VN).`,
+      );
       return;
     }
 
@@ -704,7 +734,8 @@ function AssemblyPointDetails({
             />
             <p className="text-[11px] text-muted-foreground">
               Điều kiện: thời điểm triệu tập phải từ 48 giờ trở lên kể từ hiện
-              tại.
+              tại. Hệ thống cộng thêm {GATHERING_SUBMIT_BUFFER_MINUTES} phút để
+              tránh lỗi sát giờ khi gửi yêu cầu.
             </p>
             <div className="flex items-center gap-2">
               <Button
@@ -712,15 +743,9 @@ function AssemblyPointDetails({
                 variant="outline"
                 size="sm"
                 className="border-[#FF5722]/40 text-[#FF5722] hover:bg-[#FF5722]/10"
-                onClick={() =>
-                  setAssemblyDateInput(
-                    formatDateTimeLocal(
-                      new Date(Date.now() + 48 * 60 * 60 * 1000),
-                    ),
-                  )
-                }
+                onClick={() => setAssemblyDateInput(minGatheringTimeLocal())}
               >
-                Gợi ý +48h
+                Gợi ý an toàn
               </Button>
               <Button
                 type="button"
@@ -856,36 +881,6 @@ function AssemblyPointDetails({
               Điểm tập kết hiện chưa có đội nào.
             </div>
           )}
-        </div>
-
-        {/* Additional Info */}
-        <div className="h-2 bg-muted/50" />
-
-        <div className="px-5 py-4">
-          <h4 className="text-sm font-semibold mb-3">Thông tin bổ sung</h4>
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard
-              label="ID"
-              value={`#${displayAssemblyPoint.id}`}
-              icon={<Hash className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Tình trạng"
-              value={statusConfig.label}
-              icon={<StatusIcon className="h-4 w-4" />}
-              statusColor={statusConfig.textColor}
-            />
-            <StatCard
-              label="Sức chứa"
-              value={`${displayAssemblyPoint.maxCapacity} người`}
-              icon={<Users className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Mã"
-              value={displayAssemblyPoint.code}
-              icon={<Info className="h-4 w-4" />}
-            />
-          </div>
         </div>
       </div>
     </>
