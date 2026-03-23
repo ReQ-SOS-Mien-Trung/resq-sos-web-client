@@ -25,7 +25,7 @@ import {
   rejectSupplyRequest,
   importInventory,
   importRegularInventory,
-  getDepotTransactions,
+  getDepotStockMovements,
   exportInventoryMovements,
   getInventoryLots,
 } from "./api";
@@ -49,8 +49,8 @@ import {
   GetSupplyRequestsParams,
   GetSupplyRequestsResponse,
   RejectSupplyRequestPayload,
-  GetDepotTransactionsParams,
-  GetDepotTransactionsResponse,
+  GetDepotStockMovementsParams,
+  GetDepotStockMovementsResponse,
   ExportMovementsParams,
   GetInventoryLotsResponse,
 } from "./type";
@@ -73,7 +73,7 @@ export const INVENTORY_KEYS = {
   supplyRequests: (params: GetSupplyRequestsParams) =>
     [...INVENTORY_KEYS.all, "supplyRequests", params] as const,
   organizations: () => [...INVENTORY_KEYS.all, "organizations"] as const,
-  transactions: (params: GetDepotTransactionsParams) =>
+  stockMovements: (params: GetDepotStockMovementsParams) =>
     [...INVENTORY_KEYS.all, "transactions", params] as const,
   lots: (itemModelId: number) =>
     [...INVENTORY_KEYS.all, "lots", itemModelId] as const,
@@ -266,16 +266,16 @@ export function useImportRegularInventory() {
   });
 }
 
-export function useDepotTransactions(
-  params: GetDepotTransactionsParams,
+export function useDepotStockMovements(
+  params: GetDepotStockMovementsParams,
   options?: Omit<
-    UseQueryOptions<GetDepotTransactionsResponse, Error>,
+    UseQueryOptions<GetDepotStockMovementsResponse, Error>,
     "queryKey" | "queryFn"
   >,
 ) {
   return useQuery({
-    queryKey: INVENTORY_KEYS.transactions(params),
-    queryFn: () => getDepotTransactions(params),
+    queryKey: INVENTORY_KEYS.stockMovements(params),
+    queryFn: () => getDepotStockMovements(params),
     ...options,
   });
 }

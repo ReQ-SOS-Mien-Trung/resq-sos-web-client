@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -44,7 +43,6 @@ import {
 } from "@/components/ui/popover";
 import {
   MagnifyingGlass,
-  Wallet,
   FloppyDisk,
   Warehouse,
   ClockCountdown,
@@ -64,6 +62,9 @@ import {
   Storefront,
   ArrowClockwise,
   PiggyBankIcon,
+  ArrowDown,
+  ArrowUp,
+  List,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -78,8 +79,10 @@ import type {
   FundingRequestStatus,
 } from "@/services/funding_request";
 import { useDepotMetadata, useDepotFunds, useUpdateDepotAdvanceLimit } from "@/services/depot/hooks";
+import type { DepotFund } from "@/services/depot/type";
 import { useInventoryCategories } from "@/services/inventory/hooks";
 import { useCampaigns, useAllocateDisbursement } from "@/services/campaign_disbursement";
+import { useDepotFundTransactions } from "@/services/transaction";
 import { useQueryClient } from "@tanstack/react-query";
 
 /* ── Status configs ───────────────────────────────────────── */
@@ -247,7 +250,6 @@ function AdvanceLimitSection() {
 /* ── Main Page ────────────────────────────────────────────── */
 
 export default function FundingRequestsPage() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -263,6 +265,11 @@ export default function FundingRequestsPage() {
   const [selectedItem, setSelectedItem] =
     useState<FundingRequestEntity | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+
+  // Depot fund transaction panel
+  const [selectedDepotFund, setSelectedDepotFund] = useState<DepotFund | null>(null);
+  const [depotTxPanelOpen, setDepotTxPanelOpen] = useState(false);
+  const [depotTxPage, setDepotTxPage] = useState(1);
 
   // Review dialogs
   const [approveDialog, setApproveDialog] = useState<{
@@ -298,6 +305,9 @@ export default function FundingRequestsPage() {
     [campaignsData],
   );
   const { data: categoriesData } = useInventoryCategories();
+  const { data: depotTxData, isLoading: loadingDepotTx } = useDepotFundTransactions(
+    { depotId: selectedDepotFund?.depotId ?? 0, pageNumber: depotTxPage, pageSize: 20 },
+  );
   const categoryMap = useMemo(
     () =>
       Object.fromEntries(
@@ -433,7 +443,16 @@ export default function FundingRequestsPage() {
   const openDetail = (item: FundingRequestEntity) => {
     setSelectedItem(item);
     setPanelOpen(true);
+    if (depotTxPanelOpen) { setDepotTxPanelOpen(false); }
     handlePanelChange(true);
+  };
+
+  // Open depot fund transaction panel
+  const openDepotFundPanel = (fund: DepotFund) => {
+    setSelectedDepotFund(fund);
+    setDepotTxPage(1);
+    if (panelOpen) { setPanelOpen(false); setSelectedItem(null); handlePanelChange(false); }
+    setDepotTxPanelOpen(true);
   };
 
   // Approve handler
@@ -522,14 +541,6 @@ export default function FundingRequestsPage() {
             >
               <ArrowClockwise size={15} className={isRefreshing ? "animate-spin" : ""} />
               Làm mới
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push("/dashboard/admin/campaigns")}
-              className="gap-2 tracking-tight"
-            >
-              <Wallet size={16} weight="bold" />
-              Quản lý quỹ chiến dịch
             </Button>
             <Button
               onClick={() => setAllocateOpen(true)}
@@ -653,7 +664,12 @@ export default function FundingRequestsPage() {
                 {depotFunds.map((fund) => (
                   <div
                     key={fund.depotId}
-                    className="rounded-xl border border-border/60 bg-background p-3.5 hover:bg-muted/30 transition-colors"
+                    onClick={() => openDepotFundPanel(fund)}
+                    className={`rounded-xl border bg-background p-3.5 cursor-pointer transition-all active:scale-[0.97] ${
+                      selectedDepotFund?.depotId === fund.depotId && depotTxPanelOpen
+                        ? "border-primary ring-1 ring-primary/30 shadow-sm"
+                        : "border-border/60 hover:bg-muted/30 hover:border-border"
+                    }`}
                   >
                     <p className="text-xs font-semibold tracking-tighter text-muted-foreground truncate mb-1.5">
                       {fund.depotName}
@@ -1193,6 +1209,154 @@ export default function FundingRequestsPage() {
                   </Button>
                 </div>
               )}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* ── Depot Fund Transaction Panel ─────────────────── */}
+      <Sheet
+        open={depotTxPanelOpen}
+        onOpenChange={(val) => {
+          setDepotTxPanelOpen(val);
+          if (!val) setSelectedDepotFund(null);
+        }}
+      >
+        <SheetContent
+          side="bottom"
+          className="h-[85vh] overflow-y-auto rounded-t-2xl p-6"
+        >
+          <SheetHeader className="pb-4 border-b mb-4">
+            <SheetTitle className="tracking-tighter text-xl flex items-center gap-2">
+              <List size={18} className="text-primary" />
+              Lịch sử giao dịch quỹ kho
+            </SheetTitle>
+            <SheetDescription className="tracking-tight text-sm">
+              {selectedDepotFund?.depotName}
+            </SheetDescription>
+          </SheetHeader>
+
+          {selectedDepotFund && (
+            <div className="space-y-4">
+              {/* Fund summary */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                  <p className="text-xs text-muted-foreground tracking-tight mb-1">Số dư hiện tại</p>
+                  <p className={`text-sm font-bold tracking-tight ${
+                    selectedDepotFund.balance < 0 ? "text-red-600" : "text-emerald-600"
+                  }`}>
+                    {formatMoney(selectedDepotFund.balance)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                  <p className="text-xs text-muted-foreground tracking-tight mb-1">Hạn mức ứng</p>
+                  <p className="text-sm font-bold tracking-tight">
+                    {formatMoney(selectedDepotFund.maxAdvanceLimit)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Transaction list */}
+              <div>
+                <h4 className="text-sm font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
+                  <Receipt size={14} className="text-primary" />
+                  Giao dịch ({depotTxData?.totalCount ?? 0})
+                </h4>
+
+                {loadingDepotTx ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="rounded-xl border border-border/40 p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-muted animate-pulse shrink-0" />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3 bg-muted rounded animate-pulse w-2/3" />
+                            <div className="h-2.5 bg-muted rounded animate-pulse w-1/2" />
+                          </div>
+                          <div className="h-4 bg-muted rounded animate-pulse w-16" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (depotTxData?.items ?? []).length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border/60 p-8 text-center">
+                    <Receipt size={28} className="mx-auto text-muted-foreground/40 mb-2" />
+                    <p className="text-sm text-muted-foreground tracking-tight">Chưa có giao dịch</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(depotTxData?.items ?? []).map((tx) => {
+                      const isIn = tx.amount >= 0;
+                      return (
+                        <div
+                          key={tx.id}
+                          className="rounded-xl border border-border/50 bg-background p-3"
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className={`mt-0.5 w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                              isIn ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-rose-50 dark:bg-rose-950/30"
+                            }`}>
+                              {isIn
+                                ? <ArrowDown size={13} weight="bold" className="text-emerald-600" />
+                                : <ArrowUp size={13} weight="bold" className="text-rose-600" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-semibold tracking-tighter truncate">
+                                  {tx.transactionType}
+                                </p>
+                                <p className={`text-sm font-bold tracking-tight shrink-0 ${
+                                  isIn ? "text-emerald-600" : "text-rose-600"
+                                }`}>
+                                  {isIn ? "+" : ""}{tx.amount.toLocaleString("vi-VN")}đ
+                                </p>
+                              </div>
+                              {tx.referenceType && (
+                                <p className="text-xs text-muted-foreground tracking-tight truncate">
+                                  {tx.referenceType}{tx.referenceId ? ` #${tx.referenceId}` : ""}
+                                </p>
+                              )}
+                              {tx.note && (
+                                <p className="text-xs text-muted-foreground/70 tracking-tight truncate mt-0.5">
+                                  {tx.note}
+                                </p>
+                              )}
+                              <p className="text-xs text-muted-foreground/60 tracking-tight mt-1">
+                                {new Date(tx.createdAt).toLocaleString("vi-VN")}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {(depotTxData?.totalPages ?? 0) > 1 && (
+                  <div className="flex items-center justify-between pt-3 border-t border-border/40 mt-3">
+                    <p className="text-xs text-muted-foreground tracking-tight">
+                      Trang {depotTxPage}/{depotTxData?.totalPages}
+                    </p>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => setDepotTxPage((p) => Math.max(1, p - 1))}
+                        disabled={!depotTxData?.hasPreviousPage}
+                        className="px-2.5 py-1 text-xs rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
+                      >
+                        Trước
+                      </button>
+                      <button
+                        onClick={() => setDepotTxPage((p) => p + 1)}
+                        disabled={!depotTxData?.hasNextPage}
+                        className="px-2.5 py-1 text-xs rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </SheetContent>

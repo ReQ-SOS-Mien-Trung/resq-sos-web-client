@@ -1,19 +1,25 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  ArrowLeft,
   MagnifyingGlass,
   Money,
   Target,
@@ -28,11 +34,15 @@ import {
   Check,
   X,
   Funnel,
+  ArrowUp,
+  ArrowDown,
+  ArrowsLeftRight,
 } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import { useCampaigns, useCampaignStatuses } from "@/services/campaign_disbursement";
-import type { CampaignStatus } from "@/services/campaign_disbursement";
+import type { CampaignStatus, CampaignEntity } from "@/services/campaign_disbursement";
+import { useCampaignTransactions } from "@/services/transaction";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -51,17 +61,33 @@ function formatDate(dateStr: string) {
 /* ── Main Page ────────────────────────────────────────────── */
 
 export default function CampaignsPage() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<CampaignStatus[]>([]);
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
 
+  // Panel state
+  const [selectedCampaign, setSelectedCampaign] = useState<CampaignEntity | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [txPage, setTxPage] = useState(1);
+
+  const openPanel = (campaign: CampaignEntity) => {
+    setSelectedCampaign(campaign);
+    setTxPage(1);
+    setPanelOpen(true);
+  };
+
   const { data, isLoading } = useCampaigns({
     params: { pageNumber: 1, pageSize: 200 },
   });
   const { data: campaignStatuses = [] } = useCampaignStatuses();
+
+  // Transactions for selected campaign
+  const { data: txData, isLoading: txLoading } = useCampaignTransactions(
+    { id: selectedCampaign?.id ?? 0, pageNumber: txPage, pageSize: 20 },
+    { enabled: !!selectedCampaign },
+  );
 
   const campaigns = useMemo(() => data?.items ?? [], [data]);
 
@@ -101,19 +127,11 @@ export default function CampaignsPage() {
   );
 
   return (
+    <>
     <DashboardLayout favorites={[]} projects={[]} cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}>
       <div className="space-y-6">
         {/* ── Header ── */}
         <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push("/dashboard/admin/reports")}
-            className="gap-1.5 text-muted-foreground mb-3 -ml-2"
-          >
-            <ArrowLeft size={14} />
-            Quay lại
-          </Button>
           <div className="flex items-center gap-2.5 mb-1">
             <Money size={20} weight="bold" className="text-foreground" />
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -317,7 +335,8 @@ export default function CampaignsPage() {
               return (
                 <Card
                   key={campaign.id}
-                  className="border border-border/50 hover:border-border transition-colors overflow-hidden"
+                  onClick={() => openPanel(campaign)}
+                  className="border border-border/50 hover:border-border transition-colors overflow-hidden cursor-pointer hover:shadow-sm"
                 >
                   <CardContent className="p-5 space-y-4">
                     {/* Header */}
@@ -422,5 +441,150 @@ export default function CampaignsPage() {
         )}
       </div>
     </DashboardLayout>
+
+      {/* ── Transaction Panel ─────────────────────────── */}
+      <Sheet
+        open={panelOpen}
+        onOpenChange={(val) => {
+          setPanelOpen(val);
+          if (!val) setSelectedCampaign(null);
+        }}
+      >
+        <SheetContent
+          side="bottom"
+          className="h-[85vh] overflow-y-auto rounded-t-2xl p-6"
+        >
+          <SheetHeader className="pb-4 border-b mb-4">
+            <SheetTitle className="tracking-tighter text-xl line-clamp-2">
+              {selectedCampaign?.name}
+            </SheetTitle>
+            <SheetDescription className="tracking-tight text-sm">
+              Lịch sử giao dịch tài chính của chiến dịch
+            </SheetDescription>
+          </SheetHeader>
+
+          {selectedCampaign && (
+            <div className="space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <div className="flex items-center gap-1 mb-1">
+                    <TrendUp size={12} className="text-emerald-600" />
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Đã quyên góp</p>
+                  </div>
+                  <p className="text-base font-bold tracking-tighter text-emerald-600">
+                    {formatMoney(selectedCampaign.totalAmount)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <div className="flex items-center gap-1 mb-1">
+                    <Target size={12} className="text-blue-600" />
+                    <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Mục tiêu</p>
+                  </div>
+                  <p className="text-base font-bold tracking-tighter text-blue-600">
+                    {formatMoney(selectedCampaign.targetAmount)}
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Transaction list */}
+              <div>
+                <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
+                  <ArrowsLeftRight size={20} className="text-muted-foreground" />
+                  Giao dịch ({txData?.totalCount ?? 0})
+                </h4>
+
+                {txLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : !txData?.items?.length ? (
+                  <div className="rounded-xl border border-dashed border-border/60 p-8 text-center">
+                    <ArrowsLeftRight size={28} className="mx-auto text-muted-foreground/30 mb-2" />
+                    <p className="text-sm text-muted-foreground tracking-tight">Chưa có giao dịch nào</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {txData.items.map((tx) => {
+                      const isIn = tx.direction?.toLowerCase() === "in";
+                      return (
+                        <div
+                          key={tx.id}
+                          className="rounded-xl border border-border/60 bg-background p-3 flex items-start gap-3"
+                        >
+                          <div
+                            className={`mt-0.5 rounded-md p-1.5 shrink-0 ${
+                              isIn
+                                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40"
+                                : "bg-rose-100 text-rose-600 dark:bg-rose-950/40"
+                            }`}
+                          >
+                            {isIn ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-semibold tracking-tighter">
+                                  {tx.type || tx.referenceType || "—"}
+                                </p>
+                                <p className="text-xs text-muted-foreground tracking-tight mt-0.5">
+                                  {tx.createdByUserName} ·{" "}
+                                  {new Date(tx.createdAt).toLocaleString("vi-VN")}
+                                </p>
+                              </div>
+                              <p
+                                className={`text-sm font-bold tracking-tighter shrink-0 ${
+                                  isIn ? "text-emerald-600" : "text-rose-600"
+                                }`}
+                              >
+                                {isIn ? "+" : "-"}{formatMoney(tx.amount)}
+                              </p>
+                            </div>
+                            {tx.referenceId != null && (
+                              <p className="text-xs text-muted-foreground tracking-tighter mt-1">
+                                Giao dịch số {tx.referenceId} · {tx.referenceType}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {txData && txData.totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/40">
+                    <p className="text-xs text-muted-foreground tracking-tight">
+                      Trang {txPage} / {txData.totalPages}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => setTxPage((p) => Math.max(1, p - 1))}
+                        disabled={!txData.hasPreviousPage}
+                      >
+                        Trước
+                      </Button>
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => setTxPage((p) => p + 1)}
+                        disabled={!txData.hasNextPage}
+                      >
+                        Sau
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

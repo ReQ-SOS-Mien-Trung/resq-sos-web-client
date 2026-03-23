@@ -20,8 +20,8 @@ import {
   GetSupplyRequestsParams,
   GetSupplyRequestsResponse,
   RejectSupplyRequestPayload,
-  GetDepotTransactionsParams,
-  GetDepotTransactionsResponse,
+  GetDepotStockMovementsParams,
+  GetDepotStockMovementsResponse,
   ExportMovementsParams,
   GetInventoryLotsResponse,
 } from "./type";
@@ -253,12 +253,12 @@ export async function importRegularInventory(
 }
 
 /**
- * Get depot transaction history
- * GET /logistics/inventory/transactions/my-depot
+ * Get depot stock movement history
+ * GET /logistics/inventory/stock-movements/my-depot
  */
-export async function getDepotTransactions(
-  params: GetDepotTransactionsParams,
-): Promise<GetDepotTransactionsResponse> {
+export async function getDepotStockMovements(
+  params: GetDepotStockMovementsParams,
+): Promise<GetDepotStockMovementsResponse> {
   const { data } = await api.get(
     "/logistics/inventory/stock-movements/my-depot",
     {

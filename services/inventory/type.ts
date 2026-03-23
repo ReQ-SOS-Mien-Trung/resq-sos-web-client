@@ -143,9 +143,9 @@ export type ImportRegularRequest = {
   }>;
 };
 
-// ─── Transaction History ───
+// ─── Stock Movement History ───
 
-export interface TransactionItem {
+export interface StockMovementItem {
   itemId: number;
   itemName: string;
   quantityChange: number;
@@ -162,7 +162,7 @@ export interface TransactionItem {
   supplyInventoryLotId?: number | null;
 }
 
-export interface TransactionEntity {
+export interface StockMovementEntity {
   transactionId: string;
   actionType: string;
   sourceType: string;
@@ -171,10 +171,10 @@ export interface TransactionEntity {
   performedByName: string;
   note: string;
   createdAt: string;
-  items: TransactionItem[];
+  items: StockMovementItem[];
 }
 
-export interface GetDepotTransactionsParams {
+export interface GetDepotStockMovementsParams {
   actionTypes?: string[];
   sourceTypes?: string[];
   fromDate?: string;
@@ -199,8 +199,8 @@ export interface ExportMovementsParams {
   toDate?: string;
 }
 
-export interface GetDepotTransactionsResponse {
-  items: TransactionEntity[];
+export interface GetDepotStockMovementsResponse {
+  items: StockMovementEntity[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;

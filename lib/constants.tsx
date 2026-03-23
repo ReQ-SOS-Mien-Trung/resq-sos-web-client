@@ -49,6 +49,7 @@ import {
   FadersIcon,
   SlidersIcon,
   UserIcon,
+  Folder,
 } from "@phosphor-icons/react";
 
 export const navLinks = [
@@ -360,6 +361,7 @@ export const navigationItems = [
     href: "/dashboard/admin/assembly-points",
   },
   { icon: ChartBar, label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
+  { icon: Folder, label: "Quản lý quỹ chiến dịch", href: "/dashboard/admin/campaigns" },
   {
     icon: LockKey,
     label: "Phân quyền người dùng",

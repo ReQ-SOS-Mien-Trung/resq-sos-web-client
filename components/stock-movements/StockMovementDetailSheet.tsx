@@ -36,10 +36,10 @@ import {
 } from "@phosphor-icons/react";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import { TransactionEntity } from "@/services/inventory/type";
+import { StockMovementEntity } from "@/services/inventory/type";
 
-interface TransactionDetailSheetProps {
-  transaction: TransactionEntity | null;
+interface StockMovementDetailSheetProps {
+  movement: StockMovementEntity | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -93,14 +93,14 @@ function formatDateShort(dateString: string | null | undefined) {
   }
 }
 
-export function TransactionDetailSheet({
-  transaction,
+export function StockMovementDetailSheet({
+  movement,
   open,
   onOpenChange,
-}: TransactionDetailSheetProps) {
-  if (!transaction) return null;
+}: StockMovementDetailSheetProps) {
+  if (!movement) return null;
 
-  const actionConfig = ACTION_TYPE_MAP[transaction.actionType];
+  const actionConfig = ACTION_TYPE_MAP[movement.actionType];
   const ActionIcon = actionConfig?.icon ?? Package;
 
   return (
@@ -113,17 +113,17 @@ export function TransactionDetailSheet({
             </div>
             <div className="flex-1 min-w-0">
               <SheetTitle className="text-base tracking-tighter truncate font-mono">
-                {transaction.transactionId}
+                {movement.transactionId}
               </SheetTitle>
               <SheetDescription className="sr-only">
-                Chi tiết giao dịch {transaction.transactionId}
+                Chi tiết giao dịch {movement.transactionId}
               </SheetDescription>
               <div className="mt-1">
                 <Badge
                   variant="outline"
                   className={`text-xs ${actionConfig?.className ?? ""}`}
                 >
-                  {actionConfig?.label ?? transaction.actionType}
+                  {actionConfig?.label ?? movement.actionType}
                 </Badge>
               </div>
             </div>
@@ -131,7 +131,7 @@ export function TransactionDetailSheet({
         </SheetHeader>
 
         <div className="space-y-5">
-          {/* ── Transaction Info ── */}
+          {/* ── Stock Movement Info ── */}
           <section className="space-y-3">
             <h3 className="text-base font-semibold tracking-tighter flex items-center gap-2">
               <ClipboardText size={24} className="text-muted-foreground" />
@@ -142,14 +142,14 @@ export function TransactionDetailSheet({
                 <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
                   <Hash size={18} /> Mã giao dịch
                 </span>
-                <span className="font-medium text-sm break-all">{transaction.transactionId}</span>
+                <span className="font-medium text-sm break-all">{movement.transactionId}</span>
               </div>
 
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
                   <Calendar size={16} /> Thời gian nhập kho
                 </span>
-                <span className="font-medium tracking-tighter">{formatDate(transaction.createdAt)}</span>
+                <span className="font-medium tracking-tighter">{formatDate(movement.createdAt)}</span>
               </div>
 
               <div className="flex flex-col gap-0.5">
@@ -157,7 +157,7 @@ export function TransactionDetailSheet({
                   <Tag size={16} /> Loại nguồn
                 </span>
                 <span className="font-medium tracking-tighter">
-                  {SOURCE_TYPE_MAP[transaction.sourceType] ?? (transaction.sourceType || "—")}
+                  {SOURCE_TYPE_MAP[movement.sourceType] ?? (movement.sourceType || "—")}
                 </span>
               </div>
 
@@ -165,15 +165,15 @@ export function TransactionDetailSheet({
                 <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
                   <Warehouse size={16} /> Nguồn
                 </span>
-                <span className="font-medium tracking-tighter">{transaction.sourceName || "—"}</span>
+                <span className="font-medium tracking-tighter">{movement.sourceName || "—"}</span>
               </div>
 
-              {/* {transaction.sourceId != null && (
+              {/* {movement.sourceId != null && (
                 <div className="flex flex-col gap-0.5">
                   <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
                     <Hash size={16} /> ID nguồn
                   </span>
-                  <span className="font-medium text-xs">{transaction.sourceId}</span>
+                  <span className="font-medium text-xs">{movement.sourceId}</span>
                 </div>
               )} */}
 
@@ -181,14 +181,14 @@ export function TransactionDetailSheet({
                 <span className="text-xs text-muted-foreground tracking-tighter flex items-center gap-1">
                   <User size={11} /> Người thực hiện
                 </span>
-                <span className="font-medium tracking-tighter">{transaction.performedByName || "—"}</span>
+                <span className="font-medium tracking-tighter">{movement.performedByName || "—"}</span>
               </div> */}
             </div>
 
-            {transaction.note && (
+            {movement.note && (
               <div className="mt-2 p-3 rounded-lg bg-muted/50 text-sm tracking-tighter">
                 <p className="text-xs text-muted-foreground mb-1">Ghi chú</p>
-                <p>{transaction.note}</p>
+                <p>{movement.note}</p>
               </div>
             )}
           </section>
@@ -201,7 +201,7 @@ export function TransactionDetailSheet({
               <Package size={24} className="text-muted-foreground" />
               Danh sách vật tư
               <span className="ml-1 text-xs font-normal bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                {transaction.items.length} mặt hàng
+                {movement.items.length} mặt hàng
               </span>
             </h3>
 
@@ -217,9 +217,9 @@ export function TransactionDetailSheet({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transaction.items.map((item) => {
-                    const expired = item.expiredDate ? new Date(item.expiredDate) < new Date(transaction.createdAt) : false;
-                    const thirtyDaysLater = new Date(transaction.createdAt);
+                  {movement.items.map((item) => {
+                    const expired = item.expiredDate ? new Date(item.expiredDate) < new Date(movement.createdAt) : false;
+                    const thirtyDaysLater = new Date(movement.createdAt);
                     thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
                     const expiringSoon =
                       !expired &&
@@ -319,12 +319,12 @@ export function TransactionDetailSheet({
             </h3>
             <div className="grid grid-cols-3 gap-3 text-sm">
               <div className="rounded-lg border p-3 text-center">
-                <p className="text-2xl font-black tracking-tighter">{transaction.items.length}</p>
+                <p className="text-2xl font-black tracking-tighter">{movement.items.length}</p>
                 <p className="text-xs text-muted-foreground tracking-tighter mt-0.5">Mặt hàng</p>
               </div>
               <div className="rounded-lg border p-3 text-center">
                 <p className="text-2xl font-black tracking-tighter">
-                  {transaction.items
+                  {movement.items
                     .filter((i) => i.quantityChange > 0)
                     .reduce((s, i) => s + i.quantityChange, 0)
                     .toLocaleString("vi-VN")}
@@ -334,7 +334,7 @@ export function TransactionDetailSheet({
               <div className="rounded-lg border p-3 text-center">
                 <p className="text-2xl font-black tracking-tighter text-red-600">
                   {Math.abs(
-                    transaction.items
+                    movement.items
                       .filter((i) => i.quantityChange < 0)
                       .reduce((s, i) => s + i.quantityChange, 0),
                   ).toLocaleString("vi-VN")}

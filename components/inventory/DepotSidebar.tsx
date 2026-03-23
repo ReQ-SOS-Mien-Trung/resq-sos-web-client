@@ -111,10 +111,10 @@ const DepotSidebar = ({
   const hasPendingReqs = pendingRequestsAll.length > 0;
 
   return (
-    <div className="h-full flex flex-col bg-background border-r overflow-hidden">
+    <div className="h-full flex flex-col bg-sidebar border-r border-sidebar-border overflow-hidden">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="relative px-4 pt-4 pb-3 border-b bg-linear-to-br from-primary/5 via-background to-orange-500/5 shrink-0">
+      <div className="relative px-4 pt-4 pb-3 border-b border-sidebar-border bg-sidebar shrink-0">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
             <Warehouse className="h-4 w-4 text-primary" weight="fill" />
@@ -137,7 +137,7 @@ const DepotSidebar = ({
       </div>
 
       {/* ── KPI Strip ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 shrink-0 bg-muted/20 border-b">
+      <div className="grid grid-cols-3 shrink-0 border-b border-sidebar-border">
         <KpiCell
           value={depotInfo.criticalAlerts}
           label="Cảnh báo"
@@ -171,7 +171,7 @@ const DepotSidebar = ({
         onValueChange={onActiveTabChange}
         className="flex-1 flex flex-col overflow-hidden min-h-0"
       >
-        <TabsList className="w-full mt-3 mb-1 flex flex-col h-auto bg-transparent p-0 px-3 rounded-none shrink-0 gap-0.5">
+        <TabsList className="w-full mt-2 flex flex-col h-auto bg-transparent p-0 px-3 rounded-none shrink-0 gap-0">
           <TabTriggerWithDot value="inventory" dot={hasUrgent} label="Kho hàng" icon={<ChartBar className="h-4 w-4" />} />
           <TabTriggerWithDot value="vattu" dot={false} label="Vật tư" icon={<Cube className="h-4 w-4" />} />
           <TabTriggerWithDot value="requests" dot={hasPendingReqs} label="Tạo yêu cầu" icon={<ClipboardText className="h-4 w-4" />} />
@@ -429,14 +429,20 @@ function TabTriggerWithDot({
   return (
     <TabsTrigger
       value={value}
-      className="relative w-full flex flex-row items-center gap-3 px-3 py-2.5 text-sm font-medium tracking-tight text-left justify-start data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none hover:bg-muted/60 transition-colors leading-none"
+      className="relative w-full flex flex-row items-center gap-3 px-3 py-2.5 text-sm font-medium tracking-tighter text-left justify-start rounded-none
+        text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1 transition-all duration-200
+        data-[state=active]:bg-linear-to-r data-[state=active]:from-red-500/10 data-[state=active]:to-orange-500/10
+        data-[state=active]:text-red-600 dark:data-[state=active]:text-red-400
+        data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-red-500/10
+        data-[state=inactive]:border data-[state=inactive]:border-transparent
+        leading-none shadow-none"
     >
-      <span className="shrink-0 text-muted-foreground data-[state=active]:text-primary">{icon}</span>
+      <span className="shrink-0">{icon}</span>
       <span className="flex-1">{label}</span>
       {dot && (
-        <span className="relative flex h-2 w-2 shrink-0">
+        <span className="relative flex h-1.5 w-1.5 shrink-0">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500" />
         </span>
       )}
     </TabsTrigger>
