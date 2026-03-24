@@ -12,12 +12,6 @@ import {
   ClipboardText,
   Warning,
   MagnifyingGlass,
-  Stethoscope,
-  ForkKnife,
-  Drop,
-  Wrench,
-  Tent,
-  TShirt,
   ArrowLineDown,
   ArrowLineUp,
   Clock,
@@ -36,24 +30,6 @@ import {
   SupplyRequest,
 } from "@/type";
 
-// ── Category icon map ─────────────────────────────────────────────────────────
-const categoryIcons: Record<string, React.ReactNode> = {
-  MEDICAL: <Stethoscope className="h-3.5 w-3.5" weight="fill" />,
-  FOOD: <ForkKnife className="h-3.5 w-3.5" weight="fill" />,
-  WATER: <Drop className="h-3.5 w-3.5" weight="fill" />,
-  EQUIPMENT: <Wrench className="h-3.5 w-3.5" weight="fill" />,
-  SHELTER: <Tent className="h-3.5 w-3.5" weight="fill" />,
-  CLOTHING: <TShirt className="h-3.5 w-3.5" weight="fill" />,
-  Food: <ForkKnife className="h-3.5 w-3.5" weight="fill" />,
-  Water: <Drop className="h-3.5 w-3.5" weight="fill" />,
-  Medical: <Stethoscope className="h-3.5 w-3.5" weight="fill" />,
-  Hygiene: <Drop className="h-3.5 w-3.5" />,
-  Shelter: <Tent className="h-3.5 w-3.5" weight="fill" />,
-  Clothing: <TShirt className="h-3.5 w-3.5" weight="fill" />,
-  RescueEquipment: <Wrench className="h-3.5 w-3.5" weight="fill" />,
-  Others: <Package className="h-3.5 w-3.5" />,
-};
-
 // ── Main component ────────────────────────────────────────────────────────────
 const DepotSidebar = ({
   depotInfo,
@@ -64,7 +40,6 @@ const DepotSidebar = ({
   selectedItem,
   selectedRequest,
   selectedCategory,
-  onCategorySelect,
   apiCategories,
   activeTab,
   onActiveTabChange,
@@ -192,25 +167,6 @@ const DepotSidebar = ({
               />
             </div>
           </div>
-
-          {apiCategories && apiCategories.length > 0 && (
-            <div className="px-3 pb-2 flex gap-1 flex-wrap shrink-0">
-              <CategoryChip
-                active={selectedCategory === null}
-                onClick={() => onCategorySelect?.(null)}
-                label="Tất cả"
-              />
-              {apiCategories.map((cat) => (
-                <CategoryChip
-                  key={cat.id}
-                  active={selectedCategory === cat.code}
-                  onClick={() => onCategorySelect?.(cat.code)}
-                  label={cat.name}
-                  icon={categoryIcons[cat.code]}
-                />
-              ))}
-            </div>
-          )}
 
           <ScrollArea className="flex-1 min-h-0">
             <div className="px-3 pb-4 space-y-4">
@@ -446,34 +402,6 @@ function TabTriggerWithDot({
         </span>
       )}
     </TabsTrigger>
-  );
-}
-
-function CategoryChip({
-  active,
-  onClick,
-  label,
-  icon,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide transition-colors",
-        active
-          ? "bg-primary text-primary-foreground"
-          : "bg-muted text-muted-foreground hover:bg-muted/80",
-      )}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
 

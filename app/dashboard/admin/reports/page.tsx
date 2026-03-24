@@ -82,7 +82,11 @@ import { useDepotMetadata, useDepotFunds, useUpdateDepotAdvanceLimit } from "@/s
 import type { DepotFund } from "@/services/depot/type";
 import { useInventoryCategories } from "@/services/inventory/hooks";
 import { useCampaigns, useAllocateDisbursement } from "@/services/campaign_disbursement";
-import { useDepotFundTransactions } from "@/services/transaction";
+import {
+  useDepotFundTransactions,
+  useDepotFundTransactionTypes,
+  useDepotFundReferenceTypes,
+} from "@/services/transaction";
 import { useQueryClient } from "@tanstack/react-query";
 
 /* ── Status configs ───────────────────────────────────────── */
@@ -307,6 +311,16 @@ export default function FundingRequestsPage() {
   const { data: categoriesData } = useInventoryCategories();
   const { data: depotTxData, isLoading: loadingDepotTx } = useDepotFundTransactions(
     { depotId: selectedDepotFund?.depotId ?? 0, pageNumber: depotTxPage, pageSize: 20 },
+  );
+  const { data: txTypesMeta = [] } = useDepotFundTransactionTypes();
+  const { data: refTypesMeta = [] } = useDepotFundReferenceTypes();
+  const txTypeMap = useMemo(
+    () => Object.fromEntries(txTypesMeta.map((m) => [m.key, m.value])),
+    [txTypesMeta],
+  );
+  const refTypeMap = useMemo(
+    () => Object.fromEntries(refTypesMeta.map((m) => [m.key, m.value])),
+    [refTypesMeta],
   );
   const categoryMap = useMemo(
     () =>
@@ -671,7 +685,7 @@ export default function FundingRequestsPage() {
                         : "border-border/60 hover:bg-muted/30 hover:border-border"
                     }`}
                   >
-                    <p className="text-xs font-semibold tracking-tighter text-muted-foreground truncate mb-1.5">
+                    <p className="text-sm font-semibold tracking-tighter text-muted-foreground truncate mb-1.5">
                       {fund.depotName}
                     </p>
                     <p className={`text-lg font-bold tracking-tighter ${
@@ -1297,13 +1311,13 @@ export default function FundingRequestsPage() {
                               isIn ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-rose-50 dark:bg-rose-950/30"
                             }`}>
                               {isIn
-                                ? <ArrowDown size={13} weight="bold" className="text-emerald-600" />
-                                : <ArrowUp size={13} weight="bold" className="text-rose-600" />}
+                                ? <ArrowUp size={13} weight="bold" className="text-emerald-600" />
+                                : <ArrowDown size={13} weight="bold" className="text-rose-600" />}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-2">
                                 <p className="text-sm font-semibold tracking-tighter truncate">
-                                  {tx.transactionType}
+                                  {txTypeMap[tx.transactionType] ?? tx.transactionType}
                                 </p>
                                 <p className={`text-sm font-bold tracking-tight shrink-0 ${
                                   isIn ? "text-emerald-600" : "text-rose-600"
@@ -1313,7 +1327,7 @@ export default function FundingRequestsPage() {
                               </div>
                               {tx.referenceType && (
                                 <p className="text-xs text-muted-foreground tracking-tight truncate">
-                                  {tx.referenceType}{tx.referenceId ? ` #${tx.referenceId}` : ""}
+                                  {refTypeMap[tx.referenceType] ?? tx.referenceType}{tx.referenceId ? ` #${tx.referenceId}` : ""}
                                 </p>
                               )}
                               {tx.note && (
@@ -1555,8 +1569,8 @@ export default function FundingRequestsPage() {
           <div className="space-y-4 py-2">
             {/* Campaign */}
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                <CurrencyDollar size={12} weight="bold" />
+              <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <PiggyBankIcon size={16} weight="bold" />
                 Chiến dịch quỹ (nguồn rút tiền)
               </label>
               <Select
@@ -1588,8 +1602,8 @@ export default function FundingRequestsPage() {
 
             {/* Depot */}
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                <Storefront size={12} weight="bold" />
+              <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Storefront size={16} weight="bold" />
                 Kho nhận quỹ
               </label>
               <Select
@@ -1611,8 +1625,8 @@ export default function FundingRequestsPage() {
 
             {/* Amount */}
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                <Money size={12} weight="bold" />
+              <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Money size={16} weight="bold" />
                 Số tiền (VNĐ)
               </label>
               <Input
@@ -1633,8 +1647,8 @@ export default function FundingRequestsPage() {
 
             {/* Purpose */}
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                <FileText size={12} weight="bold" />
+              <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <FileText size={16} weight="bold" />
                 Mục đích
               </label>
               <Textarea

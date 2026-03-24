@@ -523,16 +523,15 @@ export default function CampaignsPage() {
                                 : "bg-rose-100 text-rose-600 dark:bg-rose-950/40"
                             }`}
                           >
-                            {isIn ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+                            {isIn ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <p className="text-sm font-semibold tracking-tighter">
+                                <p className="text-base font-semibold tracking-tighter">
                                   {tx.type || tx.referenceType || "—"}
                                 </p>
-                                <p className="text-xs text-muted-foreground tracking-tight mt-0.5">
-                                  {tx.createdByUserName} ·{" "}
+                                <p className="text-sm text-muted-foreground tracking-tight mt-0.5">
                                   {new Date(tx.createdAt).toLocaleString("vi-VN")}
                                 </p>
                               </div>
@@ -545,7 +544,7 @@ export default function CampaignsPage() {
                               </p>
                             </div>
                             {tx.referenceId != null && (
-                              <p className="text-xs text-muted-foreground tracking-tighter mt-1">
+                              <p className="text-sm text-muted-foreground tracking-tighter mt-1">
                                 Giao dịch số {tx.referenceId} · {tx.referenceType}
                               </p>
                             )}

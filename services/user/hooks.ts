@@ -21,6 +21,7 @@ import {
   AdminCreateUserRequest,
   AdminUpdateUserRequest,
   UserEntity,
+  GetAdminUserByIdResponse,
   GetUsersForPermissionParams,
   GetUsersForPermissionResponse,
 } from "./type";
@@ -87,9 +88,12 @@ export function useAdminRescuers(
 
 export function useAdminUserById(
   userId: string,
-  options?: Omit<UseQueryOptions<UserEntity, Error>, "queryKey" | "queryFn">,
+  options?: Omit<
+    UseQueryOptions<GetAdminUserByIdResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
 ) {
-  return useQuery<UserEntity, Error>({
+  return useQuery<GetAdminUserByIdResponse, Error>({
     queryKey: [...ADMIN_USERS_QUERY_KEY, userId],
     queryFn: () => getAdminUserById(userId),
     ...options,

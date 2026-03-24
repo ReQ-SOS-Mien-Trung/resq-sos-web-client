@@ -55,7 +55,10 @@ import {
   InventoryItemEntity,
   SupplyRequestListItem,
 } from "@/services/inventory/type";
-import { useSupplyRequests } from "@/services/inventory/hooks";
+import {
+  useMyDepotQuantityByCategory,
+  useSupplyRequests,
+} from "@/services/inventory/hooks";
 import {
   DepotInfo,
   InventoryItem,
@@ -259,6 +262,11 @@ const InventoryDashboardPage = () => {
   } = useItemCategories({ params: { pageNumber: 1, pageSize: 50 } });
 
   const {
+    data: quantityByCategoryData,
+    refetch: refetchQuantityByCategory,
+  } = useMyDepotQuantityByCategory();
+
+  const {
     data: supplyRequestsData,
     isLoading: isSupplyRequestsLoading,
     refetch: refetchSupplyRequests,
@@ -339,6 +347,19 @@ const InventoryDashboardPage = () => {
     [allRequestsPagedData],
   );
 
+  const categoryOverviewData = useMemo(
+    () =>
+      (quantityByCategoryData ?? []).map((category) => ({
+        id: category.categoryId,
+        code: category.categoryCode,
+        name: category.categoryName,
+        quantity:
+          category.availableConsumableQuantity + category.availableReusableUnits,
+        description: "",
+      })),
+    [quantityByCategoryData],
+  );
+
   // Find the live request from sidebar or table data for the tracker
   const trackerRequest = useMemo(() => {
     if (trackerRequestId === null) return null;
@@ -389,7 +410,13 @@ const InventoryDashboardPage = () => {
     refetchDepots();
     refetchCategories();
     refetchSupplyRequests();
-  }, [refetchDepots, refetchCategories, refetchSupplyRequests]);
+    refetchQuantityByCategory();
+  }, [
+    refetchDepots,
+    refetchCategories,
+    refetchSupplyRequests,
+    refetchQuantityByCategory,
+  ]);
 
   const toggleDarkMode = () => {
     setIsDarkMode((prev) => !prev);
@@ -845,7 +872,7 @@ const InventoryDashboardPage = () => {
 
                 {/* Category Overview */}
                 <CategoryOverview
-                  apiCategories={categoriesData?.items}
+                  apiCategories={categoryOverviewData}
                   onCategorySelect={handleCategorySelect}
                   selectedCategory={selectedCategory}
                 />

@@ -8,6 +8,7 @@ import {
   getDepotInventory,
   getMyDepotInventory,
   getInventoryCategories,
+  getMyDepotQuantityByCategory,
   getInventoryItemTypes,
   getInventoryTargetGroups,
   getInventoryOrganizations,
@@ -34,6 +35,7 @@ import {
   GetDepotInventoryResponse,
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
+  GetMyDepotCategoryQuantitiesResponse,
   ImportInventoryRequest,
   ImportRegularRequest,
   InventoryCategory,
@@ -62,6 +64,8 @@ export const INVENTORY_KEYS = {
   myDepot: (params: GetMyDepotInventoryParams) =>
     [...INVENTORY_KEYS.all, "myDepot", params] as const,
   categories: () => [...INVENTORY_KEYS.all, "categories"] as const,
+  quantityByCategory: () =>
+    [...INVENTORY_KEYS.all, "quantityByCategory"] as const,
   itemTypes: () => [...INVENTORY_KEYS.all, "itemTypes"] as const,
   targetGroups: () => [...INVENTORY_KEYS.all, "targetGroups"] as const,
   actionTypes: () => [...INVENTORY_KEYS.all, "actionTypes"] as const,
@@ -116,6 +120,19 @@ export function useInventoryCategories(
   return useQuery({
     queryKey: INVENTORY_KEYS.categories(),
     queryFn: getInventoryCategories,
+    ...options,
+  });
+}
+
+export function useMyDepotQuantityByCategory(
+  options?: Omit<
+    UseQueryOptions<GetMyDepotCategoryQuantitiesResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.quantityByCategory(),
+    queryFn: getMyDepotQuantityByCategory,
     ...options,
   });
 }

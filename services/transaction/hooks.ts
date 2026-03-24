@@ -1,6 +1,12 @@
 import { useQuery, UseQueryOptions } from "@tanstack/react-query";
-import { getCampaignTransactions, getDepotFundTransactions } from "./api";
 import {
+  getCampaignTransactions,
+  getDepotFundTransactions,
+  getDepotFundTransactionTypes,
+  getDepotFundReferenceTypes,
+} from "./api";
+import {
+  DepotFundMetadataItem,
   GetDepotFundTransactionsParams,
   GetDepotFundTransactionsResponse,
   GetCampaignTransactionsParams,
@@ -13,7 +19,27 @@ export const TRANSACTION_KEYS = {
     [...TRANSACTION_KEYS.all, "campaign", params] as const,
   depotFundTransactions: (params: GetDepotFundTransactionsParams) =>
     [...TRANSACTION_KEYS.all, "depotFund", params] as const,
+  depotFundTransactionTypes: () =>
+    [...TRANSACTION_KEYS.all, "depotFundTransactionTypes"] as const,
+  depotFundReferenceTypes: () =>
+    [...TRANSACTION_KEYS.all, "depotFundReferenceTypes"] as const,
 };
+
+export function useDepotFundTransactionTypes() {
+  return useQuery<DepotFundMetadataItem[]>({
+    queryKey: TRANSACTION_KEYS.depotFundTransactionTypes(),
+    queryFn: getDepotFundTransactionTypes,
+    staleTime: Infinity,
+  });
+}
+
+export function useDepotFundReferenceTypes() {
+  return useQuery<DepotFundMetadataItem[]>({
+    queryKey: TRANSACTION_KEYS.depotFundReferenceTypes(),
+    queryFn: getDepotFundReferenceTypes,
+    staleTime: Infinity,
+  });
+}
 
 export function useCampaignTransactions(
   params: GetCampaignTransactionsParams,

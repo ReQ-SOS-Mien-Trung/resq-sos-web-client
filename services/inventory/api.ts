@@ -5,6 +5,7 @@ import {
   GetDepotInventoryResponse,
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
+  GetMyDepotCategoryQuantitiesResponse,
   ImportInventoryRequest,
   ImportRegularRequest,
   InventoryCategory,
@@ -65,6 +66,17 @@ export async function getMyDepotInventory(
  */
 export async function getInventoryCategories(): Promise<InventoryCategory[]> {
   const { data } = await api.get("/logistics/inventory/metadata/categories");
+  return data;
+}
+
+/**
+ * Get quantity summary by category for current depot
+ * GET /logistics/inventory/my-depot/quantity-by-category
+ */
+export async function getMyDepotQuantityByCategory(): Promise<GetMyDepotCategoryQuantitiesResponse> {
+  const { data } = await api.get(
+    "/logistics/inventory/my-depot/quantity-by-category",
+  );
   return data;
 }
 

@@ -1,3 +1,10 @@
+// ─── Depot Fund Metadata ───
+
+export interface DepotFundMetadataItem {
+  key: string;
+  value: string;
+}
+
 // ─── Depot Fund Transactions ───
 
 export interface GetDepotFundTransactionsParams {

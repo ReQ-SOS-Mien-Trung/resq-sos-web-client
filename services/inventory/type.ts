@@ -3,6 +3,19 @@ export interface InventoryCategory {
   value: string;
 }
 
+export interface MyDepotCategoryQuantityItem {
+  categoryId: number;
+  categoryCode: string;
+  categoryName: string;
+  totalConsumableQuantity: number;
+  availableConsumableQuantity: number;
+  totalReusableUnits: number;
+  availableReusableUnits: number;
+}
+
+export type GetMyDepotCategoryQuantitiesResponse =
+  MyDepotCategoryQuantityItem[];
+
 export type InventoryItemType = InventoryCategory;
 
 export type InventoryTargetGroup = InventoryCategory;
