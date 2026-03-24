@@ -17,6 +17,9 @@ export async function getRescuers(
       rescuerType: params?.rescuerType,
       abilitySubgroupCode: params?.abilitySubgroupCode,
       abilityCategoryCode: params?.abilityCategoryCode,
+      firstName: params?.firstName,
+      lastName: params?.lastName,
+      email: params?.email,
     },
   });
 

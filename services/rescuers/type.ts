@@ -24,6 +24,9 @@ export interface GetRescuersParams {
   rescuerType?: Exclude<RescuerType, null>;
   abilitySubgroupCode?: string;
   abilityCategoryCode?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
 }
 
 export interface GetRescuersResponse {

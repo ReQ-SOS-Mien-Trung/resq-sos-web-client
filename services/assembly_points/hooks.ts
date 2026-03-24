@@ -264,8 +264,13 @@ export function useStartAssemblyPointGathering() {
 
   return useMutation<void, Error, StartAssemblyPointGatheringRequest>({
     mutationFn: startAssemblyPointGathering,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
+      if (variables.assemblyPointId) {
+        queryClient.invalidateQueries({
+          queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, variables.assemblyPointId],
+        });
+      }
     },
   });
 }

@@ -5,13 +5,13 @@ import type { DepotEntity } from "@/services/depot/type";
 import {
   useAssemblyPointById,
   useScheduleAssemblyPointGathering,
+  useStartAssemblyPointGathering,
 } from "@/services/assembly_points/hooks";
 import type {
   AssemblyPointEntity,
   AssemblyPointDetailEntity,
   AssemblyPointTeam,
   AssemblyPointTeamMember,
-  ScheduleAssemblyPointGatheringErrorResponse,
 } from "@/services/assembly_points/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ import {
   CalendarBlank,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import type { AxiosError } from "axios";
 import { LocationDetailsPanelProps } from "@/type";
 import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
 
@@ -152,6 +153,45 @@ function clampToMinimumDate(date: Date, minDate: Date): Date {
     return new Date(minDate);
   }
   return date;
+}
+
+function extractBackendErrorMessage(error: unknown): string | null {
+  const err = error as AxiosError<{
+    message?: string;
+    title?: string;
+    errors?: Record<string, string[] | undefined>;
+  }>;
+
+  const errors = err.response?.data?.errors;
+  if (errors && typeof errors === "object") {
+    const firstError = Object.values(errors).find(
+      (messages) => Array.isArray(messages) && messages.length > 0,
+    );
+    if (firstError?.[0]) return firstError[0];
+  }
+
+  return err.response?.data?.message || err.response?.data?.title || null;
+}
+
+function resolveActiveEventId(payload: unknown): number | null {
+  const data = payload as {
+    activeEventId?: number | null;
+    eventId?: number | null;
+    currentEventId?: number | null;
+    activeEvent?: {
+      id?: number | null;
+      eventId?: number | null;
+    } | null;
+  };
+
+  if (typeof data?.activeEventId === "number") return data.activeEventId;
+  if (typeof data?.eventId === "number") return data.eventId;
+  if (typeof data?.currentEventId === "number") return data.currentEventId;
+  if (typeof data?.activeEvent?.eventId === "number") {
+    return data.activeEvent.eventId;
+  }
+  if (typeof data?.activeEvent?.id === "number") return data.activeEvent.id;
+  return null;
 }
 
 function getInventoryQuantities(item: InventoryItemEntity): {
@@ -578,10 +618,13 @@ function AssemblyPointDetails({
     data: assemblyPointDetail,
     isLoading: isAssemblyPointDetailLoading,
     isError: isAssemblyPointDetailError,
+    refetch: refetchAssemblyPointDetail,
   } = useAssemblyPointById(assemblyPoint.id, { enabled: true });
 
   const { mutateAsync: scheduleGathering, isPending: isSchedulingGathering } =
     useScheduleAssemblyPointGathering();
+  const { mutateAsync: startGathering, isPending: isStartingGathering } =
+    useStartAssemblyPointGathering();
 
   const displayAssemblyPoint: AssemblyPointDetailEntity | AssemblyPointEntity =
     assemblyPointDetail ?? assemblyPoint;
@@ -590,6 +633,14 @@ function AssemblyPointDetails({
     "teams" in displayAssemblyPoint && Array.isArray(displayAssemblyPoint.teams)
       ? displayAssemblyPoint.teams
       : [];
+  const hasActiveEvent = Boolean(displayAssemblyPoint.hasActiveEvent);
+  const activeEventId = resolveActiveEventId(displayAssemblyPoint);
+
+  useEffect(() => {
+    if (hasActiveEvent) {
+      setShowScheduleForm(false);
+    }
+  }, [hasActiveEvent]);
 
   const statusConfig = assemblyPointStatusConfig[
     displayAssemblyPoint.status as keyof typeof assemblyPointStatusConfig
@@ -632,23 +683,34 @@ function AssemblyPointDetails({
       );
       setAssemblyDateInput(null);
     } catch (error) {
-      const err = error as {
-        response?: {
-          data?: ScheduleAssemblyPointGatheringErrorResponse;
-        };
-      };
+      const backendMessage = extractBackendErrorMessage(error);
+      toast.error(backendMessage || "Yeu cau that bai. Vui long thu lai.");
+    }
+  };
 
-      const backendErrors = err.response?.data?.errors;
-      const firstBackendError = backendErrors
-        ? Object.values(backendErrors).find(
-            (messages) => Array.isArray(messages) && messages.length > 0,
-          )?.[0]
-        : undefined;
-      const backendMessage = err.response?.data?.message;
+  const handleStartGathering = async () => {
+    let targetEventId = activeEventId;
 
-      if (firstBackendError || backendMessage) {
-        toast.error(firstBackendError || backendMessage);
+    if (!targetEventId) {
+      const refreshed = await refetchAssemblyPointDetail();
+      targetEventId = resolveActiveEventId(refreshed.data);
+      if (!targetEventId) {
+        toast.error(
+          "Khong xac dinh duoc eventId tu du lieu backend. Vui long kiem tra response detail assembly-point.",
+        );
+        return;
       }
+    }
+
+    try {
+      await startGathering({
+        eventId: targetEventId,
+        assemblyPointId: assemblyPoint.id,
+      });
+      toast.success("Đã mở check-in cho sự kiện tập kết đang hoạt động.");
+    } catch (error) {
+      const backendMessage = extractBackendErrorMessage(error);
+      toast.error(backendMessage || "Yeu cau that bai. Vui long thu lai.");
     }
   };
 
@@ -730,16 +792,26 @@ function AssemblyPointDetails({
             label="Chia sẻ"
             color="text-purple-600 dark:text-purple-400"
           />
-          <ActionButton
-            icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
-            label="Triệu tập"
-            color="text-[#FF5722]"
-            active={showScheduleForm}
-            onClick={() => setShowScheduleForm((prev) => !prev)}
-          />
+          {hasActiveEvent ? (
+            <ActionButton
+              icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
+              label="Mở check-in"
+              color="text-[#FF5722]"
+              active={isStartingGathering}
+              onClick={handleStartGathering}
+            />
+          ) : (
+            <ActionButton
+              icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
+              label="Triệu tập"
+              color="text-[#FF5722]"
+              active={showScheduleForm}
+              onClick={() => setShowScheduleForm((prev) => !prev)}
+            />
+          )}
         </div>
 
-        {showScheduleForm && (
+        {!hasActiveEvent && showScheduleForm && (
           <div className="mt-3 rounded-lg border border-[#FF5722]/25 bg-[#FF5722]/5 p-3 space-y-2">
             <AssemblyDateTimePicker
               value={assemblyDateInput}

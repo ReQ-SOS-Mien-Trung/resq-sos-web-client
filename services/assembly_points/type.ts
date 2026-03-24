@@ -23,9 +23,12 @@ export interface AssemblyPointEntity {
   maxCapacity: number;
   status: AssemblyPointStatus;
   lastUpdatedAt: string;
+  hasActiveEvent: boolean;
+  activeEventId?: number | null;
+  teams: AssemblyPointTeam[];
 }
 
-// Team domain for Assembly Point detail
+// Team domain for Assembly Point responses
 export type AssemblyPointTeamType = "Rescue" | "Medical" | "Transportation";
 
 export type AssemblyPointTeamStatus =
@@ -58,9 +61,7 @@ export interface AssemblyPointTeam {
 }
 
 // Detail Response for GET /personnel/assembly-point/{id}
-export interface AssemblyPointDetailEntity extends AssemblyPointEntity {
-  teams: AssemblyPointTeam[];
-}
+export interface AssemblyPointDetailEntity extends AssemblyPointEntity {}
 
 // Paginated Response for Assembly Points
 export interface GetAssemblyPointsResponse {
@@ -159,4 +160,5 @@ export interface ScheduleAssemblyPointGatheringErrorResponse {
 // Start gathering by assembly event id request
 export interface StartAssemblyPointGatheringRequest {
   eventId: number;
+  assemblyPointId?: number;
 }

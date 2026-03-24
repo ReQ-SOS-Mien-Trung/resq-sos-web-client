@@ -25,17 +25,15 @@ import {
   ArrowsCounterClockwise,
   FunnelSimple,
   MagnifyingGlass,
-} from "@phosphor-icons/react";
-import {
-  Users,
+  UsersThree,
   MapPin,
-  Activity,
+  Pulse,
   ArrowRight,
   UserPlus,
   Plus,
-  CheckCircle2,
-  AlertTriangle,
-} from "lucide-react";
+  CheckCircle,
+  Warning,
+} from "@phosphor-icons/react";
 import Link from "next/link";
 import {
   RescueTeamStatusKey,
@@ -454,28 +452,28 @@ export default function RescueTeamsPage() {
       description: hasActiveFilters
         ? `${numberFormatter.format(visibleTeamsCount)} / ${numberFormatter.format(teams.length)} đội phù hợp bộ lọc`
         : "Tất cả đội trong trang hiện tại đang được hiển thị",
-      icon: Users,
+      icon: UsersThree,
       iconClassName: "bg-slate-900 text-white",
     },
     {
       title: "Sẵn sàng điều phối",
       value: numberFormatter.format(readyTeams),
       description: "Đội có thể nhận nhiệm vụ ngay hoặc đang ở trạng thái trống",
-      icon: CheckCircle2,
+      icon: CheckCircle,
       iconClassName: "bg-emerald-500 text-white",
     },
     {
       title: "Đang triển khai",
       value: numberFormatter.format(activeTeams),
       description: "Đội đang tập hợp, đã phân công hoặc đang làm nhiệm vụ",
-      icon: Activity,
+      icon: Pulse,
       iconClassName: "bg-sky-500 text-white",
     },
     {
       title: "Cần bổ sung quân số",
       value: numberFormatter.format(shortageTeams),
       description: `${numberFormatter.format(fullyStaffedTeams)} đội đã đủ quân số`,
-      icon: AlertTriangle,
+      icon: Warning,
       iconClassName: "bg-rose-500 text-white",
     },
   ];
@@ -538,7 +536,7 @@ export default function RescueTeamsPage() {
                 <Skeleton className="h-7 w-10 rounded-full" />
               </div>
 
-              <div className="flex gap-4 overflow-x-auto pb-2 pr-1">
+              <div className="flex gap-3 overflow-x-auto pb-1 pr-1">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Card
                     key={i}
@@ -578,7 +576,7 @@ export default function RescueTeamsPage() {
       <div className="mx-auto w-full max-w-[1480px] bg-slate-50 p-4 tracking-tighter md:p-6">
         <div className="rounded-[28px] border border-rose-200 bg-white p-8 text-center shadow-sm">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
-            <AlertTriangle className="h-6 w-6" />
+            <Warning className="h-6 w-6" weight="duotone" />
           </div>
           <h2 className="mt-4 text-xl font-semibold text-slate-900">
             Quản lý Đội Cứu Hộ
@@ -861,7 +859,7 @@ export default function RescueTeamsPage() {
                       key={team.id}
                       className="min-w-[340px] max-w-[390px] shrink-0 rounded-2xl border border-slate-200 bg-white shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
                     >
-                      <CardHeader className="space-y-3 pb-3">
+                      <CardHeader className="space-y-2.5 pb-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
                             {team.code}
@@ -883,13 +881,14 @@ export default function RescueTeamsPage() {
                         </div>
                       </CardHeader>
 
-                      <CardContent className="space-y-3 pb-4 text-sm">
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50/85 p-3">
+                      <CardContent className="space-y-2.5 pb-3 text-sm">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/85 p-2.5">
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <span className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
-                              <Users
+                              <UsersThree
                                 className="h-3.5 w-3.5"
                                 aria-hidden="true"
+                                weight="duotone"
                               />
                               Quân số hiện tại
                             </span>
@@ -941,78 +940,29 @@ export default function RescueTeamsPage() {
                             </div>
                           </div>
 
-                          <div className="mt-2 flex items-center justify-between text-[11px] font-medium">
-                            <span
-                              className={cn(
-                                occupancy === 0
-                                  ? "text-slate-700"
-                                  : "text-muted-foreground",
-                              )}
-                            >
-                              0% Trống
-                            </span>
-                            <span
-                              className={cn(
-                                occupancy >= 50 && occupancy < 100
-                                  ? "text-amber-700"
-                                  : "text-muted-foreground",
-                              )}
-                            >
-                              50% Bổ sung
-                            </span>
-                            <span
-                              className={cn(
-                                occupancy >= 100
-                                  ? "text-emerald-700"
-                                  : "text-muted-foreground",
-                              )}
-                            >
-                              100% Đủ
-                            </span>
-                          </div>
-
-                          <div className="mt-3 flex items-end justify-between gap-3">
+                          <div className="mt-2 flex items-end justify-between gap-2">
                             <p className="text-xs text-slate-500">
                               <span className="font-semibold text-slate-900 tabular-nums">
                                 {team.currentMemberCount}
                               </span>{" "}
                               / {team.maxMembers} thành viên
                             </p>
-                            <p className="text-right text-xs text-slate-500">
-                              {occupancyMeta.hint}
-                            </p>
                           </div>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-100 bg-white p-3">
-                          <div className="flex items-start gap-2 text-slate-600">
-                            <Activity
-                              className="mt-0.5 h-4 w-4 shrink-0 text-slate-400"
-                              aria-hidden="true"
-                            />
-                            <div>
-                              <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
-                                Chuyên môn
-                              </p>
-                              <p className="mt-1 line-clamp-1 text-sm text-slate-700">
-                                Đội {typeMap[team.teamType]?.label ?? "khác"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                        <div className="rounded-2xl border border-slate-100 bg-white p-2.5">
                           <div className="flex items-start gap-2 text-slate-600">
                             <MapPin
                               className="mt-0.5 h-4 w-4 shrink-0 text-slate-400"
                               aria-hidden="true"
+                              weight="duotone"
                             />
                             <div className="min-w-0">
                               <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
                                 Điểm tập kết
                               </p>
                               <p
-                                className="mt-1 line-clamp-2 break-words text-sm leading-5 text-slate-700"
+                                className="mt-0.5 line-clamp-2 break-words text-sm leading-5 text-slate-700"
                                 title={team.assemblyPointName}
                               >
                                 {team.assemblyPointName ||
