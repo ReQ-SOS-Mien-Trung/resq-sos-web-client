@@ -10,6 +10,7 @@ import {
   updateDepot,
   updateDepotStatus,
   updateDepotAdvanceLimit,
+  getMyDepotFundTransactions,
 } from "./api";
 import {
   GetDepotsResponse,
@@ -22,6 +23,8 @@ import {
   UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
+  GetDepotFundTransactionsResponse,
+  GetDepotFundTransactionsParams,
 } from "./type";
 
 export const DEPOTS_QUERY_KEY = ["depots"] as const;
@@ -102,6 +105,10 @@ export function useDepotFunds(options?: { enabled?: boolean }) {
   });
 }
 
+export const MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY = [
+  "my-depot-fund-transactions",
+] as const;
+
 /**
  * [Manager] Hook to fetch my depot fund
  */
@@ -109,6 +116,20 @@ export function useMyDepotFund(options?: { enabled?: boolean }) {
   return useQuery<DepotFund>({
     queryKey: MY_DEPOT_FUND_QUERY_KEY,
     queryFn: getMyDepotFund,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * [Manager] Hook to fetch my depot fund transaction history
+ */
+export function useMyDepotFundTransactions(
+  params?: GetDepotFundTransactionsParams,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<GetDepotFundTransactionsResponse>({
+    queryKey: [...MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY, params],
+    queryFn: () => getMyDepotFundTransactions(params),
     enabled: options?.enabled ?? true,
   });
 }

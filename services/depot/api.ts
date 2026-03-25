@@ -10,6 +10,8 @@ import {
   UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
+  GetDepotFundTransactionsResponse,
+  GetDepotFundTransactionsParams,
 } from "./type";
 
 /**
@@ -124,4 +126,20 @@ export async function updateDepotAdvanceLimit(
   await api.put(`/finance/depot-funds/${depotId}/advance-limit`, {
     maxAdvanceLimit,
   });
+}
+
+/**
+ * [Manager] Get my depot fund transaction history
+ * GET /finance/depot-funds/my/transactions
+ */
+export async function getMyDepotFundTransactions(
+  params?: GetDepotFundTransactionsParams,
+): Promise<GetDepotFundTransactionsResponse> {
+  const { data } = await api.get("/finance/depot-funds/my/transactions", {
+    params: {
+      pageNumber: params?.pageNumber ?? 1,
+      pageSize: params?.pageSize ?? 20,
+    },
+  });
+  return data;
 }

@@ -665,14 +665,14 @@ const UserDetailSheet = ({
                 <Skeleton className="h-4 w-3/4" />
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4">
                 {ABILITY_CATEGORIES.map((cat) => {
                   const catAbilities = (user.abilities ?? []).filter(
                     (a) => a.categoryCode === cat.code
                   );
                   return (
                     <div key={cat.code}>
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
                         {cat.label}
                       </p>
                       {catAbilities.length === 0 ? (
@@ -682,7 +682,7 @@ const UserDetailSheet = ({
                           {catAbilities.map((ab) => (
                             <div
                               key={ab.abilityId}
-                              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs tracking-tighter ${cat.badgeClass}`}
+                              className={`inline-flex font-medium items-center gap-1.5 px-2 py-1 rounded-md border text-xs tracking-tighter ${cat.badgeClass}`}
                             >
                               <span>{ab.description}</span>
                               <span className="opacity-60 font-semibold">Lv.{ab.level}</span>

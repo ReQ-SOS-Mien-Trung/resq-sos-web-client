@@ -44,6 +44,7 @@ import {
   useInventoryItemTypes,
   useInventoryTargetGroups,
   useImportRegularInventory,
+  useDownloadPurchaseImportTemplate,
 } from "@/services/inventory/hooks";
 import type { ImportPurchaseItem, VatInvoice } from "@/services/inventory/type";
 import { uploadRawToCloudinary } from "@/utils/uploadFile";
@@ -89,11 +90,11 @@ const COL = {
   DOITUONG: "Đối tượng",
   LOAI: "Loại vật phẩm",
   DONVI: "Đơn vị",
+  MOTA: "Mô tả vật phẩm",
   DONGIA: "Đơn giá",
   SOLUONG: "Số lượng",
   HETHAN: "Ngày hết hạn",
   NHAN: "Ngày nhận",
-  GHICHU: "Ghi chú",
 } as const;
 
 interface VatFormState {
@@ -117,7 +118,7 @@ interface ImportRow {
   unitPrice: number;
   expiredDate: string;
   receivedDate: string;
-  notes: string;
+  description: string;
   errors: Record<string, string>;
 }
 
@@ -463,6 +464,7 @@ interface PurchaseGroup {
   vatForm: VatFormState;
   rows: ImportRow[];
   fileName: string;
+  batchNote: string;
 }
 
 function createEmptyGroup(): PurchaseGroup {
@@ -473,6 +475,7 @@ function createEmptyGroup(): PurchaseGroup {
     vatForm: { ...EMPTY_VAT_FORM },
     rows: [],
     fileName: "",
+    batchNote: "",
   };
 }
 
@@ -499,6 +502,7 @@ export default function ExcelImportRegular() {
   const { data: itemTypesData } = useInventoryItemTypes();
   const { data: targetGroupsData } = useInventoryTargetGroups();
   const importMutation = useImportRegularInventory();
+  const { mutateAsync: downloadTemplate } = useDownloadPurchaseImportTemplate();
 
   const itemTypes = useMemo(() => itemTypesData ?? [], [itemTypesData]);
   const targetGroups = useMemo(() => targetGroupsData ?? [], [targetGroupsData]);
@@ -606,7 +610,7 @@ export default function ExcelImportRegular() {
           unitPrice: Number(raw[COL.DONGIA] ?? 0) >= 0 ? Number(raw[COL.DONGIA]) : 0,
           expiredDate: parseExcelDate(raw[COL.HETHAN]),
           receivedDate: parseExcelDate(raw[COL.NHAN]),
-          notes: String(raw[COL.GHICHU] ?? "").trim(),
+          description: String(raw[COL.MOTA] ?? "").trim(),
         };
         return { ...rowData, errors: validateRow(rowData) };
       });
@@ -685,7 +689,7 @@ export default function ExcelImportRegular() {
           id: `row-manual-${Date.now()}-${Math.random()}`,
           row: g.rows.length + 1,
           itemName: "", categoryCode: "", targetGroup: "", itemType: "",
-          unit: "", quantity: 0, unitPrice: 0, expiredDate: "", receivedDate: "", notes: "",
+          unit: "", quantity: 0, unitPrice: 0, expiredDate: "", receivedDate: "", description: "",
           errors: {},
         };
         newRow.errors = validateRow(newRow);
@@ -709,15 +713,22 @@ export default function ExcelImportRegular() {
     setGroups([createEmptyGroup()]);
   }, []);
 
-  const handleDownloadTemplate = useCallback(() => {
-    const link = document.createElement("a");
-    link.href = "/templates/mau_nhap_kho_thuong.xlsx";
-    link.download = "mau_nhap_kho_thuong.xlsx";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Đã tải file mẫu");
-  }, []);
+  const handleDownloadTemplate = useCallback(async () => {
+    try {
+      const { blob, filename } = await downloadTemplate();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Đã tải file mẫu");
+    } catch {
+      toast.error("Không thể tải file mẫu");
+    }
+  }, [downloadTemplate]);
 
   const totalRows = useMemo(() => groups.reduce((s, g) => s + g.rows.length, 0), [groups]);
   const totalErrors = useMemo(
@@ -758,6 +769,7 @@ export default function ExcelImportRegular() {
     toast.dismiss(uploadToastId);
 
     const payload = { invoices: groups.map((g, i) => ({
+      batchNote: g.batchNote.trim() || undefined,
       vatInvoice: {
         invoiceSerial: g.vatForm.invoiceSerial.trim(),
         invoiceNumber: g.vatForm.invoiceNumber.trim(),
@@ -775,10 +787,10 @@ export default function ExcelImportRegular() {
         unitPrice: r.unitPrice,
         unit: r.unit,
         itemType: r.itemType,
-        targetGroup: r.targetGroup,
+        targetGroups: [r.targetGroup],
         receivedDate: r.receivedDate,
         expiredDate: r.expiredDate || null,
-        notes: r.notes || null,
+        description: r.description || null,
       } as ImportPurchaseItem)),
     })) };
 
@@ -1305,6 +1317,15 @@ export default function ExcelImportRegular() {
                       {vatField(group.id, group.vatForm, !!group.vatFile, "Ngày hóa đơn", "invoiceDate", "", "date", true)}
                       {vatField(group.id, group.vatForm, !!group.vatFile, "Tổng tiền (VNĐ)", "totalAmount", "5.000.000", "number", true, true)}
                     </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Ghi chú lần nhập</label>
+                      <Input
+                        value={group.batchNote}
+                        onChange={(e) => patchGroup(group.id, { batchNote: e.target.value })}
+                        placeholder="Ghi chú cho lần nhập này..."
+                        className="h-8 text-sm"
+                      />
+                    </div>
                   </div>
 
                   <div className="overflow-auto">
@@ -1317,11 +1338,11 @@ export default function ExcelImportRegular() {
                           <TableHead className="min-w-36">Đối tượng</TableHead>
                           <TableHead className="min-w-36">Loại vật phẩm</TableHead>
                           <TableHead className="min-w-24">Đơn vị</TableHead>
+                          <TableHead className="min-w-40">Mô tả vật phẩm</TableHead>
                           <TableHead className="min-w-28">Đơn giá</TableHead>
                           <TableHead className="min-w-24">Số lượng</TableHead>
                           <TableHead className="min-w-36">Ngày hết hạn</TableHead>
                           <TableHead className="min-w-36">Ngày nhận</TableHead>
-                          <TableHead className="min-w-40">Ghi chú</TableHead>
                           <TableHead className="w-10" />
                         </TableRow>
                       </TableHeader>
@@ -1349,6 +1370,14 @@ export default function ExcelImportRegular() {
                                   : renderInputCell(group.id, row, "itemType", "Loại vật phẩm")}
                               </TableCell>
                               <TableCell>{renderInputCell(group.id, row, "unit", "Đơn vị")}</TableCell>
+                              <TableCell>
+                                <Input
+                                  value={row.description}
+                                  onChange={(e) => updateRow(group.id, row.id, "description", e.target.value)}
+                                  placeholder="Mô tả vật phẩm..."
+                                  className="h-8 text-sm"
+                                />
+                              </TableCell>
                               <TableCell>{renderCurrencyCell(group.id, row, "unitPrice")}</TableCell>
                               <TableCell>{renderInputCell(group.id, row, "quantity", "0", "number")}</TableCell>
                               <TableCell>
@@ -1370,14 +1399,6 @@ export default function ExcelImportRegular() {
                                     <p className="text-[11px] text-red-500">{row.errors.receivedDate}</p>
                                   )}
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  value={row.notes}
-                                  onChange={(e) => updateRow(group.id, row.id, "notes", e.target.value)}
-                                  placeholder="Ghi chú..."
-                                  className="h-8 text-sm"
-                                />
                               </TableCell>
                               <TableCell>
                                 <Button

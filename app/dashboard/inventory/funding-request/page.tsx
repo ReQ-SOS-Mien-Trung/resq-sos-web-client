@@ -50,12 +50,15 @@ import {
   CheckCircle,
   Trash,
   ArrowClockwise,
+  ClockCounterClockwise,
+  ArrowUp,
+  ArrowDown,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/auth.store";
 import { useInventoryCategories } from "@/services/inventory/hooks";
-import { useMyDepotFund, MY_DEPOT_FUND_QUERY_KEY } from "@/services/depot/hooks";
+import { useMyDepotFund, MY_DEPOT_FUND_QUERY_KEY, useMyDepotFundTransactions } from "@/services/depot/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useFundingRequests,
@@ -198,7 +201,7 @@ function getSheetRows(sheet: XLSX.WorkSheet): Record<string, unknown>[] {
   return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { range, defval: "" });
 }
 
-type TabType = "create" | "history";
+type TabType = "create" | "history" | "transactions";
 
 /* ── Import row with validation ───────────────────────────── */
 
@@ -273,6 +276,11 @@ export default function FundingRequestPage() {
   // ── My fund balance ──
   const { data: myFund, isLoading: loadingFund } = useMyDepotFund();
   const queryClient = useQueryClient();
+  const [txPage, setTxPage] = useState(1);
+  const { data: txData, isLoading: loadingTx } = useMyDepotFundTransactions(
+    { pageNumber: txPage, pageSize: 20 },
+    { enabled: true },
+  );
 
   const [activeTab, setActiveTab] = useState<TabType>("create");
 
@@ -736,6 +744,17 @@ export default function FundingRequestPage() {
                 {requests.length}
               </Badge>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab("transactions")}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
+              activeTab === "transactions"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ClockCounterClockwise size={14} />
+            GD kho
           </button>
         </div>
 
@@ -1411,6 +1430,99 @@ export default function FundingRequestPage() {
                     );
                   })}
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ─── TRANSACTIONS TAB ──────────────────────────────── */}
+        {activeTab === "transactions" && (
+          <Card className="border border-border/50">
+            <CardContent className="p-5">
+              <h3 className="text-base font-semibold tracking-tighter mb-4 flex items-center gap-1.5">
+                <ClockCounterClockwise size={16} className="text-primary" />
+                Lịch sử giao dịch kho
+              </h3>
+
+              {loadingTx ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-14 w-full rounded-xl" />
+                  ))}
+                </div>
+              ) : !txData?.items?.length ? (
+                <div className="p-10 text-center">
+                  <ClockCounterClockwise size={40} className="mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground tracking-tight">
+                    Chưa có giao dịch nào
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {txData.items.map((tx) => {
+                      const isCredit = tx.amount >= 0;
+                      return (
+                        <div
+                          key={tx.id}
+                          className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:bg-muted/20 transition-colors"
+                        >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                            isCredit ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+                          }`}>
+                            {isCredit ? <ArrowDown size={15} weight="bold" /> : <ArrowUp size={15} weight="bold" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-semibold tracking-tighter truncate">
+                                {tx.transactionType}
+                              </p>
+                              <span className={`text-sm font-bold shrink-0 ${
+                                isCredit ? "text-emerald-600" : "text-rose-600"
+                              }`}>
+                                {isCredit ? "+" : ""}{tx.amount.toLocaleString("vi-VN")}đ
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground tracking-tight mt-0.5">
+                              {tx.note && <span className="truncate">{tx.note}</span>}
+                              {tx.note && <span>·</span>}
+                              <span>{new Date(tx.createdAt).toLocaleDateString("vi-VN")}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Pagination */}
+                  {txData.totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
+                      <p className="text-xs text-muted-foreground tracking-tight">
+                        Trang {txData.pageNumber} / {txData.totalPages} &middot; {txData.totalCount} giao dịch
+                      </p>
+                      <div className="flex gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={!txData.hasPreviousPage}
+                          onClick={() => setTxPage((p) => p - 1)}
+                          className="h-7 px-2 text-xs"
+                        >
+                          Trước
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={!txData.hasNextPage}
+                          onClick={() => setTxPage((p) => p + 1)}
+                          className="h-7 px-2 text-xs"
+                        >
+                          Tiếp
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

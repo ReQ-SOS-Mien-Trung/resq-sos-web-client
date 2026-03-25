@@ -299,6 +299,60 @@ export async function getInventoryLots(
  * Routes through /api/inventory/export-movements (Next.js server-side proxy)
  * so Content-Disposition header is readable without CORS restrictions.
  */
+/**
+ * Download donation import template
+ * GET /logistics/inventory/template/donation-import
+ */
+export async function downloadDonationImportTemplate(): Promise<{
+  blob: Blob;
+  filename: string;
+}> {
+  const token = useAuthStore.getState().accessToken;
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_BASE_URL}/logistics/inventory/template/donation-import`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+  const disposition = response.headers.get("content-disposition") ?? "";
+  let filename = "mau_nhap_kho_tu_thien.xlsx";
+  const utf8Match = disposition.match(/filename\*=[^']*'[^']*'([^;\s]+)/i);
+  if (utf8Match) {
+    filename = decodeURIComponent(utf8Match[1]);
+  } else {
+    const asciiMatch = disposition.match(/filename="([^"]+)"/);
+    if (asciiMatch) filename = asciiMatch[1];
+  }
+  const blob = await response.blob();
+  return { blob, filename };
+}
+
+/**
+ * Download purchase import template
+ * GET /logistics/inventory/template/purchase-import
+ */
+export async function downloadPurchaseImportTemplate(): Promise<{
+  blob: Blob;
+  filename: string;
+}> {
+  const token = useAuthStore.getState().accessToken;
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_BASE_URL}/logistics/inventory/template/purchase-import`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+  const disposition = response.headers.get("content-disposition") ?? "";
+  let filename = "mau_nhap_kho_thuong.xlsx";
+  const utf8Match = disposition.match(/filename\*=[^']*'[^']*'([^;\s]+)/i);
+  if (utf8Match) {
+    filename = decodeURIComponent(utf8Match[1]);
+  } else {
+    const asciiMatch = disposition.match(/filename="([^"]+)"/);
+    if (asciiMatch) filename = asciiMatch[1];
+  }
+  const blob = await response.blob();
+  return { blob, filename };
+}
+
 export async function exportInventoryMovements(
   params: ExportMovementsParams,
 ): Promise<{ blob: Blob; filename: string }> {

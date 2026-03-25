@@ -106,20 +106,22 @@ export interface GetMyDepotInventoryResponse {
 
 export interface ImportInventoryItem {
   row: number;
+  itemModelId?: number;
   itemName: string;
   categoryCode: string;
+  description?: string | null;
   quantity: number;
   unit: string;
   itemType: string;
-  targetGroup: string;
+  targetGroups: string[];
   receivedDate: string;
   expiredDate?: string | null;
-  notes?: string | null;
 }
 
 export interface ImportInventoryRequest {
   organizationId?: number;
   organizationName?: string;
+  batchNote?: string;
   items: ImportInventoryItem[];
 }
 
@@ -137,22 +139,25 @@ export interface VatInvoice {
 
 export interface ImportPurchaseItem {
   row: number;
+  itemModelId?: number;
   itemName: string;
   categoryCode: string;
+  description?: string | null;
   quantity: number;
   unitPrice: number;
   unit: string;
   itemType: string;
-  targetGroup: string;
+  targetGroups: string[];
   receivedDate: string;
   expiredDate?: string | null;
-  notes?: string | null;
 }
 
 export type ImportRegularRequest = {
   invoices: Array<{
+    batchNote?: string;
     vatInvoice: VatInvoice;
     items: ImportPurchaseItem[];
+    campaignDisbursementId?: number;
   }>;
 };
 

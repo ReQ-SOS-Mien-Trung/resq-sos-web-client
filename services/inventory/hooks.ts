@@ -29,6 +29,8 @@ import {
   getDepotStockMovements,
   exportInventoryMovements,
   getInventoryLots,
+  downloadDonationImportTemplate,
+  downloadPurchaseImportTemplate,
 } from "./api";
 import {
   GetDepotInventoryParams,
@@ -381,5 +383,17 @@ export function useInventoryLots(
     queryKey: INVENTORY_KEYS.lots(itemModelId),
     queryFn: () => getInventoryLots(itemModelId),
     ...options,
+  });
+}
+
+export function useDownloadDonationImportTemplate() {
+  return useMutation({
+    mutationFn: downloadDonationImportTemplate,
+  });
+}
+
+export function useDownloadPurchaseImportTemplate() {
+  return useMutation({
+    mutationFn: downloadPurchaseImportTemplate,
   });
 }

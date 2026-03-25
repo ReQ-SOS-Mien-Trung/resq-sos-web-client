@@ -49,8 +49,9 @@ import {
   useInventoryTargetGroups,
   useInventoryOrganizations,
   useImportInventory,
+  useDownloadDonationImportTemplate,
 } from "@/services/inventory/hooks";
-import type { ImportInventoryItem } from "@/services/inventory/type";
+import type { ImportInventoryItem, ImportInventoryRequest } from "@/services/inventory/type";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 
 // ─── System categories (seed) ───
@@ -96,10 +97,10 @@ const COL = {
   DOITUONG: "Đối tượng",
   LOAI: "Loại vật phẩm",
   DONVI: "Đơn vị",
+  MOTA: "Mô tả vật phẩm",
   SOLUONG: "Số lượng",
   HETHAN: "Ngày hết hạn",
   NHAN: "Ngày nhận",
-  GHICHU: "Ghi chú",
 } as const;
 
 // ─── Row type ───
@@ -114,7 +115,7 @@ interface ImportRow {
   quantity: number;
   expiredDate: string;
   receivedDate: string;
-  notes: string;
+  description: string;
   errors: Record<string, string>;
 }
 
@@ -184,6 +185,7 @@ export default function ExcelImportFromOrg() {
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [orgError, setOrgError] = useState("");
   const [isOrgOpen, setIsOrgOpen] = useState(false);
+  const [batchNote, setBatchNote] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const orgInputRef = useRef<HTMLInputElement>(null);
 
@@ -192,6 +194,7 @@ export default function ExcelImportFromOrg() {
   const { data: targetGroupsData } = useInventoryTargetGroups();
   const { data: organizationsData } = useInventoryOrganizations();
   const importMutation = useImportInventory();
+  const { mutateAsync: downloadTemplate } = useDownloadDonationImportTemplate();
 
   const itemTypes = useMemo(() => itemTypesData ?? [], [itemTypesData]);
   const targetGroups = useMemo(() => targetGroupsData ?? [], [targetGroupsData]);
@@ -269,7 +272,7 @@ export default function ExcelImportFromOrg() {
             const quantity = Number(raw[COL.SOLUONG] ?? 0);
             const expiredDate = parseExcelDate(raw[COL.HETHAN]);
             const receivedDate = parseExcelDate(raw[COL.NHAN]);
-            const notes = String(raw[COL.GHICHU] ?? "").trim();
+            const description = String(raw[COL.MOTA] ?? "").trim();
 
             const rowData = {
               id: `row-${idx}-${Date.now()}`,
@@ -282,7 +285,7 @@ export default function ExcelImportFromOrg() {
               quantity: quantity > 0 ? quantity : 0,
               expiredDate,
               receivedDate,
-              notes,
+              description,
             };
 
             return { ...rowData, errors: validateRow(rowData) };
@@ -357,7 +360,7 @@ export default function ExcelImportFromOrg() {
         quantity: 0,
         expiredDate: "",
         receivedDate: "",
-        notes: "",
+        description: "",
         errors: {},
       };
       newRow.errors = validateRow(newRow);
@@ -420,7 +423,7 @@ export default function ExcelImportFromOrg() {
                 quantity: Number(raw[COL.SOLUONG] ?? 0) > 0 ? Number(raw[COL.SOLUONG]) : 0,
                 expiredDate: parseExcelDate(raw[COL.HETHAN]),
                 receivedDate: parseExcelDate(raw[COL.NHAN]),
-                notes: String(raw[COL.GHICHU] ?? "").trim(),
+                description: String(raw[COL.MOTA] ?? "").trim(),
               };
               return { ...rowData, errors: validateRow(rowData) };
             });
@@ -492,18 +495,21 @@ export default function ExcelImportFromOrg() {
       quantity: r.quantity,
       unit: r.unit,
       itemType: r.itemType,
-      targetGroup: r.targetGroup,
+      targetGroups: [r.targetGroup],
       receivedDate: r.receivedDate,
       expiredDate: r.expiredDate || null,
-      notes: r.notes || null,
+      description: r.description || null,
     }));
 
-    const payload: { organizationId?: number; organizationName?: string; items: ImportInventoryItem[] } = { items };
+    const payload: ImportInventoryRequest = { items };
     if (selectedOrgId) {
       payload.organizationId = Number(selectedOrgId);
     }
     if (orgSearchValue.trim()) {
       payload.organizationName = orgSearchValue.trim();
+    }
+    if (batchNote.trim()) {
+      payload.batchNote = batchNote.trim();
     }
 
     importMutation.mutate(payload, {
@@ -516,24 +522,32 @@ export default function ExcelImportFromOrg() {
         toast.error(`Nhập kho thất bại: ${errorMsg}`);
       },
     });
-  }, [rows, errorCount, selectedOrgId, orgSearchValue, importMutation, router]);
+  }, [rows, errorCount, selectedOrgId, orgSearchValue, batchNote, importMutation, router]);
 
   // ─── Reset ───
   const handleReset = useCallback(() => {
     setStep("upload");
     setRows([]);
     setFileName("");
+    setBatchNote("");
   }, []);
 
-  const handleDownloadTemplate = useCallback(() => {
-    const link = document.createElement("a");
-    link.href = "/templates/mau_nhap_kho_tu_thien.xlsx";
-    link.download = "mau_nhap_kho_tu_thien.xlsx";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Đã tải file mẫu");
-  }, []);
+  const handleDownloadTemplate = useCallback(async () => {
+    try {
+      const { blob, filename } = await downloadTemplate();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Đã tải file mẫu");
+    } catch {
+      toast.error("Không thể tải file mẫu");
+    }
+  }, [downloadTemplate]);
 
   // ─── Render: Cell with error ───
   const renderInputCell = (
@@ -991,6 +1005,18 @@ export default function ExcelImportFromOrg() {
               )}
             </div>
 
+            {/* Batch Note */}
+            <div className="shrink-0 rounded-xl border bg-card px-4 py-3 flex items-center gap-3">
+              <PencilSimple className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm tracking-tighter font-medium shrink-0">Ghi chú lần nhập</span>
+              <Input
+                value={batchNote}
+                onChange={(e) => setBatchNote(e.target.value)}
+                placeholder="Ghi chú cho lần nhập kho này..."
+                className="h-8 text-sm flex-1"
+              />
+            </div>
+
             {/* Editable Table */}
             <div className="border rounded-xl bg-card overflow-auto flex-1">
               <Table>
@@ -1002,10 +1028,10 @@ export default function ExcelImportFromOrg() {
                     <TableHead className="min-w-36">Đối tượng</TableHead>
                     <TableHead className="min-w-36">Loại vật phẩm</TableHead>
                     <TableHead className="min-w-24">Đơn vị</TableHead>
+                    <TableHead className="min-w-48">Mô tả vật phẩm</TableHead>
                     <TableHead className="min-w-24">Số lượng</TableHead>
                     <TableHead className="min-w-36">Ngày hết hạn</TableHead>
                     <TableHead className="min-w-36">Ngày nhận</TableHead>
-                    <TableHead className="min-w-48">Ghi chú</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -1055,6 +1081,16 @@ export default function ExcelImportFromOrg() {
                         {/* Đơn vị */}
                         <TableCell>{renderInputCell(row, "unit", "Đơn vị")}</TableCell>
 
+                        {/* Mô tả vật phẩm */}
+                        <TableCell>
+                          <Input
+                            value={row.description}
+                            onChange={(e) => updateRow(row.id, "description", e.target.value)}
+                            placeholder="Mô tả vật phẩm..."
+                            className="h-8 text-sm"
+                          />
+                        </TableCell>
+
                         {/* Số lượng */}
                         <TableCell>{renderInputCell(row, "quantity", "0", "number")}</TableCell>
 
@@ -1080,16 +1116,6 @@ export default function ExcelImportFromOrg() {
                               <p className="text-[11px] text-red-500">{row.errors.receivedDate}</p>
                             )}
                           </div>
-                        </TableCell>
-
-                        {/* Ghi chú */}
-                        <TableCell>
-                          <Input
-                            value={row.notes}
-                            onChange={(e) => updateRow(row.id, "notes", e.target.value)}
-                            placeholder="Ghi chú..."
-                            className="h-8 text-sm"
-                          />
                         </TableCell>
 
                         {/* Delete */}

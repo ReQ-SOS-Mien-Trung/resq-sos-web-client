@@ -93,3 +93,31 @@ export interface DepotFund {
   maxAdvanceLimit: number;
   lastUpdatedAt: string;
 }
+
+// Depot Fund Transaction (from /finance/depot-funds/my/transactions)
+export interface DepotFundTransaction {
+  id: number;
+  depotFundId: number;
+  transactionType: string;
+  amount: number;
+  referenceType: string;
+  referenceId: number;
+  note: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface GetDepotFundTransactionsResponse {
+  items: DepotFundTransaction[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface GetDepotFundTransactionsParams {
+  pageNumber?: number;
+  pageSize?: number;
+}
