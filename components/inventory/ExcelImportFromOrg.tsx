@@ -89,6 +89,30 @@ const CATEGORY_VI_MAP: Record<string, string> = {
   heating: "Heating",
 };
 
+/** Match category from bilingual format like "Thực phẩm - Food" */
+function matchCategoryCode(rawCategory: string): string {
+  const lower = rawCategory.toLowerCase().trim();
+  if (CATEGORY_VI_MAP[lower]) return CATEGORY_VI_MAP[lower];
+  // Bilingual: split by " - " and try each part
+  const parts = rawCategory.split(/\s*-\s*/);
+  for (const part of parts) {
+    const match = CATEGORY_VI_MAP[part.trim().toLowerCase()];
+    if (match) return match;
+  }
+  return "";
+}
+
+/** Find the data sheet (has "STT" in A1) — skips lookup / hidden sheets */
+function findDataSheet(workbook: XLSX.WorkBook): XLSX.WorkSheet {
+  for (const name of workbook.SheetNames) {
+    const ws = workbook.Sheets[name];
+    if (!ws["!ref"]) continue;
+    const a1 = ws["A1"];
+    if (a1 && String(a1.v ?? "").trim().toUpperCase() === "STT") return ws;
+  }
+  return workbook.Sheets[workbook.SheetNames[0]];
+}
+
 // ─── Excel column names (matching the template screenshot) ───
 const COL = {
   STT: "STT",
@@ -157,20 +181,38 @@ function parseExcelDate(val: unknown): string {
   return str;
 }
 
-/** Auto-detects the real header row (skips title/note rows) and returns parsed data rows. */
-function getSheetRows(sheet: XLSX.WorkSheet): Record<string, unknown>[] {
-  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 });
+/**
+ * Đọc sheet theo VỊTRI CỘT (không phụ thuộc tên cột / Unicode).
+ * Tìm dòng header bằng cách kiểm tra cột 0 = "STT" (ASCII thuần).
+ * Sau đó map từng dòng data theo đúng thứ tự cột của colNames.
+ */
+function getSheetRows(
+  sheet: XLSX.WorkSheet,
+  colNames: readonly string[],
+): Record<string, unknown>[] {
+  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+  if (rawRows.length === 0) return [];
+
+  // Tìm header: dòng đầu tiên có cột 0 = "STT" (ASCII → không bị ảnh hưởng Unicode)
   const headerRowIndex = rawRows.findIndex(
-    (row) =>
-      Array.isArray(row) &&
-      row.some(
-        (cell) =>
-          String(cell ?? "").trim() === "STT" ||
-          String(cell ?? "").trim() === "Tên vật phẩm",
-      ),
+    (row) => Array.isArray(row) && String(row[0] ?? "").trim().toUpperCase() === "STT",
   );
-  const range = headerRowIndex >= 0 ? headerRowIndex : 0;
-  return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { range, defval: "" });
+
+  // Nếu không tìm thấy STT, giả sử dòng 0 là header
+  const dataStart = headerRowIndex >= 0 ? headerRowIndex + 1 : 1;
+
+  return rawRows.slice(dataStart).map((row) => {
+    const arr = Array.isArray(row) ? row : [];
+    const obj: Record<string, unknown> = {};
+    colNames.forEach((name, i) => {
+      const raw = arr[i];
+      // Các cell formula có thể trả về object {v, f} — lấy .v nếu có
+      obj[name] = (raw !== null && raw !== undefined && typeof raw === "object" && "v" in (raw as object))
+        ? (raw as { v: unknown }).v ?? ""
+        : raw ?? "";
+    });
+    return obj;
+  });
 }
 
 // ─── Component ───
@@ -238,30 +280,28 @@ export default function ExcelImportFromOrg() {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
-          const sheetName = workbook.SheetNames[0];
-          const sheet = workbook.Sheets[sheetName];
-          const jsonData = getSheetRows(sheet);
+          const sheet = findDataSheet(workbook);
+          const jsonData = getSheetRows(sheet, Object.values(COL));
+          const dataRows = jsonData.filter((raw) => String(raw[COL.TEN] ?? "").trim() !== "");
+          if (dataRows.length === 0) { toast.error("Không tìm thấy dòng nào có dữ liệu"); return; }
 
-          if (jsonData.length === 0) {
-            toast.error("File Excel không có dữ liệu");
-            return;
-          }
-
-          const parsed: ImportRow[] = jsonData.map((raw, idx) => {
+          const parsed: ImportRow[] = dataRows.map((raw, idx) => {
             const rawCategory = String(raw[COL.DANHMUC] ?? "").trim();
-            const categoryCode = CATEGORY_VI_MAP[rawCategory.toLowerCase()] ?? "";
+            const categoryCode = matchCategoryCode(rawCategory);
 
             const itemName = String(raw[COL.TEN] ?? "").trim();
 
             const rawTargetGroup = String(raw[COL.DOITUONG] ?? "").trim();
+            const tgParts = rawTargetGroup.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
             const matchedTargetGroup = targetGroups.find(
-              (t) => t.value.toLowerCase() === rawTargetGroup.toLowerCase() || t.key.toLowerCase() === rawTargetGroup.toLowerCase(),
+              (t) => tgParts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
             );
             const targetGroupRaw = matchedTargetGroup?.key ?? rawTargetGroup;
 
             const rawItemType = String(raw[COL.LOAI] ?? "").trim();
+            const itParts = rawItemType.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
             const matchedItemType = itemTypes.find(
-              (t) => t.value.toLowerCase() === rawItemType.toLowerCase() || t.key.toLowerCase() === rawItemType.toLowerCase(),
+              (t) => itParts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
             );
             const itemType = matchedItemType?.key ?? rawItemType;
 
@@ -388,24 +428,28 @@ export default function ExcelImportFromOrg() {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = getSheetRows(sheet);
+          const sheet = findDataSheet(workbook);
+          const jsonData = getSheetRows(sheet, Object.values(COL));
           if (jsonData.length === 0) { toast.error("File Excel không có dữ liệu"); return; }
           setRows((prev) => {
             const offset = prev.length;
-            const parsed: ImportRow[] = jsonData.map((raw, idx) => {
+            const dataRows = jsonData.filter((raw) => String(raw[COL.TEN] ?? "").trim() !== "");
+            if (dataRows.length === 0) { toast.error("Không tìm thấy dòng nào có dữ liệu"); return prev; }
+            const parsed: ImportRow[] = dataRows.map((raw, idx) => {
               const rawCategory = String(raw[COL.DANHMUC] ?? "").trim();
-              const categoryCode = CATEGORY_VI_MAP[rawCategory.toLowerCase()] ?? "";
+              const categoryCode = matchCategoryCode(rawCategory);
 
               const rawTargetGroup = String(raw[COL.DOITUONG] ?? "").trim();
+              const tgParts = rawTargetGroup.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
               const matchedTargetGroup = targetGroups.find(
-                (t) => t.value.toLowerCase() === rawTargetGroup.toLowerCase() || t.key.toLowerCase() === rawTargetGroup.toLowerCase(),
+                (t) => tgParts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
               );
               const targetGroupRaw = matchedTargetGroup?.key ?? rawTargetGroup;
 
               const rawItemType = String(raw[COL.LOAI] ?? "").trim();
+              const itParts = rawItemType.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
               const matchedItemType = itemTypes.find(
-                (t) => t.value.toLowerCase() === rawItemType.toLowerCase() || t.key.toLowerCase() === rawItemType.toLowerCase(),
+                (t) => itParts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
               );
               const itemType = matchedItemType?.key ?? rawItemType;
 
