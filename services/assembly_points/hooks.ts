@@ -7,6 +7,7 @@ import {
 import {
   getAssemblyPoints,
   getAssemblyPointById,
+  getAssemblyPointEvents,
   getAssemblyPointStatuses,
   getAssemblyPointMetadata,
   createAssemblyPoint,
@@ -35,6 +36,8 @@ import {
   ScheduleAssemblyPointGatheringResponse,
   ScheduleAssemblyPointGatheringErrorResponse,
   StartAssemblyPointGatheringRequest,
+  GetAssemblyPointEventsParams,
+  GetAssemblyPointEventsResponse,
 } from "./type";
 import { AxiosError } from "axios";
 
@@ -44,6 +47,9 @@ export const ASSEMBLY_POINT_STATUSES_QUERY_KEY = [
 ] as const;
 export const ASSEMBLY_POINT_METADATA_QUERY_KEY = [
   "assembly-point-metadata",
+] as const;
+export const ASSEMBLY_POINT_EVENTS_QUERY_KEY = [
+  "assembly-point-events",
 ] as const;
 
 export interface UseAssemblyPointsOptions {
@@ -60,6 +66,11 @@ export interface UseAssemblyPointStatusesOptions {
 }
 
 export interface UseAssemblyPointMetadataOptions {
+  enabled?: boolean;
+}
+
+export interface UseAssemblyPointEventsOptions {
+  params?: GetAssemblyPointEventsParams;
   enabled?: boolean;
 }
 
@@ -111,6 +122,20 @@ export function useAssemblyPointById(
     queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, id],
     queryFn: () => getAssemblyPointById(id),
     enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Hook to fetch events by assembly point ID with pagination
+ */
+export function useAssemblyPointEvents(
+  id: number,
+  options?: UseAssemblyPointEventsOptions,
+) {
+  return useQuery<GetAssemblyPointEventsResponse>({
+    queryKey: [...ASSEMBLY_POINT_EVENTS_QUERY_KEY, id, options?.params],
+    queryFn: () => getAssemblyPointEvents(id, options?.params),
+    enabled: (options?.enabled ?? true) && Number.isFinite(id),
   });
 }
 
@@ -252,6 +277,9 @@ export function useScheduleAssemblyPointGathering() {
       queryClient.invalidateQueries({
         queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, variables.id],
       });
+      queryClient.invalidateQueries({
+        queryKey: [...ASSEMBLY_POINT_EVENTS_QUERY_KEY, variables.id],
+      });
     },
   });
 }
@@ -269,6 +297,12 @@ export function useStartAssemblyPointGathering() {
       if (variables.assemblyPointId) {
         queryClient.invalidateQueries({
           queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, variables.assemblyPointId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: [
+            ...ASSEMBLY_POINT_EVENTS_QUERY_KEY,
+            variables.assemblyPointId,
+          ],
         });
       }
     },

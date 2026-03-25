@@ -2,7 +2,6 @@ import api from "@/config/axios";
 import {
   GetAssemblyPointsResponse,
   GetAssemblyPointsParams,
-  AssemblyPointEntity,
   AssemblyPointDetailEntity,
   CreateAssemblyPointRequest,
   CreateAssemblyPointResponse,
@@ -16,6 +15,8 @@ import {
   ScheduleAssemblyPointGatheringRequest,
   ScheduleAssemblyPointGatheringResponse,
   StartAssemblyPointGatheringRequest,
+  GetAssemblyPointEventsParams,
+  GetAssemblyPointEventsResponse,
 } from "./type";
 
 /**
@@ -151,4 +152,21 @@ export async function startAssemblyPointGathering(
 ): Promise<void> {
   const { eventId } = payload;
   await api.post(`/personnel/assembly-point/events/${eventId}/start-gathering`);
+}
+
+/**
+ * Get events by assembly point with pagination
+ * GET /personnel/assembly-point/{id}/events
+ */
+export async function getAssemblyPointEvents(
+  id: number,
+  params?: GetAssemblyPointEventsParams,
+): Promise<GetAssemblyPointEventsResponse> {
+  const { data } = await api.get(`/personnel/assembly-point/${id}/events`, {
+    params: {
+      pageNumber: params?.pageNumber ?? 1,
+      pageSize: params?.pageSize ?? 10,
+    },
+  });
+  return data;
 }

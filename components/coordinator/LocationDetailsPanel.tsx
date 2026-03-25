@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { DepotEntity } from "@/services/depot/type";
 import {
   useAssemblyPointById,
+  useAssemblyPointEvents,
   useScheduleAssemblyPointGathering,
   useStartAssemblyPointGathering,
 } from "@/services/assembly_points/hooks";
 import type {
   AssemblyPointEntity,
   AssemblyPointDetailEntity,
+  AssemblyPointEventEntity,
   AssemblyPointTeam,
   AssemblyPointTeamMember,
 } from "@/services/assembly_points/type";
@@ -91,6 +93,24 @@ const memberStatusLabel: Record<AssemblyPointTeamMember["status"], string> = {
 const memberRoleLabel: Record<AssemblyPointTeamMember["roleInTeam"], string> = {
   Leader: "Trưởng nhóm",
   Member: "Thành viên",
+};
+
+const assemblyEventStatusLabel: Record<string, string> = {
+  Scheduled: "Đã lên lịch",
+  Gathering: "Đang tập hợp",
+  Completed: "Đã hoàn tất",
+  Cancelled: "Đã hủy",
+};
+
+const assemblyEventStatusColor: Record<string, string> = {
+  Scheduled:
+    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300",
+  Gathering:
+    "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-300",
+  Completed:
+    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300",
+  Cancelled:
+    "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-300",
 };
 
 function formatLastUpdated(dateStr: string): string {
@@ -192,6 +212,28 @@ function resolveActiveEventId(payload: unknown): number | null {
   }
   if (typeof data?.activeEvent?.id === "number") return data.activeEvent.id;
   return null;
+}
+
+function getDefaultEventId(
+  events: AssemblyPointEventEntity[],
+  activeEventId: number | null,
+): number | null {
+  if (!events.length) return null;
+
+  if (
+    typeof activeEventId === "number" &&
+    events.some((event) => event.eventId === activeEventId)
+  ) {
+    return activeEventId;
+  }
+
+  const gatheringEvent = events.find((event) => event.status === "Gathering");
+  if (gatheringEvent) return gatheringEvent.eventId;
+
+  const scheduledEvent = events.find((event) => event.status === "Scheduled");
+  if (scheduledEvent) return scheduledEvent.eventId;
+
+  return events[0]?.eventId ?? null;
 }
 
 function getInventoryQuantities(item: InventoryItemEntity): {
@@ -613,6 +655,7 @@ function AssemblyPointDetails({
 }) {
   const [assemblyDateInput, setAssemblyDateInput] = useState<Date | null>(null);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
   const {
     data: assemblyPointDetail,
@@ -620,6 +663,18 @@ function AssemblyPointDetails({
     isError: isAssemblyPointDetailError,
     refetch: refetchAssemblyPointDetail,
   } = useAssemblyPointById(assemblyPoint.id, { enabled: true });
+  const {
+    data: assemblyPointEvents,
+    isLoading: isAssemblyPointEventsLoading,
+    isError: isAssemblyPointEventsError,
+    refetch: refetchAssemblyPointEvents,
+  } = useAssemblyPointEvents(assemblyPoint.id, {
+    enabled: true,
+    params: {
+      pageNumber: 1,
+      pageSize: 10,
+    },
+  });
 
   const { mutateAsync: scheduleGathering, isPending: isSchedulingGathering } =
     useScheduleAssemblyPointGathering();
@@ -635,12 +690,35 @@ function AssemblyPointDetails({
       : [];
   const hasActiveEvent = Boolean(displayAssemblyPoint.hasActiveEvent);
   const activeEventId = resolveActiveEventId(displayAssemblyPoint);
+  const events = useMemo(() => {
+    if (!assemblyPointEvents?.items) return [];
+    return [...assemblyPointEvents.items].sort(
+      (a, b) =>
+        new Date(b.assemblyDate).getTime() - new Date(a.assemblyDate).getTime(),
+    );
+  }, [assemblyPointEvents]);
+
+  const selectedEvent = useMemo(
+    () => events.find((event) => event.eventId === selectedEventId) ?? null,
+    [events, selectedEventId],
+  );
 
   useEffect(() => {
     if (hasActiveEvent) {
       setShowScheduleForm(false);
     }
   }, [hasActiveEvent]);
+
+  useEffect(() => {
+    setSelectedEventId((previous) => {
+      if (typeof previous === "number") {
+        const exists = events.some((event) => event.eventId === previous);
+        if (exists) return previous;
+      }
+
+      return getDefaultEventId(events, activeEventId);
+    });
+  }, [events, activeEventId]);
 
   const statusConfig = assemblyPointStatusConfig[
     displayAssemblyPoint.status as keyof typeof assemblyPointStatusConfig
@@ -689,17 +767,28 @@ function AssemblyPointDetails({
   };
 
   const handleStartGathering = async () => {
-    let targetEventId = activeEventId;
+    if (selectedEvent?.status === "Gathering") {
+      return;
+    }
+
+    let targetEventId = selectedEventId ?? activeEventId;
 
     if (!targetEventId) {
       const refreshed = await refetchAssemblyPointDetail();
       targetEventId = resolveActiveEventId(refreshed.data);
-      if (!targetEventId) {
-        toast.error(
-          "Khong xac dinh duoc eventId tu du lieu backend. Vui long kiem tra response detail assembly-point.",
-        );
-        return;
-      }
+    }
+
+    if (!targetEventId) {
+      const refreshedEvents = await refetchAssemblyPointEvents();
+      const fallbackEvents = refreshedEvents.data?.items ?? [];
+      targetEventId = getDefaultEventId(fallbackEvents, null);
+    }
+
+    if (!targetEventId) {
+      toast.error(
+        "Chưa có sự kiện tập kết phù hợp để mở check-in. Vui lòng lên lịch trước.",
+      );
+      return;
     }
 
     try {
@@ -707,12 +796,25 @@ function AssemblyPointDetails({
         eventId: targetEventId,
         assemblyPointId: assemblyPoint.id,
       });
-      toast.success("Đã mở check-in cho sự kiện tập kết đang hoạt động.");
+      toast.success(`Đã mở check-in cho sự kiện #${targetEventId}.`);
+      void refetchAssemblyPointEvents();
+      void refetchAssemblyPointDetail();
     } catch (error) {
       const backendMessage = extractBackendErrorMessage(error);
       toast.error(backendMessage || "Yeu cau that bai. Vui long thu lai.");
     }
   };
+
+  const selectedEventStatusLabel = selectedEvent
+    ? (assemblyEventStatusLabel[selectedEvent.status] ?? selectedEvent.status)
+    : "Chưa chọn sự kiện";
+
+  const selectedEventStatusClass = selectedEvent
+    ? (assemblyEventStatusColor[selectedEvent.status] ??
+      "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300")
+    : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300";
+
+  const shouldShowOpenCheckIn = selectedEvent?.status !== "Gathering";
 
   return (
     <>
@@ -792,24 +894,31 @@ function AssemblyPointDetails({
             label="Chia sẻ"
             color="text-purple-600 dark:text-purple-400"
           />
-          {hasActiveEvent ? (
+          {shouldShowOpenCheckIn && (
             <ActionButton
               icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
               label="Mở check-in"
               color="text-[#FF5722]"
               active={isStartingGathering}
+              disabled={isStartingGathering || !selectedEventId}
               onClick={handleStartGathering}
-            />
-          ) : (
-            <ActionButton
-              icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
-              label="Triệu tập"
-              color="text-[#FF5722]"
-              active={showScheduleForm}
-              onClick={() => setShowScheduleForm((prev) => !prev)}
             />
           )}
         </div>
+
+        {!hasActiveEvent && (
+          <div className="mt-2 flex justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3 text-xs text-[#FF5722] hover:bg-[#FF5722]/10"
+              onClick={() => setShowScheduleForm((prev) => !prev)}
+            >
+              {showScheduleForm ? "Ẩn triệu tập" : "Triệu tập mới"}
+            </Button>
+          </div>
+        )}
 
         {!hasActiveEvent && showScheduleForm && (
           <div className="mt-3 rounded-lg border border-[#FF5722]/25 bg-[#FF5722]/5 p-3 space-y-2">
@@ -848,6 +957,100 @@ function AssemblyPointDetails({
 
       {/* Content */}
       <div className="py-2">
+        {/* Events */}
+        <div className="px-5 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold">Sự kiện tập kết</h4>
+            <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+              {assemblyPointEvents?.totalCount ?? 0} sự kiện
+            </Badge>
+          </div>
+
+          {isAssemblyPointEventsLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-9 w-full rounded-md" />
+              <Skeleton className="h-20 w-full rounded-lg" />
+            </div>
+          ) : isAssemblyPointEventsError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+              Không tải được danh sách sự kiện tập kết.
+            </div>
+          ) : events.length > 0 ? (
+            <div className="space-y-3">
+              <Select
+                value={selectedEventId ? String(selectedEventId) : undefined}
+                onValueChange={(value) => setSelectedEventId(Number(value))}
+              >
+                <SelectTrigger className="h-9 w-full border-border/70 bg-white text-xs">
+                  <SelectValue placeholder="Chọn sự kiện để mở check-in" />
+                </SelectTrigger>
+                <SelectContent className="z-[1250]">
+                  {events.map((event) => (
+                    <SelectItem
+                      key={event.eventId}
+                      value={String(event.eventId)}
+                      className="text-xs"
+                    >
+                      #{event.eventId} •{" "}
+                      {formatDateTimeVi(new Date(event.assemblyDate))}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {selectedEvent ? (
+                <div className="rounded-lg border border-border/60 bg-card px-3 py-2.5 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Sự kiện #{selectedEvent.eventId}
+                    </p>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px] h-5 px-2 shrink-0 border",
+                        selectedEventStatusClass,
+                      )}
+                    >
+                      {selectedEventStatusLabel}
+                    </Badge>
+                  </div>
+
+                  <div className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-2">
+                    <p className="text-[11px] text-muted-foreground mb-0.5">
+                      Thời gian tập kết
+                    </p>
+                    <div className="flex items-center gap-1.5 text-sm font-medium">
+                      <CalendarBlank className="h-4 w-4 text-[#FF5722]" />
+                      <span>
+                        {formatDateTimeVi(new Date(selectedEvent.assemblyDate))}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <StatCard
+                      label="Tổng tham gia"
+                      value={String(selectedEvent.participantCount)}
+                      icon={<Users className="h-3.5 w-3.5" />}
+                    />
+                    <StatCard
+                      label="Đã check-in"
+                      value={String(selectedEvent.checkedInCount)}
+                      icon={<ChartBar className="h-3.5 w-3.5" />}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              Chưa có sự kiện nào. Hãy tạo lịch triệu tập trước khi mở check-in.
+            </div>
+          )}
+        </div>
+
+        <div className="h-px bg-border mx-5" />
+
         {/* Code */}
         <InfoRow
           icon={<Hash className="h-5 w-5" />}
@@ -1150,26 +1353,33 @@ function ActionButton({
   color,
   onClick,
   active,
+  disabled,
 }: {
   icon: React.ReactNode;
   label: string;
   color: string;
   onClick?: () => void;
   active?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         "flex flex-col items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors group",
-        active ? "bg-accent/70" : "hover:bg-accent",
+        disabled
+          ? "opacity-45 cursor-not-allowed"
+          : active
+            ? "bg-accent/70"
+            : "hover:bg-accent",
       )}
     >
       <div
         className={cn(
           "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all group-hover:scale-105",
-          active && "scale-105",
+          active && !disabled && "scale-105",
           color,
           "border-current",
         )}

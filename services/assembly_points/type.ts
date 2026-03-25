@@ -162,3 +162,36 @@ export interface StartAssemblyPointGatheringRequest {
   eventId: number;
   assemblyPointId?: number;
 }
+
+// Assembly point event status
+export type AssemblyPointEventStatus = string;
+
+// Assembly point event entity
+export interface AssemblyPointEventEntity {
+  eventId: number;
+  assemblyPointId: number;
+  assemblyDate: string;
+  status: AssemblyPointEventStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string | null;
+  participantCount: number;
+  checkedInCount: number;
+}
+
+// Query params for fetching assembly point events
+export interface GetAssemblyPointEventsParams {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+// Paginated response for assembly point events
+export interface GetAssemblyPointEventsResponse {
+  items: AssemblyPointEventEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
