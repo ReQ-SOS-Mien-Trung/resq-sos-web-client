@@ -880,11 +880,7 @@ const InventoryDashboardPage = () => {
                 {/* Two Column Layout: Alerts + Activity */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Low Stock Alerts */}
-                  <LowStockAlerts
-                    items={mockInventoryItems}
-                    onItemClick={handleItemSelect}
-                    onViewAll={() => setSelectedCategory(null)}
-                  />
+                  <LowStockAlerts />
 
                   {/* Recent Activity */}
                   <RecentActivity activities={mockActivityLogs} maxItems={8} />

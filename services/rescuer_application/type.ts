@@ -1,4 +1,41 @@
-// Document attached to a rescuer application
+// ─── List Item (GET /identity/admin/rescuer-applications) ───
+
+export interface RescuerApplicationListItem {
+  id: number;
+  userId: string;
+  status: string;
+  submittedAt: string;
+  reviewedAt: string | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  avatarUrl: string | null;
+  rescuerType: string;
+  province: string;
+}
+
+// Paginated Response for Rescuer Applications
+export interface GetRescuerApplicationsResponse {
+  items: RescuerApplicationListItem[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+// Query params for fetching rescuer applications
+export interface GetRescuerApplicationsParams {
+  pageNumber?: number;
+  pageSize?: number;
+  status?: string;
+  rescuerType?: string;
+}
+
+// ─── Detail (GET /identity/admin/rescuer-applications/{id}) ───
+
 export interface RescuerApplicationDocument {
   id: number;
   fileUrl: string;
@@ -21,8 +58,7 @@ export interface RescuerAbility {
   categoryDescription: string;
 }
 
-// Rescuer Application Entity (item in paginated list)
-export interface RescuerApplicationEntity {
+export interface RescuerApplicationDetail {
   id: number;
   userId: string;
   status: string;
@@ -43,32 +79,17 @@ export interface RescuerApplicationEntity {
   abilities: RescuerAbility[];
 }
 
-// Paginated Response for Rescuer Applications
-export interface GetRescuerApplicationsResponse {
-  items: RescuerApplicationEntity[];
-  pageNumber: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-}
+/** @deprecated Use RescuerApplicationListItem or RescuerApplicationDetail instead */
+export type RescuerApplicationEntity = RescuerApplicationDetail;
 
-// Query params for fetching rescuer applications
-export interface GetRescuerApplicationsParams {
-  pageNumber?: number;
-  pageSize?: number;
-  status?: string;
-}
+// ─── Review (POST /identity/admin/rescuer-applications/review) ───
 
-// Review Rescuer Application Request
 export interface ReviewRescuerApplicationRequest {
   applicationId: number;
   isApproved: boolean;
-  adminNote: string;
+  adminNote?: string;
 }
 
-// Review Rescuer Application Response
 export interface ReviewRescuerApplicationResponse {
   applicationId: number;
   userId: string;

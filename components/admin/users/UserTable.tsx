@@ -229,7 +229,7 @@ const UserTable = ({
         <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-border/40">
           {/* Search */}
           <div className="relative flex-1 min-w-52">
-            
+
             <Input
               placeholder="Tìm theo tên, email, số điện thoại..."
               value={search}
@@ -267,11 +267,10 @@ const UserTable = ({
                     className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-md hover:bg-muted/60 transition-colors"
                   >
                     <span
-                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                        checked
+                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
                           ? "bg-primary border-primary text-primary-foreground"
                           : "border-border bg-background"
-                      }`}
+                        }`}
                     >
                       {checked && <Check size={11} weight="bold" />}
                     </span>
@@ -315,11 +314,10 @@ const UserTable = ({
                     className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-md hover:bg-muted/60 transition-colors"
                   >
                     <span
-                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                        checked
+                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
                           ? "bg-primary border-primary text-primary-foreground"
                           : "border-border bg-background"
-                      }`}
+                        }`}
                     >
                       {checked && <Check size={11} weight="bold" />}
                     </span>
@@ -330,7 +328,7 @@ const UserTable = ({
               {selectedStatuses.length > 0 && (
                 <button
                   onClick={() => { setSelectedStatuses([]); setPage(1); }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
+                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs tracking-tighter text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
                 >
                   <X size={11} />
                   Xóa lọc trạng thái

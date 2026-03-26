@@ -25,6 +25,15 @@ import {
   GetDepotStockMovementsResponse,
   ExportMovementsParams,
   GetInventoryLotsResponse,
+  GetThresholdsResponse,
+  GetThresholdsHistoryParams,
+  GetThresholdsHistoryResponse,
+  UpdateThresholdPayload,
+  UpdateThresholdResponse,
+  DeleteThresholdPayload,
+  DeleteThresholdResponse,
+  GetLowStockParams,
+  GetLowStockResponse,
 } from "./type";
 
 /**
@@ -397,4 +406,72 @@ export async function exportInventoryMovements(
 
   const blob = await response.blob();
   return { blob, filename };
+}
+
+// ─── Thresholds ───
+
+/**
+ * Get current threshold configs (global + overrides) for my depot
+ * GET /logistics/inventory/my-depot/thresholds
+ */
+export async function getMyDepotThresholds(): Promise<GetThresholdsResponse> {
+  const { data } = await api.get("/logistics/inventory/my-depot/thresholds");
+  return data;
+}
+
+/**
+ * Get threshold change history with optional filters + pagination
+ * GET /logistics/inventory/my-depot/thresholds/history
+ */
+export async function getMyDepotThresholdsHistory(
+  params: GetThresholdsHistoryParams,
+): Promise<GetThresholdsHistoryResponse> {
+  const { data } = await api.get(
+    "/logistics/inventory/my-depot/thresholds/history",
+    { params },
+  );
+  return data;
+}
+
+/**
+ * Create or update a threshold config by scope
+ * PUT /logistics/inventory/my-depot/thresholds
+ */
+export async function updateMyDepotThreshold(
+  payload: UpdateThresholdPayload,
+): Promise<UpdateThresholdResponse> {
+  const { data } = await api.put(
+    "/logistics/inventory/my-depot/thresholds",
+    payload,
+  );
+  return data;
+}
+
+/**
+ * Soft-reset (deactivate) a threshold config
+ * DELETE /logistics/inventory/my-depot/thresholds
+ */
+export async function deleteMyDepotThreshold(
+  payload: DeleteThresholdPayload,
+): Promise<DeleteThresholdResponse> {
+  const { data } = await api.delete(
+    "/logistics/inventory/my-depot/thresholds",
+    { data: payload },
+  );
+  return data;
+}
+
+// ─── Low Stock ───
+
+/**
+ * Get low-stock items for my depot (resolved by threshold precedence)
+ * GET /logistics/inventory/my-depot/low-stock
+ */
+export async function getMyDepotLowStock(
+  params?: GetLowStockParams,
+): Promise<GetLowStockResponse> {
+  const { data } = await api.get("/logistics/inventory/my-depot/low-stock", {
+    params,
+  });
+  return data;
 }

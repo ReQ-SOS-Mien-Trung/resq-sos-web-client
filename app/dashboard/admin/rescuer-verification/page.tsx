@@ -60,13 +60,17 @@ import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
 import {
   useRescuerApplications,
+  useRescuerApplicationDetail,
   useReviewRescuerApplication,
 } from "@/services/rescuer_application/hooks";
-import { RescuerApplicationEntity } from "@/services/rescuer_application/type";
+import type {
+  RescuerApplicationListItem,
+  RescuerApplicationDetail,
+} from "@/services/rescuer_application/type";
 import { useUpdateUserAvatar } from "@/services/user/hooks";
 
 type StatusFilter = "all" | "Pending" | "Approved" | "Rejected";
-type SortColumn = "name" | "email" | "rescuerType" | "region" | "status" | "submittedAt";
+type SortColumn = "name" | "email" | "region" | "status" | "submittedAt";
 type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
 
@@ -78,7 +82,7 @@ const STATUS_OPTIONS = [
   { value: "Rejected", label: "Đã từ chối" },
 ];
 
-const RESCUER_TYPE_OPTIONS = [
+const _RESCUER_TYPE_OPTIONS = [
   { value: "Core", label: "Core" },
   { value: "Volunteer", label: "Volunteer" },
 ];
@@ -118,16 +122,21 @@ const SortHeader = ({
 );
 
 /** Build full name (Vietnamese: lastName firstName) */
-const getFullName = (item: RescuerApplicationEntity) =>
+const getFullName = (item: { firstName: string; lastName: string }) =>
   `${item.lastName} ${item.firstName}`;
 
 
 const RescuerVerificationPage = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
-  const [selectedItem, setSelectedItem] =
-    useState<RescuerApplicationEntity | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Fetch detail when an item is selected
+  const { data: selectedItem, isLoading: isLoadingDetail } =
+    useRescuerApplicationDetail(selectedId ?? 0, {
+      enabled: (selectedId ?? 0) > 0,
+    });
 
   useGSAP(
     () => {
@@ -143,14 +152,12 @@ const RescuerVerificationPage = () => {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
-  const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<SortState>(null);
   const [reviewDialog, setReviewDialog] = useState<{
     open: boolean;
-    item: RescuerApplicationEntity | null;
+    item: RescuerApplicationDetail | null;
     isApproved: boolean;
   }>({ open: false, item: null, isApproved: true });
   const [adminNote, setAdminNote] = useState("");
@@ -163,7 +170,7 @@ const RescuerVerificationPage = () => {
   const { mutateAsync: updateAvatarMutate } = useUpdateUserAvatar();
 
   const openReviewDialog = (
-    item: RescuerApplicationEntity,
+    item: RescuerApplicationDetail,
     isApproved: boolean,
   ) => {
     setReviewDialog({ open: true, item, isApproved });
@@ -201,7 +208,7 @@ const RescuerVerificationPage = () => {
           onSuccess: () => {
             setReviewDialog({ open: false, item: null, isApproved: true });
             setAdminNote("");
-            setSelectedItem(null);
+            setSelectedId(null);
             setAvatarFile(null);
             setAvatarPreview(null);
             if (!avatarFile) toast.success(reviewDialog.isApproved ? "Phê duyệt thành công!" : "Từ chối thành công!");
@@ -360,7 +367,7 @@ const RescuerVerificationPage = () => {
 
   const { data: applicationsData, isLoading: isLoadingApplications } =
     useRescuerApplications({
-      params: { pageNumber: 1, pageSize: 1000 },
+      params: { pageNumber: 1, pageSize: 1000, rescuerType: "Volunteer" },
     });
 
   const { mutate: reviewApplication, isPending: isReviewing } =
@@ -409,17 +416,12 @@ const RescuerVerificationPage = () => {
       result = result.filter((i) => selectedStatuses.includes(i.status));
     }
 
-    if (selectedTypes.length > 0) {
-      result = result.filter((i) => selectedTypes.includes(i.rescuerType));
-    }
-
     if (sort) {
       result = [...result].sort((a, b) => {
         let aVal = "";
         let bVal = "";
         if (sort.column === "name") { aVal = getFullName(a); bVal = getFullName(b); }
         else if (sort.column === "email") { aVal = a.email; bVal = b.email; }
-        else if (sort.column === "rescuerType") { aVal = a.rescuerType ?? ""; bVal = b.rescuerType ?? ""; }
         else if (sort.column === "region") { aVal = a.province; bVal = b.province; }
         else if (sort.column === "status") { aVal = a.status; bVal = b.status; }
         else if (sort.column === "submittedAt") { aVal = a.submittedAt; bVal = b.submittedAt; }
@@ -429,7 +431,7 @@ const RescuerVerificationPage = () => {
     }
 
     return result;
-  }, [items, searchQuery, selectedStatuses, selectedTypes, sort]);
+  }, [items, searchQuery, selectedStatuses, sort]);
 
   const getStatusConfig = (status: string) => {
     const configs: Record<
@@ -479,7 +481,31 @@ const RescuerVerificationPage = () => {
   }
 
   // ──── Detail view ────
-  if (selectedItem) {
+  if (selectedId) {
+    if (isLoadingDetail || !selectedItem) {
+      return (
+        <DashboardLayout
+          favorites={dashboardData?.favorites ?? []}
+          projects={dashboardData?.projects ?? []}
+          cloudStorage={dashboardData?.cloudStorage ?? { used: 0, total: 0, percentage: 0, unit: "GB" }}
+        >
+          <div className="space-y-6">
+            <button
+              onClick={() => setSelectedId(null)}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-6"
+            >
+              <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+              <span className="uppercase tracking-wider text-sm font-semibold">Quay lại</span>
+            </button>
+            <Skeleton className="h-[200px] w-full rounded-2xl" />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Skeleton className="h-[400px] rounded-2xl" />
+              <Skeleton className="h-[400px] rounded-2xl" />
+            </div>
+          </div>
+        </DashboardLayout>
+      );
+    }
     const statusConfig = getStatusConfig(selectedItem.status);
     return (
       <>
@@ -492,7 +518,7 @@ const RescuerVerificationPage = () => {
             {/* Back */}
             <button
               onClick={() => {
-                setSelectedItem(null);
+                setSelectedId(null);
                 setAvatarFile(null);
                 setAvatarPreview(null);
               }}
@@ -806,7 +832,7 @@ const RescuerVerificationPage = () => {
               ];
 
               return (
-                <div className="gsap-item mt-12 pt-12 border-t border-border/40 w-full">
+                <div className="gsap-item mt-4 pt-4 border-t border-border/40 w-full">
                   <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/60 mb-8 pb-4">
                     <div>
                       <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
@@ -874,7 +900,7 @@ const RescuerVerificationPage = () => {
             })()}
 
             {/* FULL WIDTH DOCUMENTS SECTION (MỤC IV) */}
-            <div className="gsap-item mt-12 pt-12 border-t border-border/40">
+            <div className="gsap-item mt-4 pt-4 border-t border-border/40">
               <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/60 mb-8 pb-4">
                 <div>
                   <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
@@ -998,19 +1024,11 @@ const RescuerVerificationPage = () => {
     );
   };
 
-  const toggleType = (value: string) => {
-    setPage(1);
-    setSelectedTypes((prev) =>
-      prev.includes(value) ? prev.filter((t) => t !== value) : [...prev, value]
-    );
-  };
-
-  const hasFilters = !!(searchQuery || selectedStatuses.length > 0 || selectedTypes.length > 0);
+  const hasFilters = !!(searchQuery || selectedStatuses.length > 0);
 
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedStatuses([]);
-    setSelectedTypes([]);
     setPage(1);
   };
 
@@ -1124,54 +1142,6 @@ const RescuerVerificationPage = () => {
                   />
                 </div>
 
-                {/* Loại cứu hộ filter */}
-                <Popover open={typeFilterOpen} onOpenChange={setTypeFilterOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 gap-1.5 font-normal text-sm">
-                      Loại cứu hộ
-                      {selectedTypes.length > 0 ? (
-                        <Badge className="h-4.5 px-1.5 text-xs tracking-tighter rounded-full bg-primary text-primary-foreground">
-                          {selectedTypes.length}
-                        </Badge>
-                      ) : (
-                        <CaretDown size={13} className="text-muted-foreground" />
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-56 p-1.5" align="start">
-                    {RESCUER_TYPE_OPTIONS.map(({ value, label }) => {
-                      const checked = selectedTypes.includes(value);
-                      return (
-                        <button
-                          key={value}
-                          onClick={() => toggleType(value)}
-                          className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
-                        >
-                          <span
-                            className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                              checked
-                                ? "bg-primary border-primary text-primary-foreground"
-                                : "border-border bg-background"
-                            }`}
-                          >
-                            {checked && <Check size={11} weight="bold" />}
-                          </span>
-                          <span className={checked ? "font-medium tracking-tighter" : ""}>{label}</span>
-                        </button>
-                      );
-                    })}
-                    {selectedTypes.length > 0 && (
-                      <button
-                        onClick={() => { setSelectedTypes([]); setPage(1); }}
-                        className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
-                      >
-                        <X size={11} />
-                        Xóa lọc loại
-                      </button>
-                    )}
-                  </PopoverContent>
-                </Popover>
-
                 {/* Status filter */}
                 <Popover open={statusFilterOpen} onOpenChange={setStatusFilterOpen}>
                   <PopoverTrigger asChild>
@@ -1196,11 +1166,10 @@ const RescuerVerificationPage = () => {
                           className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
                         >
                           <span
-                            className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                              checked
-                                ? "bg-primary border-primary text-primary-foreground"
-                                : "border-border bg-background"
-                            }`}
+                            className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-border bg-background"
+                              }`}
                           >
                             {checked && <Check size={11} weight="bold" />}
                           </span>
@@ -1211,7 +1180,7 @@ const RescuerVerificationPage = () => {
                     {selectedStatuses.length > 0 && (
                       <button
                         onClick={() => { setSelectedStatuses([]); setPage(1); }}
-                        className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
+                        className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground tracking-tighter border-t border-border/40 hover:text-foreground transition-colors"
                       >
                         <X size={11} />
                         Xóa lọc trạng thái
@@ -1249,7 +1218,7 @@ const RescuerVerificationPage = () => {
                       <th className="text-left tracking-tighter p-3 text-sm font-semibold text-foreground">
                         Số điện thoại
                       </th>
-                      <SortHeader column="rescuerType" label="Loại cứu hộ" sort={sort} onSort={handleSort} />
+
                       <SortHeader column="region" label="Khu vực" sort={sort} onSort={handleSort} />
                       <SortHeader column="status" label="Trạng thái" sort={sort} onSort={handleSort} />
                       <SortHeader column="submittedAt" label="Ngày nộp" sort={sort} onSort={handleSort} />
@@ -1259,7 +1228,7 @@ const RescuerVerificationPage = () => {
                     {isLoadingApplications ? (
                       Array.from({ length: 8 }).map((_, i) => (
                         <tr key={i} className="border-b border-border/30">
-                          {Array.from({ length: 7 }).map((__, j) => (
+                          {Array.from({ length: 6 }).map((__, j) => (
                             <td key={j} className="p-3">
                               <Skeleton className="h-4 w-full rounded" />
                             </td>
@@ -1269,7 +1238,7 @@ const RescuerVerificationPage = () => {
                     ) : paginatedItems.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={7}
+                          colSpan={6}
                           className="p-10 text-center tracking-tighter text-muted-foreground text-sm"
                         >
                           Không tìm thấy hồ sơ nào
@@ -1278,16 +1247,10 @@ const RescuerVerificationPage = () => {
                     ) : (
                       paginatedItems.map((item) => {
                         const statusConfig = getStatusConfig(item.status);
-                        const typeBadge =
-                          item.rescuerType === "Core"
-                            ? { label: "Core", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" }
-                            : item.rescuerType === "Volunteer"
-                            ? { label: "Volunteer", className: "bg-violet-500/10 text-violet-700 dark:text-violet-400" }
-                            : { label: item.rescuerType ?? "—", className: "bg-gray-500/10 text-gray-700 dark:text-gray-400" };
                         return (
                           <tr
                             key={item.id}
-                            onClick={() => setSelectedItem(item)}
+                            onClick={() => setSelectedId(item.id)}
                             className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
                           >
                             <td className="p-3">
@@ -1300,9 +1263,6 @@ const RescuerVerificationPage = () => {
                             </td>
                             <td className="p-3 text-sm tracking-tighter text-foreground/80">
                               {item.phone || "—"}
-                            </td>
-                            <td className="p-3">
-                              <Badge className={typeBadge.className}>{typeBadge.label}</Badge>
                             </td>
                             <td className="p-3 text-sm tracking-tighter text-foreground/80">
                               {item.province || "Chưa cập nhật"}

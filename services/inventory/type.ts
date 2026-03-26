@@ -370,3 +370,159 @@ export interface RejectSupplyRequestPayload {
   reason: string;
 }
 export type GetDepotInventoryResponse = GetMyDepotInventoryResponse;
+
+// ─── Thresholds ───
+
+export type ThresholdScopeType =
+  | "Global"
+  | "Depot"
+  | "DepotCategory"
+  | "DepotItem";
+
+export interface ThresholdConfig {
+  id: number;
+  scopeType: string;
+  categoryId: number;
+  itemModelId: number;
+  dangerPercent: number;
+  warningPercent: number;
+  rowVersion: number;
+  updatedAt: string;
+}
+
+export interface GetThresholdsResponse {
+  depotId: number;
+  global: ThresholdConfig | null;
+  depot: ThresholdConfig | null;
+  depotCategories: ThresholdConfig[];
+  depotItems: ThresholdConfig[];
+}
+
+export interface GetThresholdsHistoryParams {
+  scopeType?: ThresholdScopeType;
+  categoryId?: number;
+  itemModelId?: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ThresholdHistoryItem {
+  id: number;
+  configId: number;
+  scopeType: string;
+  depotId: number;
+  categoryId: number;
+  itemModelId: number;
+  oldDangerPercent: number;
+  oldWarningPercent: number;
+  newDangerPercent: number;
+  newWarningPercent: number;
+  changedBy: string;
+  changedAt: string;
+  changeReason: string;
+  action: string;
+}
+
+export interface GetThresholdsHistoryResponse {
+  items: ThresholdHistoryItem[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface UpdateThresholdPayload {
+  scopeType: ThresholdScopeType;
+  categoryId?: number;
+  itemModelId?: number;
+  dangerPercent: number;
+  warningPercent: number;
+  rowVersion?: number;
+  reason?: string;
+}
+
+export interface UpdateThresholdResponse {
+  scopeType: string;
+  depotId: number;
+  categoryId: number;
+  itemModelId: number;
+  dangerPercent: number;
+  warningPercent: number;
+  rowVersion: number;
+  updatedAt: string;
+  message: string;
+}
+
+export interface DeleteThresholdPayload {
+  scopeType: ThresholdScopeType;
+  categoryId?: number;
+  itemModelId?: number;
+  rowVersion?: number;
+  reason?: string;
+}
+
+export interface DeleteThresholdResponse {
+  scopeType: string;
+  depotId: number;
+  categoryId: number;
+  itemModelId: number;
+  dangerPercent: number;
+  warningPercent: number;
+  rowVersion: number;
+  updatedAt: string;
+  message: string;
+}
+
+// ─── Low Stock ───
+
+export type LowStockLevel = "Warning" | "Danger";
+
+export interface LowStockSummary {
+  dangerCount: number;
+  warningCount: number;
+  totalCount: number;
+}
+
+export interface LowStockByDepot {
+  depotId: number;
+  depotName: string;
+  dangerCount: number;
+  warningCount: number;
+}
+
+export interface LowStockByCategory {
+  categoryId: number;
+  categoryName: string;
+  dangerCount: number;
+  warningCount: number;
+}
+
+export interface LowStockItem {
+  depotId: number;
+  depotName: string;
+  itemModelId: number;
+  itemModelName: string;
+  unit: string;
+  categoryId: number;
+  categoryName: string;
+  targetGroup: string;
+  quantity: number;
+  reservedQuantity: number;
+  availableQuantity: number;
+  availableRatio: number;
+  alertLevel: string;
+  alertLevelLabel: string;
+}
+
+export interface GetLowStockResponse {
+  summary: LowStockSummary;
+  byDepot: LowStockByDepot[];
+  byCategory: LowStockByCategory[];
+  items: LowStockItem[];
+}
+
+export interface GetLowStockParams {
+  level?: LowStockLevel;
+}

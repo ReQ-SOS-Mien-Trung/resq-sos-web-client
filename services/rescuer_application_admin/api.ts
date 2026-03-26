@@ -2,6 +2,7 @@ import api from "@/config/axios";
 import {
   GetRescuerApplicationsResponse,
   GetRescuerApplicationsParams,
+  RescuerApplicationDetail,
   ReviewRescuerApplicationRequest,
   ReviewRescuerApplicationResponse,
 } from "./type";
@@ -20,6 +21,19 @@ export async function getRescuerApplications(
       ...(params?.status ? { status: params.status } : {}),
     },
   });
+  return data;
+}
+
+/**
+ * Get rescuer application detail by ID
+ * GET /identity/admin/rescuer-applications/{id}
+ */
+export async function getRescuerApplicationDetail(
+  id: number,
+): Promise<RescuerApplicationDetail> {
+  const { data } = await api.get(
+    `/identity/admin/rescuer-applications/${id}`,
+  );
   return data;
 }
 

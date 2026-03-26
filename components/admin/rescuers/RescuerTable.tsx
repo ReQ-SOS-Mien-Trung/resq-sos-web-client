@@ -81,9 +81,9 @@ const getStatusBadge = (isBanned: boolean) =>
   isBanned
     ? { label: "Bị cấm", className: "bg-rose-500/10 text-rose-700 dark:text-rose-400" }
     : {
-        label: "Hoạt động",
-        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-      };
+      label: "Hoạt động",
+      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    };
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 
@@ -272,11 +272,10 @@ const RescuerTable = ({
                     className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
                   >
                     <span
-                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                        checked
+                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
                           ? "bg-primary border-primary tracking-tighter text-primary-foreground"
                           : "border-border bg-background"
-                      }`}
+                        }`}
                     >
                       {checked && <Check size={11} weight="bold" />}
                     </span>
@@ -320,11 +319,10 @@ const RescuerTable = ({
                     className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
                   >
                     <span
-                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                        checked
+                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
                           ? "bg-primary border-primary text-primary-foreground"
                           : "border-border bg-background"
-                      }`}
+                        }`}
                     >
                       {checked && <Check size={11} weight="bold" />}
                     </span>
@@ -335,7 +333,7 @@ const RescuerTable = ({
               {selectedStatuses.length > 0 && (
                 <button
                   onClick={() => { setSelectedStatuses([]); setPage(1); }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
+                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs tracking-tighter text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
                 >
                   <X size={11} />
                   Xóa lọc trạng thái

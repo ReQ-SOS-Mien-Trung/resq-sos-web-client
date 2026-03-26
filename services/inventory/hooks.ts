@@ -31,6 +31,11 @@ import {
   getInventoryLots,
   downloadDonationImportTemplate,
   downloadPurchaseImportTemplate,
+  getMyDepotThresholds,
+  getMyDepotThresholdsHistory,
+  updateMyDepotThreshold,
+  deleteMyDepotThreshold,
+  getMyDepotLowStock,
 } from "./api";
 import {
   GetDepotInventoryParams,
@@ -57,6 +62,15 @@ import {
   GetDepotStockMovementsResponse,
   ExportMovementsParams,
   GetInventoryLotsResponse,
+  GetThresholdsResponse,
+  GetThresholdsHistoryParams,
+  GetThresholdsHistoryResponse,
+  UpdateThresholdPayload,
+  UpdateThresholdResponse,
+  DeleteThresholdPayload,
+  DeleteThresholdResponse,
+  GetLowStockParams,
+  GetLowStockResponse,
 } from "./type";
 
 export const INVENTORY_KEYS = {
@@ -83,6 +97,11 @@ export const INVENTORY_KEYS = {
     [...INVENTORY_KEYS.all, "transactions", params] as const,
   lots: (itemModelId: number) =>
     [...INVENTORY_KEYS.all, "lots", itemModelId] as const,
+  thresholds: () => [...INVENTORY_KEYS.all, "thresholds"] as const,
+  thresholdsHistory: (params: GetThresholdsHistoryParams) =>
+    [...INVENTORY_KEYS.all, "thresholdsHistory", params] as const,
+  lowStock: (params?: GetLowStockParams) =>
+    [...INVENTORY_KEYS.all, "lowStock", params] as const,
 };
 
 export function useDepotInventory(
@@ -395,5 +414,70 @@ export function useDownloadDonationImportTemplate() {
 export function useDownloadPurchaseImportTemplate() {
   return useMutation({
     mutationFn: downloadPurchaseImportTemplate,
+  });
+}
+
+// ─── Thresholds ───
+
+export function useMyDepotThresholds(
+  options?: Omit<
+    UseQueryOptions<GetThresholdsResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<GetThresholdsResponse>({
+    queryKey: INVENTORY_KEYS.thresholds(),
+    queryFn: getMyDepotThresholds,
+    ...options,
+  });
+}
+
+export function useMyDepotThresholdsHistory(
+  params: GetThresholdsHistoryParams,
+  options?: Omit<
+    UseQueryOptions<GetThresholdsHistoryResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<GetThresholdsHistoryResponse>({
+    queryKey: INVENTORY_KEYS.thresholdsHistory(params),
+    queryFn: () => getMyDepotThresholdsHistory(params),
+    ...options,
+  });
+}
+
+export function useUpdateMyDepotThreshold() {
+  const queryClient = useQueryClient();
+  return useMutation<UpdateThresholdResponse, Error, UpdateThresholdPayload>({
+    mutationFn: updateMyDepotThreshold,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.thresholds() });
+    },
+  });
+}
+
+export function useDeleteMyDepotThreshold() {
+  const queryClient = useQueryClient();
+  return useMutation<DeleteThresholdResponse, Error, DeleteThresholdPayload>({
+    mutationFn: deleteMyDepotThreshold,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.thresholds() });
+    },
+  });
+}
+
+// ─── Low Stock ───
+
+export function useMyDepotLowStock(
+  params?: GetLowStockParams,
+  options?: Omit<
+    UseQueryOptions<GetLowStockResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<GetLowStockResponse>({
+    queryKey: INVENTORY_KEYS.lowStock(params),
+    queryFn: () => getMyDepotLowStock(params),
+    ...options,
   });
 }
