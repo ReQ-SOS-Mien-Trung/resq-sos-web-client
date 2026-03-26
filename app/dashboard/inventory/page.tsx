@@ -205,6 +205,14 @@ const requestingStatusLabels: Record<string, string> = {
   Rejected: "Từ chối",
 };
 
+const requestingStatusColors: Record<string, string> = {
+  WaitingForApproval: "bg-amber-100 text-amber-700 border-amber-200",
+  Approved: "bg-violet-100 text-violet-700 border-violet-200",
+  InTransit: "bg-blue-100 text-blue-700 border-blue-200",
+  Received: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  Rejected: "bg-red-100 text-red-700 border-red-200",
+};
+
 // --- Page Component ---
 
 const InventoryDashboardPage = () => {
@@ -251,6 +259,7 @@ const InventoryDashboardPage = () => {
   const {
     data: depotsData,
     isLoading: isDepotsLoading,
+    isFetching: isDepotsFetching,
     refetch: refetchDepots,
   } = useDepots({ params: { pageNumber: 1, pageSize: 50 } });
 
@@ -269,9 +278,10 @@ const InventoryDashboardPage = () => {
   const {
     data: supplyRequestsData,
     isLoading: isSupplyRequestsLoading,
+    isFetching: isSupplyRequestsFetching,
     refetch: refetchSupplyRequests,
   } = useSupplyRequests(
-    { pageNumber: 1, pageSize: 50 },
+    { pageNumber: 1, pageSize: 10 },
     { refetchInterval: 10_000, refetchOnWindowFocus: true },
   );
 
@@ -715,8 +725,9 @@ const InventoryDashboardPage = () => {
                   size="sm"
                   className="gap-2"
                   onClick={handleRefresh}
+                  disabled={isDepotsFetching || isSupplyRequestsFetching}
                 >
-                  <ArrowsClockwise className="h-4 w-4" />
+                  <ArrowsClockwise className={cn("h-4 w-4", (isDepotsFetching || isSupplyRequestsFetching) && "animate-spin")} />
                   Làm mới
                 </Button>
               </div>
@@ -769,7 +780,7 @@ const InventoryDashboardPage = () => {
                                       {/* <Badge variant="warning">
                                         {sourceStatusLabels[request.sourceStatus] ?? request.sourceStatus}
                                       </Badge> */}
-                                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                                      <Badge variant="outline" className={requestingStatusColors[request.requestingStatus] ?? "bg-gray-100 text-gray-700 border-gray-200"}>
                                         {requestingStatusLabels[request.requestingStatus] ?? request.requestingStatus}
                                       </Badge>
                                     </div>

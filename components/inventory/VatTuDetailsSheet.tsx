@@ -200,10 +200,12 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
                 <span className="text-muted-foreground tracking-tighter">Phân loại:</span>
                 <span className="font-medium tracking-tighter">{itemTypeLabel(item.itemType)}</span>
               </div>
-              <div className="flex items-center tracking-tighter gap-3 text-sm">
-                <HandHeart className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-start tracking-tighter gap-3 text-sm">
+                <HandHeart className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <span className="text-muted-foreground tracking-tighter">Đối tượng:</span>
-                <span className="font-medium tracking-tighter">{targetGroupLabel(item.targetGroup)}</span>
+                <span className="font-medium tracking-tighter">
+                  {(item.targetGroups ?? []).map((g) => targetGroupLabel(g)).join(", ") || "—"}
+                </span>
               </div>
               <div className="flex items-center tracking-tighter gap-3 text-sm">
                 <Calendar className="h-4 w-4 text-muted-foreground" />

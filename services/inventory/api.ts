@@ -310,17 +310,16 @@ export async function getInventoryLots(
  */
 /**
  * Download donation import template
- * GET /logistics/inventory/template/donation-import
+ * Proxied via /api/inventory/template-donation → GET /logistics/inventory/template/donation-import
  */
 export async function downloadDonationImportTemplate(): Promise<{
   blob: Blob;
   filename: string;
 }> {
   const token = useAuthStore.getState().accessToken;
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL}/logistics/inventory/template/donation-import`,
-    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-  );
+  const response = await fetch("/api/inventory/template-donation", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!response.ok) throw new Error(`Download failed: ${response.status}`);
   const disposition = response.headers.get("content-disposition") ?? "";
   let filename = "mau_nhap_kho_tu_thien.xlsx";
@@ -330,6 +329,10 @@ export async function downloadDonationImportTemplate(): Promise<{
   } else {
     const asciiMatch = disposition.match(/filename="([^"]+)"/);
     if (asciiMatch) filename = asciiMatch[1];
+    else if (disposition.includes("filename=")) {
+      const plain = disposition.match(/filename=([^;\s]+)/);
+      if (plain) filename = plain[1];
+    }
   }
   const blob = await response.blob();
   return { blob, filename };
@@ -337,17 +340,16 @@ export async function downloadDonationImportTemplate(): Promise<{
 
 /**
  * Download purchase import template
- * GET /logistics/inventory/template/purchase-import
+ * Proxied via /api/inventory/template-purchase → GET /logistics/inventory/template/purchase-import
  */
 export async function downloadPurchaseImportTemplate(): Promise<{
   blob: Blob;
   filename: string;
 }> {
   const token = useAuthStore.getState().accessToken;
-  const response = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL}/logistics/inventory/template/purchase-import`,
-    { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-  );
+  const response = await fetch("/api/inventory/template-purchase", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!response.ok) throw new Error(`Download failed: ${response.status}`);
   const disposition = response.headers.get("content-disposition") ?? "";
   let filename = "mau_nhap_kho_thuong.xlsx";
@@ -357,6 +359,10 @@ export async function downloadPurchaseImportTemplate(): Promise<{
   } else {
     const asciiMatch = disposition.match(/filename="([^"]+)"/);
     if (asciiMatch) filename = asciiMatch[1];
+    else if (disposition.includes("filename=")) {
+      const plain = disposition.match(/filename=([^;\s]+)/);
+      if (plain) filename = plain[1];
+    }
   }
   const blob = await response.blob();
   return { blob, filename };

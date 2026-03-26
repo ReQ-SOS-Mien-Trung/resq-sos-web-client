@@ -312,7 +312,7 @@ export function StockMovementDetailSheet({
           </section>
 
           {/* ── Raw summary ── */}
-          <Separator />
+          {/* <Separator />
           <section className="space-y-2">
             <h3 className="text-xs font-semibold tracking-tighter text-muted-foreground uppercase">
               Tổng kết
@@ -342,7 +342,7 @@ export function StockMovementDetailSheet({
                 <p className="text-xs text-muted-foreground tracking-tighter mt-0.5">Xuất</p>
               </div>
             </div>
-          </section>
+          </section> */}
         </div>
       </SheetContent>
     </Sheet>

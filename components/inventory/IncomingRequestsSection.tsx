@@ -537,7 +537,7 @@ function RequestCard({
       onClick={onViewDetail}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onViewDetail(); }}
       className={cn(
-        "rounded-xl border-y border-r border-l-4 bg-card overflow-hidden transition-all hover:shadow-lg cursor-pointer",
+        "rounded-xl border-y border-r border-l-4 bg-card overflow-hidden transition-all hover:shadow-lg cursor-pointer flex flex-col",
         accentBorder,
       )}
     >
@@ -716,7 +716,7 @@ function RequestCard({
               onClick={(e) => { e.stopPropagation(); setShowRejectForm(true); }}
               disabled={isAnyPending}
             >
-              <XCircle className="h-3.5 w-3.5" weight="fill" />
+              
               Từ chối
             </Button>
             <Button
@@ -786,22 +786,21 @@ function RequestCard({
           </Button>
         )}
 
-        {/* Requester + InTransit + Source đã Completed → Confirm received */}
+        {/* Requester + InTransit → Confirm received (disabled until Source completes) */}
         {request.role === "Requester" &&
-          request.requestingStatus === "InTransit" &&
-          request.sourceStatus === "Completed" && (
+          request.requestingStatus === "InTransit" && (
           <Button
             size="sm"
-            className="h-8 text-xs gap-1.5 flex-1 bg-green-600 hover:bg-green-700 tracking-tighter"
+            className="h-8 text-xs gap-1.5 flex-1 bg-green-600 hover:bg-green-700 tracking-tighter disabled:opacity-40"
             onClick={(e) => { e.stopPropagation(); handleConfirm(); }}
-            disabled={isAnyPending}
+            disabled={isAnyPending || request.sourceStatus !== "Completed"}
           >
             {confirmMutation.isPending ? (
               <Spinner className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <CheckCircle className="h-3.5 w-3.5" weight="fill" />
             )}
-            Xác nhận đã nhận
+            {request.sourceStatus === "Completed" ? "Xác nhận đã nhận" : "Chờ bên gửi xác nhận giao"}
           </Button>
         )}
       </div>

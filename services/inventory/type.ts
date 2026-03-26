@@ -46,7 +46,7 @@ interface InventoryItemEntityBase {
   itemModelName: string;
   categoryId: number;
   categoryName: string;
-  targetGroup: string;
+  targetGroups: string[];
   lastStockedAt: string;
 }
 

@@ -23,6 +23,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   UploadSimple,
   FileXls,
   FilePdf,
@@ -39,6 +44,7 @@ import {
   Receipt,
   Plus,
   PencilSimple,
+  CaretDown,
 } from "@phosphor-icons/react";
 import {
   useInventoryItemTypes,
@@ -49,6 +55,7 @@ import {
 import type { ImportPurchaseItem, VatInvoice } from "@/services/inventory/type";
 import { uploadRawToCloudinary } from "@/utils/uploadFile";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
+import { DateTimePickerInput } from "@/components/ui/date-time-picker-input";
 
 const SYSTEM_CATEGORIES = [
   { label: "Thực phẩm", value: "Food" },
@@ -132,9 +139,10 @@ interface VatFormState {
 interface ImportRow {
   id: string;
   row: number;
+  itemModelId?: number;
   itemName: string;
   categoryCode: string;
-  targetGroup: string;
+  targetGroups: string[];
   itemType: string;
   unit: string;
   quantity: number;
@@ -181,6 +189,43 @@ function parseExcelDate(val: unknown): string {
   return str;
 }
 
+/** Parse datetime from Excel cell — returns "yyyy-MM-ddTHH:mm" */
+function parseExcelDateTime(val: unknown): string {
+  if (!val) return "";
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  if (typeof val === "number") {
+    const date = XLSX.SSF.parse_date_code(val);
+    if (date) {
+      return `${String(date.y).padStart(4, "0")}-${p2(date.m)}-${p2(date.d)}T${p2(date.H ?? 0)}:${p2(date.M ?? 0)}`;
+    }
+  }
+  const str = String(val).trim();
+  if (!str) return "";
+  // dd/mm/yyyy HH:mm (Vietnamese with time)
+  const dmyHM = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\s+(\d{1,2}):(\d{2})/);
+  if (dmyHM) {
+    const [, d, m, y, H, M] = dmyHM;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${H.padStart(2, "0")}:${M}`;
+  }
+  // dd/mm/yyyy — date only, default to 00:00
+  const dmy = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T00:00`;
+  }
+  // yyyy-mm-ddTHH:mm or yyyy-mm-dd
+  const isoLike = str.match(/^(\d{4})[\-](\d{2})[\-](\d{2})(?:T(\d{2}):(\d{2}))?/);
+  if (isoLike) {
+    const [, y, m, d, H = "00", M = "00"] = isoLike;
+    return `${y}-${m}-${d}T${H}:${M}`;
+  }
+  const dt = new Date(str);
+  if (!isNaN(dt.getTime())) {
+    return `${dt.getFullYear()}-${p2(dt.getMonth() + 1)}-${p2(dt.getDate())}T${p2(dt.getHours())}:${p2(dt.getMinutes())}`;
+  }
+  return "";
+}
+
 /**
  * Đọc sheet theo VỊTRI CỘT (không phụ thuộc tên cột / Unicode).
  * Tìm dòng header bằng cách kiểm tra cột 0 = "STT" (ASCII thuần).
@@ -210,6 +255,15 @@ function getSheetRows(
     });
     return obj;
   });
+}
+
+/** Extract trailing model ID from item name, e.g. "Mì tôm - 1" → { cleanName: "Mì tôm", itemModelId: 1 } */
+function parseItemName(raw: string): { cleanName: string; itemModelId?: number } {
+  const m = raw.trim().match(/^(.*?)\s*-\s*(\d+)$/);
+  if (m) {
+    return { cleanName: m[1].trim(), itemModelId: Number(m[2]) };
+  }
+  return { cleanName: raw.trim() };
 }
 
 function cleanNumber(s: string): string {
@@ -564,11 +618,11 @@ export default function ExcelImportRegular() {
     if (row.unitPrice < 0) errors.unitPrice = "Đơn giá không hợp lệ";
     if (!row.unit) errors.unit = "Đơn vị không được trống";
     if (!row.itemType) errors.itemType = "Loại vật phẩm không được trống";
-    if (!row.targetGroup) errors.targetGroup = "Đối tượng không được trống";
-    if (row.itemType === "Reusable" && row.targetGroup !== "Rescuer")
-      errors.targetGroup = "Đối với vật phẩm ‘Tái sử dụng’, đối tượng áp dụng là ‘Lực lượng cứu hộ’.";
+    if (!row.targetGroups?.length) errors.targetGroups = "Đối tượng không được trống";
+    if (row.itemType === "Reusable" && !row.targetGroups?.includes("Rescuer"))
+      errors.targetGroups = "Đối với vật phẩm ‘Tái sử dụng’, đối tượng áp dụng là ‘Lực lượng cứu hộ’.";
     if (!row.receivedDate) errors.receivedDate = "Ngày nhận không được trống";
-    else if (row.receivedDate > new Date().toISOString().slice(0, 10)) errors.receivedDate = "Ngày nhận không được là ngày trong tương lai";
+    else if (new Date(row.receivedDate) > new Date()) errors.receivedDate = "Ngày nhận không được là thời điểm trong tương lai";
     return errors;
   }, []);
 
@@ -623,11 +677,18 @@ export default function ExcelImportRegular() {
         const categoryCode = matchCategoryCode(rawCategory);
 
         const rawTargetGroup = String(raw[COL.DOITUONG] ?? "").trim();
-        const tgParts = rawTargetGroup.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
-        const matchedTargetGroup = targetGroups.find(
-          (t) => tgParts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
-        );
-        const targetGroupRaw = matchedTargetGroup?.key ?? rawTargetGroup;
+        const targetGroupsValue = rawTargetGroup
+          .split(/[,;،]/)
+          .map((seg) => {
+            const seg2 = seg.trim();
+            if (!seg2) return null;
+            const parts = seg2.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
+            const matched = targetGroups.find((t) =>
+              parts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
+            );
+            return matched?.key ?? seg2;
+          })
+          .filter((v): v is string => !!v);
 
         const rawItemType = String(raw[COL.LOAI] ?? "").trim();
         const itParts = rawItemType.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
@@ -636,21 +697,23 @@ export default function ExcelImportRegular() {
         );
         const itemType = matchedItemType?.key ?? rawItemType;
 
-        // Auto-set targetGroup to Rescuer when item is Reusable
-        const targetGroup = itemType === "Reusable" ? "Rescuer" : targetGroupRaw;
+        // Auto-set targetGroups to ["Rescuer"] when item is Reusable
+        const targetGroupsFinal = itemType === "Reusable" ? ["Rescuer"] : targetGroupsValue;
 
+        const { cleanName: itemName, itemModelId } = parseItemName(String(raw[COL.TEN] ?? ""));
         const rowData = {
           id: `row-${offset + idx}-${Date.now()}`,
           row: offset + idx + 1,
-          itemName: String(raw[COL.TEN] ?? "").trim(),
+          itemModelId,
+          itemName,
           categoryCode,
-          targetGroup,
+          targetGroups: targetGroupsFinal,
           itemType,
           unit: String(raw[COL.DONVI] ?? "").trim(),
           quantity: Number(raw[COL.SOLUONG] ?? 0) > 0 ? Number(raw[COL.SOLUONG]) : 0,
           unitPrice: Number(raw[COL.DONGIA] ?? 0) >= 0 ? Number(raw[COL.DONGIA]) : 0,
           expiredDate: parseExcelDate(raw[COL.HETHAN]),
-          receivedDate: parseExcelDate(raw[COL.NHAN]),
+          receivedDate: parseExcelDateTime(raw[COL.NHAN]),
           description: String(raw[COL.MOTA] ?? "").trim(),
         };
         return { ...rowData, errors: validateRow(rowData) };
@@ -695,15 +758,15 @@ export default function ExcelImportRegular() {
   );
 
   const updateRow = useCallback(
-    (groupId: string, rowId: string, field: keyof ImportRow, value: string | number) => {
+    (groupId: string, rowId: string, field: keyof ImportRow, value: string | number | string[] | undefined) => {
       patchGroup(groupId, (g) => ({
         ...g,
         rows: g.rows.map((r) => {
           if (r.id !== rowId) return r;
-          const updated = { ...r, [field]: value };
-          // Auto-set targetGroup when itemType changes to Reusable
+          const updated = { ...r, [field]: value } as ImportRow;
+          // Auto-set targetGroups when itemType changes to Reusable
           if (field === "itemType" && value === "Reusable") {
-            updated.targetGroup = "Rescuer";
+            updated.targetGroups = ["Rescuer"];
           }
           updated.errors = validateRow(updated);
           return updated;
@@ -729,7 +792,7 @@ export default function ExcelImportRegular() {
         const newRow: ImportRow = {
           id: `row-manual-${Date.now()}-${Math.random()}`,
           row: g.rows.length + 1,
-          itemName: "", categoryCode: "", targetGroup: "", itemType: "",
+          itemModelId: undefined, itemName: "", categoryCode: "", targetGroups: [], itemType: "",
           unit: "", quantity: 0, unitPrice: 0, expiredDate: "", receivedDate: "", description: "",
           errors: {},
         };
@@ -822,14 +885,15 @@ export default function ExcelImportRegular() {
       } as VatInvoice,
       items: g.rows.map((r) => ({
         row: r.row,
+        ...(r.itemModelId ? { itemModelId: r.itemModelId } : {}),
         itemName: r.itemName,
         categoryCode: r.categoryCode,
         quantity: r.quantity,
         unitPrice: r.unitPrice,
         unit: r.unit,
         itemType: r.itemType,
-        targetGroups: [r.targetGroup],
-        receivedDate: r.receivedDate,
+        targetGroups: r.targetGroups,
+        receivedDate: r.receivedDate ? new Date(r.receivedDate).toISOString() : r.receivedDate,
         expiredDate: r.expiredDate || null,
         description: r.description || null,
       } as ImportPurchaseItem)),
@@ -911,6 +975,71 @@ export default function ExcelImportRegular() {
             ))}
           </SelectContent>
         </Select>
+        {error && <p className="text-[11px] text-red-500">{error}</p>}
+      </div>
+    );
+  };
+
+  const renderMultiSelectCell = (
+    groupId: string,
+    row: ImportRow,
+    options: { label: string; value: string }[],
+    placeholder: string,
+  ) => {
+    const error = row.errors.targetGroups;
+    const selected = row.targetGroups ?? [];
+    const labelText =
+      selected.length === 0
+        ? placeholder
+        : selected.map((v) => options.find((o) => o.value === v)?.label ?? v).join(", ");
+    return (
+      <div className="space-y-1">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-8 w-full justify-between text-sm font-normal px-3",
+                error && "border-red-500 focus-visible:ring-red-500",
+                selected.length === 0 && "text-muted-foreground",
+              )}
+            >
+              <span className="truncate text-left">{labelText}</span>
+              <CaretDown className="h-3.5 w-3.5 shrink-0 opacity-50 ml-1" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="p-1 w-48" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+            {options.map((opt) => {
+              const checked = selected.includes(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    const next = checked
+                      ? selected.filter((v) => v !== opt.value)
+                      : [...selected, opt.value];
+                    updateRow(groupId, row.id, "targetGroups", next);
+                  }}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md w-full hover:bg-muted text-sm cursor-pointer"
+                >
+                  <div
+                    className={cn(
+                      "h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 text-[10px] font-bold",
+                      checked
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "border-muted-foreground/40",
+                    )}
+                  >
+                    {checked && "✓"}
+                  </div>
+                  {opt.label}
+                </button>
+              );
+            })}
+          </PopoverContent>
+        </Popover>
         {error && <p className="text-[11px] text-red-500">{error}</p>}
       </div>
     );
@@ -1375,6 +1504,7 @@ export default function ExcelImportRegular() {
                         <TableRow className="bg-muted/50">
                           <TableHead className="w-12 text-center">STT</TableHead>
                           <TableHead className="min-w-48">Tên vật phẩm</TableHead>
+                          <TableHead className="min-w-24 text-center">ID Model</TableHead>
                           <TableHead className="min-w-40">Danh mục</TableHead>
                           <TableHead className="min-w-36">Đối tượng</TableHead>
                           <TableHead className="min-w-36">Loại vật phẩm</TableHead>
@@ -1395,13 +1525,21 @@ export default function ExcelImportRegular() {
                               <TableCell className="text-center text-xs text-muted-foreground font-mono">{row.row}</TableCell>
                               <TableCell>{renderInputCell(group.id, row, "itemName", "Tên vật phẩm")}</TableCell>
                               <TableCell>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={row.itemModelId ?? ""}
+                                  onChange={(e) => updateRow(group.id, row.id, "itemModelId", e.target.value ? Number(e.target.value) : undefined)}
+                                  placeholder="Mới"
+                                  className="h-8 text-sm w-20"
+                                />
+                              </TableCell>
+                              <TableCell>
                                 {renderSelectCell(group.id, row, "categoryCode", SYSTEM_CATEGORIES.map((c) => ({ label: c.label, value: c.value })), "Chọn danh mục")}
                               </TableCell>
                               <TableCell>
-                                {targetGroupOptions.length > 0
-                                  ? renderSelectCell(group.id, row, "targetGroup", targetGroupOptions, "Chọn đối tượng")
-                                  : renderInputCell(group.id, row, "targetGroup", "Đối tượng")}
-                                {row.itemType === "Reusable" && row.targetGroup === "Rescuer" && !row.errors.targetGroup && (
+                                {renderMultiSelectCell(group.id, row, targetGroupOptions, "Chọn đối tượng")}
+                                {row.itemType === "Reusable" && row.targetGroups?.includes("Rescuer") && !row.errors.targetGroups && (
                                   <p className="text-[11px] text-blue-500 mt-0.5">Mặc định chọn với loại Tái sử dụng</p>
                                 )}
                               </TableCell>
@@ -1430,10 +1568,10 @@ export default function ExcelImportRegular() {
                               </TableCell>
                               <TableCell>
                                 <div className="space-y-1">
-                                  <DatePickerInput
+                                  <DateTimePickerInput
                                     value={row.receivedDate}
                                     onChange={(v) => updateRow(group.id, row.id, "receivedDate", v)}
-                                    placeholder="Chọn ngày..."
+                                    placeholder="Chọn ngày giờ..."
                                     hasError={!!row.errors.receivedDate}
                                   />
                                   {row.errors.receivedDate && (
@@ -1456,7 +1594,7 @@ export default function ExcelImportRegular() {
                         })}
                         {group.rows.length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
+                            <TableCell colSpan={13} className="h-24 text-center text-muted-foreground">
                               <div className="flex flex-col items-center gap-2">
                                 <Trash className="h-7 w-7" weight="duotone" />
                                 <p className="text-sm tracking-tighter">Chưa có vật phẩm</p>
