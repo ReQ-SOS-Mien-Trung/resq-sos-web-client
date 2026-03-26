@@ -417,16 +417,8 @@ const InventoryDashboardPage = () => {
   }, []);
 
   const handleRefresh = useCallback(() => {
-    refetchDepots();
-    refetchCategories();
-    refetchSupplyRequests();
-    refetchQuantityByCategory();
-  }, [
-    refetchDepots,
-    refetchCategories,
-    refetchSupplyRequests,
-    refetchQuantityByCategory,
-  ]);
+    window.location.reload();
+  }, []);
 
   const toggleDarkMode = () => {
     setIsDarkMode((prev) => !prev);

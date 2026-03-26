@@ -57,12 +57,17 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/auth.store";
-import { useInventoryCategories } from "@/services/inventory/hooks";
+import {
+  useInventoryCategories,
+  useInventoryItemTypes,
+  useInventoryTargetGroups,
+} from "@/services/inventory/hooks";
 import { useMyDepotFund, MY_DEPOT_FUND_QUERY_KEY, useMyDepotFundTransactions } from "@/services/depot/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useFundingRequests,
   useCreateFundingRequest,
+  useDownloadFundingRequestTemplate,
 } from "@/services/funding_request";
 import type {
   FundingRequestEntity,
@@ -70,17 +75,45 @@ import type {
   CreateFundingRequestItem,
 } from "@/services/funding_request";
 
-const CATEGORY_VI_MAP: Record<string, string> = {
-  "thực phẩm": "Food",
-  "nước uống": "Water",
-  "y tế": "Medical",
-  "vệ sinh cá nhân": "Hygiene",
-  "quần áo": "Clothing",
-  "nơi trú ẩn": "Shelter",
-  "công cụ sửa chữa": "RepairTools",
-  "thiết bị cứu hộ": "RescueEquipment",
-  "sưởi ấm": "Heating",
-  "khác": "Others",
+/* ── Excel column mapping ─────────────────────────────────── */
+
+const COL = {
+  STT: "STT",
+  TEN: "Tên vật phẩm",
+  DANHMUC: "Danh mục",
+  DOITUONG: "Đối tượng",
+  LOAI: "Loại vật phẩm",
+  DONVI: "Đơn vị",
+  GHICHU: "Mô tả vật phẩm",
+  SOLUONG: "Số lượng (*)",
+  DONGIA: "Đơn giá (VNĐ)",
+} as const;
+
+type FundingColumnKey = keyof typeof COL;
+
+const COLUMN_ALIASES: Record<FundingColumnKey, string[]> = {
+  STT: ["stt"],
+  TEN: ["ten vat pham"],
+  DANHMUC: ["danh muc"],
+  DOITUONG: ["doi tuong"],
+  LOAI: ["loai vat pham"],
+  DONVI: ["don vi"],
+  GHICHU: ["mo ta vat pham", "ghi chu", "mo ta"],
+  SOLUONG: ["so luong", "so luong *", "so luong (*)"],
+  DONGIA: ["don gia", "don gia vnd", "don gia (vnd)"],
+};
+
+const FALLBACK_CATEGORY_MAP: Record<string, string> = {
+  "thuc pham": "Food",
+  "nuoc uong": "Water",
+  "y te": "Medical",
+  "ve sinh ca nhan": "Hygiene",
+  "quan ao": "Clothing",
+  "noi tru an": "Shelter",
+  "cong cu sua chua": "RepairTools",
+  "thiet bi cuu ho": "RescueEquipment",
+  "suoi am": "Heating",
+  khac: "Others",
   food: "Food",
   water: "Water",
   medical: "Medical",
@@ -92,22 +125,6 @@ const CATEGORY_VI_MAP: Record<string, string> = {
   heating: "Heating",
   others: "Others",
 };
-
-/* ── Excel column mapping ─────────────────────────────────── */
-
-const COL = {
-  STT: "STT",
-  TEN: "Tên vật phẩm",
-  DANHMUC: "Danh mục",
-  DONVI: "Đơn vị",
-  SOLUONG: "Số lượng",
-  DONGIA: "Đơn giá",
-  LOAI: "Loại vật phẩm",
-  DOITUONG: "Đối tượng",
-  NGAYNHAN: "Ngày nhận",
-  NGAYHETHAN: "Ngày hết hạn",
-  GHICHU: "Ghi chú",
-} as const;
 
 /* ── Status config ────────────────────────────────────────── */
 
@@ -137,40 +154,6 @@ const statusConfig: Record<
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
-function parseExcelDate(val: unknown): string {
-  if (!val) return "";
-  // Excel serial number
-  if (typeof val === "number") {
-    const date = XLSX.SSF.parse_date_code(val);
-    if (date) {
-      return `${String(date.y).padStart(4, "0")}-${String(date.m).padStart(2, "0")}-${String(date.d).padStart(2, "0")}`;
-    }
-  }
-  const str = String(val).trim();
-  if (!str) return "";
-  // yyyy-mm-dd, yyyy/mm/dd, yyyy.mm.dd
-  const ymd = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
-  if (ymd) {
-    return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`;
-  }
-  // dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy, d/m/yyyy (Vietnamese format)
-  const dmy = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
-  if (dmy) {
-    const day = parseInt(dmy[1]);
-    const month = parseInt(dmy[2]);
-    const year = dmy[3];
-    // If month > 12 and day <= 12, it's likely mm/dd/yyyy — swap
-    if (month > 12 && day <= 12) {
-      return `${year}-${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
-    }
-    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  }
-  // Fallback: ISO strings with time component, etc.
-  const d = new Date(str);
-  if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
-  return str;
-}
-
 function formatMoney(value: number) {
   return value.toLocaleString("vi-VN") + "đ";
 }
@@ -186,19 +169,140 @@ function formatMoneyInput(value: string | number): string {
 }
 
 /** Auto-detects the real header row (skips title/note rows) and returns parsed data rows. */
-function getSheetRows(sheet: XLSX.WorkSheet): Record<string, unknown>[] {
-  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 });
-  const headerRowIndex = rawRows.findIndex(
-    (row) =>
-      Array.isArray(row) &&
-      row.some(
-        (cell) =>
-          String(cell ?? "").trim() === "STT" ||
-          String(cell ?? "").trim() === "Tên vật phẩm",
-      ),
-  );
-  const range = headerRowIndex >= 0 ? headerRowIndex : 0;
-  return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { range, defval: "" });
+function normalizeExcelText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/[Đđ]/g, "d")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function parseExcelNumber(value: unknown): number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+
+  const normalized = raw
+    .replace(/[^\d,.-]/g, "")
+    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+    .replace(",", ".");
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function findHeaderLayout(rows: unknown[][]): {
+  headerRowIndex: number;
+  columnIndexes: Partial<Record<FundingColumnKey, number>>;
+} | null {
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex];
+    if (!Array.isArray(row)) continue;
+
+    const columnIndexes: Partial<Record<FundingColumnKey, number>> = {};
+
+    row.forEach((cell, columnIndex) => {
+      const normalizedCell = normalizeExcelText(cell);
+      if (!normalizedCell) return;
+
+      const matchedKey = (Object.keys(COLUMN_ALIASES) as FundingColumnKey[]).find(
+        (key) => COLUMN_ALIASES[key].includes(normalizedCell),
+      );
+
+      if (matchedKey && columnIndexes[matchedKey] === undefined) {
+        columnIndexes[matchedKey] = columnIndex;
+      }
+    });
+
+    if (
+      columnIndexes.STT !== undefined &&
+      columnIndexes.TEN !== undefined &&
+      columnIndexes.DANHMUC !== undefined
+    ) {
+      return { headerRowIndex: rowIndex, columnIndexes };
+    }
+  }
+
+  return null;
+}
+
+function getSheetRows(workbook: XLSX.WorkBook): Record<FundingColumnKey, unknown>[] {
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    if (!sheet) continue;
+
+    const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      defval: "",
+    });
+    const headerLayout = findHeaderLayout(rawRows);
+    if (!headerLayout) continue;
+
+    return rawRows
+      .slice(headerLayout.headerRowIndex + 1)
+      .map((row) => {
+        const rowArray = Array.isArray(row) ? row : [];
+        const mappedRow = {} as Record<FundingColumnKey, unknown>;
+
+        (Object.keys(COL) as FundingColumnKey[]).forEach((key) => {
+          const columnIndex = headerLayout.columnIndexes[key];
+          mappedRow[key] =
+            columnIndex === undefined ? "" : rowArray[columnIndex] ?? "";
+        });
+
+        return mappedRow;
+      })
+      .filter((row) =>
+        [row.TEN, row.DANHMUC, row.DONVI, row.SOLUONG, row.DONGIA].some(
+          (value) => String(value ?? "").trim() !== "",
+        ),
+      );
+  }
+
+  return [];
+}
+
+function matchMetadataKey(
+  rawValue: string,
+  options: { key: string; value: string }[],
+): string {
+  const parts = rawValue
+    .split(/\s*-\s*/)
+    .map((part) => normalizeExcelText(part))
+    .filter(Boolean);
+
+  const matched = options.find((option) => {
+    const normalizedKey = normalizeExcelText(option.key);
+    const normalizedValue = normalizeExcelText(option.value);
+    return parts.some(
+      (part) => part === normalizedKey || part === normalizedValue,
+    );
+  });
+
+  return matched?.key ?? rawValue.trim();
+}
+
+function matchCategoryCode(
+  rawCategory: string,
+  categories: { key: string; value: string }[],
+): string {
+  const matched = matchMetadataKey(rawCategory, categories);
+  if (matched && matched !== rawCategory.trim()) {
+    return matched;
+  }
+
+  const parts = rawCategory
+    .split(/\s*-\s*/)
+    .map((part) => normalizeExcelText(part))
+    .filter(Boolean);
+
+  const fallback = parts.find((part) => FALLBACK_CATEGORY_MAP[part]);
+  return fallback ? FALLBACK_CATEGORY_MAP[fallback] : "";
 }
 
 type TabType = "create" | "history" | "transactions";
@@ -234,8 +338,6 @@ function createEmptyRow(rowNum: number): ImportRow {
     totalPrice: 0,
     itemType: "",
     targetGroup: "",
-    receivedDate: "",
-    expiredDate: "",
     notes: "",
     errors: {
       itemName: "Bắt buộc",
@@ -257,20 +359,44 @@ export default function FundingRequestPage() {
 
   // ── Categories from API ──
   const { data: categoriesData } = useInventoryCategories();
+  const { data: itemTypesData } = useInventoryItemTypes();
+  const { data: targetGroupsData } = useInventoryTargetGroups();
+  const categories = useMemo(() => categoriesData ?? [], [categoriesData]);
+  const itemTypes = useMemo(() => itemTypesData ?? [], [itemTypesData]);
+  const targetGroups = useMemo(
+    () => targetGroupsData ?? [],
+    [targetGroupsData],
+  );
   const categoryOptions = useMemo(
     () =>
-      (categoriesData ?? []).map((c) => ({
+      categories.map((c) => ({
         value: c.key,
         label: c.value,
       })),
-    [categoriesData],
+    [categories],
   );
   const categoryMap = useMemo(
     () =>
       Object.fromEntries(
-        (categoriesData ?? []).map((c) => [c.key, c.value]),
+        categories.map((c) => [c.key, c.value]),
       ) as Record<string, string>,
-    [categoriesData],
+    [categories],
+  );
+  const itemTypeOptions = useMemo(
+    () =>
+      itemTypes.map((itemType) => ({
+        value: itemType.key,
+        label: itemType.value,
+      })),
+    [itemTypes],
+  );
+  const targetGroupOptions = useMemo(
+    () =>
+      targetGroups.map((targetGroup) => ({
+        value: targetGroup.key,
+        label: targetGroup.value,
+      })),
+    [targetGroups],
   );
 
   // ── My fund balance ──
@@ -314,6 +440,10 @@ export default function FundingRequestPage() {
     useState<FundingRequestEntity | null>(null);
 
   const { mutate: createRequest, isPending } = useCreateFundingRequest();
+  const {
+    mutateAsync: downloadTemplate,
+    isPending: isDownloadingTemplate,
+  } = useDownloadFundingRequestTemplate();
 
   /* ── Excel parsing ──────────────────────────────────────── */
 
@@ -333,8 +463,7 @@ export default function FundingRequestPage() {
             e.target?.result as ArrayBuffer,
           );
           const workbook = XLSX.read(data, { type: "array" });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = getSheetRows(sheet);
+          const jsonData = getSheetRows(workbook);
           if (jsonData.length === 0) {
             toast.error("File Excel không có dữ liệu");
             return;
@@ -344,36 +473,36 @@ export default function FundingRequestPage() {
             const offset = append ? prev.length : 0;
             const parsed: ImportRow[] = jsonData.map((raw, idx) => {
               const rawCategory = String(
-                raw[COL.DANHMUC] ?? "",
+                raw.DANHMUC ?? "",
               ).trim();
-              const categoryCode =
-                CATEGORY_VI_MAP[rawCategory.toLowerCase()] ?? "";
+              const categoryCode = matchCategoryCode(
+                rawCategory,
+                categories,
+              );
+              const rawItemType = String(raw.LOAI ?? "").trim();
+              const itemType = matchMetadataKey(rawItemType, itemTypes);
+              const isReusable =
+                normalizeExcelText(itemType) === "reusable" ||
+                normalizeExcelText(rawItemType) === "tai su dung";
+              const rawTargetGroup = String(
+                raw.DOITUONG ?? "",
+              ).trim();
+              const targetGroup = isReusable
+                ? "Rescuer"
+                : matchMetadataKey(rawTargetGroup, targetGroups);
 
               const rowData: Omit<ImportRow, "errors"> = {
                 id: `row-${offset + idx}-${Date.now()}`,
                 row: offset + idx + 1,
-                itemName: String(raw[COL.TEN] ?? "").trim(),
+                itemName: String(raw.TEN ?? "").trim(),
                 categoryCode,
-                unit: String(raw[COL.DONVI] ?? "").trim(),
-                quantity:
-                  Number(raw[COL.SOLUONG] ?? 0) > 0
-                    ? Number(raw[COL.SOLUONG])
-                    : 0,
-                unitPrice:
-                  Number(raw[COL.DONGIA] ?? 0) >= 0
-                    ? Number(raw[COL.DONGIA])
-                    : 0,
+                unit: String(raw.DONVI ?? "").trim(),
+                quantity: parseExcelNumber(raw.SOLUONG),
+                unitPrice: parseExcelNumber(raw.DONGIA),
                 totalPrice: 0,
-                itemType: String(raw[COL.LOAI] ?? "").trim(),
-                targetGroup: (() => {
-                  const rawType = String(raw[COL.LOAI] ?? "").trim().toLowerCase();
-                  const isReusable = rawType === "reusable" || rawType === "tái sử dụng";
-                  if (isReusable) return "Rescuer";
-                  return String(raw[COL.DOITUONG] ?? "").trim();
-                })(),
-                receivedDate: parseExcelDate(raw[COL.NGAYNHAN]),
-                expiredDate: parseExcelDate(raw[COL.NGAYHETHAN]),
-                notes: String(raw[COL.GHICHU] ?? "").trim(),
+                itemType,
+                targetGroup,
+                notes: String(raw.GHICHU ?? "").trim(),
               };
               rowData.totalPrice =
                 rowData.quantity * rowData.unitPrice;
@@ -402,7 +531,7 @@ export default function FundingRequestPage() {
       };
       reader.readAsArrayBuffer(file);
     },
-    [],
+    [categories, itemTypes, targetGroups],
   );
 
   /* ── Row management ─────────────────────────────────────── */
@@ -456,17 +585,22 @@ export default function FundingRequestPage() {
 
   /* ── Download template ──────────────────────────────────── */
 
-  const handleDownloadTemplate = useCallback(() => {
-    const headers = Object.values(COL);
-    const ws = XLSX.utils.aoa_to_sheet([
-      headers,
-      [1, "Gạo 5kg", "Thực phẩm", "Bao", 100, 50000, "Hàng khô", "Người dân", ""],
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Vật tư");
-    XLSX.writeFile(wb, "mau_yeu_cau_cap_quy.xlsx");
-    toast.success("Đã tải file mẫu");
-  }, []);
+  const handleDownloadTemplate = useCallback(async () => {
+    try {
+      const { blob, filename } = await downloadTemplate();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Đã tải file mẫu");
+    } catch {
+      toast.error("Không thể tải file mẫu");
+    }
+  }, [downloadTemplate]);
 
   /* ── Computed ────────────────────────────────────────────── */
 
@@ -531,8 +665,6 @@ export default function FundingRequestPage() {
       totalPrice: r.totalPrice,
       itemType: r.itemType,
       targetGroup: r.targetGroup,
-      receivedDate: r.receivedDate,
-      expiredDate: r.expiredDate,
       notes: r.notes,
     }));
     createRequest(
@@ -708,10 +840,17 @@ export default function FundingRequestPage() {
               variant="outline"
               size="sm"
               className="gap-2 tracking-tighter shrink-0"
+              disabled={isDownloadingTemplate}
               onClick={handleDownloadTemplate}
             >
-              <DownloadSimple size={14} />
-              Tải file mẫu Excel
+              {isDownloadingTemplate ? (
+                <Spinner size={14} className="animate-spin" />
+              ) : (
+                <DownloadSimple size={14} />
+              )}
+              {isDownloadingTemplate
+                ? "Đang tải file mẫu..."
+                : "Tải file mẫu Excel"}
             </Button>
           )}
         </div>
@@ -927,13 +1066,13 @@ export default function FundingRequestPage() {
                   </Button>
                   {!canSubmit &&
                     description.trim() === "" && (
-                      <p className="text-[11px] text-amber-600 flex items-center gap-1 tracking-tight">
+                      <p className="text-xs text-amber-600 flex items-center gap-1 tracking-tight">
                         <WarningCircle size={11} />
                         Vui lòng nhập mô tả
                       </p>
                     )}
                   {!canSubmit && totalErrors > 0 && (
-                    <p className="text-[11px] text-red-500 flex items-center gap-1 tracking-tight">
+                    <p className="text-xs text-red-500 flex items-center gap-1 tracking-tight">
                       <WarningCircle size={11} />
                       Sửa {totalErrors} dòng lỗi trước khi gửi
                     </p>
@@ -1084,7 +1223,7 @@ export default function FundingRequestPage() {
                           {Object.values(COL).map((col) => (
                             <span
                               key={col}
-                              className="px-1.5 py-0.5 rounded bg-muted border text-[10px] font-mono"
+                              className="px-2 py-1 rounded bg-muted border text-xs font-normal tracking-tighter text-muted-foreground"
                             >
                               {col}
                             </span>
@@ -1092,16 +1231,21 @@ export default function FundingRequestPage() {
                         </div>
                       </div>
                       <Button
-                        variant="outline"
+                        variant="default"
                         size="sm"
-                        className="gap-1.5 text-xs tracking-tighter shrink-0"
+                        className="gap-1.5 text-sm tracking-tighter shrink-0"
+                        disabled={isDownloadingTemplate}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDownloadTemplate();
                         }}
                       >
-                        <DownloadSimple size={13} />
-                        Tải file mẫu
+                        {isDownloadingTemplate ? (
+                          <Spinner size={13} className="animate-spin" />
+                        ) : (
+                          <DownloadSimple size={13} />
+                        )}
+                        {isDownloadingTemplate ? "Đang tải..." : "Tải file mẫu"}
                       </Button>
                     </div>
 
@@ -1150,12 +1294,6 @@ export default function FundingRequestPage() {
                           </TableHead>
                           <TableHead className="min-w-32 text-xs">
                             Đối tượng
-                          </TableHead>
-                          <TableHead className="min-w-36 text-xs">
-                            Ngày nhận
-                          </TableHead>
-                          <TableHead className="min-w-36 text-xs">
-                            Ngày hết hạn
                           </TableHead>
                           <TableHead className="min-w-32 text-xs">
                             Ghi chú
@@ -1220,46 +1358,32 @@ export default function FundingRequestPage() {
                                 </span>
                               </TableCell>
                               <TableCell>
-                                {renderInputCell(
-                                  row,
-                                  "itemType",
-                                  "Hàng khô...",
-                                )}
+                                {itemTypeOptions.length > 0
+                                  ? renderSelectCell(
+                                    row,
+                                    "itemType",
+                                    itemTypeOptions,
+                                    "Chọn loại vật phẩm",
+                                  )
+                                  : renderInputCell(
+                                    row,
+                                    "itemType",
+                                    "Hàng khô...",
+                                  )}
                               </TableCell>
                               <TableCell>
-                                {renderInputCell(
-                                  row,
-                                  "targetGroup",
-                                  "Người dân...",
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="date"
-                                  value={row.receivedDate}
-                                  onChange={(e) =>
-                                    updateRow(
-                                      row.id,
-                                      "receivedDate",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="h-8 text-sm"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Input
-                                  type="date"
-                                  value={row.expiredDate}
-                                  onChange={(e) =>
-                                    updateRow(
-                                      row.id,
-                                      "expiredDate",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="h-8 text-sm"
-                                />
+                                {targetGroupOptions.length > 0
+                                  ? renderSelectCell(
+                                    row,
+                                    "targetGroup",
+                                    targetGroupOptions,
+                                    "Chọn đối tượng",
+                                  )
+                                  : renderInputCell(
+                                    row,
+                                    "targetGroup",
+                                    "Người dân...",
+                                  )}
                               </TableCell>
                               <TableCell>
                                 <Input
@@ -1293,7 +1417,7 @@ export default function FundingRequestPage() {
                         {rows.length === 0 && (
                           <TableRow>
                             <TableCell
-                              colSpan={13}
+                              colSpan={11}
                               className="h-32 text-center text-muted-foreground"
                             >
                               <div className="flex flex-col items-center gap-2">

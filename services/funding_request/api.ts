@@ -1,4 +1,5 @@
 import api from "@/config/axios";
+import { useAuthStore } from "@/stores/auth.store";
 import type {
   GetFundingRequestsParams,
   GetFundingRequestsResponse,
@@ -45,6 +46,44 @@ export async function createFundingRequest(
   payload: CreateFundingRequestPayload,
 ): Promise<void> {
   await api.post("/finance/funding-requests", payload);
+}
+
+/**
+ * Download funding request Excel template
+ * Proxied via /api/finance/funding-requests/template
+ * → GET /finance/funding-requests/template
+ */
+export async function downloadFundingRequestTemplate(): Promise<{
+  blob: Blob;
+  filename: string;
+}> {
+  const token = useAuthStore.getState().accessToken;
+  const response = await fetch("/api/finance/funding-requests/template", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status}`);
+  }
+
+  const disposition = response.headers.get("content-disposition") ?? "";
+  let filename = "mau_yeu_cau_cap_quy.xlsx";
+
+  const utf8Match = disposition.match(/filename\*=[^']*'[^']*'([^;\s]+)/i);
+  if (utf8Match) {
+    filename = decodeURIComponent(utf8Match[1]);
+  } else {
+    const asciiMatch = disposition.match(/filename="([^"]+)"/);
+    if (asciiMatch) {
+      filename = asciiMatch[1];
+    } else if (disposition.includes("filename=")) {
+      const plain = disposition.match(/filename=([^;\s]+)/);
+      if (plain) filename = plain[1];
+    }
+  }
+
+  const blob = await response.blob();
+  return { blob, filename };
 }
 
 /**

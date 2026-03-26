@@ -15,8 +15,6 @@ export interface FundingRequestItem {
   totalPrice: number;
   itemType: string;
   targetGroup: string;
-  receivedDate: string;
-  expiredDate: string;
   notes: string;
 }
 
@@ -71,8 +69,6 @@ export interface CreateFundingRequestItem {
   totalPrice: number;
   itemType: string;
   targetGroup: string;
-  receivedDate: string;
-  expiredDate: string;
   notes: string;
 }
 

@@ -1504,7 +1504,7 @@ export default function ExcelImportRegular() {
                         <TableRow className="bg-muted/50">
                           <TableHead className="w-12 text-center">STT</TableHead>
                           <TableHead className="min-w-48">Tên vật phẩm</TableHead>
-                          <TableHead className="min-w-24 text-center">ID Model</TableHead>
+                          <TableHead className="min-w-24 text-center">ID Vật phẩm</TableHead>
                           <TableHead className="min-w-40">Danh mục</TableHead>
                           <TableHead className="min-w-36">Đối tượng</TableHead>
                           <TableHead className="min-w-36">Loại vật phẩm</TableHead>

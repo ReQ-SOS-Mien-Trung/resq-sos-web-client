@@ -3,6 +3,7 @@ import {
   getFundingRequests,
   getFundingRequestStatuses,
   createFundingRequest,
+  downloadFundingRequestTemplate,
   approveFundingRequest,
   rejectFundingRequest,
 } from "./api";
@@ -63,6 +64,12 @@ export function useCreateFundingRequest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: FUNDING_REQUESTS_QUERY_KEY });
     },
+  });
+}
+
+export function useDownloadFundingRequestTemplate() {
+  return useMutation({
+    mutationFn: downloadFundingRequestTemplate,
   });
 }
 
