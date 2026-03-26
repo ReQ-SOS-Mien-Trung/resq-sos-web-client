@@ -17,6 +17,9 @@ export type SOSSituation =
   | "TRAPPED"
   | "ISOLATED"
   | "STRANDED"
+  | "COLLAPSED"
+  | "DANGER_ZONE"
+  | "CANNOT_MOVE"
   | "OTHER";
 
 // Supply types
@@ -24,17 +27,62 @@ export type SupplyType =
   | "MEDICINE"
   | "FOOD"
   | "WATER"
+  | "CLOTHES"
+  | "BLANKET"
+  | "OTHER"
   | "RESCUE_EQUIPMENT"
   | "TRANSPORTATION";
 
 // Medical issue types
 export type MedicalIssueType =
+  | "SEVERELY_BLEEDING"
   | "FRACTURE"
   | "BLEEDING"
+  | "HEAD_INJURY"
+  | "BURNS"
+  | "UNCONSCIOUS"
   | "CHRONIC_DISEASE"
   | "PREGNANCY"
   | "BREATHING_DIFFICULTY"
-  | "MOBILITY_IMPAIRMENT";
+  | "MOBILITY_IMPAIRMENT"
+  | "CHEST_PAIN_STROKE"
+  | "CANNOT_MOVE"
+  | "DROWNING"
+  | "HIGH_FEVER"
+  | "DEHYDRATION"
+  | "INFANT_NEEDS_MILK"
+  | "LOST_PARENT"
+  | "CONFUSION"
+  | "NEEDS_MEDICAL_DEVICE"
+  | "OTHER";
+
+export type MedicalSupportNeedType =
+  | "COMMON_MEDICINE"
+  | "FIRST_AID"
+  | "CHRONIC_MAINTENANCE"
+  | "MINOR_INJURY";
+
+export type ClothingGenderType = "MALE" | "FEMALE";
+
+export type WaterDurationType =
+  | "UNDER_6H"
+  | "6_TO_12H"
+  | "12_TO_24H"
+  | "1_TO_2_DAYS"
+  | "OVER_2_DAYS";
+
+export type WaterRemainingType =
+  | "NONE"
+  | "UNDER_2L"
+  | "2_TO_5L"
+  | "OVER_5L";
+
+export type FoodDurationType =
+  | "UNDER_12H"
+  | "12_TO_24H"
+  | "1_TO_2_DAYS"
+  | "2_TO_3_DAYS"
+  | "OVER_3_DAYS";
 
 // Injured person in SOS request
 export interface InjuredPerson {
@@ -44,6 +92,41 @@ export interface InjuredPerson {
   person_type: string;
   medical_issues: MedicalIssueType[];
   severity: string;
+}
+
+export interface SOSSpecialDietPerson {
+  person_type: string;
+  index: number;
+  name: string;
+  custom_name: string | null;
+  diet_description: string | null;
+}
+
+export interface SOSClothingPerson {
+  person_type: string;
+  index: number;
+  name: string;
+  custom_name: string | null;
+  gender: ClothingGenderType;
+}
+
+export interface SOSSupplyDetails {
+  water_duration?: WaterDurationType | null;
+  water_remaining?: WaterRemainingType | null;
+  food_duration?: FoodDurationType | null;
+  special_diet_need?: string | null;
+  special_diet_persons?: SOSSpecialDietPerson[] | null;
+  needs_urgent_medicine?: boolean | null;
+  medicine_conditions?: string[] | null;
+  medicine_other_description?: string | null;
+  medical_needs?: MedicalSupportNeedType[] | null;
+  medical_description?: string | null;
+  is_cold_or_wet?: boolean | null;
+  blanket_availability?: string | null;
+  are_blankets_enough?: boolean | null;
+  blanket_request_count?: number | null;
+  clothing_status?: string | null;
+  clothing_persons?: SOSClothingPerson[] | null;
 }
 
 // Structured data from SOS request
@@ -63,6 +146,7 @@ export interface SOSStructuredData {
   need_medical: boolean;
   supplies: SupplyType[];
   other_supply_description: string | null;
+  supply_details?: SOSSupplyDetails | null;
   additional_description: string | null;
   injured_persons: InjuredPerson[];
 }
