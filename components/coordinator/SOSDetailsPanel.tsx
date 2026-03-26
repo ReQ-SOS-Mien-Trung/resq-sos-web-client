@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { SOSDetailsPanelProps } from "@/type";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   MapPin,
-  Clock,
   Stethoscope,
   ForkKnife,
   Anchor,
@@ -30,6 +29,16 @@ import {
 } from "@phosphor-icons/react";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import {
+  getClothingGenderLabel,
+  getFoodDurationLabel,
+  getMedicalIssueLabel,
+  getMedicalSupportNeedLabel,
+  getSupplyLabel,
+  getSituationLabel,
+  getWaterDurationLabel,
+  getWaterRemainingLabel,
+} from "@/lib/sos";
 
 // Panel width
 const PANEL_WIDTH = 420;
@@ -204,7 +213,7 @@ function ParsedMessage({
             content.includes("(") &&
             content.includes(")")
           ) {
-            let injuries = content.includes(";")
+            const injuries = content.includes(";")
               ? content
                   .split(";")
                   .map((i) => i.trim())
@@ -351,12 +360,7 @@ function FormulaTooltip({
   details?: string[];
 }) {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -388,7 +392,7 @@ function FormulaTooltip({
       >
         <Info className="h-3.5 w-3.5" weight="fill" />
       </button>
-      {mounted &&
+      {typeof document !== "undefined" &&
         open &&
         createPortal(
           <div
@@ -415,6 +419,32 @@ function FormulaTooltip({
   );
 }
 
+function DetailCard({
+  title,
+  lines,
+}: {
+  title: string;
+  lines: Array<string | null | undefined>;
+}) {
+  const normalizedLines = lines.filter(Boolean) as string[];
+  if (normalizedLines.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border bg-background px-3 py-3 shadow-sm">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </div>
+      <div className="mt-2 space-y-1 text-sm text-foreground">
+        {normalizedLines.map((line, index) => (
+          <p key={`${title}-${index}`} className="leading-snug">
+            {line}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const SOSDetailsPanel = ({
   open,
   onOpenChange,
@@ -422,9 +452,9 @@ const SOSDetailsPanel = ({
   onProcessSOS,
   isProcessing = false,
   nearbySOSRequests,
-  allSOSRequests,
 }: SOSDetailsPanelProps) => {
   const currentUser = useAuthStore((state) => state.user);
+  const [renderedAt] = useState(() => Date.now());
 
   const { data: analysisResponse, isLoading: isLoadingAnalysis } =
     useSOSRequestAnalysis(Number(sosRequest?.id) || 0, {
@@ -469,7 +499,7 @@ const SOSDetailsPanel = ({
     sosRequest.waitTimeMinutes ??
     Math.max(
       0,
-      Math.floor((Date.now() - sosRequest.createdAt.getTime()) / 60000),
+      Math.floor((renderedAt - sosRequest.createdAt.getTime()) / 60000),
     );
   const waitDurationLabel =
     waitTimeMinutes >= 1440
@@ -521,9 +551,51 @@ const SOSDetailsPanel = ({
     return "Nạn nhân";
   };
 
-  const issueLabel = (value: string) => {
-    return getMedicalIssueMeta(value)?.label ?? value;
-  };
+  const issueLabel = (value: string) => getMedicalIssueLabel(value);
+
+  const supplyDetails = sosRequest.supplyDetails ?? sosRequest.structuredData?.supply_details;
+  const specialDietPersons =
+    sosRequest.specialDietPersons ?? supplyDetails?.special_diet_persons ?? [];
+  const clothingPersons =
+    sosRequest.clothingPersons ?? supplyDetails?.clothing_persons ?? [];
+  const medicalSupportNeeds =
+    sosRequest.medicalSupportNeeds ?? supplyDetails?.medical_needs ?? [];
+  const requestedPeopleMap = new Map<
+    string,
+    {
+      name: string;
+      personType?: string | null;
+      dietDescription?: string | null;
+      gender?: string | null;
+      needs: string[];
+    }
+  >();
+
+  specialDietPersons.forEach((person) => {
+    const key = `${person.person_type}-${person.index}`;
+    const existing = requestedPeopleMap.get(key);
+    requestedPeopleMap.set(key, {
+      name: person.custom_name?.trim() || person.name,
+      personType: person.person_type,
+      dietDescription: person.diet_description,
+      gender: existing?.gender,
+      needs: Array.from(new Set([...(existing?.needs ?? []), "Chế độ ăn đặc biệt"])),
+    });
+  });
+
+  clothingPersons.forEach((person) => {
+    const key = `${person.person_type}-${person.index}`;
+    const existing = requestedPeopleMap.get(key);
+    requestedPeopleMap.set(key, {
+      name: person.custom_name?.trim() || person.name,
+      personType: person.person_type,
+      dietDescription: existing?.dietDescription,
+      gender: person.gender,
+      needs: Array.from(new Set([...(existing?.needs ?? []), "Quần áo"])),
+    });
+  });
+
+  const requestedPeople = Array.from(requestedPeopleMap.values());
 
   const scoreRows = [
     {
@@ -572,25 +644,20 @@ const SOSDetailsPanel = ({
     },
   ] as const;
 
-  const summedScore = scoreRows.reduce((sum, row) => sum + row.value, 0);
   const displayedTotalScore = ruleEvaluation?.totalScore ?? 0;
 
   const isV3 = ruleEvaluation?.ruleVersion?.startsWith("3");
 
   // Calculate local factors to match BE Rule 3.0 (for display in tooltip)
   let requestTypeScore = 10;
-  let requestTypeLabel = "Khác";
   const sosTypeStr = ((sosRequest as any).sosType || "").toLowerCase();
   if (sosTypeStr.includes("rescue")) {
     requestTypeScore = 30;
-    requestTypeLabel = "Cứu hộ";
   } else if (sosTypeStr.includes("relief") || sosTypeStr.includes("support")) {
     requestTypeScore = 20;
-    requestTypeLabel = "Cứu trợ";
   }
 
   let situationMultiplier = 1.0;
-  let situationLabel = "Mặc định";
   const sitStr = (sosRequest.situation || "").toLowerCase();
   if (
     sitStr.includes("flood") ||
@@ -599,13 +666,10 @@ const SOSDetailsPanel = ({
     sitStr.includes("building_collapse")
   ) {
     situationMultiplier = 1.5;
-    situationLabel = "Lũ lụt/Sập công trình";
   } else if (sitStr.includes("trapped") || sitStr.includes("danger")) {
     situationMultiplier = 1.3;
-    situationLabel = "Mắc kẹt/Nguy hiểm";
   } else if (sitStr.includes("cannot_move") || sosRequest.canMove === false) {
     situationMultiplier = 1.2;
-    situationLabel = "Không thể di chuyển";
   }
 
   // Filter out 0-value factors for v3.0
@@ -647,7 +711,7 @@ const SOSDetailsPanel = ({
                 SOS {sosRequest.id}
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Chi tiết yêu cầu cứu hộ
+                Chi tiết yêu cầu SOS
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -811,31 +875,7 @@ const SOSDetailsPanel = ({
                 <div className="flex flex-wrap gap-2">
                   {sosRequest.situation && (
                     <Badge variant="secondary" className="text-xs">
-                      {(() => {
-                        const sit = sosRequest.situation.toLowerCase();
-                        const situationLabels: Record<string, string> = {
-                          flooding: "Lũ lụt",
-                          flood: "Lũ lụt",
-                          building_collapse: "Sập công trình",
-                          collapsed: "Sập công trình",
-                          collapse: "Sập công trình",
-                          trapped: "Bị mắc kẹt",
-                          danger_zone: "Khu vực nguy hiểm",
-                          dangerous_area: "Khu vực nguy hiểm",
-                          dangerous: "Khu vực nguy hiểm",
-                          cannot_move: "Không di chuyển được",
-                          cannotmove: "Không di chuyển được",
-                          isolated: "Bị cô lập",
-                          stranded: "Mắc cạn",
-                          accident: "Tai nạn",
-                          landslide: "Sạt lở đất",
-                          storm: "Mưa bão",
-                          fire: "Hỏa hoạn",
-                          earthquake: "Động đất",
-                          other: "Khác",
-                        };
-                        return situationLabels[sit] || sosRequest.situation;
-                      })()}
+                      {getSituationLabel(sosRequest.situation)}
                     </Badge>
                   )}
                   {sosRequest.canMove === false && (
@@ -1004,9 +1044,169 @@ const SOSDetailsPanel = ({
                     <div className="text-sm text-muted-foreground">
                       Không có yêu cầu cụ thể
                     </div>
-                  )}
+                )}
               </div>
             </div>
+
+            {(sosRequest.supplies && sosRequest.supplies.length > 0) ||
+            supplyDetails ? (
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold">Chi tiết cứu trợ</h4>
+
+                {sosRequest.supplies && sosRequest.supplies.length > 0 && (
+                  <div>
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Nhu yếu phẩm yêu cầu
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {sosRequest.supplies.map((supply) => (
+                        <Badge
+                          key={supply}
+                          variant="outline"
+                          className="text-[11px] px-2 py-1"
+                        >
+                          {getSupplyLabel(supply)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {sosRequest.waterDuration && (
+                    <DetailCard
+                      title="Nước uống"
+                      lines={[
+                        `Còn duy trì được: ${getWaterDurationLabel(sosRequest.waterDuration)}`,
+                        sosRequest.waterRemaining
+                          ? `Lượng còn lại: ${getWaterRemainingLabel(sosRequest.waterRemaining)}`
+                          : null,
+                      ]}
+                    />
+                  )}
+                  {sosRequest.foodDuration && (
+                    <DetailCard
+                      title="Thực phẩm"
+                      lines={[
+                        `Còn duy trì được: ${getFoodDurationLabel(sosRequest.foodDuration)}`,
+                      ]}
+                    />
+                  )}
+                  {(medicalSupportNeeds.length > 0 ||
+                    sosRequest.medicalDescription ||
+                    supplyDetails?.medicine_conditions?.length ||
+                    supplyDetails?.medicine_other_description) && (
+                    <DetailCard
+                      title="Y tế"
+                      lines={[
+                        medicalSupportNeeds.length > 0
+                          ? `Hạng mục: ${medicalSupportNeeds
+                              .map((item) => getMedicalSupportNeedLabel(item))
+                              .join(", ")}`
+                          : null,
+                        sosRequest.medicalDescription
+                          ? `Mô tả: ${sosRequest.medicalDescription}`
+                          : null,
+                        supplyDetails?.medicine_conditions?.length
+                          ? `Legacy: ${supplyDetails.medicine_conditions.join(", ")}`
+                          : null,
+                        supplyDetails?.medicine_other_description
+                          ? `Legacy mô tả: ${supplyDetails.medicine_other_description}`
+                          : null,
+                      ]}
+                    />
+                  )}
+                  {(sosRequest.areBlanketsEnough !== undefined ||
+                    supplyDetails?.blanket_availability ||
+                    supplyDetails?.is_cold_or_wet !== undefined) && (
+                    <DetailCard
+                      title="Chăn mền"
+                      lines={[
+                        sosRequest.areBlanketsEnough === true
+                          ? "Tình trạng: Còn đủ"
+                          : sosRequest.areBlanketsEnough === false
+                            ? `Tình trạng: Không đủ${
+                                sosRequest.blanketRequestCount
+                                  ? `, cần thêm ${sosRequest.blanketRequestCount}`
+                                  : ""
+                              }`
+                            : supplyDetails?.blanket_availability
+                              ? `Legacy: ${supplyDetails.blanket_availability}`
+                              : null,
+                        supplyDetails?.is_cold_or_wet === true
+                          ? "Legacy: Người đang lạnh hoặc ướt"
+                          : null,
+                      ]}
+                    />
+                  )}
+                  {sosRequest.otherSupplyDescription && (
+                    <DetailCard
+                      title="Khác"
+                      lines={[sosRequest.otherSupplyDescription]}
+                    />
+                  )}
+                  {!specialDietPersons.length &&
+                    !!supplyDetails?.special_diet_need && (
+                      <DetailCard
+                        title="Chế độ ăn đặc biệt"
+                        lines={[`Legacy: ${supplyDetails.special_diet_need}`]}
+                      />
+                    )}
+                  {!clothingPersons.length && !!supplyDetails?.clothing_status && (
+                    <DetailCard
+                      title="Quần áo"
+                      lines={[`Legacy: ${supplyDetails.clothing_status}`]}
+                    />
+                  )}
+                </div>
+
+                {requestedPeople.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Yêu cầu theo người
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {requestedPeople.map((person, index) => (
+                        <div
+                          key={`${person.name}-${index}`}
+                          className="rounded-lg border bg-background px-3 py-3 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold leading-snug">
+                                {person.name}
+                              </p>
+                              {person.personType && (
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {person.personType === "ELDERLY"
+                                    ? "Người già"
+                                    : person.personType === "CHILD"
+                                      ? "Trẻ em"
+                                      : "Người lớn"}
+                                </p>
+                              )}
+                            </div>
+                            {person.gender && (
+                              <Badge variant="outline" className="text-[10.5px]">
+                                {getClothingGenderLabel(person.gender)}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="mt-2 text-sm text-muted-foreground">
+                            Yêu cầu: {person.needs.join(", ")}
+                          </div>
+                          {person.dietDescription && (
+                            <div className="mt-1 text-sm text-muted-foreground">
+                              Chế độ ăn: {person.dietDescription}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             {/* System Analysis & AI Scores */}
             {(ruleEvaluation ||
@@ -1134,7 +1334,7 @@ const SOSDetailsPanel = ({
                               ) {
                                 parsedItems = ruleEvaluation.itemsNeeded;
                               }
-                            } catch (e) {}
+                            } catch {}
 
                             if (!parsedItems || parsedItems.length === 0)
                               return null;
