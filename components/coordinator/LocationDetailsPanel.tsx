@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { DepotEntity } from "@/services/depot/type";
 import {
   useAssemblyPointById,
@@ -53,6 +54,8 @@ import {
   Hash,
   Info,
   CalendarBlank,
+  CaretDown,
+  CaretUp,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { AxiosError } from "axios";
@@ -70,20 +73,42 @@ const assemblyTeamTypeLabel: Record<AssemblyPointTeam["teamType"], string> = {
   Transportation: "Vận chuyển",
 };
 
-const assemblyTeamStatusLabel: Record<AssemblyPointTeam["status"], string> = {
+const assemblyTeamStatusLabel: Record<string, string> = {
   AwaitingAcceptance: "Chờ xác nhận",
   Ready: "Sẵn sàng",
   Gathering: "Đang tập hợp",
+  Available: "Sẵn sàng điều phối",
+  Assigned: "Đã phân công",
+  OnMission: "Đang làm nhiệm vụ",
+  Stuck: "Gặp sự cố",
+  Unavailable: "Không khả dụng",
+  Disbanded: "Đã giải tán",
 };
 
-const assemblyTeamStatusColor: Record<AssemblyPointTeam["status"], string> = {
+const assemblyTeamStatusColor: Record<string, string> = {
   AwaitingAcceptance:
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300",
   Ready:
     "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300",
   Gathering:
     "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-300",
+  Available:
+    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300",
+  Assigned:
+    "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300",
+  OnMission:
+    "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800/60 dark:bg-violet-950/40 dark:text-violet-300",
+  Stuck:
+    "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-300",
+  Unavailable:
+    "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300",
+  Disbanded:
+    "border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-800/60 dark:bg-zinc-950/40 dark:text-zinc-300",
 };
+
+function formatStatusText(status: string): string {
+  return status.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
 
 const memberStatusLabel: Record<AssemblyPointTeamMember["status"], string> = {
   Accepted: "Đã xác nhận",
@@ -653,9 +678,13 @@ function AssemblyPointDetails({
   assemblyPoint: AssemblyPointEntity;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [assemblyDateInput, setAssemblyDateInput] = useState<Date | null>(null);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [expandedTeamIds, setExpandedTeamIds] = useState<
+    Record<number, boolean>
+  >({});
 
   const {
     data: assemblyPointDetail,
@@ -814,7 +843,25 @@ function AssemblyPointDetails({
       "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300")
     : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300";
 
-  const shouldShowOpenCheckIn = selectedEvent?.status !== "Gathering";
+  const shouldShowOpenCheckIn =
+    hasActiveEvent && selectedEvent?.status !== "Gathering";
+  const shouldShowCreateTeam =
+    hasActiveEvent && selectedEvent?.status === "Gathering";
+
+  const handleCreateTeam = () => {
+    const eventId = selectedEvent?.eventId ?? selectedEventId;
+    const query = eventId
+      ? `?assemblyPointId=${assemblyPoint.id}&eventId=${eventId}`
+      : "";
+    router.push(`/dashboard/coordinator/rescue-teams/create${query}`);
+  };
+
+  const toggleTeamExpand = (teamId: number) => {
+    setExpandedTeamIds((previous) => ({
+      ...previous,
+      [teamId]: !previous[teamId],
+    }));
+  };
 
   return (
     <>
@@ -894,31 +941,34 @@ function AssemblyPointDetails({
             label="Chia sẻ"
             color="text-purple-600 dark:text-purple-400"
           />
-          {shouldShowOpenCheckIn && (
+          {hasActiveEvent ? (
+            shouldShowOpenCheckIn ? (
+              <ActionButton
+                icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
+                label="Mở check-in"
+                color="text-[#FF5722]"
+                active={isStartingGathering}
+                disabled={isStartingGathering || !selectedEventId}
+                onClick={handleStartGathering}
+              />
+            ) : shouldShowCreateTeam ? (
+              <ActionButton
+                icon={<Users className="h-5 w-5" />}
+                label="Tạo team"
+                color="text-purple-600 dark:text-purple-400"
+                onClick={handleCreateTeam}
+              />
+            ) : null
+          ) : (
             <ActionButton
               icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
-              label="Mở check-in"
+              label={showScheduleForm ? "Ẩn triệu tập" : "Triệu tập mới"}
               color="text-[#FF5722]"
-              active={isStartingGathering}
-              disabled={isStartingGathering || !selectedEventId}
-              onClick={handleStartGathering}
+              active={showScheduleForm}
+              onClick={() => setShowScheduleForm((prev) => !prev)}
             />
           )}
         </div>
-
-        {!hasActiveEvent && (
-          <div className="mt-2 flex justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 px-3 text-xs text-[#FF5722] hover:bg-[#FF5722]/10"
-              onClick={() => setShowScheduleForm((prev) => !prev)}
-            >
-              {showScheduleForm ? "Ẩn triệu tập" : "Triệu tập mới"}
-            </Button>
-          </div>
-        )}
 
         {!hasActiveEvent && showScheduleForm && (
           <div className="mt-3 rounded-lg border border-[#FF5722]/25 bg-[#FF5722]/5 p-3 space-y-2">
@@ -981,18 +1031,34 @@ function AssemblyPointDetails({
                 value={selectedEventId ? String(selectedEventId) : undefined}
                 onValueChange={(value) => setSelectedEventId(Number(value))}
               >
-                <SelectTrigger className="h-9 w-full border-border/70 bg-white text-xs">
-                  <SelectValue placeholder="Chọn sự kiện để mở check-in" />
+                <SelectTrigger className="h-10 w-full border-border/70 bg-white px-3 py-2">
+                  {selectedEvent ? (
+                    <div className="w-full pr-5 text-left">
+                      <p className="text-sm font-semibold text-foreground">
+                        Sự kiện #{selectedEvent.eventId}
+                      </p>
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="Chọn sự kiện để mở check-in" />
+                  )}
                 </SelectTrigger>
-                <SelectContent className="z-[1250]">
+                <SelectContent className="z-1250">
                   {events.map((event) => (
                     <SelectItem
                       key={event.eventId}
                       value={String(event.eventId)}
-                      className="text-xs"
+                      className="py-2"
                     >
-                      #{event.eventId} •{" "}
-                      {formatDateTimeVi(new Date(event.assemblyDate))}
+                      <div className="min-w-0">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-foreground">
+                            Sự kiện #{event.eventId}
+                          </p>
+                          <p className="truncate text-[11px] text-muted-foreground">
+                            {formatDateTimeVi(new Date(event.assemblyDate))}
+                          </p>
+                        </div>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1069,13 +1135,6 @@ function AssemblyPointDetails({
 
         <div className="h-px bg-border mx-5" />
 
-        {/* Last Updated */}
-        <InfoRow
-          icon={<Clock className="h-5 w-5" />}
-          primary={formatLastUpdated(displayAssemblyPoint.lastUpdatedAt)}
-          secondary="Cập nhật lần cuối"
-        />
-
         <div className="h-px bg-border mx-5" />
 
         {/* Teams */}
@@ -1099,70 +1158,96 @@ function AssemblyPointDetails({
             </div>
           ) : teams.length > 0 ? (
             <div className="space-y-3">
-              {teams.map((team) => (
-                <div
-                  key={team.id}
-                  className="rounded-lg border border-border/60 bg-card px-3 py-2.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">
-                        {team.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {team.code}
-                      </p>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-[10px] h-5 px-2 shrink-0 border",
-                        assemblyTeamStatusColor[team.status],
-                      )}
-                    >
-                      {assemblyTeamStatusLabel[team.status]}
-                    </Badge>
-                  </div>
+              {teams.map((team) => {
+                const statusKey = String(team.status);
+                const statusLabel =
+                  assemblyTeamStatusLabel[statusKey] ??
+                  formatStatusText(statusKey);
+                const statusColor =
+                  assemblyTeamStatusColor[statusKey] ??
+                  "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300";
+                const isExpanded = Boolean(expandedTeamIds[team.id]);
 
-                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{assemblyTeamTypeLabel[team.teamType]}</span>
-                    <span>•</span>
-                    <span>
-                      {team.members.length}/{team.maxMembers} thành viên
-                    </span>
-                  </div>
-
-                  <div className="mt-2 space-y-1.5">
-                    {team.members.map((member) => (
-                      <div
-                        key={member.userId}
-                        className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-2 py-1.5"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium truncate">
-                            {member.firstName} {member.lastName}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground truncate">
-                            {memberRoleLabel[member.roleInTeam]}
-                            {member.isLeader ? " • Leader" : ""}
-                          </p>
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            "text-[10px] h-5 px-2 shrink-0",
-                            member.status === "Accepted"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                              : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-                          )}
-                        >
-                          {memberStatusLabel[member.status]}
-                        </Badge>
+                return (
+                  <div
+                    key={team.id}
+                    className="rounded-lg border border-border/60 bg-card px-3 py-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">
+                          {team.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {team.code}
+                        </p>
                       </div>
-                    ))}
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px] h-5 px-2 shrink-0 border",
+                          statusColor,
+                        )}
+                      >
+                        {statusLabel}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{assemblyTeamTypeLabel[team.teamType]}</span>
+                      <span>•</span>
+                      <span>
+                        {team.members.length}/{team.maxMembers} thành viên
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#FF5722] hover:opacity-80"
+                      onClick={() => toggleTeamExpand(team.id)}
+                    >
+                      {isExpanded ? "Ẩn thành viên" : "Xem thành viên"}
+                      {isExpanded ? (
+                        <CaretUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <CaretDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+
+                    {isExpanded && (
+                      <div className="mt-2 space-y-1.5">
+                        {team.members.map((member) => (
+                          <div
+                            key={member.userId}
+                            className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-2 py-1.5"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">
+                                {member.firstName} {member.lastName}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground truncate">
+                                {memberRoleLabel[member.roleInTeam]}
+                                {member.isLeader ? " • Leader" : ""}
+                              </p>
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "text-[10px] h-5 px-2 shrink-0",
+                                member.status === "Accepted"
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+                              )}
+                            >
+                              {memberStatusLabel[member.status]}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -1185,25 +1270,59 @@ function AssemblyDateTimePicker({
   const [open, setOpen] = useState(false);
   const minAllowedDate = getMinimumGatheringDate();
   const [draft, setDraft] = useState<Date>(value ?? minAllowedDate);
+  const [hourInput, setHourInput] = useState<string>(
+    String(draft.getHours()).padStart(2, "0"),
+  );
+  const [minuteInput, setMinuteInput] = useState<string>(
+    String(draft.getMinutes()).padStart(2, "0"),
+  );
+  const hourOptions = useMemo(
+    () =>
+      Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0")),
+    [],
+  );
+  const minuteOptions = useMemo(
+    () =>
+      Array.from({ length: 60 }, (_, minute) =>
+        String(minute).padStart(2, "0"),
+      ),
+    [],
+  );
 
   useEffect(() => {
     if (!open) return;
-    setDraft(value ?? getMinimumGatheringDate());
+    const d = value ?? getMinimumGatheringDate();
+    setDraft(d);
+    setHourInput(String(d.getHours()).padStart(2, "0"));
+    setMinuteInput(String(d.getMinutes()).padStart(2, "0"));
   }, [open, value]);
 
-  const hourValue = String(draft.getHours()).padStart(2, "0");
-  const minuteValue = String(draft.getMinutes()).padStart(2, "0");
+  const updateTime = (newHour?: number, newMinute?: number) => {
+    const hour = newHour !== undefined ? newHour : parseInt(hourInput, 10) || 0;
+    const minute =
+      newMinute !== undefined ? newMinute : parseInt(minuteInput, 10) || 0;
 
-  const updateHour = (hour: string) => {
-    const base = new Date(draft);
-    base.setHours(Number(hour), base.getMinutes(), 0, 0);
-    setDraft(clampToMinimumDate(base, minAllowedDate));
+    const next = new Date(draft);
+    next.setHours(
+      Math.max(0, Math.min(23, hour)),
+      Math.max(0, Math.min(59, minute)),
+      0,
+      0,
+    );
+    const clamped = clampToMinimumDate(next, minAllowedDate);
+    setDraft(clamped);
+    setHourInput(String(clamped.getHours()).padStart(2, "0"));
+    setMinuteInput(String(clamped.getMinutes()).padStart(2, "0"));
   };
 
-  const updateMinute = (minute: string) => {
-    const base = new Date(draft);
-    base.setHours(base.getHours(), Number(minute), 0, 0);
-    setDraft(clampToMinimumDate(base, minAllowedDate));
+  const handleHourSelect = (val: string) => {
+    setHourInput(val);
+    updateTime(parseInt(val, 10), undefined);
+  };
+
+  const handleMinuteSelect = (val: string) => {
+    setMinuteInput(val);
+    updateTime(undefined, parseInt(val, 10));
   };
 
   const applySelection = () => {
@@ -1233,71 +1352,109 @@ function AssemblyDateTimePicker({
       </PopoverTrigger>
 
       <PopoverContent
-        className="z-[1200] w-[340px] space-y-3 p-3"
+        className="z-1200 w-[calc(100vw-20px)] max-w-[340px] space-y-2.5 p-2.5"
         align="start"
         side="bottom"
-        sideOffset={8}
-        avoidCollisions={false}
+        sideOffset={6}
+        avoidCollisions
+        collisionPadding={12}
       >
-        <Calendar
-          mode="single"
-          selected={draft}
-          onSelect={(date) => {
-            if (!date) return;
-            const next = new Date(date);
-            next.setHours(draft.getHours(), draft.getMinutes(), 0, 0);
-            setDraft(clampToMinimumDate(next, minAllowedDate));
-          }}
-          locale={vi}
-          disabled={(date) => {
-            const dayEnd = new Date(date);
-            dayEnd.setHours(23, 59, 59, 999);
-            return dayEnd.getTime() < minAllowedDate.getTime();
-          }}
-          initialFocus
-        />
-
-        <div className="grid grid-cols-2 gap-2">
-          <Select value={hourValue} onValueChange={updateHour}>
-            <SelectTrigger className="h-8 w-full border-border/60 bg-white text-xs">
-              <SelectValue placeholder="Giờ" />
-            </SelectTrigger>
-            <SelectContent className="z-[1250]">
-              {Array.from({ length: 24 }, (_, hour) => {
-                const value = String(hour).padStart(2, "0");
-                return (
-                  <SelectItem key={value} value={value}>
-                    {value} giờ
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-
-          <Select value={minuteValue} onValueChange={updateMinute}>
-            <SelectTrigger className="h-8 w-full border-border/60 bg-white text-xs">
-              <SelectValue placeholder="Phút" />
-            </SelectTrigger>
-            <SelectContent className="z-[1250]">
-              {Array.from({ length: 60 }, (_, minute) => {
-                const value = String(minute).padStart(2, "0");
-                return (
-                  <SelectItem key={value} value={value}>
-                    {value} phút
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+        <div>
+          <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+            Chọn ngày
+          </p>
+          <Calendar
+            mode="single"
+            selected={draft}
+            onSelect={(date) => {
+              if (!date) return;
+              const next = new Date(date);
+              next.setHours(draft.getHours(), draft.getMinutes(), 0, 0);
+              setDraft(clampToMinimumDate(next, minAllowedDate));
+            }}
+            locale={vi}
+            disabled={(date) => {
+              const dayEnd = new Date(date);
+              dayEnd.setHours(23, 59, 59, 999);
+              return dayEnd.getTime() < minAllowedDate.getTime();
+            }}
+            initialFocus
+            className="rounded-md border border-border/60 bg-background p-2"
+            classNames={{
+              months: "flex flex-col gap-2",
+              month: "flex flex-col gap-2",
+              month_grid: "w-full border-collapse",
+              month_caption: "flex h-6 items-center justify-center pt-0.5",
+              nav: "absolute top-2 left-0 right-0 flex items-center justify-between px-1 z-10",
+              weekdays: "grid grid-cols-7 gap-0",
+              week: "mt-1 grid grid-cols-7 gap-0",
+              weekday:
+                "rounded-md text-center text-[11px] font-normal text-muted-foreground",
+              day: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
+              day_button:
+                "h-7 w-full rounded-none p-0 text-xs font-normal aria-selected:opacity-100",
+            }}
+          />
         </div>
 
-        <div className="flex items-center justify-between border-t pt-2">
+        <div className="border-t pt-2.5">
+          <p className="mb-2 text-[11px] font-medium text-muted-foreground">
+            Chọn thời gian
+          </p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {/* Hour Picker */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Giờ</label>
+              <Select value={hourInput} onValueChange={handleHourSelect}>
+                <SelectTrigger className="h-9 w-full border-border/60 bg-muted/40 text-sm font-semibold">
+                  <SelectValue placeholder="Chọn giờ" />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  className="z-1250 max-h-44 w-(--radix-select-trigger-width) overflow-y-auto"
+                >
+                  {hourOptions.map((hour) => (
+                    <SelectItem key={hour} value={hour}>
+                      {hour}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Minute Picker */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Phút</label>
+              <Select value={minuteInput} onValueChange={handleMinuteSelect}>
+                <SelectTrigger className="h-9 w-full border-border/60 bg-muted/40 text-sm font-semibold">
+                  <SelectValue placeholder="Chọn phút" />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  className="z-1250 max-h-44 w-(--radix-select-trigger-width) overflow-y-auto"
+                >
+                  {minuteOptions.map((minute) => (
+                    <SelectItem key={minute} value={minute}>
+                      {minute}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 border-t pt-2.5">
           <div className="flex items-center gap-1">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs text-muted-foreground"
+              className="h-7 px-2.5 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               onClick={() => {
                 onChange(null);
                 setOpen(false);
@@ -1310,33 +1467,21 @@ function AssemblyDateTimePicker({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs text-muted-foreground"
+              className="h-7 px-2.5 text-xs text-muted-foreground"
               onClick={() => setOpen(false)}
             >
               Hủy
             </Button>
           </div>
 
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs text-[#FF5722] hover:bg-[#FF5722]/10"
-              onClick={() => setDraft(getMinimumGatheringDate())}
-            >
-              Mốc an toàn
-            </Button>
-
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 bg-[#FF5722] px-2 text-xs text-white hover:bg-[#E64A19]"
-              onClick={applySelection}
-            >
-              Áp dụng
-            </Button>
-          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="h-7 bg-[#FF5722] px-3.5 text-xs text-white hover:bg-[#E64A19]"
+            onClick={applySelection}
+          >
+            Áp dụng
+          </Button>
         </div>
       </PopoverContent>
     </Popover>
