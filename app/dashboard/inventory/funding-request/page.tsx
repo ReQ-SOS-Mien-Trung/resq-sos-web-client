@@ -382,9 +382,9 @@ export default function FundingRequestPage() {
 
             const newRows = append
               ? [...prev, ...parsed].map((r, i) => ({
-                  ...r,
-                  row: i + 1,
-                }))
+                ...r,
+                row: i + 1,
+              }))
               : parsed;
             return newRows;
           });
@@ -720,22 +720,20 @@ export default function FundingRequestPage() {
         <div className="flex gap-1 bg-muted/40 rounded-lg p-1 w-fit">
           <button
             onClick={() => setActiveTab("create")}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
-              activeTab === "create"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${activeTab === "create"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             <PaperPlaneTilt size={14} />
             Tạo yêu cầu
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
-              activeTab === "history"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${activeTab === "history"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             <ListBullets size={14} />
             Lịch sử
@@ -747,11 +745,10 @@ export default function FundingRequestPage() {
           </button>
           <button
             onClick={() => setActiveTab("transactions")}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
-              activeTab === "transactions"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${activeTab === "transactions"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+              }`}
           >
             <ClockCounterClockwise size={14} />
             GD kho
@@ -789,11 +786,10 @@ export default function FundingRequestPage() {
                     <Skeleton className="h-8 w-32 rounded" />
                   ) : myFund ? (
                     <>
-                      <p className={`text-2xl font-bold tracking-tighter ${
-                        myFund.balance < 0
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }`}>
+                      <p className={`text-2xl font-bold tracking-tighter ${myFund.balance < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-emerald-600 dark:text-emerald-400"
+                        }`}>
                         {formatMoney(myFund.balance)}
                       </p>
                       {myFund.balance < 0 && (
@@ -1176,7 +1172,7 @@ export default function FundingRequestPage() {
                               key={row.id}
                               className={cn(
                                 hasErrors &&
-                                  "bg-red-50/50 dark:bg-red-950/10",
+                                "bg-red-50/50 dark:bg-red-950/10",
                               )}
                             >
                               <TableCell className="text-center text-xs text-muted-foreground font-mono">
@@ -1382,16 +1378,15 @@ export default function FundingRequestPage() {
                       <div
                         key={req.id}
                         onClick={() => setDetailItem(req)}
-                        className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:bg-muted/30 cursor-pointer transition-colors"
+                        className="flex items-center gap-3 p-3 rounded-xl border border-border/90 hover:bg-muted/30 cursor-pointer transition-colors"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-sm font-semibold tracking-tighter truncate">
-                              {req.description ||
-                                "Yêu cầu #" + req.id}
+                          <div className="flex items-center gap-3">
+                            <p className="text-base font-semibold tracking-tighter truncate">
+                              {"Yêu cầu số " + req.id}
                             </p>
                             <Badge
-                              className={`${st.className} border gap-1 shrink-0`}
+                              className={`${st.className} border gap-1.5 shrink-0 px-2 py-0.5`}
                             >
                               <span
                                 className={`w-1.5 h-1.5 rounded-full ${st.dotColor}`}
@@ -1399,21 +1394,16 @@ export default function FundingRequestPage() {
                               {st.label}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground tracking-tight">
-                            <span className="font-semibold text-emerald-600">
-                              {formatMoney(req.totalAmount)}
-                            </span>
-                            <span>·</span>
-                            <span>
-                              {req.items.length} vật tư
-                            </span>
-                            <span>·</span>
-                            <span>
-                              {new Date(
-                                req.createdAt,
-                              ).toLocaleDateString("vi-VN")}
-                            </span>
-                          </div>
+                        </div>
+                        <div className="flex flex-col items-end shrink-0">
+                          <span className="font-bold text-base text-emerald-600 tracking-tighter">
+                            {formatMoney(req.totalAmount)}
+                          </span>
+                          <span className="text-sm text-muted-foreground tracking-tighter">
+                            {new Date(
+                              req.createdAt,
+                            ).toLocaleDateString("vi-VN")}
+                          </span>
                         </div>
                         <Button
                           variant="ghost"
@@ -1467,9 +1457,8 @@ export default function FundingRequestPage() {
                           key={tx.id}
                           className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:bg-muted/20 transition-colors"
                         >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                            isCredit ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
-                          }`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isCredit ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+                            }`}>
                             {isCredit ? <ArrowDown size={15} weight="bold" /> : <ArrowUp size={15} weight="bold" />}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1477,9 +1466,8 @@ export default function FundingRequestPage() {
                               <p className="text-sm font-semibold tracking-tighter truncate">
                                 {tx.transactionType}
                               </p>
-                              <span className={`text-sm font-bold shrink-0 ${
-                                isCredit ? "text-emerald-600" : "text-rose-600"
-                              }`}>
+                              <span className={`text-sm font-bold shrink-0 ${isCredit ? "text-emerald-600" : "text-rose-600"
+                                }`}>
                                 {isCredit ? "+" : ""}{tx.amount.toLocaleString("vi-VN")}đ
                               </span>
                             </div>
@@ -1540,12 +1528,12 @@ export default function FundingRequestPage() {
               Chi tiết yêu cầu cấp quỹ
             </DialogTitle>
             <DialogDescription className="tracking-tight">
-              Yêu cầu #{detailItem?.id}
+              Yêu cầu số {detailItem?.id}
             </DialogDescription>
           </DialogHeader>
 
           {detailItem && (
-            <div className="space-y-4 py-2">
+            <div className="space-y-4">
               {/* Status + amount */}
               <div className="flex items-center justify-between">
                 <Badge

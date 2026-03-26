@@ -43,6 +43,13 @@ import { DashboardLayout } from "@/components/admin/dashboard";
 import { useCampaigns, useCampaignStatuses } from "@/services/campaign_disbursement";
 import type { CampaignStatus, CampaignEntity } from "@/services/campaign_disbursement";
 import { useCampaignTransactions } from "@/services/transaction";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -71,6 +78,7 @@ export default function CampaignsPage() {
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignEntity | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [txPage, setTxPage] = useState(1);
+  const [txPageSize, setTxPageSize] = useState(10);
 
   const openPanel = (campaign: CampaignEntity) => {
     setSelectedCampaign(campaign);
@@ -85,7 +93,7 @@ export default function CampaignsPage() {
 
   // Transactions for selected campaign
   const { data: txData, isLoading: txLoading } = useCampaignTransactions(
-    { id: selectedCampaign?.id ?? 0, pageNumber: txPage, pageSize: 20 },
+    { id: selectedCampaign?.id ?? 0, pageNumber: txPage, pageSize: txPageSize },
     { enabled: !!selectedCampaign },
   );
 
@@ -558,9 +566,22 @@ export default function CampaignsPage() {
                 {/* Pagination */}
                 {txData && txData.totalPages > 1 && (
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/40">
-                    <p className="text-xs text-muted-foreground tracking-tight">
-                      Trang {txPage} / {txData.totalPages}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground tracking-tight">
+                        Trang {txPage} / {txData.totalPages}
+                      </p>
+                      <Select value={String(txPageSize)} onValueChange={(v) => { setTxPageSize(Number(v)); setTxPage(1); }}>
+                        <SelectTrigger className="w-14 h-6 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-muted-foreground tracking-tight">/ trang</span>
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline" size="sm"

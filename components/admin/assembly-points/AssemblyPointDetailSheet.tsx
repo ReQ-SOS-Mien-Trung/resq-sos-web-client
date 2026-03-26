@@ -130,13 +130,13 @@ function MemberFloatingTooltip({
       </p>
     ) : (
       <>
-        <p className="text-[13px] font-semibold text-foreground tracking-tight mb-2">
+        <p className="text-sm font-semibold text-foreground tracking-tighter mb-2">
           Thành viên ({members.length})
         </p>
         <div className="space-y-1.5 max-w-56">
           {members.map((m) => (
             <div key={m.userId} className="flex items-center gap-2">
-              <Avatar className="h-5 w-5 text-[11px]">
+              <Avatar className="h-6 w-6 text-xs">
                 <AvatarFallback
                   className={cn(
                     m.isLeader && "bg-amber-100 text-amber-800",

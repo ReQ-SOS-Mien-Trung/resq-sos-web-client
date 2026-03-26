@@ -284,10 +284,7 @@ export default function AssemblyPointsPage() {
         {/* Search & filter */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <MagnifyingGlass
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
+           
             <Input
               placeholder="Tìm theo tên hoặc mã..."
               value={search}
@@ -296,6 +293,10 @@ export default function AssemblyPointsPage() {
                 setPage(1);
               }}
               className="pl-10 tracking-tight"
+            />
+             <MagnifyingGlass
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
           </div>
           <div className="flex gap-2 flex-wrap">

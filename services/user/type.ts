@@ -121,13 +121,21 @@ export interface GetUsersParams {
   search?: string;
 }
 
-// Response for rescuers list (no pagination metadata)
+// Response for rescuers list
 export interface GetRescuersResponse {
   items: UserEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
 // Query params for fetching rescuers
 export interface GetRescuersParams {
+  pageNumber?: number;
+  pageSize?: number;
   isBanned?: boolean;
   search?: string;
 }

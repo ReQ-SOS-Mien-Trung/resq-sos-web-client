@@ -92,7 +92,7 @@ const UserPermissionPanel = () => {
   const { data: usersForPermission, isLoading: loadingUsers } =
     useUsersForPermission({
       search: debouncedSearch,
-      pageSize: 8,
+      pageSize: 10,
       roleId: selectedRoleId ?? undefined,
     });
   const { data: userData, isLoading: loadingUserPerms } = useUserPermissions(

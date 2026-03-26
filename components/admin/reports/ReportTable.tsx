@@ -7,10 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { DownloadSimple, Eye } from "@phosphor-icons/react";
 import { ReportTableProps, RescueReport } from "@/type";
 import { getStatusBadge } from "@/lib/constants";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const ReportTable = ({ reports, onView, onDownload }: ReportTableProps) => {
   const [page, setPage] = useState(1);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const totalPages = Math.ceil(reports.length / itemsPerPage);
   const paginatedReports = reports.slice(
@@ -144,10 +151,25 @@ const ReportTable = ({ reports, onView, onDownload }: ReportTableProps) => {
 
         {totalPages > 1 && (
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
-            <div className="text-sm text-muted-foreground">
-              Hiển thị {(page - 1) * itemsPerPage + 1}-
-              {Math.min(page * itemsPerPage, reports.length)} trong tổng số{" "}
-              {reports.length} báo cáo
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-muted-foreground">
+                Hiển thị {(page - 1) * itemsPerPage + 1}-
+                {Math.min(page * itemsPerPage, reports.length)} trong tổng số{" "}
+                {reports.length} báo cáo
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Select value={String(itemsPerPage)} onValueChange={(v) => { setItemsPerPage(Number(v)); setPage(1); }}>
+                  <SelectTrigger className="w-16 h-7 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-muted-foreground">/ trang</span>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button

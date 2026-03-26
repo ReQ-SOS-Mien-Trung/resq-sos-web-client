@@ -31,8 +31,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { User, UserTableProps } from "@/type";
-
-const ITEMS_PER_PAGE = 15;
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type SortColumn = "name" | "email" | "role" | "region" | "status" | "createdAt";
 type SortDir = "asc" | "desc";
@@ -123,12 +128,35 @@ const UserTable = ({
   onBan,
   onActivate,
   onViewDetail,
-  onPrefetch,
   isLoading,
   totalCount,
+  serverPagination,
 }: UserTableProps) => {
-  const [page, setPage] = useState(1);
+  const [_page, _setPage] = useState(1);
+  const [_pageSize, _setPageSize] = useState(10);
   const [sort, setSort] = useState<SortState>(null);
+
+  const isServerMode = !!serverPagination;
+  const page = isServerMode ? serverPagination!.page : _page;
+  const pageSize = isServerMode ? serverPagination!.pageSize : _pageSize;
+
+  const setPage = (val: number | ((prev: number) => number)) => {
+    if (isServerMode) {
+      const resolved = typeof val === 'function' ? val(serverPagination!.page) : val;
+      serverPagination!.onPageChange(resolved);
+    } else {
+      _setPage(val);
+    }
+  };
+
+  const setPageSize = (newSize: number) => {
+    if (isServerMode) {
+      serverPagination!.onPageSizeChange(newSize);
+    } else {
+      _setPageSize(newSize);
+      _setPage(1);
+    }
+  };
   const [search, setSearch] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<User["role"][]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<("active" | "banned")[]>([]);
@@ -212,15 +240,20 @@ const UserTable = ({
   }, [users, search, selectedRoles, selectedStatuses, sort]);
 
   // ── Pagination ────────────────────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE));
+  const displayTotalCount = isServerMode ? serverPagination!.totalCount : filteredAndSorted.length;
+  const totalPages = isServerMode
+    ? serverPagination!.totalPages
+    : Math.max(1, Math.ceil(filteredAndSorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const paginatedUsers = filteredAndSorted.slice(
-    (safePage - 1) * ITEMS_PER_PAGE,
-    safePage * ITEMS_PER_PAGE
+  const paginatedUsers = isServerMode
+    ? filteredAndSorted
+    : filteredAndSorted.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize
   );
-  const startItem = filteredAndSorted.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1;
-  const endItem = Math.min(safePage * ITEMS_PER_PAGE, filteredAndSorted.length);
-  const displayTotal = totalCount ?? filteredAndSorted.length;
+  const startItem = displayTotalCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const endItem = Math.min(safePage * pageSize, displayTotalCount);
+  const displayTotal = totalCount ?? displayTotalCount;
 
   return (
     <Card className="border border-border/50">
@@ -396,7 +429,6 @@ const UserTable = ({
                     <tr
                       key={user.id}
                       onClick={() => onViewDetail?.(user.id)}
-                      onMouseEnter={() => onPrefetch?.(user.id)}
                       className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
                     >
                       <td className="p-3">
@@ -451,11 +483,26 @@ const UserTable = ({
         </div>
 
         {/* ── Pagination ───────────────────────────────────────────────────── */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+          <div className="flex items-center gap-3">
             <div className="text-sm tracking-tighter text-muted-foreground">
-              Hiển thị {startItem}–{endItem} trong {filteredAndSorted.length} người dùng
+              Hiển thị {startItem}–{endItem} trong {displayTotalCount} người dùng
             </div>
+            <div className="flex items-center gap-1.5">
+              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); }}>
+                <SelectTrigger className="w-16 h-7 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>
+            </div>
+          </div>
+          {totalPages > 1 && (
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -501,8 +548,8 @@ const UserTable = ({
                 Sau
               </Button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );

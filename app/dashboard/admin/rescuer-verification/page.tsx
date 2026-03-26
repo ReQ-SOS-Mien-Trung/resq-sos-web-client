@@ -68,13 +68,18 @@ import type {
   RescuerApplicationDetail,
 } from "@/services/rescuer_application/type";
 import { useUpdateUserAvatar } from "@/services/user/hooks";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type StatusFilter = "all" | "Pending" | "Approved" | "Rejected";
 type SortColumn = "name" | "email" | "region" | "status" | "submittedAt";
 type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
-
-const ITEMS_PER_PAGE = 15;
 
 const STATUS_OPTIONS = [
   { value: "Pending", label: "Chờ xét duyệt" },
@@ -154,6 +159,7 @@ const RescuerVerificationPage = () => {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [sort, setSort] = useState<SortState>(null);
   const [reviewDialog, setReviewDialog] = useState<{
     open: boolean;
@@ -367,7 +373,7 @@ const RescuerVerificationPage = () => {
 
   const { data: applicationsData, isLoading: isLoadingApplications } =
     useRescuerApplications({
-      params: { pageNumber: 1, pageSize: 1000, rescuerType: "Volunteer" },
+      params: { pageNumber: page, pageSize, rescuerType: "Volunteer" },
     });
 
   const { mutate: reviewApplication, isPending: isReviewing } =
@@ -391,12 +397,12 @@ const RescuerVerificationPage = () => {
 
   const stats = useMemo(() => {
     return {
-      total: items.length,
+      total: applicationsData?.totalCount ?? 0,
       pending: items.filter((i) => i.status === "Pending").length,
       approved: items.filter((i) => i.status === "Approved").length,
       rejected: items.filter((i) => i.status === "Rejected").length,
     };
-  }, [items]);
+  }, [items, applicationsData?.totalCount]);
 
   const filteredAndSorted = useMemo(() => {
     let result = items;
@@ -1032,14 +1038,12 @@ const RescuerVerificationPage = () => {
     setPage(1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE));
+  const serverTotalCount = applicationsData?.totalCount ?? 0;
+  const totalPages = applicationsData?.totalPages ?? Math.max(1, Math.ceil(filteredAndSorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const paginatedItems = filteredAndSorted.slice(
-    (safePage - 1) * ITEMS_PER_PAGE,
-    safePage * ITEMS_PER_PAGE
-  );
-  const startItem = filteredAndSorted.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1;
-  const endItem = Math.min(safePage * ITEMS_PER_PAGE, filteredAndSorted.length);
+  const paginatedItems = filteredAndSorted;
+  const startItem = serverTotalCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const endItem = Math.min(safePage * pageSize, serverTotalCount);
 
   return (
     <>
@@ -1203,8 +1207,8 @@ const RescuerVerificationPage = () => {
 
                 <div className="ml-auto text-sm tracking-tighter text-muted-foreground whitespace-nowrap">
                   {hasFilters
-                    ? `${filteredAndSorted.length} / ${items.length.toLocaleString("vi-VN")} hồ sơ`
-                    : `${items.length.toLocaleString("vi-VN")} hồ sơ`}
+                    ? `${filteredAndSorted.length} / ${serverTotalCount.toLocaleString("vi-VN")} hồ sơ`
+                    : `${serverTotalCount.toLocaleString("vi-VN")} hồ sơ`}
                 </div>
               </div>
 
@@ -1287,8 +1291,23 @@ const RescuerVerificationPage = () => {
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
-                  <div className="text-sm tracking-tighter text-muted-foreground">
-                    Hiển thị {startItem}–{endItem} trong {filteredAndSorted.length} hồ sơ
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm tracking-tighter text-muted-foreground">
+                      Hiển thị {startItem}–{endItem} trong {serverTotalCount} hồ sơ
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+                        <SelectTrigger className="w-16 h-7 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -1339,7 +1358,7 @@ const RescuerVerificationPage = () => {
                     >
                       Sau
                     </Button>
-                  </div>
+                    </div>
                 </div>
               )}
             </CardContent>

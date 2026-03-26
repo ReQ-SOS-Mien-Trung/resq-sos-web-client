@@ -65,6 +65,7 @@ import {
   ArrowDown,
   ArrowUp,
   List,
+  HandCoinsIcon,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -121,7 +122,6 @@ const STATUS_LABEL_MAP: Record<string, string> = {
   Rejected: "Đã từ chối",
 };
 
-const ITEMS_PER_PAGE = 15;
 const PANEL_WIDTH = 480;
 
 function formatMoney(value: number) {
@@ -264,6 +264,7 @@ export default function FundingRequestsPage() {
   const [selectedDepots, setSelectedDepots] = useState<number[]>([]);
   const [depotFilterOpen, setDepotFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Detail panel
   const [selectedItem, setSelectedItem] =
@@ -274,6 +275,7 @@ export default function FundingRequestsPage() {
   const [selectedDepotFund, setSelectedDepotFund] = useState<DepotFund | null>(null);
   const [depotTxPanelOpen, setDepotTxPanelOpen] = useState(false);
   const [depotTxPage, setDepotTxPage] = useState(1);
+  const [depotTxPageSize, setDepotTxPageSize] = useState(10);
 
   // Review dialogs
   const [approveDialog, setApproveDialog] = useState<{
@@ -304,13 +306,12 @@ export default function FundingRequestsPage() {
   const { data: depotFunds = [], isLoading: loadingFunds } = useDepotFunds();
   const { data: campaignsData } = useCampaigns();
   const activeCampaigns = useMemo(
-    () =>
-      (campaignsData?.items ?? []).filter((c) => c.status === "Active"),
+    () => campaignsData?.items ?? [],
     [campaignsData],
   );
   const { data: categoriesData } = useInventoryCategories();
   const { data: depotTxData, isLoading: loadingDepotTx } = useDepotFundTransactions(
-    { depotId: selectedDepotFund?.depotId ?? 0, pageNumber: depotTxPage, pageSize: 20 },
+    { depotId: selectedDepotFund?.depotId ?? 0, pageNumber: depotTxPage, pageSize: depotTxPageSize },
   );
   const { data: txTypesMeta = [] } = useDepotFundTransactionTypes();
   const { data: refTypesMeta = [] } = useDepotFundReferenceTypes();
@@ -384,15 +385,15 @@ export default function FundingRequestsPage() {
     return result;
   }, [items, search, selectedStatuses, selectedDepots]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice(
-    (safePage - 1) * ITEMS_PER_PAGE,
-    safePage * ITEMS_PER_PAGE,
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
   );
   const startItem =
-    filtered.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1;
-  const endItem = Math.min(safePage * ITEMS_PER_PAGE, filtered.length);
+    filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const endItem = Math.min(safePage * pageSize, filtered.length);
 
   const toggleStatus = (val: string) => {
     setSelectedStatuses((prev) =>
@@ -987,8 +988,23 @@ export default function FundingRequestsPage() {
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
-                <div className="text-sm tracking-tighter text-muted-foreground">
-                  Hiển thị {startItem}–{endItem} trong {filtered.length} yêu cầu
+                <div className="flex items-center gap-3">
+                  <div className="text-sm tracking-tighter text-muted-foreground">
+                    Hiển thị {startItem}–{endItem} trong {filtered.length} yêu cầu
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+                      <SelectTrigger className="w-16 h-7 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -1065,20 +1081,20 @@ export default function FundingRequestsPage() {
                 {/* Meta cards */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                    <p className="text-xs text-muted-foreground tracking-tight flex items-center gap-1 mb-1">
-                      <CurrencyDollar size={11} />
+                    <p className="text-sm text-muted-foreground tracking-tight flex items-center gap-2 mb-1">
+                      <HandCoinsIcon size={16} />
                       Tổng tiền
                     </p>
-                    <p className="text-sm font-bold tracking-tight text-emerald-600">
+                    <p className="text-base font-bold tracking-tight text-emerald-600">
                       {formatMoney(selectedItem.totalAmount)}
                     </p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                    <p className="text-xs text-muted-foreground tracking-tight flex items-center gap-1 mb-1">
-                      <CalendarBlank size={11} />
+                    <p className="text-sm text-muted-foreground tracking-tight flex items-center gap-2 mb-1">
+                      <CalendarBlank size={16} />
                       Ngày gửi
                     </p>
-                    <p className="text-sm tracking-tight">
+                    <p className="text-base tracking-tight">
                       {new Date(selectedItem.createdAt).toLocaleString(
                         "vi-VN",
                       )}
@@ -1088,11 +1104,11 @@ export default function FundingRequestsPage() {
 
                 {/* Description */}
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                  <p className="text-xs text-muted-foreground tracking-tight flex items-center gap-1 mb-1">
-                    <FileText size={11} />
+                  <p className="text-sm text-muted-foreground tracking-tight flex items-center gap-2 mb-1">
+                    <FileText size={16} />
                     Mô tả
                   </p>
-                  <p className="text-sm tracking-tight">
+                  <p className="text-base tracking-tight">
                     {selectedItem.description || "Không có mô tả"}
                   </p>
                 </div>
@@ -1176,14 +1192,14 @@ export default function FundingRequestsPage() {
                         className="rounded-xl border border-border/60 bg-background p-3"
                       >
                         <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <p className="text-sm font-semibold tracking-tighter">
+                          <p className="text-base font-semibold tracking-tighter">
                             {item.itemName}
                           </p>
-                          <span className="text-sm font-bold text-emerald-600 shrink-0">
+                          <span className="text-base tracking-tighter font-bold text-emerald-600 shrink-0">
                             {formatMoney(item.totalPrice)}
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground tracking-tight">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground tracking-tighter">
                           <span>
                             SL: {item.quantity} {item.unit}
                           </span>
@@ -1208,7 +1224,7 @@ export default function FundingRequestsPage() {
                       setApproveDialog({ open: true, item: selectedItem })
                     }
                   >
-                    <CheckCircle size={16} weight="bold" />
+                    
                     Phê duyệt
                   </Button>
                   <Button
@@ -1218,7 +1234,7 @@ export default function FundingRequestsPage() {
                       setRejectDialog({ open: true, item: selectedItem })
                     }
                   >
-                    <XCircle size={16} weight="bold" />
+                    
                     Từ chối
                   </Button>
                 </div>
@@ -1349,9 +1365,22 @@ export default function FundingRequestsPage() {
                 {/* Pagination */}
                 {(depotTxData?.totalPages ?? 0) > 1 && (
                   <div className="flex items-center justify-between pt-3 border-t border-border/40 mt-3">
-                    <p className="text-xs text-muted-foreground tracking-tight">
-                      Trang {depotTxPage}/{depotTxData?.totalPages}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-muted-foreground tracking-tight">
+                        Trang {depotTxPage}/{depotTxData?.totalPages}
+                      </p>
+                      <Select value={String(depotTxPageSize)} onValueChange={(v) => { setDepotTxPageSize(Number(v)); setDepotTxPage(1); }}>
+                        <SelectTrigger className="w-14 h-6 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-xs text-muted-foreground tracking-tight">/ trang</span>
+                    </div>
                     <div className="flex gap-1.5">
                       <button
                         onClick={() => setDepotTxPage((p) => Math.max(1, p - 1))}
@@ -1422,15 +1451,20 @@ export default function FundingRequestsPage() {
                     <SelectItem key={c.id} value={String(c.id)}>
                       <div className="flex items-center justify-between w-full gap-3">
                         <span className="truncate">{c.name}</span>
-                        <span className="text-sm font-semibold text-emerald-600 shrink-0">
-                          {c.totalAmount.toLocaleString("vi-VN")}đ
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {c.status !== "Active" && (
+                            <span className="text-xs text-muted-foreground">[{c.status}]</span>
+                          )}
+                          <span className="text-sm font-semibold text-emerald-600">
+                            {c.totalAmount.toLocaleString("vi-VN")}đ
+                          </span>
+                        </div>
                       </div>
                     </SelectItem>
                   ))}
                   {activeCampaigns.length === 0 && (
                     <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-                      Không có quỹ Active
+                      Không có chiến dịch quỹ nào
                     </div>
                   )}
                 </SelectContent>
@@ -1585,15 +1619,20 @@ export default function FundingRequestsPage() {
                     <SelectItem key={c.id} value={String(c.id)}>
                       <div className="flex items-center justify-between w-full gap-3">
                         <span className="truncate">{c.name}</span>
-                        <span className="text-sm font-semibold text-emerald-600 shrink-0">
-                          {c.totalAmount.toLocaleString("vi-VN")}đ
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {c.status !== "Active" && (
+                            <span className="text-xs text-muted-foreground">[{c.status}]</span>
+                          )}
+                          <span className="text-sm font-semibold text-emerald-600">
+                            {c.totalAmount.toLocaleString("vi-VN")}đ
+                          </span>
+                        </div>
                       </div>
                     </SelectItem>
                   ))}
                   {activeCampaigns.length === 0 && (
                     <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-                      Không có quỹ Active
+                      Không có chiến dịch quỹ nào
                     </div>
                   )}
                 </SelectContent>
