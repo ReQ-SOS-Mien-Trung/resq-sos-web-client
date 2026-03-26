@@ -66,6 +66,10 @@ export interface ClusterSuggestedTeam {
   teamId?: number | null;
   teamName?: string | null;
   teamType?: string | null;
+  reason?: string | null;
+  assemblyPointName?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
   contactPhone?: string | null;
   estimatedEtaMinutes?: number | null;
   [key: string]: unknown;
@@ -82,6 +86,10 @@ export interface ClusterSuggestedActivity {
   depotId: number | null;
   depotName: string | null;
   depotAddress: string | null;
+  assemblyPointId?: number | null;
+  assemblyPointName?: string | null;
+  assemblyPointLatitude?: number | null;
+  assemblyPointLongitude?: number | null;
   suppliesToCollect: ClusterSupplyCollection[] | null;
   suggestedTeam?: ClusterSuggestedTeam | null;
 }

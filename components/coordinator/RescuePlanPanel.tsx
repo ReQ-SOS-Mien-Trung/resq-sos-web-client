@@ -52,6 +52,7 @@ import { getActivityRoute } from "@/services/mission/api";
 import type {
   MissionActivity,
   MissionEntity,
+  MissionType,
   MissionTeam,
   RouteVehicle,
 } from "@/services/mission/type";
@@ -123,10 +124,48 @@ const TEAM_TYPE_LABELS: Record<string, string> = {
   SEARCH_AND_RESCUE: "Tìm kiếm cứu nạn",
 };
 
+const MISSION_TYPE_LABELS: Record<string, string> = {
+  RESCUE: "Cứu hộ",
+  EVACUATE: "Sơ tán",
+  MEDICAL: "Y tế",
+  SUPPLY: "Cứu trợ",
+  MIXED: "Tổng hợp",
+};
+
 const formatTeamTypeLabel = (teamType?: string | null) => {
   if (!teamType) return "Chưa rõ";
   const normalized = teamType.trim().toUpperCase();
   return TEAM_TYPE_LABELS[normalized] ?? teamType;
+};
+
+const formatMissionTypeLabel = (missionType?: string | null) => {
+  if (!missionType) return "Chưa rõ";
+  const normalized = missionType.trim().toUpperCase();
+  return MISSION_TYPE_LABELS[normalized] ?? missionType;
+};
+
+const normalizeEditMissionType = (value?: string | null): MissionType => {
+  const normalized = (value ?? "").trim().toUpperCase();
+
+  if (normalized === "MIXED") return "MIXED";
+  if (
+    normalized === "SUPPLY" ||
+    normalized === "MEDICAL" ||
+    normalized === "EVACUATE" ||
+    normalized === "RELIEF"
+  ) {
+    return "RELIEF";
+  }
+  if (normalized === "RESCUER") return "RESCUER";
+  return "RESCUE";
+};
+
+const formatCoordinateLabel = (
+  lat?: number | null,
+  lng?: number | null,
+): string | null => {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return `${lat!.toFixed(4)}, ${lng!.toFixed(4)}`;
 };
 
 const buildLeafletMapKey = (points: [number, number][]) =>
@@ -144,7 +183,7 @@ const RoutePreviewFitBounds = ({ points }: { points: [number, number][] }) => {
 
       try {
         const container = map.getContainer();
-        if (!container || !map._loaded) return;
+        if (!container) return;
 
         map.invalidateSize(false);
 
@@ -779,6 +818,55 @@ interface RouteSegment {
 const COORD_EPSILON = 0.0005; // ~55m tolerance for "same location"
 const HUE_DEFAULT_ORIGIN = { lat: 16.4637, lng: 107.5909 };
 const SOS_COORD_MATCH_EPSILON = 0.003; // ~330m tolerance for SOS coordinate matching
+const VEHICLE_PRIORITY: RouteVehicle[] = ["bike", "car", "hd"];
+const VEHICLE_LABELS: Record<RouteVehicle, string> = {
+  bike: "Xe máy",
+  car: "Ô tô",
+  taxi: "Taxi",
+  hd: "Xe tải",
+};
+
+function buildVehicleTryOrder(preferred: RouteVehicle): RouteVehicle[] {
+  const next = [preferred, ...VEHICLE_PRIORITY.filter((v) => v !== preferred)];
+  return Array.from(new Set(next));
+}
+
+function estimateDurationSeconds(
+  distanceMeters: number,
+  vehicle: RouteVehicle,
+) {
+  const speedByVehicleKmh: Record<RouteVehicle, number> = {
+    bike: 28,
+    car: 42,
+    taxi: 40,
+    hd: 32,
+  };
+  const speedMps = (speedByVehicleKmh[vehicle] * 1000) / 3600;
+  if (!Number.isFinite(speedMps) || speedMps <= 0) {
+    return Math.round(distanceMeters / 8);
+  }
+  return Math.max(60, Math.round(distanceMeters / speedMps));
+}
+
+function haversineDistanceMeters(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+) {
+  const R = 6371e3;
+  const phi1 = (origin.lat * Math.PI) / 180;
+  const phi2 = (destination.lat * Math.PI) / 180;
+  const deltaPhi = ((destination.lat - origin.lat) * Math.PI) / 180;
+  const deltaLambda = ((destination.lng - origin.lng) * Math.PI) / 180;
+
+  const a =
+    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+    Math.cos(phi1) *
+      Math.cos(phi2) *
+      Math.sin(deltaLambda / 2) *
+      Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 const RESCUE_ROUTE_ACTIVITY_TYPES = new Set([
   "COLLECT_SUPPLIES",
   "DELIVER_SUPPLIES",
@@ -1252,6 +1340,9 @@ const MissionRoutePreview = ({
   const [totalDistance, setTotalDistance] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
   const [fetchProgress, setFetchProgress] = useState(0);
+  const [fallbackSegments, setFallbackSegments] = useState(0);
+  const [alternativeVehicleSegments, setAlternativeVehicleSegments] =
+    useState(0);
   const abortRef = useRef(false);
 
   const routeOrigin = useMemo(() => {
@@ -1445,6 +1536,8 @@ const MissionRoutePreview = ({
     setError(null);
     setSegments([]);
     setFetchProgress(0);
+    setFallbackSegments(0);
+    setAlternativeVehicleSegments(0);
 
     let currentOrigin = { lat: originCoords.lat, lng: originCoords.lng };
 
@@ -1452,6 +1545,8 @@ const MissionRoutePreview = ({
       const allSegments: RouteSegment[] = [];
       let distanceSum = 0;
       let durationSum = 0;
+      let fallbackCount = 0;
+      let altVehicleCount = 0;
 
       for (let i = 0; i < uniqueWaypoints.length; i++) {
         if (abortRef.current) return;
@@ -1465,18 +1560,29 @@ const MissionRoutePreview = ({
         if (!isSameAsOrigin) {
           // Use the first activity in this waypoint group for the API call
           const representativeAct = wp.activities[0];
-          try {
-            const resp = await getActivityRoute({
-              missionId: mission.id,
-              activityId: representativeAct.id,
-              originLat: currentOrigin.lat,
-              originLng: currentOrigin.lng,
-              vehicle,
-            });
-            if (resp.route?.overviewPolyline) {
+          let segmentAdded = false;
+          const tryVehicles = buildVehicleTryOrder(vehicle);
+
+          for (const tryVehicle of tryVehicles) {
+            try {
+              const resp = await getActivityRoute({
+                missionId: mission.id,
+                activityId: representativeAct.id,
+                originLat: currentOrigin.lat,
+                originLng: currentOrigin.lng,
+                vehicle: tryVehicle,
+              });
+              if (!resp.route?.overviewPolyline) {
+                continue;
+              }
+
               const decoded = polylineDecode.decode(
                 resp.route.overviewPolyline,
               ) as [number, number][];
+              if (decoded.length < 2) {
+                continue;
+              }
+
               allSegments.push({
                 index: i,
                 waypoint: wp,
@@ -1488,9 +1594,49 @@ const MissionRoutePreview = ({
               });
               distanceSum += resp.route.totalDistanceMeters;
               durationSum += resp.route.totalDurationSeconds;
+              if (tryVehicle !== vehicle) {
+                altVehicleCount += 1;
+              }
+              segmentAdded = true;
+              break;
+            } catch {
+              // Try next vehicle profile for the same segment.
             }
-          } catch {
-            // Skip failed segments
+          }
+
+          if (!segmentAdded) {
+            // Final fallback: draw a direct line so the mission route still renders.
+            const distanceMeters = Math.round(
+              haversineDistanceMeters(currentOrigin, {
+                lat: wp.lat,
+                lng: wp.lng,
+              }),
+            );
+            const durationSeconds = estimateDurationSeconds(
+              distanceMeters,
+              vehicle,
+            );
+            allSegments.push({
+              index: i,
+              waypoint: wp,
+              points: [
+                [currentOrigin.lat, currentOrigin.lng],
+                [wp.lat, wp.lng],
+              ],
+              distance:
+                distanceMeters < 1000
+                  ? `${distanceMeters}m`
+                  : `${(distanceMeters / 1000).toFixed(1)} km`,
+              duration:
+                durationSeconds < 3600
+                  ? `${Math.round(durationSeconds / 60)} phút`
+                  : `${Math.floor(durationSeconds / 3600)}h ${Math.round((durationSeconds % 3600) / 60)}p`,
+              distanceMeters,
+              durationSeconds,
+            });
+            distanceSum += distanceMeters;
+            durationSum += durationSeconds;
+            fallbackCount += 1;
           }
         }
 
@@ -1503,6 +1649,8 @@ const MissionRoutePreview = ({
         setSegments(allSegments);
         setTotalDistance(distanceSum);
         setTotalDuration(durationSum);
+        setFallbackSegments(fallbackCount);
+        setAlternativeVehicleSegments(altVehicleCount);
         setLoading(false);
       }
     })();
@@ -1635,6 +1783,17 @@ const MissionRoutePreview = ({
               {uniqueWaypoints.length} điểm · {segments.length} đoạn đường
             </span>
           </div>
+
+          {(fallbackSegments > 0 || alternativeVehicleSegments > 0) && (
+            <p className="text-[10px] text-amber-700 dark:text-amber-300">
+              {alternativeVehicleSegments > 0
+                ? `${alternativeVehicleSegments} đoạn đã tự đổi phương tiện để tìm đường. `
+                : ""}
+              {fallbackSegments > 0
+                ? `${fallbackSegments} đoạn dùng lộ trình ước lượng đường thẳng do API chưa trả tuyến.`
+                : ""}
+            </p>
+          )}
 
           {originCoords && allPoints.length > 1 && (
             <div className="h-[28rem] overflow-hidden rounded-lg border bg-background">
@@ -1937,6 +2096,44 @@ const SuggestionCard = ({
                             ? ` • ETA: ${act.suggestedTeam.estimatedEtaMinutes} phút`
                             : ""}
                         </p>
+                        {act.suggestedTeam.reason && (
+                          <p className="text-[10px] text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
+                            Lý do: {act.suggestedTeam.reason}
+                          </p>
+                        )}
+                        {act.suggestedTeam.assemblyPointName && (
+                          <p className="text-[10px] text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
+                            Điểm tập kết đội:{" "}
+                            {act.suggestedTeam.assemblyPointName}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {(act.assemblyPointName ||
+                      (act.assemblyPointLatitude != null &&
+                        act.assemblyPointLongitude != null)) && (
+                      <div className="mt-1 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15 px-2 py-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                          <MapPin className="h-3 w-3" weight="fill" />
+                          Điểm tập kết hoạt động
+                        </p>
+                        {act.assemblyPointName && (
+                          <p className="text-[11px] font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
+                            {act.assemblyPointName}
+                          </p>
+                        )}
+                        {formatCoordinateLabel(
+                          act.assemblyPointLatitude,
+                          act.assemblyPointLongitude,
+                        ) && (
+                          <p className="text-[10px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                            Tọa độ:{" "}
+                            {formatCoordinateLabel(
+                              act.assemblyPointLatitude,
+                              act.assemblyPointLongitude,
+                            )}
+                          </p>
+                        )}
                       </div>
                     )}
                     {act.suppliesToCollect &&
@@ -2039,9 +2236,7 @@ const RescuePlanPanel = ({
       };
 
   const [editActivities, setEditActivities] = useState<EditableActivity[]>([]);
-  const [editMissionType, setEditMissionType] = useState<"RESCUE" | "RESCUER">(
-    "RESCUE",
-  );
+  const [editMissionType, setEditMissionType] = useState<MissionType>("RESCUE");
   const [editPriorityScore, setEditPriorityScore] = useState(5);
   const [editStartTime, setEditStartTime] = useState("");
   const [editExpectedEndTime, setEditExpectedEndTime] = useState("");
@@ -2316,6 +2511,66 @@ const RescuePlanPanel = ({
             a.suppliesToCollect,
           );
 
+          const rawSosRequestId =
+            a.sosRequestId != null ? Number(a.sosRequestId) : Number(sos?.id);
+          const sosRequestId =
+            Number.isFinite(rawSosRequestId) && rawSosRequestId > 0
+              ? rawSosRequestId
+              : null;
+
+          const rawDepotId = a.depotId != null ? Number(a.depotId) : Number.NaN;
+          const depotId =
+            Number.isFinite(rawDepotId) && rawDepotId > 0 ? rawDepotId : null;
+
+          const depotName =
+            typeof a.depotName === "string" && a.depotName.trim()
+              ? a.depotName.trim()
+              : null;
+
+          const depotAddress =
+            typeof a.depotAddress === "string" && a.depotAddress.trim()
+              ? a.depotAddress.trim()
+              : null;
+
+          const rawAssemblyPointId =
+            a.assemblyPointId != null ? Number(a.assemblyPointId) : Number.NaN;
+          const assemblyPointId =
+            Number.isFinite(rawAssemblyPointId) && rawAssemblyPointId > 0
+              ? rawAssemblyPointId
+              : null;
+          const assemblyPointName =
+            typeof a.assemblyPointName === "string" &&
+            a.assemblyPointName.trim()
+              ? a.assemblyPointName.trim()
+              : null;
+          const rawAssemblyPointLat =
+            a.assemblyPointLatitude != null
+              ? Number(a.assemblyPointLatitude)
+              : Number.NaN;
+          const assemblyPointLatitude = Number.isFinite(rawAssemblyPointLat)
+            ? rawAssemblyPointLat
+            : null;
+          const rawAssemblyPointLng =
+            a.assemblyPointLongitude != null
+              ? Number(a.assemblyPointLongitude)
+              : Number.NaN;
+          const assemblyPointLongitude = Number.isFinite(rawAssemblyPointLng)
+            ? rawAssemblyPointLng
+            : null;
+
+          const selectedSos =
+            sosRequestId != null
+              ? clusterSOSRequests.find(
+                  (s) => String(s.id) === String(sosRequestId),
+                )
+              : null;
+
+          const rawRescueTeamId = Number(a.suggestedTeam?.teamId);
+          const rescueTeamId =
+            Number.isFinite(rawRescueTeamId) && rawRescueTeamId > 0
+              ? rawRescueTeamId
+              : null;
+
           return {
             step: i + 1,
             activityCode: `${a.activityType}_${i + 1}`,
@@ -2323,37 +2578,35 @@ const RescuePlanPanel = ({
             description: syncedDescription,
             priority: a.priority || "Medium",
             estimatedTime: Number.parseInt(String(a.estimatedTime), 10) || 30,
-            sosRequestId: Number(a.sosRequestId ?? sos?.id ?? 0),
-            depotId: Number(a.depotId ?? 0),
-            depotName: a.depotName ?? "",
-            depotAddress: a.depotAddress ?? "",
+            sosRequestId,
+            depotId,
+            depotName,
+            depotAddress,
+            assemblyPointId,
+            assemblyPointName,
+            assemblyPointLatitude,
+            assemblyPointLongitude,
             suppliesToCollect: (a.suppliesToCollect ?? []).map((s) => ({
-              id: s.itemId,
-              name: s.itemName,
+              id: typeof s.itemId === "number" ? s.itemId : null,
+              name:
+                typeof s.itemName === "string" && s.itemName.trim()
+                  ? s.itemName.trim()
+                  : null,
               quantity: s.quantity,
               unit: s.unit,
             })),
-            target:
-              a.depotName || `SOS ${a.sosRequestId || sos?.id || "unknown"}`,
+            target: depotName || `SOS ${sosRequestId || sos?.id || "unknown"}`,
             targetLatitude:
               extractCoordsFromDescription(syncedDescription)?.lat ??
-              (a.sosRequestId
-                ? (clusterSOSRequests.find(
-                    (s) => String(s.id) === String(a.sosRequestId),
-                  )?.location?.lat ??
-                  sos?.location?.lat ??
-                  0)
+              (sosRequestId
+                ? (selectedSos?.location?.lat ?? sos?.location?.lat ?? 0)
                 : (sos?.location?.lat ?? 0)),
             targetLongitude:
               extractCoordsFromDescription(syncedDescription)?.lng ??
-              (a.sosRequestId
-                ? (clusterSOSRequests.find(
-                    (s) => String(s.id) === String(a.sosRequestId),
-                  )?.location?.lng ??
-                  sos?.location?.lng ??
-                  0)
+              (sosRequestId
+                ? (selectedSos?.location?.lng ?? sos?.location?.lng ?? 0)
                 : (sos?.location?.lng ?? 0)),
-            rescueTeamId: a.suggestedTeam?.teamId ?? null,
+            rescueTeamId,
           };
         }),
       },
@@ -2478,7 +2731,9 @@ const RescuePlanPanel = ({
       setEditActivities([]);
       setEditPriorityScore(5);
     }
-    setEditMissionType("RESCUE");
+    setEditMissionType(
+      normalizeEditMissionType(activeSuggestion?.suggestedMissionType),
+    );
     const now = new Date();
     setEditStartTime(now.toISOString().slice(0, 16));
     const end = new Date(now.getTime() + 4 * 60 * 60 * 1000);
@@ -2519,13 +2774,15 @@ const RescuePlanPanel = ({
             depotId: null,
             depotName: isDepot ? a.target || null : null,
             depotAddress: null,
+            assemblyPointId: a.assemblyPointId ?? null,
+            assemblyPointName: a.assemblyPointName ?? null,
+            assemblyPointLatitude: a.assemblyPointLatitude ?? null,
+            assemblyPointLongitude: a.assemblyPointLongitude ?? null,
             suppliesToCollect: a.suppliesToCollect,
           };
         }),
       );
-      setEditMissionType(
-        (mission.missionType as "RESCUE" | "RESCUER") || "RESCUE",
-      );
+      setEditMissionType(normalizeEditMissionType(mission.missionType));
       setEditPriorityScore(mission.priorityScore);
       setEditStartTime(new Date(mission.startTime).toISOString().slice(0, 16));
       setEditExpectedEndTime(
@@ -2719,8 +2976,26 @@ const RescuePlanPanel = ({
                         variant="outline"
                         className="text-[10px] px-1.5 py-0 h-5"
                       >
-                        {activeSuggestion.suggestedMissionType}
+                        {formatMissionTypeLabel(
+                          activeSuggestion.suggestedMissionType,
+                        )}
                       </Badge>
+                      {activeSuggestion.multiDepotRecommended && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0 h-5 border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-300"
+                        >
+                          Nhiều kho
+                        </Badge>
+                      )}
+                      {activeSuggestion.needsManualReview && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0 h-5 border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300"
+                        >
+                          Cần duyệt tay
+                        </Badge>
+                      )}
                     </>
                   ) : (
                     <Badge
@@ -3034,13 +3309,9 @@ const RescuePlanPanel = ({
                                           variant="outline"
                                           className="text-xs h-5 px-2 shrink-0 font-semibold"
                                         >
-                                          {mission.missionType?.toUpperCase() ===
-                                          "RESCUE"
-                                            ? "Cứu hộ"
-                                            : mission.missionType?.toUpperCase() ===
-                                                "RESCUER"
-                                              ? "Điều phối"
-                                              : mission.missionType}
+                                          {formatMissionTypeLabel(
+                                            mission.missionType,
+                                          )}
                                         </Badge>
                                       </div>
                                       <div className="flex items-center gap-1.5 shrink-0">
@@ -3159,6 +3430,11 @@ const RescuePlanPanel = ({
                                   <span>
                                     Ưu tiên: {mission.priorityScore.toFixed(1)}
                                   </span>
+                                  {mission.suggestedSeverityLevel && (
+                                    <span>
+                                      Mức độ: {mission.suggestedSeverityLevel}
+                                    </span>
+                                  )}
                                   <span>{mission.activityCount} bước</span>
                                   {mission.modelName && (
                                     <span className="flex items-center gap-1">
@@ -3530,6 +3806,76 @@ const RescuePlanPanel = ({
                                                           <p className="text-sm text-foreground/80 leading-relaxed font-medium">
                                                             {displayDescription}
                                                           </p>
+
+                                                          {(activity.assemblyPointName ||
+                                                            (activity.assemblyPointLatitude !=
+                                                              null &&
+                                                              activity.assemblyPointLongitude !=
+                                                                null)) && (
+                                                            <div className="mt-2 p-2 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15">
+                                                              <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
+                                                                <MapPin
+                                                                  className="h-3 w-3"
+                                                                  weight="fill"
+                                                                />
+                                                                Điểm tập kết
+                                                                hoạt động
+                                                              </p>
+                                                              {activity.assemblyPointName && (
+                                                                <p className="text-[11px] font-semibold text-blue-800 dark:text-blue-200">
+                                                                  {
+                                                                    activity.assemblyPointName
+                                                                  }
+                                                                </p>
+                                                              )}
+                                                              {formatCoordinateLabel(
+                                                                activity.assemblyPointLatitude,
+                                                                activity.assemblyPointLongitude,
+                                                              ) && (
+                                                                <p className="text-[11px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                                                                  Tọa độ:{" "}
+                                                                  {formatCoordinateLabel(
+                                                                    activity.assemblyPointLatitude,
+                                                                    activity.assemblyPointLongitude,
+                                                                  )}
+                                                                </p>
+                                                              )}
+                                                            </div>
+                                                          )}
+
+                                                          {(activity.completedBy ||
+                                                            activity.completedAt) && (
+                                                            <div className="mt-2 p-2 rounded-md border border-slate-200/80 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-900/20">
+                                                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                                                                <CheckCircle
+                                                                  className="h-3 w-3"
+                                                                  weight="fill"
+                                                                />
+                                                                Thông tin hoàn
+                                                                tất bước
+                                                              </p>
+                                                              {activity.completedBy && (
+                                                                <p className="text-[11px] text-slate-700/85 dark:text-slate-300/85">
+                                                                  Người hoàn
+                                                                  tất:{" "}
+                                                                  {
+                                                                    activity.completedBy
+                                                                  }
+                                                                </p>
+                                                              )}
+                                                              {activity.completedAt && (
+                                                                <p className="text-[11px] text-slate-700/85 dark:text-slate-300/85">
+                                                                  Thời điểm:{" "}
+                                                                  {new Date(
+                                                                    activity.completedAt,
+                                                                  ).toLocaleString(
+                                                                    "vi-VN",
+                                                                  )}
+                                                                </p>
+                                                              )}
+                                                            </div>
+                                                          )}
+
                                                           {teamsForStep.length >
                                                             0 && (
                                                             <div className="mt-2 p-2 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
@@ -3563,6 +3909,33 @@ const RescuePlanPanel = ({
                                                                           {team.teamName ||
                                                                             `Đội #${team.rescueTeamId}`}
                                                                         </p>
+                                                                        {team.assemblyPointName && (
+                                                                          <p className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                                            Điểm
+                                                                            tập
+                                                                            kết:{" "}
+                                                                            {
+                                                                              team.assemblyPointName
+                                                                            }
+                                                                          </p>
+                                                                        )}
+                                                                        {formatCoordinateLabel(
+                                                                          team.latitude,
+                                                                          team.longitude,
+                                                                        ) && (
+                                                                          <p className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                                            Vị
+                                                                            trí
+                                                                            đội:{" "}
+                                                                            {formatCoordinateLabel(
+                                                                              team.latitude,
+                                                                              team.longitude,
+                                                                            )}
+                                                                            {team.locationSource
+                                                                              ? ` (${team.locationSource})`
+                                                                              : ""}
+                                                                          </p>
+                                                                        )}
                                                                         <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                                                                           {team.teamCode && (
                                                                             <Badge
@@ -3764,7 +4137,7 @@ const RescuePlanPanel = ({
                               <Select
                                 value={editMissionType}
                                 onValueChange={(v) =>
-                                  setEditMissionType(v as "RESCUE" | "RESCUER")
+                                  setEditMissionType(v as MissionType)
                                 }
                               >
                                 <SelectTrigger className="h-8 text-xs mt-1">
@@ -3772,6 +4145,12 @@ const RescuePlanPanel = ({
                                 </SelectTrigger>
                                 <SelectContent className="z-[1200]">
                                   <SelectItem value="RESCUE">Cứu hộ</SelectItem>
+                                  <SelectItem value="RELIEF">
+                                    Cứu trợ
+                                  </SelectItem>
+                                  <SelectItem value="MIXED">
+                                    Tổng hợp
+                                  </SelectItem>
                                   <SelectItem value="RESCUER">
                                     Cứu hộ viên
                                   </SelectItem>
@@ -4640,6 +5019,59 @@ const RescuePlanPanel = ({
                                                     ? ` • ETA: ${activity.suggestedTeam.estimatedEtaMinutes} phút`
                                                     : ""}
                                                 </p>
+                                                {activity.suggestedTeam
+                                                  .reason && (
+                                                  <p className="text-[11px] text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
+                                                    Lý do:{" "}
+                                                    {
+                                                      activity.suggestedTeam
+                                                        .reason
+                                                    }
+                                                  </p>
+                                                )}
+                                                {activity.suggestedTeam
+                                                  .assemblyPointName && (
+                                                  <p className="text-[11px] text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
+                                                    Điểm tập kết đội:{" "}
+                                                    {
+                                                      activity.suggestedTeam
+                                                        .assemblyPointName
+                                                    }
+                                                  </p>
+                                                )}
+                                              </div>
+                                            )}
+
+                                            {(activity.assemblyPointName ||
+                                              (activity.assemblyPointLatitude !=
+                                                null &&
+                                                activity.assemblyPointLongitude !=
+                                                  null)) && (
+                                              <div className="mt-2 p-2 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15">
+                                                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
+                                                  <MapPin
+                                                    className="h-3 w-3"
+                                                    weight="fill"
+                                                  />
+                                                  Điểm tập kết hoạt động
+                                                </p>
+                                                {activity.assemblyPointName && (
+                                                  <p className="text-xs font-semibold text-blue-800 dark:text-blue-200">
+                                                    {activity.assemblyPointName}
+                                                  </p>
+                                                )}
+                                                {formatCoordinateLabel(
+                                                  activity.assemblyPointLatitude,
+                                                  activity.assemblyPointLongitude,
+                                                ) && (
+                                                  <p className="text-[11px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                                                    Tọa độ:{" "}
+                                                    {formatCoordinateLabel(
+                                                      activity.assemblyPointLatitude,
+                                                      activity.assemblyPointLongitude,
+                                                    )}
+                                                  </p>
+                                                )}
                                               </div>
                                             )}
 
@@ -4720,12 +5152,56 @@ const RescuePlanPanel = ({
                                   <span className="text-xs font-bold text-primary shrink-0">
                                     x{resource.quantity}
                                   </span>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] h-5 px-1.5 shrink-0"
+                                  >
+                                    {resource.priority}
+                                  </Badge>
                                 </div>
                               );
                             },
                           )}
                         </div>
                       </section>
+
+                      {(activeSuggestion.needsManualReview ||
+                        activeSuggestion.lowConfidenceWarning ||
+                        activeSuggestion.multiDepotRecommended) && (
+                        <>
+                          <Separator />
+                          <section className="space-y-2">
+                            <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                              <Info className="h-3.5 w-3.5" weight="fill" />
+                              Cảnh báo hệ thống
+                            </h4>
+                            {activeSuggestion.needsManualReview && (
+                              <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg p-2.5">
+                                <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                                  {activeSuggestion.lowConfidenceWarning ||
+                                    "Kế hoạch cần kiểm tra thủ công trước khi phê duyệt."}
+                                </p>
+                              </div>
+                            )}
+                            {!activeSuggestion.needsManualReview &&
+                              activeSuggestion.lowConfidenceWarning && (
+                                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg p-2.5">
+                                  <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                                    {activeSuggestion.lowConfidenceWarning}
+                                  </p>
+                                </div>
+                              )}
+                            {activeSuggestion.multiDepotRecommended && (
+                              <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30 rounded-lg p-2.5">
+                                <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed">
+                                  Kế hoạch đề xuất phối hợp nhiều kho để đáp ứng
+                                  đủ vật tư.
+                                </p>
+                              </div>
+                            )}
+                          </section>
+                        </>
+                      )}
 
                       {/* Special Notes */}
                       {activeSuggestion.specialNotes && (

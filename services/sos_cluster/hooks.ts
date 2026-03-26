@@ -72,6 +72,60 @@ export interface StreamLogEntry {
   type: "status" | "chunk" | "result" | "error";
 }
 
+const TOOL_LABELS: Record<string, string> = {
+  getTeams: "danh sách đội cứu hộ",
+  getAssemblyPoints: "điểm tập kết",
+  getDepots: "kho vật tư",
+  getDepotInventory: "tồn kho vật tư",
+  getSOSRequests: "dữ liệu yêu cầu SOS",
+  getSOSClusters: "dữ liệu cụm SOS",
+};
+
+function toReadableToolLabel(toolName?: string): string {
+  if (!toolName) return "dữ liệu hiện trường";
+  return TOOL_LABELS[toolName] ?? "dữ liệu hiện trường";
+}
+
+function extractToolName(message: string): string | null {
+  const callMatch = message.match(
+    /(?:tool|công cụ)\s*:?\s*([A-Za-z_][A-Za-z0-9_]*)/i,
+  );
+  if (callMatch?.[1]) return callMatch[1];
+
+  const resultMatch = message.match(/([A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)/);
+  if (resultMatch?.[1]) return resultMatch[1];
+
+  return null;
+}
+
+function normalizeStatusMessage(raw: string): string {
+  const message = raw.trim();
+  if (!message) return "Đang chuẩn bị phân tích...";
+
+  const lower = message.toLowerCase();
+  const toolName = extractToolName(message) ?? undefined;
+  const toolLabel = toReadableToolLabel(toolName);
+
+  if (lower.includes("agent") && lower.includes("công cụ")) {
+    return `AI đang thu thập ${toolLabel}...`;
+  }
+
+  if (lower.includes("công cụ") && lower.includes("đã trả về kết quả")) {
+    return `Đã tải xong ${toolLabel}.`;
+  }
+
+  if (lower === "done") {
+    return "AI đã hoàn tất phân tích.";
+  }
+
+  return message
+    .replace(/([A-Za-z_][A-Za-z0-9_]*)\([^)]*\)/g, (_, fnName: string) =>
+      toReadableToolLabel(fnName),
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * Hook to stream AI rescue suggestion via SSE with real-time updates.
  * Exposes a full activity log so the UI can render an animated timeline.
@@ -112,11 +166,13 @@ export function useAiMissionStream() {
   );
 
   const derivePhase = useCallback((msg: string) => {
-    if (msg.includes("Đang tải")) return "loading-data" as const;
+    if (msg.includes("Đang tải") || msg.includes("thu thập"))
+      return "loading-data" as const;
     if (msg.includes("Đã tải")) return "loading-data" as const;
     if (msg.includes("Đang gọi AI")) return "calling-ai" as const;
     if (msg.includes("Đang xử lý")) return "processing" as const;
     if (msg.includes("Đã lưu")) return "done" as const;
+    if (msg.includes("hoàn tất")) return "done" as const;
     return "connecting" as const;
   }, []);
 
@@ -137,9 +193,10 @@ export function useAiMissionStream() {
 
       abortRef.current = streamClusterRescueSuggestion(clusterId, {
         onStatus: (msg) => {
-          setStatus(msg);
-          addLog(msg, "status");
-          setPhase(derivePhase(msg));
+          const readableMessage = normalizeStatusMessage(msg);
+          setStatus(readableMessage);
+          addLog(readableMessage, "status");
+          setPhase(derivePhase(readableMessage));
         },
         onChunk: (text) => setThinkingText((prev) => prev + text),
         onResult: (res) => {

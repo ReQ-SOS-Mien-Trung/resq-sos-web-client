@@ -989,7 +989,7 @@ function AssemblyPointDetails({
                 className="border-[#FF5722]/40 text-[#FF5722] hover:bg-[#FF5722]/10"
                 onClick={() => setAssemblyDateInput(getMinimumGatheringDate())}
               >
-                Gợi ý an toàn
+                Gợi ý lên lịch
               </Button>
               <Button
                 type="button"

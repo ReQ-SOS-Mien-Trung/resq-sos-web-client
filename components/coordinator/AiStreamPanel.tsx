@@ -886,6 +886,39 @@ function ActivityFlowNode({
                 ? ` • ETA: ${activity.suggestedTeam.estimatedEtaMinutes} phút`
                 : ""}
             </p>
+            {activity.suggestedTeam.reason && (
+              <p className="text-[10px] text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
+                Lý do: {activity.suggestedTeam.reason}
+              </p>
+            )}
+            {activity.suggestedTeam.assemblyPointName && (
+              <p className="text-[10px] text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
+                Điểm tập kết đội: {activity.suggestedTeam.assemblyPointName}
+              </p>
+            )}
+          </div>
+        )}
+
+        {(activity.assemblyPointName ||
+          (activity.assemblyPointLatitude != null &&
+            activity.assemblyPointLongitude != null)) && (
+          <div className="ml-9 mb-2 rounded-lg border border-blue-300/40 bg-blue-50/50 dark:bg-blue-900/15 dark:border-blue-700/40 p-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
+              <MapPin className="h-3 w-3" weight="fill" />
+              Điểm tập kết hoạt động
+            </p>
+            {activity.assemblyPointName && (
+              <p className="text-[11px] font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
+                {activity.assemblyPointName}
+              </p>
+            )}
+            {activity.assemblyPointLatitude != null &&
+              activity.assemblyPointLongitude != null && (
+                <p className="text-[10px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                  Tọa độ: {activity.assemblyPointLatitude.toFixed(4)},{" "}
+                  {activity.assemblyPointLongitude.toFixed(4)}
+                </p>
+              )}
           </div>
         )}
 

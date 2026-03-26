@@ -134,9 +134,8 @@ export default function CoordinatorSOSForm({
   const [lng, setLng] = useState(toCoordinateString(initialCoordinates?.lng));
 
   const [sosType, setSosType] = useState<CoordinatorSOSType | "">("");
-  const [peopleCount, setPeopleCount] = useState<PeopleCountValue>(
-    emptyPeopleCount(),
-  );
+  const [peopleCount, setPeopleCount] =
+    useState<PeopleCountValue>(emptyPeopleCount());
   const [sharedPeople, setSharedPeople] = useState<SharedPerson[]>([]);
   const [rescue, setRescue] = useState<RescueFormState>(createEmptyRescueState);
   const [relief, setRelief] = useState<ReliefFormState>(createEmptyReliefState);
@@ -167,8 +166,8 @@ export default function CoordinatorSOSForm({
   const selectedPerson = useMemo(
     () =>
       activeEditor
-        ? sharedPeople.find((person) => person.id === activeEditor.personId) ??
-          null
+        ? (sharedPeople.find((person) => person.id === activeEditor.personId) ??
+          null)
         : null,
     [activeEditor, sharedPeople],
   );
@@ -184,7 +183,14 @@ export default function CoordinatorSOSForm({
       relief,
       additionalDescription,
     });
-  }, [additionalDescription, peopleCount, relief, rescue, sharedPeople, sosType]);
+  }, [
+    additionalDescription,
+    peopleCount,
+    relief,
+    rescue,
+    sharedPeople,
+    sosType,
+  ]);
 
   const validationWarnings = useMemo(() => {
     const warnings: string[] = [];
@@ -193,7 +199,12 @@ export default function CoordinatorSOSForm({
       warnings.push("Chọn loại SOS.");
     }
 
-    if (!lat || !lng || Number.isNaN(Number(lat)) || Number.isNaN(Number(lng))) {
+    if (
+      !lat ||
+      !lng ||
+      Number.isNaN(Number(lat)) ||
+      Number.isNaN(Number(lng))
+    ) {
       warnings.push("Chưa có tọa độ hợp lệ.");
     }
 
@@ -234,7 +245,8 @@ export default function CoordinatorSOSForm({
       isReliefSOSType(sosType) &&
       relief.specialDietPersonIds.some((personId) => {
         const description =
-          relief.specialDietInfoByPerson[personId]?.dietDescription?.trim() ?? "";
+          relief.specialDietInfoByPerson[personId]?.dietDescription?.trim() ??
+          "";
         return !description;
       })
     ) {
@@ -307,7 +319,10 @@ export default function CoordinatorSOSForm({
       }
 
       const nextSupplies = current.supplies.filter((item) => item !== supply);
-      return clearReliefFollowUp({ ...current, supplies: nextSupplies }, supply);
+      return clearReliefFollowUp(
+        { ...current, supplies: nextSupplies },
+        supply,
+      );
     });
   };
 
@@ -319,7 +334,9 @@ export default function CoordinatorSOSForm({
         delete nextMedicalInfo[personId];
         return {
           ...current,
-          injuredPersonIds: current.injuredPersonIds.filter((id) => id !== personId),
+          injuredPersonIds: current.injuredPersonIds.filter(
+            (id) => id !== personId,
+          ),
           medicalInfoByPerson: nextMedicalInfo,
         };
       }
@@ -353,8 +370,9 @@ export default function CoordinatorSOSForm({
         specialDietPersonIds: [...current.specialDietPersonIds, personId],
         specialDietInfoByPerson: {
           ...current.specialDietInfoByPerson,
-          [personId]:
-            current.specialDietInfoByPerson[personId] ?? { dietDescription: "" },
+          [personId]: current.specialDietInfoByPerson[personId] ?? {
+            dietDescription: "",
+          },
         },
       };
     });
@@ -382,8 +400,9 @@ export default function CoordinatorSOSForm({
         clothingPersonIds: [...current.clothingPersonIds, personId],
         clothingInfoByPerson: {
           ...current.clothingInfoByPerson,
-          [personId]:
-            current.clothingInfoByPerson[personId] ?? { gender: undefined },
+          [personId]: current.clothingInfoByPerson[personId] ?? {
+            gender: undefined,
+          },
         },
       };
     });
@@ -420,7 +439,12 @@ export default function CoordinatorSOSForm({
       return;
     }
 
-    if (!lat || !lng || Number.isNaN(Number(lat)) || Number.isNaN(Number(lng))) {
+    if (
+      !lat ||
+      !lng ||
+      Number.isNaN(Number(lat)) ||
+      Number.isNaN(Number(lng))
+    ) {
       toast.error("Vui lòng chọn vị trí hợp lệ");
       return;
     }
@@ -570,7 +594,9 @@ export default function CoordinatorSOSForm({
                         <div
                           className={cn(
                             "mt-1 text-xs",
-                            sosType === option.value ? "text-white/80" : "text-black/65",
+                            sosType === option.value
+                              ? "text-white/80"
+                              : "text-black/65",
                           )}
                         >
                           {option.description}
@@ -669,7 +695,10 @@ export default function CoordinatorSOSForm({
                     value={peopleCount.adult}
                     min={0}
                     onChange={(value) =>
-                      setPeopleCount((current) => ({ ...current, adult: value }))
+                      setPeopleCount((current) => ({
+                        ...current,
+                        adult: value,
+                      }))
                     }
                   />
                   <PeopleCountInput
@@ -677,7 +706,10 @@ export default function CoordinatorSOSForm({
                     value={peopleCount.child}
                     min={0}
                     onChange={(value) =>
-                      setPeopleCount((current) => ({ ...current, child: value }))
+                      setPeopleCount((current) => ({
+                        ...current,
+                        child: value,
+                      }))
                     }
                   />
                   <PeopleCountInput
@@ -685,7 +717,10 @@ export default function CoordinatorSOSForm({
                     value={peopleCount.elderly}
                     min={0}
                     onChange={(value) =>
-                      setPeopleCount((current) => ({ ...current, elderly: value }))
+                      setPeopleCount((current) => ({
+                        ...current,
+                        elderly: value,
+                      }))
                     }
                   />
                 </div>
@@ -727,9 +762,12 @@ export default function CoordinatorSOSForm({
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       {sharedPeople.map((person) => {
-                        const selected = rescue.injuredPersonIds.includes(person.id);
+                        const selected = rescue.injuredPersonIds.includes(
+                          person.id,
+                        );
                         const issues =
-                          rescue.medicalInfoByPerson[person.id]?.medicalIssues ?? [];
+                          rescue.medicalInfoByPerson[person.id]
+                            ?.medicalIssues ?? [];
 
                         return (
                           <PersonSelectionCard
@@ -737,7 +775,9 @@ export default function CoordinatorSOSForm({
                             person={person}
                             selected={selected}
                             accentClass="border-red-500 bg-red-50"
-                            badge={issues.length ? `${issues.length} vấn đề` : null}
+                            badge={
+                              issues.length ? `${issues.length} vấn đề` : null
+                            }
                             detail={
                               issues.length
                                 ? issues
@@ -748,7 +788,10 @@ export default function CoordinatorSOSForm({
                             }
                             onToggle={() => toggleInjuredPerson(person.id)}
                             onEdit={() =>
-                              setActiveEditor({ mode: "medical", personId: person.id })
+                              setActiveEditor({
+                                mode: "medical",
+                                personId: person.id,
+                              })
                             }
                           />
                         );
@@ -891,20 +934,26 @@ export default function CoordinatorSOSForm({
                             <PersonSelectionCard
                               key={person.id}
                               person={person}
-                              selected={relief.specialDietPersonIds.includes(person.id)}
+                              selected={relief.specialDietPersonIds.includes(
+                                person.id,
+                              )}
                               accentClass="border-orange-400 bg-orange-50"
                               badge={
-                                relief.specialDietInfoByPerson[person.id]
-                                  ?.dietDescription?.trim()
+                                relief.specialDietInfoByPerson[
+                                  person.id
+                                ]?.dietDescription?.trim()
                                   ? "Đã mô tả"
                                   : null
                               }
                               detail={
-                                relief.specialDietInfoByPerson[person.id]
-                                  ?.dietDescription?.trim() ||
+                                relief.specialDietInfoByPerson[
+                                  person.id
+                                ]?.dietDescription?.trim() ||
                                 "Nhập mô tả chế độ ăn đặc biệt"
                               }
-                              onToggle={() => toggleSpecialDietPerson(person.id)}
+                              onToggle={() =>
+                                toggleSpecialDietPerson(person.id)
+                              }
                               onEdit={() =>
                                 setActiveEditor({
                                   mode: "specialDiet",
@@ -926,7 +975,9 @@ export default function CoordinatorSOSForm({
                         </div>
                         <div className="space-y-2">
                           {MEDICAL_SUPPORT_OPTIONS.map((option) => {
-                            const checked = relief.medicalNeeds.includes(option.value);
+                            const checked = relief.medicalNeeds.includes(
+                              option.value,
+                            );
                             return (
                               <label
                                 key={option.value}
@@ -995,7 +1046,7 @@ export default function CoordinatorSOSForm({
                             areBlanketsEnough: value === "ENOUGH",
                             blanketRequestCount:
                               value === "NOT_ENOUGH"
-                                ? current.blanketRequestCount ?? 1
+                                ? (current.blanketRequestCount ?? 1)
                                 : undefined,
                           }))
                         }
@@ -1068,7 +1119,9 @@ export default function CoordinatorSOSForm({
                             <PersonSelectionCard
                               key={person.id}
                               person={person}
-                              selected={relief.clothingPersonIds.includes(person.id)}
+                              selected={relief.clothingPersonIds.includes(
+                                person.id,
+                              )}
                               accentClass="border-teal-400 bg-teal-50"
                               badge={getClothingGenderLabel(
                                 relief.clothingInfoByPerson[person.id]?.gender,
@@ -1076,7 +1129,8 @@ export default function CoordinatorSOSForm({
                               detail={
                                 relief.clothingInfoByPerson[person.id]?.gender
                                   ? `Giới tính: ${getClothingGenderLabel(
-                                      relief.clothingInfoByPerson[person.id]?.gender,
+                                      relief.clothingInfoByPerson[person.id]
+                                        ?.gender,
                                     )}`
                                   : "Nhập tên và giới tính người cần quần áo"
                               }
@@ -1121,7 +1175,9 @@ export default function CoordinatorSOSForm({
                 </p>
                 <Textarea
                   value={additionalDescription}
-                  onChange={(event) => setAdditionalDescription(event.target.value)}
+                  onChange={(event) =>
+                    setAdditionalDescription(event.target.value)
+                  }
                   placeholder="Thông tin bổ sung từ cuộc gọi / điều phối viên..."
                   rows={4}
                   className={EDITORIAL_INPUT}
@@ -1150,7 +1206,10 @@ export default function CoordinatorSOSForm({
                     value={sosType ? getSosTypeLabel(sosType) : "Chưa chọn"}
                     className="col-span-2"
                   />
-                  <SummaryMiniCard label="Tổng người" value={String(totalPeople)} />
+                  <SummaryMiniCard
+                    label="Tổng người"
+                    value={String(totalPeople)}
+                  />
                   <SummaryMiniCard
                     label="Người lớn"
                     value={String(peopleCount.adult)}
@@ -1224,29 +1283,17 @@ export default function CoordinatorSOSForm({
                   />
                 </div>
 
-                <div className="flex gap-2 border-t border-black/10 pt-4">
+                {isDialog && (
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={handleReset}
+                    onClick={onCancel}
                     disabled={isPending}
-                    className="flex-1 rounded-none border-black hover:bg-black hover:text-white"
+                    className="rounded-none border-black hover:bg-black hover:text-white"
                   >
-                    <ArrowCounterClockwise size={16} />
-                    Làm mới form
+                    Đóng
                   </Button>
-                  {isDialog && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={onCancel}
-                      disabled={isPending}
-                      className="rounded-none border-black hover:bg-black hover:text-white"
-                    >
-                      Đóng
-                    </Button>
-                  )}
-                </div>
+                )}
               </CardContent>
             </Card>
           </aside>
@@ -1315,7 +1362,10 @@ export default function CoordinatorSOSForm({
         )}
       </form>
 
-      <Dialog open={!!activeEditor} onOpenChange={(open) => !open && setActiveEditor(null)}>
+      <Dialog
+        open={!!activeEditor}
+        onOpenChange={(open) => !open && setActiveEditor(null)}
+      >
         <DialogContent className="max-w-3xl rounded-none border-2 border-black p-0">
           {selectedPerson && activeEditor?.mode === "medical" && (
             <MedicalEditorDialog
@@ -1354,7 +1404,10 @@ export default function CoordinatorSOSForm({
                 setRelief((current) => ({
                   ...current,
                   specialDietPersonIds: Array.from(
-                    new Set([...current.specialDietPersonIds, selectedPerson.id]),
+                    new Set([
+                      ...current.specialDietPersonIds,
+                      selectedPerson.id,
+                    ]),
                   ),
                   specialDietInfoByPerson: {
                     ...current.specialDietInfoByPerson,
@@ -1418,7 +1471,9 @@ function PeopleCountInput({
         type="number"
         min={min}
         value={value}
-        onChange={(event) => onChange(Math.max(min, Number(event.target.value) || 0))}
+        onChange={(event) =>
+          onChange(Math.max(min, Number(event.target.value) || 0))
+        }
         className={EDITORIAL_INPUT}
       />
     </div>
@@ -1435,7 +1490,12 @@ function SummaryMiniCard({
   className?: string;
 }) {
   return (
-    <div className={cn("border border-black/15 bg-black/[0.03] px-3 py-2", className)}>
+    <div
+      className={cn(
+        "border border-black/15 bg-black/[0.03] px-3 py-2",
+        className,
+      )}
+    >
       <div className="text-[11px] font-black uppercase tracking-wide text-black/60">
         {label}
       </div>
@@ -1516,7 +1576,9 @@ function PersonSelectionCard({
             ) : null}
           </div>
 
-          <div className="mt-3 text-sm leading-snug text-black/70">{detail}</div>
+          <div className="mt-3 text-sm leading-snug text-black/70">
+            {detail}
+          </div>
 
           {selected && (
             <Button
@@ -1632,7 +1694,9 @@ function MedicalEditorDialog({
       </DialogHeader>
       <div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
         <div className="space-y-2">
-          <Label className="text-xs font-bold uppercase tracking-wide">Tên</Label>
+          <Label className="text-xs font-bold uppercase tracking-wide">
+            Tên
+          </Label>
           <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -1745,7 +1809,9 @@ function SpecialDietEditorDialog({
       </DialogHeader>
       <div className="space-y-5 px-6 py-5">
         <div className="space-y-2">
-          <Label className="text-xs font-bold uppercase tracking-wide">Tên</Label>
+          <Label className="text-xs font-bold uppercase tracking-wide">
+            Tên
+          </Label>
           <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -1815,7 +1881,9 @@ function ClothingEditorDialog({
       </DialogHeader>
       <div className="space-y-5 px-6 py-5">
         <div className="space-y-2">
-          <Label className="text-xs font-bold uppercase tracking-wide">Tên</Label>
+          <Label className="text-xs font-bold uppercase tracking-wide">
+            Tên
+          </Label>
           <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
