@@ -335,7 +335,8 @@ export const navigationItems = [
     href: "/dashboard/admin",
   },
   { icon: Users, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
-  {    icon: UserCheck,
+  {
+    icon: UserCheck,
     label: "Quản lý cứu hộ viên",
     href: "/dashboard/admin/rescuers",
   },
@@ -360,7 +361,7 @@ export const navigationItems = [
     href: "/dashboard/admin/weather-flood",
   },
   { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
-  
+
   {
     icon: Robot,
     label: "Cấu hình AI Prompt",

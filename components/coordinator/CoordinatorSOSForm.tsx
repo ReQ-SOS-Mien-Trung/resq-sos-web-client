@@ -158,8 +158,11 @@ export default function CoordinatorSOSForm({
 
   useEffect(() => {
     if (pickedLocation) {
-      setLat(pickedLocation.lat.toFixed(6));
-      setLng(pickedLocation.lng.toFixed(6));
+      const pickedLat = pickedLocation.lat.toFixed(6);
+      const pickedLng = pickedLocation.lng.toFixed(6);
+      setLat(pickedLat);
+      setLng(pickedLng);
+      void reverseGeocodeCoordinates(pickedLat, pickedLng);
     }
   }, [pickedLocation]);
 
@@ -296,6 +299,45 @@ export default function CoordinatorSOSForm({
       toast.success(`Đã xác định: ${firstResult.display_name}`);
     } catch {
       toast.error("Lỗi tra cứu địa chỉ, vui lòng thử lại");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
+  const reverseGeocodeCoordinates = async (
+    nextLat: number | string,
+    nextLng: number | string,
+  ) => {
+    const latValue = Number(nextLat);
+    const lngValue = Number(nextLng);
+
+    if (
+      Number.isNaN(latValue) ||
+      Number.isNaN(lngValue) ||
+      latValue < -90 ||
+      latValue > 90 ||
+      lngValue < -180 ||
+      lngValue > 180
+    ) {
+      return;
+    }
+
+    setIsGeocoding(true);
+    try {
+      const res = await fetch(`/api/geocode?lat=${latValue}&lng=${lngValue}`);
+      if (!res.ok) {
+        throw new Error("Reverse geocode request failed");
+      }
+
+      const payload = (await res.json()) as {
+        result?: { display_name?: string };
+      };
+      const displayName = payload.result?.display_name?.trim();
+      if (displayName) {
+        setAddress(displayName);
+      }
+    } catch {
+      // Silent fail: keep user-entered address if reverse lookup is unavailable.
     } finally {
       setIsGeocoding(false);
     }
@@ -519,6 +561,9 @@ export default function CoordinatorSOSForm({
     });
   };
 
+  const hasValidCoordinates =
+    !!lat && !!lng && !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lng));
+
   return (
     <>
       <form id="coordinator-sos-form" onSubmit={handleSubmit}>
@@ -651,13 +696,30 @@ export default function CoordinatorSOSForm({
                     Chọn vị trí trên bản đồ dashboard
                   </Button>
                 ) : (
-                  <div className="h-[280px] overflow-hidden border-2 border-black">
+                  <div className="relative h-[280px] overflow-hidden border-2 border-black">
+                    <div className="pointer-events-none absolute left-3 top-3 z-50 border border-black bg-white/95 px-3 py-2 shadow-[3px_3px_0_0_#000] backdrop-blur-sm">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#FF5722]">
+                        Tọa độ đã chọn
+                      </p>
+                      {hasValidCoordinates ? (
+                        <p className="mt-1 font-mono text-xs font-semibold text-black sm:text-sm">
+                          {lat}, {lng}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs font-medium text-black/75 sm:text-sm">
+                          Chưa chọn điểm trên bản đồ
+                        </p>
+                      )}
+                    </div>
                     <LocationPickerMap
                       lat={lat ? Number(lat) : undefined}
                       lng={lng ? Number(lng) : undefined}
                       onPick={(pickedLat, pickedLng) => {
-                        setLat(pickedLat.toFixed(6));
-                        setLng(pickedLng.toFixed(6));
+                        const nextLat = pickedLat.toFixed(6);
+                        const nextLng = pickedLng.toFixed(6);
+                        setLat(nextLat);
+                        setLng(nextLng);
+                        void reverseGeocodeCoordinates(nextLat, nextLng);
                       }}
                     />
                   </div>
