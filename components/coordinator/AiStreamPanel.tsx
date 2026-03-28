@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import gsap from "gsap";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,7 @@ interface AiStreamPanelProps {
 
 const activityIconMap: Record<
   string,
-  React.ComponentType<{ className?: string; weight?: string }>
+  ComponentType<{ className?: string; weight?: string }>
 > = {
   COLLECT_SUPPLIES: Package,
   DELIVER_SUPPLIES: Truck,
@@ -137,8 +137,7 @@ export default function AiStreamPanel({
 
   if (!open) return null;
 
-  const showSonar = loading && !result;
-  const showMatrix = loading && thinkingText.length > 0 && !result;
+  const showProgress = loading && !result;
   const showActionMap = result !== null;
   const showError = error !== null && !result;
 
@@ -167,10 +166,14 @@ export default function AiStreamPanel({
           onClose={onClose}
         />
         <div className="relative flex-1 min-h-0 overflow-auto">
-          {showSonar && (
-            <SonarRadar status={status} statusLog={statusLog} phase={phase} />
+          {showProgress && (
+            <LoadingStreamView
+              status={status}
+              statusLog={statusLog}
+              thinkingText={thinkingText}
+              phase={phase}
+            />
           )}
-          {showMatrix && <MatrixStream text={thinkingText} />}
           {showActionMap && <ActionMapView result={result} />}
           {showError && <ErrorView error={error} onRetry={onRetry} />}
         </div>
@@ -277,20 +280,73 @@ function phaseLabel(phase: string): string {
   }
 }
 
+function LoadingStreamView({
+  status,
+  statusLog,
+  thinkingText,
+  phase,
+}: {
+  status: string;
+  statusLog: StreamLogEntry[];
+  thinkingText: string;
+  phase: string;
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!wrapperRef.current) return;
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        ".loading-block",
+        { opacity: 0, y: 18 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.45,
+          stagger: 0.08,
+          ease: "power2.out",
+        },
+      );
+    }, wrapperRef);
+
+    return () => ctx.revert();
+  }, []);
+
+  return (
+    <div ref={wrapperRef} className="h-full px-4 py-8 md:px-6 md:py-10">
+      <div className="mx-auto flex w-full flex-col items-center gap-5">
+        <div className="loading-block w-full">
+          <SonarRadar
+            status={status}
+            statusLog={statusLog}
+            thinkingText={thinkingText}
+            phase={phase}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ═══ Phase 1: Sonar Radar ═══ */
 
 function SonarRadar({
   status,
   statusLog,
+  thinkingText,
   phase,
 }: {
   status: string;
   statusLog: StreamLogEntry[];
+  thinkingText: string;
   phase: string;
 }) {
   const ringRefs = useRef<(SVGCircleElement | null)[]>([]);
-  const textRef = useRef<HTMLDivElement>(null);
-  const glitchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tickerRef = useRef<HTMLDivElement>(null);
+  const thinkingRef = useRef<HTMLDivElement>(null);
+  const statusEntries = statusLog
+    .filter((entry) => entry.type === "status" || entry.type === "result")
+    .slice(-3);
 
   useEffect(() => {
     const rings = ringRefs.current.filter(Boolean) as SVGCircleElement[];
@@ -313,175 +369,166 @@ function SonarRadar({
   }, []);
 
   useEffect(() => {
-    if (!textRef.current || !status) return;
-    const target = status;
-    let frame = 0;
-    const chars = "░▒▓█▄▀■□◤◥◈◇⬡⬢⊕⊗";
-    const el = textRef.current;
-    glitchIntervalRef.current = setInterval(() => {
-      frame += 3;
-      const revealed = Math.min(frame, target.length);
-      let display = target.slice(0, revealed);
-      if (revealed < target.length) {
-        const noiseLen = Math.min(4, target.length - revealed);
-        for (let i = 0; i < noiseLen; i++) {
-          display += chars[Math.floor(Math.random() * chars.length)];
-        }
-      }
-      el.textContent = display;
-      if (frame >= target.length + 5) {
-        el.textContent = target;
-        if (glitchIntervalRef.current) clearInterval(glitchIntervalRef.current);
-      }
-    }, 20);
-    return () => {
-      if (glitchIntervalRef.current) clearInterval(glitchIntervalRef.current);
-    };
-  }, [status]);
+    if (!tickerRef.current || statusEntries.length === 0) return;
+    const items = tickerRef.current.querySelectorAll(".status-ticker-item");
+    gsap.killTweensOf(items);
+    gsap.fromTo(
+      items,
+      { y: 18, opacity: 0 },
+      {
+        y: 0,
+        opacity: 1,
+        duration: 0.38,
+        stagger: 0.05,
+        ease: "power2.out",
+      },
+    );
+  }, [statusEntries]);
+
+  useEffect(() => {
+    if (thinkingRef.current) {
+      thinkingRef.current.scrollTop = thinkingRef.current.scrollHeight;
+    }
+  }, [thinkingText]);
 
   return (
-    <div className="flex flex-col items-center justify-center py-16">
-      <div className="relative w-72 h-72">
-        <svg viewBox="0 0 300 300" className="w-full h-full">
-          {[60, 100, 140].map((r) => (
-            <circle
-              key={r}
-              cx="150"
-              cy="150"
-              r={r}
-              fill="none"
+    <div className="w-full px-2 py-6 md:px-4">
+      <div className="flex flex-col items-center justify-center">
+        <div className="relative h-72 w-72">
+          <svg viewBox="0 0 300 300" className="w-full h-full">
+            {[60, 100, 140].map((r) => (
+              <circle
+                key={r}
+                cx="150"
+                cy="150"
+                r={r}
+                fill="none"
+                className="stroke-primary/10"
+                strokeWidth="0.5"
+              />
+            ))}
+            <line
+              x1="150"
+              y1="30"
+              x2="150"
+              y2="270"
               className="stroke-primary/10"
               strokeWidth="0.5"
             />
-          ))}
-          <line
-            x1="150"
-            y1="30"
-            x2="150"
-            y2="270"
-            className="stroke-primary/10"
-            strokeWidth="0.5"
-          />
-          <line
-            x1="30"
-            y1="150"
-            x2="270"
-            y2="150"
-            className="stroke-primary/10"
-            strokeWidth="0.5"
-          />
-          {[0, 1, 2, 3].map((i) => (
+            <line
+              x1="30"
+              y1="150"
+              x2="270"
+              y2="150"
+              className="stroke-primary/10"
+              strokeWidth="0.5"
+            />
+            {[0, 1, 2, 3].map((i) => (
+              <circle
+                key={`ring-${i}`}
+                ref={(el) => {
+                  ringRefs.current[i] = el;
+                }}
+                cx="150"
+                cy="150"
+                r="20"
+                fill="none"
+                stroke="url(#sonarGrad)"
+                strokeWidth={2.5 - i * 0.4}
+                opacity="0"
+              />
+            ))}
             <circle
-              key={`ring-${i}`}
-              ref={(el) => {
-                ringRefs.current[i] = el;
-              }}
               cx="150"
               cy="150"
-              r="20"
-              fill="none"
-              stroke="url(#sonarGrad)"
-              strokeWidth={2.5 - i * 0.4}
-              opacity="0"
+              r="18"
+              className="fill-primary/15 stroke-primary/60"
+              strokeWidth="2"
             />
-          ))}
-          <circle
-            cx="150"
-            cy="150"
-            r="18"
-            className="fill-primary/15 stroke-primary/60"
-            strokeWidth="2"
-          />
-          <circle cx="150" cy="150" r="8" className="fill-primary/50">
-            <animate
-              attributeName="r"
-              values="6;10;6"
-              dur="1.5s"
-              repeatCount="indefinite"
-            />
-            <animate
-              attributeName="opacity"
-              values="0.8;0.4;0.8"
-              dur="1.5s"
-              repeatCount="indefinite"
-            />
-          </circle>
-          <defs>
-            <radialGradient id="sonarGrad">
-              <stop offset="0%" stopColor="rgba(249,115,22,0.8)" />
-              <stop offset="100%" stopColor="rgba(249,115,22,0)" />
-            </radialGradient>
-          </defs>
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <Brain className="h-6 w-6 text-primary animate-pulse" weight="fill" />
-        </div>
-      </div>
-      <div
-        ref={textRef}
-        className="mt-6 text-sm font-mono text-primary/80 text-center tracking-wide max-w-md px-4"
-      />
-      {statusLog.length > 0 && (
-        <div className="mt-4 space-y-1 max-w-sm">
-          {statusLog.slice(-3).map((entry) => (
-            <div
-              key={entry.id}
-              className={cn(
-                "flex items-center gap-2 text-[10px] font-mono",
-                entry.type === "status" && "text-muted-foreground",
-                entry.type === "error" && "text-red-500/70",
-              )}
-            >
-              <span
-                className={cn(
-                  "w-1 h-1 rounded-full shrink-0",
-                  entry.type === "status" ? "bg-primary/50" : "bg-red-500/50",
-                )}
+            <circle cx="150" cy="150" r="8" className="fill-primary/50">
+              <animate
+                attributeName="r"
+                values="6;10;6"
+                dur="1.5s"
+                repeatCount="indefinite"
               />
-              <span className="truncate">{entry.message}</span>
-            </div>
-          ))}
+              <animate
+                attributeName="opacity"
+                values="0.8;0.4;0.8"
+                dur="1.5s"
+                repeatCount="indefinite"
+              />
+            </circle>
+            <defs>
+              <radialGradient id="sonarGrad">
+                <stop offset="0%" stopColor="rgba(249,115,22,0.8)" />
+                <stop offset="100%" stopColor="rgba(249,115,22,0)" />
+              </radialGradient>
+            </defs>
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <Brain className="h-6 w-6 text-primary animate-pulse" weight="fill" />
+          </div>
         </div>
-      )}
-    </div>
-  );
-}
 
-/* ═══ Phase 2: Matrix Stream ═══ */
+        <Badge className="mt-1 border-primary/20 bg-primary/10 text-primary hover:bg-primary/10">
+          {phaseLabel(phase)}
+        </Badge>
 
-function MatrixStream({ text }: { text: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (containerRef.current)
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-  }, [text]);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    gsap.fromTo(
-      containerRef.current,
-      { opacity: 0, x: 20 },
-      { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" },
-    );
-  }, []);
-
-  return (
-    <div className="absolute bottom-3 right-3 w-64 max-h-32 z-10">
-      <div className="flex items-center gap-1.5 mb-1">
-        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-        <span className="text-[9px] font-mono text-primary/60 uppercase tracking-widest">
-          AI Processing
-        </span>
-      </div>
-      <div
-        ref={containerRef}
-        className="overflow-hidden rounded-lg bg-muted border p-2 max-h-24 overflow-y-auto scrollbar-none"
-      >
-        <div className="text-[8px] font-mono text-primary/40 leading-tight break-all whitespace-pre-wrap">
-          {text.slice(-600)}
-          <span className="inline-block w-1.5 h-3 bg-primary/60 animate-pulse ml-0.5 align-text-bottom" />
+        <div className="mt-5 w-full max-w-md px-4">
+          <div
+            ref={tickerRef}
+            className="mx-auto flex min-h-[88px] max-w-sm flex-col justify-end overflow-hidden"
+          >
+            {statusEntries.length > 0 ? (
+              statusEntries.map((entry, index) => {
+                const isLatest = index === statusEntries.length - 1;
+                return (
+                  <div
+                    key={entry.id}
+                    className={cn(
+                      "status-ticker-item flex items-center justify-center gap-2 py-1 text-center transition-opacity",
+                      isLatest
+                        ? "text-primary/85"
+                        : "text-muted-foreground/65",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 shrink-0 rounded-full",
+                        isLatest ? "bg-primary/70" : "bg-primary/25",
+                      )}
+                    />
+                    <p
+                      className={cn(
+                        "font-mono break-words",
+                        isLatest ? "text-sm" : "text-[11px]",
+                      )}
+                    >
+                      {entry.message}
+                    </p>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="status-ticker-item py-1 text-center text-sm font-mono text-primary/80">
+                {status || "Đang khởi tạo..."}
+              </div>
+            )}
+          </div>
         </div>
+
+        {thinkingText && (
+          <div
+            ref={thinkingRef}
+            className="mt-4 max-h-28 w-full max-w-xl overflow-y-auto px-3 text-center scrollbar-none"
+          >
+            <p className="text-[11px] font-mono leading-5 text-primary/55 whitespace-pre-wrap break-words">
+              {thinkingText}
+              <span className="ml-1 inline-block h-3 w-1.5 animate-pulse bg-primary/60 align-middle" />
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -495,50 +542,17 @@ function ActionMapView({
   result: ClusterRescueSuggestionResponse;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [revealedCount, setRevealedCount] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const activities = result.suggestedActivities;
-
-  useEffect(() => {
-    timerRef.current.forEach(clearTimeout);
-    timerRef.current = [];
-    setRevealedCount(0);
-    activities.forEach((_, idx) => {
-      const t = setTimeout(
-        () => setRevealedCount((p) => p + 1),
-        (idx + 1) * 1200,
-      );
-      timerRef.current.push(t);
-    });
-    return () => timerRef.current.forEach(clearTimeout);
-  }, [activities]);
+  const activitiesKey = activities
+    .map((activity) => `${activity.step}-${activity.activityType}`)
+    .join("|");
 
   return (
     <ScrollArea className="h-full">
       <div className="p-5 space-y-5" ref={containerRef}>
         <MissionBanner result={result} />
         <StatsRow result={result} />
-        <div className="relative">
-          <AiOriginNode />
-          <div className="ml-12 space-y-0">
-            {activities.slice(0, revealedCount).map((activity, idx) => (
-              <ActivityFlowNode
-                key={activity.step}
-                activity={activity}
-                index={idx}
-                isLast={idx === activities.length - 1}
-              />
-            ))}
-          </div>
-          {revealedCount < activities.length && (
-            <div className="ml-12 pl-4 border-l-2 border-dashed border-primary/20 py-3">
-              <div className="flex items-center gap-2 text-[10px] font-mono text-primary/40">
-                <span className="w-2 h-2 rounded-full bg-primary/30 animate-pulse" />
-                Đang tải bước {revealedCount + 1}/{activities.length}...
-              </div>
-            </div>
-          )}
-        </div>
+        <ActionFlowTimeline key={activitiesKey} activities={activities} />
         {result.overallAssessment && (
           <AssessmentBlock text={result.overallAssessment} />
         )}
@@ -548,6 +562,49 @@ function ActionMapView({
         <WarningsBlock result={result} />
       </div>
     </ScrollArea>
+  );
+}
+
+function ActionFlowTimeline({
+  activities,
+}: {
+  activities: ClusterSuggestedActivity[];
+}) {
+  const [revealedCount, setRevealedCount] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    activities.forEach((_, idx) => {
+      const t = setTimeout(
+        () => setRevealedCount((prev) => prev + 1),
+        (idx + 1) * 1200,
+      );
+      timerRef.current.push(t);
+    });
+
+    return () => {
+      timerRef.current.forEach(clearTimeout);
+      timerRef.current = [];
+    };
+  }, [activities]);
+
+  return (
+    <div className="relative">
+      <AiOriginNode />
+      <div className="ml-12 space-y-0">
+        {activities.slice(0, revealedCount).map((activity) => (
+          <ActivityFlowNode key={activity.step} activity={activity} />
+        ))}
+      </div>
+      {revealedCount < activities.length && (
+        <div className="ml-12 border-l-2 border-dashed border-primary/20 py-3 pl-4">
+          <div className="flex items-center gap-2 text-[10px] font-mono text-primary/40">
+            <span className="h-2 w-2 rounded-full bg-primary/30 animate-pulse" />
+            Đang tải bước {revealedCount + 1}/{activities.length}...
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -710,12 +767,8 @@ function AiOriginNode() {
 
 function ActivityFlowNode({
   activity,
-  index,
-  isLast,
 }: {
   activity: ClusterSuggestedActivity;
-  index: number;
-  isLast: boolean;
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const lineRef = useRef<SVGSVGElement>(null);
