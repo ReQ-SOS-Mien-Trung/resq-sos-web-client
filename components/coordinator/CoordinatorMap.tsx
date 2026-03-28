@@ -1009,15 +1009,19 @@ function AssemblyPointMarker({
   onClick?: () => void;
 }) {
   const statusColors = {
+    Created: "#0ea5e9", // sky-500
     Active: "#22c55e", // green-500
     Overloaded: "#f97316", // orange-500
-    Unavailable: "#ef4444", // red-500
+    UnderMaintenance: "#8b5cf6", // violet-500
+    Closed: "#ef4444", // red-500
   };
 
   const statusLabels = {
+    Created: "Mới tạo",
     Active: "Hoạt động",
     Overloaded: "Quá tải",
-    Unavailable: "Không khả dụng",
+    UnderMaintenance: "Đang bảo trì",
+    Closed: "Đã đóng",
   };
 
   const color = statusColors[assemblyPoint.status];

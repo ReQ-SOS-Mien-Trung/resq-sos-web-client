@@ -38,6 +38,10 @@ const statusConfig: Record<
   AssemblyPointStatus,
   { label: string; class: string }
 > = {
+  Created: {
+    label: "Mới tạo",
+    class: "bg-sky-500/10 text-sky-700 border-sky-200",
+  },
   Active: {
     label: "Hoạt động",
     class: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
@@ -46,11 +50,30 @@ const statusConfig: Record<
     label: "Quá tải",
     class: "bg-amber-500/10 text-amber-700 border-amber-200",
   },
-  Unavailable: {
-    label: "Không khả dụng",
+  UnderMaintenance: {
+    label: "Đang bảo trì",
+    class: "bg-violet-500/10 text-violet-700 border-violet-200",
+  },
+  Closed: {
+    label: "Đã đóng",
     class: "bg-red-500/10 text-red-700 border-red-200",
   },
 };
+
+const fallbackStatusConfig = {
+  label: "Không xác định",
+  class: "bg-slate-500/10 text-slate-700 border-slate-200",
+};
+
+function getStatusConfig(status: string | null | undefined) {
+  if (!status) return fallbackStatusConfig;
+  return statusConfig[status as AssemblyPointStatus] ?? fallbackStatusConfig;
+}
+
+function formatLastUpdated(date: string | null) {
+  if (!date) return "Chưa cập nhật";
+  return new Date(date).toLocaleString("vi-VN");
+}
 
 const teamTypeConfig: Record<
   AssemblyPointTeamType,
@@ -305,7 +328,7 @@ export function AssemblyPointDetailSheet({
     enabled: open && pointId !== null,
   });
 
-  const st = data ? statusConfig[data.status] : null;
+  const st = data ? getStatusConfig(data.status) : null;
 
   const handleOpenChange = useCallback(
     (val: boolean) => {
@@ -350,7 +373,7 @@ export function AssemblyPointDetailSheet({
                   <h3 className="text-lg font-bold tracking-tighter">
                     {data.name}
                   </h3>
-                  <p className="text-sm text-muted-foreground font-mono tracking-tight">
+                  <p className="text-sm text-muted-foreground font-regular tracking-tight">
                     {data.code}
                   </p>
                 </div>
@@ -368,7 +391,7 @@ export function AssemblyPointDetailSheet({
                     <MapPin size={11} />
                     Tọa độ
                   </p>
-                  <p className="text-sm font-mono tracking-tight">
+                  <p className="text-sm font-semibold tracking-tight">
                     {data.latitude.toFixed(5)}, {data.longitude.toFixed(5)}
                   </p>
                 </div>
@@ -387,7 +410,7 @@ export function AssemblyPointDetailSheet({
                     Cập nhật lần cuối
                   </p>
                   <p className="text-sm tracking-tight">
-                    {new Date(data.lastUpdatedAt).toLocaleString("vi-VN")}
+                    {formatLastUpdated(data.lastUpdatedAt)}
                   </p>
                 </div>
               </div>
@@ -406,7 +429,7 @@ export function AssemblyPointDetailSheet({
                     size={28}
                     className="mx-auto text-muted-foreground/40 mb-2"
                   />
-                  <p className="text-base text-muted-foreground tracking-tight">
+                  <p className="text-sm text-muted-foreground tracking-tight">
                     Chưa có đội nào tại điểm tập kết này
                   </p>
                 </div>

@@ -56,6 +56,12 @@ const statusConfig: Record<
   AssemblyPointStatus,
   { label: string; color: string; bg: string; icon: React.ReactNode }
 > = {
+  Created: {
+    label: "Mới tạo",
+    color: "text-sky-700",
+    bg: "bg-sky-500/10 border-sky-200",
+    icon: <Clock size={14} weight="fill" className="text-sky-500" />,
+  },
   Active: {
     label: "Hoạt động",
     color: "text-emerald-700",
@@ -68,15 +74,38 @@ const statusConfig: Record<
     bg: "bg-amber-500/10 border-amber-200",
     icon: <WarningCircle size={14} weight="fill" className="text-amber-500" />,
   },
-  Unavailable: {
-    label: "Không khả dụng",
+  UnderMaintenance: {
+    label: "Đang bảo trì",
+    color: "text-violet-700",
+    bg: "bg-violet-500/10 border-violet-200",
+    icon: <Spinner size={14} weight="fill" className="text-violet-500" />,
+  },
+  Closed: {
+    label: "Đã đóng",
     color: "text-red-700",
     bg: "bg-red-500/10 border-red-200",
     icon: <XCircle size={14} weight="fill" className="text-red-500" />,
   },
 };
 
+const fallbackStatusConfig = {
+  label: "Không xác định",
+  color: "text-slate-700",
+  bg: "bg-slate-500/10 border-slate-200",
+  icon: <WarningCircle size={14} weight="fill" className="text-slate-500" />,
+};
+
+function getStatusConfig(status: string | null | undefined) {
+  if (!status) return fallbackStatusConfig;
+  return statusConfig[status as AssemblyPointStatus] ?? fallbackStatusConfig;
+}
+
 const ITEMS_PER_PAGE = 12;
+
+function formatLastUpdated(date: string | null) {
+  if (!date) return "Chưa cập nhật";
+  return new Date(date).toLocaleDateString("vi-VN");
+}
 
 /* ── Main Page ── */
 
@@ -150,8 +179,12 @@ export default function AssemblyPointsPage() {
   const overloadedCount = items.filter(
     (i) => i.status === "Overloaded",
   ).length;
-  const unavailableCount = items.filter(
-    (i) => i.status === "Unavailable",
+  const createdCount = items.filter((i) => i.status === "Created").length;
+  const maintenanceCount = items.filter(
+    (i) => i.status === "UnderMaintenance",
+  ).length;
+  const closedCount = items.filter(
+    (i) => i.status === "Closed",
   ).length;
 
   const handleDelete = () => {
@@ -225,7 +258,7 @@ export default function AssemblyPointsPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           {[
             {
               label: "Tổng điểm",
@@ -242,6 +275,13 @@ export default function AssemblyPointsPage() {
               bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
             },
             {
+              label: "Mới tạo",
+              value: createdCount,
+              icon: Clock,
+              color: "text-sky-600 dark:text-sky-400",
+              bgColor: "bg-sky-50 dark:bg-sky-950/30",
+            },
+            {
               label: "Quá tải",
               value: overloadedCount,
               icon: WarningCircle,
@@ -249,8 +289,15 @@ export default function AssemblyPointsPage() {
               bgColor: "bg-amber-50 dark:bg-amber-950/30",
             },
             {
-              label: "Không khả dụng",
-              value: unavailableCount,
+              label: "Bảo trì",
+              value: maintenanceCount,
+              icon: Spinner,
+              color: "text-violet-600 dark:text-violet-400",
+              bgColor: "bg-violet-50 dark:bg-violet-950/30",
+            },
+            {
+              label: "Đã đóng",
+              value: closedCount,
               icon: XCircle,
               color: "text-rose-600 dark:text-rose-400",
               bgColor: "bg-rose-50 dark:bg-rose-950/30",
@@ -303,9 +350,11 @@ export default function AssemblyPointsPage() {
             {(
               [
                 { key: "all", label: "Tất cả" },
+                { key: "Created", label: "Mới tạo" },
                 { key: "Active", label: "Hoạt động" },
                 { key: "Overloaded", label: "Quá tải" },
-                { key: "Unavailable", label: "Không khả dụng" },
+                { key: "UnderMaintenance", label: "Bảo trì" },
+                { key: "Closed", label: "Đã đóng" },
               ] as const
             ).map((opt) => (
               <Button
@@ -355,7 +404,7 @@ export default function AssemblyPointsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {paged.map((point) => {
-              const st = statusConfig[point.status];
+              const st = getStatusConfig(point.status);
               return (
                 <Card
                   key={point.id}
@@ -408,9 +457,7 @@ export default function AssemblyPointsPage() {
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground tracking-tight">
                         <Clock size={13} className="shrink-0" />
                         <span>
-                          {new Date(point.lastUpdatedAt).toLocaleDateString(
-                            "vi-VN",
-                          )}
+                          {formatLastUpdated(point.lastUpdatedAt)}
                         </span>
                       </div>
                     </div>

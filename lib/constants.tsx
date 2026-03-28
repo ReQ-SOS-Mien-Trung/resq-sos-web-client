@@ -31,6 +31,7 @@ import {
   Radio,
   Robot,
   Shield,
+  Spinner,
   SquaresFour,
   Stethoscope,
   Target,
@@ -544,6 +545,13 @@ export const depotStatusConfig = {
 };
 
 export const assemblyPointStatusConfig = {
+  Created: {
+    label: "Mới tạo",
+    color: "bg-sky-500",
+    textColor: "text-sky-700 dark:text-sky-400",
+    bgColor: "bg-sky-50 dark:bg-sky-950/30",
+    icon: Clock,
+  },
   Active: {
     label: "Hoạt động",
     color: "bg-green-500",
@@ -558,8 +566,15 @@ export const assemblyPointStatusConfig = {
     bgColor: "bg-orange-50 dark:bg-orange-950/30",
     icon: WarningCircle,
   },
-  Unavailable: {
-    label: "Không khả dụng",
+  UnderMaintenance: {
+    label: "Đang bảo trì",
+    color: "bg-violet-500",
+    textColor: "text-violet-700 dark:text-violet-400",
+    bgColor: "bg-violet-50 dark:bg-violet-950/30",
+    icon: Spinner,
+  },
+  Closed: {
+    label: "Đã đóng",
     color: "bg-red-500",
     textColor: "text-red-700 dark:text-red-400",
     bgColor: "bg-red-50 dark:bg-red-950/30",

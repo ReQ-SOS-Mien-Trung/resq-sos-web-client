@@ -882,8 +882,14 @@ export interface CoordinatorMapProps {
     latitude: number;
     longitude: number;
     maxCapacity: number;
-    status: "Active" | "Overloaded" | "Unavailable";
-    lastUpdatedAt: string;
+    status:
+      | "Created"
+      | "Active"
+      | "Overloaded"
+      | "UnderMaintenance"
+      | "Closed";
+    lastUpdatedAt: string | null;
+    hasActiveEvent?: boolean;
   }[];
   // SOS Clusters from backend
   clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
@@ -928,8 +934,14 @@ export interface AssemblyPoint {
   latitude: number;
   longitude: number;
   maxCapacity: number;
-  status: "Active" | "Overloaded" | "Unavailable";
-  lastUpdatedAt: string;
+  status:
+    | "Created"
+    | "Active"
+    | "Overloaded"
+    | "UnderMaintenance"
+    | "Closed";
+  lastUpdatedAt: string | null;
+  hasActiveEvent?: boolean;
 }
 
 export interface SOSSidebarProps {

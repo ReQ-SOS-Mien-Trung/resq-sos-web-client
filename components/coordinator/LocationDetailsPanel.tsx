@@ -69,7 +69,8 @@ const memberRoleLabel: Record<AssemblyPointTeamMember["roleInTeam"], string> = {
   Member: "Thành viên",
 };
 
-function formatLastUpdated(dateStr: string): string {
+function formatLastUpdated(dateStr: string | null): string {
+  if (!dateStr) return "Chưa cập nhật";
   try {
     const date = new Date(dateStr);
     const now = new Date();
@@ -528,7 +529,9 @@ function AssemblyPointDetails({
   const teams =
     "teams" in displayAssemblyPoint ? displayAssemblyPoint.teams : [];
 
-  const statusConfig = assemblyPointStatusConfig[assemblyPoint.status];
+  const statusConfig =
+    assemblyPointStatusConfig[assemblyPoint.status] ??
+    assemblyPointStatusConfig.Created;
   const StatusIcon = statusConfig.icon;
 
   return (
