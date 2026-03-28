@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -59,6 +60,10 @@ export default function CoordinatorRescuerManagementPage() {
   const [rowSelectedAssemblyPointIds, setRowSelectedAssemblyPointIds] =
     useState<Record<string, string>>({});
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [selectedRescuerIds, setSelectedRescuerIds] = useState<string[]>([]);
+  const [bulkSelectedAssemblyPointId, setBulkSelectedAssemblyPointId] =
+    useState("");
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   const rescuerParams = useMemo<
     Omit<GetRescuersParams, "pageNumber" | "pageSize">
@@ -130,6 +135,16 @@ export default function CoordinatorRescuerManagementPage() {
     });
   }, [rescuers, searchQuery]);
 
+  useEffect(() => {
+    const visibleRescuerIds = new Set(
+      filteredRescuers.map((rescuer) => rescuer.id),
+    );
+
+    setSelectedRescuerIds((previous) =>
+      previous.filter((rescuerId) => visibleRescuerIds.has(rescuerId)),
+    );
+  }, [filteredRescuers]);
+
   const assemblyPointNameById = useMemo(() => {
     const entries = (assemblyPointOptions ?? [])
       .map((option) => {
@@ -149,6 +164,28 @@ export default function CoordinatorRescuerManagementPage() {
     () => rescuers.filter((rescuer) => rescuer.hasAssemblyPoint).length,
     [rescuers],
   );
+
+  const selectedRescuerIdSet = useMemo(
+    () => new Set(selectedRescuerIds),
+    [selectedRescuerIds],
+  );
+
+  const selectedVisibleRescuerCount = useMemo(
+    () =>
+      filteredRescuers.reduce(
+        (count, rescuer) =>
+          count + (selectedRescuerIdSet.has(rescuer.id) ? 1 : 0),
+        0,
+      ),
+    [filteredRescuers, selectedRescuerIdSet],
+  );
+
+  const areAllVisibleRescuersSelected =
+    filteredRescuers.length > 0 &&
+    selectedVisibleRescuerCount === filteredRescuers.length;
+  const hasPartialVisibleSelection =
+    selectedVisibleRescuerCount > 0 && !areAllVisibleRescuersSelected;
+  const isAssignmentBusy = isUpdatingAssignment || isBulkUpdating;
 
   const pageItems = useMemo(() => {
     if (totalPages <= 7) {
@@ -206,11 +243,109 @@ export default function CoordinatorRescuerManagementPage() {
         ...previous,
         [userId]: "",
       }));
+      setSelectedRescuerIds((previous) =>
+        previous.filter((rescuerId) => rescuerId !== userId),
+      );
       await refetch();
     } catch {
       toast.error("Không thể cập nhật phân công. Vui lòng thử lại.");
     } finally {
       setPendingUserId(null);
+    }
+  };
+
+  const handleToggleRescuerSelection = (
+    rescuerId: string,
+    shouldSelect: boolean,
+  ) => {
+    setSelectedRescuerIds((previous) => {
+      if (shouldSelect) {
+        return previous.includes(rescuerId)
+          ? previous
+          : [...previous, rescuerId];
+      }
+
+      return previous.filter((id) => id !== rescuerId);
+    });
+  };
+
+  const handleToggleSelectAllVisible = (shouldSelect: boolean) => {
+    setSelectedRescuerIds(
+      shouldSelect ? filteredRescuers.map((rescuer) => rescuer.id) : [],
+    );
+  };
+
+  const handleBulkSaveAssignment = async () => {
+    if (selectedRescuerIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất một rescuer.");
+      return;
+    }
+
+    if (!bulkSelectedAssemblyPointId) {
+      toast.error("Vui lòng chọn thao tác trước khi áp dụng hàng loạt.");
+      return;
+    }
+
+    const nextAssemblyPointId =
+      bulkSelectedAssemblyPointId === UNASSIGN_SELECT_VALUE
+        ? null
+        : Number(bulkSelectedAssemblyPointId);
+
+    if (
+      nextAssemblyPointId !== null &&
+      Number.isNaN(nextAssemblyPointId)
+    ) {
+      toast.error("Điểm tập kết không hợp lệ.");
+      return;
+    }
+
+    const targetRescuerIds = [...selectedRescuerIds];
+
+    try {
+      setIsBulkUpdating(true);
+
+      const results = await Promise.allSettled(
+        targetRescuerIds.map((userId) =>
+          updateAssignment({
+            userId,
+            assemblyPointId: nextAssemblyPointId,
+          }),
+        ),
+      );
+
+      const failedRescuerIds = results.flatMap((result, index) =>
+        result.status === "rejected" ? [targetRescuerIds[index]] : [],
+      );
+      const successCount = results.length - failedRescuerIds.length;
+
+      setRowSelectedAssemblyPointIds((previous) => {
+        const nextSelections = { ...previous };
+
+        for (const userId of targetRescuerIds) {
+          nextSelections[userId] = "";
+        }
+
+        return nextSelections;
+      });
+      setSelectedRescuerIds(failedRescuerIds);
+      setBulkSelectedAssemblyPointId("");
+
+      if (successCount > 0) {
+        toast.success(
+          nextAssemblyPointId === null
+            ? `Đã bỏ gán ${successCount} rescuer khỏi điểm tập kết.`
+            : `Đã thêm ${successCount} rescuer vào điểm tập kết.`,
+        );
+        await refetch();
+      }
+
+      if (failedRescuerIds.length > 0) {
+        toast.error(
+          `Có ${failedRescuerIds.length} rescuer chưa được cập nhật. Vui lòng thử lại.`,
+        );
+      }
+    } finally {
+      setIsBulkUpdating(false);
     }
   };
 
@@ -372,6 +507,103 @@ export default function CoordinatorRescuerManagementPage() {
           </CardHeader>
 
           <CardContent className="space-y-3">
+            {!isRescuersLoading && !isRescuersError && filteredRescuers.length > 0 ? (
+              <div className="rounded-lg border border-[#FF5722]/15 bg-[#FF5722]/[0.04] p-3">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label
+                      htmlFor="select-all-visible-rescuers"
+                      className="flex items-center gap-2 text-sm font-medium tracking-tight"
+                    >
+                      <Checkbox
+                        id="select-all-visible-rescuers"
+                        checked={
+                          areAllVisibleRescuersSelected
+                            ? true
+                            : hasPartialVisibleSelection
+                              ? "indeterminate"
+                              : false
+                        }
+                        onCheckedChange={(checked) =>
+                          handleToggleSelectAllVisible(checked === true)
+                        }
+                        disabled={isAssignmentBusy}
+                        className="border-[#FF5722]/40 data-[state=checked]:border-[#FF5722] data-[state=checked]:bg-[#FF5722]"
+                      />
+                      <span>Chọn tất cả trên danh sách hiện tại</span>
+                    </label>
+
+                    <Badge
+                      variant="outline"
+                      className="border-[#FF5722]/25 bg-white text-[#C2410C]"
+                    >
+                      {selectedVisibleRescuerCount} rescuer đã chọn
+                    </Badge>
+
+                    {selectedVisibleRescuerCount > 0 ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedRescuerIds([])}
+                        disabled={isAssignmentBusy}
+                        className="h-8 px-2 text-muted-foreground"
+                      >
+                        Bỏ chọn
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  <div className="flex w-full flex-col gap-2 sm:flex-row xl:max-w-2xl">
+                    <Select
+                      value={bulkSelectedAssemblyPointId}
+                      onValueChange={setBulkSelectedAssemblyPointId}
+                      disabled={isAssignmentBusy || selectedVisibleRescuerCount === 0}
+                    >
+                      <SelectTrigger className="h-9 w-full sm:flex-1">
+                        <SelectValue
+                          placeholder={
+                            isAssemblyPointLoading
+                              ? "Đang tải điểm tập kết..."
+                              : "Chọn điểm tập kết cho nhóm đã chọn"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={UNASSIGN_SELECT_VALUE}>
+                          Bỏ gán khỏi điểm tập kết
+                        </SelectItem>
+                        {(assemblyPointOptions ?? []).map((point) => (
+                          <SelectItem key={point.key} value={point.key}>
+                            {point.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Button
+                      type="button"
+                      className="h-9 gap-2 bg-[#FF5722] text-white hover:bg-[#FF5722]/90"
+                      onClick={handleBulkSaveAssignment}
+                      disabled={
+                        isAssignmentBusy ||
+                        selectedVisibleRescuerCount === 0 ||
+                        !bulkSelectedAssemblyPointId
+                      }
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Áp dụng cho nhóm đã chọn
+                    </Button>
+                  </div>
+                </div>
+
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Coordinator có thể tick nhiều rescuer rồi gán chung vào cùng
+                  một assembly point ngay trên trang hiện tại.
+                </p>
+              </div>
+            ) : null}
+
             {isRescuersLoading ? (
               <div className="space-y-2">
                 {Array.from({ length: 6 }).map((_, idx) => (
@@ -390,6 +622,7 @@ export default function CoordinatorRescuerManagementPage() {
               <>
                 {filteredRescuers.map((rescuer) => {
                   const isRowPending = pendingUserId === rescuer.id;
+                  const isRowSelected = selectedRescuerIdSet.has(rescuer.id);
                   const fullName = `${rescuer.firstName} ${rescuer.lastName}`;
                   const assemblyPointName =
                     rescuer.assemblyPointId != null
@@ -414,10 +647,28 @@ export default function CoordinatorRescuerManagementPage() {
                   return (
                     <div
                       key={rescuer.id}
-                      className="rounded-lg border border-border bg-card p-2.5 md:p-3"
+                      className={cn(
+                        "rounded-lg border border-border bg-card p-2.5 transition-colors md:p-3",
+                        isRowSelected && "border-[#FF5722]/35 bg-[#FF5722]/[0.03]",
+                      )}
                     >
                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div className="flex min-w-0 items-start gap-3">
+                          <div className="flex h-9 items-center">
+                            <Checkbox
+                              checked={isRowSelected}
+                              onCheckedChange={(checked) =>
+                                handleToggleRescuerSelection(
+                                  rescuer.id,
+                                  checked === true,
+                                )
+                              }
+                              disabled={isAssignmentBusy}
+                              aria-label={`Chọn rescuer ${fullName}`}
+                              className="border-[#FF5722]/40 data-[state=checked]:border-[#FF5722] data-[state=checked]:bg-[#FF5722]"
+                            />
+                          </div>
+
                           <Avatar className="h-9 w-9 border border-black/10">
                             <AvatarImage
                               src={rescuer.avatarUrl ?? DEFAULT_RESCUER_AVATAR}
@@ -499,6 +750,7 @@ export default function CoordinatorRescuerManagementPage() {
                                 [rescuer.id]: value,
                               }))
                             }
+                            disabled={isAssignmentBusy}
                           >
                             <SelectTrigger className="h-8 w-55">
                               <SelectValue
@@ -543,7 +795,7 @@ export default function CoordinatorRescuerManagementPage() {
                               )
                             }
                             disabled={
-                              isUpdatingAssignment ||
+                              isAssignmentBusy ||
                               isRowPending ||
                               !rawRowSelectedAssemblyPointId
                             }

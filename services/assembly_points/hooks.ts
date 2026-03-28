@@ -21,7 +21,6 @@ import {
 import {
   GetAssemblyPointsResponse,
   GetAssemblyPointsParams,
-  AssemblyPointEntity,
   AssemblyPointDetailEntity,
   CreateAssemblyPointRequest,
   CreateAssemblyPointResponse,
@@ -40,6 +39,7 @@ import {
   GetAssemblyPointEventsResponse,
 } from "./type";
 import { AxiosError } from "axios";
+import { RESCUERS_QUERY_KEY } from "../rescuers/hooks";
 
 export const ASSEMBLY_POINTS_QUERY_KEY = ["assembly-points"] as const;
 export const ASSEMBLY_POINT_STATUSES_QUERY_KEY = [
@@ -98,7 +98,7 @@ export function useInfiniteAssemblyPoints(options?: UseAssemblyPointsOptions) {
         pageSize: options?.params?.pageSize || 10,
       }),
     initialPageParam: 1,
-    getNextPageParam: (lastPage, allPages) => {
+    getNextPageParam: (lastPage) => {
       // Assuming paginated response shape typically contains `currentPage` and `totalPages` directly
       // Adjust according to actual response shape
       const { currentPage, totalPages } = lastPage as any;
@@ -256,6 +256,7 @@ export function useUpdateRescuerAssemblyPointAssignment() {
     onSuccess: () => {
       // Invalidate assembly points query to refetch the list
       queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: RESCUERS_QUERY_KEY });
     },
   });
 }
