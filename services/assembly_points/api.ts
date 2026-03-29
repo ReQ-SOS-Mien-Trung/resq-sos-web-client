@@ -17,6 +17,8 @@ import {
   StartAssemblyPointGatheringRequest,
   GetAssemblyPointEventsParams,
   GetAssemblyPointEventsResponse,
+  GetAssemblyPointCheckedInRescuersParams,
+  GetAssemblyPointCheckedInRescuersResponse,
 } from "./type";
 
 /**
@@ -168,5 +170,31 @@ export async function getAssemblyPointEvents(
       pageSize: params?.pageSize ?? 10,
     },
   });
+  return data;
+}
+
+/**
+ * Get checked-in rescuers for an assembly point event with pagination and filters
+ * GET /personnel/assembly-point/events/{eventId}/checked-in-rescuers
+ */
+export async function getAssemblyPointCheckedInRescuers(
+  eventId: number,
+  params?: GetAssemblyPointCheckedInRescuersParams,
+): Promise<GetAssemblyPointCheckedInRescuersResponse> {
+  const { data } = await api.get(
+    `/personnel/assembly-point/events/${eventId}/checked-in-rescuers`,
+    {
+      params: {
+        pageNumber: params?.pageNumber ?? 1,
+        pageSize: params?.pageSize ?? 10,
+        rescuerType: params?.rescuerType,
+        abilitySubgroupCode: params?.abilitySubgroupCode,
+        abilityCategoryCode: params?.abilityCategoryCode,
+        firstName: params?.firstName,
+        lastName: params?.lastName,
+        email: params?.email,
+      },
+    },
+  );
   return data;
 }

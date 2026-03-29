@@ -8,6 +8,7 @@ import {
   getAssemblyPoints,
   getAssemblyPointById,
   getAssemblyPointEvents,
+  getAssemblyPointCheckedInRescuers,
   getAssemblyPointStatuses,
   getAssemblyPointMetadata,
   createAssemblyPoint,
@@ -37,6 +38,8 @@ import {
   StartAssemblyPointGatheringRequest,
   GetAssemblyPointEventsParams,
   GetAssemblyPointEventsResponse,
+  GetAssemblyPointCheckedInRescuersParams,
+  GetAssemblyPointCheckedInRescuersResponse,
 } from "./type";
 import { AxiosError } from "axios";
 import { RESCUERS_QUERY_KEY } from "../rescuers/hooks";
@@ -50,6 +53,9 @@ export const ASSEMBLY_POINT_METADATA_QUERY_KEY = [
 ] as const;
 export const ASSEMBLY_POINT_EVENTS_QUERY_KEY = [
   "assembly-point-events",
+] as const;
+export const ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY = [
+  "assembly-point-checked-in-rescuers",
 ] as const;
 
 export interface UseAssemblyPointsOptions {
@@ -71,6 +77,11 @@ export interface UseAssemblyPointMetadataOptions {
 
 export interface UseAssemblyPointEventsOptions {
   params?: GetAssemblyPointEventsParams;
+  enabled?: boolean;
+}
+
+export interface UseAssemblyPointCheckedInRescuersOptions {
+  params?: GetAssemblyPointCheckedInRescuersParams;
   enabled?: boolean;
 }
 
@@ -136,6 +147,24 @@ export function useAssemblyPointEvents(
     queryKey: [...ASSEMBLY_POINT_EVENTS_QUERY_KEY, id, options?.params],
     queryFn: () => getAssemblyPointEvents(id, options?.params),
     enabled: (options?.enabled ?? true) && Number.isFinite(id),
+  });
+}
+
+/**
+ * Hook to fetch checked-in rescuers by assembly event ID with pagination
+ */
+export function useAssemblyPointCheckedInRescuers(
+  eventId: number,
+  options?: UseAssemblyPointCheckedInRescuersOptions,
+) {
+  return useQuery<GetAssemblyPointCheckedInRescuersResponse>({
+    queryKey: [
+      ...ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY,
+      eventId,
+      options?.params,
+    ],
+    queryFn: () => getAssemblyPointCheckedInRescuers(eventId, options?.params),
+    enabled: (options?.enabled ?? true) && Number.isFinite(eventId),
   });
 }
 
