@@ -93,7 +93,8 @@ const memberRoleLabel: Record<AssemblyPointTeamMember["roleInTeam"], string> = {
   Member: "Thành viên",
 };
 
-function formatLastUpdated(dateStr: string): string {
+function formatLastUpdated(dateStr: string | null): string {
+  if (!dateStr) return "Chưa cập nhật";
   try {
     const date = new Date(dateStr);
     const now = new Date();
@@ -966,6 +967,36 @@ function AssemblyPointDetails({
               Điểm tập kết hiện chưa có đội nào.
             </div>
           )}
+        </div>
+
+        {/* Additional Info */}
+        <div className="h-2 bg-muted/50" />
+
+        <div className="px-5 py-4">
+          <h4 className="text-sm font-semibold mb-3">Thông tin bổ sung</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard
+              label="ID"
+              value={`#${displayAssemblyPoint.id}`}
+              icon={<Hash className="h-4 w-4" />}
+            />
+            <StatCard
+              label="Tình trạng"
+              value={statusConfig.label}
+              icon={<StatusIcon className="h-4 w-4" />}
+              statusColor={statusConfig.textColor}
+            />
+            <StatCard
+              label="Sức chứa"
+              value={`${displayAssemblyPoint.maxCapacity} người`}
+              icon={<Users className="h-4 w-4" />}
+            />
+            <StatCard
+              label="Mã"
+              value={displayAssemblyPoint.code}
+              icon={<Info className="h-4 w-4" />}
+            />
+          </div>
         </div>
       </div>
     </>

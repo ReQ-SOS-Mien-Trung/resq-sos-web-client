@@ -1104,10 +1104,12 @@ function AssemblyPointMarker({
   position: [number, number];
   onClick?: () => void;
 }) {
-  const statusColors: Record<string, string> = {
+  const statusColors = {
+    Created: "#0ea5e9", // sky-500
     Active: "#22c55e", // green-500
     Overloaded: "#f97316", // orange-500
-    Unavailable: "#ef4444", // red-500
+    UnderMaintenance: "#8b5cf6", // violet-500
+    Closed: "#ef4444", // red-500
   };
 
   const color = statusColors[assemblyPoint.status] ?? "#64748b";
@@ -1132,7 +1134,7 @@ function AssemblyPointMarker({
       iconSize: [36, 36],
       iconAnchor: [18, 18],
     });
-  }, [assemblyPoint.status, color]);
+  }, [color]);
 
   if (!iconEl) return null;
 

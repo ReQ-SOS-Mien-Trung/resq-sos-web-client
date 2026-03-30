@@ -3,9 +3,14 @@ import {
   getDepots,
   getDepotById,
   getDepotStatuses,
+  getDepotMetadata,
+  getDepotFunds,
+  getMyDepotFund,
   createDepot,
   updateDepot,
   updateDepotStatus,
+  updateDepotAdvanceLimit,
+  getMyDepotFundTransactions,
 } from "./api";
 import {
   GetDepotsResponse,
@@ -13,13 +18,20 @@ import {
   CreateDepotRequest,
   DepotEntity,
   DepotStatusMetadata,
+  DepotMetadataItem,
+  DepotFund,
   UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
+  GetDepotFundTransactionsResponse,
+  GetDepotFundTransactionsParams,
 } from "./type";
 
 export const DEPOTS_QUERY_KEY = ["depots"] as const;
 export const DEPOT_STATUSES_QUERY_KEY = ["depot-statuses"] as const;
+export const DEPOT_METADATA_QUERY_KEY = ["depot-metadata"] as const;
+export const DEPOT_FUNDS_QUERY_KEY = ["depot-funds"] as const;
+export const MY_DEPOT_FUND_QUERY_KEY = ["my-depot-fund"] as const;
 
 export interface UseDepotsOptions {
   params?: GetDepotsParams;
@@ -31,6 +43,10 @@ export interface UseDepotByIdOptions {
 }
 
 export interface UseDepotStatusesOptions {
+  enabled?: boolean;
+}
+
+export interface UseDepotMetadataOptions {
   enabled?: boolean;
 }
 
@@ -65,6 +81,73 @@ export function useDepotStatuses(options?: UseDepotStatusesOptions) {
     queryFn: getDepotStatuses,
     enabled: options?.enabled ?? true,
   });
+}
+
+/**
+ * Hook to fetch depot metadata (key-value list for dropdowns)
+ */
+export function useDepotMetadata(options?: UseDepotMetadataOptions) {
+  return useQuery<DepotMetadataItem[]>({
+    queryKey: DEPOT_METADATA_QUERY_KEY,
+    queryFn: getDepotMetadata,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * [Admin] Hook to fetch all depot funds
+ */
+export function useDepotFunds(options?: { enabled?: boolean }) {
+  return useQuery<DepotFund[]>({
+    queryKey: DEPOT_FUNDS_QUERY_KEY,
+    queryFn: getDepotFunds,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export const MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY = [
+  "my-depot-fund-transactions",
+] as const;
+
+/**
+ * [Manager] Hook to fetch my depot fund
+ */
+export function useMyDepotFund(options?: { enabled?: boolean }) {
+  return useQuery<DepotFund>({
+    queryKey: MY_DEPOT_FUND_QUERY_KEY,
+    queryFn: getMyDepotFund,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * [Manager] Hook to fetch my depot fund transaction history
+ */
+export function useMyDepotFundTransactions(
+  params?: GetDepotFundTransactionsParams,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<GetDepotFundTransactionsResponse>({
+    queryKey: [...MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY, params],
+    queryFn: () => getMyDepotFundTransactions(params),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * [Admin] Hook to update advance limit for a depot
+ */
+export function useUpdateDepotAdvanceLimit() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { depotId: number; maxAdvanceLimit: number }>(
+    {
+      mutationFn: ({ depotId, maxAdvanceLimit }) =>
+        updateDepotAdvanceLimit(depotId, maxAdvanceLimit),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: DEPOT_FUNDS_QUERY_KEY });
+      },
+    },
+  );
 }
 
 /**

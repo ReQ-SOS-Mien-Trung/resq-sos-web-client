@@ -17,9 +17,12 @@ import {
   CheckCircle,
   WarningCircle,
   XCircle,
+  Tray,
+  Warning,
+  ClockCountdown,
 } from "@phosphor-icons/react";
 import { InventoryItemEntity } from "@/services/inventory/type";
-import { useInventoryItemTypes, useInventoryTargetGroups } from "@/services/inventory/hooks";
+import { useInventoryItemTypes, useInventoryTargetGroups, useInventoryLots } from "@/services/inventory/hooks";
 
 interface VatTuDetailsSheetProps {
   item: InventoryItemEntity | null;
@@ -30,6 +33,10 @@ interface VatTuDetailsSheetProps {
 export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsSheetProps) {
   const { data: itemTypesData } = useInventoryItemTypes();
   const { data: targetGroupsData } = useInventoryTargetGroups();
+  const { data: lotsData, isLoading: loadingLots } = useInventoryLots(
+    item?.itemModelId ?? 0,
+    { enabled: open && item?.itemType === "Consumable" && !!item?.itemModelId },
+  );
 
   const itemTypeLabel = (key: string) =>
     itemTypesData?.find((t) => t.key === key)?.value ?? key;
@@ -121,7 +128,7 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
           <Separator />
 
           {/* Reusable Breakdown */}
-          {item.itemType === "Reusable" && (() => {
+          {item.itemType === "Reusable" && item.reusableBreakdown && (() => {
             const rb = item.reusableBreakdown;
             return (
               <div className="space-y-3">
@@ -184,7 +191,7 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
             );
           })()}
 
-          {item.itemType === "Reusable" && <Separator />}
+          {item.itemType === "Reusable" && item.reusableBreakdown && <Separator />}
           <div className="space-y-3">
             <h3 className="text-sm tracking-tighter font-semibold">Chi Tiết</h3>
             <div className="grid gap-3">
@@ -193,10 +200,12 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
                 <span className="text-muted-foreground tracking-tighter">Phân loại:</span>
                 <span className="font-medium tracking-tighter">{itemTypeLabel(item.itemType)}</span>
               </div>
-              <div className="flex items-center tracking-tighter gap-3 text-sm">
-                <HandHeart className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-start tracking-tighter gap-3 text-sm">
+                <HandHeart className="h-4 w-4 text-muted-foreground mt-0.5" />
                 <span className="text-muted-foreground tracking-tighter">Đối tượng:</span>
-                <span className="font-medium tracking-tighter">{targetGroupLabel(item.targetGroup)}</span>
+                <span className="font-medium tracking-tighter">
+                  {(item.targetGroups ?? []).map((g) => targetGroupLabel(g)).join(", ") || "—"}
+                </span>
               </div>
               <div className="flex items-center tracking-tighter gap-3 text-sm">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -205,10 +214,90 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
                   {formatDate(item.lastStockedAt)}
                 </span>
               </div>
+              {item.itemType === "Consumable" && (
+                <>
+                  <div className="flex items-center tracking-tighter gap-3 text-sm">
+                    <Tray className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground tracking-tighter">Số lô hiện tại:</span>
+                    <span className="font-medium tracking-tighter">{item.lotCount ?? 0} lô</span>
+                  </div>
+                  {item.nearestExpiryDate && (
+                    <div className="flex items-center tracking-tighter gap-3 text-sm">
+                      <ClockCountdown className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground tracking-tighter">Hết hạn gần nhất:</span>
+                      <span className={`font-medium tracking-tighter ${item.isExpiringSoon ? "text-amber-600" : ""}`}>
+                        {formatDate(item.nearestExpiryDate)}
+                        {item.isExpiringSoon && (
+                          <span className="ml-1.5 inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                            <Warning size={10} weight="fill" /> Sắp hết hạn
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
           <Separator />
+
+          {/* Lot Section for Consumable */}
+          {item.itemType === "Consumable" && (
+            <div className="space-y-3">
+              <h3 className="text-sm tracking-tighter font-semibold flex items-center gap-2">
+                <Tray className="h-6 w-6 text-muted-foreground" />
+                Lô hàng
+              </h3>
+              {loadingLots ? (
+                <div className="space-y-2">
+                  {[1,2,3].map(i => <div key={i} className="h-12 bg-muted/50 animate-pulse rounded-lg" />)}
+                </div>
+              ) : !lotsData?.items?.length ? (
+                <p className="text-sm text-muted-foreground tracking-tighter">Không có lô nào</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {lotsData.items.map((lot) => (
+                    <div
+                      key={lot.lotId}
+                      className={`rounded-lg border px-3 py-3 text-xs tracking-tighter ${
+                        lot.isExpired
+                          ? "border-red-200 bg-red-50 dark:bg-red-950/20"
+                          : lot.isExpiringSoon
+                          ? "border-amber-200 bg-amber-50 dark:bg-amber-950/20"
+                          : "border-border/50 bg-muted/20"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold">Lô số {lot.lotId}</span>
+                        <div className="flex items-center gap-1.5">
+                          {lot.isExpired && (
+                            <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-sm font-semibold">
+                              Hết hạn
+                            </span>
+                          )}
+                          {lot.isExpiringSoon && !lot.isExpired && (
+                            <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-sm font-semibold">
+                              Sắp hết hạn
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex justify-between text-muted-foreground text-sm">
+                        <span>Còn lại: <span className="font-semibold text-foreground">{lot.remainingQuantity.toLocaleString()}</span> / {lot.quantity.toLocaleString()}</span>
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between text-sm text-muted-foreground tracking-tighter">
+                        <span>Nguồn: <span className="font-medium text-foreground">{lot.sourceType}</span></span>
+                        <span>Hết hạn: {new Date(lot.expiredDate).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {item.itemType === "Consumable" && <Separator />}
 
           {/* Actions */}
           {/* <div className="space-y-3">

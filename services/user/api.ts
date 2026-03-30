@@ -9,6 +9,7 @@ import {
   AdminCreateUserRequest,
   AdminUpdateUserRequest,
   UserEntity,
+  GetAdminUserByIdResponse,
   GetUsersForPermissionParams,
   GetUsersForPermissionResponse,
 } from "./type";
@@ -53,7 +54,9 @@ export async function unbanUser(userId: string): Promise<void> {
   await api.post(`/identity/admin/users/${userId}/unban`);
 }
 
-export async function getAdminUserById(userId: string): Promise<UserEntity> {
+export async function getAdminUserById(
+  userId: string,
+): Promise<GetAdminUserByIdResponse> {
   const { data } = await api.get(`/identity/admin/users/${userId}`);
   return data;
 }

@@ -5,6 +5,7 @@ import {
   GetDepotInventoryResponse,
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
+  GetMyDepotCategoryQuantitiesResponse,
   ImportInventoryRequest,
   ImportRegularRequest,
   InventoryCategory,
@@ -20,9 +21,19 @@ import {
   GetSupplyRequestsParams,
   GetSupplyRequestsResponse,
   RejectSupplyRequestPayload,
-  GetDepotTransactionsParams,
-  GetDepotTransactionsResponse,
+  GetDepotStockMovementsParams,
+  GetDepotStockMovementsResponse,
   ExportMovementsParams,
+  GetInventoryLotsResponse,
+  GetThresholdsResponse,
+  GetThresholdsHistoryParams,
+  GetThresholdsHistoryResponse,
+  UpdateThresholdPayload,
+  UpdateThresholdResponse,
+  DeleteThresholdPayload,
+  DeleteThresholdResponse,
+  GetLowStockParams,
+  GetLowStockResponse,
 } from "./type";
 
 /**
@@ -64,6 +75,17 @@ export async function getMyDepotInventory(
  */
 export async function getInventoryCategories(): Promise<InventoryCategory[]> {
   const { data } = await api.get("/logistics/inventory/metadata/categories");
+  return data;
+}
+
+/**
+ * Get quantity summary by category for current depot
+ * GET /logistics/inventory/my-depot/quantity-by-category
+ */
+export async function getMyDepotQuantityByCategory(): Promise<GetMyDepotCategoryQuantitiesResponse> {
+  const { data } = await api.get(
+    "/logistics/inventory/my-depot/quantity-by-category",
+  );
   return data;
 }
 
@@ -252,12 +274,12 @@ export async function importRegularInventory(
 }
 
 /**
- * Get depot transaction history
- * GET /logistics/inventory/transactions/my-depot
+ * Get depot stock movement history
+ * GET /logistics/inventory/stock-movements/my-depot
  */
-export async function getDepotTransactions(
-  params: GetDepotTransactionsParams,
-): Promise<GetDepotTransactionsResponse> {
+export async function getDepotStockMovements(
+  params: GetDepotStockMovementsParams,
+): Promise<GetDepotStockMovementsResponse> {
   const { data } = await api.get(
     "/logistics/inventory/stock-movements/my-depot",
     {
@@ -271,10 +293,81 @@ export async function getDepotTransactions(
 }
 
 /**
+ * Get inventory lots (FEFO) for a specific item model
+ * GET /logistics/inventory/{itemModelId}/lots
+ */
+export async function getInventoryLots(
+  itemModelId: number,
+): Promise<GetInventoryLotsResponse> {
+  const { data } = await api.get(`/logistics/inventory/${itemModelId}/lots`);
+  return data;
+}
+
+/**
  * Export inventory movements to Excel.
  * Routes through /api/inventory/export-movements (Next.js server-side proxy)
  * so Content-Disposition header is readable without CORS restrictions.
  */
+/**
+ * Download donation import template
+ * Proxied via /api/inventory/template-donation → GET /logistics/inventory/template/donation-import
+ */
+export async function downloadDonationImportTemplate(): Promise<{
+  blob: Blob;
+  filename: string;
+}> {
+  const token = useAuthStore.getState().accessToken;
+  const response = await fetch("/api/inventory/template-donation", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+  const disposition = response.headers.get("content-disposition") ?? "";
+  let filename = "mau_nhap_kho_tu_thien.xlsx";
+  const utf8Match = disposition.match(/filename\*=[^']*'[^']*'([^;\s]+)/i);
+  if (utf8Match) {
+    filename = decodeURIComponent(utf8Match[1]);
+  } else {
+    const asciiMatch = disposition.match(/filename="([^"]+)"/);
+    if (asciiMatch) filename = asciiMatch[1];
+    else if (disposition.includes("filename=")) {
+      const plain = disposition.match(/filename=([^;\s]+)/);
+      if (plain) filename = plain[1];
+    }
+  }
+  const blob = await response.blob();
+  return { blob, filename };
+}
+
+/**
+ * Download purchase import template
+ * Proxied via /api/inventory/template-purchase → GET /logistics/inventory/template/purchase-import
+ */
+export async function downloadPurchaseImportTemplate(): Promise<{
+  blob: Blob;
+  filename: string;
+}> {
+  const token = useAuthStore.getState().accessToken;
+  const response = await fetch("/api/inventory/template-purchase", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+  const disposition = response.headers.get("content-disposition") ?? "";
+  let filename = "mau_nhap_kho_thuong.xlsx";
+  const utf8Match = disposition.match(/filename\*=[^']*'[^']*'([^;\s]+)/i);
+  if (utf8Match) {
+    filename = decodeURIComponent(utf8Match[1]);
+  } else {
+    const asciiMatch = disposition.match(/filename="([^"]+)"/);
+    if (asciiMatch) filename = asciiMatch[1];
+    else if (disposition.includes("filename=")) {
+      const plain = disposition.match(/filename=([^;\s]+)/);
+      if (plain) filename = plain[1];
+    }
+  }
+  const blob = await response.blob();
+  return { blob, filename };
+}
+
 export async function exportInventoryMovements(
   params: ExportMovementsParams,
 ): Promise<{ blob: Blob; filename: string }> {
@@ -319,4 +412,72 @@ export async function exportInventoryMovements(
 
   const blob = await response.blob();
   return { blob, filename };
+}
+
+// ─── Thresholds ───
+
+/**
+ * Get current threshold configs (global + overrides) for my depot
+ * GET /logistics/inventory/my-depot/thresholds
+ */
+export async function getMyDepotThresholds(): Promise<GetThresholdsResponse> {
+  const { data } = await api.get("/logistics/inventory/my-depot/thresholds");
+  return data;
+}
+
+/**
+ * Get threshold change history with optional filters + pagination
+ * GET /logistics/inventory/my-depot/thresholds/history
+ */
+export async function getMyDepotThresholdsHistory(
+  params: GetThresholdsHistoryParams,
+): Promise<GetThresholdsHistoryResponse> {
+  const { data } = await api.get(
+    "/logistics/inventory/my-depot/thresholds/history",
+    { params },
+  );
+  return data;
+}
+
+/**
+ * Create or update a threshold config by scope
+ * PUT /logistics/inventory/my-depot/thresholds
+ */
+export async function updateMyDepotThreshold(
+  payload: UpdateThresholdPayload,
+): Promise<UpdateThresholdResponse> {
+  const { data } = await api.put(
+    "/logistics/inventory/my-depot/thresholds",
+    payload,
+  );
+  return data;
+}
+
+/**
+ * Soft-reset (deactivate) a threshold config
+ * DELETE /logistics/inventory/my-depot/thresholds
+ */
+export async function deleteMyDepotThreshold(
+  payload: DeleteThresholdPayload,
+): Promise<DeleteThresholdResponse> {
+  const { data } = await api.delete(
+    "/logistics/inventory/my-depot/thresholds",
+    { data: payload },
+  );
+  return data;
+}
+
+// ─── Low Stock ───
+
+/**
+ * Get low-stock items for my depot (resolved by threshold precedence)
+ * GET /logistics/inventory/my-depot/low-stock
+ */
+export async function getMyDepotLowStock(
+  params?: GetLowStockParams,
+): Promise<GetLowStockResponse> {
+  const { data } = await api.get("/logistics/inventory/my-depot/low-stock", {
+    params,
+  });
+  return data;
 }
