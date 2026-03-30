@@ -58,10 +58,13 @@ const UsersPage = () => {
     getDashboardData().then(setDashboardData).catch(console.error);
   }, []);
 
-  // Fetch all users once – filtering & pagination handled client-side in UserTable
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Fetch users with server-side pagination
   const { data: usersData, isLoading: isLoadingUsers } = useAdminUsers({
-    pageNumber: 1,
-    pageSize: 1000,
+    pageNumber: page,
+    pageSize,
   });
 
   const dynamicStats = {
@@ -156,7 +159,6 @@ const UsersPage = () => {
           onEdit={handleEditClick}
           onBan={handleBanClick}
           onActivate={handleActivateClick}
-          onPrefetch={(userId) => setSelectedUserId(userId)}
           onViewDetail={(userId) => {
             setSelectedUserId(userId);
             setDetailSheetMode("view");
@@ -164,6 +166,16 @@ const UsersPage = () => {
           }}
           isLoading={isLoadingUsers}
           totalCount={usersData?.totalCount}
+          serverPagination={{
+            totalCount: usersData?.totalCount ?? 0,
+            totalPages: usersData?.totalPages ?? 1,
+            page,
+            pageSize,
+            hasPreviousPage: usersData?.hasPreviousPage ?? false,
+            hasNextPage: usersData?.hasNextPage ?? false,
+            onPageChange: setPage,
+            onPageSizeChange: (size) => { setPageSize(size); setPage(1); },
+          }}
         />
       </div>
 

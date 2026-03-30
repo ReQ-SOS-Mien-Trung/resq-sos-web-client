@@ -31,6 +31,7 @@ import {
   Radio,
   Robot,
   Shield,
+  Spinner,
   SquaresFour,
   Stethoscope,
   Target,
@@ -47,6 +48,9 @@ import {
   Wrench,
   XCircle,
   FadersIcon,
+  SlidersIcon,
+  UserIcon,
+  Folder,
 } from "@phosphor-icons/react";
 
 export const navLinks = [
@@ -334,14 +338,28 @@ export const navigationItems = [
     label: "Tổng quan",
     href: "/dashboard/admin",
   },
-  { icon: Users, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
   {
-    icon: UserCheck,
-    label: "Quản lý cứu hộ viên",
-    href: "/dashboard/admin/rescuers",
+    icon: UserIcon,
+    label: "Quản lý người dùng",
+    children: [
+      { icon: UserIcon, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
+      { icon: UserCheck, label: "Quản lý cứu hộ viên", href: "/dashboard/admin/rescuers" },
+      { icon: IdentificationCardIcon, label: "Quản lý hồ sơ cứu hộ viên", href: "/dashboard/admin/rescuer-verification" },
+    ],
   },
   {
+    icon: SlidersIcon,
+    label: "Cấu hình hệ thống",
+    children: [
+      { icon: FadersIcon, label: "Tham số hệ thống", href: "/dashboard/admin/config" },
+      { icon: Robot, label: "Cấu hình AI Prompt", href: "/dashboard/admin/ai-prompt" },
+      { icon: ChatCircle, label: "Cấu hình phòng chat", href: "/dashboard/admin/chat-config" },
+    ],
+  },
+    {
     icon: IdentificationCardIcon,
+    label: "Quản lý điểm tập kết",
+    href: "/dashboard/admin/assembly-points",
     label: "Quản lý hồ sơ cứu hộ viên",
     href: "/dashboard/admin/rescuer-verification",
   },
@@ -372,6 +390,8 @@ export const navigationItems = [
     label: "Cấu hình phòng chat",
     href: "/dashboard/admin/chat-config",
   },
+  { icon: ChartBar, label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
+  { icon: Folder, label: "Quản lý quỹ chiến dịch", href: "/dashboard/admin/campaigns" },
   {
     icon: LockKey,
     label: "Phân quyền người dùng",
@@ -381,6 +401,14 @@ export const navigationItems = [
     icon: MapTrifold,
     label: "Khoanh vùng cứu hộ",
     href: "/dashboard/admin/map-zone",
+  },
+  {
+    icon: CloudSun,
+    label: "Thời tiết",
+    children: [
+      { icon: CloudSun, label: "Bài đăng thời tiết", href: "/dashboard/admin/weather-posts" },
+      { icon: Drop, label: "Thời tiết & Lũ lụt", href: "/dashboard/admin/weather-flood" },
+    ],
   },
 ];
 
@@ -546,6 +574,13 @@ export const depotStatusConfig = {
 };
 
 export const assemblyPointStatusConfig = {
+  Created: {
+    label: "Mới tạo",
+    color: "bg-sky-500",
+    textColor: "text-sky-700 dark:text-sky-400",
+    bgColor: "bg-sky-50 dark:bg-sky-950/30",
+    icon: Clock,
+  },
   Active: {
     label: "Hoạt động",
     color: "bg-green-500",
@@ -560,8 +595,15 @@ export const assemblyPointStatusConfig = {
     bgColor: "bg-orange-50 dark:bg-orange-950/30",
     icon: WarningCircle,
   },
-  Unavailable: {
-    label: "Không khả dụng",
+  UnderMaintenance: {
+    label: "Đang bảo trì",
+    color: "bg-violet-500",
+    textColor: "text-violet-700 dark:text-violet-400",
+    bgColor: "bg-violet-50 dark:bg-violet-950/30",
+    icon: Spinner,
+  },
+  Closed: {
+    label: "Đã đóng",
     color: "bg-red-500",
     textColor: "text-red-700 dark:text-red-400",
     bgColor: "bg-red-50 dark:bg-red-950/30",

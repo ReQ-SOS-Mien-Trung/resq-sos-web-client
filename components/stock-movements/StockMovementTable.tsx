@@ -44,23 +44,27 @@ import { vi } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import {
-  useDepotTransactions,
+  useDepotStockMovements,
   useInventoryActionTypes,
   useInventorySourceTypes,
-  type GetDepotTransactionsParams,
+  type GetDepotStockMovementsParams,
 } from '@/services/inventory';
+import { type StockMovementEntity } from '@/services/inventory/type';
+import { StockMovementDetailSheet } from './StockMovementDetailSheet';
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
-const TransactionTable: React.FC = () => {
+const StockMovementTable: React.FC = () => {
   // State for filters
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(10);
   const [search, setSearch] = useState('');
   const [selectedActionTypes, setSelectedActionTypes] = useState<string[]>([]);
   const [selectedSourceTypes, setSelectedSourceTypes] = useState<string[]>([]);
   const [selectedSourceNames, setSelectedSourceNames] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [selectedMovement, setSelectedMovement] = useState<StockMovementEntity | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -80,7 +84,7 @@ const TransactionTable: React.FC = () => {
   }, [debouncedSearch, selectedActionTypes, selectedSourceTypes, selectedSourceNames, dateRange]);
 
   // Query filters
-  const queryFilters = useMemo((): GetDepotTransactionsParams => ({
+  const queryFilters = useMemo((): GetDepotStockMovementsParams => ({
     pageNumber: page + 1,
     pageSize: pageSize,
     actionTypes: selectedActionTypes.length > 0 ? selectedActionTypes : undefined,
@@ -90,67 +94,58 @@ const TransactionTable: React.FC = () => {
   }), [page, pageSize, selectedActionTypes, selectedSourceTypes, dateRange]);
 
   // Fetch data
-  const { data: transactionsData, isLoading: loadingTransactions, error: transactionsError } = useDepotTransactions(queryFilters);
+  const { data: stockMovementsData, isLoading: loadingStockMovements, error: stockMovementsError } = useDepotStockMovements(queryFilters);
 
   const { data: actionTypes = [] } = useInventoryActionTypes();
 
   const { data: sourceTypes = [] } = useInventorySourceTypes();
 
-  // Transform data to match expected structure
-  const transactions = useMemo(() => {
-    if (!transactionsData) return null;
-    
+  // Transform data — one row per stock movement
+  const stockMovements = useMemo(() => {
+    if (!stockMovementsData) return null;
+
     return {
-      content: transactionsData.items.flatMap(transaction => 
-        transaction.items.map(item => ({
-          id: `${transaction.transactionId}-${item.itemId}`,
-          transactionId: transaction.transactionId,
-          actionType: transaction.actionType,
-          actionTypeId: transaction.actionType,
-          sourceType: transaction.sourceType,
-          sourceTypeId: transaction.sourceType,
-          sourceName: transaction.sourceName,
-          sourceId: transaction.sourceId?.toString() || '',
-          itemName: item.itemName,
-          itemId: item.itemId.toString(),
-          categoryName: item.categoryName,
-          categoryId: item.categoryName,
-          quantity: Math.abs(item.quantityChange),
-          unit: item.unit,
-          notes: transaction.note,
-          createdAt: transaction.createdAt,
-          updatedAt: transaction.createdAt,
-          createdBy: transaction.performedByName,
-          createdByName: transaction.performedByName,
-        }))
-      ),
-      totalElements: transactionsData.totalCount,
-      totalPages: transactionsData.totalPages,
-      size: transactionsData.pageSize,
-      number: transactionsData.pageNumber,
-      first: !transactionsData.hasPreviousPage,
-      last: !transactionsData.hasNextPage,
+      content: stockMovementsData.items.map((movement, idx) => ({
+        id: `${movement.transactionId}-${idx}`,
+        transactionId: movement.transactionId,
+        actionType: movement.actionType,
+        sourceType: movement.sourceType,
+        sourceName: movement.sourceName,
+        sourceId: movement.sourceId?.toString() || '',
+        notes: movement.note,
+        createdAt: movement.createdAt,
+        createdByName: movement.performedByName,
+        items: movement.items,
+        rawMovement: movement,
+      })),
+      totalElements: stockMovementsData.totalCount,
+      totalPages: stockMovementsData.totalPages,
+      size: stockMovementsData.pageSize,
+      number: stockMovementsData.pageNumber,
+      first: !stockMovementsData.hasPreviousPage,
+      last: !stockMovementsData.hasNextPage,
     };
-  }, [transactionsData]);
+  }, [stockMovementsData]);
 
-  // Get unique source names from transactions for filter
+  // Get unique source names from stock movements for filter
   const uniqueSourceNames = useMemo(() => {
-    if (!transactionsData?.items) return [];
-    const names = new Set(transactionsData.items.map(t => t.sourceName));
+    if (!stockMovementsData?.items) return [];
+    const names = new Set(stockMovementsData.items.map(t => t.sourceName));
     return Array.from(names).sort();
-  }, [transactionsData]);
+  }, [stockMovementsData]);
 
-  // Filter transactions by source name and search
-  const filteredTransactions = useMemo(() => {
-    if (!transactions) return null;
+  // Filter stock movements by source name and search
+  const filteredStockMovements = useMemo(() => {
+    if (!stockMovements) return null;
     
-    let filtered = transactions.content;
+    let filtered = stockMovements.content;
     
     // Filter by search term
     if (debouncedSearch.trim()) {
-      filtered = filtered.filter(t => 
-        t.sourceName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        t.itemName.toLowerCase().includes(debouncedSearch.toLowerCase())
+      const term = debouncedSearch.toLowerCase();
+      filtered = filtered.filter(t =>
+        t.sourceName.toLowerCase().includes(term) ||
+        t.items.some(i => i.itemName.toLowerCase().includes(term))
       );
     }
     
@@ -160,10 +155,10 @@ const TransactionTable: React.FC = () => {
     }
     
     return {
-      ...transactions,
+      ...stockMovements,
       content: filtered
     };
-  }, [transactions, debouncedSearch, selectedSourceNames]);
+  }, [stockMovements, debouncedSearch, selectedSourceNames]);
 
   // Clear filters
   const clearFilters = () => {
@@ -206,11 +201,6 @@ const TransactionTable: React.FC = () => {
     return format(new Date(dateString), 'dd/MM/yyyy HH:mm', { locale: vi });
   };
 
-  // Format quantity with unit
-  const formatQuantity = (quantity: number, unit: string) => {
-    return `${quantity.toLocaleString('vi-VN')} ${unit}`;
-  };
-
   // Get action type badge with Vietnamese label + proper color
   const getActionTypeBadge = (actionType: string) => {
     const config = ACTION_TYPE_MAP[actionType];
@@ -224,7 +214,7 @@ const TransactionTable: React.FC = () => {
     return <Badge variant="outline">{actionType}</Badge>;
   };
 
-  const displayTransactions = filteredTransactions || transactions;
+  const displayStockMovements = filteredStockMovements || stockMovements;
 
   return (
     <div className="flex flex-col pb-6">
@@ -426,14 +416,14 @@ const TransactionTable: React.FC = () => {
                 Lịch sử xuất nhập kho
               </CardTitle>
               <div className="flex items-center gap-2 text-sm tracking-tighter text-muted-foreground">
-                {displayTransactions && (
+                {displayStockMovements && (
                   <>
                     <span>
-                      Trang {page + 1} / {displayTransactions.totalPages}
+                      Trang {page + 1} / {displayStockMovements.totalPages}
                     </span>
                     <Separator orientation="vertical" className="h-4" />
                     <span>
-                      Tổng {displayTransactions.totalElements.toLocaleString('vi-VN')} lần
+                      Tổng {displayStockMovements.totalElements.toLocaleString('vi-VN')} lần
                     </span>
                   </>
                 )}
@@ -447,17 +437,15 @@ const TransactionTable: React.FC = () => {
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
-                      <TableHead>Mã</TableHead>
+                      <TableHead className="pl-6">Mã</TableHead>
                       <TableHead>Loại hành động</TableHead>
                       <TableHead>Nguồn</TableHead>
                       <TableHead>Vật tư</TableHead>
-                      <TableHead className="text-right">Số lượng</TableHead>
                       <TableHead>Thời gian</TableHead>                   
-                      <TableHead>Ghi chú</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {loadingTransactions ? (
+                    {loadingStockMovements ? (
                       Array.from({ length: pageSize }, (_, i) => (
                         <TableRow key={i}>
                           <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
@@ -470,7 +458,7 @@ const TransactionTable: React.FC = () => {
                           <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
                         </TableRow>
                       ))
-                    ) : transactionsError ? (
+                    ) : stockMovementsError ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8">
                           <div className="flex flex-col items-center gap-2">
@@ -481,7 +469,7 @@ const TransactionTable: React.FC = () => {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ) : !displayTransactions?.content?.length ? (
+                    ) : !displayStockMovements?.content?.length ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8">
                           <div className="flex flex-col items-center gap-2">
@@ -493,35 +481,50 @@ const TransactionTable: React.FC = () => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      displayTransactions.content.map((transaction) => (
-                        <TableRow key={transaction.id} className="hover:bg-muted/50">
-                          <TableCell className="font-regular text-sm">
-                            {transaction.transactionId}
+                      displayStockMovements.content.map((movement) => (
+                        <TableRow
+                          key={movement.id}
+                          className="hover:bg-muted/50 cursor-pointer"
+                          onClick={() => {
+                            setSelectedMovement(movement.rawMovement as StockMovementEntity);
+                            setSheetOpen(true);
+                          }}
+                        >
+                          <TableCell className="font-regular text-sm pl-6">
+                            {movement.transactionId}
                           </TableCell>
                           <TableCell>
-                            {getActionTypeBadge(transaction.actionType)}
+                            {getActionTypeBadge(movement.actionType)}
                           </TableCell>
                           <TableCell>
-                            {transaction.sourceName || "—"}
+                            {movement.sourceName || "—"}
                           </TableCell>
                           <TableCell>
-                            <div>
-                              <p className="font-medium">{transaction.itemName}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {transaction.categoryName}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatQuantity(transaction.quantity, transaction.unit)}
+                            {movement.items.length === 1 ? (
+                              <div>
+                                <p className="font-medium text-sm">{movement.items[0].itemName}</p>
+                                <p className="text-xs text-muted-foreground">{movement.items[0].categoryName}</p>
+                                {movement.items[0].receivedDate && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    Nhập: {format(new Date(movement.items[0].receivedDate), "dd/MM/yyyy", { locale: vi })}
+                                    {movement.items[0].expiredDate && (
+                                      <> • Hết hạn: <span className={new Date(movement.items[0].expiredDate) < new Date() ? "text-red-500 font-medium" : ""}>
+                                        {format(new Date(movement.items[0].expiredDate), "dd/MM/yyyy", { locale: vi })}
+                                      </span></>
+                                    )}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="font-medium text-sm">{movement.items[0].itemName}</p>
+                                <p className="text-xs text-muted-foreground">{movement.items[0].categoryName}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5 italic">+{movement.items.length - 1} mặt hàng khác</p>
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className="text-sm">
-                            {formatDate(transaction.createdAt)}
-                          </TableCell>
-                          <TableCell className="max-w-xs">
-                            <p className="text-sm font-regular truncate">
-                              {transaction.notes || '-'}
-                            </p>
+                            {formatDate(movement.createdAt)}
                           </TableCell>
                         </TableRow>
                       ))
@@ -531,7 +534,7 @@ const TransactionTable: React.FC = () => {
               </div>
 
               {/* Pagination */}
-              {displayTransactions && displayTransactions.totalPages > 0 && (
+              {displayStockMovements && displayStockMovements.totalPages > 0 && (
                 <div className="border-t bg-background px-6 py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm tracking-tighter text-muted-foreground">
@@ -554,26 +557,26 @@ const TransactionTable: React.FC = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                      <span>/ {displayTransactions.totalElements} kết quả</span>
+                      <span>/ {displayStockMovements.totalElements} kết quả</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setPage(page - 1)}
-                        disabled={displayTransactions.first || loadingTransactions}
+                        disabled={displayStockMovements.first || loadingStockMovements}
                       >
                         <ChevronLeft className="h-4 w-4" />
                         Trước
                       </Button>
                       <span className="text-sm text-muted-foreground">
-                        {page + 1} / {displayTransactions.totalPages}
+                        {page + 1} / {displayStockMovements.totalPages}
                       </span>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setPage(page + 1)}
-                        disabled={displayTransactions.last || loadingTransactions}
+                        disabled={displayStockMovements.last || loadingStockMovements}
                       >
                         Sau
                         <ChevronRight className="h-4 w-4" />
@@ -586,8 +589,13 @@ const TransactionTable: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+      <StockMovementDetailSheet
+        movement={selectedMovement}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+      />
     </div>
   );
 };
 
-export default TransactionTable;
+export default StockMovementTable;

@@ -43,15 +43,18 @@ import {
   MagnifyingGlass,
   Plus,
   PencilSimple,
+  CaretDown,
 } from "@phosphor-icons/react";
 import {
   useInventoryItemTypes,
   useInventoryTargetGroups,
   useInventoryOrganizations,
   useImportInventory,
+  useDownloadDonationImportTemplate,
 } from "@/services/inventory/hooks";
-import type { ImportInventoryItem } from "@/services/inventory/type";
+import type { ImportInventoryItem, ImportInventoryRequest } from "@/services/inventory/type";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
+import { DateTimePickerInput } from "@/components/ui/date-time-picker-input";
 
 // ─── System categories (seed) ───
 const SYSTEM_CATEGORIES = [
@@ -88,6 +91,30 @@ const CATEGORY_VI_MAP: Record<string, string> = {
   heating: "Heating",
 };
 
+/** Match category from bilingual format like "Thực phẩm - Food" */
+function matchCategoryCode(rawCategory: string): string {
+  const lower = rawCategory.toLowerCase().trim();
+  if (CATEGORY_VI_MAP[lower]) return CATEGORY_VI_MAP[lower];
+  // Bilingual: split by " - " and try each part
+  const parts = rawCategory.split(/\s*-\s*/);
+  for (const part of parts) {
+    const match = CATEGORY_VI_MAP[part.trim().toLowerCase()];
+    if (match) return match;
+  }
+  return "";
+}
+
+/** Find the data sheet (has "STT" in A1) — skips lookup / hidden sheets */
+function findDataSheet(workbook: XLSX.WorkBook): XLSX.WorkSheet {
+  for (const name of workbook.SheetNames) {
+    const ws = workbook.Sheets[name];
+    if (!ws["!ref"]) continue;
+    const a1 = ws["A1"];
+    if (a1 && String(a1.v ?? "").trim().toUpperCase() === "STT") return ws;
+  }
+  return workbook.Sheets[workbook.SheetNames[0]];
+}
+
 // ─── Excel column names (matching the template screenshot) ───
 const COL = {
   STT: "STT",
@@ -96,25 +123,26 @@ const COL = {
   DOITUONG: "Đối tượng",
   LOAI: "Loại vật phẩm",
   DONVI: "Đơn vị",
+  MOTA: "Mô tả vật phẩm",
   SOLUONG: "Số lượng",
   HETHAN: "Ngày hết hạn",
   NHAN: "Ngày nhận",
-  GHICHU: "Ghi chú",
 } as const;
 
 // ─── Row type ───
 interface ImportRow {
   id: string;
   row: number;
+  itemModelId?: number;
   itemName: string;
   categoryCode: string;
-  targetGroup: string;
+  targetGroups: string[];
   itemType: string;
   unit: string;
   quantity: number;
   expiredDate: string;
   receivedDate: string;
-  notes: string;
+  description: string;
   errors: Record<string, string>;
 }
 
@@ -124,6 +152,7 @@ type Step = "upload" | "review";
 // ─── Date helper ───
 function parseExcelDate(val: unknown): string {
   if (!val) return "";
+  // Excel serial number
   if (typeof val === "number") {
     const date = XLSX.SSF.parse_date_code(val);
     if (date) {
@@ -131,11 +160,110 @@ function parseExcelDate(val: unknown): string {
     }
   }
   const str = String(val).trim();
-  const d = new Date(str);
-  if (!isNaN(d.getTime())) {
-    return d.toISOString().split("T")[0];
+  if (!str) return "";
+  // yyyy-mm-dd, yyyy/mm/dd, yyyy.mm.dd
+  const ymd = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (ymd) {
+    return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`;
   }
+  // dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy, d/m/yyyy (Vietnamese format)
+  const dmy = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (dmy) {
+    const day = parseInt(dmy[1]);
+    const month = parseInt(dmy[2]);
+    const year = dmy[3];
+    // If month > 12 and day <= 12, it's likely mm/dd/yyyy — swap
+    if (month > 12 && day <= 12) {
+      return `${year}-${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}`;
+    }
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+  // Fallback: ISO strings with time component, etc.
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
   return str;
+}
+
+/** Parse datetime from Excel cell — returns "yyyy-MM-ddTHH:mm" */
+function parseExcelDateTime(val: unknown): string {
+  if (!val) return "";
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  // Excel serial number (may include fractional time)
+  if (typeof val === "number") {
+    const date = XLSX.SSF.parse_date_code(val);
+    if (date) {
+      return `${String(date.y).padStart(4, "0")}-${p2(date.m)}-${p2(date.d)}T${p2(date.H ?? 0)}:${p2(date.M ?? 0)}`;
+    }
+  }
+  const str = String(val).trim();
+  if (!str) return "";
+  // dd/mm/yyyy HH:mm or dd/mm/yyyy H:mm (Vietnamese with time)
+  const dmyHM = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\s+(\d{1,2}):(\d{2})/);
+  if (dmyHM) {
+    const [, d, m, y, H, M] = dmyHM;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${H.padStart(2, "0")}:${M}`;
+  }
+  // dd/mm/yyyy — date only, default to 00:00
+  const dmy = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T00:00`;
+  }
+  // yyyy-mm-ddTHH:mm or yyyy-mm-dd
+  const isoLike = str.match(/^(\d{4})[\-](\d{2})[\-](\d{2})(?:T(\d{2}):(\d{2}))?/);
+  if (isoLike) {
+    const [, y, m, d, H = "00", M = "00"] = isoLike;
+    return `${y}-${m}-${d}T${H}:${M}`;
+  }
+  // Fallback
+  const dt = new Date(str);
+  if (!isNaN(dt.getTime())) {
+    return `${dt.getFullYear()}-${p2(dt.getMonth() + 1)}-${p2(dt.getDate())}T${p2(dt.getHours())}:${p2(dt.getMinutes())}`;
+  }
+  return "";
+}
+
+/** Extract trailing model ID from item name, e.g. "Mì tôm - 1" → { cleanName: "Mì tôm", itemModelId: 1 } */
+function parseItemName(raw: string): { cleanName: string; itemModelId?: number } {
+  const m = raw.trim().match(/^(.*?)\s*-\s*(\d+)$/);
+  if (m) {
+    return { cleanName: m[1].trim(), itemModelId: Number(m[2]) };
+  }
+  return { cleanName: raw.trim() };
+}
+
+/**
+ * Đọc sheet theo VỊTRI CỘT (không phụ thuộc tên cột / Unicode).
+ * Tìm dòng header bằng cách kiểm tra cột 0 = "STT" (ASCII thuần).
+ * Sau đó map từng dòng data theo đúng thứ tự cột của colNames.
+ */
+function getSheetRows(
+  sheet: XLSX.WorkSheet,
+  colNames: readonly string[],
+): Record<string, unknown>[] {
+  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+  if (rawRows.length === 0) return [];
+
+  // Tìm header: dòng đầu tiên có cột 0 = "STT" (ASCII → không bị ảnh hưởng Unicode)
+  const headerRowIndex = rawRows.findIndex(
+    (row) => Array.isArray(row) && String(row[0] ?? "").trim().toUpperCase() === "STT",
+  );
+
+  // Nếu không tìm thấy STT, giả sử dòng 0 là header
+  const dataStart = headerRowIndex >= 0 ? headerRowIndex + 1 : 1;
+
+  return rawRows.slice(dataStart).map((row) => {
+    const arr = Array.isArray(row) ? row : [];
+    const obj: Record<string, unknown> = {};
+    colNames.forEach((name, i) => {
+      const raw = arr[i];
+      // Các cell formula có thể trả về object {v, f} — lấy .v nếu có
+      obj[name] = (raw !== null && raw !== undefined && typeof raw === "object" && "v" in (raw as object))
+        ? (raw as { v: unknown }).v ?? ""
+        : raw ?? "";
+    });
+    return obj;
+  });
 }
 
 // ─── Component ───
@@ -150,6 +278,7 @@ export default function ExcelImportFromOrg() {
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [orgError, setOrgError] = useState("");
   const [isOrgOpen, setIsOrgOpen] = useState(false);
+  const [batchNote, setBatchNote] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const orgInputRef = useRef<HTMLInputElement>(null);
 
@@ -158,6 +287,7 @@ export default function ExcelImportFromOrg() {
   const { data: targetGroupsData } = useInventoryTargetGroups();
   const { data: organizationsData } = useInventoryOrganizations();
   const importMutation = useImportInventory();
+  const { mutateAsync: downloadTemplate } = useDownloadDonationImportTemplate();
 
   const itemTypes = useMemo(() => itemTypesData ?? [], [itemTypesData]);
   const targetGroups = useMemo(() => targetGroupsData ?? [], [targetGroupsData]);
@@ -185,9 +315,11 @@ export default function ExcelImportFromOrg() {
     if (!row.quantity || row.quantity <= 0) errors.quantity = "Số lượng phải > 0";
     if (!row.unit) errors.unit = "Đơn vị không được trống";
     if (!row.itemType) errors.itemType = "Loại vật phẩm không được trống";
-    if (!row.targetGroup) errors.targetGroup = "Đối tượng không được trống";
+    if (!row.targetGroups?.length) errors.targetGroups = "Đối tượng không được trống";
+    if (row.itemType === "Reusable" && !row.targetGroups?.includes("Rescuer"))
+      errors.targetGroups = "Đối với vật phẩm ‘Tái sử dụng’, đối tượng áp dụng là ‘Lực lượng cứu hộ’.";
     if (!row.receivedDate) errors.receivedDate = "Ngày nhận không được trống";
-    else if (row.receivedDate > new Date().toISOString().slice(0, 10)) errors.receivedDate = "Ngày nhận không được là ngày trong tương lai";
+    else if (new Date(row.receivedDate) > new Date()) errors.receivedDate = "Ngày nhận không được là thời điểm trong tương lai";
     return errors;
   }, []);
 
@@ -199,51 +331,59 @@ export default function ExcelImportFromOrg() {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
-          const sheetName = workbook.SheetNames[0];
-          const sheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+          const sheet = findDataSheet(workbook);
+          const jsonData = getSheetRows(sheet, Object.values(COL));
+          const dataRows = jsonData.filter((raw) => String(raw[COL.TEN] ?? "").trim() !== "");
+          if (dataRows.length === 0) { toast.error("Không tìm thấy dòng nào có dữ liệu"); return; }
 
-          if (jsonData.length === 0) {
-            toast.error("File Excel không có dữ liệu");
-            return;
-          }
-
-          const parsed: ImportRow[] = jsonData.map((raw, idx) => {
+          const parsed: ImportRow[] = dataRows.map((raw, idx) => {
             const rawCategory = String(raw[COL.DANHMUC] ?? "").trim();
-            const categoryCode = CATEGORY_VI_MAP[rawCategory.toLowerCase()] ?? "";
+            const categoryCode = matchCategoryCode(rawCategory);
 
-            const itemName = String(raw[COL.TEN] ?? "").trim();
+            const { cleanName: itemName, itemModelId } = parseItemName(String(raw[COL.TEN] ?? ""));
 
             const rawTargetGroup = String(raw[COL.DOITUONG] ?? "").trim();
-            const matchedTargetGroup = targetGroups.find(
-              (t) => t.value.toLowerCase() === rawTargetGroup.toLowerCase() || t.key.toLowerCase() === rawTargetGroup.toLowerCase(),
-            );
-            const targetGroup = matchedTargetGroup?.key ?? rawTargetGroup;
+            const targetGroupsValue = rawTargetGroup
+              .split(/[,;،]/)
+              .map((seg) => {
+                const seg2 = seg.trim();
+                if (!seg2) return null;
+                const parts = seg2.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
+                const matched = targetGroups.find((t) =>
+                  parts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
+                );
+                return matched?.key ?? seg2;
+              })
+              .filter((v): v is string => !!v);
 
             const rawItemType = String(raw[COL.LOAI] ?? "").trim();
+            const itParts = rawItemType.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
             const matchedItemType = itemTypes.find(
-              (t) => t.value.toLowerCase() === rawItemType.toLowerCase() || t.key.toLowerCase() === rawItemType.toLowerCase(),
+              (t) => itParts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
             );
             const itemType = matchedItemType?.key ?? rawItemType;
+
+            // Auto-set targetGroups to ["Rescuer"] when item is Reusable
+            const targetGroupsFinal = itemType === "Reusable" ? ["Rescuer"] : targetGroupsValue;
 
             const unit = String(raw[COL.DONVI] ?? "").trim();
             const quantity = Number(raw[COL.SOLUONG] ?? 0);
             const expiredDate = parseExcelDate(raw[COL.HETHAN]);
-            const receivedDate = parseExcelDate(raw[COL.NHAN]);
-            const notes = String(raw[COL.GHICHU] ?? "").trim();
+            const description = String(raw[COL.MOTA] ?? "").trim();
 
             const rowData = {
               id: `row-${idx}-${Date.now()}`,
               row: idx + 1,
+              itemModelId,
               itemName,
               categoryCode,
-              targetGroup,
+              targetGroups: targetGroupsFinal,
               itemType,
               unit,
               quantity: quantity > 0 ? quantity : 0,
               expiredDate,
-              receivedDate,
-              notes,
+              receivedDate: parseExcelDateTime(raw[COL.NHAN]),
+              description,
             };
 
             return { ...rowData, errors: validateRow(rowData) };
@@ -310,15 +450,16 @@ export default function ExcelImportFromOrg() {
       const newRow: ImportRow = {
         id: `row-manual-${Date.now()}-${Math.random()}`,
         row: prev.length + 1,
+        itemModelId: undefined,
         itemName: "",
         categoryCode: "",
-        targetGroup: "",
+        targetGroups: [],
         itemType: "",
         unit: "",
         quantity: 0,
         expiredDate: "",
         receivedDate: "",
-        notes: "",
+        description: "",
         errors: {},
       };
       newRow.errors = validateRow(newRow);
@@ -346,39 +487,55 @@ export default function ExcelImportFromOrg() {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+          const sheet = findDataSheet(workbook);
+          const jsonData = getSheetRows(sheet, Object.values(COL));
           if (jsonData.length === 0) { toast.error("File Excel không có dữ liệu"); return; }
           setRows((prev) => {
             const offset = prev.length;
-            const parsed: ImportRow[] = jsonData.map((raw, idx) => {
+            const dataRows = jsonData.filter((raw) => String(raw[COL.TEN] ?? "").trim() !== "");
+            if (dataRows.length === 0) { toast.error("Không tìm thấy dòng nào có dữ liệu"); return prev; }
+            const parsed: ImportRow[] = dataRows.map((raw, idx) => {
               const rawCategory = String(raw[COL.DANHMUC] ?? "").trim();
-              const categoryCode = CATEGORY_VI_MAP[rawCategory.toLowerCase()] ?? "";
+              const categoryCode = matchCategoryCode(rawCategory);
 
               const rawTargetGroup = String(raw[COL.DOITUONG] ?? "").trim();
-              const matchedTargetGroup = targetGroups.find(
-                (t) => t.value.toLowerCase() === rawTargetGroup.toLowerCase() || t.key.toLowerCase() === rawTargetGroup.toLowerCase(),
-              );
-              const targetGroup = matchedTargetGroup?.key ?? rawTargetGroup;
+              const targetGroupsValue = rawTargetGroup
+                .split(/[,;،]/)
+                .map((seg) => {
+                  const seg2 = seg.trim();
+                  if (!seg2) return null;
+                  const parts = seg2.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
+                  const matched = targetGroups.find((t) =>
+                    parts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
+                  );
+                  return matched?.key ?? seg2;
+                })
+                .filter((v): v is string => !!v);
 
               const rawItemType = String(raw[COL.LOAI] ?? "").trim();
+              const itParts = rawItemType.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
               const matchedItemType = itemTypes.find(
-                (t) => t.value.toLowerCase() === rawItemType.toLowerCase() || t.key.toLowerCase() === rawItemType.toLowerCase(),
+                (t) => itParts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
               );
               const itemType = matchedItemType?.key ?? rawItemType;
 
+              // Auto-set targetGroups to ["Rescuer"] when item is Reusable
+              const targetGroupsFinal = itemType === "Reusable" ? ["Rescuer"] : targetGroupsValue;
+
+              const { cleanName: itemName, itemModelId } = parseItemName(String(raw[COL.TEN] ?? ""));
               const rowData = {
                 id: `row-${offset + idx}-${Date.now()}`,
                 row: offset + idx + 1,
-                itemName: String(raw[COL.TEN] ?? "").trim(),
+                itemModelId,
+                itemName,
                 categoryCode,
-                targetGroup,
+                targetGroups: targetGroupsFinal,
                 itemType,
                 unit: String(raw[COL.DONVI] ?? "").trim(),
                 quantity: Number(raw[COL.SOLUONG] ?? 0) > 0 ? Number(raw[COL.SOLUONG]) : 0,
                 expiredDate: parseExcelDate(raw[COL.HETHAN]),
-                receivedDate: parseExcelDate(raw[COL.NHAN]),
-                notes: String(raw[COL.GHICHU] ?? "").trim(),
+                receivedDate: parseExcelDateTime(raw[COL.NHAN]),
+                description: String(raw[COL.MOTA] ?? "").trim(),
               };
               return { ...rowData, errors: validateRow(rowData) };
             });
@@ -398,11 +555,15 @@ export default function ExcelImportFromOrg() {
 
   // ─── Row editing ───
   const updateRow = useCallback(
-    (id: string, field: keyof ImportRow, value: string | number) => {
+    (id: string, field: keyof ImportRow, value: string | number | string[] | undefined) => {
       setRows((prev) =>
         prev.map((row) => {
           if (row.id !== id) return row;
-          const updated = { ...row, [field]: value };
+          const updated = { ...row, [field]: value } as ImportRow;
+          // Auto-set targetGroups when itemType changes to Reusable
+          if (field === "itemType" && value === "Reusable") {
+            updated.targetGroups = ["Rescuer"];
+          }
           updated.errors = validateRow(updated);
           return updated;
         }),
@@ -441,23 +602,27 @@ export default function ExcelImportFromOrg() {
 
     const items: ImportInventoryItem[] = rows.map((r) => ({
       row: r.row,
+      ...(r.itemModelId ? { itemModelId: r.itemModelId } : {}),
       itemName: r.itemName,
       categoryCode: r.categoryCode,
       quantity: r.quantity,
       unit: r.unit,
       itemType: r.itemType,
-      targetGroup: r.targetGroup,
-      receivedDate: r.receivedDate,
+      targetGroups: r.targetGroups,
+      receivedDate: r.receivedDate ? new Date(r.receivedDate).toISOString() : r.receivedDate,
       expiredDate: r.expiredDate || null,
-      notes: r.notes || null,
+      description: r.description || null,
     }));
 
-    const payload: { organizationId?: number; organizationName?: string; items: ImportInventoryItem[] } = { items };
+    const payload: ImportInventoryRequest = { items };
     if (selectedOrgId) {
       payload.organizationId = Number(selectedOrgId);
     }
     if (orgSearchValue.trim()) {
       payload.organizationName = orgSearchValue.trim();
+    }
+    if (batchNote.trim()) {
+      payload.batchNote = batchNote.trim();
     }
 
     importMutation.mutate(payload, {
@@ -470,24 +635,32 @@ export default function ExcelImportFromOrg() {
         toast.error(`Nhập kho thất bại: ${errorMsg}`);
       },
     });
-  }, [rows, errorCount, selectedOrgId, orgSearchValue, importMutation, router]);
+  }, [rows, errorCount, selectedOrgId, orgSearchValue, batchNote, importMutation, router]);
 
   // ─── Reset ───
   const handleReset = useCallback(() => {
     setStep("upload");
     setRows([]);
     setFileName("");
+    setBatchNote("");
   }, []);
 
-  const handleDownloadTemplate = useCallback(() => {
-    const link = document.createElement("a");
-    link.href = "/templates/mau_nhap_kho_tu_thien.xlsx";
-    link.download = "mau_nhap_kho_tu_thien.xlsx";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Đã tải file mẫu");
-  }, []);
+  const handleDownloadTemplate = useCallback(async () => {
+    try {
+      const { blob, filename } = await downloadTemplate();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Đã tải file mẫu");
+    } catch {
+      toast.error("Không thể tải file mẫu");
+    }
+  }, [downloadTemplate]);
 
   // ─── Render: Cell with error ───
   const renderInputCell = (
@@ -561,6 +734,70 @@ export default function ExcelImportFromOrg() {
             ))}
           </SelectContent>
         </Select>
+        {error && <p className="text-[11px] text-red-500">{error}</p>}
+      </div>
+    );
+  };
+
+  const renderMultiSelectCell = (
+    row: ImportRow,
+    options: { label: string; value: string }[],
+    placeholder: string,
+  ) => {
+    const error = row.errors.targetGroups;
+    const selected = row.targetGroups ?? [];
+    const labelText =
+      selected.length === 0
+        ? placeholder
+        : selected.map((v) => options.find((o) => o.value === v)?.label ?? v).join(", ");
+    return (
+      <div className="space-y-1">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "h-8 w-full justify-between text-sm font-normal px-3",
+                error && "border-red-500 focus-visible:ring-red-500",
+                selected.length === 0 && "text-muted-foreground",
+              )}
+            >
+              <span className="truncate text-left">{labelText}</span>
+              <CaretDown className="h-3.5 w-3.5 shrink-0 opacity-50 ml-1" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="p-1 w-48" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+            {options.map((opt) => {
+              const checked = selected.includes(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    const next = checked
+                      ? selected.filter((v) => v !== opt.value)
+                      : [...selected, opt.value];
+                    updateRow(row.id, "targetGroups", next);
+                  }}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-md w-full hover:bg-muted text-sm cursor-pointer"
+                >
+                  <div
+                    className={cn(
+                      "h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 text-[10px] font-bold",
+                      checked
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "border-muted-foreground/40",
+                    )}
+                  >
+                    {checked && "✓"}
+                  </div>
+                  {opt.label}
+                </button>
+              );
+            })}
+          </PopoverContent>
+        </Popover>
         {error && <p className="text-[11px] text-red-500">{error}</p>}
       </div>
     );
@@ -945,6 +1182,18 @@ export default function ExcelImportFromOrg() {
               )}
             </div>
 
+            {/* Batch Note */}
+            <div className="shrink-0 rounded-xl border bg-card px-4 py-3 flex items-center gap-3">
+              <PencilSimple className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm tracking-tighter font-medium shrink-0">Ghi chú lần nhập</span>
+              <Input
+                value={batchNote}
+                onChange={(e) => setBatchNote(e.target.value)}
+                placeholder="Ghi chú cho lần nhập kho này..."
+                className="h-8 text-sm flex-1"
+              />
+            </div>
+
             {/* Editable Table */}
             <div className="border rounded-xl bg-card overflow-auto flex-1">
               <Table>
@@ -952,14 +1201,15 @@ export default function ExcelImportFromOrg() {
                   <TableRow className="bg-muted/50">
                     <TableHead className="w-12 text-center">STT</TableHead>
                     <TableHead className="min-w-48">Tên vật phẩm</TableHead>
+                    <TableHead className="min-w-24 text-center">ID Vật phẩm</TableHead>
                     <TableHead className="min-w-40">Danh mục</TableHead>
                     <TableHead className="min-w-36">Đối tượng</TableHead>
                     <TableHead className="min-w-36">Loại vật phẩm</TableHead>
                     <TableHead className="min-w-24">Đơn vị</TableHead>
+                    <TableHead className="min-w-48">Mô tả vật phẩm</TableHead>
                     <TableHead className="min-w-24">Số lượng</TableHead>
                     <TableHead className="min-w-36">Ngày hết hạn</TableHead>
                     <TableHead className="min-w-36">Ngày nhận</TableHead>
-                    <TableHead className="min-w-48">Ghi chú</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -979,6 +1229,18 @@ export default function ExcelImportFromOrg() {
                         {/* Tên vật phẩm */}
                         <TableCell>{renderInputCell(row, "itemName", "Tên vật phẩm")}</TableCell>
 
+                        {/* ID Model */}
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={row.itemModelId ?? ""}
+                            onChange={(e) => updateRow(row.id, "itemModelId", e.target.value ? Number(e.target.value) : undefined)}
+                            placeholder="Mới"
+                            className="h-8 text-sm w-20"
+                          />
+                        </TableCell>
+
                         {/* Danh mục */}
                         <TableCell>
                           {renderSelectCell(
@@ -991,9 +1253,10 @@ export default function ExcelImportFromOrg() {
 
                         {/* Đối tượng */}
                         <TableCell>
-                          {targetGroupOptions.length > 0
-                            ? renderSelectCell(row, "targetGroup", targetGroupOptions, "Chọn đối tượng")
-                            : renderInputCell(row, "targetGroup", "Đối tượng")}
+                          {renderMultiSelectCell(row, targetGroupOptions, "Chọn đối tượng")}
+                          {row.itemType === "Reusable" && row.targetGroups?.includes("Rescuer") && !row.errors.targetGroups && (
+                            <p className="text-[11px] text-blue-500 mt-0.5">Mặc định chọn với loại Tái sử dụng</p>
+                          )}
                         </TableCell>
 
                         {/* Loại vật phẩm */}
@@ -1005,6 +1268,16 @@ export default function ExcelImportFromOrg() {
 
                         {/* Đơn vị */}
                         <TableCell>{renderInputCell(row, "unit", "Đơn vị")}</TableCell>
+
+                        {/* Mô tả vật phẩm */}
+                        <TableCell>
+                          <Input
+                            value={row.description}
+                            onChange={(e) => updateRow(row.id, "description", e.target.value)}
+                            placeholder="Mô tả vật phẩm..."
+                            className="h-8 text-sm"
+                          />
+                        </TableCell>
 
                         {/* Số lượng */}
                         <TableCell>{renderInputCell(row, "quantity", "0", "number")}</TableCell>
@@ -1021,26 +1294,16 @@ export default function ExcelImportFromOrg() {
                         {/* Ngày nhận */}
                         <TableCell>
                           <div className="space-y-1">
-                            <DatePickerInput
+                            <DateTimePickerInput
                               value={row.receivedDate}
                               onChange={(v) => updateRow(row.id, "receivedDate", v)}
-                              placeholder="Chọn ngày..."
+                              placeholder="Chọn ngày giờ..."
                               hasError={!!row.errors.receivedDate}
                             />
                             {row.errors.receivedDate && (
                               <p className="text-[11px] text-red-500">{row.errors.receivedDate}</p>
                             )}
                           </div>
-                        </TableCell>
-
-                        {/* Ghi chú */}
-                        <TableCell>
-                          <Input
-                            value={row.notes}
-                            onChange={(e) => updateRow(row.id, "notes", e.target.value)}
-                            placeholder="Ghi chú..."
-                            className="h-8 text-sm"
-                          />
                         </TableCell>
 
                         {/* Delete */}
@@ -1060,7 +1323,7 @@ export default function ExcelImportFromOrg() {
 
                   {rows.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
+                      <TableCell colSpan={12} className="h-32 text-center text-muted-foreground">
                         <div className="flex flex-col items-center gap-3">
                           <Trash className="h-8 w-8" weight="duotone" />
                           <p className="text-sm">Chưa có dữ liệu</p>

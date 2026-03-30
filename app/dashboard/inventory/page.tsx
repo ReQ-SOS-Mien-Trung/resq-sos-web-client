@@ -36,6 +36,7 @@ import {
   Buildings,
   CaretDown,
   Package,
+  Wallet,
 } from "@phosphor-icons/react";
 import {
   CategoryOverview,
@@ -54,7 +55,10 @@ import {
   InventoryItemEntity,
   SupplyRequestListItem,
 } from "@/services/inventory/type";
-import { useSupplyRequests } from "@/services/inventory/hooks";
+import {
+  useMyDepotQuantityByCategory,
+  useSupplyRequests,
+} from "@/services/inventory/hooks";
 import {
   DepotInfo,
   InventoryItem,
@@ -201,6 +205,14 @@ const requestingStatusLabels: Record<string, string> = {
   Rejected: "Từ chối",
 };
 
+const requestingStatusColors: Record<string, string> = {
+  WaitingForApproval: "bg-amber-100 text-amber-700 border-amber-200",
+  Approved: "bg-violet-100 text-violet-700 border-violet-200",
+  InTransit: "bg-blue-100 text-blue-700 border-blue-200",
+  Received: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  Rejected: "bg-red-100 text-red-700 border-red-200",
+};
+
 // --- Page Component ---
 
 const InventoryDashboardPage = () => {
@@ -247,6 +259,7 @@ const InventoryDashboardPage = () => {
   const {
     data: depotsData,
     isLoading: isDepotsLoading,
+    isFetching: isDepotsFetching,
     refetch: refetchDepots,
   } = useDepots({ params: { pageNumber: 1, pageSize: 50 } });
 
@@ -258,11 +271,17 @@ const InventoryDashboardPage = () => {
   } = useItemCategories({ params: { pageNumber: 1, pageSize: 50 } });
 
   const {
+    data: quantityByCategoryData,
+    refetch: refetchQuantityByCategory,
+  } = useMyDepotQuantityByCategory();
+
+  const {
     data: supplyRequestsData,
     isLoading: isSupplyRequestsLoading,
+    isFetching: isSupplyRequestsFetching,
     refetch: refetchSupplyRequests,
   } = useSupplyRequests(
-    { pageNumber: 1, pageSize: 50 },
+    { pageNumber: 1, pageSize: 10 },
     { refetchInterval: 10_000, refetchOnWindowFocus: true },
   );
 
@@ -338,6 +357,19 @@ const InventoryDashboardPage = () => {
     [allRequestsPagedData],
   );
 
+  const categoryOverviewData = useMemo(
+    () =>
+      (quantityByCategoryData ?? []).map((category) => ({
+        id: category.categoryId,
+        code: category.categoryCode,
+        name: category.categoryName,
+        quantity:
+          category.availableConsumableQuantity + category.availableReusableUnits,
+        description: "",
+      })),
+    [quantityByCategoryData],
+  );
+
   // Find the live request from sidebar or table data for the tracker
   const trackerRequest = useMemo(() => {
     if (trackerRequestId === null) return null;
@@ -385,10 +417,8 @@ const InventoryDashboardPage = () => {
   }, []);
 
   const handleRefresh = useCallback(() => {
-    refetchDepots();
-    refetchCategories();
-    refetchSupplyRequests();
-  }, [refetchDepots, refetchCategories, refetchSupplyRequests]);
+    window.location.reload();
+  }, []);
 
   const toggleDarkMode = () => {
     setIsDarkMode((prev) => !prev);
@@ -542,10 +572,19 @@ const InventoryDashboardPage = () => {
             variant="outline" 
             size="sm" 
             className="hidden md:flex gap-2"
-            onClick={() => router.push("/dashboard/inventory/transactions")}
+            onClick={() => router.push("/dashboard/inventory/stock-movements")}
           >
             <FileTextIcon className="h-4 w-4" />
             Truy xuất
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden md:flex gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+            onClick={() => router.push("/dashboard/inventory/funding-request")}
+          >
+            <Wallet className="h-4 w-4" />
+            Yêu cầu cấp quỹ
           </Button>
 
           {/* Notifications */}
@@ -678,8 +717,9 @@ const InventoryDashboardPage = () => {
                   size="sm"
                   className="gap-2"
                   onClick={handleRefresh}
+                  disabled={isDepotsFetching || isSupplyRequestsFetching}
                 >
-                  <ArrowsClockwise className="h-4 w-4" />
+                  <ArrowsClockwise className={cn("h-4 w-4", (isDepotsFetching || isSupplyRequestsFetching) && "animate-spin")} />
                   Làm mới
                 </Button>
               </div>
@@ -732,7 +772,7 @@ const InventoryDashboardPage = () => {
                                       {/* <Badge variant="warning">
                                         {sourceStatusLabels[request.sourceStatus] ?? request.sourceStatus}
                                       </Badge> */}
-                                      <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                                      <Badge variant="outline" className={requestingStatusColors[request.requestingStatus] ?? "bg-gray-100 text-gray-700 border-gray-200"}>
                                         {requestingStatusLabels[request.requestingStatus] ?? request.requestingStatus}
                                       </Badge>
                                     </div>
@@ -835,7 +875,7 @@ const InventoryDashboardPage = () => {
 
                 {/* Category Overview */}
                 <CategoryOverview
-                  apiCategories={categoriesData?.items}
+                  apiCategories={categoryOverviewData}
                   onCategorySelect={handleCategorySelect}
                   selectedCategory={selectedCategory}
                 />
@@ -843,11 +883,7 @@ const InventoryDashboardPage = () => {
                 {/* Two Column Layout: Alerts + Activity */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Low Stock Alerts */}
-                  <LowStockAlerts
-                    items={mockInventoryItems}
-                    onItemClick={handleItemSelect}
-                    onViewAll={() => setSelectedCategory(null)}
-                  />
+                  <LowStockAlerts />
 
                   {/* Recent Activity */}
                   <RecentActivity activities={mockActivityLogs} maxItems={8} />

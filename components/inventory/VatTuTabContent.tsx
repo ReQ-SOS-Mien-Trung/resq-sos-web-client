@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMyDepotInventory, useInventoryCategories, useInventoryItemTypes, useInventoryTargetGroups } from "@/services/inventory/hooks";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MagnifyingGlass, Package, ArrowDown, ArrowUp } from "@phosphor-icons/react";
+import { MagnifyingGlass, Package, ArrowDown, ArrowUp, Warning } from "@phosphor-icons/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InventoryItemEntity } from "@/services/inventory/type";
 
@@ -226,24 +226,40 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                           <div className="flex items-end justify-between gap-1">
                             <div className="flex flex-col">
                               <span className="text-base font-black tracking-tighter">
-                                {item.reusableBreakdown.availableUnits}
-                                <span className="text-[11px] font-normal text-muted-foreground ml-0.5">/ {item.reusableBreakdown.totalUnits}</span>
+                                {item.reusableBreakdown?.availableUnits ?? 0}
+                                <span className="text-[11px] font-normal text-muted-foreground ml-0.5">/ {item.reusableBreakdown?.totalUnits ?? 0}</span>
                               </span>
                             </div>
                             <div className="flex gap-0.5 items-center">
-                              {item.reusableBreakdown.inUseUnits > 0 && (
-                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded tracking-tighter">{item.reusableBreakdown.inUseUnits} đang dùng</span>
+                              {(item.reusableBreakdown?.inUseUnits ?? 0) > 0 && (
+                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded tracking-tighter">{item.reusableBreakdown?.inUseUnits} đang dùng</span>
                               )}
-                              {item.reusableBreakdown.maintenanceUnits > 0 && (
-                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded tracking-tighter">{item.reusableBreakdown.maintenanceUnits} bảo trì</span>
+                              {(item.reusableBreakdown?.maintenanceUnits ?? 0) > 0 && (
+                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded tracking-tighter">{item.reusableBreakdown?.maintenanceUnits} bảo trì</span>
                               )}
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-end justify-between">
-                            <span className="text-base font-black tracking-tighter">
-                              {item.availableQuantity.toLocaleString()} <span className="text-[14px] font-normal text-muted-foreground uppercase">SL</span>
-                            </span>
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-end justify-between">
+                              <span className="text-base font-black tracking-tighter">
+                                {item.availableQuantity.toLocaleString()} <span className="text-[14px] font-normal text-muted-foreground uppercase">SL</span>
+                              </span>
+                              {item.itemType === "Consumable" && (
+                                <span className="text-sm text-muted-foreground tracking-tighter">{item.lotCount ?? 0} lô</span>
+                              )}
+                            </div>
+                            {item.itemType === "Consumable" && item.isExpiringSoon && (
+                              <span className="flex items-center gap-1 text-xs font-medium text-amber-600 tracking-tighter">
+                                <Warning size={10} weight="fill" />
+                                Sắp hết hạn
+                              </span>
+                            )}
+                            {item.itemType === "Consumable" && item.nearestExpiryDate && !item.isExpiringSoon && (
+                              <span className="text-xs font-medium text-blue-600 tracking-tighter">
+                                Hết hạn: {new Date(item.nearestExpiryDate).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>

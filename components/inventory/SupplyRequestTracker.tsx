@@ -231,7 +231,7 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
               disabled={isAnyPending}
             >
               {isAccepting && <Spinner className="h-4 w-4 animate-spin" />}
-              <CheckCircle className="h-4 w-4" />
+              
               Chấp nhận
             </Button>
             <Button
@@ -240,7 +240,7 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
               onClick={() => setShowRejectForm(true)}
               disabled={isAnyPending}
             >
-              <XCircle className="h-4 w-4" />
+              
               Từ chối
             </Button>
           </div>
@@ -329,10 +329,10 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
               <Truck className="h-4 w-4 text-primary" weight="fill" />
             </div>
             <div>
-              <SheetTitle className="tracking-tighter text-base leading-tight">
+              <SheetTitle className="tracking-tighter text-base mb-0.5 leading-tight">
                 Theo dõi yêu cầu tiếp tế
               </SheetTitle>
-              <p className="text-xs text-muted-foreground tracking-tighter">
+              <p className="text-sm text-muted-foreground tracking-tighter">
                 Đơn yêu cầu số{" "}
                 <span className="font-semibold text-foreground">{request.id}</span>
               </p>
@@ -341,7 +341,7 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
         </SheetHeader>
 
         {/* ── Scrollable body ── */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 pt-2 pb-4 space-y-6">
 
           {/* Info card */}
           <div className="rounded-xl border bg-card p-4 space-y-4">
@@ -351,8 +351,8 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                   Kho nguồn
                 </p>
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-orange-500 shrink-0" weight="fill" />
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-orange-500 shrink-0" weight="fill" />
                   <p className="font-semibold text-sm tracking-tighter leading-snug">
                     {request.sourceDepotName}
                   </p>
@@ -371,11 +371,11 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                   Kho yêu cầu
                 </p>
-                <div className="flex items-center gap-1.5 justify-end">
+                <div className="flex items-center gap-2 justify-end">
                   <p className="font-semibold text-sm tracking-tighter leading-snug">
                     {request.requestingDepotName}
                   </p>
-                  <MapPin className="h-3.5 w-3.5 text-blue-500 shrink-0" weight="fill" />
+                  <MapPin className="h-4 w-4 text-blue-500 shrink-0" weight="fill" />
                 </div>
               </div>
             </div>
@@ -385,10 +385,10 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
             {/* Meta */}
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="flex items-center gap-2">
-                <CalendarBlank className="h-4 w-4 text-muted-foreground shrink-0" />
+                <CalendarBlank className="h-5 w-5 text-muted-foreground shrink-0" />
                 <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Thời gian tạo</p>
-                  <p className="text-xs tracking-tighter font-medium">
+                  <p className="text-xs mb-1 text-muted-foreground uppercase tracking-tight">Thời gian tạo</p>
+                  <p className="text-sm tracking-tight font-medium">
                     {new Date(request.createdAt).toLocaleString("vi-VN")}
                   </p>
                 </div>
@@ -396,7 +396,7 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Vai trò</p>
+                  <p className="text-xs mb-1 text-muted-foreground uppercase tracking-tight">Vai trò</p>
                   <Badge
                     variant="outline"
                     className={cn(
@@ -415,7 +415,7 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
 
           {/* ── Timeline ── */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
               Trạng thái vận chuyển
             </p>
 
@@ -534,7 +534,7 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                             </p>
                           </div>
                           {timestamp && (
-                            <p className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0 pt-0.5">
+                            <p className="text-xs text-muted-foreground whitespace-nowrap shrink-0 pt-0.5">
                               {timestamp}
                             </p>
                           )}

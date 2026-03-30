@@ -581,9 +581,18 @@ export interface UserTableProps {
   onBan?: (user: User) => void;
   onActivate?: (user: User) => void;
   onViewDetail?: (userId: string) => void;
-  onPrefetch?: (userId: string) => void;
   isLoading?: boolean;
   totalCount?: number;
+  serverPagination?: {
+    totalCount: number;
+    totalPages: number;
+    page: number;
+    pageSize: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (size: number) => void;
+  };
 }
 
 export interface UserStatsProps {
@@ -892,8 +901,14 @@ export interface CoordinatorMapProps {
     latitude: number;
     longitude: number;
     maxCapacity: number;
-    status: "Active" | "Overloaded" | "Unavailable";
-    lastUpdatedAt: string;
+    status:
+      | "Created"
+      | "Active"
+      | "Overloaded"
+      | "UnderMaintenance"
+      | "Closed";
+    lastUpdatedAt: string | null;
+    hasActiveEvent?: boolean;
   }[];
   // SOS Clusters from backend
   clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
@@ -938,8 +953,14 @@ export interface AssemblyPoint {
   latitude: number;
   longitude: number;
   maxCapacity: number;
-  status: "Active" | "Overloaded" | "Unavailable";
-  lastUpdatedAt: string;
+  status:
+    | "Created"
+    | "Active"
+    | "Overloaded"
+    | "UnderMaintenance"
+    | "Closed";
+  lastUpdatedAt: string | null;
+  hasActiveEvent?: boolean;
 }
 
 export interface SOSSidebarProps {

@@ -4,9 +4,9 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
-import TransactionTable from '@/components/transactions/TransactionTable';
+import StockMovementTable from '@/components/stock-movements/StockMovementTable';
 
-const TransactionsPage: React.FC = () => {
+const StockMovementsPage: React.FC = () => {
   const router = useRouter();
 
   return (
@@ -35,10 +35,10 @@ const TransactionsPage: React.FC = () => {
 
       {/* Main content */}
       <div className="flex-1">
-        <TransactionTable />
+        <StockMovementTable />
       </div>
     </div>
   );
 };
 
-export default TransactionsPage;
+export default StockMovementsPage;

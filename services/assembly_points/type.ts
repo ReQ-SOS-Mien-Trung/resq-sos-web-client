@@ -1,12 +1,17 @@
 import type { RescuerType } from "../rescuers/type";
 
 // Assembly Point Status
-export type AssemblyPointStatus = "Active" | "Overloaded" | "Unavailable";
+export type AssemblyPointStatus =
+  | "Created"
+  | "Active"
+  | "Overloaded"
+  | "UnderMaintenance"
+  | "Closed";
 
 // Assembly Point Status Metadata (from /personnel/assembly-point/status-metadata)
 export interface AssemblyPointStatusMetadata {
   key: AssemblyPointStatus;
-  label: string;
+  value: string;
 }
 
 // Assembly Point Metadata option (for dropdown)
@@ -117,7 +122,7 @@ export interface UpdateAssemblyPointResponse {
   longitude: number;
   maxCapacity: number;
   status: AssemblyPointStatus;
-  lastUpdatedAt: string;
+  lastUpdatedAt: string | null;
 }
 
 // Update Assembly Point Status Request

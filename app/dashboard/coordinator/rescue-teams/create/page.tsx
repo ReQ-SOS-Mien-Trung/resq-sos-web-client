@@ -828,7 +828,7 @@ function CreateRescueTeamContent() {
                   <div className="bg-black p-1.5 text-[#FF5722]">
                     <MapTrifold size={16} weight="fill" />
                   </div>
-                  Điểm tập kết <span className="text-red-500 ml-[-4px]">*</span>
+                  Điểm tập kết <span className="text-red-500 -ml-1">*</span>
                 </div>
 
                 {isLoadingPoints ? (

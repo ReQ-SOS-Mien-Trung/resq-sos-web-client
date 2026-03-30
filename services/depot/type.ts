@@ -7,6 +7,12 @@ export interface DepotStatusMetadata {
   label: string;
 }
 
+// Depot Metadata (from /logistics/depot/metadata/depots) - key/value pairs
+export interface DepotMetadataItem {
+  key: number;
+  value: string;
+}
+
 // Depot Manager
 export interface DepotManager {
   id: string;
@@ -76,4 +82,42 @@ export interface UpdateDepotStatusResponse {
   id: number;
   status: DepotStatus;
   message: string;
+}
+
+// Depot Fund (from /logistics/depot/funds & /logistics/depot/my-fund)
+export interface DepotFund {
+  depotId: number;
+  depotName: string;
+  balance: number;
+  /** Giới hạn ứng trước tối đa (số dư có thể xuống đến −maxAdvanceLimit) */
+  maxAdvanceLimit: number;
+  lastUpdatedAt: string;
+}
+
+// Depot Fund Transaction (from /finance/depot-funds/my/transactions)
+export interface DepotFundTransaction {
+  id: number;
+  depotFundId: number;
+  transactionType: string;
+  amount: number;
+  referenceType: string;
+  referenceId: number;
+  note: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface GetDepotFundTransactionsResponse {
+  items: DepotFundTransaction[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface GetDepotFundTransactionsParams {
+  pageNumber?: number;
+  pageSize?: number;
 }

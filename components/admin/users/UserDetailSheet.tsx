@@ -27,6 +27,8 @@ import {
   Trash,
   Image as ImageIcon,
   FloppyDisk,
+  FileText,
+  ArrowSquareOut,
 } from "@phosphor-icons/react";
 
 interface UserDetailSheetProps {
@@ -60,6 +62,13 @@ const DEFAULT_ROLE = {
   label: "Công dân",
   className: "bg-gray-500/10 text-gray-600 border border-gray-200/60",
 };
+
+const ABILITY_CATEGORIES = [
+  { code: "RESCUE",         label: "Cứu hộ",      badgeClass: "bg-blue-50 text-blue-700 border-blue-200" },
+  { code: "MEDICAL",        label: "Y tế",         badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  { code: "TRANSPORTATION", label: "Vận chuyển",   badgeClass: "bg-orange-50 text-orange-700 border-orange-200" },
+  { code: "EXPERIENCE",     label: "Kinh nghiệm",  badgeClass: "bg-violet-50 text-violet-700 border-violet-200" },
+] as const;
 
 const formatDateTime = (iso: string) =>
   new Intl.DateTimeFormat("vi-VN", {
@@ -293,7 +302,7 @@ const UserDetailSheet = ({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-115 overflow-y-auto p-0 flex flex-col">
+      <SheetContent className="w-full sm:max-w-140 overflow-y-auto p-0 flex flex-col">
         {/* ── header ── */}
         <div className="px-6 pt-10 pb-6 border-b border-border/30">
           <SheetHeader className="mb-5">
@@ -429,6 +438,11 @@ const UserDetailSheet = ({
                       <Badge className={`${role.className} text-xs tracking-tighter font-medium px-2 py-0.5`}>
                         {role.label}
                       </Badge>
+                      {user?.roleId === 3 && user?.rescuerType && (
+                        <Badge className="bg-sky-500/10 text-sky-700 border border-sky-200/60 text-xs tracking-tighter font-medium px-2 py-0.5">
+                          {user.rescuerType}
+                        </Badge>
+                      )}
                     </div>
                   </>
                 )}
@@ -438,7 +452,7 @@ const UserDetailSheet = ({
         </div>
 
         {/* ── liên hệ ── */}
-        <div className="px-6 py-2 border-b border-border/30">
+        <div className="px-6 pb-2 border-b border-border/30">
           <SectionLabel>THÔNG TIN LIÊN HỆ</SectionLabel>
           {isLoading ? (
             <div className="space-y-3">
@@ -481,7 +495,7 @@ const UserDetailSheet = ({
                             : "border-border hover:bg-muted/50"
                         }`}
                       >
-                        {t === "Core" ? "Cứu hộ hệ thống" : "Tình nguyện viên"}
+                        {t === "Core" ? "Core" : "Volunteer"}
                       </button>
                     ))}
                   </div>
@@ -508,25 +522,19 @@ const UserDetailSheet = ({
                   </span>
                 }
               />
-              {user?.roleId === 3 && (
-                <FieldRow
-                  label="Loại cứu hộ"
-                  value={
-                    user.rescuerType === "Core"
-                      ? "Cứu hộ hệ thống"
-                      : user.rescuerType === "Volunteer"
-                      ? "Tình nguyện viên"
-                      : user.rescuerType ?? "—"
-                  }
-                />
-              )}
+              <FieldRow
+                label="Địa chỉ"
+                value={
+                  [user?.address, user?.ward, user?.province].filter(Boolean).join(", ") || "—"
+                }
+              />
             </>
           )}
         </div>
 
-        {/* ── địa chỉ ── */}
+        {/* ── địa chỉ (edit only) ── */}
+        {isEditing && (
         <div className="px-6 py-2 border-b border-border/30">
-          <SectionLabel>ĐỊA CHỈ</SectionLabel>
           {isLoading ? (
             <div className="space-y-3">
               <Skeleton className="h-4 w-full" />
@@ -535,6 +543,7 @@ const UserDetailSheet = ({
             </div>
           ) : isEditing ? (
             <div className="space-y-3">
+              <SectionLabel>ĐỊA CHỈ</SectionLabel>
               <div className="space-y-1">
                 <label className="text-sm tracking-tighter text-muted-foreground">Địa chỉ</label>
                 <Input
@@ -642,20 +651,89 @@ const UserDetailSheet = ({
                 </div>
               </div>
             </div>
-          ) : (
-            <>
-              <FieldRow label="Địa chỉ" value={user?.address} />
-              <FieldRow label="Phường / Xã" value={user?.ward} />
-              <FieldRow label="Tỉnh / Thành phố" value={user?.province} />
-            </>
-          )}
+          ) : null}
         </div>
+        )}
 
+        {/* ── kỹ năng (view only, rescuer only) ── */}
+        {!isEditing && user?.roleId === 3 && (
+          <div className="px-6 pb-3 border-b border-border/30">
+            <SectionLabel>KỸ NĂNG</SectionLabel>
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+                {ABILITY_CATEGORIES.map((cat) => {
+                  const catAbilities = (user.abilities ?? []).filter(
+                    (a) => a.categoryCode === cat.code
+                  );
+                  return (
+                    <div key={cat.code}>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
+                        {cat.label}
+                      </p>
+                      {catAbilities.length === 0 ? (
+                        <p className="text-sm tracking-tighter text-muted-foreground/50 italic">Không có</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {catAbilities.map((ab) => (
+                            <div
+                              key={ab.abilityId}
+                              className={`inline-flex font-medium items-center gap-1.5 px-2 py-1 rounded-md border text-xs tracking-tighter ${cat.badgeClass}`}
+                            >
+                              <span>{ab.description}</span>
+                              <span className="opacity-60 font-semibold">Lv.{ab.level}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
+        {/* ── chứng chỉ (view only, rescuer only) ── */}
+        {!isEditing && user?.roleId === 3 && (
+          <div className="px-6 pb-3 border-b border-border/30">
+            <SectionLabel>CHỨNG CHỈ</SectionLabel>
+            {isLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : !user?.rescuerApplicationDocuments?.length ? (
+              <p className="text-sm tracking-tighter text-muted-foreground/50 italic">Không có chứng chỉ</p>
+            ) : (
+              <div className="space-y-2">
+                {user.rescuerApplicationDocuments.map((doc) => (
+                  <a
+                    key={doc.id}
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border/40 hover:border-primary/40 hover:bg-muted/30 transition-colors group"
+                  >
+                    <FileText size={16} className="text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
+                    <span className="text-sm tracking-tighter text-foreground truncate flex-1">
+                      {doc.fileTypeName ?? "Tài liệu không xác định"}
+                    </span>
+                    <ArrowSquareOut size={14} className="text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── thời gian (view only) ── */}
         {!isEditing && (
-          <div className="px-6 py-3">
+          <div className="px-6 pb-3">
             <SectionLabel>THỜI GIAN</SectionLabel>
             {isLoading ? (
               <div className="space-y-3">

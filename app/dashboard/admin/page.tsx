@@ -8,11 +8,11 @@ import {
   DashboardLayout,
   LeadsManagement,
   RetentionRate,
-  RevenueChart,
   RescuerOverview,
   SOSOverview,
   SummaryCards,
   TopCountries,
+  VictimsBarChart,
 } from "@/components/admin/dashboard";
 import { DashboardData } from "@/type";
 import { DashboardSkeleton } from "@/components/admin";
@@ -107,12 +107,12 @@ const AdminDashboardPage = () => {
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Revenue Chart */}
+          {/* Left Column - Victims Bar Chart */}
           <div
             className="lg:col-span-2 animate-in fade-in slide-in-from-left-4 duration-500"
             style={{ animationDelay: "200ms" }}
           >
-            <RevenueChart data={data.revenue} />
+            <VictimsBarChart />
           </div>
 
           {/* Right Column - Calendar */}

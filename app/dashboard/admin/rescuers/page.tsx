@@ -44,12 +44,18 @@ const RescuersPage = () => {
     getDashboardData().then(setDashboardData).catch(console.error);
   }, []);
 
-  const { data: rescuersData, isLoading } = useAdminRescuers();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const { data: rescuersData, isLoading } = useAdminRescuers({
+    pageNumber: page,
+    pageSize,
+  });
 
   const items = rescuersData?.items ?? [];
 
   const stats = {
-    total: items.length,
+    total: rescuersData?.totalCount ?? 0,
     core: items.filter((u) => u.rescuerType === "Core").length,
     volunteer: items.filter((u) => u.rescuerType === "Volunteer").length,
     banned: items.filter((u) => u.isBanned).length,
@@ -139,13 +145,22 @@ const RescuersPage = () => {
           onEdit={handleEditClick}
           onBan={handleBanClick}
           onActivate={handleActivateClick}
-          onPrefetch={(userId) => setSelectedUserId(userId)}
           onViewDetail={(userId) => {
             setSelectedUserId(userId);
             setDetailSheetMode("view");
             setDetailSheetOpen(true);
           }}
           isLoading={isLoading}
+          serverPagination={{
+            totalCount: rescuersData?.totalCount ?? 0,
+            totalPages: rescuersData?.totalPages ?? 1,
+            page,
+            pageSize,
+            hasPreviousPage: rescuersData?.hasPreviousPage ?? false,
+            hasNextPage: rescuersData?.hasNextPage ?? false,
+            onPageChange: setPage,
+            onPageSizeChange: (size) => { setPageSize(size); setPage(1); },
+          }}
         />
       </div>
 

@@ -282,7 +282,7 @@ export default function ExportReportPage() {
             variant="outline"
             size="sm"
             className="hidden md:flex gap-2"
-            onClick={() => router.push("/dashboard/inventory/transactions")}
+            onClick={() => router.push("/dashboard/inventory/stock-movements")}
           >
             <FileTextIcon className="h-4 w-4" />
             Truy xuất

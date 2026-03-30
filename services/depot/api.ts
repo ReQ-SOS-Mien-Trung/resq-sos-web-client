@@ -5,9 +5,13 @@ import {
   CreateDepotRequest,
   DepotEntity,
   DepotStatusMetadata,
+  DepotMetadataItem,
+  DepotFund,
   UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
+  GetDepotFundTransactionsResponse,
+  GetDepotFundTransactionsParams,
 } from "./type";
 
 /**
@@ -41,6 +45,15 @@ export async function getDepotById(id: number): Promise<DepotEntity> {
  */
 export async function getDepotStatuses(): Promise<DepotStatusMetadata[]> {
   const { data } = await api.get("/logistics/depot/metadata/depot-statuses");
+  return data;
+}
+
+/**
+ * Get depot metadata (key-value pairs for dropdown)
+ * GET /logistics/depot/metadata/depots
+ */
+export async function getDepotMetadata(): Promise<DepotMetadataItem[]> {
+  const { data } = await api.get("/logistics/depot/metadata/depots");
   return data;
 }
 
@@ -81,5 +94,52 @@ export async function updateDepotStatus(
       params: { Status: request.status },
     },
   );
+  return data;
+}
+
+/**
+ * [Admin] Get all depot funds
+ * GET /logistics/depot/funds
+ */
+export async function getDepotFunds(): Promise<DepotFund[]> {
+  const { data } = await api.get("/logistics/depot/funds");
+  return data;
+}
+
+/**
+ * [Manager] Get my depot fund
+ * GET /logistics/depot/my-fund
+ */
+export async function getMyDepotFund(): Promise<DepotFund> {
+  const { data } = await api.get("/logistics/depot/my-fund");
+  return data;
+}
+
+/**
+ * [Admin] Cấu hình hạn mức ứng trước (balance âm tối đa) cho một kho
+ * PUT /finance/depot-funds/{depotId}/advance-limit
+ */
+export async function updateDepotAdvanceLimit(
+  depotId: number,
+  maxAdvanceLimit: number,
+): Promise<void> {
+  await api.put(`/finance/depot-funds/${depotId}/advance-limit`, {
+    maxAdvanceLimit,
+  });
+}
+
+/**
+ * [Manager] Get my depot fund transaction history
+ * GET /finance/depot-funds/my/transactions
+ */
+export async function getMyDepotFundTransactions(
+  params?: GetDepotFundTransactionsParams,
+): Promise<GetDepotFundTransactionsResponse> {
+  const { data } = await api.get("/finance/depot-funds/my/transactions", {
+    params: {
+      pageNumber: params?.pageNumber ?? 1,
+      pageSize: params?.pageSize ?? 20,
+    },
+  });
   return data;
 }

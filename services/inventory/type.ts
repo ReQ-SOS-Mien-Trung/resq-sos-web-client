@@ -3,6 +3,19 @@ export interface InventoryCategory {
   value: string;
 }
 
+export interface MyDepotCategoryQuantityItem {
+  categoryId: number;
+  categoryCode: string;
+  categoryName: string;
+  totalConsumableQuantity: number;
+  availableConsumableQuantity: number;
+  totalReusableUnits: number;
+  availableReusableUnits: number;
+}
+
+export type GetMyDepotCategoryQuantitiesResponse =
+  MyDepotCategoryQuantityItem[];
+
 export type InventoryItemType = InventoryCategory;
 
 export type InventoryTargetGroup = InventoryCategory;
@@ -33,7 +46,7 @@ interface InventoryItemEntityBase {
   itemModelName: string;
   categoryId: number;
   categoryName: string;
-  targetGroup: string;
+  targetGroups: string[];
   lastStockedAt: string;
 }
 
@@ -42,7 +55,13 @@ export interface ConsumableItemEntity extends InventoryItemEntityBase {
   quantity: number;
   reservedQuantity: number;
   availableQuantity: number;
-  reusableBreakdown: null;
+  reusableBreakdown?: null;
+  /** Số lô hiện tại */
+  lotCount: number;
+  /** Ngày hết hạn gần nhất trong các lô */
+  nearestExpiryDate?: string | null;
+  /** true nếu có lô sắp hết hạn */
+  isExpiringSoon?: boolean;
 }
 
 export interface ReusableItemEntity extends InventoryItemEntityBase {
@@ -51,7 +70,7 @@ export interface ReusableItemEntity extends InventoryItemEntityBase {
   unit: number;
   reservedUnit: number;
   availableUnit: number;
-  reusableBreakdown: ReusableBreakdown;
+  reusableBreakdown?: ReusableBreakdown;
 }
 
 export type InventoryItemEntity = ConsumableItemEntity | ReusableItemEntity;
@@ -87,20 +106,22 @@ export interface GetMyDepotInventoryResponse {
 
 export interface ImportInventoryItem {
   row: number;
+  itemModelId?: number;
   itemName: string;
   categoryCode: string;
+  description?: string | null;
   quantity: number;
   unit: string;
   itemType: string;
-  targetGroup: string;
+  targetGroups: string[];
   receivedDate: string;
   expiredDate?: string | null;
-  notes?: string | null;
 }
 
 export interface ImportInventoryRequest {
   organizationId?: number;
   organizationName?: string;
+  batchNote?: string;
   items: ImportInventoryItem[];
 }
 
@@ -118,28 +139,31 @@ export interface VatInvoice {
 
 export interface ImportPurchaseItem {
   row: number;
+  itemModelId?: number;
   itemName: string;
   categoryCode: string;
+  description?: string | null;
   quantity: number;
   unitPrice: number;
   unit: string;
   itemType: string;
-  targetGroup: string;
+  targetGroups: string[];
   receivedDate: string;
   expiredDate?: string | null;
-  notes?: string | null;
 }
 
 export type ImportRegularRequest = {
   invoices: Array<{
+    batchNote?: string;
     vatInvoice: VatInvoice;
     items: ImportPurchaseItem[];
+    campaignDisbursementId?: number;
   }>;
 };
 
-// ─── Transaction History ───
+// ─── Stock Movement History ───
 
-export interface TransactionItem {
+export interface StockMovementItem {
   itemId: number;
   itemName: string;
   quantityChange: number;
@@ -148,9 +172,15 @@ export interface TransactionItem {
   itemType: string;
   targetGroup: string;
   categoryName: string;
+  /** Ngày nhập lô (chỉ có với Consumable) */
+  receivedDate?: string | null;
+  /** Ngày hết hạn lô (chỉ có với Consumable) */
+  expiredDate?: string | null;
+  /** ID lô hàng gắn kết */
+  supplyInventoryLotId?: number | null;
 }
 
-export interface TransactionEntity {
+export interface StockMovementEntity {
   transactionId: string;
   actionType: string;
   sourceType: string;
@@ -159,10 +189,10 @@ export interface TransactionEntity {
   performedByName: string;
   note: string;
   createdAt: string;
-  items: TransactionItem[];
+  items: StockMovementItem[];
 }
 
-export interface GetDepotTransactionsParams {
+export interface GetDepotStockMovementsParams {
   actionTypes?: string[];
   sourceTypes?: string[];
   fromDate?: string;
@@ -187,14 +217,32 @@ export interface ExportMovementsParams {
   toDate?: string;
 }
 
-export interface GetDepotTransactionsResponse {
-  items: TransactionEntity[];
+export interface GetDepotStockMovementsResponse {
+  items: StockMovementEntity[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
   totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
+}
+
+// ─── Inventory Lots (FEFO) ───
+
+export interface InventoryLotItem {
+  lotId: number;
+  quantity: number;
+  remainingQuantity: number;
+  receivedDate: string;
+  expiredDate: string;
+  sourceType: string;
+  createdAt: string;
+  isExpiringSoon: boolean;
+  isExpired: boolean;
+}
+
+export interface GetInventoryLotsResponse {
+  items: InventoryLotItem[];
 }
 
 // ─── Search Depots by Relief Items ───
@@ -322,3 +370,159 @@ export interface RejectSupplyRequestPayload {
   reason: string;
 }
 export type GetDepotInventoryResponse = GetMyDepotInventoryResponse;
+
+// ─── Thresholds ───
+
+export type ThresholdScopeType =
+  | "Global"
+  | "Depot"
+  | "DepotCategory"
+  | "DepotItem";
+
+export interface ThresholdConfig {
+  id: number;
+  scopeType: string;
+  categoryId: number;
+  itemModelId: number;
+  dangerPercent: number;
+  warningPercent: number;
+  rowVersion: number;
+  updatedAt: string;
+}
+
+export interface GetThresholdsResponse {
+  depotId: number;
+  global: ThresholdConfig | null;
+  depot: ThresholdConfig | null;
+  depotCategories: ThresholdConfig[];
+  depotItems: ThresholdConfig[];
+}
+
+export interface GetThresholdsHistoryParams {
+  scopeType?: ThresholdScopeType;
+  categoryId?: number;
+  itemModelId?: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ThresholdHistoryItem {
+  id: number;
+  configId: number;
+  scopeType: string;
+  depotId: number;
+  categoryId: number;
+  itemModelId: number;
+  oldDangerPercent: number;
+  oldWarningPercent: number;
+  newDangerPercent: number;
+  newWarningPercent: number;
+  changedBy: string;
+  changedAt: string;
+  changeReason: string;
+  action: string;
+}
+
+export interface GetThresholdsHistoryResponse {
+  items: ThresholdHistoryItem[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface UpdateThresholdPayload {
+  scopeType: ThresholdScopeType;
+  categoryId?: number;
+  itemModelId?: number;
+  dangerPercent: number;
+  warningPercent: number;
+  rowVersion?: number;
+  reason?: string;
+}
+
+export interface UpdateThresholdResponse {
+  scopeType: string;
+  depotId: number;
+  categoryId: number;
+  itemModelId: number;
+  dangerPercent: number;
+  warningPercent: number;
+  rowVersion: number;
+  updatedAt: string;
+  message: string;
+}
+
+export interface DeleteThresholdPayload {
+  scopeType: ThresholdScopeType;
+  categoryId?: number;
+  itemModelId?: number;
+  rowVersion?: number;
+  reason?: string;
+}
+
+export interface DeleteThresholdResponse {
+  scopeType: string;
+  depotId: number;
+  categoryId: number;
+  itemModelId: number;
+  dangerPercent: number;
+  warningPercent: number;
+  rowVersion: number;
+  updatedAt: string;
+  message: string;
+}
+
+// ─── Low Stock ───
+
+export type LowStockLevel = "Warning" | "Danger";
+
+export interface LowStockSummary {
+  dangerCount: number;
+  warningCount: number;
+  totalCount: number;
+}
+
+export interface LowStockByDepot {
+  depotId: number;
+  depotName: string;
+  dangerCount: number;
+  warningCount: number;
+}
+
+export interface LowStockByCategory {
+  categoryId: number;
+  categoryName: string;
+  dangerCount: number;
+  warningCount: number;
+}
+
+export interface LowStockItem {
+  depotId: number;
+  depotName: string;
+  itemModelId: number;
+  itemModelName: string;
+  unit: string;
+  categoryId: number;
+  categoryName: string;
+  targetGroup: string;
+  quantity: number;
+  reservedQuantity: number;
+  availableQuantity: number;
+  availableRatio: number;
+  alertLevel: string;
+  alertLevelLabel: string;
+}
+
+export interface GetLowStockResponse {
+  summary: LowStockSummary;
+  byDepot: LowStockByDepot[];
+  byCategory: LowStockByCategory[];
+  items: LowStockItem[];
+}
+
+export interface GetLowStockParams {
+  level?: LowStockLevel;
+}

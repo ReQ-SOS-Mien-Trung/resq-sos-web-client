@@ -31,16 +31,21 @@ import {
   CaretDown,
 } from "@phosphor-icons/react";
 import { UserEntity } from "@/services/user/type";
-
-const ITEMS_PER_PAGE = 15;
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type SortColumn = "name" | "email" | "rescuerType" | "region" | "status" | "createdAt";
 type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
 
 const RESCUER_TYPE_OPTIONS: { value: string; label: string; subLabel: string }[] = [
-  { value: "Core", label: "Cứu hộ hệ thống", subLabel: "Core" },
-  { value: "Volunteer", label: "Tình nguyện viên", subLabel: "Volunteer" },
+  { value: "Core", label: "Core", subLabel: "Core" },
+  { value: "Volunteer", label: "Volunteer", subLabel: "Volunteer" },
 ];
 
 const STATUS_OPTIONS: { value: "active" | "banned"; label: string }[] = [
@@ -48,14 +53,25 @@ const STATUS_OPTIONS: { value: "active" | "banned"; label: string }[] = [
   { value: "banned", label: "Bị cấm" },
 ];
 
+export interface ServerPaginationProps {
+  totalCount: number;
+  totalPages: number;
+  page: number;
+  pageSize: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}
+
 export interface RescuerTableProps {
   rescuers: UserEntity[];
   onEdit?: (rescuer: UserEntity) => void;
   onBan?: (rescuer: UserEntity) => void;
   onActivate?: (rescuer: UserEntity) => void;
   onViewDetail?: (userId: string) => void;
-  onPrefetch?: (userId: string) => void;
   isLoading?: boolean;
+  serverPagination?: ServerPaginationProps;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -63,12 +79,12 @@ export interface RescuerTableProps {
 const getRescuerTypeBadge = (type: string | null) => {
   if (type === "Core")
     return {
-      label: "Cứu hộ hệ thống",
+      label: "Core",
       className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     };
   if (type === "Volunteer")
     return {
-      label: "Tình nguyện viên",
+      label: "Volunteer",
       className: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
     };
   return {
@@ -81,9 +97,9 @@ const getStatusBadge = (isBanned: boolean) =>
   isBanned
     ? { label: "Bị cấm", className: "bg-rose-500/10 text-rose-700 dark:text-rose-400" }
     : {
-        label: "Hoạt động",
-        className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-      };
+      label: "Hoạt động",
+      className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    };
 
 // ─── Sort ─────────────────────────────────────────────────────────────────────
 
@@ -127,11 +143,34 @@ const RescuerTable = ({
   onBan,
   onActivate,
   onViewDetail,
-  onPrefetch,
   isLoading,
+  serverPagination,
 }: RescuerTableProps) => {
-  const [page, setPage] = useState(1);
+  const [_page, _setPage] = useState(1);
+  const [_pageSize, _setPageSize] = useState(10);
   const [sort, setSort] = useState<SortState>(null);
+
+  const isServerMode = !!serverPagination;
+  const page = isServerMode ? serverPagination!.page : _page;
+  const pageSize = isServerMode ? serverPagination!.pageSize : _pageSize;
+
+  const setPage = (val: number | ((prev: number) => number)) => {
+    if (isServerMode) {
+      const resolved = typeof val === 'function' ? val(serverPagination!.page) : val;
+      serverPagination!.onPageChange(resolved);
+    } else {
+      _setPage(val);
+    }
+  };
+
+  const setPageSize = (newSize: number) => {
+    if (isServerMode) {
+      serverPagination!.onPageSizeChange(newSize);
+    } else {
+      _setPageSize(newSize);
+      _setPage(1);
+    }
+  };
   const [search, setSearch] = useState("");
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<("active" | "banned")[]>([]);
@@ -219,14 +258,16 @@ const RescuerTable = ({
   }, [rescuers, search, selectedTypes, selectedStatuses, sort]);
 
   // ── Pagination ────────────────────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE));
+  const displayTotalCount = isServerMode ? serverPagination!.totalCount : filteredAndSorted.length;
+  const totalPages = isServerMode
+    ? serverPagination!.totalPages
+    : Math.max(1, Math.ceil(filteredAndSorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const paginated = filteredAndSorted.slice(
-    (safePage - 1) * ITEMS_PER_PAGE,
-    safePage * ITEMS_PER_PAGE
-  );
-  const startItem = filteredAndSorted.length === 0 ? 0 : (safePage - 1) * ITEMS_PER_PAGE + 1;
-  const endItem = Math.min(safePage * ITEMS_PER_PAGE, filteredAndSorted.length);
+  const paginated = isServerMode
+    ? filteredAndSorted
+    : filteredAndSorted.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const startItem = displayTotalCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const endItem = Math.min(safePage * pageSize, displayTotalCount);
 
   return (
     <Card className="border border-border/50">
@@ -272,11 +313,10 @@ const RescuerTable = ({
                     className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
                   >
                     <span
-                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                        checked
+                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
                           ? "bg-primary border-primary tracking-tighter text-primary-foreground"
                           : "border-border bg-background"
-                      }`}
+                        }`}
                     >
                       {checked && <Check size={11} weight="bold" />}
                     </span>
@@ -320,11 +360,10 @@ const RescuerTable = ({
                     className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
                   >
                     <span
-                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                        checked
+                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
                           ? "bg-primary border-primary text-primary-foreground"
                           : "border-border bg-background"
-                      }`}
+                        }`}
                     >
                       {checked && <Check size={11} weight="bold" />}
                     </span>
@@ -335,7 +374,7 @@ const RescuerTable = ({
               {selectedStatuses.length > 0 && (
                 <button
                   onClick={() => { setSelectedStatuses([]); setPage(1); }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
+                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs tracking-tighter text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
                 >
                   <X size={11} />
                   Xóa lọc trạng thái
@@ -357,9 +396,9 @@ const RescuerTable = ({
           )}
 
           <div className="ml-auto text-sm tracking-tighter text-muted-foreground whitespace-nowrap">
-            {hasFilters
-              ? `${filteredAndSorted.length} / ${rescuers.length.toLocaleString("vi-VN")} cứu hộ viên`
-              : `${rescuers.length.toLocaleString("vi-VN")} cứu hộ viên`}
+            {hasFilters && !isServerMode
+              ? `${filteredAndSorted.length} / ${displayTotalCount.toLocaleString("vi-VN")} cứu hộ viên`
+              : `${displayTotalCount.toLocaleString("vi-VN")} cứu hộ viên`}
           </div>
         </div>
 
@@ -419,7 +458,6 @@ const RescuerTable = ({
                     <tr
                       key={rescuer.id}
                       onClick={() => onViewDetail?.(rescuer.id)}
-                      onMouseEnter={() => onPrefetch?.(rescuer.id)}
                       className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
                     >
                       <td className="p-3">
@@ -483,11 +521,26 @@ const RescuerTable = ({
         </div>
 
         {/* ── Pagination ───────────────────────────────────────────────────── */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
+          <div className="flex items-center gap-3">
             <div className="text-sm tracking-tighter text-muted-foreground">
-              Hiển thị {startItem}–{endItem} trong {filteredAndSorted.length} cứu hộ viên
+              Hiển thị {startItem}–{endItem} trong {displayTotalCount} cứu hộ viên
             </div>
+            <div className="flex items-center gap-1.5">
+              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); }}>
+                <SelectTrigger className="w-16 h-7 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>
+            </div>
+          </div>
+          {totalPages > 1 && (
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -539,8 +592,8 @@ const RescuerTable = ({
                 Sau
               </Button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );
