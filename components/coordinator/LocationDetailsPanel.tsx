@@ -120,8 +120,6 @@ const memberRoleLabel: Record<AssemblyPointTeamMember["roleInTeam"], string> = {
   Member: "Thành viên",
 };
 
-function formatLastUpdated(dateStr: string | null): string {
-  if (!dateStr) return "Chưa cập nhật";
 const assemblyEventStatusLabel: Record<string, string> = {
   Scheduled: "Đã lên lịch",
   Gathering: "Đang tập hợp",
@@ -140,7 +138,9 @@ const assemblyEventStatusColor: Record<string, string> = {
     "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-300",
 };
 
-function formatLastUpdated(dateStr: string): string {
+function formatLastUpdated(dateStr: string | null): string {
+  if (!dateStr) return "Chưa cập nhật";
+
   try {
     const date = new Date(dateStr);
     const now = new Date();
@@ -630,7 +630,11 @@ function DepotDetails({
                     <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{item.categoryName}</span>
                       <span>•</span>
-                      <span>{item.targetGroup}</span>
+                      <span>
+                        {item.targetGroups.length > 0
+                          ? item.targetGroups.join(", ")
+                          : "Chưa phân nhóm"}
+                      </span>
                     </div>
 
                     <div className="mt-2 grid grid-cols-3 gap-1.5">
