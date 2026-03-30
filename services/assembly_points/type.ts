@@ -12,6 +12,12 @@ export interface AssemblyPointStatusMetadata {
   value: string;
 }
 
+// Assembly Point Metadata option (for dropdown)
+export interface AssemblyPointMetadataOption {
+  key: string;
+  value: string;
+}
+
 // Assembly Point Entity
 export interface AssemblyPointEntity {
   id: number;
@@ -21,12 +27,13 @@ export interface AssemblyPointEntity {
   longitude: number;
   maxCapacity: number;
   status: AssemblyPointStatus;
-  lastUpdatedAt: string | null;
-  hasActiveEvent?: boolean;
-  teams?: AssemblyPointTeam[];
+  lastUpdatedAt: string;
+  hasActiveEvent: boolean;
+  activeEventId?: number | null;
+  teams: AssemblyPointTeam[];
 }
 
-// Team domain for Assembly Point detail
+// Team domain for Assembly Point responses
 export type AssemblyPointTeamType = "Rescue" | "Medical" | "Transportation";
 
 export type AssemblyPointTeamStatus =
@@ -59,9 +66,7 @@ export interface AssemblyPointTeam {
 }
 
 // Detail Response for GET /personnel/assembly-point/{id}
-export interface AssemblyPointDetailEntity extends AssemblyPointEntity {
-  teams: AssemblyPointTeam[];
-}
+export interface AssemblyPointDetailEntity extends AssemblyPointEntity {}
 
 // Paginated Response for Assembly Points
 export interface GetAssemblyPointsResponse {
@@ -129,4 +134,36 @@ export interface UpdateAssemblyPointStatusResponse {
   id: number;
   status: AssemblyPointStatus;
   message: string;
+}
+
+// Assign or unassign rescuer to assembly point request
+export interface UpdateRescuerAssemblyPointAssignmentRequest {
+  userId: string;
+  assemblyPointId: number | null;
+}
+
+// Schedule gathering at an assembly point request
+export interface ScheduleAssemblyPointGatheringRequest {
+  id: number;
+  assemblyDate: string;
+}
+
+// Schedule gathering success response
+export interface ScheduleAssemblyPointGatheringResponse {
+  eventId: number;
+}
+
+// Schedule gathering validation error response (HTTP 400)
+export interface ScheduleAssemblyPointGatheringErrorResponse {
+  message: string;
+  errors?: {
+    AssemblyDate?: string[];
+    [key: string]: string[] | undefined;
+  };
+}
+
+// Start gathering by assembly event id request
+export interface StartAssemblyPointGatheringRequest {
+  eventId: number;
+  assemblyPointId?: number;
 }

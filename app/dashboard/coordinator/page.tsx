@@ -80,6 +80,7 @@ import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
+import { deriveSOSNeeds } from "@/lib/sos";
 
 // ── Lazy-loaded map components ──
 
@@ -130,24 +131,20 @@ function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
   const si = entity.senderInfo;
   const nm = entity.networkMetadata;
   const supplies = sd?.supplies ?? [];
+  const supplyDetails = sd?.supply_details;
   const createdAt = new Date(entity.createdAt);
   const computedWaitTimeMinutes = Math.max(
     0,
     Math.floor((Date.now() - createdAt.getTime()) / 60000),
   );
+  const needs = deriveSOSNeeds(sd, entity.sosType);
 
   return {
     id: String(entity.id),
     groupId: entity.clusterId ? String(entity.clusterId) : String(entity.id),
     location: { lat: entity.latitude, lng: entity.longitude },
     priority: toPriority(entity.priorityLevel),
-    needs: {
-      medical: sd?.need_medical ?? supplies.includes("MEDICINE"),
-      food: supplies.includes("FOOD") || supplies.includes("WATER"),
-      boat:
-        supplies.includes("RESCUE_EQUIPMENT") ||
-        supplies.includes("TRANSPORTATION"),
-    },
+    needs,
     status: toStatus(entity.status),
     message: entity.msg,
     createdAt,
@@ -165,11 +162,23 @@ function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     sosType: entity.sosType ?? undefined,
     situation: sd?.situation,
     medicalIssues: sd?.medical_issues,
-    supplies: sd?.supplies,
+    supplies: supplies.length > 0 ? supplies : undefined,
     canMove: sd?.can_move,
     hasInjured: sd?.has_injured,
     othersAreStable: sd?.others_are_stable,
     additionalDescription: sd?.additional_description ?? undefined,
+    otherSupplyDescription: sd?.other_supply_description ?? undefined,
+    structuredData: sd,
+    supplyDetails,
+    specialDietPersons: supplyDetails?.special_diet_persons ?? undefined,
+    clothingPersons: supplyDetails?.clothing_persons ?? undefined,
+    medicalSupportNeeds: supplyDetails?.medical_needs ?? undefined,
+    medicalDescription: supplyDetails?.medical_description ?? undefined,
+    waterDuration: supplyDetails?.water_duration ?? undefined,
+    waterRemaining: supplyDetails?.water_remaining ?? undefined,
+    foodDuration: supplyDetails?.food_duration ?? undefined,
+    areBlanketsEnough: supplyDetails?.are_blankets_enough,
+    blanketRequestCount: supplyDetails?.blanket_request_count,
     senderPhone: si?.user_phone ?? undefined,
     senderName: si?.user_name ?? undefined,
     createdByCoordinatorId: entity.createdByCoordinatorId ?? null,

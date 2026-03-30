@@ -10,7 +10,7 @@ import {
   useAddRescueTeamMember,
   useRemoveRescueTeamMember,
 } from "@/services/rescue_teams/hooks";
-import { useFreeRescuers } from "@/services/rescuers/hooks";
+import { useRescuers } from "@/services/rescuers/hooks";
 import type {
   RescueTeamStatusKey,
   RescueTeamTypeKey,
@@ -55,19 +55,19 @@ const teamTypeMap: Record<
 > = {
   Rescue: {
     label: "Cứu hộ",
-    className: "border-black bg-white text-black",
+    className: "border-orange-300 bg-orange-50 text-orange-800",
   },
   Medical: {
     label: "Y tế",
-    className: "border-black bg-white text-black",
+    className: "border-emerald-300 bg-emerald-50 text-emerald-800",
   },
   Transportation: {
     label: "Vận chuyển",
-    className: "border-black bg-white text-black",
+    className: "border-sky-300 bg-sky-50 text-sky-800",
   },
   Mixed: {
     label: "Hỗn hợp",
-    className: "border-black bg-white text-black",
+    className: "border-slate-300 bg-slate-100 text-slate-700",
   },
 };
 
@@ -81,47 +81,47 @@ const statusMap: Record<
 > = {
   AwaitingAcceptance: {
     label: "Chờ xác nhận",
-    className: "border-black bg-white text-black",
+    className: "border-amber-300 bg-amber-50 text-amber-800",
     tone: "neutral",
   },
   Ready: {
     label: "Sẵn sàng",
-    className: "border-black bg-white text-black",
+    className: "border-emerald-300 bg-emerald-50 text-emerald-800",
     tone: "good",
   },
   Gathering: {
     label: "Đang tập hợp",
-    className: "border-black bg-white text-black",
+    className: "border-sky-300 bg-sky-50 text-sky-800",
     tone: "warn",
   },
   Available: {
     label: "Trống",
-    className: "border-black bg-white text-black",
+    className: "border-teal-300 bg-teal-50 text-teal-800",
     tone: "good",
   },
   Assigned: {
     label: "Đã phân công",
-    className: "border-black bg-white text-black",
+    className: "border-indigo-300 bg-indigo-50 text-indigo-800",
     tone: "warn",
   },
   OnMission: {
     label: "Đang làm nhiệm vụ",
-    className: "border-black bg-white text-black",
+    className: "border-violet-300 bg-violet-50 text-violet-800",
     tone: "warn",
   },
   Stuck: {
     label: "Mắc kẹt",
-    className: "border-black bg-white text-black",
+    className: "border-rose-300 bg-rose-50 text-rose-800",
     tone: "danger",
   },
   Unavailable: {
     label: "Không khả dụng",
-    className: "border-black bg-white text-black",
+    className: "border-zinc-300 bg-zinc-100 text-zinc-700",
     tone: "danger",
   },
   Disbanded: {
     label: "Đã giải tán",
-    className: "border-black bg-white text-black",
+    className: "border-slate-300 bg-slate-100 text-slate-700",
     tone: "neutral",
   },
 };
@@ -294,10 +294,11 @@ export default function RescueTeamDetailPage() {
     enabled: Number.isFinite(teamId) && teamId > 0,
   });
   const { data: freeRescuersData, isLoading: isLoadingFreeRescuers } =
-    useFreeRescuers({
+    useRescuers({
       params: {
         pageNumber: 1,
         pageSize: 100,
+        hasTeam: false,
       },
       enabled: Number.isFinite(teamId) && teamId > 0,
     });
@@ -517,22 +518,22 @@ export default function RescueTeamDetailPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1320px] space-y-6 bg-[linear-gradient(to_right,rgba(0,0,0,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.08)_1px,transparent_1px)] bg-[size:30px_30px] bg-white p-4 tracking-tighter md:p-6">
+    <div className="mx-auto w-full max-w-[1320px] space-y-5 bg-[linear-gradient(to_right,rgba(0,0,0,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.08)_1px,transparent_1px)] bg-[size:30px_30px] bg-white p-4 tracking-tighter md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Link href="/dashboard/coordinator/rescue-teams">
             <Button
               variant="ghost"
-              className="-ml-2 h-8 gap-1.5 rounded-none border border-black px-2 text-xs"
+              className="-ml-1.5 h-8 gap-1.5 rounded-none border border-black px-2.5 text-xs"
             >
               <ArrowLeft className="h-4 w-4" />
               Danh sách đội cứu hộ
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold uppercase md:text-3xl">
+          <h1 className="text-2xl font-bold uppercase tracking-[0.06em] md:text-[1.95rem]">
             Chi tiết đội cứu hộ
           </h1>
-          <p className="text-sm text-black/70">
+          <p className="text-sm text-black/70 md:text-base">
             Theo dõi thông tin đội, thành viên và mức độ sẵn sàng theo thời gian
             thực.
           </p>
@@ -557,14 +558,14 @@ export default function RescueTeamDetailPage() {
       </div>
 
       <Card className="border-black bg-white shadow-none">
-        <CardContent className="p-5 md:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+        <CardContent className="p-4 md:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs uppercase text-black/60">{data.code}</p>
               <h2 className="text-xl md:text-2xl font-bold mt-1">
                 {data.name}
               </h2>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-black/70">
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-black/70 md:text-base">
                 <span className="inline-flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" />
                   {data.assemblyPointName}
@@ -576,25 +577,25 @@ export default function RescueTeamDetailPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 min-w-[240px]">
-              <div className="border border-black p-3">
-                <p className="text-[11px] text-black/60">Quân số</p>
+            <div className="grid min-w-[220px] grid-cols-2 gap-1.5">
+              <div className="border border-black p-2.5">
+                <p className="text-xs text-black/60">Quân số</p>
                 <p className="mt-1 text-lg font-bold">
                   {memberStats.total}/{data.maxMembers}
                 </p>
               </div>
-              <div className="border border-black p-3">
-                <p className="text-[11px] text-black/60">Đội trưởng</p>
+              <div className="border border-black p-2.5">
+                <p className="text-xs text-black/60">Đội trưởng</p>
                 <p className="mt-1 text-lg font-bold">{memberStats.leaders}</p>
               </div>
-              <div className="border border-black p-3">
-                <p className="text-[11px] text-black/60">Ngày lập</p>
+              <div className="border border-black p-2.5">
+                <p className="text-xs text-black/60">Ngày lập</p>
                 <p className="mt-1 text-xs font-semibold leading-tight">
                   {formatDate(data.createdAt)}
                 </p>
               </div>
-              <div className="border border-black p-3">
-                <p className="text-[11px] text-black/60">Ngày tập kết</p>
+              <div className="border border-black p-2.5">
+                <p className="text-xs text-black/60">Ngày tập kết</p>
                 <p className="mt-1 text-xs font-semibold leading-tight">
                   {formatDate(data.assemblyDate)}
                 </p>
@@ -604,17 +605,17 @@ export default function RescueTeamDetailPage() {
         </CardContent>
       </Card>
 
-      <section className="grid gap-4 xl:grid-cols-5">
+      <section className="grid gap-3 xl:grid-cols-5">
         <Card className="xl:col-span-2 border-black bg-white shadow-none">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1.5">
             <CardTitle className="text-base flex items-center gap-2">
               <CalendarClock className="h-4 w-4 text-[#FF5722]" />
               Lịch tập kết đội
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2.5">
             <div className="space-y-1.5">
-              <Label className="text-xs text-black/70">Thời gian tập kết</Label>
+              <Label className="text-sm text-black/70">Thời gian tập kết</Label>
               <Input
                 type="datetime-local"
                 value={assemblyAtInput}
@@ -641,14 +642,14 @@ export default function RescueTeamDetailPage() {
         </Card>
 
         <Card className="xl:col-span-3 border-black bg-white shadow-none">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1.5">
             <CardTitle className="text-base flex items-center gap-2">
               <UserPlus className="h-4 w-4 text-[#FF5722]" />
               Bổ sung thành viên
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between gap-2 border border-black px-3 py-2 text-xs text-black/70">
+          <CardContent className="space-y-2.5">
+            <div className="flex items-center justify-between gap-2 border border-black px-3 py-2 text-sm text-black/70">
               <span>Chỗ trống còn lại</span>
               <span className="font-semibold text-foreground">
                 {remainingSlots}/{data.maxMembers}
@@ -750,35 +751,35 @@ export default function RescueTeamDetailPage() {
             Thống kê thành viên
           </h3>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="border-black bg-white shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-black/60">Đã xác nhận</p>
-              <p className="mt-1 text-2xl font-bold text-black">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <Card className="border-emerald-300 bg-emerald-50/50 shadow-none">
+            <CardContent className="p-3">
+              <p className="text-[11px] text-emerald-800/80">Đã xác nhận</p>
+              <p className="mt-0.5 text-xl font-bold text-emerald-900">
                 {memberStats.accepted}
               </p>
             </CardContent>
           </Card>
-          <Card className="border-black bg-white shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-black/60">Đang chờ</p>
-              <p className="mt-1 text-2xl font-bold text-black">
+          <Card className="border-amber-300 bg-amber-50/50 shadow-none">
+            <CardContent className="p-3">
+              <p className="text-[11px] text-amber-800/80">Đang chờ</p>
+              <p className="mt-0.5 text-xl font-bold text-amber-900">
                 {memberStats.pending}
               </p>
             </CardContent>
           </Card>
-          <Card className="border-black bg-white shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-black/60">Từ chối</p>
-              <p className="mt-1 text-2xl font-bold text-black">
+          <Card className="border-rose-300 bg-rose-50/50 shadow-none">
+            <CardContent className="p-3">
+              <p className="text-[11px] text-rose-800/80">Từ chối</p>
+              <p className="mt-0.5 text-xl font-bold text-rose-900">
                 {memberStats.rejected}
               </p>
             </CardContent>
           </Card>
-          <Card className="border-black bg-white shadow-none">
-            <CardContent className="p-4">
-              <p className="text-xs text-black/60">Còn trống</p>
-              <p className="mt-1 text-2xl font-bold text-black">
+          <Card className="border-sky-300 bg-sky-50/50 shadow-none">
+            <CardContent className="p-3">
+              <p className="text-[11px] text-sky-800/80">Còn trống</p>
+              <p className="mt-0.5 text-xl font-bold text-sky-900">
                 {Math.max(0, data.maxMembers - memberStats.total)}
               </p>
             </CardContent>

@@ -1,22 +1,25 @@
 import api from "@/config/axios";
-import type { GetFreeRescuersParams, GetFreeRescuersResponse } from "./type";
+import type { GetRescuersParams, GetRescuersResponse } from "./type";
 
 /**
- * Get free rescuers with pagination.
- * GET /personnel/rescuers/free
+ * Get rescuers with pagination and filters.
+ * GET /personnel/rescuers
  */
-export async function getFreeRescuers(
-  params?: GetFreeRescuersParams,
-): Promise<GetFreeRescuersResponse> {
-  const { data } = await api.get("/personnel/rescuers/free", {
+export async function getRescuers(
+  params?: GetRescuersParams,
+): Promise<GetRescuersResponse> {
+  const { data } = await api.get("/personnel/rescuers", {
     params: {
       pageNumber: params?.pageNumber ?? 1,
       pageSize: params?.pageSize ?? 10,
+      hasAssemblyPoint: params?.hasAssemblyPoint,
+      hasTeam: params?.hasTeam,
+      rescuerType: params?.rescuerType,
+      abilitySubgroupCode: params?.abilitySubgroupCode,
+      abilityCategoryCode: params?.abilityCategoryCode,
       firstName: params?.firstName,
       lastName: params?.lastName,
-      phone: params?.phone,
       email: params?.email,
-      rescuerType: params?.rescuerType,
     },
   });
 

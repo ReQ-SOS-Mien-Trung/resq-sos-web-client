@@ -36,6 +36,7 @@ import {
   useSendConversationMessage,
 } from "@/services/chat/hooks";
 import { ReceiveMessageEvent } from "@/services/chat/type";
+import { uploadImageToCloudinary } from "@/utils/uploadFile";
 
 const ACTIVE_CONVERSATION_STORAGE_KEY =
   "coordinator-chat-active-conversation-id";
@@ -457,6 +458,46 @@ export default function CoordinatorChatPage() {
     }
   };
 
+  const handleSendImage = async (file: File) => {
+    if (!activeConversationId) {
+      toast.error("Vui lòng chọn một cuộc trò chuyện trước.");
+      return;
+    }
+
+    if (connectionState !== "connected") {
+      toast.error("Kết nối realtime chưa sẵn sàng. Vui lòng thử lại sau.");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Chỉ hỗ trợ gửi tệp hình ảnh.");
+      return;
+    }
+
+    const maxSizeInBytes = 10 * 1024 * 1024;
+    if (file.size > maxSizeInBytes) {
+      toast.error("Ảnh vượt quá 10MB. Vui lòng chọn ảnh nhỏ hơn.");
+      return;
+    }
+
+    const toastId = toast.loading("Đang tải ảnh lên...");
+
+    try {
+      const imageUrl = await uploadImageToCloudinary(file, "resq/chat");
+      const safeAlt = file.name.replace(/[\[\]\(\)]/g, "").trim() || "image";
+      await sendMessageMutation.mutateAsync({
+        conversationId: activeConversationId,
+        content: `![${safeAlt}](${imageUrl})`,
+      });
+      toast.success("Đã gửi ảnh.", { id: toastId });
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Không thể gửi ảnh.",
+        { id: toastId },
+      );
+    }
+  };
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-white text-black tracking-tighter">
       <header className="shrink-0 border-b border-black bg-white px-4 py-3 md:px-5">
@@ -617,6 +658,7 @@ export default function CoordinatorChatPage() {
                 onSend={(content) => {
                   void handleSendMessage(content);
                 }}
+                onUploadImage={handleSendImage}
               />
             </>
           ) : (

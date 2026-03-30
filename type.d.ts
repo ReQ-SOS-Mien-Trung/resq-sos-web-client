@@ -4,6 +4,13 @@ import type {
   CreatePromptRequest,
   UpdatePromptRequest,
 } from "@/services/prompt/type";
+import type {
+  MedicalSupportNeedType,
+  SOSClothingPerson,
+  SOSSpecialDietPerson,
+  SOSStructuredData,
+  SOSSupplyDetails,
+} from "@/services/sos_request/type";
 
 interface Ticker {
   market: {
@@ -88,6 +95,18 @@ export interface SOSRequest {
   hasInjured?: boolean;
   othersAreStable?: boolean;
   additionalDescription?: string;
+  otherSupplyDescription?: string | null;
+  structuredData?: SOSStructuredData | null;
+  supplyDetails?: SOSSupplyDetails | null;
+  specialDietPersons?: SOSSpecialDietPerson[];
+  clothingPersons?: SOSClothingPerson[];
+  medicalSupportNeeds?: MedicalSupportNeedType[];
+  medicalDescription?: string | null;
+  waterDuration?: string | null;
+  waterRemaining?: string | null;
+  foodDuration?: string | null;
+  areBlanketsEnough?: boolean | null;
+  blanketRequestCount?: number | null;
   senderPhone?: string;
   senderName?: string;
   createdByCoordinatorId?: string | null;

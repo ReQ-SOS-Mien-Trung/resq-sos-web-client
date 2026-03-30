@@ -1,36 +1,36 @@
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
-import { getFreeRescuers } from "./api";
-import type { GetFreeRescuersParams, GetFreeRescuersResponse } from "./type";
+import { getRescuers } from "./api";
+import type { GetRescuersParams, GetRescuersResponse } from "./type";
 
-export const FREE_RESCUERS_QUERY_KEY = ["free-rescuers"] as const;
+export const RESCUERS_QUERY_KEY = ["rescuers"] as const;
 
-export interface UseFreeRescuersOptions {
-  params?: GetFreeRescuersParams;
+export interface UseRescuersOptions {
+  params?: GetRescuersParams;
   enabled?: boolean;
 }
 
-export function useFreeRescuers(options?: UseFreeRescuersOptions) {
+export function useRescuers(options?: UseRescuersOptions) {
   const params = options?.params;
 
-  return useQuery<GetFreeRescuersResponse>({
-    queryKey: [...FREE_RESCUERS_QUERY_KEY, params],
-    queryFn: () => getFreeRescuers(params),
+  return useQuery<GetRescuersResponse>({
+    queryKey: [...RESCUERS_QUERY_KEY, params],
+    queryFn: () => getRescuers(params),
     enabled: options?.enabled ?? true,
   });
 }
 
-export function useInfiniteFreeRescuers(options?: {
-  params?: Omit<GetFreeRescuersParams, "pageNumber" | "pageSize">;
+export function useInfiniteRescuers(options?: {
+  params?: Omit<GetRescuersParams, "pageNumber" | "pageSize">;
   pageSize?: number;
   enabled?: boolean;
 }) {
   const pageSize = options?.pageSize ?? 10;
   const params = options?.params;
 
-  return useInfiniteQuery<GetFreeRescuersResponse>({
-    queryKey: [...FREE_RESCUERS_QUERY_KEY, "infinite", pageSize, params],
+  return useInfiniteQuery<GetRescuersResponse>({
+    queryKey: [...RESCUERS_QUERY_KEY, "infinite", pageSize, params],
     queryFn: ({ pageParam = 1 }) =>
-      getFreeRescuers({
+      getRescuers({
         ...params,
         pageNumber: pageParam as number,
         pageSize,
