@@ -1113,15 +1113,6 @@ function AssemblyPointMarker({
   };
 
   const color = statusColors[assemblyPoint.status] ?? "#64748b";
-  const statusLabels = {
-    Created: "Mới tạo",
-    Active: "Hoạt động",
-    Overloaded: "Quá tải",
-    UnderMaintenance: "Đang bảo trì",
-    Closed: "Đã đóng",
-  };
-
-  const color = statusColors[assemblyPoint.status];
 
   const iconEl = useMemo(() => {
     if (typeof window === "undefined") return undefined;
@@ -1143,7 +1134,7 @@ function AssemblyPointMarker({
       iconSize: [36, 36],
       iconAnchor: [18, 18],
     });
-  }, [assemblyPoint.status, color]);
+  }, [color]);
 
   if (!iconEl) return null;
 

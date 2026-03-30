@@ -652,9 +652,6 @@ function AssemblyPointDetails({
     bgColor: "bg-slate-50 dark:bg-slate-900/30",
     icon: Info,
   };
-  const statusConfig =
-    assemblyPointStatusConfig[assemblyPoint.status] ??
-    assemblyPointStatusConfig.Created;
   const StatusIcon = statusConfig.icon;
 
   const handleScheduleGathering = async () => {
