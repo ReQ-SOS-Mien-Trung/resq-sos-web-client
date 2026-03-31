@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   UploadSimple,
   FileXls,
   FilePdf,
@@ -53,9 +59,14 @@ import {
   useDownloadPurchaseImportTemplate,
 } from "@/services/inventory/hooks";
 import type { ImportPurchaseItem, VatInvoice } from "@/services/inventory/type";
-import { uploadRawToCloudinary } from "@/utils/uploadFile";
+import { uploadImageToCloudinary, uploadRawToCloudinary } from "@/utils/uploadFile";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { DateTimePickerInput } from "@/components/ui/date-time-picker-input";
+import {
+  extractImageUrlFromCell,
+  getSheetRowsWithOptionalImageColumn,
+  revokeBlobUrl,
+} from "@/components/inventory/import-image-helpers";
 
 const SYSTEM_CATEGORIES = [
   { label: "Thực phẩm", value: "Food" },
@@ -121,11 +132,41 @@ const COL = {
   LOAI: "Loại vật phẩm",
   DONVI: "Đơn vị",
   MOTA: "Mô tả vật phẩm",
+  ANH: "Ảnh",
   DONGIA: "Đơn giá",
   SOLUONG: "Số lượng",
   HETHAN: "Ngày hết hạn",
   NHAN: "Ngày nhận",
 } as const;
+
+const LEGACY_COLS = [
+  COL.STT,
+  COL.TEN,
+  COL.DANHMUC,
+  COL.DOITUONG,
+  COL.LOAI,
+  COL.DONVI,
+  COL.MOTA,
+  COL.DONGIA,
+  COL.SOLUONG,
+  COL.HETHAN,
+  COL.NHAN,
+] as const;
+
+const SHEET_COLS = [
+  COL.STT,
+  COL.TEN,
+  COL.DANHMUC,
+  COL.DOITUONG,
+  COL.LOAI,
+  COL.DONVI,
+  COL.MOTA,
+  COL.ANH,
+  COL.DONGIA,
+  COL.SOLUONG,
+  COL.HETHAN,
+  COL.NHAN,
+] as const;
 
 interface VatFormState {
   invoiceSerial: string;
@@ -150,8 +191,25 @@ interface ImportRow {
   expiredDate: string;
   receivedDate: string;
   description: string;
+  imageUrl: string;
+  imagePreviewUrl: string;
+  imageFile: File | null;
+  showErrors: boolean;
   errors: Record<string, string>;
 }
+
+type EditableField =
+  | "itemModelId"
+  | "itemName"
+  | "categoryCode"
+  | "targetGroups"
+  | "itemType"
+  | "unit"
+  | "quantity"
+  | "unitPrice"
+  | "expiredDate"
+  | "receivedDate"
+  | "description";
 
 type Step = "upload" | "review";
 
@@ -224,37 +282,6 @@ function parseExcelDateTime(val: unknown): string {
     return `${dt.getFullYear()}-${p2(dt.getMonth() + 1)}-${p2(dt.getDate())}T${p2(dt.getHours())}:${p2(dt.getMinutes())}`;
   }
   return "";
-}
-
-/**
- * Đọc sheet theo VỊTRI CỘT (không phụ thuộc tên cột / Unicode).
- * Tìm dòng header bằng cách kiểm tra cột 0 = "STT" (ASCII thuần).
- * Sau đó map từng dòng data theo đúng thứ tự cột của colNames.
- */
-function getSheetRows(
-  sheet: XLSX.WorkSheet,
-  colNames: readonly string[],
-): Record<string, unknown>[] {
-  const rawRows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
-  if (rawRows.length === 0) return [];
-
-  const headerRowIndex = rawRows.findIndex(
-    (row) => Array.isArray(row) && String(row[0] ?? "").trim().toUpperCase() === "STT",
-  );
-
-  const dataStart = headerRowIndex >= 0 ? headerRowIndex + 1 : 1;
-
-  return rawRows.slice(dataStart).map((row) => {
-    const arr = Array.isArray(row) ? row : [];
-    const obj: Record<string, unknown> = {};
-    colNames.forEach((name, i) => {
-      const raw = arr[i];
-      obj[name] = (raw !== null && raw !== undefined && typeof raw === "object" && "v" in (raw as object))
-        ? (raw as { v: unknown }).v ?? ""
-        : raw ?? "";
-    });
-    return obj;
-  });
 }
 
 /** Extract trailing model ID from item name, e.g. "Mì tôm - 1" → { cleanName: "Mì tôm", itemModelId: 1 } */
@@ -577,10 +604,16 @@ export default function ExcelImportRegular() {
   const [groups, setGroups] = useState<PurchaseGroup[]>([createEmptyGroup()]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{
+    src: string;
+    alt: string;
+  } | null>(null);
 
   const vatInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const excelReviewInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const imageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const previousPreviewUrlsRef = useRef<Record<string, string>>({});
 
   const GROUP_COLORS = [
     { border: "border-l-blue-500",   header: "bg-blue-50/60 dark:bg-blue-950/20",   icon: "text-blue-600",   badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
@@ -598,6 +631,37 @@ export default function ExcelImportRegular() {
 
   const itemTypes = useMemo(() => itemTypesData ?? [], [itemTypesData]);
   const targetGroups = useMemo(() => targetGroupsData ?? [], [targetGroupsData]);
+
+  useEffect(() => {
+    const nextPreviewUrls: Record<string, string> = {};
+
+    groups.forEach((group) => {
+      group.rows.forEach((row) => {
+        if (row.imagePreviewUrl) {
+          nextPreviewUrls[`${group.id}:${row.id}`] = row.imagePreviewUrl;
+        }
+      });
+    });
+
+    Object.entries(previousPreviewUrlsRef.current).forEach(
+      ([rowKey, previewUrl]) => {
+        if (previewUrl !== nextPreviewUrls[rowKey]) {
+          revokeBlobUrl(previewUrl);
+        }
+      },
+    );
+
+    previousPreviewUrlsRef.current = nextPreviewUrls;
+  }, [groups]);
+
+  useEffect(
+    () => () => {
+      Object.values(previousPreviewUrlsRef.current).forEach((previewUrl) => {
+        revokeBlobUrl(previewUrl);
+      });
+    },
+    [],
+  );
 
   const patchGroup = useCallback(
     (id: string, patch: Partial<PurchaseGroup> | ((g: PurchaseGroup) => PurchaseGroup)) => {
@@ -621,10 +685,20 @@ export default function ExcelImportRegular() {
     if (!row.targetGroups?.length) errors.targetGroups = "Đối tượng không được trống";
     if (row.itemType === "Reusable" && !row.targetGroups?.includes("Rescuer"))
       errors.targetGroups = "Đối với vật phẩm ‘Tái sử dụng’, đối tượng áp dụng là ‘Lực lượng cứu hộ’.";
+    if (!row.itemModelId && !row.imageFile && !row.imageUrl)
+      errors.imageUrl = "Vui lòng tải ảnh cho vật phẩm mới";
     if (!row.receivedDate) errors.receivedDate = "Ngày nhận không được trống";
     else if (new Date(row.receivedDate) > new Date()) errors.receivedDate = "Ngày nhận không được là thời điểm trong tương lai";
     return errors;
   }, []);
+
+  const applyRowValidation = useCallback(
+    (row: Omit<ImportRow, "errors">): ImportRow => ({
+      ...row,
+      errors: row.showErrors ? validateRow(row) : {},
+    }),
+    [validateRow],
+  );
 
   const handleVatFile = useCallback(
     async (groupId: string, file: File) => {
@@ -701,6 +775,7 @@ export default function ExcelImportRegular() {
         const targetGroupsFinal = itemType === "Reusable" ? ["Rescuer"] : targetGroupsValue;
 
         const { cleanName: itemName, itemModelId } = parseItemName(String(raw[COL.TEN] ?? ""));
+        const imageUrl = itemModelId ? "" : extractImageUrlFromCell(raw[COL.ANH]);
         const rowData = {
           id: `row-${offset + idx}-${Date.now()}`,
           row: offset + idx + 1,
@@ -715,11 +790,15 @@ export default function ExcelImportRegular() {
           expiredDate: parseExcelDate(raw[COL.HETHAN]),
           receivedDate: parseExcelDateTime(raw[COL.NHAN]),
           description: String(raw[COL.MOTA] ?? "").trim(),
+          imageUrl,
+          imagePreviewUrl: imageUrl,
+          imageFile: null,
+          showErrors: true,
         };
-        return { ...rowData, errors: validateRow(rowData) };
+        return applyRowValidation(rowData);
       });
     },
-    [validateRow, targetGroups, itemTypes],
+    [applyRowValidation, targetGroups, itemTypes],
   );
 
   const parseExcelForGroup = useCallback(
@@ -734,7 +813,11 @@ export default function ExcelImportRegular() {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
           const sheet = findDataSheet(workbook);
-          const jsonData = getSheetRows(sheet, Object.values(COL));
+          const jsonData = getSheetRowsWithOptionalImageColumn(
+            sheet,
+            LEGACY_COLS,
+            SHEET_COLS,
+          );
           if (jsonData.length === 0) { toast.error("File Excel không có dữ liệu"); return; }
 
           patchGroup(groupId, (g) => {
@@ -758,7 +841,7 @@ export default function ExcelImportRegular() {
   );
 
   const updateRow = useCallback(
-    (groupId: string, rowId: string, field: keyof ImportRow, value: string | number | string[] | undefined) => {
+    (groupId: string, rowId: string, field: EditableField, value: string | number | string[] | undefined) => {
       patchGroup(groupId, (g) => ({
         ...g,
         rows: g.rows.map((r) => {
@@ -768,12 +851,50 @@ export default function ExcelImportRegular() {
           if (field === "itemType" && value === "Reusable") {
             updated.targetGroups = ["Rescuer"];
           }
-          updated.errors = validateRow(updated);
-          return updated;
+          return applyRowValidation(updated);
         }),
       }));
     },
-    [patchGroup, validateRow],
+    [patchGroup, applyRowValidation],
+  );
+
+  const handleRowImageChange = useCallback(
+    (groupId: string, rowId: string, file?: File | null) => {
+      if (file && !file.type.startsWith("image/")) {
+        toast.error("Chỉ chấp nhận file ảnh");
+        return;
+      }
+
+      patchGroup(groupId, (group) => ({
+        ...group,
+        rows: group.rows.map((row) => {
+          if (row.id !== rowId) return row;
+
+          const previewUrl = file ? URL.createObjectURL(file) : "";
+          const updated: ImportRow = {
+            ...row,
+            imageFile: file ?? null,
+            imageUrl: file ? "" : "",
+            imagePreviewUrl: previewUrl,
+            errors: row.errors,
+          };
+
+          return applyRowValidation(updated);
+        }),
+      }));
+    },
+    [patchGroup, applyRowValidation],
+  );
+
+  const clearRowImage = useCallback(
+    (groupId: string, rowId: string) => {
+      handleRowImageChange(groupId, rowId, null);
+      const inputKey = `${groupId}:${rowId}`;
+      if (imageInputRefs.current[inputKey]) {
+        imageInputRefs.current[inputKey]!.value = "";
+      }
+    },
+    [handleRowImageChange],
   );
 
   const deleteRow = useCallback(
@@ -794,13 +915,14 @@ export default function ExcelImportRegular() {
           row: g.rows.length + 1,
           itemModelId: undefined, itemName: "", categoryCode: "", targetGroups: [], itemType: "",
           unit: "", quantity: 0, unitPrice: 0, expiredDate: "", receivedDate: "", description: "",
+          imageUrl: "", imagePreviewUrl: "", imageFile: null,
+          showErrors: false,
           errors: {},
         };
-        newRow.errors = validateRow(newRow);
-        return { ...g, rows: [...g.rows, newRow] };
+        return { ...g, rows: [...g.rows, applyRowValidation(newRow)] };
       });
     },
-    [patchGroup, validateRow],
+    [patchGroup, applyRowValidation],
   );
 
   const addGroup = useCallback(() => setGroups((prev) => [...prev, createEmptyGroup()]), []);
@@ -843,7 +965,23 @@ export default function ExcelImportRegular() {
 
   const handleSubmit = useCallback(async () => {
     if (totalRows === 0) { toast.error("Không có dữ liệu để nhập kho"); return; }
-    if (totalErrors > 0) { toast.error(`Còn ${totalErrors} dòng lỗi. Vui lòng sửa trước khi nhập.`); return; }
+
+    const validatedGroups = groups.map((group) => ({
+      ...group,
+      rows: group.rows.map((row) => applyRowValidation({ ...row, showErrors: true })),
+    }));
+    const nextTotalErrors = validatedGroups.reduce(
+      (sum, group) =>
+        sum + group.rows.filter((row) => Object.keys(row.errors).length > 0).length,
+      0,
+    );
+
+    if (nextTotalErrors > 0) {
+      setGroups(validatedGroups);
+      toast.error(`Còn ${nextTotalErrors} dòng lỗi. Vui lòng sửa trước khi nhập.`);
+      return;
+    }
+
     for (const g of groups) {
       const idx = groups.indexOf(g) + 1;
       if (!g.vatFile) { toast.error(`Hóa đơn #${idx} chưa chọn file PDF.`); return; }
@@ -858,15 +996,68 @@ export default function ExcelImportRegular() {
       if (vatErrors.length > 0) { toast.error(`Hóa đơn #${idx}: Vui lòng điền đầy đủ thông tin (${vatErrors.join(", ")})`); return; }
     }
 
+    const imageUrlByRowKey = new Map<string, string>();
+    groups.forEach((group) => {
+      group.rows.forEach((row) => {
+        imageUrlByRowKey.set(`${group.id}:${row.id}`, row.imageUrl.trim() || "");
+      });
+    });
+
+    const rowsNeedingImageUpload = groups.flatMap((group) =>
+      group.rows
+        .filter(
+          (row) =>
+            !row.itemModelId &&
+            row.imageFile &&
+            !imageUrlByRowKey.get(`${group.id}:${row.id}`),
+        )
+        .map((row) => ({ groupId: group.id, row })),
+    );
+
     setIsUploading(true);
-    const uploadToastId = toast.loading(`Đang tải ${groups.length} hóa đơn PDF lên...`);
+    const uploadToastId = toast.loading(
+      rowsNeedingImageUpload.length > 0
+        ? `Đang tải ${groups.length} hóa đơn PDF và ${rowsNeedingImageUpload.length} ảnh lên...`
+        : `Đang tải ${groups.length} hóa đơn PDF lên...`,
+    );
     let fileUrls: string[];
     try {
-      fileUrls = await Promise.all(groups.map((g) => uploadRawToCloudinary(g.vatFile!)));
+      const [uploadedPdfUrls, uploadedImages] = await Promise.all([
+        Promise.all(groups.map((g) => uploadRawToCloudinary(g.vatFile!))),
+        Promise.all(
+          rowsNeedingImageUpload.map(async ({ groupId, row }) => ({
+            rowKey: `${groupId}:${row.id}`,
+            imageUrl: await uploadImageToCloudinary(
+              row.imageFile!,
+              "item_model_img",
+            ),
+          })),
+        ),
+      ]);
+
+      fileUrls = uploadedPdfUrls;
+      uploadedImages.forEach(({ rowKey, imageUrl }) => {
+        imageUrlByRowKey.set(rowKey, imageUrl);
+      });
+
+      if (uploadedImages.length > 0) {
+        setGroups((prev) =>
+          prev.map((group) => ({
+            ...group,
+            rows: group.rows.map((row) => {
+              const uploadedImageUrl =
+                imageUrlByRowKey.get(`${group.id}:${row.id}`) || "";
+              return uploadedImageUrl && uploadedImageUrl !== row.imageUrl
+                ? { ...row, imageUrl: uploadedImageUrl }
+                : row;
+            }),
+          })),
+        );
+      }
     } catch {
       setIsUploading(false);
       toast.dismiss(uploadToastId);
-      toast.error("Tải PDF thất bại. Vui lòng thử lại.");
+      toast.error("Tải tệp thất bại. Vui lòng thử lại.");
       return;
     }
     setIsUploading(false);
@@ -888,6 +1079,7 @@ export default function ExcelImportRegular() {
         ...(r.itemModelId ? { itemModelId: r.itemModelId } : {}),
         itemName: r.itemName,
         categoryCode: r.categoryCode,
+        imageUrl: r.itemModelId ? null : imageUrlByRowKey.get(`${g.id}:${r.id}`) || null,
         quantity: r.quantity,
         unitPrice: r.unitPrice,
         unit: r.unit,
@@ -899,16 +1091,14 @@ export default function ExcelImportRegular() {
       } as ImportPurchaseItem)),
     })) };
 
-    importMutation.mutate(payload, {
-      onSuccess: () => {
-        toast.success(`Nhập kho thành công ${totalRows} vật phẩm!`);
-        router.push("/dashboard/inventory");
-      },
-      onError: (err: any) => {
-        toast.error(`Nhập kho thất bại: ${err.response?.data?.message || err.message || "Lỗi không xác định"}`);
-      },
-    });
-  }, [groups, totalRows, totalErrors, importMutation, router]);
+    try {
+      await importMutation.mutateAsync(payload);
+      toast.success(`Nhập kho thành công ${totalRows} vật phẩm!`);
+      router.push("/dashboard/inventory");
+    } catch (err: any) {
+      toast.error(`Nhập kho thất bại: ${err.response?.data?.message || err.message || "Lỗi không xác định"}`);
+    }
+  }, [applyRowValidation, groups, totalRows, importMutation, router]);
 
   const itemTypeOptions = useMemo(
     () => itemTypes.map((t) => ({ label: t.value, value: t.key })),
@@ -922,7 +1112,7 @@ export default function ExcelImportRegular() {
   const renderInputCell = (
     groupId: string,
     row: ImportRow,
-    field: keyof Omit<ImportRow, "errors" | "id">,
+    field: EditableField,
     placeholder: string,
     type: "text" | "number" = "text",
   ) => {
@@ -957,7 +1147,7 @@ export default function ExcelImportRegular() {
   const renderSelectCell = (
     groupId: string,
     row: ImportRow,
-    field: keyof Omit<ImportRow, "errors" | "id">,
+    field: EditableField,
     options: { label: string; value: string }[],
     placeholder: string,
   ) => {
@@ -1048,7 +1238,7 @@ export default function ExcelImportRegular() {
   const renderCurrencyCell = (
     groupId: string,
     row: ImportRow,
-    field: keyof Omit<ImportRow, "errors" | "id">,
+    field: EditableField,
   ) => {
     const error = row.errors[field];
     const rawValue = row[field] as number;
@@ -1073,6 +1263,86 @@ export default function ExcelImportRegular() {
             />
           )}
         </div>
+        {error && <p className="text-[11px] text-red-500">{error}</p>}
+      </div>
+    );
+  };
+
+  const renderImageCell = (groupId: string, row: ImportRow) => {
+    const error = row.errors.imageUrl;
+    const inputKey = `${groupId}:${row.id}`;
+
+    if (row.itemModelId) {
+      return (
+        <div className="w-28">
+          <div className="inline-flex h-7 items-center rounded-md bg-emerald-50 px-2 text-[11px] font-medium text-emerald-700">
+            Đã có
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-28 space-y-1.5">
+        {!row.imagePreviewUrl && (
+          <div className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 flex-1 gap-1 px-2 text-sm"
+              onClick={() => imageInputRefs.current[inputKey]?.click()}
+            >
+              <UploadSimple className="h-3 w-3" />
+              Tải
+            </Button>
+            <input
+              ref={(el) => {
+                imageInputRefs.current[inputKey] = el;
+              }}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleRowImageChange(groupId, row.id, file);
+                e.target.value = "";
+              }}
+            />
+          </div>
+        )}
+
+        {row.imagePreviewUrl ? (
+          <div className="flex h-8 w-full min-w-0 items-center gap-1 rounded-md border border-input px-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 min-w-0 flex-1 justify-start gap-1 px-1 text-sm text-foreground hover:text-foreground"
+              onClick={() =>
+                setPreviewImage({
+                  src: row.imagePreviewUrl,
+                  alt: `Ảnh ${row.itemName || `dòng ${row.row}`}`,
+                })
+              }
+            >
+              
+              <span className="inline-flex min-w-0 max-w-full items-center rounded-md bg-emerald-50 px-2 py-0.5 text-sm font-medium text-emerald-700">
+                <span className="truncate">Xem trước</span>
+              </span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 shrink-0 p-0 text-muted-foreground hover:text-red-500"
+              onClick={() => clearRowImage(groupId, row.id)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : null}
+
         {error && <p className="text-[11px] text-red-500">{error}</p>}
       </div>
     );
@@ -1510,6 +1780,7 @@ export default function ExcelImportRegular() {
                           <TableHead className="min-w-36">Loại vật phẩm</TableHead>
                           <TableHead className="min-w-24">Đơn vị</TableHead>
                           <TableHead className="min-w-40">Mô tả vật phẩm</TableHead>
+                          <TableHead className="min-w-32 w-32">Ảnh</TableHead>
                           <TableHead className="min-w-28">Đơn giá</TableHead>
                           <TableHead className="min-w-24">Số lượng</TableHead>
                           <TableHead className="min-w-36">Ngày hết hạn</TableHead>
@@ -1530,8 +1801,9 @@ export default function ExcelImportRegular() {
                                   min={1}
                                   value={row.itemModelId ?? ""}
                                   onChange={(e) => updateRow(group.id, row.id, "itemModelId", e.target.value ? Number(e.target.value) : undefined)}
-                                  placeholder="Mới"
-                                  className="h-8 text-sm w-20"
+                                  placeholder="X"
+                                  disabled={!row.itemModelId}
+                                  className="h-8 text-sm w-20 disabled:cursor-not-allowed disabled:opacity-60"
                                 />
                               </TableCell>
                               <TableCell>
@@ -1557,6 +1829,7 @@ export default function ExcelImportRegular() {
                                   className="h-8 text-sm"
                                 />
                               </TableCell>
+                              <TableCell>{renderImageCell(group.id, row)}</TableCell>
                               <TableCell>{renderCurrencyCell(group.id, row, "unitPrice")}</TableCell>
                               <TableCell>{renderInputCell(group.id, row, "quantity", "0", "number")}</TableCell>
                               <TableCell>
@@ -1594,7 +1867,7 @@ export default function ExcelImportRegular() {
                         })}
                         {group.rows.length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={13} className="h-24 text-center text-muted-foreground">
+                            <TableCell colSpan={14} className="h-24 text-center text-muted-foreground">
                               <div className="flex flex-col items-center gap-2">
                                 <Trash className="h-7 w-7" weight="duotone" />
                                 <p className="text-sm tracking-tighter">Chưa có vật phẩm</p>
@@ -1633,7 +1906,7 @@ export default function ExcelImportRegular() {
                 ) : (
                   <FloppyDisk className="h-4 w-4" weight="fill" />
                 )}
-                {isUploading ? "Đang tải PDF..." : importMutation.isPending ? "Đang nhập kho..." : "Xác nhận nhập kho"}
+                {isUploading ? "Đang tải tệp..." : importMutation.isPending ? "Đang nhập kho..." : "Xác nhận nhập kho"}
                 {totalRows > 0 && !importMutation.isPending && !isUploading && (
                   <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/20 text-xs">{totalRows}</span>
                 )}
@@ -1642,6 +1915,29 @@ export default function ExcelImportRegular() {
           </div>
         )}
       </div>
+      <Dialog
+        open={!!previewImage}
+        onOpenChange={(open) => {
+          if (!open) setPreviewImage(null);
+        }}
+      >
+        <DialogContent className="max-w-3xl border-0 bg-transparent p-2 shadow-none">
+          <DialogTitle className="sr-only">Xem ảnh vật phẩm</DialogTitle>
+          {previewImage && (
+            <div className="overflow-hidden rounded-xl bg-background p-3 shadow-xl">
+              <div className="relative mx-auto aspect-square max-h-[75vh] w-full max-w-2xl">
+                <Image
+                  src={previewImage.src}
+                  alt={previewImage.alt}
+                  fill
+                  unoptimized
+                  className="object-contain"
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

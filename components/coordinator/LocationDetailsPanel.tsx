@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { DepotEntity } from "@/services/depot/type";
 import {
   useAssemblyPointById,
@@ -32,6 +32,12 @@ import {
 } from "@/components/ui/select";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import type { InventoryItemEntity } from "@/services/inventory/type";
+import {
+  formatInventoryTargetGroups,
+  getInventoryAvailable,
+  getInventoryTotal,
+  getInventoryTotalReserved,
+} from "@/services/inventory/utils";
 import { vi } from "date-fns/locale";
 import {
   X,
@@ -42,7 +48,6 @@ import {
   Phone,
   EnvelopeSimple,
   Package,
-  ChartBar,
   NavigationArrow,
   ShareNetwork,
   BookmarkSimple,
@@ -122,11 +127,6 @@ function formatLastUpdated(dateStr: string | null): string {
   }
 }
 
-function formatDateTimeLocal(date: Date): string {
-  const offsetMs = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
-}
-
 function formatDateTimeVi(date: Date): string {
   return date.toLocaleString("vi-VN", {
     day: "2-digit",
@@ -200,18 +200,10 @@ function getInventoryQuantities(item: InventoryItemEntity): {
   reserved: number;
   available: number;
 } {
-  if (item.itemType === "Consumable") {
-    return {
-      total: item.quantity,
-      reserved: item.reservedQuantity,
-      available: item.availableQuantity,
-    };
-  }
-
   return {
-    total: item.unit,
-    reserved: item.reservedUnit,
-    available: item.availableUnit,
+    total: getInventoryTotal(item),
+    reserved: getInventoryTotalReserved(item),
+    available: getInventoryAvailable(item),
   };
 }
 
@@ -562,7 +554,7 @@ function DepotDetails({
                     <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{item.categoryName}</span>
                       <span>•</span>
-                      <span>{item.targetGroup}</span>
+                      <span>{formatInventoryTargetGroups(item)}</span>
                     </div>
 
                     <div className="mt-2 grid grid-cols-3 gap-1.5">
@@ -636,12 +628,6 @@ function AssemblyPointDetails({
       : [];
   const hasActiveEvent = Boolean(displayAssemblyPoint.hasActiveEvent);
   const activeEventId = resolveActiveEventId(displayAssemblyPoint);
-
-  useEffect(() => {
-    if (hasActiveEvent) {
-      setShowScheduleForm(false);
-    }
-  }, [hasActiveEvent]);
 
   const statusConfig = assemblyPointStatusConfig[
     displayAssemblyPoint.status as keyof typeof assemblyPointStatusConfig
@@ -806,7 +792,7 @@ function AssemblyPointDetails({
               icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
               label="Triệu tập"
               color="text-[#FF5722]"
-              active={showScheduleForm}
+              active={!hasActiveEvent && showScheduleForm}
               onClick={() => setShowScheduleForm((prev) => !prev)}
             />
           )}
@@ -1014,11 +1000,6 @@ function AssemblyDateTimePicker({
   const minAllowedDate = getMinimumGatheringDate();
   const [draft, setDraft] = useState<Date>(value ?? minAllowedDate);
 
-  useEffect(() => {
-    if (!open) return;
-    setDraft(value ?? getMinimumGatheringDate());
-  }, [open, value]);
-
   const hourValue = String(draft.getHours()).padStart(2, "0");
   const minuteValue = String(draft.getMinutes()).padStart(2, "0");
 
@@ -1040,7 +1021,15 @@ function AssemblyDateTimePicker({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) {
+          setDraft(value ?? getMinimumGatheringDate());
+        }
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"

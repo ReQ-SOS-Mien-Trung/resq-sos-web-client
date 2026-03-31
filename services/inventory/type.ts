@@ -31,7 +31,9 @@ export type InventoryReliefItem = InventoryCategory;
 export interface ReusableBreakdown {
   totalUnits: number;
   availableUnits: number;
-  reservedUnits: number;
+  totalReservedUnits: number;
+  reservedForMissionUnits: number;
+  reservedForTransferUnits: number;
   inTransitUnits: number;
   inUseUnits: number;
   maintenanceUnits: number;
@@ -39,6 +41,8 @@ export interface ReusableBreakdown {
   goodCount: number;
   fairCount: number;
   poorCount: number;
+  /** Legacy field from older payloads */
+  reservedUnits?: number;
 }
 
 interface InventoryItemEntityBase {
@@ -53,7 +57,9 @@ interface InventoryItemEntityBase {
 export interface ConsumableItemEntity extends InventoryItemEntityBase {
   itemType: "Consumable";
   quantity: number;
-  reservedQuantity: number;
+  totalReservedQuantity: number;
+  reservedForMissionQuantity: number;
+  reservedForTransferQuantity: number;
   availableQuantity: number;
   reusableBreakdown?: null;
   /** Số lô hiện tại */
@@ -62,15 +68,23 @@ export interface ConsumableItemEntity extends InventoryItemEntityBase {
   nearestExpiryDate?: string | null;
   /** true nếu có lô sắp hết hạn */
   isExpiringSoon?: boolean;
+  /** Legacy field from older payloads */
+  reservedQuantity?: number;
 }
 
 export interface ReusableItemEntity extends InventoryItemEntityBase {
   itemType: "Reusable";
   /** Total unit count */
   unit: number;
-  reservedUnit: number;
+  totalReservedUnits: number;
+  reservedForMissionUnits: number;
+  reservedForTransferUnits: number;
   availableUnit: number;
   reusableBreakdown?: ReusableBreakdown;
+  /** Legacy fields from older payloads */
+  reservedUnit?: number;
+  reservedForMissionUnit?: number;
+  reservedForTransferUnit?: number;
 }
 
 export type InventoryItemEntity = ConsumableItemEntity | ReusableItemEntity;
@@ -110,6 +124,7 @@ export interface ImportInventoryItem {
   itemName: string;
   categoryCode: string;
   description?: string | null;
+  imageUrl: string | null;
   quantity: number;
   unit: string;
   itemType: string;
@@ -143,6 +158,7 @@ export interface ImportPurchaseItem {
   itemName: string;
   categoryCode: string;
   description?: string | null;
+  imageUrl: string | null;
   quantity: number;
   unitPrice: number;
   unit: string;

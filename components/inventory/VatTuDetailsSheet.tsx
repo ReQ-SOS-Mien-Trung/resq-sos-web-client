@@ -23,6 +23,13 @@ import {
 } from "@phosphor-icons/react";
 import { InventoryItemEntity } from "@/services/inventory/type";
 import { useInventoryItemTypes, useInventoryTargetGroups, useInventoryLots } from "@/services/inventory/hooks";
+import {
+  getInventoryAvailable,
+  getInventoryReservedForMission,
+  getInventoryReservedForTransfer,
+  getInventoryTotal,
+  getInventoryTotalReserved,
+} from "@/services/inventory/utils";
 
 interface VatTuDetailsSheetProps {
   item: InventoryItemEntity | null;
@@ -56,13 +63,16 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
     }).format(new Date(dateString));
   };
 
-  // Normalize qty fields: Consumable uses quantity/reservedQuantity/availableQuantity;
-  // Reusable uses unit/reservedUnit/availableUnit
-  const totalQty = item.itemType === "Reusable" ? item.unit : item.quantity;
-  const reservedQty = item.itemType === "Reusable" ? item.reservedUnit : item.reservedQuantity;
-  const availableQty = item.itemType === "Reusable" ? item.availableUnit : item.availableQuantity;
+  const totalQty = getInventoryTotal(item);
+  const reservedQty = getInventoryTotalReserved(item);
+  const availableQty = getInventoryAvailable(item);
+  const reservedForMissionQty = getInventoryReservedForMission(item);
+  const reservedForTransferQty = getInventoryReservedForTransfer(item);
 
-  const reservedPercent = totalQty > 0 ? (reservedQty / totalQty) * 100 : 0;
+  const missionPercent =
+    totalQty > 0 ? (reservedForMissionQty / totalQty) * 100 : 0;
+  const transferPercent =
+    totalQty > 0 ? (reservedForTransferQty / totalQty) * 100 : 0;
   const availablePercent = totalQty > 0 ? (availableQty / totalQty) * 100 : 0;
 
   return (
@@ -105,22 +115,69 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
               </div>
 
               {/* Progress bar container */}
-              <div className="h-3 bg-muted rounded-full overflow-hidden flex">
-                <div
-                  className="h-full bg-[#FF5722] tracking-tighter transition-all"
-                  style={{ width: `${availablePercent}%` }}
-                  title={`Có sẵn: ${availableQty.toLocaleString()}`}
-                />
-                <div
-                  className="h-full bg-orange-300 tracking-tighter transition-all"
-                  style={{ width: `${reservedPercent}%` }}
-                  title={`Đã cọc: ${reservedQty.toLocaleString()}`}
-                />
+              <div className="h-4 overflow-hidden rounded-full bg-slate-200/80 p-px">
+                <div className="flex h-full w-full gap-px overflow-hidden rounded-full bg-background/80">
+                  {reservedForMissionQty > 0 && (
+                    <div
+                      className="h-full bg-blue-500 transition-all"
+                      style={{ width: `${missionPercent}%` }}
+                      title={`Nhiệm vụ: ${reservedForMissionQty.toLocaleString()}`}
+                    />
+                  )}
+                  {reservedForTransferQty > 0 && (
+                    <div
+                      className="h-full bg-emerald-500 transition-all"
+                      style={{ width: `${transferPercent}%` }}
+                      title={`Điều chuyển: ${reservedForTransferQty.toLocaleString()}`}
+                    />
+                  )}
+                  {availableQty > 0 && (
+                    <div
+                      className="h-full bg-slate-400 transition-all"
+                      style={{ width: `${availablePercent}%` }}
+                      title={`Còn lại: ${availableQty.toLocaleString()}`}
+                    />
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-between text-sm text-muted-foreground mt-2">
-                <span className="text-[#FF5722] tracking-tighter font-semibold">Khả dụng: {availableQty.toLocaleString()}</span>
-                <span className="text-orange-500 tracking-tighter font-semibold">Đã phân bổ: {reservedQty.toLocaleString()}</span>
+                <span className="text-slate-700 tracking-tighter font-semibold">
+                  Còn lại: {availableQty.toLocaleString()}
+                </span>
+                <span className="text-slate-600 tracking-tighter font-semibold">
+                  Đã phân bổ: {reservedQty.toLocaleString()}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-x-4 gap-y-2 tracking-tighter text-sm font-medium">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                  <span>
+                    Nhiệm vụ:{" "}
+                    <strong className="text-blue-700">
+                      {reservedForMissionQty.toLocaleString()}
+                    </strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  <span>
+                    Điều chuyển:{" "}
+                    <strong className="text-emerald-700">
+                      {reservedForTransferQty.toLocaleString()}
+                    </strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+                  <span>
+                    Còn lại:{" "}
+                    <strong className="text-slate-700">
+                      {availableQty.toLocaleString()}
+                    </strong>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
