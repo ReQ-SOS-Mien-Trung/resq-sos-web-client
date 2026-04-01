@@ -10,7 +10,6 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
@@ -46,9 +45,8 @@ import {
   LowStockAlerts,
   RecentActivity,
   SupplyRequestSection,
-  SupplyRequestTracker,
 } from "@/components/inventory";
-import IncomingRequestsSection from "@/components/inventory/IncomingRequestsSection";
+import SupplyRequestManagement from "@/components/inventory/SupplyRequestManagement";
 import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
 import {
@@ -198,22 +196,6 @@ const mapApiSupplyRequestToSidebar = (
   };
 };
 
-const requestingStatusLabels: Record<string, string> = {
-  WaitingForApproval: "Chờ phê duyệt",
-  Approved: "Đã duyệt",
-  InTransit: "Đang được chi viện đến",
-  Received: "Đã nhận",
-  Rejected: "Từ chối",
-};
-
-const requestingStatusColors: Record<string, string> = {
-  WaitingForApproval: "bg-amber-100 text-amber-700 border-amber-200",
-  Approved: "bg-violet-100 text-violet-700 border-violet-200",
-  InTransit: "bg-blue-100 text-blue-700 border-blue-200",
-  Received: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  Rejected: "bg-red-100 text-red-700 border-red-200",
-};
-
 // --- Page Component ---
 
 const InventoryDashboardPage = () => {
@@ -232,10 +214,6 @@ const InventoryDashboardPage = () => {
   const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
   const mainRef = useRef<HTMLElement>(null);
   const panelWidthRef = useRef(480);
-  const [requestsPageNumber, setRequestsPageNumber] = useState(1);
-  const requestsPageSize = 8;
-  const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
-  const [trackerOpen, setTrackerOpen] = useState(false);
 
   const router = useRouter();
 
@@ -281,24 +259,9 @@ const InventoryDashboardPage = () => {
     data: supplyRequestsData,
     isLoading: isSupplyRequestsLoading,
     isFetching: isSupplyRequestsFetching,
-    refetch: refetchSupplyRequests,
   } = useSupplyRequests(
     { pageNumber: 1, pageSize: 10 },
     { refetchInterval: 10_000, refetchOnWindowFocus: true },
-  );
-
-  const {
-    data: allRequestsPagedData,
-    isLoading: isAllRequestsLoading,
-    isFetching: isAllRequestsFetching,
-    refetch: refetchAllRequests,
-  } = useSupplyRequests(
-    { pageNumber: requestsPageNumber, pageSize: requestsPageSize },
-    {
-      enabled: activeTab === "shipments",
-      refetchInterval: 10_000,
-      refetchOnWindowFocus: true,
-    },
   );
 
   // Use the first depot as the current managed depot
@@ -351,14 +314,6 @@ const InventoryDashboardPage = () => {
     [supplyRequestsData],
   );
 
-  const allSupplyRequestsSorted = useMemo(
-    () =>
-      [...(allRequestsPagedData?.items ?? [])].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
-    [allRequestsPagedData],
-  );
-
   const categoryOverviewData = useMemo(
     () =>
       (quantityByCategoryData ?? []).map((category) => ({
@@ -371,22 +326,6 @@ const InventoryDashboardPage = () => {
       })),
     [quantityByCategoryData],
   );
-
-  // Find the live request from sidebar or table data for the tracker
-  const trackerRequest = useMemo(() => {
-    if (trackerRequestId === null) return null;
-    return (
-      supplyRequestsData?.items?.find((r) => r.id === trackerRequestId) ??
-      allRequestsPagedData?.items?.find((r) => r.id === trackerRequestId) ??
-      null
-    );
-  }, [trackerRequestId, supplyRequestsData, allRequestsPagedData]);
-
-  const canPrevRequestsPage =
-    allRequestsPagedData?.hasPreviousPage ?? requestsPageNumber > 1;
-  const canNextRequestsPage =
-    allRequestsPagedData?.hasNextPage ??
-    (allRequestsPagedData?.items?.length ?? 0) >= requestsPageSize;
 
   // ── Compute stats (will use real item APIs when available) ──
   const stats = useMemo<IInventoryStats>(
@@ -686,9 +625,6 @@ const InventoryDashboardPage = () => {
               activeTab={activeTab}
               onActiveTabChange={(tab) => {
                 setActiveTab(tab);
-                if (tab === "shipments") {
-                  setRequestsPageNumber(1);
-                }
               }}
             />
           )}
@@ -700,8 +636,8 @@ const InventoryDashboardPage = () => {
           className="flex-1 overflow-auto bg-muted/30"
         >
           <div className="p-6 space-y-6">
-            {/* Page Title — hidden on incoming tab (it has its own header) */}
-            {activeTab !== "incoming" && (
+            {/* Page Title — hidden on supply-management tab (it has its own header) */}
+            {activeTab !== "supply-management" && (
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-semibold tracking-tighter">Dashboard Kho Hàng</h1>
@@ -722,132 +658,13 @@ const InventoryDashboardPage = () => {
               </div>
             )}
 
-            {activeTab === "incoming" ? (
-              <IncomingRequestsSection />
+            {activeTab === "supply-management" ? (
+              <SupplyRequestManagement />
             ) : activeTab === "vattu" ? (
               <VatTuSection onItemSelect={(item) => {
                 setVatTuSelectedItem(item);
                 setVatTuSheetOpen(true);
               }} />
-            ) : activeTab === "shipments" ? (
-                <div className="space-y-4">
-                  {allSupplyRequestsSorted.length === 0 ? (
-                    <Card className="border-border/60">
-                      <CardContent className="p-4 text-sm text-muted-foreground tracking-tighter">
-                        Chưa có yêu cầu nào.
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Card className="border-border/60">
-                      <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                          <table className="w-full min-w-230 text-sm tracking-tighter">
-                            <thead className="bg-muted/40">
-                              <tr className="border-b border-border/60 text-left">
-                                <th className="px-4 py-3 font-semibold">Mã yêu cầu</th>
-                                <th className="px-4 py-3 font-semibold">Kho nguồn</th>
-                                <th className="px-4 py-3 font-semibold">Trạng thái</th>
-                                <th className="px-4 py-3 font-semibold">Vật tư</th>
-                                <th className="px-4 py-3 font-semibold">Thời gian tạo</th>
-                                <th className="px-4 py-3 font-semibold w-44">Ghi chú</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {allSupplyRequestsSorted.map((request) => (
-                                <tr
-                                  key={request.id}
-                                  className="border-b border-border/50 align-top cursor-pointer hover:bg-muted/40 transition-colors"
-                                  onClick={() => {
-                                    setTrackerRequestId(request.id);
-                                    setTrackerOpen(true);
-                                  }}
-                                >
-                                  <td className="px-4 py-3 font-semibold">Đơn yêu cầu số {request.id}</td>
-                                  <td className="px-4 py-3">{request.sourceDepotName}</td>
-                                  <td className="px-4 py-3">
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {/* <Badge variant="warning">
-                                        {sourceStatusLabels[request.sourceStatus] ?? request.sourceStatus}
-                                      </Badge> */}
-                                      <Badge variant="outline" className={requestingStatusColors[request.requestingStatus] ?? "bg-gray-100 text-gray-700 border-gray-200"}>
-                                        {requestingStatusLabels[request.requestingStatus] ?? request.requestingStatus}
-                                      </Badge>
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <div className="space-y-1.5">
-                                      {request.items.map((item) => (
-                                        <div key={`${request.id}-${item.itemModelId}`} className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5">
-                                          <span>{item.itemModelName}</span>
-                                          <span className="font-semibold text-primary whitespace-nowrap">
-                                            {item.quantity.toLocaleString("vi-VN")} {item.unit}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </td>
-                                  <td className="px-4 py-3 whitespace-nowrap">
-                                    {new Date(request.createdAt).toLocaleString("vi-VN")}
-                                  </td>
-                                  <td className="px-4 py-3 text-muted-foreground w-44 max-w-44 whitespace-normal wrap-break-word leading-snug">
-                                    {request.note || "-"}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground tracking-tighter">
-                      Trang {requestsPageNumber}
-                      {allRequestsPagedData?.totalPages
-                        ? ` / ${allRequestsPagedData.totalPages}`
-                        : ""}
-                      {allRequestsPagedData?.totalCount !== undefined
-                        ? ` • ${allRequestsPagedData.totalCount} yêu cầu`
-                        : ""}
-                    </p>
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={!canPrevRequestsPage || isAllRequestsFetching}
-                        onClick={() =>
-                          setRequestsPageNumber((prev) => Math.max(1, prev - 1))
-                        }
-                      >
-                        Trước
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={!canNextRequestsPage || isAllRequestsFetching}
-                        onClick={() => setRequestsPageNumber((prev) => prev + 1)}
-                      >
-                        Sau
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => refetchAllRequests()}
-                        disabled={isAllRequestsFetching || isAllRequestsLoading}
-                      >
-                        <ArrowsClockwise
-                          size={15}
-                          className={isAllRequestsFetching ? "animate-spin" : ""}
-                        />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
             ) : activeTab === "requests" ? (
                 <SupplyRequestSection
                   onSelectionSidebarOpen={() => {
@@ -912,17 +729,6 @@ const InventoryDashboardPage = () => {
         item={vatTuSelectedItem}
         open={vatTuSheetOpen}
         onOpenChange={setVatTuSheetOpen}
-      />
-
-      {/* Supply Request Tracker Sheet */}
-      <SupplyRequestTracker
-        request={trackerRequest}
-        open={trackerOpen}
-        onOpenChange={setTrackerOpen}
-        onActionSuccess={() => {
-          refetchSupplyRequests();
-          refetchAllRequests();
-        }}
       />
 
     </div>
