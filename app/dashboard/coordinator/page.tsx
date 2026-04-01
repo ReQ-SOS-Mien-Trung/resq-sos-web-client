@@ -132,7 +132,8 @@ function toStatus(status: string): "PENDING" | "ASSIGNED" | "RESCUED" {
 /** Convert SOSRequestEntity from API to SOSRequest used by UI */
 function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
   const sd = entity.structuredData;
-  const si = entity.senderInfo;
+  const victimInfo = entity.victimInfo ?? entity.senderInfo ?? null;
+  const reporterInfo = entity.reporterInfo ?? null;
   const nm = entity.networkMetadata;
   const supplies = sd?.supplies ?? [];
   const supplyDetails = sd?.supply_details;
@@ -183,15 +184,24 @@ function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     foodDuration: supplyDetails?.food_duration ?? undefined,
     areBlanketsEnough: supplyDetails?.are_blankets_enough,
     blanketRequestCount: supplyDetails?.blanket_request_count,
-    senderPhone: si?.user_phone ?? undefined,
-    senderName: si?.user_name ?? undefined,
+    address: sd?.address ?? undefined,
+    victimPhone: victimInfo?.user_phone ?? undefined,
+    victimName: victimInfo?.user_name ?? undefined,
+    reporterPhone: reporterInfo?.user_phone ?? undefined,
+    reporterName:
+      reporterInfo?.user_name ??
+      entity.createdByCoordinatorName ??
+      undefined,
     createdByCoordinatorId: entity.createdByCoordinatorId ?? null,
     createdByCoordinatorName:
       entity.createdByCoordinatorName ??
       (entity as { createdByCoordinator?: { fullName?: string | null } })
         .createdByCoordinator?.fullName ??
       null,
-    isOnline: si?.is_online,
+    isSentOnBehalf:
+      entity.isSentOnBehalf ?? Boolean(entity.createdByCoordinatorId),
+    reporterIsOnline:
+      reporterInfo?.is_online ?? entity.senderInfo?.is_online ?? undefined,
     hopCount: nm?.hop_count,
     locationAccuracy: entity.locationAccuracy,
   };
