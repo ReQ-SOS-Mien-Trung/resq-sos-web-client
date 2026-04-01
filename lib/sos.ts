@@ -183,12 +183,30 @@ const SITUATION_LABELS: Record<string, string> = {
   ISOLATED: "Bị cô lập",
   STRANDED: "Mắc cạn",
   COLLAPSED: "Nhà sập",
+  LANDSLIDE: "Sạt lở",
+  ACCIDENT: "Tai nạn",
   DANGER_ZONE: "Khu vực nguy hiểm",
   CANNOT_MOVE: "Không thể di chuyển",
   FLOODING: "Nước dâng cao",
   FLOOD: "Nước dâng cao",
   OTHER: "Khác",
 };
+
+const SITUATION_CODE_ALIASES: Record<string, string> = {
+  COLLAPSE: "COLLAPSED",
+  BUILDING_COLLAPSE: "COLLAPSED",
+  BUILDING_COLLAPSED: "COLLAPSED",
+  MUDSLIDE: "LANDSLIDE",
+  SLIDE: "LANDSLIDE",
+  TRAFFIC_ACCIDENT: "ACCIDENT",
+};
+
+function normalizeSituationCode(value: string): string {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+}
 
 const SUPPLY_LABELS: Record<string, string> = {
   WATER: "Nước uống",
@@ -467,35 +485,45 @@ export function getPersonDisplayName(person: SharedPerson): string {
 }
 
 export function getSituationLabel(value?: string | null): string {
-  return value ? SITUATION_LABELS[value] ?? value : "Chưa rõ";
+  if (!value) return "Chưa rõ";
+
+  const normalized = normalizeSituationCode(value);
+  const mappedCode = SITUATION_CODE_ALIASES[normalized] ?? normalized;
+  const label = SITUATION_LABELS[mappedCode];
+  if (label) return label;
+
+  // Avoid showing raw backend enum-like English tags in UI badges.
+  if (/^[A-Z0-9_]+$/.test(normalized)) return SITUATION_LABELS.OTHER;
+
+  return value;
 }
 
 export function getSupplyLabel(value?: string | null): string {
-  return value ? SUPPLY_LABELS[value] ?? value : "Chưa rõ";
+  return value ? (SUPPLY_LABELS[value] ?? value) : "Chưa rõ";
 }
 
 export function getMedicalIssueLabel(value?: string | null): string {
-  return value ? MEDICAL_ISSUE_LABELS[value] ?? value : "Chưa rõ";
+  return value ? (MEDICAL_ISSUE_LABELS[value] ?? value) : "Chưa rõ";
 }
 
 export function getWaterDurationLabel(value?: string | null): string {
-  return value ? WATER_DURATION_LABELS[value] ?? value : "Chưa rõ";
+  return value ? (WATER_DURATION_LABELS[value] ?? value) : "Chưa rõ";
 }
 
 export function getWaterRemainingLabel(value?: string | null): string {
-  return value ? WATER_REMAINING_LABELS[value] ?? value : "Chưa rõ";
+  return value ? (WATER_REMAINING_LABELS[value] ?? value) : "Chưa rõ";
 }
 
 export function getFoodDurationLabel(value?: string | null): string {
-  return value ? FOOD_DURATION_LABELS[value] ?? value : "Chưa rõ";
+  return value ? (FOOD_DURATION_LABELS[value] ?? value) : "Chưa rõ";
 }
 
 export function getMedicalSupportNeedLabel(value?: string | null): string {
-  return value ? MEDICAL_SUPPORT_LABELS[value] ?? value : "Chưa rõ";
+  return value ? (MEDICAL_SUPPORT_LABELS[value] ?? value) : "Chưa rõ";
 }
 
 export function getClothingGenderLabel(value?: string | null): string {
-  return value ? CLOTHING_GENDER_LABELS[value] ?? value : "Chưa rõ";
+  return value ? (CLOTHING_GENDER_LABELS[value] ?? value) : "Chưa rõ";
 }
 
 export function groupedMedicalIssuesForPersonType(
@@ -592,7 +620,7 @@ export function buildStructuredDataFromForm(args: {
             : null,
         blanket_request_count:
           relief.areBlanketsEnough === false
-            ? relief.blanketRequestCount ?? null
+            ? (relief.blanketRequestCount ?? null)
             : null,
         clothing_persons: clothingPersons.length > 0 ? clothingPersons : null,
       };
@@ -609,13 +637,14 @@ export function buildStructuredDataFromForm(args: {
               : null,
           has_injured: injuredPersons.length > 0,
           medical_issues: medicalIssues,
-          other_medical_description: Array.from(
-            new Set(
-              Object.values(rescue.medicalInfoByPerson)
-                .map((info) => info.otherDescription.trim())
-                .filter(Boolean),
-            ),
-          ).join("; ") || null,
+          other_medical_description:
+            Array.from(
+              new Set(
+                Object.values(rescue.medicalInfoByPerson)
+                  .map((info) => info.otherDescription.trim())
+                  .filter(Boolean),
+              ),
+            ).join("; ") || null,
           others_are_stable:
             injuredPersons.length > 0 &&
             injuredPersons.length < peopleCountTotal(peopleCount)
@@ -629,7 +658,8 @@ export function buildStructuredDataFromForm(args: {
     ...(includeRelief
       ? {
           supplies: relief.supplies,
-          other_supply_description: relief.otherSupplyDescription.trim() || null,
+          other_supply_description:
+            relief.otherSupplyDescription.trim() || null,
           supply_details: supplyDetails ?? null,
         }
       : {}),
@@ -796,13 +826,9 @@ export function deriveSOSNeeds(
     supplies.includes("TRANSPORTATION") ||
     ((normalizedType === "RESCUE" || normalizedType === "BOTH") &&
       (structuredData?.can_move === false ||
-        [
-          "FLOODING",
-          "TRAPPED",
-          "ISOLATED",
-          "STRANDED",
-          "DANGER_ZONE",
-        ].includes(normalizedSituation)));
+        ["FLOODING", "TRAPPED", "ISOLATED", "STRANDED", "DANGER_ZONE"].includes(
+          normalizedSituation,
+        )));
 
   return { medical, food, boat };
 }

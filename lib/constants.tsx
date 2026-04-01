@@ -360,6 +360,35 @@ export const navigationItems = [
     icon: IdentificationCardIcon,
     label: "Quản lý điểm tập kết",
     href: "/dashboard/admin/assembly-points",
+    label: "Quản lý hồ sơ cứu hộ viên",
+    href: "/dashboard/admin/rescuer-verification",
+  },
+  {
+    icon: FadersIcon,
+    label: "Điều chỉnh tham số hệ thống",
+    href: "/dashboard/admin/config",
+  },
+  {
+    icon: CloudSun,
+    label: "Bài đăng thời tiết",
+    href: "/dashboard/admin/weather-posts",
+  },
+  {
+    icon: Drop,
+    label: "Thời tiết & Lũ lụt",
+    href: "/dashboard/admin/weather-flood",
+  },
+  { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
+
+  {
+    icon: Robot,
+    label: "Cấu hình AI Prompt",
+    href: "/dashboard/admin/ai-prompt",
+  },
+  {
+    icon: ChatCircle,
+    label: "Cấu hình phòng chat",
+    href: "/dashboard/admin/chat-config",
   },
   { icon: ChartBar, label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
   { icon: Folder, label: "Quản lý quỹ chiến dịch", href: "/dashboard/admin/campaigns" },

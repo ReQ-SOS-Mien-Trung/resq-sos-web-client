@@ -51,6 +51,7 @@ import {
 import { DepotInfo } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import { useThemeStore } from "@/stores/theme.store";
 import { useUserMe } from "@/services/user/hooks";
 import { useDepots } from "@/services/depot/hooks";
 import { DepotEntity } from "@/services/depot/type";
@@ -102,10 +103,11 @@ export default function ExportReportPage() {
 
   // ── Layout state ──
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState("inventory");
   const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
+  const isDarkMode = useThemeStore((state) => state.isDarkMode);
+  const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
 
   // ── Auth ──
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -166,11 +168,6 @@ export default function ExportReportPage() {
         toast.error("Xuất báo cáo thất bại. Vui lòng thử lại.");
       },
     });
-  };
-
-  const toggleDarkMode = () => {
-    setIsDarkMode((prev) => !prev);
-    document.documentElement.classList.toggle("dark");
   };
 
   // ── Loading skeleton ──

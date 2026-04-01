@@ -7,6 +7,8 @@ import {
 import {
   getAssemblyPoints,
   getAssemblyPointById,
+  getAssemblyPointEvents,
+  getAssemblyPointCheckedInRescuers,
   getAssemblyPointStatuses,
   getAssemblyPointMetadata,
   createAssemblyPoint,
@@ -20,7 +22,6 @@ import {
 import {
   GetAssemblyPointsResponse,
   GetAssemblyPointsParams,
-  AssemblyPointEntity,
   AssemblyPointDetailEntity,
   CreateAssemblyPointRequest,
   CreateAssemblyPointResponse,
@@ -35,8 +36,13 @@ import {
   ScheduleAssemblyPointGatheringResponse,
   ScheduleAssemblyPointGatheringErrorResponse,
   StartAssemblyPointGatheringRequest,
+  GetAssemblyPointEventsParams,
+  GetAssemblyPointEventsResponse,
+  GetAssemblyPointCheckedInRescuersParams,
+  GetAssemblyPointCheckedInRescuersResponse,
 } from "./type";
 import { AxiosError } from "axios";
+import { RESCUERS_QUERY_KEY } from "../rescuers/hooks";
 
 export const ASSEMBLY_POINTS_QUERY_KEY = ["assembly-points"] as const;
 export const ASSEMBLY_POINT_STATUSES_QUERY_KEY = [
@@ -44,6 +50,12 @@ export const ASSEMBLY_POINT_STATUSES_QUERY_KEY = [
 ] as const;
 export const ASSEMBLY_POINT_METADATA_QUERY_KEY = [
   "assembly-point-metadata",
+] as const;
+export const ASSEMBLY_POINT_EVENTS_QUERY_KEY = [
+  "assembly-point-events",
+] as const;
+export const ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY = [
+  "assembly-point-checked-in-rescuers",
 ] as const;
 
 export interface UseAssemblyPointsOptions {
@@ -60,6 +72,16 @@ export interface UseAssemblyPointStatusesOptions {
 }
 
 export interface UseAssemblyPointMetadataOptions {
+  enabled?: boolean;
+}
+
+export interface UseAssemblyPointEventsOptions {
+  params?: GetAssemblyPointEventsParams;
+  enabled?: boolean;
+}
+
+export interface UseAssemblyPointCheckedInRescuersOptions {
+  params?: GetAssemblyPointCheckedInRescuersParams;
   enabled?: boolean;
 }
 
@@ -87,7 +109,7 @@ export function useInfiniteAssemblyPoints(options?: UseAssemblyPointsOptions) {
         pageSize: options?.params?.pageSize || 10,
       }),
     initialPageParam: 1,
-    getNextPageParam: (lastPage, allPages) => {
+    getNextPageParam: (lastPage) => {
       // Assuming paginated response shape typically contains `currentPage` and `totalPages` directly
       // Adjust according to actual response shape
       const { currentPage, totalPages } = lastPage as any;
@@ -111,6 +133,38 @@ export function useAssemblyPointById(
     queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, id],
     queryFn: () => getAssemblyPointById(id),
     enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Hook to fetch events by assembly point ID with pagination
+ */
+export function useAssemblyPointEvents(
+  id: number,
+  options?: UseAssemblyPointEventsOptions,
+) {
+  return useQuery<GetAssemblyPointEventsResponse>({
+    queryKey: [...ASSEMBLY_POINT_EVENTS_QUERY_KEY, id, options?.params],
+    queryFn: () => getAssemblyPointEvents(id, options?.params),
+    enabled: (options?.enabled ?? true) && Number.isFinite(id),
+  });
+}
+
+/**
+ * Hook to fetch checked-in rescuers by assembly event ID with pagination
+ */
+export function useAssemblyPointCheckedInRescuers(
+  eventId: number,
+  options?: UseAssemblyPointCheckedInRescuersOptions,
+) {
+  return useQuery<GetAssemblyPointCheckedInRescuersResponse>({
+    queryKey: [
+      ...ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY,
+      eventId,
+      options?.params,
+    ],
+    queryFn: () => getAssemblyPointCheckedInRescuers(eventId, options?.params),
+    enabled: (options?.enabled ?? true) && Number.isFinite(eventId),
   });
 }
 
@@ -231,6 +285,7 @@ export function useUpdateRescuerAssemblyPointAssignment() {
     onSuccess: () => {
       // Invalidate assembly points query to refetch the list
       queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: RESCUERS_QUERY_KEY });
     },
   });
 }
@@ -252,6 +307,9 @@ export function useScheduleAssemblyPointGathering() {
       queryClient.invalidateQueries({
         queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, variables.id],
       });
+      queryClient.invalidateQueries({
+        queryKey: [...ASSEMBLY_POINT_EVENTS_QUERY_KEY, variables.id],
+      });
     },
   });
 }
@@ -269,6 +327,12 @@ export function useStartAssemblyPointGathering() {
       if (variables.assemblyPointId) {
         queryClient.invalidateQueries({
           queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, variables.assemblyPointId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: [
+            ...ASSEMBLY_POINT_EVENTS_QUERY_KEY,
+            variables.assemblyPointId,
+          ],
         });
       }
     },

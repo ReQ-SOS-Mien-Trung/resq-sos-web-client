@@ -1,3 +1,5 @@
+import type { RescuerType } from "../rescuers/type";
+
 // Assembly Point Status
 export type AssemblyPointStatus =
   | "Created"
@@ -66,7 +68,7 @@ export interface AssemblyPointTeam {
 }
 
 // Detail Response for GET /personnel/assembly-point/{id}
-export interface AssemblyPointDetailEntity extends AssemblyPointEntity {}
+export type AssemblyPointDetailEntity = AssemblyPointEntity;
 
 // Paginated Response for Assembly Points
 export interface GetAssemblyPointsResponse {
@@ -166,4 +168,75 @@ export interface ScheduleAssemblyPointGatheringErrorResponse {
 export interface StartAssemblyPointGatheringRequest {
   eventId: number;
   assemblyPointId?: number;
+}
+
+// Assembly point event status
+export type AssemblyPointEventStatus = string;
+
+// Assembly point event entity
+export interface AssemblyPointEventEntity {
+  eventId: number;
+  assemblyPointId: number;
+  assemblyDate: string;
+  status: AssemblyPointEventStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string | null;
+  participantCount: number;
+  checkedInCount: number;
+}
+
+// Query params for fetching assembly point events
+export interface GetAssemblyPointEventsParams {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+// Paginated response for assembly point events
+export interface GetAssemblyPointEventsResponse {
+  items: AssemblyPointEventEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+// Checked-in rescuer entity for assembly point event
+export interface AssemblyPointCheckedInRescuerEntity {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  avatarUrl: string | null;
+  rescuerType: RescuerType;
+  checkedInAt: string;
+  isInTeam: boolean;
+  isEarly: boolean;
+  isLate: boolean;
+  topAbilities: string[];
+}
+
+// Query params for fetching checked-in rescuers by event
+export interface GetAssemblyPointCheckedInRescuersParams {
+  pageNumber?: number;
+  pageSize?: number;
+  rescuerType?: Exclude<RescuerType, null>;
+  abilitySubgroupCode?: string;
+  abilityCategoryCode?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
+
+// Paginated response for checked-in rescuers by event
+export interface GetAssemblyPointCheckedInRescuersResponse {
+  items: AssemblyPointCheckedInRescuerEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 }

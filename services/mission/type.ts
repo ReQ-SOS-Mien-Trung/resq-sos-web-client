@@ -3,7 +3,7 @@ import type {
   ClusterSuggestedResource,
 } from "@/services/sos_cluster/type";
 
-export type MissionType = "RESCUE" | "RESCUER";
+export type MissionType = "RESCUE" | "RESCUER" | "RELIEF" | "MIXED" | string;
 
 export type MissionStatus =
   | "Planned"
@@ -69,16 +69,21 @@ export interface MissionActivity {
   depotId: number | null;
   depotName: string | null;
   depotAddress: string | null;
+  assemblyPointId?: number | null;
+  assemblyPointName?: string | null;
+  assemblyPointLatitude?: number | null;
+  assemblyPointLongitude?: number | null;
   missionTeamId: number | null;
-  target: string;
-  items: unknown | null;
+  target?: string | null;
+  items?: unknown | null;
   suppliesToCollect: MissionSupplyItem[] | null;
   targetLatitude: number;
   targetLongitude: number;
   status: ActivityStatus;
   assignedAt: string;
   completedAt: string | null;
-  lastDecisionBy: string | null;
+  completedBy?: string | null;
+  lastDecisionBy?: string | null;
 }
 
 export interface MissionEntity {
@@ -152,10 +157,14 @@ export interface CreateMissionActivityRequest {
   description: string;
   priority: string;
   estimatedTime: number;
-  sosRequestId: number;
-  depotId: number;
-  depotName: string;
-  depotAddress: string;
+  sosRequestId: number | null;
+  depotId: number | null;
+  depotName: string | null;
+  depotAddress: string | null;
+  assemblyPointId?: number | null;
+  assemblyPointName?: string | null;
+  assemblyPointLatitude?: number | null;
+  assemblyPointLongitude?: number | null;
   suppliesToCollect: CreateMissionSupplyRequest[];
   target: string;
   targetLatitude: number;
@@ -164,8 +173,8 @@ export interface CreateMissionActivityRequest {
 }
 
 export interface CreateMissionSupplyRequest {
-  id: number;
-  name: string;
+  id: number | null;
+  name: string | null;
   quantity: number;
   unit: string;
 }
