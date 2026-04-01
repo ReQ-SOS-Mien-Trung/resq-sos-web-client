@@ -68,6 +68,7 @@ import {
 } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import { useThemeStore } from "@/stores/theme.store";
 import { useUserMe } from "@/services/user/hooks";
 import { useDepots } from "@/services/depot/hooks";
 import { DepotEntity } from "@/services/depot/type";
@@ -223,11 +224,12 @@ const InventoryDashboardPage = () => {
     null,
   );
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [itemSheetOpen, setItemSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("inventory");
   const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
+  const isDarkMode = useThemeStore((state) => state.isDarkMode);
+  const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
   const mainRef = useRef<HTMLElement>(null);
   const panelWidthRef = useRef(480);
   const [requestsPageNumber, setRequestsPageNumber] = useState(1);
@@ -419,11 +421,6 @@ const InventoryDashboardPage = () => {
   const handleRefresh = useCallback(() => {
     window.location.reload();
   }, []);
-
-  const toggleDarkMode = () => {
-    setIsDarkMode((prev) => !prev);
-    document.documentElement.classList.toggle("dark");
-  };
 
   // ── Loading state ──
   if (isDepotsLoading || isCategoriesLoading || isSupplyRequestsLoading) {

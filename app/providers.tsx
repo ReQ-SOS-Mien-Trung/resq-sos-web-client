@@ -2,11 +2,26 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GoogleOAuthProvider } from "@react-oauth/google";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
+import { useThemeStore } from "@/stores/theme.store";
 
 function TokenRefreshProvider({ children }: { children: React.ReactNode }) {
   useTokenRefresh();
+  return <>{children}</>;
+}
+
+function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const isDarkMode = useThemeStore((state) => state.isDarkMode);
+  const hasHydrated = useThemeStore((state) => state.hasHydrated);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    document.documentElement.style.colorScheme = isDarkMode ? "dark" : "light";
+  }, [hasHydrated, isDarkMode]);
+
   return <>{children}</>;
 }
 
@@ -28,7 +43,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <QueryClientProvider client={queryClient}>
-        <TokenRefreshProvider>{children}</TokenRefreshProvider>
+        <ThemeProvider>
+          <TokenRefreshProvider>{children}</TokenRefreshProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </GoogleOAuthProvider>
   );

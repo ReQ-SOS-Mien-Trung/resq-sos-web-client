@@ -291,10 +291,7 @@ export default function CoordinatorRescuerManagementPage() {
         ? null
         : Number(bulkSelectedAssemblyPointId);
 
-    if (
-      nextAssemblyPointId !== null &&
-      Number.isNaN(nextAssemblyPointId)
-    ) {
+    if (nextAssemblyPointId !== null && Number.isNaN(nextAssemblyPointId)) {
       toast.error("Điểm tập kết không hợp lệ.");
       return;
     }
@@ -354,7 +351,7 @@ export default function CoordinatorRescuerManagementPage() {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-[#FF5722]">
+            <p className="text-sm uppercase tracking-[0.14em] text-[#FF5722]">
               Coordinator Dashboard
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
@@ -378,7 +375,7 @@ export default function CoordinatorRescuerManagementPage() {
           <Card className="border-black/10 shadow-none">
             <CardContent className="flex items-center justify-between p-3">
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                <p className="text-sm uppercase tracking-wide text-muted-foreground">
                   Tổng rescuer đã tải
                 </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight">
@@ -392,7 +389,7 @@ export default function CoordinatorRescuerManagementPage() {
           <Card className="border-black/10 shadow-none">
             <CardContent className="flex items-center justify-between p-3">
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                <p className="text-sm uppercase tracking-wide text-muted-foreground">
                   Đã có điểm tập kết
                 </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight">
@@ -406,7 +403,7 @@ export default function CoordinatorRescuerManagementPage() {
           <Card className="border-black/10 shadow-none">
             <CardContent className="flex items-center justify-between p-3">
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                <p className="text-sm uppercase tracking-wide text-muted-foreground">
                   Chưa phân công
                 </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight">
@@ -507,13 +504,15 @@ export default function CoordinatorRescuerManagementPage() {
           </CardHeader>
 
           <CardContent className="space-y-3">
-            {!isRescuersLoading && !isRescuersError && filteredRescuers.length > 0 ? (
+            {!isRescuersLoading &&
+            !isRescuersError &&
+            filteredRescuers.length > 0 ? (
               <div className="rounded-lg border border-[#FF5722]/15 bg-[#FF5722]/[0.04] p-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex flex-wrap items-center gap-3">
                     <label
                       htmlFor="select-all-visible-rescuers"
-                      className="flex items-center gap-2 text-sm font-medium tracking-tight"
+                      className="flex items-center gap-2 text-base font-medium tracking-tight"
                     >
                       <Checkbox
                         id="select-all-visible-rescuers"
@@ -558,7 +557,9 @@ export default function CoordinatorRescuerManagementPage() {
                     <Select
                       value={bulkSelectedAssemblyPointId}
                       onValueChange={setBulkSelectedAssemblyPointId}
-                      disabled={isAssignmentBusy || selectedVisibleRescuerCount === 0}
+                      disabled={
+                        isAssignmentBusy || selectedVisibleRescuerCount === 0
+                      }
                     >
                       <SelectTrigger className="h-9 w-full sm:flex-1">
                         <SelectValue
@@ -597,7 +598,7 @@ export default function CoordinatorRescuerManagementPage() {
                   </div>
                 </div>
 
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Coordinator có thể tick nhiều rescuer rồi gán chung vào cùng
                   một assembly point ngay trên trang hiện tại.
                 </p>
@@ -649,7 +650,8 @@ export default function CoordinatorRescuerManagementPage() {
                       key={rescuer.id}
                       className={cn(
                         "rounded-lg border border-border bg-card p-2.5 transition-colors md:p-3",
-                        isRowSelected && "border-[#FF5722]/35 bg-[#FF5722]/[0.03]",
+                        isRowSelected &&
+                          "border-[#FF5722]/35 bg-[#FF5722]/[0.03]",
                       )}
                     >
                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -684,7 +686,7 @@ export default function CoordinatorRescuerManagementPage() {
                               {fullName}
                             </p>
 
-                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                               {rescuer.phone ? (
                                 <span>{rescuer.phone}</span>
                               ) : null}
@@ -697,7 +699,7 @@ export default function CoordinatorRescuerManagementPage() {
                               <Badge
                                 variant="outline"
                                 className={cn(
-                                  "border px-2 py-0.5 text-[10px]",
+                                  "border px-2 py-0.5 text-xs",
                                   rescuer.hasAssemblyPoint
                                     ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                                     : "border-amber-300 bg-amber-50 text-amber-700",
@@ -711,7 +713,7 @@ export default function CoordinatorRescuerManagementPage() {
                               <Badge
                                 variant="outline"
                                 className={cn(
-                                  "border px-2 py-0.5 text-[10px]",
+                                  "border px-2 py-0.5 text-xs",
                                   rescuer.hasTeam
                                     ? "border-indigo-300 bg-indigo-50 text-indigo-700"
                                     : "border-slate-300 bg-slate-50 text-slate-700",
@@ -726,7 +728,7 @@ export default function CoordinatorRescuerManagementPage() {
                                 <Badge
                                   variant="outline"
                                   className={cn(
-                                    "border px-2 py-0.5 text-[10px] font-semibold",
+                                    "border px-2 py-0.5 text-xs font-semibold",
                                     rescuer.rescuerType === "Core"
                                       ? "border-sky-300 bg-sky-50 text-sky-700"
                                       : "border-[#FF5722]/40 bg-[#FF5722]/10 text-[#C2410C]",
@@ -812,12 +814,12 @@ export default function CoordinatorRescuerManagementPage() {
                 {totalPages > 1 ? (
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         Trang {currentPage}/{Math.max(totalPages, 1)} • Tổng{" "}
                         {totalCount} rescuer
                       </p>
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-sm text-muted-foreground">
                           Hiển thị
                         </span>
                         <Select
@@ -835,7 +837,7 @@ export default function CoordinatorRescuerManagementPage() {
                             ))}
                           </SelectContent>
                         </Select>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-sm text-muted-foreground">
                           / trang
                         </span>
                       </div>
@@ -861,7 +863,7 @@ export default function CoordinatorRescuerManagementPage() {
                           return (
                             <span
                               key={item}
-                              className="px-2 text-xs text-muted-foreground"
+                              className="px-2 text-sm text-muted-foreground"
                             >
                               ...
                             </span>
@@ -908,7 +910,7 @@ export default function CoordinatorRescuerManagementPage() {
               </>
             )}
 
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Gợi ý: ô tìm kiếm đang lọc trực tiếp ở frontend theo
               firstName/lastName/email trên dữ liệu đã tải của trang hiện tại;
               các filter hasAssemblyPoint/hasTeam/rescuerType vẫn truy vấn

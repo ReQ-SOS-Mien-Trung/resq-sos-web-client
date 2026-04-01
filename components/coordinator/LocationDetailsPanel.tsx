@@ -791,9 +791,7 @@ function AssemblyPointDetails({
         id: assemblyPoint.id,
         assemblyDate: assemblyDate.toISOString(),
       });
-      toast.success(
-        `Đã lên lịch tập trung thành công (Event #${result.eventId}).`,
-      );
+      toast.success(`Đã lên lịch tập trung thành công.`);
       setAssemblyDateInput(null);
     } catch (error) {
       const backendMessage = extractBackendErrorMessage(error);

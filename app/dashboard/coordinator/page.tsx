@@ -78,6 +78,7 @@ import AiStreamPanel from "@/components/coordinator/AiStreamPanel";
 
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import { useThemeStore } from "@/stores/theme.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { deriveSOSNeeds } from "@/lib/sos";
@@ -346,10 +347,11 @@ const CoordinatorDashboardContent = () => {
   const [flyToLocation, setFlyToLocation] = useState<Location | null>(null);
   const [flyToZoom, setFlyToZoom] = useState<number | undefined>(undefined);
   const [isConnected] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
+  const isDarkMode = useThemeStore((state) => state.isDarkMode);
+  const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
 
   // ─── Panel State ───
   const [sosDetailOpen, setSOSDetailOpen] = useState(false);
@@ -834,13 +836,6 @@ const CoordinatorDashboardContent = () => {
     setRescuePlanOpen(false);
     aiStream.startStream(activeClusterId);
   }, [activeClusterId, aiStream]);
-
-  const toggleDarkMode = useCallback(() => {
-    setIsDarkMode((prev) => {
-      document.documentElement.classList.toggle("dark");
-      return !prev;
-    });
-  }, []);
 
   // ─── Derived data for panels ───
 

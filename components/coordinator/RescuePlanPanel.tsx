@@ -48,6 +48,7 @@ import {
   useMissions,
   useActivityRoute,
 } from "@/services/mission/hooks";
+import { useDepotInventoryRealtime } from "@/hooks/useDepotInventoryRealtime";
 import { getActivityRoute } from "@/services/mission/api";
 import type {
   MissionActivity,
@@ -87,6 +88,8 @@ import {
   CircleNotch,
   CaretDown,
   CaretUp,
+  CaretLeft,
+  CaretRight,
   Storefront,
   Info,
   PencilSimpleLine,
@@ -457,15 +460,19 @@ const DepotInventoryCard = ({
   depotName,
   depotAddress,
   isDraggable,
+  draftedQuantitiesByItemId,
 }: {
   depotId: number;
   depotName: string;
   depotAddress: string | null;
   isDraggable: boolean;
+  draftedQuantitiesByItemId?: Record<number, number>;
 }) => {
+  const [page, setPage] = useState(1);
   const { data, isLoading } = useDepotInventory({
     depotId,
-    pageSize: 50,
+    pageNumber: page,
+    pageSize: 6,
   });
 
   return (
@@ -480,6 +487,14 @@ const DepotInventoryCard = ({
             </p>
           )}
         </div>
+        {data ? (
+          <Badge
+            variant="secondary"
+            className="h-5 shrink-0 rounded-full px-2 text-[9px] font-semibold"
+          >
+            {data.totalCount} vật tư
+          </Badge>
+        ) : null}
       </div>
       <div className="p-2 space-y-1">
         {isLoading ? (
@@ -500,6 +515,12 @@ const DepotInventoryCard = ({
                   item.itemType === "Reusable"
                     ? item.availableUnit
                     : item.availableQuantity;
+                const draftedQuantity =
+                  draftedQuantitiesByItemId?.[item.itemModelId] ?? 0;
+                const previewAvailableQuantity = Math.max(
+                  availableQuantity - draftedQuantity,
+                  0,
+                );
                 const itemId = item.itemModelId;
                 const itemName = item.itemModelName;
 
@@ -530,6 +551,9 @@ const DepotInventoryCard = ({
                                 availableQuantity,
                                 categoryName: item.categoryName,
                                 unit: rawUnit || null,
+                                sourceDepotId: depotId,
+                                sourceDepotName: depotName,
+                                sourceDepotAddress: depotAddress,
                               }),
                             );
                             e.dataTransfer.effectAllowed = "copy";
@@ -554,9 +578,13 @@ const DepotInventoryCard = ({
                     </div>
                     <Badge
                       variant="outline"
-                      className="text-[9px] h-4 px-1 shrink-0 font-bold"
+                      className={cn(
+                        "text-[9px] h-4 px-1 shrink-0 font-bold",
+                        draftedQuantity > 0 &&
+                          "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300",
+                      )}
                     >
-                      {availableQuantity}
+                      {previewAvailableQuantity}
                     </Badge>
                   </div>
                 );
@@ -567,6 +595,43 @@ const DepotInventoryCard = ({
             Kho trống
           </p>
         )}
+
+        {data && data.totalPages > 1 ? (
+          <div className="mt-2 flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-2 py-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 gap-1 px-2 text-[10px] font-semibold"
+              disabled={!data.hasPreviousPage}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            >
+              <CaretLeft className="h-3 w-3" />
+              Trước
+            </Button>
+
+            <div className="text-center leading-none">
+              <p className="text-[10px] font-semibold text-foreground">
+                Trang {data.pageNumber}/{data.totalPages}
+              </p>
+              <p className="mt-0.5 text-[9px] text-muted-foreground">
+                6 vật tư mỗi trang
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 gap-1 px-2 text-[10px] font-semibold"
+              disabled={!data.hasNextPage}
+              onClick={() => setPage((prev) => prev + 1)}
+            >
+              Sau
+              <CaretRight className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -2240,6 +2305,7 @@ const RescuePlanPanel = ({
   const [editPriorityScore, setEditPriorityScore] = useState(5);
   const [editStartTime, setEditStartTime] = useState("");
   const [editExpectedEndTime, setEditExpectedEndTime] = useState("");
+  const [editingMissionId, setEditingMissionId] = useState<number | null>(null);
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(
@@ -2253,6 +2319,7 @@ const RescuePlanPanel = ({
   const exitEditMode = useCallback(() => {
     setIsEditMode(false);
     setEditActivities([]);
+    setEditingMissionId(null);
   }, []);
 
   const updateEditActivity = useCallback(
@@ -2337,6 +2404,9 @@ const RescuePlanPanel = ({
         itemName: string;
         availableQuantity: number;
         unit?: string | null;
+        sourceDepotId?: number | null;
+        sourceDepotName?: string | null;
+        sourceDepotAddress?: string | null;
       },
     ) => {
       setEditActivities((prev) =>
@@ -2351,6 +2421,25 @@ const RescuePlanPanel = ({
           if (resolvedUnit) {
             supplyUnitByItemIdRef.current[item.itemId] = resolvedUnit;
           }
+
+          const nextDepotId =
+            a.activityType === "COLLECT_SUPPLIES" &&
+            typeof item.sourceDepotId === "number" &&
+            item.sourceDepotId > 0
+              ? item.sourceDepotId
+              : a.depotId;
+          const nextDepotName =
+            a.activityType === "COLLECT_SUPPLIES" &&
+            typeof item.sourceDepotName === "string" &&
+            item.sourceDepotName.trim()
+              ? item.sourceDepotName.trim()
+              : a.depotName;
+          const nextDepotAddress =
+            a.activityType === "COLLECT_SUPPLIES" &&
+            typeof item.sourceDepotAddress === "string" &&
+            item.sourceDepotAddress.trim()
+              ? item.sourceDepotAddress.trim()
+              : a.depotAddress;
 
           const existing = a.suppliesToCollect ?? [];
           const foundIdx = existing.findIndex((s) => s.itemId === item.itemId);
@@ -2368,10 +2457,19 @@ const RescuePlanPanel = ({
               quantity: next[foundIdx].quantity + 1,
               unit: shouldUpgradeUnit ? resolvedUnit : next[foundIdx].unit,
             };
-            return { ...a, suppliesToCollect: next };
+            return {
+              ...a,
+              depotId: nextDepotId,
+              depotName: nextDepotName,
+              depotAddress: nextDepotAddress,
+              suppliesToCollect: next,
+            };
           }
           return {
             ...a,
+            depotId: nextDepotId,
+            depotName: nextDepotName,
+            depotAddress: nextDepotAddress,
             suppliesToCollect: [
               ...existing,
               {
@@ -2738,6 +2836,7 @@ const RescuePlanPanel = ({
     setEditStartTime(now.toISOString().slice(0, 16));
     const end = new Date(now.getTime() + 4 * 60 * 60 * 1000);
     setEditExpectedEndTime(end.toISOString().slice(0, 16));
+    setEditingMissionId(null);
     setIsEditMode(true);
   }, [activeSuggestion]);
 
@@ -2771,9 +2870,9 @@ const RescuePlanPanel = ({
               : inferredSosRequestId
                 ? Number(inferredSosRequestId)
                 : null,
-            depotId: null,
-            depotName: isDepot ? a.target || null : null,
-            depotAddress: null,
+            depotId: isDepot ? a.depotId ?? null : null,
+            depotName: isDepot ? a.depotName ?? a.target ?? null : null,
+            depotAddress: isDepot ? a.depotAddress ?? null : null,
             assemblyPointId: a.assemblyPointId ?? null,
             assemblyPointName: a.assemblyPointName ?? null,
             assemblyPointLatitude: a.assemblyPointLatitude ?? null,
@@ -2788,6 +2887,7 @@ const RescuePlanPanel = ({
       setEditExpectedEndTime(
         new Date(mission.expectedEndTime).toISOString().slice(0, 16),
       );
+      setEditingMissionId(mission.id);
       setActiveTab("plan");
       setIsEditMode(true);
     },
@@ -2819,6 +2919,35 @@ const RescuePlanPanel = ({
   }, [isEditMode, editActivities, activeSuggestion]);
 
   const showSidebar = hasSidebar || sidebarDepots.length > 0;
+
+  const draftedDepotItemQuantities = useMemo(() => {
+    const next: Record<number, Record<number, number>> = {};
+
+    for (const activity of editActivities) {
+      if (activity.activityType !== "COLLECT_SUPPLIES") continue;
+      if (typeof activity.depotId !== "number" || activity.depotId <= 0) {
+        continue;
+      }
+
+      const depotDrafts = (next[activity.depotId] ??= {});
+      for (const supply of activity.suppliesToCollect ?? []) {
+        if (typeof supply.itemId !== "number" || supply.itemId <= 0) {
+          continue;
+        }
+
+        depotDrafts[supply.itemId] =
+          (depotDrafts[supply.itemId] ?? 0) + Math.max(0, supply.quantity);
+      }
+    }
+
+    return next;
+  }, [editActivities]);
+
+  useDepotInventoryRealtime({
+    depotIds: sidebarDepots.map((depot) => depot.depotId),
+    missionId: editingMissionId,
+    enabled: open && isEditMode && sidebarDepots.length > 0,
+  });
 
   const sortedMissions = useMemo(() => {
     const source = (missionsData?.missions ?? []).slice();
@@ -5322,6 +5451,9 @@ const RescuePlanPanel = ({
                               depotName={depot.depotName}
                               depotAddress={depot.depotAddress}
                               isDraggable={isEditMode}
+                              draftedQuantitiesByItemId={
+                                draftedDepotItemQuantities[depot.depotId]
+                              }
                             />
                           ))}
                         </div>
