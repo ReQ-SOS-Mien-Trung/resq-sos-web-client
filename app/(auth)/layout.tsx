@@ -9,7 +9,7 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         {/* Background Image - Full Screen */}
         <Image
-          src="/images/authenbackground.jpg"
+          src="/images/IMG_1301.JPG"
           alt="ResQ SOS Branding"
           fill
           className="object-cover"
@@ -37,7 +37,7 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
           </Link>
 
           {/* Text Content - Overlay on bottom with backdrop */}
-          <div className="space-y-4 max-w-lg animate-in fade-in-0 slide-in-from-left duration-700 p-6 rounded-2xl bg-black/40 backdrop-blur-sm">
+          {/* <div className="space-y-4 max-w-lg animate-in fade-in-0 slide-in-from-left duration-700 p-6 rounded-2xl bg-black/40 backdrop-blur-sm">
             <h2 className="text-4xl font-bold leading-tight font-sans">
               Hệ thống tiếp nhận tin báo SOS và điều phối cứu hộ khẩn cấp
             </h2>
@@ -45,7 +45,7 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
               Hỗ trợ kịp thời cho người dân khu vực Miền Trung trong các tình
               huống khẩn cấp
             </p>
-          </div>
+          </div> */}
         </div>
       </div>
 
