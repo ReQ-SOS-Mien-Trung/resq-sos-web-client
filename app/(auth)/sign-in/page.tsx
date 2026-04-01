@@ -7,18 +7,12 @@ import {
   Eye,
   EyeSlash,
   ArrowRight,
-  EnvelopeSimple,
   X,
 } from "@phosphor-icons/react";
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  useLogin,
-  useGoogleLogin as useGoogleLoginApi,
-} from "@/services/auth/hooks";
-import { useGoogleLogin as useGoogleOAuth } from "@react-oauth/google";
+import { useLogin } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { getDashboardPathByRole } from "@/lib/roles";
 import gsap from "gsap";
@@ -70,30 +64,6 @@ const SignIn = () => {
       setErrors({
         general: "Tài khoản của bạn không có quyền truy cập hệ thống này",
       });
-    },
-  });
-
-  // Google login hook with error callbacks
-  const { mutate: googleLoginApi, isPending: isGoogleLoading } =
-    useGoogleLoginApi({
-      onError: () => {
-        setErrors({ general: "Đăng nhập với Google thất bại" });
-      },
-      onUnauthorizedRole: () => {
-        setErrors({
-          general: "Tài khoản của bạn không có quyền truy cập hệ thống này",
-        });
-      },
-    });
-
-  // Google OAuth handler
-  const handleGoogleLogin = useGoogleOAuth({
-    onSuccess: (tokenResponse) => {
-      googleLoginApi({ idToken: tokenResponse.access_token });
-    },
-    onError: (error) => {
-      setErrors({ general: "Đăng nhập với Google thất bại" });
-      console.error("Google OAuth error:", error);
     },
   });
 
@@ -150,15 +120,15 @@ const SignIn = () => {
       <div ref={formRef}>
         {/* Header */}
         <div className="space-y-2 mb-8">
-          <p className="text-xs sm:text-sm font-bold uppercase tracking-wider text-[#FF5722]">
+          <p className="text-sm sm:text-base font-bold uppercase tracking-wider text-[#FF5722]">
             Chào mừng trở lại
           </p>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-[1.1]">
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-[1.1]">
             ĐĂNG NHẬP
             <br />
             <span className="text-black/30">RESQ SOS</span>
           </h1>
-          <p className="text-sm sm:text-base text-black/60">
+          <p className="text-sm sm:text-base tracking-tight text-black/60">
             Đăng nhập vào tài khoản của bạn để tiếp tục
           </p>
         </div>
@@ -200,7 +170,7 @@ const SignIn = () => {
                 placeholder="Nhập tên đăng nhập"
                 required
                 className={cn(
-                  "w-full pl-12 pr-12 py-4 border-2 focus:border-black outline-none text-sm transition-all rounded-lg",
+                  "w-full pl-12 pr-12 py-4 border-2 focus:border-black outline-none text-sm tracking-tight transition-all rounded-lg",
                   errors.username && usernameTouched
                     ? "border-red-500 focus:border-red-500"
                     : formData.username && !errors.username && usernameTouched
@@ -253,7 +223,7 @@ const SignIn = () => {
               </label>
               <Link
                 href="/forgot-password"
-                className="text-xs text-[#FF5722] hover:underline"
+                className="text-sm font-medium text-primary tracking-tight hover:underline"
               >
                 Quên mật khẩu?
               </Link>
@@ -316,40 +286,6 @@ const SignIn = () => {
             )}
           </button>
         </form>
-
-        {/* Divider */}
-        <div className="flex items-center gap-4 my-6">
-          <div className="flex-1 h-px bg-black/10" />
-          <span className="text-xs text-black/40 uppercase tracking-wider">
-            Hoặc tiếp tục với
-          </span>
-          <div className="flex-1 h-px bg-black/10" />
-        </div>
-
-        {/* Google Login Button */}
-        <button
-          type="button"
-          className="w-full px-6 py-4 bg-white border-2 border-black/20 text-sm font-bold uppercase tracking-wider hover:border-black transition-all flex items-center justify-center gap-3 group rounded-lg"
-          onClick={() => handleGoogleLogin()}
-          disabled={isGoogleLoading || isLoading}
-        >
-          {isGoogleLoading ? (
-            <span className="flex items-center gap-2">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/30 border-t-black" />
-              Đang xử lý...
-            </span>
-          ) : (
-            <>
-              <Image
-                src="/icons/google.svg"
-                alt="Google"
-                width={20}
-                height={20}
-              />
-              Đăng nhập với Google
-            </>
-          )}
-        </button>
       </div>
     </div>
   );

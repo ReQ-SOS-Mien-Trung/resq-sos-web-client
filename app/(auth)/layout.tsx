@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { AnimatedLogo } from "@/components/auth/AnimatedLogo";
 
 const AuthLayout = ({ children }: { children: ReactNode }) => {
   return (
@@ -16,36 +17,14 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
           priority
         />
 
-        {/* Content Overlay - Logo and Text */}
-        <div className="relative z-10 flex flex-col justify-between p-12 text-white h-full">
-          {/* Logo - Overlay on top with backdrop */}
+        <div className="absolute left-12 top-12 z-10">
           <Link
             href="/"
-            className="flex items-center gap-3 transition-transform hover:scale-105 z-20 w-fit px-4 py-2 rounded-xl bg-black/30 backdrop-blur-sm"
+            aria-label="Trang chu ResQ SOS"
+            className="block transition-transform hover:scale-105"
           >
-            <Image
-              src="/icons/logo.svg"
-              alt="ResQ SOS Logo"
-              width={48}
-              height={48}
-              className="w-12 h-12 drop-shadow-lg"
-            />
-            <div>
-              <h1 className="text-2xl font-bold font-sans">ResQ SOS</h1>
-              <p className="text-sm opacity-90 font-sans">Miền Trung</p>
-            </div>
+            <AnimatedLogo className="h-[clamp(5.25rem,7.8vw,8.4rem)] w-[clamp(5.25rem,7.8vw,8.4rem)] drop-shadow-[0_10px_24px_rgba(255,87,34,0.28)]" />
           </Link>
-
-          {/* Text Content - Overlay on bottom with backdrop */}
-          {/* <div className="space-y-4 max-w-lg animate-in fade-in-0 slide-in-from-left duration-700 p-6 rounded-2xl bg-black/40 backdrop-blur-sm">
-            <h2 className="text-4xl font-bold leading-tight font-sans">
-              Hệ thống tiếp nhận tin báo SOS và điều phối cứu hộ khẩn cấp
-            </h2>
-            <p className="text-lg opacity-95 leading-relaxed font-sans">
-              Hỗ trợ kịp thời cho người dân khu vực Miền Trung trong các tình
-              huống khẩn cấp
-            </p>
-          </div> */}
         </div>
       </div>
 
@@ -53,19 +32,10 @@ const AuthLayout = ({ children }: { children: ReactNode }) => {
       <div className="lg:hidden w-full p-6 bg-linear-to-r from-orange-500/10 to-orange-400/5">
         <Link
           href="/"
-          className="flex items-center gap-3 transition-transform hover:scale-105"
+          aria-label="Trang chu ResQ SOS"
+          className="w-fit rounded-2xl bg-black/5 p-2 transition-transform hover:scale-105"
         >
-          <Image
-            src="/icons/logo.svg"
-            alt="ResQ SOS Logo"
-            width={40}
-            height={40}
-            className="w-10 h-10"
-          />
-          <div>
-            <h1 className="text-xl font-bold font-sans">ResQ SOS</h1>
-            <p className="text-xs opacity-90 font-sans">Miền Trung</p>
-          </div>
+          <AnimatedLogo className="h-11 w-11" />
         </Link>
       </div>
 

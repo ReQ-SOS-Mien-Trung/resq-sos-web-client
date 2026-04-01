@@ -1,8 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { googleLogin, login, logout, refreshToken } from "./api";
+import { login, logout, refreshToken } from "./api";
 import {
-  GoogleLoginPayload,
   LoginHookOptions,
   LoginPayload,
   LoginResponse,
@@ -13,7 +12,6 @@ import {
 import { useAuthStore } from "@/stores/auth.store";
 
 export const LOGIN_MUTATION_KEY = ["auth", "login"] as const;
-export const GOOGLE_LOGIN_MUTATION_KEY = ["auth", "google-login"] as const;
 export const LOGOUT_MUTATION_KEY = ["auth", "logout"] as const;
 export const REFRESH_TOKEN_MUTATION_KEY = ["auth", "refresh-token"] as const;
 
@@ -63,43 +61,6 @@ export function useLogin(options?: LoginHookOptions) {
         options.onError(error);
       } else {
         console.error("Login error:", error);
-      }
-    },
-  });
-}
-
-export function useGoogleLogin(options?: LoginHookOptions) {
-  const router = useRouter();
-  const { setAuth, logout: clearAuth } = useAuthStore();
-
-  return useMutation<LoginResponse, Error, GoogleLoginPayload>({
-    mutationKey: GOOGLE_LOGIN_MUTATION_KEY,
-    mutationFn: googleLogin,
-    onSuccess: (data) => {
-      // Save auth data to store
-      setAuth(data);
-
-      // Get redirect path based on role
-      const redirectPath = getRedirectPathByRole(data.roleId);
-
-      if (redirectPath) {
-        // Custom onSuccess or default redirect
-        if (options?.onSuccess) {
-          options.onSuccess(data);
-        } else {
-          router.push(redirectPath);
-        }
-      } else {
-        // Role not allowed - clear auth and call callback
-        clearAuth();
-        options?.onUnauthorizedRole?.();
-      }
-    },
-    onError: (error) => {
-      if (options?.onError) {
-        options.onError(error);
-      } else {
-        console.error("Google login error:", error);
       }
     },
   });
