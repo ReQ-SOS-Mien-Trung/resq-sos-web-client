@@ -456,14 +456,8 @@ export default function CoordinatorSOSForm({
       return;
     }
 
-    const payload: CreateSOSRequestPayload = {
-      sos_type: sosType,
-      msg: generatedMessage,
-      location: {
-        lat: latNum,
-        lng: lngNum,
-      },
-      structured_data: buildStructuredDataFromForm({
+    const structuredData = {
+      ...buildStructuredDataFromForm({
         sosType,
         peopleCount,
         sharedPeople,
@@ -471,6 +465,28 @@ export default function CoordinatorSOSForm({
         relief,
         additionalDescription,
       }),
+      address: address.trim() || undefined,
+    };
+
+    const payload: CreateSOSRequestPayload = {
+      sos_type: sosType,
+      msg: generatedMessage,
+      location: {
+        lat: latNum,
+        lng: lngNum,
+      },
+      structured_data: structuredData,
+      victim_info: {
+        user_name: name.trim() || undefined,
+        user_phone: normalizedPhone || undefined,
+      },
+      reporter_info: {
+        user_id: user?.userId,
+        user_name: user?.fullName || undefined,
+        is_online: true,
+      },
+      is_sent_on_behalf: true,
+      // Keep legacy shape during the transition so the current BE still accepts the request.
       sender_info: {
         user_id: user?.userId,
         user_name: name.trim() || undefined,
@@ -516,12 +532,12 @@ export default function CoordinatorSOSForm({
               <Card className={EDITORIAL_CARD}>
                 <CardContent className="space-y-3 pt-5">
                   <p className={SECTION_TITLE}>
-                    <User size={16} /> Thông tin người gọi
+                    <User size={16} /> Thông tin nạn nhân
                   </p>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="space-y-1.5">
                       <Label className="text-xs font-bold uppercase tracking-wide text-black/80">
-                        Tên người gọi
+                        Tên nạn nhân
                       </Label>
                       <Input
                         value={name}
@@ -532,7 +548,7 @@ export default function CoordinatorSOSForm({
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs font-bold uppercase tracking-wide text-black/80">
-                        Số điện thoại
+                        Số điện thoại nạn nhân
                       </Label>
                       <Input
                         value={phone}

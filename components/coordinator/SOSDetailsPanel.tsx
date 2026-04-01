@@ -550,7 +550,8 @@ const SOSDetailsPanel = ({
       )
     : scoreRows;
 
-  const coordinatorDisplayName =
+  const reporterDisplayName =
+    sosRequest.reporterName?.trim() ||
     sosRequest.createdByCoordinatorName?.trim() ||
     (sosRequest.createdByCoordinatorId &&
     currentUser?.userId === sosRequest.createdByCoordinatorId
@@ -630,68 +631,78 @@ const SOSDetailsPanel = ({
         {/* Content */}
         <ScrollArea className="flex-1">
           <div className="p-5 space-y-5">
-            {/* Sender Info */}
-            {(sosRequest.senderPhone ||
-              sosRequest.senderName ||
-              sosRequest.createdByCoordinatorId) && (
+            {/* Victim / Reporter Info */}
+            {(sosRequest.victimPhone ||
+              sosRequest.victimName ||
+              sosRequest.address ||
+              reporterDisplayName ||
+              sosRequest.reporterPhone ||
+              sosRequest.isSentOnBehalf ||
+              sosRequest.reporterIsOnline !== undefined) && (
               <div className="bg-muted/50 rounded-lg p-4">
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
                   <Phone className="h-4 w-4" />
-                  Người gửi
+                  Nạn nhân
                 </h4>
                 <div className="flex items-center justify-between">
                   <div className="text-sm space-y-1">
-                    {sosRequest.senderName && (
-                      <div className="font-medium">{sosRequest.senderName}</div>
+                    {sosRequest.victimName && (
+                      <div className="font-medium">{sosRequest.victimName}</div>
                     )}
-                    {sosRequest.senderPhone && (
+                    {sosRequest.victimPhone && (
                       <div className="text-muted-foreground">
-                        {sosRequest.senderPhone}
+                        {sosRequest.victimPhone}
                       </div>
                     )}
-                    {sosRequest.createdByCoordinatorId && (
+                    {sosRequest.address && (
                       <div className="text-xs text-muted-foreground">
-                        Tạo hộ bởi điều phối viên:{" "}
-                        {coordinatorDisplayName || "Điều phối viên"}
+                        Địa chỉ nhập tay: {sosRequest.address}
+                      </div>
+                    )}
+                    {(reporterDisplayName || sosRequest.reporterPhone) && (
+                      <div className="text-xs text-muted-foreground">
+                        Người tạo yêu cầu:{" "}
+                        {reporterDisplayName || "Người gửi SOS"}
+                        {sosRequest.reporterPhone
+                          ? ` • ${sosRequest.reporterPhone}`
+                          : ""}
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {sosRequest.createdByCoordinatorId ? (
+                  <div className="flex flex-col items-end gap-1.5">
+                    {sosRequest.isSentOnBehalf && (
                       <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md border border-blue-200 dark:border-blue-800">
                         <Users
                           className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400"
                           weight="fill"
                         />
                         <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
-                          Điều phối viên tạo yêu cầu hộ
+                          Gửi hộ
                         </span>
                       </div>
-                    ) : (
-                      <>
-                        {sosRequest.isOnline ? (
-                          <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-md border border-green-200 dark:border-green-800">
-                            <WifiHigh
-                              className="h-3.5 w-3.5 text-green-600 dark:text-green-400"
-                              weight="fill"
-                            />
-                            <span className="text-xs font-medium text-green-700 dark:text-green-300">
-                              Gửi qua Internet
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-md border border-orange-200 dark:border-orange-800">
-                            <WifiSlash
-                              className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400"
-                              weight="fill"
-                            />
-                            <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
-                              Gửi ngoại tuyến (Mesh)
-                            </span>
-                          </div>
-                        )}
-                      </>
                     )}
+                    {sosRequest.reporterIsOnline !== undefined &&
+                      (sosRequest.reporterIsOnline ? (
+                        <div className="flex items-center gap-1.5 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-md border border-green-200 dark:border-green-800">
+                          <WifiHigh
+                            className="h-3.5 w-3.5 text-green-600 dark:text-green-400"
+                            weight="fill"
+                          />
+                          <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                            Gửi qua Internet
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded-md border border-orange-200 dark:border-orange-800">
+                          <WifiSlash
+                            className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400"
+                            weight="fill"
+                          />
+                          <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
+                            Gửi ngoại tuyến (Mesh)
+                          </span>
+                        </div>
+                      ))}
                   </div>
                 </div>
                 {sosRequest.hopCount != null && sosRequest.hopCount > 0 && (

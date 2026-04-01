@@ -4494,6 +4494,16 @@
           "network_metadata": {
             "$ref": "#/components/schemas/NetworkMetadataDto"
           },
+          "victim_info": {
+            "$ref": "#/components/schemas/VictimInfoDto"
+          },
+          "reporter_info": {
+            "$ref": "#/components/schemas/ReporterInfoDto"
+          },
+          "is_sent_on_behalf": {
+            "type": "boolean",
+            "nullable": true
+          },
           "sender_info": {
             "$ref": "#/components/schemas/SenderInfoDto"
           }
@@ -5063,6 +5073,37 @@
         },
         "additionalProperties": false
       },
+      "ReporterInfoDto": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "user_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "user_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "user_phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "battery_level": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "is_online": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SaveRescuerAbilitiesRequestDto": {
         "type": "object",
         "properties": {
@@ -5201,11 +5242,33 @@
             "type": "string",
             "nullable": true
           },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
           "injured_persons": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/InjuredPersonDto"
             },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "VictimInfoDto": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "user_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "user_phone": {
+            "type": "string",
             "nullable": true
           }
         },

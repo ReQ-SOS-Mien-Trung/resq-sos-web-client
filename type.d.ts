@@ -84,7 +84,7 @@ export interface SOSRequest {
     medicalIssues?: string[];
     severity?: string;
   }>;
-  // Extended fields from backend structuredData / senderInfo
+  // Extended fields from backend structuredData / victimInfo / reporterInfo
   peopleCount?: { adult: number; child: number; elderly: number };
   waitTimeMinutes?: number;
   sosType?: string;
@@ -107,11 +107,15 @@ export interface SOSRequest {
   foodDuration?: string | null;
   areBlanketsEnough?: boolean | null;
   blanketRequestCount?: number | null;
-  senderPhone?: string;
-  senderName?: string;
+  address?: string | null;
+  victimPhone?: string;
+  victimName?: string;
+  reporterPhone?: string;
+  reporterName?: string;
   createdByCoordinatorId?: string | null;
   createdByCoordinatorName?: string | null;
-  isOnline?: boolean;
+  isSentOnBehalf?: boolean;
+  reporterIsOnline?: boolean;
   hopCount?: number;
   locationAccuracy?: number | null;
 }
