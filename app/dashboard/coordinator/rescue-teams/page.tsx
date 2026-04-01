@@ -40,6 +40,9 @@ import {
   RescueTeamTypeKey,
 } from "@/services/rescue_teams/type";
 
+type RescueTeamColumnKey = "todo" | "in-progress" | "completed";
+type OccupancyFilterKey = "all" | "empty" | "low" | "medium" | "full";
+
 export default function RescueTeamsPage() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,9 +55,29 @@ export default function RescueTeamsPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | RescueTeamTypeKey>(
     "all",
   );
-  const [occupancyFilter, setOccupancyFilter] = useState<
-    "all" | "empty" | "low" | "medium" | "full"
-  >("all");
+  const [occupancyFilter, setOccupancyFilter] =
+    useState<OccupancyFilterKey>("all");
+  const [columnStatusFilters, setColumnStatusFilters] = useState<
+    Record<RescueTeamColumnKey, "all" | RescueTeamStatusKey>
+  >({
+    todo: "all",
+    "in-progress": "all",
+    completed: "all",
+  });
+  const [columnTypeFilters, setColumnTypeFilters] = useState<
+    Record<RescueTeamColumnKey, "all" | RescueTeamTypeKey>
+  >({
+    todo: "all",
+    "in-progress": "all",
+    completed: "all",
+  });
+  const [columnOccupancyFilters, setColumnOccupancyFilters] = useState<
+    Record<RescueTeamColumnKey, OccupancyFilterKey>
+  >({
+    todo: "all",
+    "in-progress": "all",
+    completed: "all",
+  });
   const { data, isLoading, isError } = useRescueTeams({
     params: {
       pageNumber: page,
@@ -239,6 +262,19 @@ export default function RescueTeamsPage() {
     return `${occupancy}%`;
   };
 
+  const matchesOccupancyFilter = (
+    occupancy: number,
+    filter: OccupancyFilterKey,
+  ) => {
+    return (
+      filter === "all" ||
+      (filter === "empty" && occupancy === 0) ||
+      (filter === "low" && occupancy > 0 && occupancy < 50) ||
+      (filter === "medium" && occupancy >= 50 && occupancy < 100) ||
+      (filter === "full" && occupancy >= 100)
+    );
+  };
+
   const getColumnKey = (status: RescueTeamStatusKey) => {
     if (
       status === "AwaitingAcceptance" ||
@@ -327,6 +363,33 @@ export default function RescueTeamsPage() {
       countClassName: "bg-slate-200 text-slate-700",
     },
   ] as const;
+  const columnStatusOptions: Record<
+    RescueTeamColumnKey,
+    Array<"all" | RescueTeamStatusKey>
+  > = {
+    todo: ["all", "AwaitingAcceptance", "Ready", "Available"],
+    "in-progress": ["all", "Gathering", "Assigned", "OnMission"],
+    completed: ["all", "Stuck", "Unavailable", "Disbanded"],
+  };
+  const columnFilterTheme: Record<
+    RescueTeamColumnKey,
+    {
+      selectClassName: string;
+    }
+  > = {
+    todo: {
+      selectClassName:
+        "border-amber-200/80 bg-white/90 text-amber-900 focus:ring-amber-200",
+    },
+    "in-progress": {
+      selectClassName:
+        "border-sky-200/80 bg-white/90 text-sky-900 focus:ring-sky-200",
+    },
+    completed: {
+      selectClassName:
+        "border-slate-200/80 bg-white/90 text-slate-900 focus:ring-slate-200",
+    },
+  };
 
   const teams = useMemo(() => data?.items ?? [], [data?.items]);
   const numberFormatter = new Intl.NumberFormat("vi-VN");
@@ -337,6 +400,9 @@ export default function RescueTeamsPage() {
     statusFilter !== "all",
     typeFilter !== "all",
     occupancyFilter !== "all",
+    ...Object.values(columnStatusFilters).map((value) => value !== "all"),
+    ...Object.values(columnTypeFilters).map((value) => value !== "all"),
+    ...Object.values(columnOccupancyFilters).map((value) => value !== "all"),
   ].filter(Boolean).length;
   const hasActiveFilters = activeFilterCount > 0;
 
@@ -375,14 +441,10 @@ export default function RescueTeamsPage() {
           statusFilter === "all" || team.status === statusFilter;
         const matchesType =
           typeFilter === "all" || team.teamType === typeFilter;
-        const matchesOccupancy =
-          occupancyFilter === "all" ||
-          (occupancyFilter === "empty" && occupancy === 0) ||
-          (occupancyFilter === "low" && occupancy > 0 && occupancy < 50) ||
-          (occupancyFilter === "medium" &&
-            occupancy >= 50 &&
-            occupancy < 100) ||
-          (occupancyFilter === "full" && occupancy >= 100);
+        const matchesOccupancy = matchesOccupancyFilter(
+          occupancy,
+          occupancyFilter,
+        );
 
         return (
           matchesSearch &&
@@ -444,6 +506,21 @@ export default function RescueTeamsPage() {
     setStatusFilter("all");
     setTypeFilter("all");
     setOccupancyFilter("all");
+    setColumnStatusFilters({
+      todo: "all",
+      "in-progress": "all",
+      completed: "all",
+    });
+    setColumnTypeFilters({
+      todo: "all",
+      "in-progress": "all",
+      completed: "all",
+    });
+    setColumnOccupancyFilters({
+      todo: "all",
+      "in-progress": "all",
+      completed: "all",
+    });
   };
   const overviewCards = [
     {
@@ -804,10 +881,48 @@ export default function RescueTeamsPage() {
 
       <section className="space-y-4">
         {visibleColumns.map((column) => {
-          const columnTeams = [...filteredTeamsByColumn[column.key]].sort(
-            compareTeams,
-          );
+          const visibleColumnTeams = filteredTeamsByColumn[column.key];
+          const currentColumnFilter = columnStatusFilters[column.key];
+          const currentColumnTypeFilter = columnTypeFilters[column.key];
+          const currentColumnOccupancyFilter = columnOccupancyFilters[column.key];
+          const filterTheme = columnFilterTheme[column.key];
+          const columnTeams = [
+            ...visibleColumnTeams.filter(
+              (team) => {
+                const occupancy = getOccupancyPercent(
+                  team.currentMemberCount,
+                  team.maxMembers,
+                );
+
+                const matchesColumnStatus =
+                  currentColumnFilter === "all" ||
+                  team.status === currentColumnFilter;
+                const matchesColumnType =
+                  currentColumnTypeFilter === "all" ||
+                  team.teamType === currentColumnTypeFilter;
+                const matchesColumnOccupancy = matchesOccupancyFilter(
+                  occupancy,
+                  currentColumnOccupancyFilter,
+                );
+
+                return (
+                  matchesColumnStatus &&
+                  matchesColumnType &&
+                  matchesColumnOccupancy
+                );
+              },
+            ),
+          ].sort(compareTeams);
           const totalColumnTeams = teamsByColumn[column.key].length;
+          const hasColumnScopedFilter =
+            currentColumnFilter !== "all" ||
+            currentColumnTypeFilter !== "all" ||
+            currentColumnOccupancyFilter !== "all";
+          const columnCountLabel = hasColumnScopedFilter
+            ? `${numberFormatter.format(columnTeams.length)} / ${numberFormatter.format(visibleColumnTeams.length)}`
+            : hasActiveFilters
+              ? `${numberFormatter.format(visibleColumnTeams.length)} / ${numberFormatter.format(totalColumnTeams)}`
+              : numberFormatter.format(columnTeams.length);
 
           return (
             <div
@@ -833,6 +948,107 @@ export default function RescueTeamsPage() {
                   <p className="mt-2 max-w-sm text-sm leading-5 text-slate-600">
                     {column.description}
                   </p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Select
+                      value={currentColumnFilter}
+                      onValueChange={(value) =>
+                        setColumnStatusFilters((previous) => ({
+                          ...previous,
+                          [column.key]: value as "all" | RescueTeamStatusKey,
+                        }))
+                      }
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "h-8 min-w-[180px] rounded-full px-3 text-xs font-medium shadow-none",
+                          filterTheme.selectClassName,
+                        )}
+                      >
+                        <SelectValue placeholder="Trạng thái" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {columnStatusOptions[column.key].map((statusKey) => {
+                          const count =
+                            statusKey === "all"
+                              ? visibleColumnTeams.length
+                              : visibleColumnTeams.filter(
+                                  (team) => team.status === statusKey,
+                                ).length;
+                          const label =
+                            statusKey === "all"
+                              ? "Tất cả trạng thái"
+                              : getStatusMeta(statusKey).label;
+
+                          return (
+                            <SelectItem key={statusKey} value={statusKey}>
+                              {label} ({numberFormatter.format(count)})
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+
+                    <Select
+                      value={currentColumnTypeFilter}
+                      onValueChange={(value) =>
+                        setColumnTypeFilters((previous) => ({
+                          ...previous,
+                          [column.key]: value as "all" | RescueTeamTypeKey,
+                        }))
+                      }
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "h-8 min-w-[150px] rounded-full px-3 text-xs font-medium shadow-none",
+                          filterTheme.selectClassName,
+                        )}
+                      >
+                        <SelectValue placeholder="Loại đội" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả loại đội</SelectItem>
+                        {(
+                          Object.entries(typeMap) as [
+                            RescueTeamTypeKey,
+                            { label: string; className: string },
+                          ][]
+                        ).map(([key, config]) => (
+                          <SelectItem key={key} value={key}>
+                            {config.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select
+                      value={currentColumnOccupancyFilter}
+                      onValueChange={(value) =>
+                        setColumnOccupancyFilters((previous) => ({
+                          ...previous,
+                          [column.key]: value as OccupancyFilterKey,
+                        }))
+                      }
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "h-8 min-w-[170px] rounded-full px-3 text-xs font-medium shadow-none",
+                          filterTheme.selectClassName,
+                        )}
+                      >
+                        <SelectValue placeholder="Quân số" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả quân số</SelectItem>
+                        <SelectItem value="empty">0% - Trống quân số</SelectItem>
+                        <SelectItem value="low">1% - 49%: Thiếu nhiều</SelectItem>
+                        <SelectItem value="medium">
+                          50% - 99%: Đang bổ sung
+                        </SelectItem>
+                        <SelectItem value="full">100%: Đủ quân số</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <span
                   className={cn(
@@ -840,9 +1056,7 @@ export default function RescueTeamsPage() {
                     column.countClassName,
                   )}
                 >
-                  {hasActiveFilters
-                    ? `${numberFormatter.format(columnTeams.length)} / ${numberFormatter.format(totalColumnTeams)}`
-                    : numberFormatter.format(columnTeams.length)}
+                  {columnCountLabel}
                 </span>
               </div>
 

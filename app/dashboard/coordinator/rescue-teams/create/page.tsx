@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Suspense,
   useState,
   useMemo,
   useRef,
@@ -8,7 +9,7 @@ import {
   type FormEvent,
   type MouseEvent,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,9 +49,14 @@ import type {
   RescueTeamTypeKey,
   RescueTeamMember,
 } from "@/services/rescue_teams/type";
-import { useInfiniteAssemblyPoints } from "@/services/assembly_points/hooks";
+import {
+  useAssemblyPointById,
+  useAssemblyPointCheckedInRescuers,
+  useInfiniteAssemblyPoints,
+} from "@/services/assembly_points/hooks";
 import { useInfiniteRescuers } from "@/services/rescuers/hooks";
 import type { RescuerEntity, RescuerType } from "@/services/rescuers/type";
+import type { AssemblyPointCheckedInRescuerEntity } from "@/services/assembly_points/type";
 
 const DEFAULT_RESCUER_AVATAR =
   "https://res.cloudinary.com/dezgwdrfs/image/upload/v1773504004/611251674_1432765175119052_6622750233977483141_n_sgxqxd.png";
@@ -110,6 +116,25 @@ const ABILITY_LABELS_VI: Record<string, string> = {
   VOLUNTEER_ORG_MEMBER: "Thành viên tổ chức tình nguyện",
 };
 
+const TEAM_TYPE_ABILITY_FILTER: Record<
+  RescueTeamTypeKey,
+  {
+    abilityCategoryCode?: string;
+    abilitySubgroupCode?: string;
+  }
+> = {
+  Rescue: {
+    abilityCategoryCode: "Rescue",
+  },
+  Medical: {
+    abilityCategoryCode: "Medical",
+  },
+  Transportation: {
+    abilityCategoryCode: "Transportation",
+  },
+  Mixed: {},
+};
+
 function getAbilityLabelVi(code: string): string {
   if (ABILITY_LABELS_VI[code]) return ABILITY_LABELS_VI[code];
   return code
@@ -119,17 +144,48 @@ function getAbilityLabelVi(code: string): string {
     .join(" ");
 }
 
+function parsePositiveInteger(value: string | null): number | null {
+  if (!value) return null;
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function mapCheckedInRescuerToRescuerEntity(
+  rescuer: AssemblyPointCheckedInRescuerEntity,
+  assemblyPointId: number | null,
+): RescuerEntity {
+  return {
+    id: rescuer.userId,
+    firstName: rescuer.firstName,
+    lastName: rescuer.lastName,
+    email: null,
+    phone: rescuer.phone,
+    avatarUrl: rescuer.avatarUrl,
+    address: null,
+    ward: null,
+    province: null,
+    rescuerType: rescuer.rescuerType,
+    topAbilities: rescuer.topAbilities,
+    hasTeam: rescuer.isInTeam,
+    hasAssemblyPoint: assemblyPointId !== null,
+    assemblyPointId,
+  };
+}
+
 // ── Type Card Component ──
 
 function TypeCard({
   label,
-  value,
   selected,
   onClick,
   description,
 }: {
   label: string;
-  value: string;
   selected: boolean;
   onClick: () => void;
   description?: string;
@@ -150,9 +206,7 @@ function TypeCard({
         {label}
       </div>
       {description && (
-        <div className="line-clamp-1 text-[11px] text-black/70">
-          {description}
-        </div>
+        <div className="line-clamp-1 text-xs text-black/70">{description}</div>
       )}
     </button>
   );
@@ -226,7 +280,7 @@ function RescuerCard({
 
         <Avatar className="h-8 w-8 border border-background shadow-sm">
           <AvatarImage src={avatarSrc} />
-          <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-[10px] font-bold">
+          <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-xs font-bold">
             {initials}
           </AvatarFallback>
         </Avatar>
@@ -235,11 +289,11 @@ function RescuerCard({
           <div className="font-medium text-[13px] truncate flex items-center gap-2">
             {user.firstName} {user.lastName}
           </div>
-          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 truncate mt-0.5">
+          <div className="text-xs text-muted-foreground flex items-center gap-1.5 truncate mt-0.5">
             {user.rescuerType && (
               <Badge
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
-                className="text-[9px] font-medium h-4 px-1"
+                className="text-xs font-medium h-4 px-1"
               >
                 {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
               </Badge>
@@ -253,7 +307,7 @@ function RescuerCard({
             type="button"
             variant={isLeader ? "default" : "outline"}
             size="sm"
-            className={`h-7 shrink-0 gap-1 border-black px-2.5 text-[11px] shadow-none transition-colors ${isLeader ? "border-transparent bg-[#FF5722] text-white hover:bg-[#e64a19]" : "text-black/70 hover:bg-black/5 hover:text-black"}`}
+            className={`h-7 shrink-0 gap-1 border-black px-2.5 text-xs shadow-none transition-colors ${isLeader ? "border-transparent bg-[#FF5722] text-white hover:bg-[#e64a19]" : "text-black/70 hover:bg-black/5 hover:text-black"}`}
             onClick={(e) => {
               e.stopPropagation();
               onToggleLeader();
@@ -286,13 +340,13 @@ function RescuerCard({
               </div>
               <Badge
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
-                className="mt-1 h-5 border border-black px-1.5 text-[10px] font-medium"
+                className="mt-1 h-5 border border-black px-1.5 text-xs font-medium"
               >
                 {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
               </Badge>
             </div>
           </div>
-          <div className="mt-2 space-y-1.5 border-t border-black/40 pt-2 text-[11px]">
+          <div className="mt-2 space-y-1.5 border-t border-black/40 pt-2 text-xs">
             <div className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">SĐT:</span>
               <span className="font-medium text-foreground">
@@ -323,7 +377,7 @@ function RescuerCard({
                     <Badge
                       key={idx}
                       variant="outline"
-                      className="h-auto border-black bg-white px-1.5 py-0.5 text-[9px] leading-none"
+                      className="h-auto border-black bg-white px-1.5 py-0.5 text-xs leading-none"
                     >
                       {getAbilityLabelVi(ability)}
                     </Badge>
@@ -344,13 +398,22 @@ function RescuerCard({
 
 // ── Main Page ──
 
-export default function CreateRescueTeamPage() {
+function CreateRescueTeamContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialAssemblyPointId =
+    searchParams.get("assemblyPointId")?.trim() ?? "";
+  const eventId = parsePositiveInteger(searchParams.get("eventId"));
+  const lockedAssemblyPointId = parsePositiveInteger(initialAssemblyPointId);
+  const isEventScopedTeamCreation =
+    eventId !== null && lockedAssemblyPointId !== null;
 
   // ─── Form State ───
   const [teamName, setTeamName] = useState("");
   const [teamType, setTeamType] = useState<RescueTeamTypeKey | "">("");
-  const [assemblyPointId, setAssemblyPointId] = useState<string>("");
+  const [assemblyPointId, setAssemblyPointId] = useState<string>(
+    initialAssemblyPointId,
+  );
   const [maxMembers, setMaxMembers] = useState("6");
   const [selectedMembers, setSelectedMembers] = useState<RescueTeamMember[]>(
     [],
@@ -373,38 +436,76 @@ export default function CreateRescueTeamPage() {
     params: { pageSize: 10 },
   });
 
+  const { data: lockedAssemblyPoint } = useAssemblyPointById(
+    lockedAssemblyPointId ?? 0,
+    { enabled: lockedAssemblyPointId !== null },
+  );
+
   const assemblyPoints = useMemo(() => {
     const allPoints = pointsData?.pages.flatMap((page) => page.items) || [];
-    return allPoints.filter(
+    const activePoints = allPoints.filter(
       (point) => point.status === "Active" || point.status === "Overloaded",
     );
-  }, [pointsData]);
+
+    if (
+      lockedAssemblyPoint &&
+      (lockedAssemblyPoint.status === "Active" ||
+        lockedAssemblyPoint.status === "Overloaded") &&
+      !activePoints.some((point) => point.id === lockedAssemblyPoint.id)
+    ) {
+      return [lockedAssemblyPoint, ...activePoints];
+    }
+
+    return activePoints;
+  }, [pointsData, lockedAssemblyPoint]);
 
   const rescuerFilters = useMemo(() => {
     const filters: {
       hasTeam: boolean;
       rescuerType?: Exclude<RescuerType, null>;
+      abilityCategoryCode?: string;
+      abilitySubgroupCode?: string;
     } = {
       hasTeam: false,
     };
+
+    if (teamType && teamType !== "Mixed") {
+      const abilityFilter = TEAM_TYPE_ABILITY_FILTER[teamType];
+      filters.abilityCategoryCode = abilityFilter.abilityCategoryCode;
+      filters.abilitySubgroupCode = abilityFilter.abilitySubgroupCode;
+    }
 
     if (rescuerTypeFilter !== "all") {
       filters.rescuerType = rescuerTypeFilter;
     }
 
     return filters;
-  }, [rescuerTypeFilter]);
+  }, [rescuerTypeFilter, teamType]);
 
   const {
     data: usersData,
-    isLoading: isLoadingUsers,
+    isLoading: isLoadingFreeRescuers,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteRescuers({
     pageSize: 10,
     params: rescuerFilters,
+    enabled: !isEventScopedTeamCreation,
   });
+
+  const { data: checkedInRescuersData, isLoading: isLoadingCheckedInRescuers } =
+    useAssemblyPointCheckedInRescuers(eventId ?? 0, {
+      enabled: isEventScopedTeamCreation,
+      params: {
+        pageNumber: 1,
+        pageSize: 500,
+        rescuerType:
+          rescuerTypeFilter !== "all" ? rescuerTypeFilter : undefined,
+        abilityCategoryCode: rescuerFilters.abilityCategoryCode,
+        abilitySubgroupCode: rescuerFilters.abilitySubgroupCode,
+      },
+    });
 
   const { mutate: createTeam, isPending: isCreating } = useCreateRescueTeam();
 
@@ -412,7 +513,13 @@ export default function CreateRescueTeamPage() {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useCallback(
     (node: HTMLDivElement | null) => {
-      if (isLoadingUsers || isFetchingNextPage) return;
+      if (
+        isEventScopedTeamCreation ||
+        isLoadingFreeRescuers ||
+        isFetchingNextPage
+      ) {
+        return;
+      }
       if (observerRef.current) observerRef.current.disconnect();
 
       observerRef.current = new IntersectionObserver(
@@ -426,7 +533,13 @@ export default function CreateRescueTeamPage() {
 
       if (node) observerRef.current.observe(node);
     },
-    [isLoadingUsers, isFetchingNextPage, hasNextPage, fetchNextPage],
+    [
+      isEventScopedTeamCreation,
+      isLoadingFreeRescuers,
+      isFetchingNextPage,
+      hasNextPage,
+      fetchNextPage,
+    ],
   );
 
   const pointsObserverRef = useRef<IntersectionObserver | null>(null);
@@ -451,10 +564,33 @@ export default function CreateRescueTeamPage() {
 
   // ─── Filter eligible rescuers (free rescuers) ───
   const eligibleRescuers = useMemo(() => {
+    if (isEventScopedTeamCreation) {
+      const checkedInRescuers = checkedInRescuersData?.items ?? [];
+      return checkedInRescuers
+        .filter((rescuer) => !rescuer.isInTeam)
+        .map((rescuer) =>
+          mapCheckedInRescuerToRescuerEntity(rescuer, lockedAssemblyPointId),
+        );
+    }
+
     if (!usersData?.pages) return [];
 
     return usersData.pages.flatMap((page) => page.items);
-  }, [usersData]);
+  }, [
+    isEventScopedTeamCreation,
+    checkedInRescuersData,
+    lockedAssemblyPointId,
+    usersData,
+  ]);
+
+  const isBackendAbilityFilterActive = useMemo(
+    () =>
+      Boolean(
+        rescuerFilters.abilityCategoryCode ||
+        rescuerFilters.abilitySubgroupCode,
+      ),
+    [rescuerFilters.abilityCategoryCode, rescuerFilters.abilitySubgroupCode],
+  );
 
   const displayedRescuers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -470,6 +606,26 @@ export default function CreateRescueTeamPage() {
       return fullName.includes(q) || email.includes(q) || phone.includes(q);
     });
   }, [eligibleRescuers, searchQuery]);
+
+  const selectedTeamTypeLabel = useMemo(() => {
+    if (!teamType) {
+      return "";
+    }
+
+    const matchingType = teamTypes?.find((type) => type.key === teamType);
+    return matchingType?.value ?? teamType;
+  }, [teamType, teamTypes]);
+
+  const isLoadingUsers = isEventScopedTeamCreation
+    ? isLoadingCheckedInRescuers
+    : isLoadingFreeRescuers;
+
+  const selectedAssemblyPoint = useMemo(
+    () =>
+      assemblyPoints.find((point) => String(point.id) === assemblyPointId) ??
+      null,
+    [assemblyPoints, assemblyPointId],
+  );
 
   // ─── Member Selection Helpers ───
   const isMemberSelected = (userId: string) =>
@@ -610,7 +766,7 @@ export default function CreateRescueTeamPage() {
             </h1>
             <Badge
               variant="secondary"
-              className="h-5 rounded-none border border-black bg-black px-2 font-normal text-[10px] text-white"
+              className="h-5 rounded-none border border-black bg-black px-2 font-normal text-xs text-white"
             >
               Thiết lập nhanh
             </Badge>
@@ -708,7 +864,7 @@ export default function CreateRescueTeamPage() {
                         setMaxMembers(String(clamped));
                       }}
                     />
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Hệ thống yêu cầu từ 6 đến 8 thành viên.
                     </p>
                   </div>
@@ -732,6 +888,7 @@ export default function CreateRescueTeamPage() {
                   <Select
                     value={assemblyPointId}
                     onValueChange={setAssemblyPointId}
+                    disabled={isEventScopedTeamCreation}
                   >
                     <SelectTrigger className="h-9 text-sm">
                       <SelectValue placeholder="Chọn điểm tập kết..." />
@@ -754,7 +911,7 @@ export default function CreateRescueTeamPage() {
                                     ? "secondary"
                                     : "destructive"
                               }
-                              className="text-[9px] font-medium h-4 px-1"
+                              className="text-xs font-medium h-4 px-1"
                             >
                               {point.status === "Active"
                                 ? "Hoạt động"
@@ -781,14 +938,9 @@ export default function CreateRescueTeamPage() {
                       weight="fill"
                     />
                     <span className="text-[12px] text-[#c2410c]">
-                      {(() => {
-                        const point = assemblyPoints.find(
-                          (p) => String(p.id) === assemblyPointId,
-                        );
-                        return point
-                          ? `Sức chứa khả dụng: ${point.maxCapacity} người`
-                          : null;
-                      })()}
+                      {selectedAssemblyPoint
+                        ? `Sức chứa khả dụng: ${selectedAssemblyPoint.maxCapacity} người`
+                        : null}
                     </span>
                   </div>
                 )}
@@ -816,7 +968,6 @@ export default function CreateRescueTeamPage() {
                       <TypeCard
                         key={type.key}
                         label={type.value}
-                        value={type.key}
                         selected={teamType === type.key}
                         onClick={() => setTeamType(type.key)}
                         description={
@@ -881,7 +1032,7 @@ export default function CreateRescueTeamPage() {
                 </Select>
 
                 <div className="relative">
-                  <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <MagnifyingGlass className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-black/45" />
                   <Input
                     className="h-9 border-black/50 bg-white pl-8 text-sm"
                     value={searchQuery}
@@ -890,6 +1041,19 @@ export default function CreateRescueTeamPage() {
                   />
                 </div>
               </div>
+
+              {isBackendAbilityFilterActive ? (
+                <div className="mt-2 flex items-center gap-2 border border-[#FF5722]/40 bg-[#FF5722]/10 px-2.5 py-1.5">
+                  <Sparkle
+                    className="h-3.5 w-3.5 text-[#FF5722]"
+                    weight="fill"
+                  />
+                  <p className="text-[12px] text-[#C2410C]">
+                    Đang lọc thành viên theo chuyên môn đội:{" "}
+                    <strong>{selectedTeamTypeLabel}</strong>
+                  </p>
+                </div>
+              ) : null}
 
               {/* Selected tags */}
               {selectedMembers.length > 0 && (
@@ -903,7 +1067,7 @@ export default function CreateRescueTeamPage() {
                       <Badge
                         key={member.userId}
                         variant={member.isLeader ? "default" : "secondary"}
-                        className={`text-[11px] py-0.5 px-2 gap-1.5 ${
+                        className={`text-xs py-0.5 px-2 gap-1.5 ${
                           member.isLeader
                             ? "bg-[#FF5722] hover:bg-[#e64a19] text-white"
                             : ""
@@ -970,7 +1134,7 @@ export default function CreateRescueTeamPage() {
                       ref={loadMoreRef}
                       className="h-6 w-full flex items-center justify-center mt-2"
                     >
-                      {isFetchingNextPage && (
+                      {!isEventScopedTeamCreation && isFetchingNextPage && (
                         <CircleNotch className="w-5 h-5 text-muted-foreground animate-spin" />
                       )}
                     </div>
@@ -989,7 +1153,11 @@ export default function CreateRescueTeamPage() {
                   <p className="text-xs text-muted-foreground mt-1 max-w-[250px]">
                     {searchQuery
                       ? "Liên hệ hoặc tìm kiếm với từ khóa khác."
-                      : "Chỉ hiển thị người cứu hộ đã được duyệt và đang hoạt động."}
+                      : isBackendAbilityFilterActive
+                        ? `Không có rescuer có khả năng phù hợp với chuyên môn ${selectedTeamTypeLabel}.`
+                        : isEventScopedTeamCreation
+                          ? "Không có rescuer nào đã check-in phù hợp để thêm vào đội ở sự kiện này."
+                          : "Chỉ hiển thị người cứu hộ đã được duyệt và đang hoạt động."}
                   </p>
                 </div>
               )}
@@ -998,5 +1166,13 @@ export default function CreateRescueTeamPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function CreateRescueTeamPage() {
+  return (
+    <Suspense>
+      <CreateRescueTeamContent />
+    </Suspense>
   );
 }

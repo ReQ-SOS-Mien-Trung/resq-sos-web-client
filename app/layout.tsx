@@ -12,6 +12,17 @@ export const metadata: Metadata = {
     "Hệ thống tiếp nhận tin báo SOS và điều phối cứu hộ khẩn cấp, hỗ trợ kịp thời cho người dân khu vực Miền Trung.",
 };
 
+const themeInitScript = `
+  try {
+    const rawThemeState = window.localStorage.getItem("theme-storage");
+    const parsedThemeState = rawThemeState ? JSON.parse(rawThemeState) : null;
+    const isDarkMode = Boolean(parsedThemeState?.state?.isDarkMode);
+
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    document.documentElement.style.colorScheme = isDarkMode ? "dark" : "light";
+  } catch {}
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -20,6 +31,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeInitScript}
+        </Script>
         <Script
           src="https://cdn.lordicon.com/lordicon.js"
           strategy="beforeInteractive"

@@ -5,11 +5,13 @@ const UPLOAD_PRESET =
 export async function uploadImageToCloudinary(
   file: File,
   folder = "resq/avatars",
+  assetFolder?: string,
 ): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("upload_preset", UPLOAD_PRESET);
   if (folder) formData.append("folder", folder);
+  if (assetFolder) formData.append("asset_folder", assetFolder);
 
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
@@ -22,6 +24,10 @@ export async function uploadImageToCloudinary(
   const data = await res.json();
   if (!data.secure_url) throw new Error("Upload ảnh thất bại");
   return data.secure_url as string;
+}
+
+export function uploadMessageImageToCloudinary(file: File): Promise<string> {
+  return uploadImageToCloudinary(file, "messages", "messages");
 }
 
 export async function uploadRawToCloudinary(

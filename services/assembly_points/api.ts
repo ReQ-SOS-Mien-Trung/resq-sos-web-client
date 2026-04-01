@@ -2,7 +2,6 @@ import api from "@/config/axios";
 import {
   GetAssemblyPointsResponse,
   GetAssemblyPointsParams,
-  AssemblyPointEntity,
   AssemblyPointDetailEntity,
   CreateAssemblyPointRequest,
   CreateAssemblyPointResponse,
@@ -16,6 +15,10 @@ import {
   ScheduleAssemblyPointGatheringRequest,
   ScheduleAssemblyPointGatheringResponse,
   StartAssemblyPointGatheringRequest,
+  GetAssemblyPointEventsParams,
+  GetAssemblyPointEventsResponse,
+  GetAssemblyPointCheckedInRescuersParams,
+  GetAssemblyPointCheckedInRescuersResponse,
 } from "./type";
 
 /**
@@ -151,4 +154,47 @@ export async function startAssemblyPointGathering(
 ): Promise<void> {
   const { eventId } = payload;
   await api.post(`/personnel/assembly-point/events/${eventId}/start-gathering`);
+}
+
+/**
+ * Get events by assembly point with pagination
+ * GET /personnel/assembly-point/{id}/events
+ */
+export async function getAssemblyPointEvents(
+  id: number,
+  params?: GetAssemblyPointEventsParams,
+): Promise<GetAssemblyPointEventsResponse> {
+  const { data } = await api.get(`/personnel/assembly-point/${id}/events`, {
+    params: {
+      pageNumber: params?.pageNumber ?? 1,
+      pageSize: params?.pageSize ?? 10,
+    },
+  });
+  return data;
+}
+
+/**
+ * Get checked-in rescuers for an assembly point event with pagination and filters
+ * GET /personnel/assembly-point/events/{eventId}/checked-in-rescuers
+ */
+export async function getAssemblyPointCheckedInRescuers(
+  eventId: number,
+  params?: GetAssemblyPointCheckedInRescuersParams,
+): Promise<GetAssemblyPointCheckedInRescuersResponse> {
+  const { data } = await api.get(
+    `/personnel/assembly-point/events/${eventId}/checked-in-rescuers`,
+    {
+      params: {
+        pageNumber: params?.pageNumber ?? 1,
+        pageSize: params?.pageSize ?? 10,
+        rescuerType: params?.rescuerType,
+        abilitySubgroupCode: params?.abilitySubgroupCode,
+        abilityCategoryCode: params?.abilityCategoryCode,
+        firstName: params?.firstName,
+        lastName: params?.lastName,
+        email: params?.email,
+      },
+    },
+  );
+  return data;
 }
