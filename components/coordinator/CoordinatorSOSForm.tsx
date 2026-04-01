@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import {
-  ArrowCounterClockwise,
   Crosshair,
   FirstAid,
   MagnifyingGlass,
@@ -450,19 +449,6 @@ export default function CoordinatorSOSForm({
     });
 
     setActiveEditor(isSelected ? null : { mode: "clothing", personId });
-  };
-
-  const handleReset = () => {
-    setAddress("");
-    setLat(toCoordinateString(initialCoordinates?.lat));
-    setLng(toCoordinateString(initialCoordinates?.lng));
-    setSosType("");
-    setPeopleCount(emptyPeopleCount());
-    setSharedPeople([]);
-    setRescue(createEmptyRescueState());
-    setRelief(createEmptyReliefState());
-    setAdditionalDescription("");
-    setActiveEditor(null);
   };
 
   const handleSubmit = (event: React.FormEvent) => {
