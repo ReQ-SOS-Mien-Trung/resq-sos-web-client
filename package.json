@@ -13,6 +13,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@gsap/react": "^2.1.2",
+    "@iconify/react": "^6.0.2",
     "@mapbox/polyline": "^1.2.1",
     "@microsoft/signalr": "^10.0.0",
     "@phosphor-icons/react": "^2.1.10",

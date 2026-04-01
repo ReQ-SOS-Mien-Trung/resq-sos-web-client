@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { Icon } from "@iconify/react";
 import { SOSDetailsPanelProps } from "@/type";
 import { cn } from "@/lib/utils";
 import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
@@ -42,6 +43,130 @@ import {
 
 // Panel width
 const PANEL_WIDTH = 420;
+
+type MedicalIssueTier = "critical" | "severe" | "moderate" | "low" | "other";
+
+const MEDICAL_ISSUE_META: Record<
+  string,
+  { label: string; icon: string; tier: MedicalIssueTier }
+> = {
+  UNCONSCIOUS: { label: "Bất tỉnh", icon: "ph:brain", tier: "critical" },
+  BREATHING_DIFFICULTY: {
+    label: "Khó thở",
+    icon: "ph:lungs",
+    tier: "critical",
+  },
+  CHEST_PAIN_STROKE: {
+    label: "Đau ngực / Đột quỵ",
+    icon: "ph:heartbreak",
+    tier: "critical",
+  },
+  DROWNING: { label: "Đuối nước", icon: "ph:waves", tier: "critical" },
+  SEVERELY_BLEEDING: {
+    label: "Chảy máu nặng",
+    icon: "ph:drop",
+    tier: "severe",
+  },
+  BLEEDING: { label: "Chảy máu", icon: "ph:drop", tier: "severe" },
+  BURNS: { label: "Bỏng", icon: "ph:fire", tier: "severe" },
+  HEAD_INJURY: {
+    label: "Chấn thương đầu",
+    icon: "ph:head-circuit",
+    tier: "severe",
+  },
+  CANNOT_MOVE: {
+    label: "Không thể di chuyển",
+    icon: "ph:wheelchair",
+    tier: "severe",
+  },
+  HIGH_FEVER: {
+    label: "Sốt cao",
+    icon: "ph:thermometer-hot",
+    tier: "moderate",
+  },
+  DEHYDRATION: { label: "Mất nước", icon: "ph:drop", tier: "moderate" },
+  FRACTURE: { label: "Gãy xương", icon: "ph:bone", tier: "moderate" },
+  INFANT_NEEDS_MILK: {
+    label: "Trẻ sơ sinh cần sữa",
+    icon: "ph:baby-bottle",
+    tier: "moderate",
+  },
+  LOST_PARENT: {
+    label: "Lạc cha mẹ",
+    icon: "ph:person-simple-run",
+    tier: "moderate",
+  },
+  CHRONIC_DISEASE: {
+    label: "Cần thuốc bệnh nền",
+    icon: "ph:pill",
+    tier: "low",
+  },
+  CONFUSION: {
+    label: "Lú lẫn / mất phương hướng",
+    icon: "ph:brain",
+    tier: "low",
+  },
+  NEEDS_MEDICAL_DEVICE: {
+    label: "Cần thiết bị y tế",
+    icon: "ph:stethoscope",
+    tier: "low",
+  },
+  OTHER: { label: "Khác", icon: "ph:first-aid", tier: "other" },
+  // Backward compatibility for older payloads
+  MOBILITY_IMPAIRMENT: {
+    label: "Hạn chế vận động",
+    icon: "ph:wheelchair",
+    tier: "severe",
+  },
+  PREGNANCY: { label: "Thai kỳ", icon: "ph:person-simple", tier: "low" },
+  MINOR_WOUND: { label: "Vết thương nhẹ", icon: "ph:bandage", tier: "low" },
+  SEVERE_WOUND: { label: "Vết thương nặng", icon: "ph:drop", tier: "severe" },
+  INFECTION: { label: "Nhiễm trùng", icon: "ph:virus", tier: "low" },
+  SHOCK: { label: "Sốc/Ngất", icon: "ph:warning-circle", tier: "moderate" },
+  FEVER: { label: "Sốt", icon: "ph:thermometer-hot", tier: "moderate" },
+  HYPOTHERMIA: { label: "Hạ thân nhiệt", icon: "ph:snowflake", tier: "low" },
+  STARVATION: { label: "Đói lả", icon: "ph:fork-knife", tier: "moderate" },
+};
+
+const MEDICAL_ISSUE_CODE_ALIASES: Record<string, string> = {
+  CHESTPAIN_STROKE: "CHEST_PAIN_STROKE",
+  CANNOTMOVE: "CANNOT_MOVE",
+  BURN: "BURNS",
+};
+
+function normalizeMedicalIssueCode(code: string): string {
+  const normalized = code
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  return MEDICAL_ISSUE_CODE_ALIASES[normalized] ?? normalized;
+}
+
+function getMedicalIssueMeta(code: string) {
+  return MEDICAL_ISSUE_META[normalizeMedicalIssueCode(code)] ?? null;
+}
+
+function getMedicalIssueColorClass(code: string): string {
+  const tier = getMedicalIssueMeta(code)?.tier ?? "other";
+
+  if (tier === "critical") {
+    return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400";
+  }
+
+  if (tier === "severe") {
+    return "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
+  }
+
+  if (tier === "moderate") {
+    return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400";
+  }
+
+  if (tier === "low") {
+    return "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400";
+  }
+
+  return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
+}
 
 function ParsedMessage({
   text,
@@ -172,7 +297,7 @@ function ParsedMessage({
                           </div>
                           <Badge
                             variant="outline"
-                            className={`shrink-0 text-[10.5px] px-2 py-0.5 h-6 font-medium ${severityColor}`}
+                            className={`shrink-0 text-xs px-2.5 py-0.5 h-6 font-medium ${severityColor}`}
                           >
                             {severity}
                           </Badge>
@@ -388,6 +513,12 @@ const SOSDetailsPanel = ({
 
   const severityLabel = (value?: string) => {
     const normalized = (value || "").toLowerCase();
+    if (normalized === "none") {
+      return "Chưa đánh giá";
+    }
+    if (normalized.includes("high") || normalized.includes("cao")) {
+      return "Cao";
+    }
     if (normalized.includes("critical") || normalized.includes("nghiêm")) {
       return "Nghiêm trọng";
     }
@@ -404,6 +535,9 @@ const SOSDetailsPanel = ({
     const normalized = (value || "").toLowerCase();
     if (normalized.includes("critical") || normalized.includes("nghiêm")) {
       return "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50";
+    }
+    if (normalized.includes("high") || normalized.includes("cao")) {
+      return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
     }
     if (normalized.includes("moderate") || normalized.includes("trung")) {
       return "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-900/50";
@@ -424,7 +558,8 @@ const SOSDetailsPanel = ({
 
   const issueLabel = (value: string) => getMedicalIssueLabel(value);
 
-  const supplyDetails = sosRequest.supplyDetails ?? sosRequest.structuredData?.supply_details;
+  const supplyDetails =
+    sosRequest.supplyDetails ?? sosRequest.structuredData?.supply_details;
   const specialDietPersons =
     sosRequest.specialDietPersons ?? supplyDetails?.special_diet_persons ?? [];
   const clothingPersons =
@@ -450,7 +585,9 @@ const SOSDetailsPanel = ({
       personType: person.person_type,
       dietDescription: person.diet_description,
       gender: existing?.gender,
-      needs: Array.from(new Set([...(existing?.needs ?? []), "Chế độ ăn đặc biệt"])),
+      needs: Array.from(
+        new Set([...(existing?.needs ?? []), "Chế độ ăn đặc biệt"]),
+      ),
     });
   });
 
@@ -756,22 +893,22 @@ const SOSDetailsPanel = ({
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {sosRequest.situation && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-sm">
                       {getSituationLabel(sosRequest.situation)}
                     </Badge>
                   )}
                   {sosRequest.canMove === false && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-sm">
                       Không thể di chuyển
                     </Badge>
                   )}
                   {sosRequest.hasInjured && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-sm">
                       Có người bị thương
                     </Badge>
                   )}
                   {sosRequest.othersAreStable === false && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-sm">
                       Tình trạng không ổn định
                     </Badge>
                   )}
@@ -793,7 +930,8 @@ const SOSDetailsPanel = ({
                       const rank = (s?: string) => {
                         const v = (s || "").toLowerCase();
                         if (v.includes("critical") || v.includes("nghiêm"))
-                          return 3;
+                          return 4;
+                        if (v.includes("high") || v.includes("cao")) return 3;
                         if (v.includes("moderate") || v.includes("trung"))
                           return 2;
                         if (v.includes("low") || v.includes("nhẹ")) return 1;
@@ -806,7 +944,6 @@ const SOSDetailsPanel = ({
                         person.customName?.trim() ||
                         person.name ||
                         `${personTypeLabel(person.personType)} ${person.index}`;
-
                       return (
                         <div
                           key={`${person.index}-${displayName}`}
@@ -824,7 +961,7 @@ const SOSDetailsPanel = ({
                             <Badge
                               variant="outline"
                               className={cn(
-                                "text-[10.5px] px-2 py-0.5 h-6 shrink-0 font-medium",
+                                "text-xs px-2.5 py-0.5 h-6 shrink-0 font-medium",
                                 severityBadgeClass(person.severity),
                               )}
                             >
@@ -835,15 +972,28 @@ const SOSDetailsPanel = ({
                           {person.medicalIssues &&
                             person.medicalIssues.length > 0 && (
                               <div className="flex flex-wrap gap-1.5 mt-2">
-                                {person.medicalIssues.map((issue, idx) => (
-                                  <Badge
-                                    key={`${displayName}-${issue}-${idx}`}
-                                    variant="secondary"
-                                    className="text-[10.5px] h-5 px-1.5"
-                                  >
-                                    {issueLabel(issue)}
-                                  </Badge>
-                                ))}
+                                {person.medicalIssues.map((issue, idx) => {
+                                  const issueMeta = getMedicalIssueMeta(issue);
+                                  return (
+                                    <Badge
+                                      key={`${displayName}-${issue}-${idx}`}
+                                      variant="secondary"
+                                      className="text-xs h-6 px-2 inline-flex items-center gap-1"
+                                    >
+                                      {issueMeta ? (
+                                        <>
+                                          <Icon
+                                            icon={issueMeta.icon}
+                                            className="h-3 w-3"
+                                          />
+                                          <span>{issueMeta.label}</span>
+                                        </>
+                                      ) : (
+                                        issueLabel(issue)
+                                      )}
+                                    </Badge>
+                                  );
+                                })}
                               </div>
                             )}
                         </div>
@@ -862,103 +1012,8 @@ const SOSDetailsPanel = ({
                   </h4>
                   <div className="flex flex-wrap gap-2">
                     {sosRequest.medicalIssues.map((issue, idx) => {
-                      const issueLower = issue
-                        .toLowerCase()
-                        .replace(/[_\-]/g, "");
-                      const issueLabels: Record<string, string> = {
-                        unconscious: "😵 Hôn mê / Mất ý thức",
-                        drowning: "🌊 Đuối nước",
-                        breathingdifficulty: "😮💨 Khó thở",
-                        chestpainstroke: "💔 Đau ngực / Đột quỵ",
-                        severelybleeding: "🩸 Chảy máu nặng",
-                        bleeding: "🩸 Chảy máu",
-                        burns: "🔥 Bỏng",
-                        burn: "🔥 Bỏng",
-                        headinjury: "🤕 Chấn thương đầu",
-                        cannotmove: "🚶 Không di chuyển được",
-                        mobilityimpairment: "🦽 Hạn chế vận động",
-                        highfever: "🤒 Sốt cao",
-                        dehydration: "💧 Mất nước",
-                        fracture: "🦴 Gãy xương",
-                        pregnancy: "🤰 Phụ nữ mang thai",
-                        infantneedsmilk: "🍼 Trẻ cần sữa",
-                        lostparent: "🧸 Trẻ lạc cha mẹ",
-                        chronicdisease: "💊 Bệnh mãn tính",
-                        confusion: "🧠 Lú lẫn / Mất phương hướng",
-                        needsmedicaldevice: "🩺 Cần thiết bị y tế",
-                        other: "🏥 Khác",
-                        // Fallback for older data tags
-                        minor_wound: "Vết thương nhẹ",
-                        severe_wound: "🩸 Vết thương nặng",
-                        infection: "Nhiễm trùng",
-                        shock: "Sốc/Ngất",
-                        fever: "🤒 Sốt cao",
-                        hypothermia: "Hạ thân nhiệt",
-                        starvation: "Đói lả",
-                      };
-
-                      let colorClass =
-                        "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"; // default
-
-                      // 1. Đe dọa tính mạng (Red)
-                      if (
-                        [
-                          "unconscious",
-                          "drowning",
-                          "breathingdifficulty",
-                          "chestpainstroke",
-                        ].includes(issueLower)
-                      ) {
-                        colorClass =
-                          "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400";
-                      }
-                      // 2. Nghiêm trọng (Orange)
-                      else if (
-                        [
-                          "severelybleeding",
-                          "bleeding",
-                          "burns",
-                          "burn",
-                          "headinjury",
-                          "cannotmove",
-                          "severe_wound",
-                          "mobilityimpairment",
-                        ].includes(issueLower)
-                      ) {
-                        colorClass =
-                          "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
-                      }
-                      // 3. Trung bình (Yellow)
-                      else if (
-                        [
-                          "highfever",
-                          "dehydration",
-                          "fracture",
-                          "infantneedsmilk",
-                          "lostparent",
-                          "fever",
-                          "shock",
-                          "starvation",
-                        ].includes(issueLower)
-                      ) {
-                        colorClass =
-                          "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400";
-                      }
-                      // 4. Nhẹ (Blue/Cyan)
-                      else if (
-                        [
-                          "chronicdisease",
-                          "confusion",
-                          "needsmedicaldevice",
-                          "pregnancy",
-                          "minor_wound",
-                          "infection",
-                          "hypothermia",
-                        ].includes(issueLower)
-                      ) {
-                        colorClass =
-                          "bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400";
-                      }
+                      const issueMeta = getMedicalIssueMeta(issue);
+                      const colorClass = getMedicalIssueColorClass(issue);
 
                       return (
                         <div
@@ -969,7 +1024,17 @@ const SOSDetailsPanel = ({
                           )}
                         >
                           <span className="text-sm font-medium">
-                            {issueLabels[issueLower] || issue}
+                            {issueMeta ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                <Icon
+                                  icon={issueMeta.icon}
+                                  className="h-4 w-4"
+                                />
+                                <span>{issueMeta.label}</span>
+                              </span>
+                            ) : (
+                              issue
+                            )}
                           </span>
                         </div>
                       );
@@ -1019,7 +1084,7 @@ const SOSDetailsPanel = ({
                     <div className="text-sm text-muted-foreground">
                       Không có yêu cầu cụ thể
                     </div>
-                )}
+                  )}
               </div>
             </div>
 
@@ -1127,12 +1192,13 @@ const SOSDetailsPanel = ({
                         lines={[`Legacy: ${supplyDetails.special_diet_need}`]}
                       />
                     )}
-                  {!clothingPersons.length && !!supplyDetails?.clothing_status && (
-                    <DetailCard
-                      title="Quần áo"
-                      lines={[`Legacy: ${supplyDetails.clothing_status}`]}
-                    />
-                  )}
+                  {!clothingPersons.length &&
+                    !!supplyDetails?.clothing_status && (
+                      <DetailCard
+                        title="Quần áo"
+                        lines={[`Legacy: ${supplyDetails.clothing_status}`]}
+                      />
+                    )}
                 </div>
 
                 {requestedPeople.length > 0 && (
@@ -1162,7 +1228,10 @@ const SOSDetailsPanel = ({
                               )}
                             </div>
                             {person.gender && (
-                              <Badge variant="outline" className="text-[10.5px]">
+                              <Badge
+                                variant="outline"
+                                className="text-[10.5px]"
+                              >
                                 {getClothingGenderLabel(person.gender)}
                               </Badge>
                             )}
@@ -1318,50 +1387,65 @@ const SOSDetailsPanel = ({
                               string,
                               { label: string; icon: string }
                             > = {
-                              FIRST_AID_KIT: { label: "Bộ sơ cứu", icon: "🩹" },
+                              FIRST_AID_KIT: {
+                                label: "Bộ sơ cứu",
+                                icon: "ph:first-aid-kit",
+                              },
                               MEDICAL_SUPPLIES: {
                                 label: "Vật tư y tế",
-                                icon: "💊",
+                                icon: "ph:pill",
                               },
-                              BANDAGES: { label: "Băng gạc", icon: "🩻" },
+                              BANDAGES: {
+                                label: "Băng gạc",
+                                icon: "ph:bandage",
+                              },
                               BLOOD_CLOTTING_AGENTS: {
                                 label: "Thuốc cầm máu",
-                                icon: "🩸",
+                                icon: "ph:drop",
                               },
-                              LIFE_JACKET: { label: "Áo phao", icon: "🦺" },
+                              LIFE_JACKET: {
+                                label: "Áo phao",
+                                icon: "ph:lifebuoy",
+                              },
                               RESCUE_BOAT: {
                                 label: "Xuồng cứu hộ",
-                                icon: "🚤",
+                                icon: "ph:boat",
                               },
-                              ROPE: { label: "Dây thừng", icon: "🪢" },
+                              ROPE: {
+                                label: "Dây thừng",
+                                icon: "ph:circles-three",
+                              },
                               RESCUE_EQUIPMENT: {
                                 label: "Thiết bị cứu hộ",
-                                icon: "🔧",
+                                icon: "ph:toolbox",
                               },
                               FIRE_EXTINGUISHER: {
                                 label: "Bình chữa cháy",
-                                icon: "🧯",
+                                icon: "ph:fire-extinguisher",
                               },
                               PROTECTIVE_GEAR: {
                                 label: "Đồ bảo hộ",
-                                icon: "🦺",
+                                icon: "ph:shield-check",
                               },
-                              FOOD_RATIONS: { label: "Lương thực", icon: "🍱" },
-                              WATER: { label: "Nước uống", icon: "💧" },
-                              BLANKETS: { label: "Chăn mền", icon: "🛏️" },
+                              FOOD_RATIONS: {
+                                label: "Lương thực",
+                                icon: "ph:package",
+                              },
+                              WATER: { label: "Nước uống", icon: "ph:drop" },
+                              BLANKETS: { label: "Chăn mền", icon: "ph:bed" },
                               TRANSPORT_VEHICLE: {
                                 label: "Phương tiện vận chuyển",
-                                icon: "🚑",
+                                icon: "ph:ambulance",
                               },
                               STRETCHER: {
                                 label: "Cáng cứu thương",
-                                icon: "🏥",
+                                icon: "ph:first-aid",
                               },
                             };
 
                             return (
                               <div className="mt-3 pt-3 border-t border-border/50">
-                                <h5 className="text-[13px] font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                                <h5 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
                                   <FirstAid className="w-3.5 h-3.5" /> Vật phẩm
                                   gợi ý:
                                 </h5>
@@ -1372,11 +1456,19 @@ const SOSDetailsPanel = ({
                                       <Badge
                                         key={idx}
                                         variant="outline"
-                                        className="text-[11px] px-2 py-0.5 h-auto font-medium bg-background border-border/60"
+                                        className="text-xs px-2.5 py-1 h-auto font-medium bg-background border-border/60 inline-flex items-center gap-1.5"
                                       >
-                                        {config
-                                          ? `${config.icon} ${config.label}`
-                                          : item}
+                                        {config ? (
+                                          <>
+                                            <Icon
+                                              icon={config.icon}
+                                              className="h-3.5 w-3.5 text-muted-foreground"
+                                            />
+                                            <span>{config.label}</span>
+                                          </>
+                                        ) : (
+                                          item
+                                        )}
                                       </Badge>
                                     );
                                   })}
@@ -1422,7 +1514,7 @@ const SOSDetailsPanel = ({
                               {aiAnalyses[0].confidenceScore && (
                                 <Badge
                                   variant="secondary"
-                                  className="text-[10px] bg-white/60 dark:bg-black/40 text-violet-700 dark:text-violet-300 hover:bg-white/80 border border-violet-200/50 dark:border-violet-800/50"
+                                  className="text-xs bg-white/60 dark:bg-black/40 text-violet-700 dark:text-violet-300 hover:bg-white/80 border border-violet-200/50 dark:border-violet-800/50"
                                 >
                                   Tin cậy:{" "}
                                   {(

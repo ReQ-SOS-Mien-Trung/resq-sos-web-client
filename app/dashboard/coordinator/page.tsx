@@ -78,6 +78,7 @@ import AiStreamPanel from "@/components/coordinator/AiStreamPanel";
 
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import { useThemeStore } from "@/stores/theme.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { deriveSOSNeeds } from "@/lib/sos";
@@ -356,10 +357,11 @@ const CoordinatorDashboardContent = () => {
   const [flyToLocation, setFlyToLocation] = useState<Location | null>(null);
   const [flyToZoom, setFlyToZoom] = useState<number | undefined>(undefined);
   const [isConnected] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
+  const isDarkMode = useThemeStore((state) => state.isDarkMode);
+  const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
 
   // ─── Panel State ───
   const [sosDetailOpen, setSOSDetailOpen] = useState(false);
@@ -845,13 +847,6 @@ const CoordinatorDashboardContent = () => {
     aiStream.startStream(activeClusterId);
   }, [activeClusterId, aiStream]);
 
-  const toggleDarkMode = useCallback(() => {
-    setIsDarkMode((prev) => {
-      document.documentElement.classList.toggle("dark");
-      return !prev;
-    });
-  }, []);
-
   // ─── Derived data for panels ───
 
   const rescuePlanSOSRequests = useMemo(
@@ -942,26 +937,43 @@ const CoordinatorDashboardContent = () => {
             <span>Quản lý Đội cứu hộ</span>
           </Button>
 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/dashboard/coordinator/rescuers")}
+            className="flex items-center gap-2"
+          >
+            <User className="h-4 w-4" />
+            <span>Quản lý Rescuer</span>
+          </Button>
+
           {/* Connection Status */}
           <div
             className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium",
+              "relative flex h-9 w-9 items-center justify-center rounded-full border",
               isConnected
-                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+                ? "border-green-200 bg-green-100 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-400"
+                : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
             )}
+            title={isConnected ? "Đang kết nối" : "Mất kết nối"}
+            aria-label={isConnected ? "Đang kết nối" : "Mất kết nối"}
           >
             {isConnected ? (
               <>
-                <WifiHigh className="h-3 w-3" weight="bold" />
-                <span>Đang kết nối</span>
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-green-500 opacity-75 animate-ping" />
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-green-500 dark:border-zinc-900/70" />
               </>
             ) : (
-              <>
-                <WifiSlash className="h-3 w-3" weight="bold" />
-                <span>Mất kết nối</span>
-              </>
+              <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-red-500 dark:border-zinc-900/70" />
             )}
+            {isConnected ? (
+              <WifiHigh className="h-4 w-4" weight="bold" />
+            ) : (
+              <WifiSlash className="h-4 w-4" weight="bold" />
+            )}
+            <span className="sr-only">
+              {isConnected ? "Đang kết nối" : "Mất kết nối"}
+            </span>
           </div>
 
           {/* Weather Map Toggle */}

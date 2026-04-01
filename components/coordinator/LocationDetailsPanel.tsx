@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { DepotEntity } from "@/services/depot/type";
 import {
   useAssemblyPointById,
+  useAssemblyPointEvents,
   useScheduleAssemblyPointGathering,
   useStartAssemblyPointGathering,
 } from "@/services/assembly_points/hooks";
 import type {
   AssemblyPointEntity,
   AssemblyPointDetailEntity,
+  AssemblyPointEventEntity,
   AssemblyPointTeam,
   AssemblyPointTeamMember,
 } from "@/services/assembly_points/type";
@@ -51,6 +54,8 @@ import {
   Hash,
   Info,
   CalendarBlank,
+  CaretDown,
+  CaretUp,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { AxiosError } from "axios";
@@ -59,8 +64,6 @@ import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
 
 // Panel width
 const PANEL_WIDTH = 420;
-const MIN_GATHERING_HOURS = 48;
-const GATHERING_SUBMIT_BUFFER_MINUTES = 5;
 
 const assemblyTeamTypeLabel: Record<AssemblyPointTeam["teamType"], string> = {
   Rescue: "Cứu hộ",
@@ -68,20 +71,42 @@ const assemblyTeamTypeLabel: Record<AssemblyPointTeam["teamType"], string> = {
   Transportation: "Vận chuyển",
 };
 
-const assemblyTeamStatusLabel: Record<AssemblyPointTeam["status"], string> = {
+const assemblyTeamStatusLabel: Record<string, string> = {
   AwaitingAcceptance: "Chờ xác nhận",
   Ready: "Sẵn sàng",
   Gathering: "Đang tập hợp",
+  Available: "Sẵn sàng điều phối",
+  Assigned: "Đã phân công",
+  OnMission: "Đang làm nhiệm vụ",
+  Stuck: "Gặp sự cố",
+  Unavailable: "Không khả dụng",
+  Disbanded: "Đã giải tán",
 };
 
-const assemblyTeamStatusColor: Record<AssemblyPointTeam["status"], string> = {
+const assemblyTeamStatusColor: Record<string, string> = {
   AwaitingAcceptance:
     "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300",
   Ready:
     "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300",
   Gathering:
     "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-300",
+  Available:
+    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300",
+  Assigned:
+    "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800/60 dark:bg-indigo-950/40 dark:text-indigo-300",
+  OnMission:
+    "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800/60 dark:bg-violet-950/40 dark:text-violet-300",
+  Stuck:
+    "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-300",
+  Unavailable:
+    "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300",
+  Disbanded:
+    "border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-800/60 dark:bg-zinc-950/40 dark:text-zinc-300",
 };
+
+function formatStatusText(status: string): string {
+  return status.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
 
 const memberStatusLabel: Record<AssemblyPointTeamMember["status"], string> = {
   Accepted: "Đã xác nhận",
@@ -93,8 +118,27 @@ const memberRoleLabel: Record<AssemblyPointTeamMember["roleInTeam"], string> = {
   Member: "Thành viên",
 };
 
+const assemblyEventStatusLabel: Record<string, string> = {
+  Scheduled: "Đã lên lịch",
+  Gathering: "Đang tập hợp",
+  Completed: "Đã hoàn tất",
+  Cancelled: "Đã hủy",
+};
+
+const assemblyEventStatusColor: Record<string, string> = {
+  Scheduled:
+    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300",
+  Gathering:
+    "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-300",
+  Completed:
+    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300",
+  Cancelled:
+    "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/40 dark:text-rose-300",
+};
+
 function formatLastUpdated(dateStr: string | null): string {
   if (!dateStr) return "Chưa cập nhật";
+
   try {
     const date = new Date(dateStr);
     const now = new Date();
@@ -138,21 +182,10 @@ function formatDateTimeVi(date: Date): string {
 }
 
 function getMinimumGatheringDate(now = new Date()): Date {
-  const minDate = new Date(
-    now.getTime() +
-      MIN_GATHERING_HOURS * 60 * 60 * 1000 +
-      GATHERING_SUBMIT_BUFFER_MINUTES * 60 * 1000,
-  );
+  const date = new Date(now);
 
-  // Input datetime-local uses minute precision, so normalize seconds.
-  minDate.setSeconds(0, 0);
-  return minDate;
-}
-
-function clampToMinimumDate(date: Date, minDate: Date): Date {
-  if (date.getTime() < minDate.getTime()) {
-    return new Date(minDate);
-  }
+  // Keep minute precision to match picker values.
+  date.setSeconds(0, 0);
   return date;
 }
 
@@ -193,6 +226,28 @@ function resolveActiveEventId(payload: unknown): number | null {
   }
   if (typeof data?.activeEvent?.id === "number") return data.activeEvent.id;
   return null;
+}
+
+function getDefaultEventId(
+  events: AssemblyPointEventEntity[],
+  activeEventId: number | null,
+): number | null {
+  if (!events.length) return null;
+
+  if (
+    typeof activeEventId === "number" &&
+    events.some((event) => event.eventId === activeEventId)
+  ) {
+    return activeEventId;
+  }
+
+  const gatheringEvent = events.find((event) => event.status === "Gathering");
+  if (gatheringEvent) return gatheringEvent.eventId;
+
+  const scheduledEvent = events.find((event) => event.status === "Scheduled");
+  if (scheduledEvent) return scheduledEvent.eventId;
+
+  return events[0]?.eventId ?? null;
 }
 
 function getInventoryQuantities(item: InventoryItemEntity): {
@@ -498,7 +553,7 @@ function DepotDetails({
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-semibold">Tồn kho hiện tại</h4>
             {inventoryData ? (
-              <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+              <Badge variant="outline" className="text-xs h-5 px-1.5">
                 {inventoryData.totalCount} loại
               </Badge>
             ) : null}
@@ -518,19 +573,19 @@ function DepotDetails({
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
-                  <p className="text-[10px] text-muted-foreground">Tổng tồn</p>
+                  <p className="text-xs text-muted-foreground">Tổng tồn</p>
                   <p className="text-sm font-bold text-slate-800">
                     {inventorySummary.totalStock.toLocaleString("vi-VN")}
                   </p>
                 </div>
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2">
-                  <p className="text-[10px] text-amber-700">Đã giữ chỗ</p>
+                  <p className="text-xs text-amber-700">Đã giữ chỗ</p>
                   <p className="text-sm font-bold text-amber-800">
                     {inventorySummary.reservedStock.toLocaleString("vi-VN")}
                   </p>
                 </div>
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
-                  <p className="text-[10px] text-emerald-700">Còn khả dụng</p>
+                  <p className="text-xs text-emerald-700">Còn khả dụng</p>
                   <p className="text-sm font-bold text-emerald-800">
                     {inventorySummary.availableStock.toLocaleString("vi-VN")}
                   </p>
@@ -549,10 +604,7 @@ function DepotDetails({
                       <p className="text-sm font-medium truncate">
                         {item.itemModelName}
                       </p>
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] shrink-0"
-                      >
+                      <Badge variant="secondary" className="text-xs shrink-0">
                         {item.itemType === "Consumable"
                           ? "Tiêu thụ"
                           : "Tái sử dụng"}
@@ -562,26 +614,28 @@ function DepotDetails({
                     <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{item.categoryName}</span>
                       <span>•</span>
-                      <span>{item.targetGroup}</span>
+                      <span>
+                        {item.targetGroups.length > 0
+                          ? item.targetGroups.join(", ")
+                          : "Chưa phân nhóm"}
+                      </span>
                     </div>
 
                     <div className="mt-2 grid grid-cols-3 gap-1.5">
                       <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
-                        <p className="text-[10px] text-slate-600">Tổng tồn</p>
+                        <p className="text-xs text-slate-600">Tổng tồn</p>
                         <p className="text-sm font-semibold leading-none text-slate-800">
                           {qty.total.toLocaleString("vi-VN")}
                         </p>
                       </div>
                       <div className="min-w-0 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-                        <p className="text-[10px] text-amber-700">Đã giữ</p>
+                        <p className="text-xs text-amber-700">Đã giữ</p>
                         <p className="text-sm font-semibold leading-none text-amber-800">
                           {qty.reserved.toLocaleString("vi-VN")}
                         </p>
                       </div>
                       <div className="min-w-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5">
-                        <p className="text-[10px] text-emerald-700">
-                          Còn khả dụng
-                        </p>
+                        <p className="text-xs text-emerald-700">Còn khả dụng</p>
                         <p className="text-sm font-semibold leading-none text-emerald-800">
                           {qty.available.toLocaleString("vi-VN")}
                         </p>
@@ -612,8 +666,13 @@ function AssemblyPointDetails({
   assemblyPoint: AssemblyPointEntity;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [assemblyDateInput, setAssemblyDateInput] = useState<Date | null>(null);
   const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [expandedTeamIds, setExpandedTeamIds] = useState<
+    Record<number, boolean>
+  >({});
 
   const {
     data: assemblyPointDetail,
@@ -621,6 +680,18 @@ function AssemblyPointDetails({
     isError: isAssemblyPointDetailError,
     refetch: refetchAssemblyPointDetail,
   } = useAssemblyPointById(assemblyPoint.id, { enabled: true });
+  const {
+    data: assemblyPointEvents,
+    isLoading: isAssemblyPointEventsLoading,
+    isError: isAssemblyPointEventsError,
+    refetch: refetchAssemblyPointEvents,
+  } = useAssemblyPointEvents(assemblyPoint.id, {
+    enabled: true,
+    params: {
+      pageNumber: 1,
+      pageSize: 10,
+    },
+  });
 
   const { mutateAsync: scheduleGathering, isPending: isSchedulingGathering } =
     useScheduleAssemblyPointGathering();
@@ -636,12 +707,35 @@ function AssemblyPointDetails({
       : [];
   const hasActiveEvent = Boolean(displayAssemblyPoint.hasActiveEvent);
   const activeEventId = resolveActiveEventId(displayAssemblyPoint);
+  const events = useMemo(() => {
+    if (!assemblyPointEvents?.items) return [];
+    return [...assemblyPointEvents.items].sort(
+      (a, b) =>
+        new Date(b.assemblyDate).getTime() - new Date(a.assemblyDate).getTime(),
+    );
+  }, [assemblyPointEvents]);
+
+  const selectedEvent = useMemo(
+    () => events.find((event) => event.eventId === selectedEventId) ?? null,
+    [events, selectedEventId],
+  );
 
   useEffect(() => {
     if (hasActiveEvent) {
       setShowScheduleForm(false);
     }
   }, [hasActiveEvent]);
+
+  useEffect(() => {
+    setSelectedEventId((previous) => {
+      if (typeof previous === "number") {
+        const exists = events.some((event) => event.eventId === previous);
+        if (exists) return previous;
+      }
+
+      return getDefaultEventId(events, activeEventId);
+    });
+  }, [events, activeEventId]);
 
   const statusConfig = assemblyPointStatusConfig[
     displayAssemblyPoint.status as keyof typeof assemblyPointStatusConfig
@@ -669,7 +763,7 @@ function AssemblyPointDetails({
     const minAllowedDate = getMinimumGatheringDate();
     if (assemblyDate.getTime() < minAllowedDate.getTime()) {
       toast.error(
-        `Thời điểm triệu tập phải từ 48 giờ trở lên. Vui lòng chọn từ ${formatDateTimeVi(minAllowedDate)} (giờ VN).`,
+        `Thời điểm triệu tập không được ở quá khứ. Vui lòng chọn từ ${formatDateTimeVi(minAllowedDate)} (giờ VN).`,
       );
       return;
     }
@@ -679,9 +773,7 @@ function AssemblyPointDetails({
         id: assemblyPoint.id,
         assemblyDate: assemblyDate.toISOString(),
       });
-      toast.success(
-        `Đã lên lịch tập trung thành công (Event #${result.eventId}).`,
-      );
+      toast.success(`Đã lên lịch tập trung thành công.`);
       setAssemblyDateInput(null);
     } catch (error) {
       const backendMessage = extractBackendErrorMessage(error);
@@ -690,17 +782,28 @@ function AssemblyPointDetails({
   };
 
   const handleStartGathering = async () => {
-    let targetEventId = activeEventId;
+    if (selectedEvent?.status === "Gathering") {
+      return;
+    }
+
+    let targetEventId = selectedEventId ?? activeEventId;
 
     if (!targetEventId) {
       const refreshed = await refetchAssemblyPointDetail();
       targetEventId = resolveActiveEventId(refreshed.data);
-      if (!targetEventId) {
-        toast.error(
-          "Khong xac dinh duoc eventId tu du lieu backend. Vui long kiem tra response detail assembly-point.",
-        );
-        return;
-      }
+    }
+
+    if (!targetEventId) {
+      const refreshedEvents = await refetchAssemblyPointEvents();
+      const fallbackEvents = refreshedEvents.data?.items ?? [];
+      targetEventId = getDefaultEventId(fallbackEvents, null);
+    }
+
+    if (!targetEventId) {
+      toast.error(
+        "Chưa có sự kiện tập kết phù hợp để mở check-in. Vui lòng lên lịch trước.",
+      );
+      return;
     }
 
     try {
@@ -708,11 +811,42 @@ function AssemblyPointDetails({
         eventId: targetEventId,
         assemblyPointId: assemblyPoint.id,
       });
-      toast.success("Đã mở check-in cho sự kiện tập kết đang hoạt động.");
+      toast.success(`Đã mở check-in cho sự kiện #${targetEventId}.`);
+      void refetchAssemblyPointEvents();
+      void refetchAssemblyPointDetail();
     } catch (error) {
       const backendMessage = extractBackendErrorMessage(error);
       toast.error(backendMessage || "Yeu cau that bai. Vui long thu lai.");
     }
+  };
+
+  const selectedEventStatusLabel = selectedEvent
+    ? (assemblyEventStatusLabel[selectedEvent.status] ?? selectedEvent.status)
+    : "Chưa chọn sự kiện";
+
+  const selectedEventStatusClass = selectedEvent
+    ? (assemblyEventStatusColor[selectedEvent.status] ??
+      "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300")
+    : "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300";
+
+  const shouldShowOpenCheckIn =
+    hasActiveEvent && selectedEvent?.status !== "Gathering";
+  const shouldShowCreateTeam =
+    hasActiveEvent && selectedEvent?.status === "Gathering";
+
+  const handleCreateTeam = () => {
+    const eventId = selectedEvent?.eventId ?? selectedEventId;
+    const query = eventId
+      ? `?assemblyPointId=${assemblyPoint.id}&eventId=${eventId}`
+      : "";
+    router.push(`/dashboard/coordinator/rescue-teams/create${query}`);
+  };
+
+  const toggleTeamExpand = (teamId: number) => {
+    setExpandedTeamIds((previous) => ({
+      ...previous,
+      [teamId]: !previous[teamId],
+    }));
   };
 
   return (
@@ -794,17 +928,27 @@ function AssemblyPointDetails({
             color="text-purple-600 dark:text-purple-400"
           />
           {hasActiveEvent ? (
-            <ActionButton
-              icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
-              label="Mở check-in"
-              color="text-[#FF5722]"
-              active={isStartingGathering}
-              onClick={handleStartGathering}
-            />
+            shouldShowOpenCheckIn ? (
+              <ActionButton
+                icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
+                label="Mở check-in"
+                color="text-[#FF5722]"
+                active={isStartingGathering}
+                disabled={isStartingGathering || !selectedEventId}
+                onClick={handleStartGathering}
+              />
+            ) : shouldShowCreateTeam ? (
+              <ActionButton
+                icon={<Users className="h-5 w-5" />}
+                label="Tạo team"
+                color="text-purple-600 dark:text-purple-400"
+                onClick={handleCreateTeam}
+              />
+            ) : null
           ) : (
             <ActionButton
               icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
-              label="Triệu tập"
+              label={showScheduleForm ? "Ẩn triệu tập" : "Triệu tập mới"}
               color="text-[#FF5722]"
               active={showScheduleForm}
               onClick={() => setShowScheduleForm((prev) => !prev)}
@@ -818,21 +962,11 @@ function AssemblyPointDetails({
               value={assemblyDateInput}
               onChange={setAssemblyDateInput}
             />
-            <p className="text-[11px] text-muted-foreground">
-              Điều kiện: thời điểm triệu tập phải từ 48 giờ trở lên kể từ hiện
-              tại. Hệ thống cộng thêm {GATHERING_SUBMIT_BUFFER_MINUTES} phút để
-              tránh lỗi sát giờ khi gửi yêu cầu.
+            <p className="text-xs text-muted-foreground">
+              Giờ triệu tập là thời điểm rescuer cần có mặt tại điểm tập kết để
+              check-in.
             </p>
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-[#FF5722]/40 text-[#FF5722] hover:bg-[#FF5722]/10"
-                onClick={() => setAssemblyDateInput(getMinimumGatheringDate())}
-              >
-                Gợi ý an toàn
-              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -849,6 +983,116 @@ function AssemblyPointDetails({
 
       {/* Content */}
       <div className="py-2">
+        {/* Events */}
+        <div className="px-5 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold">Sự kiện tập kết</h4>
+            <Badge variant="outline" className="text-xs h-5 px-1.5">
+              {assemblyPointEvents?.totalCount ?? 0} sự kiện
+            </Badge>
+          </div>
+
+          {isAssemblyPointEventsLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-9 w-full rounded-md" />
+              <Skeleton className="h-20 w-full rounded-lg" />
+            </div>
+          ) : isAssemblyPointEventsError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+              Không tải được danh sách sự kiện tập kết.
+            </div>
+          ) : events.length > 0 ? (
+            <div className="space-y-3">
+              <Select
+                value={selectedEventId ? String(selectedEventId) : undefined}
+                onValueChange={(value) => setSelectedEventId(Number(value))}
+              >
+                <SelectTrigger className="h-10 w-full border-border/70 bg-white px-3 py-2">
+                  {selectedEvent ? (
+                    <div className="w-full pr-5 text-left">
+                      <p className="text-sm font-semibold text-foreground">
+                        Sự kiện #{selectedEvent.eventId}
+                      </p>
+                    </div>
+                  ) : (
+                    <SelectValue placeholder="Chọn sự kiện để mở check-in" />
+                  )}
+                </SelectTrigger>
+                <SelectContent className="z-1250">
+                  {events.map((event) => (
+                    <SelectItem
+                      key={event.eventId}
+                      value={String(event.eventId)}
+                      className="py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-foreground">
+                            Sự kiện #{event.eventId}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {formatDateTimeVi(new Date(event.assemblyDate))}
+                          </p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {selectedEvent ? (
+                <div className="rounded-lg border border-border/60 bg-card px-3 py-2.5 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Sự kiện #{selectedEvent.eventId}
+                    </p>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-xs h-5 px-2 shrink-0 border",
+                        selectedEventStatusClass,
+                      )}
+                    >
+                      {selectedEventStatusLabel}
+                    </Badge>
+                  </div>
+
+                  <div className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-2">
+                    <p className="text-xs text-muted-foreground mb-0.5">
+                      Thời gian tập kết
+                    </p>
+                    <div className="flex items-center gap-1.5 text-sm font-medium">
+                      <CalendarBlank className="h-4 w-4 text-[#FF5722]" />
+                      <span>
+                        {formatDateTimeVi(new Date(selectedEvent.assemblyDate))}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <StatCard
+                      label="Tổng tham gia"
+                      value={String(selectedEvent.participantCount)}
+                      icon={<Users className="h-3.5 w-3.5" />}
+                    />
+                    <StatCard
+                      label="Đã check-in"
+                      value={String(selectedEvent.checkedInCount)}
+                      icon={<ChartBar className="h-3.5 w-3.5" />}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              Chưa có sự kiện nào. Hãy tạo lịch triệu tập trước khi mở check-in.
+            </div>
+          )}
+        </div>
+
+        <div className="h-px bg-border mx-5" />
+
         {/* Code */}
         <InfoRow
           icon={<Hash className="h-5 w-5" />}
@@ -867,20 +1111,13 @@ function AssemblyPointDetails({
 
         <div className="h-px bg-border mx-5" />
 
-        {/* Last Updated */}
-        <InfoRow
-          icon={<Clock className="h-5 w-5" />}
-          primary={formatLastUpdated(displayAssemblyPoint.lastUpdatedAt)}
-          secondary="Cập nhật lần cuối"
-        />
-
         <div className="h-px bg-border mx-5" />
 
         {/* Teams */}
         <div className="px-5 py-4">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-semibold">Đội tại điểm tập kết</h4>
-            <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+            <Badge variant="outline" className="text-xs h-5 px-1.5">
               {teams.length} đội
             </Badge>
           </div>
@@ -897,70 +1134,96 @@ function AssemblyPointDetails({
             </div>
           ) : teams.length > 0 ? (
             <div className="space-y-3">
-              {teams.map((team) => (
-                <div
-                  key={team.id}
-                  className="rounded-lg border border-border/60 bg-card px-3 py-2.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">
-                        {team.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {team.code}
-                      </p>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-[10px] h-5 px-2 shrink-0 border",
-                        assemblyTeamStatusColor[team.status],
-                      )}
-                    >
-                      {assemblyTeamStatusLabel[team.status]}
-                    </Badge>
-                  </div>
+              {teams.map((team) => {
+                const statusKey = String(team.status);
+                const statusLabel =
+                  assemblyTeamStatusLabel[statusKey] ??
+                  formatStatusText(statusKey);
+                const statusColor =
+                  assemblyTeamStatusColor[statusKey] ??
+                  "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800/60 dark:bg-slate-950/40 dark:text-slate-300";
+                const isExpanded = Boolean(expandedTeamIds[team.id]);
 
-                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{assemblyTeamTypeLabel[team.teamType]}</span>
-                    <span>•</span>
-                    <span>
-                      {team.members.length}/{team.maxMembers} thành viên
-                    </span>
-                  </div>
-
-                  <div className="mt-2 space-y-1.5">
-                    {team.members.map((member) => (
-                      <div
-                        key={member.userId}
-                        className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-2 py-1.5"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium truncate">
-                            {member.firstName} {member.lastName}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground truncate">
-                            {memberRoleLabel[member.roleInTeam]}
-                            {member.isLeader ? " • Leader" : ""}
-                          </p>
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            "text-[10px] h-5 px-2 shrink-0",
-                            member.status === "Accepted"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                              : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-                          )}
-                        >
-                          {memberStatusLabel[member.status]}
-                        </Badge>
+                return (
+                  <div
+                    key={team.id}
+                    className="rounded-lg border border-border/60 bg-card px-3 py-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">
+                          {team.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {team.code}
+                        </p>
                       </div>
-                    ))}
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-xs h-5 px-2 shrink-0 border",
+                          statusColor,
+                        )}
+                      >
+                        {statusLabel}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{assemblyTeamTypeLabel[team.teamType]}</span>
+                      <span>•</span>
+                      <span>
+                        {team.members.length}/{team.maxMembers} thành viên
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#FF5722] hover:opacity-80"
+                      onClick={() => toggleTeamExpand(team.id)}
+                    >
+                      {isExpanded ? "Ẩn thành viên" : "Xem thành viên"}
+                      {isExpanded ? (
+                        <CaretUp className="h-3.5 w-3.5" />
+                      ) : (
+                        <CaretDown className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+
+                    {isExpanded && (
+                      <div className="mt-2 space-y-1.5">
+                        {team.members.map((member) => (
+                          <div
+                            key={member.userId}
+                            className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-2 py-1.5"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">
+                                {member.firstName} {member.lastName}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {memberRoleLabel[member.roleInTeam]}
+                                {member.isLeader ? " • Leader" : ""}
+                              </p>
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "text-xs h-5 px-2 shrink-0",
+                                member.status === "Accepted"
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                  : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+                              )}
+                            >
+                              {memberStatusLabel[member.status]}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -1011,31 +1274,72 @@ function AssemblyDateTimePicker({
   onChange: (value: Date | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const minAllowedDate = getMinimumGatheringDate();
-  const [draft, setDraft] = useState<Date>(value ?? minAllowedDate);
+  const [draft, setDraft] = useState<Date>(value ?? getMinimumGatheringDate());
+  const [hourInput, setHourInput] = useState<string>(
+    String(draft.getHours()).padStart(2, "0"),
+  );
+  const [minuteInput, setMinuteInput] = useState<string>(
+    String(draft.getMinutes()).padStart(2, "0"),
+  );
+  const hourOptions = useMemo(
+    () =>
+      Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0")),
+    [],
+  );
+  const minuteOptions = useMemo(
+    () =>
+      Array.from({ length: 60 }, (_, minute) =>
+        String(minute).padStart(2, "0"),
+      ),
+    [],
+  );
 
   useEffect(() => {
     if (!open) return;
-    setDraft(value ?? getMinimumGatheringDate());
+    const d = value ?? getMinimumGatheringDate();
+    setDraft(d);
+    setHourInput(String(d.getHours()).padStart(2, "0"));
+    setMinuteInput(String(d.getMinutes()).padStart(2, "0"));
   }, [open, value]);
 
-  const hourValue = String(draft.getHours()).padStart(2, "0");
-  const minuteValue = String(draft.getMinutes()).padStart(2, "0");
-
-  const updateHour = (hour: string) => {
-    const base = new Date(draft);
-    base.setHours(Number(hour), base.getMinutes(), 0, 0);
-    setDraft(clampToMinimumDate(base, minAllowedDate));
+  const clampToCurrentOrFuture = (date: Date): Date => {
+    const minAllowedDate = getMinimumGatheringDate();
+    if (date.getTime() < minAllowedDate.getTime()) {
+      return minAllowedDate;
+    }
+    return date;
   };
 
-  const updateMinute = (minute: string) => {
-    const base = new Date(draft);
-    base.setHours(base.getHours(), Number(minute), 0, 0);
-    setDraft(clampToMinimumDate(base, minAllowedDate));
+  const updateTime = (newHour?: number, newMinute?: number) => {
+    const hour = newHour !== undefined ? newHour : parseInt(hourInput, 10) || 0;
+    const minute =
+      newMinute !== undefined ? newMinute : parseInt(minuteInput, 10) || 0;
+
+    const next = new Date(draft);
+    next.setHours(
+      Math.max(0, Math.min(23, hour)),
+      Math.max(0, Math.min(59, minute)),
+      0,
+      0,
+    );
+    const clamped = clampToCurrentOrFuture(next);
+    setDraft(clamped);
+    setHourInput(String(clamped.getHours()).padStart(2, "0"));
+    setMinuteInput(String(clamped.getMinutes()).padStart(2, "0"));
+  };
+
+  const handleHourSelect = (val: string) => {
+    setHourInput(val);
+    updateTime(parseInt(val, 10), undefined);
+  };
+
+  const handleMinuteSelect = (val: string) => {
+    setMinuteInput(val);
+    updateTime(undefined, parseInt(val, 10));
   };
 
   const applySelection = () => {
-    onChange(clampToMinimumDate(draft, minAllowedDate));
+    onChange(clampToCurrentOrFuture(draft));
     setOpen(false);
   };
 
@@ -1054,78 +1358,119 @@ function AssemblyDateTimePicker({
           <span>
             {value
               ? formatDateTimeVi(value)
-              : `Chọn ngày giờ (từ ${formatDateTimeVi(minAllowedDate)})`}
+              : `Chọn ngày giờ (từ ${formatDateTimeVi(getMinimumGatheringDate())})`}
           </span>
           <CalendarBlank className="h-4 w-4 text-[#FF5722]" weight="fill" />
         </Button>
       </PopoverTrigger>
 
       <PopoverContent
-        className="z-[1200] w-[340px] space-y-3 p-3"
+        className="z-1200 w-[calc(100vw-20px)] max-w-[340px] space-y-2.5 p-2.5"
         align="start"
         side="bottom"
-        sideOffset={8}
-        avoidCollisions={false}
+        sideOffset={6}
+        avoidCollisions
+        collisionPadding={12}
       >
-        <Calendar
-          mode="single"
-          selected={draft}
-          onSelect={(date) => {
-            if (!date) return;
-            const next = new Date(date);
-            next.setHours(draft.getHours(), draft.getMinutes(), 0, 0);
-            setDraft(clampToMinimumDate(next, minAllowedDate));
-          }}
-          locale={vi}
-          disabled={(date) => {
-            const dayEnd = new Date(date);
-            dayEnd.setHours(23, 59, 59, 999);
-            return dayEnd.getTime() < minAllowedDate.getTime();
-          }}
-          initialFocus
-        />
-
-        <div className="grid grid-cols-2 gap-2">
-          <Select value={hourValue} onValueChange={updateHour}>
-            <SelectTrigger className="h-8 w-full border-border/60 bg-white text-xs">
-              <SelectValue placeholder="Giờ" />
-            </SelectTrigger>
-            <SelectContent className="z-[1250]">
-              {Array.from({ length: 24 }, (_, hour) => {
-                const value = String(hour).padStart(2, "0");
-                return (
-                  <SelectItem key={value} value={value}>
-                    {value} giờ
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-
-          <Select value={minuteValue} onValueChange={updateMinute}>
-            <SelectTrigger className="h-8 w-full border-border/60 bg-white text-xs">
-              <SelectValue placeholder="Phút" />
-            </SelectTrigger>
-            <SelectContent className="z-[1250]">
-              {Array.from({ length: 60 }, (_, minute) => {
-                const value = String(minute).padStart(2, "0");
-                return (
-                  <SelectItem key={value} value={value}>
-                    {value} phút
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+            Chọn ngày
+          </p>
+          <Calendar
+            mode="single"
+            selected={draft}
+            onSelect={(date) => {
+              if (!date) return;
+              const next = new Date(date);
+              next.setHours(draft.getHours(), draft.getMinutes(), 0, 0);
+              const clamped = clampToCurrentOrFuture(next);
+              setDraft(clamped);
+              setHourInput(String(clamped.getHours()).padStart(2, "0"));
+              setMinuteInput(String(clamped.getMinutes()).padStart(2, "0"));
+            }}
+            locale={vi}
+            disabled={(date) => {
+              const dayEnd = new Date(date);
+              dayEnd.setHours(23, 59, 59, 999);
+              return dayEnd.getTime() < getMinimumGatheringDate().getTime();
+            }}
+            initialFocus
+            className="rounded-md border border-border/60 bg-background p-2"
+            classNames={{
+              months: "flex flex-col gap-2",
+              month: "flex flex-col gap-2",
+              month_grid: "w-full border-collapse",
+              month_caption: "flex h-6 items-center justify-center pt-0.5",
+              nav: "absolute top-2 left-0 right-0 flex items-center justify-between px-1 z-10",
+              weekdays: "grid grid-cols-7 gap-0",
+              week: "mt-1 grid grid-cols-7 gap-0",
+              weekday:
+                "rounded-md text-center text-xs font-normal text-muted-foreground",
+              day: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
+              day_button:
+                "h-7 w-full rounded-none p-0 text-xs font-normal aria-selected:opacity-100",
+            }}
+          />
         </div>
 
-        <div className="flex items-center justify-between border-t pt-2">
+        <div className="border-t pt-2.5">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">
+            Chọn thời gian
+          </p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {/* Hour Picker */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Giờ</label>
+              <Select value={hourInput} onValueChange={handleHourSelect}>
+                <SelectTrigger className="h-9 w-full border-border/60 bg-muted/40 text-sm font-semibold">
+                  <SelectValue placeholder="Chọn giờ" />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  className="z-1250 max-h-44 w-(--radix-select-trigger-width) overflow-y-auto"
+                >
+                  {hourOptions.map((hour) => (
+                    <SelectItem key={hour} value={hour}>
+                      {hour}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Minute Picker */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground">Phút</label>
+              <Select value={minuteInput} onValueChange={handleMinuteSelect}>
+                <SelectTrigger className="h-9 w-full border-border/60 bg-muted/40 text-sm font-semibold">
+                  <SelectValue placeholder="Chọn phút" />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  className="z-1250 max-h-44 w-(--radix-select-trigger-width) overflow-y-auto"
+                >
+                  {minuteOptions.map((minute) => (
+                    <SelectItem key={minute} value={minute}>
+                      {minute}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-2 border-t pt-2.5">
           <div className="flex items-center gap-1">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs text-muted-foreground"
+              className="h-7 px-2.5 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               onClick={() => {
                 onChange(null);
                 setOpen(false);
@@ -1138,33 +1483,21 @@ function AssemblyDateTimePicker({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs text-muted-foreground"
+              className="h-7 px-2.5 text-xs text-muted-foreground"
               onClick={() => setOpen(false)}
             >
               Hủy
             </Button>
           </div>
 
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs text-[#FF5722] hover:bg-[#FF5722]/10"
-              onClick={() => setDraft(getMinimumGatheringDate())}
-            >
-              Mốc an toàn
-            </Button>
-
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 bg-[#FF5722] px-2 text-xs text-white hover:bg-[#E64A19]"
-              onClick={applySelection}
-            >
-              Áp dụng
-            </Button>
-          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="h-7 bg-[#FF5722] px-3.5 text-xs text-white hover:bg-[#E64A19]"
+            onClick={applySelection}
+          >
+            Áp dụng
+          </Button>
         </div>
       </PopoverContent>
     </Popover>
@@ -1181,26 +1514,33 @@ function ActionButton({
   color,
   onClick,
   active,
+  disabled,
 }: {
   icon: React.ReactNode;
   label: string;
   color: string;
   onClick?: () => void;
   active?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         "flex flex-col items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors group",
-        active ? "bg-accent/70" : "hover:bg-accent",
+        disabled
+          ? "opacity-45 cursor-not-allowed"
+          : active
+            ? "bg-accent/70"
+            : "hover:bg-accent",
       )}
     >
       <div
         className={cn(
           "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all group-hover:scale-105",
-          active && "scale-105",
+          active && !disabled && "scale-105",
           color,
           "border-current",
         )}

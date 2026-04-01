@@ -310,7 +310,7 @@ const SOSSidebar = ({
                               <Badge
                                 variant="outline"
                                 className={cn(
-                                  "text-[10px] h-5 px-1.5 border-0 leading-none whitespace-nowrap shrink-0",
+                                  "text-xs h-5 px-1.5 border-0 leading-none whitespace-nowrap shrink-0",
                                   severityBadge[cluster.severityLevel] ||
                                     severityBadge.Low,
                                 )}
@@ -320,7 +320,7 @@ const SOSSidebar = ({
                               </Badge>
                             </div>
                             <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
                                 {pendingClusterSOS.length > 0
                                   ? `${pendingClusterSOS.length} chờ xử lý`
                                   : assignedClusterSOS.length > 0
@@ -336,7 +336,7 @@ const SOSSidebar = ({
                           </div>
 
                           {/* Cluster info */}
-                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground mt-1.5">
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1.5">
                             {cluster.victimEstimated && (
                               <span className="flex items-center gap-1">
                                 <Users className="h-3 w-3" weight="fill" />~
@@ -374,7 +374,7 @@ const SOSSidebar = ({
                                           variant={
                                             PRIORITY_BADGE_VARIANT[sos.priority]
                                           }
-                                          className="text-[10px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
+                                          className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                                         >
                                           {PRIORITY_LABELS[sos.priority]}
                                         </Badge>
@@ -387,14 +387,14 @@ const SOSSidebar = ({
                                               ? "warning"
                                               : "info"
                                           }
-                                          className="text-[9px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
+                                          className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                                         >
                                           {sos.status === "PENDING"
                                             ? "Chờ"
                                             : "Đang cứu"}
                                         </Badge>
                                       </div>
-                                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground self-end sm:self-auto whitespace-nowrap">
                                         <Clock className="h-3 w-3" />
                                         <TimeElapsed date={sos.createdAt} />
                                       </div>
@@ -405,7 +405,7 @@ const SOSSidebar = ({
                                   </div>
                                 ))
                               ) : (
-                                <div className="px-3 py-2 text-[11px] text-muted-foreground italic">
+                                <div className="px-3 py-2 text-xs text-muted-foreground italic">
                                   SOS IDs: [{cluster.sosRequestIds.join(", ")}]
                                 </div>
                               )}
@@ -469,7 +469,7 @@ const SOSSidebar = ({
                           <Button
                             variant="default"
                             size="sm"
-                            className="h-7 text-[11px] px-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+                            className="h-7 text-xs px-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
                             onClick={() =>
                               onCreateCluster(cluster.map((s) => s.id))
                             }
@@ -510,7 +510,7 @@ const SOSSidebar = ({
                                     variant={
                                       PRIORITY_BADGE_VARIANT[sos.priority]
                                     }
-                                    className="text-[10px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
+                                    className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                                   >
                                     {PRIORITY_LABELS[sos.priority]}
                                   </Badge>
@@ -518,7 +518,7 @@ const SOSSidebar = ({
                                     SOS {sos.id}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground self-end sm:self-auto whitespace-nowrap">
                                   <Clock className="h-3 w-3" />
                                   <TimeElapsed date={sos.createdAt} />
                                 </div>
@@ -561,7 +561,7 @@ const SOSSidebar = ({
                           <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                             <Badge
                               variant={PRIORITY_BADGE_VARIANT[sos.priority]}
-                              className="text-[10px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
+                              className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                             >
                               {PRIORITY_LABELS[sos.priority]}
                             </Badge>
@@ -570,12 +570,12 @@ const SOSSidebar = ({
                             </span>
                             <Badge
                               variant="warning"
-                              className="text-[9px] h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
+                              className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                             >
                               Chờ
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground self-end sm:self-auto whitespace-nowrap">
                             <Clock className="h-3 w-3" />
                             <TimeElapsed date={sos.createdAt} />
                           </div>
@@ -588,7 +588,7 @@ const SOSSidebar = ({
                         <Button
                           variant="default"
                           size="sm"
-                          className="w-full h-7 text-[11px] bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+                          className="w-full h-7 text-xs bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             onCreateCluster([sos.id]);
@@ -618,7 +618,7 @@ const SOSSidebar = ({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="w-full h-7 text-[11px] border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                            className="w-full h-7 text-xs border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
                             disabled
                           >
                             <PencilSimpleLine
@@ -845,7 +845,7 @@ function MissionCard({
             >
               <div
                 className={cn(
-                  "w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold",
+                  "w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold",
                   idx === 0 ? "bg-primary text-primary-foreground" : "bg-muted",
                 )}
               >
@@ -907,7 +907,7 @@ function RescuerCard({
           </div>
           <div className="flex gap-1">
             {rescuer.capabilities.map((cap, idx) => (
-              <Badge key={idx} variant="outline" className="text-[10px]">
+              <Badge key={idx} variant="outline" className="text-xs">
                 {cap}
               </Badge>
             ))}
@@ -979,7 +979,7 @@ function ClusterActionButtons({
             <Button
               variant="outline"
               size="sm"
-              className="w-full h-7 text-[11px] border-emerald-300/60 dark:border-emerald-700/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+              className="w-full h-7 text-xs border-emerald-300/60 dark:border-emerald-700/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
               onClick={(e) => {
                 e.stopPropagation();
                 onViewClusterPlan(clusterId);
@@ -992,7 +992,7 @@ function ClusterActionButtons({
           <Button
             variant="outline"
             size="sm"
-            className="w-full h-7 text-[11px] border-blue-300/60 dark:border-blue-700/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+            className="w-full h-7 text-xs border-blue-300/60 dark:border-blue-700/60 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
             onClick={(e) => {
               e.stopPropagation();
               onAnalyzeCluster(clusterId);
@@ -1019,7 +1019,7 @@ function ClusterActionButtons({
         <Button
           variant="default"
           size="sm"
-          className="w-full h-7 text-[11px] bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+          className="w-full h-7 text-xs bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
           onClick={(e) => {
             e.stopPropagation();
             onAnalyzeCluster(clusterId);
@@ -1064,7 +1064,7 @@ function ClusterMissions({
   if (isLoading) {
     return (
       <div className="px-3 py-2 border-t border-inherit">
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Spinner className="h-3 w-3 animate-spin" />
           Đang tải nhiệm vụ...
         </div>
@@ -1077,7 +1077,7 @@ function ClusterMissions({
   return (
     <div className="border-t border-inherit">
       <div className="px-3 pt-2 pb-1">
-        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
           <Rocket className="h-3 w-3" weight="fill" />
           Nhiệm vụ đã tạo ({missions.length})
         </div>
@@ -1134,10 +1134,10 @@ function MissionEntityCard({
       <div className="flex items-center justify-between px-2.5 py-2">
         <div className="flex items-center gap-1.5">
           <Rocket className="h-3 w-3 text-orange-500" weight="fill" />
-          <span className="text-[11px] font-semibold">NV #{mission.id}</span>
+          <span className="text-xs font-semibold">NV #{mission.id}</span>
           <span
             className={cn(
-              "text-[9px] font-semibold px-1.5 py-0.5 rounded",
+              "text-xs font-semibold px-1.5 py-0.5 rounded",
               status.color,
             )}
           >
@@ -1145,7 +1145,7 @@ function MissionEntityCard({
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {mission.activityCount} bước
           </span>
           {onViewMission && clusterId && (
@@ -1155,7 +1155,7 @@ function MissionEntityCard({
       </div>
 
       {/* Compact info row */}
-      <div className="flex items-center gap-3 px-2.5 pb-2 text-[10px] text-muted-foreground">
+      <div className="flex items-center gap-3 px-2.5 pb-2 text-xs text-muted-foreground">
         <span>Ưu tiên: {mission.priorityScore}</span>
         <span>
           {new Date(mission.startTime).toLocaleTimeString("vi-VN", {
@@ -1189,7 +1189,7 @@ function ClusterMissionsGroup({
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-2">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground py-2">
         <Spinner className="h-3 w-3 animate-spin" />
         Cụm #{cluster.id}...
       </div>
@@ -1213,10 +1213,10 @@ function ClusterMissionsGroup({
           weight="fill"
         />
         <span className="text-xs font-semibold">Cụm #{cluster.id}</span>
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {severityLabels[cluster.severityLevel] || cluster.severityLevel}
         </span>
-        <span className="text-[10px] text-muted-foreground ml-auto">
+        <span className="text-xs text-muted-foreground ml-auto">
           {missions.length} nhiệm vụ
         </span>
       </div>

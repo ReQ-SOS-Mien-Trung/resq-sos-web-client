@@ -36,7 +36,7 @@ import {
   useSendConversationMessage,
 } from "@/services/chat/hooks";
 import { ReceiveMessageEvent } from "@/services/chat/type";
-import { uploadImageToCloudinary } from "@/utils/uploadFile";
+import { uploadMessageImageToCloudinary } from "@/utils/uploadFile";
 
 const ACTIVE_CONVERSATION_STORAGE_KEY =
   "coordinator-chat-active-conversation-id";
@@ -483,7 +483,7 @@ export default function CoordinatorChatPage() {
     const toastId = toast.loading("Đang tải ảnh lên...");
 
     try {
-      const imageUrl = await uploadImageToCloudinary(file, "resq/chat");
+      const imageUrl = await uploadMessageImageToCloudinary(file);
       const safeAlt = file.name.replace(/[\[\]\(\)]/g, "").trim() || "image";
       await sendMessageMutation.mutateAsync({
         conversationId: activeConversationId,

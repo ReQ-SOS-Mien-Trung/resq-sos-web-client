@@ -20,6 +20,77 @@ import {
   GetActivityRouteParams,
 } from "./type";
 
+function toNumberOrZero(value: unknown): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeCreateMissionRequest(
+  request: CreateMissionRequest,
+): CreateMissionRequest {
+  return {
+    clusterId: toNumberOrZero(request.clusterId),
+    missionType: String(request.missionType || "RESCUE").toUpperCase(),
+    priorityScore: toNumberOrZero(request.priorityScore),
+    startTime: request.startTime,
+    expectedEndTime: request.expectedEndTime,
+    activities: (request.activities ?? []).map((activity, index) => ({
+      step: toNumberOrZero(activity.step) || index + 1,
+      activityCode:
+        typeof activity.activityCode === "string" && activity.activityCode
+          ? activity.activityCode
+          : `${String(activity.activityType || "TASK").toUpperCase()}_${index + 1}`,
+      activityType: String(activity.activityType || "ASSESS").toUpperCase(),
+      description: String(activity.description || "").trim(),
+      priority: String(activity.priority || "Medium"),
+      estimatedTime: toNumberOrZero(activity.estimatedTime),
+      sosRequestId:
+        activity.sosRequestId == null
+          ? null
+          : toNumberOrZero(activity.sosRequestId),
+      depotId:
+        activity.depotId == null ? null : toNumberOrZero(activity.depotId),
+      depotName: activity.depotName ? String(activity.depotName) : null,
+      depotAddress: activity.depotAddress
+        ? String(activity.depotAddress)
+        : null,
+      assemblyPointId:
+        activity.assemblyPointId == null
+          ? null
+          : toNumberOrZero(activity.assemblyPointId),
+      assemblyPointName: activity.assemblyPointName
+        ? String(activity.assemblyPointName)
+        : null,
+      assemblyPointLatitude:
+        activity.assemblyPointLatitude == null
+          ? null
+          : toNumberOrZero(activity.assemblyPointLatitude),
+      assemblyPointLongitude:
+        activity.assemblyPointLongitude == null
+          ? null
+          : toNumberOrZero(activity.assemblyPointLongitude),
+      suppliesToCollect: (activity.suppliesToCollect ?? []).map((supply) => ({
+        id: supply.id == null ? null : toNumberOrZero(supply.id),
+        name: supply.name ? String(supply.name) : null,
+        quantity: toNumberOrZero(supply.quantity),
+        unit: String(supply.unit || "").trim(),
+      })),
+      target: String(activity.target || "").trim(),
+      targetLatitude: toNumberOrZero(activity.targetLatitude),
+      targetLongitude: toNumberOrZero(activity.targetLongitude),
+      rescueTeamId:
+        activity.rescueTeamId == null
+          ? null
+          : toNumberOrZero(activity.rescueTeamId),
+    })),
+  };
+}
+
 export async function getMissions(
   params: GetMissionsParams,
 ): Promise<GetMissionsResponse> {
@@ -32,7 +103,8 @@ export async function getMissions(
 export async function createMission(
   request: CreateMissionRequest,
 ): Promise<CreateMissionResponse> {
-  const { data } = await api.post("/operations/missions", request);
+  const payload = normalizeCreateMissionRequest(request);
+  const { data } = await api.post("/operations/missions", payload);
   return data;
 }
 
