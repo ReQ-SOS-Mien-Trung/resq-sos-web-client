@@ -48,6 +48,7 @@ export interface ReusableBreakdown {
 interface InventoryItemEntityBase {
   itemModelId: number;
   itemModelName: string;
+  imageUrl?: string | null;
   categoryId: number;
   categoryName: string;
   targetGroups: string[];
@@ -169,6 +170,7 @@ export interface ImportPurchaseItem {
 }
 
 export type ImportRegularRequest = {
+  advancedByName?: string;
   invoices: Array<{
     batchNote?: string;
     vatInvoice: VatInvoice;
@@ -395,23 +397,39 @@ export type ThresholdScopeType =
   | "DepotCategory"
   | "DepotItem";
 
+export type ResolvedThresholdScopeType = ThresholdScopeType | "None";
+
+export interface WarningBandConfig {
+  name: string;
+  from: number;
+  to: number | null;
+}
+
 export interface ThresholdConfig {
-  id: number;
-  scopeType: string;
-  categoryId: number;
-  itemModelId: number;
-  dangerPercent: number;
-  warningPercent: number;
-  rowVersion: number;
-  updatedAt: string;
+  id?: number;
+  scopeType: ThresholdScopeType;
+  depotId?: number | null;
+  categoryId?: number | null;
+  itemModelId?: number | null;
+  minimumThreshold: number | null;
+  rowVersion?: number | null;
+  updatedAt?: string | null;
+  message?: string;
+  // Legacy fields kept optional during backend rollout.
+  dangerPercent?: number;
+  warningPercent?: number;
 }
 
 export interface GetThresholdsResponse {
-  depotId: number;
+  depotId?: number;
   global: ThresholdConfig | null;
   depot: ThresholdConfig | null;
   depotCategories: ThresholdConfig[];
   depotItems: ThresholdConfig[];
+}
+
+export interface GetThresholdsParams {
+  depotId?: number;
 }
 
 export interface GetThresholdsHistoryParams {
@@ -424,18 +442,21 @@ export interface GetThresholdsHistoryParams {
 
 export interface ThresholdHistoryItem {
   id: number;
-  configId: number;
+  configId?: number;
   scopeType: string;
-  depotId: number;
-  categoryId: number;
-  itemModelId: number;
-  oldDangerPercent: number;
-  oldWarningPercent: number;
-  newDangerPercent: number;
-  newWarningPercent: number;
-  changedBy: string;
+  depotId?: number | null;
+  categoryId?: number | null;
+  itemModelId?: number | null;
+  oldMinimumThreshold?: number | null;
+  newMinimumThreshold?: number | null;
+  oldDangerPercent?: number | null;
+  oldWarningPercent?: number | null;
+  newDangerPercent?: number | null;
+  newWarningPercent?: number | null;
+  changedBy?: string;
   changedAt: string;
-  changeReason: string;
+  changeReason?: string | null;
+  reason?: string | null;
   action: string;
 }
 
@@ -453,23 +474,12 @@ export interface UpdateThresholdPayload {
   scopeType: ThresholdScopeType;
   categoryId?: number;
   itemModelId?: number;
-  dangerPercent: number;
-  warningPercent: number;
+  minimumThreshold: number | null;
   rowVersion?: number;
   reason?: string;
 }
 
-export interface UpdateThresholdResponse {
-  scopeType: string;
-  depotId: number;
-  categoryId: number;
-  itemModelId: number;
-  dangerPercent: number;
-  warningPercent: number;
-  rowVersion: number;
-  updatedAt: string;
-  message: string;
-}
+export type UpdateThresholdResponse = ThresholdConfig;
 
 export interface DeleteThresholdPayload {
   scopeType: ThresholdScopeType;
@@ -479,66 +489,57 @@ export interface DeleteThresholdPayload {
   reason?: string;
 }
 
-export interface DeleteThresholdResponse {
-  scopeType: string;
-  depotId: number;
-  categoryId: number;
-  itemModelId: number;
-  dangerPercent: number;
-  warningPercent: number;
-  rowVersion: number;
-  updatedAt: string;
-  message: string;
-}
+export type DeleteThresholdResponse = ThresholdConfig;
 
 // ─── Low Stock ───
 
-export type LowStockLevel = "Warning" | "Danger";
-
-export interface LowStockSummary {
-  dangerCount: number;
-  warningCount: number;
-  totalCount: number;
-}
-
-export interface LowStockByDepot {
-  depotId: number;
-  depotName: string;
-  dangerCount: number;
-  warningCount: number;
-}
-
-export interface LowStockByCategory {
-  categoryId: number;
-  categoryName: string;
-  dangerCount: number;
-  warningCount: number;
-}
+export type LowStockLevel =
+  | "CRITICAL"
+  | "HIGH"
+  | "MEDIUM"
+  | "LOW"
+  | "OK"
+  | "UNCONFIGURED"
+  | string;
 
 export interface LowStockItem {
-  depotId: number;
-  depotName: string;
+  depotId?: number;
+  depotName?: string;
   itemModelId: number;
   itemModelName: string;
-  unit: string;
-  categoryId: number;
-  categoryName: string;
-  targetGroup: string;
-  quantity: number;
-  reservedQuantity: number;
+  unit?: string;
+  categoryId?: number | null;
+  categoryName?: string | null;
+  targetGroups?: string[];
+  targetGroup?: string;
+  quantity?: number;
+  reservedQuantity?: number;
   availableQuantity: number;
-  availableRatio: number;
-  alertLevel: string;
-  alertLevelLabel: string;
+  minimumThreshold: number | null;
+  severityRatio: number;
+  warningLevel: LowStockLevel;
+  resolvedThresholdScope: ResolvedThresholdScopeType;
+  isUsingGlobalDefault: boolean;
+  // Legacy fields kept optional during backend rollout.
+  availableRatio?: number;
+  alertLevel?: string;
+  alertLevelLabel?: string;
 }
 
 export interface GetLowStockResponse {
-  summary: LowStockSummary;
-  byDepot: LowStockByDepot[];
-  byCategory: LowStockByCategory[];
   items: LowStockItem[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
 }
 
 export interface GetLowStockParams {
+  warningLevel?: LowStockLevel;
+  pageNumber?: number;
+  pageSize?: number;
+  // Legacy filter name kept during backend rollout.
   level?: LowStockLevel;
 }

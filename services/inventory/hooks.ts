@@ -31,10 +31,14 @@ import {
   getInventoryLots,
   downloadDonationImportTemplate,
   downloadPurchaseImportTemplate,
+  getWarningBandConfig,
+  updateWarningBandConfig,
+  getThresholds,
   getMyDepotThresholds,
   getMyDepotThresholdsHistory,
   updateMyDepotThreshold,
   deleteMyDepotThreshold,
+  getLowStock,
   getMyDepotLowStock,
 } from "./api";
 import {
@@ -62,6 +66,7 @@ import {
   GetDepotStockMovementsResponse,
   ExportMovementsParams,
   GetInventoryLotsResponse,
+  GetThresholdsParams,
   GetThresholdsResponse,
   GetThresholdsHistoryParams,
   GetThresholdsHistoryResponse,
@@ -71,6 +76,7 @@ import {
   DeleteThresholdResponse,
   GetLowStockParams,
   GetLowStockResponse,
+  WarningBandConfig,
 } from "./type";
 
 export const INVENTORY_KEYS = {
@@ -97,9 +103,14 @@ export const INVENTORY_KEYS = {
     [...INVENTORY_KEYS.all, "transactions", params] as const,
   lots: (itemModelId: number) =>
     [...INVENTORY_KEYS.all, "lots", itemModelId] as const,
+  warningBandConfig: () => [...INVENTORY_KEYS.all, "warningBandConfig"] as const,
+  thresholdsByDepot: (params?: GetThresholdsParams) =>
+    [...INVENTORY_KEYS.all, "thresholdsByDepot", params] as const,
   thresholds: () => [...INVENTORY_KEYS.all, "thresholds"] as const,
   thresholdsHistory: (params: GetThresholdsHistoryParams) =>
     [...INVENTORY_KEYS.all, "thresholdsHistory", params] as const,
+  inventoryLowStock: (params?: GetLowStockParams) =>
+    [...INVENTORY_KEYS.all, "inventoryLowStock", params] as const,
   lowStock: (params?: GetLowStockParams) =>
     [...INVENTORY_KEYS.all, "lowStock", params] as const,
 };
@@ -419,6 +430,45 @@ export function useDownloadPurchaseImportTemplate() {
 
 // ─── Thresholds ───
 
+export function useWarningBandConfig(
+  options?: Omit<
+    UseQueryOptions<WarningBandConfig[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<WarningBandConfig[]>({
+    queryKey: INVENTORY_KEYS.warningBandConfig(),
+    queryFn: getWarningBandConfig,
+    ...options,
+  });
+}
+
+export function useUpdateWarningBandConfig() {
+  const queryClient = useQueryClient();
+  return useMutation<WarningBandConfig[], Error, WarningBandConfig[]>({
+    mutationFn: updateWarningBandConfig,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: INVENTORY_KEYS.warningBandConfig(),
+      });
+    },
+  });
+}
+
+export function useThresholds(
+  params?: GetThresholdsParams,
+  options?: Omit<
+    UseQueryOptions<GetThresholdsResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<GetThresholdsResponse>({
+    queryKey: INVENTORY_KEYS.thresholdsByDepot(params),
+    queryFn: () => getThresholds(params),
+    ...options,
+  });
+}
+
 export function useMyDepotThresholds(
   options?: Omit<
     UseQueryOptions<GetThresholdsResponse, Error>,
@@ -467,6 +517,20 @@ export function useDeleteMyDepotThreshold() {
 }
 
 // ─── Low Stock ───
+
+export function useInventoryLowStock(
+  params?: GetLowStockParams,
+  options?: Omit<
+    UseQueryOptions<GetLowStockResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<GetLowStockResponse>({
+    queryKey: INVENTORY_KEYS.inventoryLowStock(params),
+    queryFn: () => getLowStock(params),
+    ...options,
+  });
+}
 
 export function useMyDepotLowStock(
   params?: GetLowStockParams,

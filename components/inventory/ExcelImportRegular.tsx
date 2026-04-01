@@ -51,6 +51,7 @@ import {
   Plus,
   PencilSimple,
   CaretDown,
+  Eye,
 } from "@phosphor-icons/react";
 import {
   useInventoryItemTypes,
@@ -604,6 +605,7 @@ export default function ExcelImportRegular() {
   const [groups, setGroups] = useState<PurchaseGroup[]>([createEmptyGroup()]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [advancedByName, setAdvancedByName] = useState("");
   const [previewImage, setPreviewImage] = useState<{
     src: string;
     alt: string;
@@ -937,6 +939,7 @@ export default function ExcelImportRegular() {
   const handleReset = useCallback(() => {
     setStep("upload");
     setGroups([createEmptyGroup()]);
+    setAdvancedByName("");
   }, []);
 
   const handleDownloadTemplate = useCallback(async () => {
@@ -1063,7 +1066,9 @@ export default function ExcelImportRegular() {
     setIsUploading(false);
     toast.dismiss(uploadToastId);
 
-    const payload = { invoices: groups.map((g, i) => ({
+    const payload = { 
+      ...(advancedByName.trim() ? { advancedByName: advancedByName.trim() } : {}),
+      invoices: groups.map((g, i) => ({
       batchNote: g.batchNote.trim() || undefined,
       vatInvoice: {
         invoiceSerial: g.vatForm.invoiceSerial.trim(),
@@ -1098,7 +1103,7 @@ export default function ExcelImportRegular() {
     } catch (err: any) {
       toast.error(`Nhập kho thất bại: ${err.response?.data?.message || err.message || "Lỗi không xác định"}`);
     }
-  }, [applyRowValidation, groups, totalRows, importMutation, router]);
+  }, [advancedByName, applyRowValidation, groups, totalRows, importMutation, router]);
 
   const itemTypeOptions = useMemo(
     () => itemTypes.map((t) => ({ label: t.value, value: t.key })),
@@ -1275,7 +1280,7 @@ export default function ExcelImportRegular() {
     if (row.itemModelId) {
       return (
         <div className="w-28">
-          <div className="inline-flex h-7 items-center rounded-md bg-emerald-50 px-2 text-[11px] font-medium text-emerald-700">
+          <div className="inline-flex h-7 items-center rounded-md bg-emerald-50 px-2 text-sm font-medium text-emerald-700">
             Đã có
           </div>
         </div>
@@ -1327,8 +1332,8 @@ export default function ExcelImportRegular() {
               }
             >
               
-              <span className="inline-flex min-w-0 max-w-full items-center rounded-md bg-emerald-50 px-2 py-0.5 text-sm font-medium text-emerald-700">
-                <span className="truncate">Xem trước</span>
+              <span className="inline-flex items-center justify-center rounded-md bg-emerald-50 p-1 text-emerald-700">
+                <Eye className="h-3.5 w-3.5" weight="bold" />
               </span>
             </Button>
             <Button
@@ -1889,6 +1894,19 @@ export default function ExcelImportRegular() {
                 </div>
               );
             })}
+
+            <div className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/30 px-4 py-3">
+              <label className="shrink-0 text-sm font-medium tracking-tighter text-foreground whitespace-nowrap">
+                Người ứng tiền
+              </label>
+              <input
+                type="text"
+                value={advancedByName}
+                onChange={(e) => setAdvancedByName(e.target.value)}
+                placeholder="Nhập tên người ứng tiền mua hàng (tuỳ chọn)..."
+                className="flex-1 bg-transparent text-sm tracking-tighter outline-none placeholder:text-muted-foreground"
+              />
+            </div>
 
             <div className="flex items-center justify-between pt-2 shrink-0">
               <Button variant="outline" size="sm" onClick={handleReset} className="gap-2">

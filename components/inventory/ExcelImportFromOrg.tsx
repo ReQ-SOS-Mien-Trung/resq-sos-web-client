@@ -50,6 +50,7 @@ import {
   Plus,
   PencilSimple,
   CaretDown,
+  Eye,
 } from "@phosphor-icons/react";
 import {
   useInventoryItemTypes,
@@ -728,6 +729,7 @@ export default function ExcelImportFromOrg() {
     }
     if (!orgSearchValue.trim()) {
       setOrgError("Vui lòng chọn hoặc nhập tên tổ chức viện trợ");
+      toast.error("Vui lòng chọn hoặc nhập tên tổ chức viện trợ trước khi xác nhận nhập kho.");
       return;
     }
 
@@ -934,7 +936,7 @@ export default function ExcelImportFromOrg() {
     if (row.itemModelId) {
       return (
         <div className="w-28">
-          <div className="inline-flex h-7 items-center rounded-md bg-emerald-50 px-2 text-[11px] font-medium text-emerald-700">
+          <div className="inline-flex h-7 items-center rounded-md bg-emerald-50 px-2 text-sm font-medium text-emerald-700">
             Đã có
           </div>
         </div>
@@ -985,8 +987,8 @@ export default function ExcelImportFromOrg() {
                 })
               }
             >
-              <span className="inline-flex min-w-0 max-w-full items-center rounded-md bg-emerald-50 px-2 py-0.5 text-sm font-medium text-emerald-700">
-                <span className="truncate">Xem trước</span>
+              <span className="inline-flex items-center justify-center rounded-md bg-emerald-50 p-1 text-emerald-700">
+                <Eye className="h-3.5 w-3.5" weight="bold" />
               </span>
             </Button>
             <Button
@@ -1191,7 +1193,7 @@ export default function ExcelImportFromOrg() {
                               )}
                             >
                               <Buildings className="h-4 w-4 text-muted-foreground shrink-0" />
-                              <span className="truncate">{org.value}</span>
+                              <span className="truncate tracking-tighter">{org.value}</span>
                               {selectedOrgId === org.key && (
                                 <CheckCircle className="ml-auto h-4 w-4 text-green-600 shrink-0" weight="fill" />
                               )}
@@ -1433,7 +1435,7 @@ export default function ExcelImportFromOrg() {
                             )}
                           >
                             <Buildings className="h-4 w-4 text-muted-foreground shrink-0" />
-                            <span className="truncate">{org.value}</span>
+                            <span className="truncate tracking-tighter">{org.value}</span>
                             {selectedOrgId === org.key && (
                               <CheckCircle className="ml-auto h-4 w-4 text-green-600 shrink-0" weight="fill" />
                             )}
