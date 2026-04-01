@@ -27,6 +27,7 @@ import {
   useSOSClusters,
   useAiMissionStream,
 } from "@/services/sos_cluster/hooks";
+import { useTeamIncidents } from "@/services/team_incidents/hooks";
 import type {
   ClusterRescueSuggestionResponse,
   SOSClusterEntity,
@@ -40,6 +41,7 @@ import type {
   RescueTeamEntity,
   RescueTeamTypeKey,
 } from "@/services/rescue_teams/type";
+import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +73,7 @@ import {
   SOSDetailsPanel,
   SOSSidebar,
   LocationDetailsPanel,
+  TeamIncidentDetailsPanel,
 } from "@/components/coordinator";
 import RescuePlanPanel from "@/components/coordinator/RescuePlanPanel";
 import ManualMissionBuilder from "@/components/coordinator/ManualMissionBuilder";
@@ -344,6 +347,8 @@ const CoordinatorDashboardContent = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedSOS, setSelectedSOS] = useState<SOSRequest | null>(null);
   const [selectedRescuer, setSelectedRescuer] = useState<Rescuer | null>(null);
+  const [selectedTeamIncident, setSelectedTeamIncident] =
+    useState<TeamIncidentEntity | null>(null);
   const [flyToLocation, setFlyToLocation] = useState<Location | null>(null);
   const [flyToZoom, setFlyToZoom] = useState<number | undefined>(undefined);
   const [isConnected] = useState(true);
@@ -355,6 +360,7 @@ const CoordinatorDashboardContent = () => {
 
   // ─── Panel State ───
   const [sosDetailOpen, setSOSDetailOpen] = useState(false);
+  const [teamIncidentDetailOpen, setTeamIncidentDetailOpen] = useState(false);
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
   const [rescuePlanDefaultTab, setRescuePlanDefaultTab] = useState<
     "plan" | "missions" | undefined
@@ -401,6 +407,7 @@ const CoordinatorDashboardContent = () => {
   const { data: assemblyPointsData } = useAssemblyPoints({
     params: { pageSize: 100 },
   });
+  const { data: teamIncidentsData } = useTeamIncidents();
   const { data: rescueTeamsData } = useRescueTeams({
     params: { pageSize: 200 },
   });
@@ -417,6 +424,10 @@ const CoordinatorDashboardContent = () => {
   const assemblyPoints = useMemo<AssemblyPointEntity[]>(
     () => assemblyPointsData?.items ?? [],
     [assemblyPointsData],
+  );
+  const teamIncidents = useMemo(
+    () => teamIncidentsData?.incidents ?? [],
+    [teamIncidentsData],
   );
   const rescuers = useMemo<Rescuer[]>(() => {
     const teams = rescueTeamsData?.items ?? [];
@@ -509,6 +520,21 @@ const CoordinatorDashboardContent = () => {
     setSelectedRescuer(null);
   }, [rescuers, selectedRescuer]);
 
+  useEffect(() => {
+    if (!selectedTeamIncident) return;
+
+    const nextSelected = teamIncidents.find(
+      (incident) => incident.incidentId === selectedTeamIncident.incidentId,
+    );
+    if (nextSelected) {
+      setSelectedTeamIncident(nextSelected);
+      return;
+    }
+
+    setSelectedTeamIncident(null);
+    setTeamIncidentDetailOpen(false);
+  }, [teamIncidents, selectedTeamIncident]);
+
   // ─── Sidebar auto-collapse when RescuePlanPanel opens ───
   useEffect(() => {
     if (rescuePlanOpen) {
@@ -599,6 +625,8 @@ const CoordinatorDashboardContent = () => {
 
   const handleSOSSelect = useCallback(
     (sos: SOSRequest) => {
+      setTeamIncidentDetailOpen(false);
+      setSelectedTeamIncident(null);
       setSelectedSOS(sos);
       setFlyToZoom(undefined);
       setFlyToLocation(sos.location);
@@ -609,15 +637,33 @@ const CoordinatorDashboardContent = () => {
   );
 
   const handleRescuerSelect = useCallback((rescuer: Rescuer) => {
+    setTeamIncidentDetailOpen(false);
+    setSelectedTeamIncident(null);
     setSelectedRescuer(rescuer);
     setFlyToZoom(undefined);
     setFlyToLocation(rescuer.location);
   }, []);
 
+  const handleTeamIncidentSelect = useCallback(
+    (incident: TeamIncidentEntity) => {
+      setSelectedSOS(null);
+      setSelectedRescuer(null);
+      setSOSDetailOpen(false);
+      setRescuePlanOpen(false);
+      setSelectedTeamIncident(incident);
+      setTeamIncidentDetailOpen(true);
+      setFlyToZoom(16);
+      setFlyToLocation({ lat: incident.latitude, lng: incident.longitude });
+    },
+    [],
+  );
+
   const handleDepotSelect = useCallback(
     (depot: DepotEntity) => {
       setLocationPanelData({ type: "depot", data: depot });
       setLocationPanelOpen(true);
+      setTeamIncidentDetailOpen(false);
+      setSelectedTeamIncident(null);
       setFlyToZoom(undefined);
       setFlyToLocation({ lat: depot.latitude, lng: depot.longitude });
       setSOSDetailOpen(false);
@@ -630,6 +676,8 @@ const CoordinatorDashboardContent = () => {
     (point: AssemblyPointEntity) => {
       setLocationPanelData({ type: "assemblyPoint", data: point });
       setLocationPanelOpen(true);
+      setTeamIncidentDetailOpen(false);
+      setSelectedTeamIncident(null);
       setFlyToZoom(undefined);
       setFlyToLocation({ lat: point.latitude, lng: point.longitude });
       setSOSDetailOpen(false);
@@ -640,6 +688,8 @@ const CoordinatorDashboardContent = () => {
 
   const handleClusterSelect = useCallback(
     (cluster: SOSClusterEntity) => {
+      setTeamIncidentDetailOpen(false);
+      setSelectedTeamIncident(null);
       setFlyToZoom(13);
       setFlyToLocation({
         lat: Number(cluster.centerLatitude),
@@ -1070,10 +1120,13 @@ const CoordinatorDashboardContent = () => {
             <SOSSidebar
               sosRequests={sosRequests}
               rescuers={rescuers}
+              teamIncidents={teamIncidents}
               missions={sidebarMissions}
               onSOSSelect={handleSOSSelect}
               onRescuerSelect={handleRescuerSelect}
+              onTeamIncidentSelect={handleTeamIncidentSelect}
               selectedSOS={selectedSOS}
+              selectedTeamIncident={selectedTeamIncident}
               autoClusters={autoClusters}
               onCreateCluster={handleProcessSOS}
               onClusterOnly={handleClusterOnly}
@@ -1111,6 +1164,8 @@ const CoordinatorDashboardContent = () => {
               <CoordinatorMap
                 sosRequests={sosRequests}
                 rescuers={rescuers}
+                teamIncidents={teamIncidents}
+                selectedTeamIncident={selectedTeamIncident}
                 depots={depots}
                 assemblyPoints={assemblyPoints}
                 clusters={clusters}
@@ -1120,6 +1175,7 @@ const CoordinatorDashboardContent = () => {
                 aiDecision={null}
                 onSOSSelect={handleSOSSelect}
                 onRescuerSelect={handleRescuerSelect}
+                onTeamIncidentSelect={handleTeamIncidentSelect}
                 onDepotSelect={handleDepotSelect}
                 onAssemblyPointSelect={handleAssemblyPointSelect}
                 onClusterSelect={handleClusterSelect}
@@ -1192,6 +1248,17 @@ const CoordinatorDashboardContent = () => {
                 isProcessing={isProcessingSOS}
                 nearbySOSRequests={nearbySOSForDetail}
                 allSOSRequests={sosRequests}
+              />
+
+              <TeamIncidentDetailsPanel
+                open={teamIncidentDetailOpen}
+                onOpenChange={(open) => {
+                  setTeamIncidentDetailOpen(open);
+                  if (!open) {
+                    setSelectedTeamIncident(null);
+                  }
+                }}
+                incident={selectedTeamIncident}
               />
 
               {/* Rescue Plan Panel */}

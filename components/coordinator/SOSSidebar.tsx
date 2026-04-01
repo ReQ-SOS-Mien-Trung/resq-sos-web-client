@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { SOSRequest, Rescuer, Mission, SOSSidebarProps } from "@/type";
-import { getRescuerTypeIcon } from "@/lib/mock-data";
+import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
 import { activityTypeConfig } from "@/lib/constants";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/lib/priority";
 import { useMissions } from "@/services/mission/hooks";
 import type { MissionEntity } from "@/services/mission/type";
+import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,7 @@ import {
   CheckCircle,
   Play,
   Circle,
+  Truck,
 } from "@phosphor-icons/react";
 
 // Client-side time elapsed hook
@@ -77,13 +79,64 @@ function TimeElapsed({ date }: { date: Date }) {
   return <span>{elapsed}</span>;
 }
 
+const rescuerTypeLabels: Record<Rescuer["type"], string> = {
+  TRUCK: "Xe tải",
+  MOTORBOAT: "Thuyền máy",
+  SMALL_BOAT: "Thuyền nhỏ",
+};
+
+function RescuerTypeIcon({
+  type,
+  className,
+}: {
+  type: Rescuer["type"];
+  className?: string;
+}) {
+  if (type === "TRUCK") {
+    return (
+      <Truck
+        className={cn("h-5 w-5 text-slate-700", className)}
+        weight="fill"
+      />
+    );
+  }
+
+  if (type === "MOTORBOAT") {
+    return (
+      <Icon
+        icon="ph:sailboat-fill"
+        className={cn("h-5 w-5 text-blue-600", className)}
+      />
+    );
+  }
+
+  return (
+    <Icon
+      icon="ph:boat-fill"
+      className={cn("h-5 w-5 text-cyan-600", className)}
+    />
+  );
+}
+
+function WaterLevelIcon({ className }: { className?: string }) {
+  return (
+    <Icon
+      icon="ph:waves"
+      className={cn("h-3.5 w-3.5 text-sky-500", className)}
+    />
+  );
+}
+
 const SOSSidebar = ({
   sosRequests,
   rescuers,
+  teamIncidents = [],
   missions,
   onSOSSelect,
   onRescuerSelect,
+  onTeamIncidentSelect,
   selectedSOS,
+  selectedTeamIncident,
   autoClusters,
   onCreateCluster,
   onClusterOnly,
@@ -104,10 +157,31 @@ const SOSSidebar = ({
     new Set(),
   );
 
+  useEffect(() => {
+    if (selectedTeamIncident) {
+      setActiveTab("incidents");
+    }
+  }, [selectedTeamIncident]);
+
   const pendingRequests = sosRequests.filter((s) => s.status === "PENDING");
   const assignedRequests = sosRequests.filter((s) => s.status === "ASSIGNED");
   const availableRescuers = rescuers.filter((r) => r.status === "AVAILABLE");
   const busyRescuers = rescuers.filter((r) => r.status === "BUSY");
+  const reportedIncidents = teamIncidents.filter(
+    (incident) => incident.status === "Reported",
+  );
+  const acknowledgedIncidents = teamIncidents.filter(
+    (incident) => incident.status === "Acknowledged",
+  );
+  const resolvedIncidents = teamIncidents.filter(
+    (incident) => incident.status === "Resolved",
+  );
+  const otherIncidents = teamIncidents.filter(
+    (incident) =>
+      incident.status !== "Reported" &&
+      incident.status !== "Acknowledged" &&
+      incident.status !== "Resolved",
+  );
 
   // IDs that belong to any auto-cluster (to identify standalone requests)
   const clusteredIds = new Set(autoClusters.flat().map((s) => s.id));
@@ -175,7 +249,7 @@ const SOSSidebar = ({
         onValueChange={setActiveTab}
         className="flex-1 flex flex-col overflow-hidden"
       >
-        <TabsList className="mx-3 mt-3 grid h-auto w-auto grid-cols-3 rounded-2xl border border-black/10 bg-black/4 p-1 shadow-inner">
+        <TabsList className="mx-3 mt-3 grid h-auto w-auto grid-cols-4 rounded-2xl border border-black/10 bg-black/4 p-1 shadow-inner">
           <TabsTrigger
             value="incoming"
             className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=inactive]:text-black/55"
@@ -193,6 +267,12 @@ const SOSSidebar = ({
             className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=inactive]:text-black/55"
           >
             Đội cứu hộ
+          </TabsTrigger>
+          <TabsTrigger
+            value="incidents"
+            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=inactive]:text-black/55"
+          >
+            Sự cố đội
           </TabsTrigger>
         </TabsList>
 
@@ -344,7 +424,10 @@ const SOSSidebar = ({
                               </span>
                             )}
                             {cluster.waterLevel && (
-                              <span>🌊 {cluster.waterLevel}</span>
+                              <span className="flex items-center gap-1">
+                                <WaterLevelIcon />
+                                {cluster.waterLevel}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -717,12 +800,158 @@ const SOSSidebar = ({
             </div>
           </ScrollArea>
         </TabsContent>
+
+        {/* Team Incidents Tab */}
+        <TabsContent
+          value="incidents"
+          className="flex-1 overflow-hidden m-0 mt-3"
+        >
+          <ScrollArea className="h-full">
+            <div className="p-3 space-y-3">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                Mới báo cáo ({reportedIncidents.length})
+              </div>
+              {reportedIncidents.map((incident) => (
+                <TeamIncidentCard
+                  key={incident.incidentId}
+                  incident={incident}
+                  isSelected={
+                    selectedTeamIncident?.incidentId === incident.incidentId
+                  }
+                  onClick={() => onTeamIncidentSelect?.(incident)}
+                />
+              ))}
+
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-4">
+                Đã tiếp nhận ({acknowledgedIncidents.length})
+              </div>
+              {acknowledgedIncidents.map((incident) => (
+                <TeamIncidentCard
+                  key={incident.incidentId}
+                  incident={incident}
+                  isSelected={
+                    selectedTeamIncident?.incidentId === incident.incidentId
+                  }
+                  onClick={() => onTeamIncidentSelect?.(incident)}
+                />
+              ))}
+
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-4">
+                Đã xử lý ({resolvedIncidents.length})
+              </div>
+              {resolvedIncidents.map((incident) => (
+                <TeamIncidentCard
+                  key={incident.incidentId}
+                  incident={incident}
+                  isSelected={
+                    selectedTeamIncident?.incidentId === incident.incidentId
+                  }
+                  onClick={() => onTeamIncidentSelect?.(incident)}
+                />
+              ))}
+
+              {otherIncidents.length > 0 && (
+                <>
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-4">
+                    Trạng thái khác ({otherIncidents.length})
+                  </div>
+                  {otherIncidents.map((incident) => (
+                    <TeamIncidentCard
+                      key={incident.incidentId}
+                      incident={incident}
+                      isSelected={
+                        selectedTeamIncident?.incidentId === incident.incidentId
+                      }
+                      onClick={() => onTeamIncidentSelect?.(incident)}
+                    />
+                  ))}
+                </>
+              )}
+
+              {teamIncidents.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  <Warning className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Hiện chưa có sự cố đội cứu hộ</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </TabsContent>
       </Tabs>
     </div>
   );
 };
 
 export default SOSSidebar;
+
+function TeamIncidentCard({
+  incident,
+  isSelected,
+  onClick,
+}: {
+  incident: TeamIncidentEntity;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  const statusVariant: Record<string, "destructive" | "warning" | "success"> = {
+    Reported: "destructive",
+    Acknowledged: "warning",
+    Resolved: "success",
+  };
+
+  const statusLabel: Record<string, string> = {
+    Reported: "Mới báo cáo",
+    Acknowledged: "Đã tiếp nhận",
+    Resolved: "Đã xử lý",
+  };
+
+  const reportedAt = Number.isNaN(Date.parse(incident.reportedAt))
+    ? incident.reportedAt
+    : new Date(incident.reportedAt).toLocaleString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+      });
+
+  return (
+    <Card
+      className={cn(
+        "cursor-pointer transition-all hover:shadow-md py-3",
+        isSelected && "ring-2 ring-primary",
+      )}
+      onClick={onClick}
+    >
+      <CardContent className="p-3">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">
+              Sự cố #{incident.incidentId}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Đội #{incident.missionTeamId}
+            </p>
+          </div>
+          <Badge variant={statusVariant[incident.status] ?? "warning"}>
+            {statusLabel[incident.status] ?? incident.status}
+          </Badge>
+        </div>
+
+        <p className="text-xs text-muted-foreground line-clamp-2">
+          {incident.description}
+        </p>
+
+        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <MapPin className="h-3 w-3" weight="fill" />
+            {incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}
+          </span>
+          <span>{reportedAt}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 // Individual SOS Card Component
 function SOSCard({
@@ -829,7 +1058,7 @@ function MissionCard({
 
         {rescuer && (
           <div className="flex items-center gap-2 text-sm mb-2">
-            <span>{getRescuerTypeIcon(rescuer.type)}</span>
+            <RescuerTypeIcon type={rescuer.type} className="h-4 w-4" />
             <span className="font-medium">{rescuer.name}</span>
           </div>
         )}
@@ -871,12 +1100,6 @@ function RescuerCard({
   rescuer: Rescuer;
   onClick: () => void;
 }) {
-  const typeLabels = {
-    TRUCK: "Xe tải",
-    MOTORBOAT: "Thuyền máy",
-    SMALL_BOAT: "Thuyền nhỏ",
-  };
-
   return (
     <Card
       className={cn(
@@ -887,11 +1110,13 @@ function RescuerCard({
     >
       <CardContent className="p-3">
         <div className="flex items-center gap-3">
-          <div className="text-2xl">{getRescuerTypeIcon(rescuer.type)}</div>
+          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center border border-border/60">
+            <RescuerTypeIcon type={rescuer.type} className="h-5 w-5" />
+          </div>
           <div className="flex-1">
             <div className="font-medium text-sm">{rescuer.name}</div>
             <div className="text-xs text-muted-foreground">
-              {typeLabels[rescuer.type]}
+              {rescuerTypeLabels[rescuer.type]}
             </div>
           </div>
           <Badge

@@ -5,6 +5,7 @@ import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
 import type { AssemblyPointEntity } from "@/services/assembly_points/type";
 import type { SOSClusterEntity } from "@/services/sos_cluster/type";
+import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import {
   MagnifyingGlass,
   X,
@@ -52,6 +53,8 @@ const RouteOverlayFitBounds = ({ points }: { points: [number, number][] }) => {
 const CoordinatorMap = ({
   sosRequests,
   rescuers,
+  teamIncidents = [],
+  selectedTeamIncident,
   depots,
   assemblyPoints = [],
   clusters = [],
@@ -61,6 +64,7 @@ const CoordinatorMap = ({
   aiDecision,
   onSOSSelect,
   onRescuerSelect,
+  onTeamIncidentSelect,
   onDepotSelect,
   onAssemblyPointSelect,
   onClusterSelect,
@@ -281,6 +285,68 @@ const CoordinatorMap = ({
       (s) => !clusteredSOSIds.has(s.id) && !autoClusteredSOSIds.has(s.id),
     );
   }, [sosRequests, isZoomedIn, clusteredSOSIds, autoClusteredSOSIds]);
+
+  const validTeamIncidents = useMemo(
+    () =>
+      teamIncidents.filter(
+        (incident) =>
+          Number.isFinite(incident.latitude) &&
+          Number.isFinite(incident.longitude),
+      ),
+    [teamIncidents],
+  );
+
+  // Hide rescue team markers that overlap/near assembly points to avoid stacked markers.
+  const visibleRescuers = useMemo(() => {
+    const validAssemblyPoints = assemblyPoints
+      .map((point) => ({
+        lat: Number(point.latitude),
+        lng: Number(point.longitude),
+      }))
+      .filter(
+        (point) => Number.isFinite(point.lat) && Number.isFinite(point.lng),
+      );
+
+    if (validAssemblyPoints.length === 0) return rescuers;
+
+    const METERS_PER_DEG_LAT = 111_320;
+    const OVERLAP_DISTANCE_METERS = 30;
+    const overlapDistanceSquared = OVERLAP_DISTANCE_METERS ** 2;
+
+    const isNearAssemblyPoint = (
+      rescuerLat: number,
+      rescuerLng: number,
+      assemblyLat: number,
+      assemblyLng: number,
+    ) => {
+      const deltaLatMeters = (rescuerLat - assemblyLat) * METERS_PER_DEG_LAT;
+      const avgLatRad = ((rescuerLat + assemblyLat) / 2) * (Math.PI / 180);
+      const metersPerDegLng = METERS_PER_DEG_LAT * Math.cos(avgLatRad);
+      const safeMetersPerDegLng =
+        Number.isFinite(metersPerDegLng) && Math.abs(metersPerDegLng) > 0
+          ? metersPerDegLng
+          : METERS_PER_DEG_LAT;
+      const deltaLngMeters = (rescuerLng - assemblyLng) * safeMetersPerDegLng;
+
+      return (
+        deltaLatMeters * deltaLatMeters + deltaLngMeters * deltaLngMeters <=
+        overlapDistanceSquared
+      );
+    };
+
+    return rescuers.filter((rescuer) => {
+      const rescuerLat = Number(rescuer.location.lat);
+      const rescuerLng = Number(rescuer.location.lng);
+
+      if (!Number.isFinite(rescuerLat) || !Number.isFinite(rescuerLng)) {
+        return true;
+      }
+
+      return !validAssemblyPoints.some((point) =>
+        isNearAssemblyPoint(rescuerLat, rescuerLng, point.lat, point.lng),
+      );
+    });
+  }, [rescuers, assemblyPoints]);
 
   // When zoomed in: hide clusters. When zoomed out: merge nearby clusters based on zoom.
   type ClusterWithMergeFlag = SOSClusterEntity & { _isMerged: boolean };
@@ -750,12 +816,24 @@ const CoordinatorMap = ({
         ))}
 
         {/* Rescuer Markers */}
-        {rescuers.map((rescuer) => (
+        {visibleRescuers.map((rescuer) => (
           <RescuerMarker
             key={rescuer.id}
             rescuer={rescuer}
             isSelected={selectedRescuer?.id === rescuer.id}
             onClick={() => onRescuerSelect(rescuer)}
+          />
+        ))}
+
+        {/* Team Incident Markers */}
+        {validTeamIncidents.map((incident) => (
+          <TeamIncidentMarker
+            key={incident.incidentId}
+            incident={incident}
+            isSelected={
+              selectedTeamIncident?.incidentId === incident.incidentId
+            }
+            onClick={() => onTeamIncidentSelect?.(incident)}
           />
         ))}
 
@@ -1104,16 +1182,6 @@ function AssemblyPointMarker({
   position: [number, number];
   onClick?: () => void;
 }) {
-  const statusColors = {
-    Created: "#0ea5e9", // sky-500
-    Active: "#22c55e", // green-500
-    Overloaded: "#f97316", // orange-500
-    UnderMaintenance: "#8b5cf6", // violet-500
-    Closed: "#ef4444", // red-500
-  };
-
-  const color = statusColors[assemblyPoint.status] ?? "#64748b";
-
   const iconEl = useMemo(() => {
     if (typeof window === "undefined") return undefined;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -1127,14 +1195,12 @@ function AssemblyPointMarker({
                style="width: 36px; height: 36px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
             📍
           </div>
-          <div class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white"
-               style="background-color: ${color};"></div>
         </div>
       `,
       iconSize: [36, 36],
       iconAnchor: [18, 18],
     });
-  }, [color]);
+  }, []);
 
   if (!iconEl) return null;
 
@@ -1144,6 +1210,56 @@ function AssemblyPointMarker({
       icon={iconEl}
       zIndexOffset={150}
       eventHandlers={{ click: () => onClick?.() }}
+    />
+  );
+}
+
+function TeamIncidentMarker({
+  incident,
+  isSelected,
+  onClick,
+}: {
+  incident: TeamIncidentEntity;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  const statusColors: Record<string, string> = {
+    Reported: "#ef4444",
+    Acknowledged: "#f97316",
+    Resolved: "#22c55e",
+  };
+
+  const markerColor = statusColors[incident.status] ?? "#64748b";
+
+  const markerSize = isSelected ? 40 : 34;
+  const iconEl = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const L = require("leaflet");
+
+    return L.divIcon({
+      className: "custom-team-incident-marker",
+      html: `
+        <div class="relative flex items-center justify-center" style="width: ${markerSize}px; height: ${markerSize}px;">
+          <div class="rounded-full flex items-center justify-center text-sm font-bold text-white" 
+               style="width: ${markerSize - 2}px; height: ${markerSize - 2}px; background-color: ${markerColor}; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+            !
+          </div>
+        </div>
+      `,
+      iconSize: [markerSize, markerSize],
+      iconAnchor: [markerSize / 2, markerSize / 2],
+    });
+  }, [isSelected, markerColor, markerSize]);
+
+  if (!iconEl) return null;
+
+  return (
+    <Marker
+      position={[incident.latitude, incident.longitude]}
+      icon={iconEl}
+      zIndexOffset={950}
+      eventHandlers={{ click: onClick }}
     />
   );
 }
@@ -1374,6 +1490,10 @@ function MapLegend() {
           <div className="flex items-center gap-2">
             <span>📍</span>
             <span>Điểm tập kết</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+            <span>Sự cố đội cứu hộ</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-teal-500 ring-2 ring-teal-300"></div>
