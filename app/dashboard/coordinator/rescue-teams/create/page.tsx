@@ -116,6 +116,25 @@ const ABILITY_LABELS_VI: Record<string, string> = {
   VOLUNTEER_ORG_MEMBER: "Thành viên tổ chức tình nguyện",
 };
 
+const TEAM_TYPE_ABILITY_FILTER: Record<
+  RescueTeamTypeKey,
+  {
+    abilityCategoryCode?: string;
+    abilitySubgroupCode?: string;
+  }
+> = {
+  Rescue: {
+    abilityCategoryCode: "Rescue",
+  },
+  Medical: {
+    abilityCategoryCode: "Medical",
+  },
+  Transportation: {
+    abilityCategoryCode: "Transportation",
+  },
+  Mixed: {},
+};
+
 function getAbilityLabelVi(code: string): string {
   if (ABILITY_LABELS_VI[code]) return ABILITY_LABELS_VI[code];
   return code
@@ -187,9 +206,7 @@ function TypeCard({
         {label}
       </div>
       {description && (
-        <div className="line-clamp-1 text-[11px] text-black/70">
-          {description}
-        </div>
+        <div className="line-clamp-1 text-xs text-black/70">{description}</div>
       )}
     </button>
   );
@@ -263,7 +280,7 @@ function RescuerCard({
 
         <Avatar className="h-8 w-8 border border-background shadow-sm">
           <AvatarImage src={avatarSrc} />
-          <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-[10px] font-bold">
+          <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-xs font-bold">
             {initials}
           </AvatarFallback>
         </Avatar>
@@ -272,11 +289,11 @@ function RescuerCard({
           <div className="font-medium text-[13px] truncate flex items-center gap-2">
             {user.firstName} {user.lastName}
           </div>
-          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 truncate mt-0.5">
+          <div className="text-xs text-muted-foreground flex items-center gap-1.5 truncate mt-0.5">
             {user.rescuerType && (
               <Badge
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
-                className="text-[9px] font-medium h-4 px-1"
+                className="text-xs font-medium h-4 px-1"
               >
                 {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
               </Badge>
@@ -290,7 +307,7 @@ function RescuerCard({
             type="button"
             variant={isLeader ? "default" : "outline"}
             size="sm"
-            className={`h-7 shrink-0 gap-1 border-black px-2.5 text-[11px] shadow-none transition-colors ${isLeader ? "border-transparent bg-[#FF5722] text-white hover:bg-[#e64a19]" : "text-black/70 hover:bg-black/5 hover:text-black"}`}
+            className={`h-7 shrink-0 gap-1 border-black px-2.5 text-xs shadow-none transition-colors ${isLeader ? "border-transparent bg-[#FF5722] text-white hover:bg-[#e64a19]" : "text-black/70 hover:bg-black/5 hover:text-black"}`}
             onClick={(e) => {
               e.stopPropagation();
               onToggleLeader();
@@ -323,13 +340,13 @@ function RescuerCard({
               </div>
               <Badge
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
-                className="mt-1 h-5 border border-black px-1.5 text-[10px] font-medium"
+                className="mt-1 h-5 border border-black px-1.5 text-xs font-medium"
               >
                 {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
               </Badge>
             </div>
           </div>
-          <div className="mt-2 space-y-1.5 border-t border-black/40 pt-2 text-[11px]">
+          <div className="mt-2 space-y-1.5 border-t border-black/40 pt-2 text-xs">
             <div className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">SĐT:</span>
               <span className="font-medium text-foreground">
@@ -360,7 +377,7 @@ function RescuerCard({
                     <Badge
                       key={idx}
                       variant="outline"
-                      className="h-auto border-black bg-white px-1.5 py-0.5 text-[9px] leading-none"
+                      className="h-auto border-black bg-white px-1.5 py-0.5 text-xs leading-none"
                     >
                       {getAbilityLabelVi(ability)}
                     </Badge>
@@ -384,7 +401,8 @@ function RescuerCard({
 function CreateRescueTeamContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialAssemblyPointId = searchParams.get("assemblyPointId")?.trim() ?? "";
+  const initialAssemblyPointId =
+    searchParams.get("assemblyPointId")?.trim() ?? "";
   const eventId = parsePositiveInteger(searchParams.get("eventId"));
   const lockedAssemblyPointId = parsePositiveInteger(initialAssemblyPointId);
   const isEventScopedTeamCreation =
@@ -445,16 +463,24 @@ function CreateRescueTeamContent() {
     const filters: {
       hasTeam: boolean;
       rescuerType?: Exclude<RescuerType, null>;
+      abilityCategoryCode?: string;
+      abilitySubgroupCode?: string;
     } = {
       hasTeam: false,
     };
+
+    if (teamType && teamType !== "Mixed") {
+      const abilityFilter = TEAM_TYPE_ABILITY_FILTER[teamType];
+      filters.abilityCategoryCode = abilityFilter.abilityCategoryCode;
+      filters.abilitySubgroupCode = abilityFilter.abilitySubgroupCode;
+    }
 
     if (rescuerTypeFilter !== "all") {
       filters.rescuerType = rescuerTypeFilter;
     }
 
     return filters;
-  }, [rescuerTypeFilter]);
+  }, [rescuerTypeFilter, teamType]);
 
   const {
     data: usersData,
@@ -468,17 +494,18 @@ function CreateRescueTeamContent() {
     enabled: !isEventScopedTeamCreation,
   });
 
-  const {
-    data: checkedInRescuersData,
-    isLoading: isLoadingCheckedInRescuers,
-  } = useAssemblyPointCheckedInRescuers(eventId ?? 0, {
-    enabled: isEventScopedTeamCreation,
-    params: {
-      pageNumber: 1,
-      pageSize: 500,
-      rescuerType: rescuerTypeFilter !== "all" ? rescuerTypeFilter : undefined,
-    },
-  });
+  const { data: checkedInRescuersData, isLoading: isLoadingCheckedInRescuers } =
+    useAssemblyPointCheckedInRescuers(eventId ?? 0, {
+      enabled: isEventScopedTeamCreation,
+      params: {
+        pageNumber: 1,
+        pageSize: 500,
+        rescuerType:
+          rescuerTypeFilter !== "all" ? rescuerTypeFilter : undefined,
+        abilityCategoryCode: rescuerFilters.abilityCategoryCode,
+        abilitySubgroupCode: rescuerFilters.abilitySubgroupCode,
+      },
+    });
 
   const { mutate: createTeam, isPending: isCreating } = useCreateRescueTeam();
 
@@ -486,7 +513,11 @@ function CreateRescueTeamContent() {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useCallback(
     (node: HTMLDivElement | null) => {
-      if (isEventScopedTeamCreation || isLoadingFreeRescuers || isFetchingNextPage) {
+      if (
+        isEventScopedTeamCreation ||
+        isLoadingFreeRescuers ||
+        isFetchingNextPage
+      ) {
         return;
       }
       if (observerRef.current) observerRef.current.disconnect();
@@ -552,6 +583,15 @@ function CreateRescueTeamContent() {
     usersData,
   ]);
 
+  const isBackendAbilityFilterActive = useMemo(
+    () =>
+      Boolean(
+        rescuerFilters.abilityCategoryCode ||
+        rescuerFilters.abilitySubgroupCode,
+      ),
+    [rescuerFilters.abilityCategoryCode, rescuerFilters.abilitySubgroupCode],
+  );
+
   const displayedRescuers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return eligibleRescuers;
@@ -567,12 +607,23 @@ function CreateRescueTeamContent() {
     });
   }, [eligibleRescuers, searchQuery]);
 
+  const selectedTeamTypeLabel = useMemo(() => {
+    if (!teamType) {
+      return "";
+    }
+
+    const matchingType = teamTypes?.find((type) => type.key === teamType);
+    return matchingType?.value ?? teamType;
+  }, [teamType, teamTypes]);
+
   const isLoadingUsers = isEventScopedTeamCreation
     ? isLoadingCheckedInRescuers
     : isLoadingFreeRescuers;
 
   const selectedAssemblyPoint = useMemo(
-    () => assemblyPoints.find((point) => String(point.id) === assemblyPointId) ?? null,
+    () =>
+      assemblyPoints.find((point) => String(point.id) === assemblyPointId) ??
+      null,
     [assemblyPoints, assemblyPointId],
   );
 
@@ -715,7 +766,7 @@ function CreateRescueTeamContent() {
             </h1>
             <Badge
               variant="secondary"
-              className="h-5 rounded-none border border-black bg-black px-2 font-normal text-[10px] text-white"
+              className="h-5 rounded-none border border-black bg-black px-2 font-normal text-xs text-white"
             >
               Thiết lập nhanh
             </Badge>
@@ -813,7 +864,7 @@ function CreateRescueTeamContent() {
                         setMaxMembers(String(clamped));
                       }}
                     />
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       Hệ thống yêu cầu từ 6 đến 8 thành viên.
                     </p>
                   </div>
@@ -860,7 +911,7 @@ function CreateRescueTeamContent() {
                                     ? "secondary"
                                     : "destructive"
                               }
-                              className="text-[9px] font-medium h-4 px-1"
+                              className="text-xs font-medium h-4 px-1"
                             >
                               {point.status === "Active"
                                 ? "Hoạt động"
@@ -890,17 +941,6 @@ function CreateRescueTeamContent() {
                       {selectedAssemblyPoint
                         ? `Sức chứa khả dụng: ${selectedAssemblyPoint.maxCapacity} người`
                         : null}
-                    </span>
-                  </div>
-                )}
-                {isEventScopedTeamCreation && (
-                  <div className="flex items-center gap-2 border border-black/20 bg-black/[0.03] px-3 py-2">
-                    <CheckCircle
-                      className="h-3.5 w-3.5 text-black"
-                      weight="fill"
-                    />
-                    <span className="text-[12px] text-black/70">
-                      Điểm tập kết được khóa theo sự kiện check-in #{eventId}.
                     </span>
                   </div>
                 )}
@@ -1002,6 +1042,19 @@ function CreateRescueTeamContent() {
                 </div>
               </div>
 
+              {isBackendAbilityFilterActive ? (
+                <div className="mt-2 flex items-center gap-2 border border-[#FF5722]/40 bg-[#FF5722]/10 px-2.5 py-1.5">
+                  <Sparkle
+                    className="h-3.5 w-3.5 text-[#FF5722]"
+                    weight="fill"
+                  />
+                  <p className="text-[12px] text-[#C2410C]">
+                    Đang lọc thành viên theo chuyên môn đội:{" "}
+                    <strong>{selectedTeamTypeLabel}</strong>
+                  </p>
+                </div>
+              ) : null}
+
               {/* Selected tags */}
               {selectedMembers.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5 max-h-[64px] overflow-y-auto custom-scrollbar">
@@ -1014,7 +1067,7 @@ function CreateRescueTeamContent() {
                       <Badge
                         key={member.userId}
                         variant={member.isLeader ? "default" : "secondary"}
-                        className={`text-[11px] py-0.5 px-2 gap-1.5 ${
+                        className={`text-xs py-0.5 px-2 gap-1.5 ${
                           member.isLeader
                             ? "bg-[#FF5722] hover:bg-[#e64a19] text-white"
                             : ""
@@ -1100,9 +1153,11 @@ function CreateRescueTeamContent() {
                   <p className="text-xs text-muted-foreground mt-1 max-w-[250px]">
                     {searchQuery
                       ? "Liên hệ hoặc tìm kiếm với từ khóa khác."
-                      : isEventScopedTeamCreation
-                        ? "Không có rescuer nào đã check-in phù hợp để thêm vào đội ở sự kiện này."
-                        : "Chỉ hiển thị người cứu hộ đã được duyệt và đang hoạt động."}
+                      : isBackendAbilityFilterActive
+                        ? `Không có rescuer có khả năng phù hợp với chuyên môn ${selectedTeamTypeLabel}.`
+                        : isEventScopedTeamCreation
+                          ? "Không có rescuer nào đã check-in phù hợp để thêm vào đội ở sự kiện này."
+                          : "Chỉ hiển thị người cứu hộ đã được duyệt và đang hoạt động."}
                   </p>
                 </div>
               )}

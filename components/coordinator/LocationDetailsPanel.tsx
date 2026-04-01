@@ -64,8 +64,6 @@ import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
 
 // Panel width
 const PANEL_WIDTH = 420;
-const MIN_GATHERING_HOURS = 48;
-const GATHERING_SUBMIT_BUFFER_MINUTES = 5;
 
 const assemblyTeamTypeLabel: Record<AssemblyPointTeam["teamType"], string> = {
   Rescue: "Cứu hộ",
@@ -184,21 +182,10 @@ function formatDateTimeVi(date: Date): string {
 }
 
 function getMinimumGatheringDate(now = new Date()): Date {
-  const minDate = new Date(
-    now.getTime() +
-      MIN_GATHERING_HOURS * 60 * 60 * 1000 +
-      GATHERING_SUBMIT_BUFFER_MINUTES * 60 * 1000,
-  );
+  const date = new Date(now);
 
-  // Input datetime-local uses minute precision, so normalize seconds.
-  minDate.setSeconds(0, 0);
-  return minDate;
-}
-
-function clampToMinimumDate(date: Date, minDate: Date): Date {
-  if (date.getTime() < minDate.getTime()) {
-    return new Date(minDate);
-  }
+  // Keep minute precision to match picker values.
+  date.setSeconds(0, 0);
   return date;
 }
 
@@ -566,7 +553,7 @@ function DepotDetails({
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-semibold">Tồn kho hiện tại</h4>
             {inventoryData ? (
-              <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+              <Badge variant="outline" className="text-xs h-5 px-1.5">
                 {inventoryData.totalCount} loại
               </Badge>
             ) : null}
@@ -586,19 +573,19 @@ function DepotDetails({
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
-                  <p className="text-[10px] text-muted-foreground">Tổng tồn</p>
+                  <p className="text-xs text-muted-foreground">Tổng tồn</p>
                   <p className="text-sm font-bold text-slate-800">
                     {inventorySummary.totalStock.toLocaleString("vi-VN")}
                   </p>
                 </div>
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2">
-                  <p className="text-[10px] text-amber-700">Đã giữ chỗ</p>
+                  <p className="text-xs text-amber-700">Đã giữ chỗ</p>
                   <p className="text-sm font-bold text-amber-800">
                     {inventorySummary.reservedStock.toLocaleString("vi-VN")}
                   </p>
                 </div>
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
-                  <p className="text-[10px] text-emerald-700">Còn khả dụng</p>
+                  <p className="text-xs text-emerald-700">Còn khả dụng</p>
                   <p className="text-sm font-bold text-emerald-800">
                     {inventorySummary.availableStock.toLocaleString("vi-VN")}
                   </p>
@@ -617,10 +604,7 @@ function DepotDetails({
                       <p className="text-sm font-medium truncate">
                         {item.itemModelName}
                       </p>
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] shrink-0"
-                      >
+                      <Badge variant="secondary" className="text-xs shrink-0">
                         {item.itemType === "Consumable"
                           ? "Tiêu thụ"
                           : "Tái sử dụng"}
@@ -639,21 +623,19 @@ function DepotDetails({
 
                     <div className="mt-2 grid grid-cols-3 gap-1.5">
                       <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
-                        <p className="text-[10px] text-slate-600">Tổng tồn</p>
+                        <p className="text-xs text-slate-600">Tổng tồn</p>
                         <p className="text-sm font-semibold leading-none text-slate-800">
                           {qty.total.toLocaleString("vi-VN")}
                         </p>
                       </div>
                       <div className="min-w-0 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-                        <p className="text-[10px] text-amber-700">Đã giữ</p>
+                        <p className="text-xs text-amber-700">Đã giữ</p>
                         <p className="text-sm font-semibold leading-none text-amber-800">
                           {qty.reserved.toLocaleString("vi-VN")}
                         </p>
                       </div>
                       <div className="min-w-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5">
-                        <p className="text-[10px] text-emerald-700">
-                          Còn khả dụng
-                        </p>
+                        <p className="text-xs text-emerald-700">Còn khả dụng</p>
                         <p className="text-sm font-semibold leading-none text-emerald-800">
                           {qty.available.toLocaleString("vi-VN")}
                         </p>
@@ -781,7 +763,7 @@ function AssemblyPointDetails({
     const minAllowedDate = getMinimumGatheringDate();
     if (assemblyDate.getTime() < minAllowedDate.getTime()) {
       toast.error(
-        `Thời điểm triệu tập phải từ 48 giờ trở lên. Vui lòng chọn từ ${formatDateTimeVi(minAllowedDate)} (giờ VN).`,
+        `Thời điểm triệu tập không được ở quá khứ. Vui lòng chọn từ ${formatDateTimeVi(minAllowedDate)} (giờ VN).`,
       );
       return;
     }
@@ -980,21 +962,11 @@ function AssemblyPointDetails({
               value={assemblyDateInput}
               onChange={setAssemblyDateInput}
             />
-            <p className="text-[11px] text-muted-foreground">
-              Điều kiện: thời điểm triệu tập phải từ 48 giờ trở lên kể từ hiện
-              tại. Hệ thống cộng thêm {GATHERING_SUBMIT_BUFFER_MINUTES} phút để
-              tránh lỗi sát giờ khi gửi yêu cầu.
+            <p className="text-xs text-muted-foreground">
+              Giờ triệu tập là thời điểm rescuer cần có mặt tại điểm tập kết để
+              check-in.
             </p>
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="border-[#FF5722]/40 text-[#FF5722] hover:bg-[#FF5722]/10"
-                onClick={() => setAssemblyDateInput(getMinimumGatheringDate())}
-              >
-                Gợi ý lên lịch
-              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -1015,7 +987,7 @@ function AssemblyPointDetails({
         <div className="px-5 py-4">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-semibold">Sự kiện tập kết</h4>
-            <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+            <Badge variant="outline" className="text-xs h-5 px-1.5">
               {assemblyPointEvents?.totalCount ?? 0} sự kiện
             </Badge>
           </div>
@@ -1058,7 +1030,7 @@ function AssemblyPointDetails({
                           <p className="text-xs font-medium text-foreground">
                             Sự kiện #{event.eventId}
                           </p>
-                          <p className="truncate text-[11px] text-muted-foreground">
+                          <p className="truncate text-xs text-muted-foreground">
                             {formatDateTimeVi(new Date(event.assemblyDate))}
                           </p>
                         </div>
@@ -1077,7 +1049,7 @@ function AssemblyPointDetails({
                     <Badge
                       variant="outline"
                       className={cn(
-                        "text-[10px] h-5 px-2 shrink-0 border",
+                        "text-xs h-5 px-2 shrink-0 border",
                         selectedEventStatusClass,
                       )}
                     >
@@ -1086,7 +1058,7 @@ function AssemblyPointDetails({
                   </div>
 
                   <div className="rounded-md border border-border/60 bg-muted/40 px-2.5 py-2">
-                    <p className="text-[11px] text-muted-foreground mb-0.5">
+                    <p className="text-xs text-muted-foreground mb-0.5">
                       Thời gian tập kết
                     </p>
                     <div className="flex items-center gap-1.5 text-sm font-medium">
@@ -1145,7 +1117,7 @@ function AssemblyPointDetails({
         <div className="px-5 py-4">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-semibold">Đội tại điểm tập kết</h4>
-            <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+            <Badge variant="outline" className="text-xs h-5 px-1.5">
               {teams.length} đội
             </Badge>
           </div>
@@ -1189,7 +1161,7 @@ function AssemblyPointDetails({
                       <Badge
                         variant="outline"
                         className={cn(
-                          "text-[10px] h-5 px-2 shrink-0 border",
+                          "text-xs h-5 px-2 shrink-0 border",
                           statusColor,
                         )}
                       >
@@ -1229,7 +1201,7 @@ function AssemblyPointDetails({
                               <p className="text-xs font-medium truncate">
                                 {member.firstName} {member.lastName}
                               </p>
-                              <p className="text-[11px] text-muted-foreground truncate">
+                              <p className="text-xs text-muted-foreground truncate">
                                 {memberRoleLabel[member.roleInTeam]}
                                 {member.isLeader ? " • Leader" : ""}
                               </p>
@@ -1237,7 +1209,7 @@ function AssemblyPointDetails({
                             <Badge
                               variant="secondary"
                               className={cn(
-                                "text-[10px] h-5 px-2 shrink-0",
+                                "text-xs h-5 px-2 shrink-0",
                                 member.status === "Accepted"
                                   ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
                                   : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
@@ -1302,8 +1274,7 @@ function AssemblyDateTimePicker({
   onChange: (value: Date | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const minAllowedDate = getMinimumGatheringDate();
-  const [draft, setDraft] = useState<Date>(value ?? minAllowedDate);
+  const [draft, setDraft] = useState<Date>(value ?? getMinimumGatheringDate());
   const [hourInput, setHourInput] = useState<string>(
     String(draft.getHours()).padStart(2, "0"),
   );
@@ -1331,6 +1302,14 @@ function AssemblyDateTimePicker({
     setMinuteInput(String(d.getMinutes()).padStart(2, "0"));
   }, [open, value]);
 
+  const clampToCurrentOrFuture = (date: Date): Date => {
+    const minAllowedDate = getMinimumGatheringDate();
+    if (date.getTime() < minAllowedDate.getTime()) {
+      return minAllowedDate;
+    }
+    return date;
+  };
+
   const updateTime = (newHour?: number, newMinute?: number) => {
     const hour = newHour !== undefined ? newHour : parseInt(hourInput, 10) || 0;
     const minute =
@@ -1343,7 +1322,7 @@ function AssemblyDateTimePicker({
       0,
       0,
     );
-    const clamped = clampToMinimumDate(next, minAllowedDate);
+    const clamped = clampToCurrentOrFuture(next);
     setDraft(clamped);
     setHourInput(String(clamped.getHours()).padStart(2, "0"));
     setMinuteInput(String(clamped.getMinutes()).padStart(2, "0"));
@@ -1360,7 +1339,7 @@ function AssemblyDateTimePicker({
   };
 
   const applySelection = () => {
-    onChange(clampToMinimumDate(draft, minAllowedDate));
+    onChange(clampToCurrentOrFuture(draft));
     setOpen(false);
   };
 
@@ -1379,7 +1358,7 @@ function AssemblyDateTimePicker({
           <span>
             {value
               ? formatDateTimeVi(value)
-              : `Chọn ngày giờ (từ ${formatDateTimeVi(minAllowedDate)})`}
+              : `Chọn ngày giờ (từ ${formatDateTimeVi(getMinimumGatheringDate())})`}
           </span>
           <CalendarBlank className="h-4 w-4 text-[#FF5722]" weight="fill" />
         </Button>
@@ -1394,7 +1373,7 @@ function AssemblyDateTimePicker({
         collisionPadding={12}
       >
         <div>
-          <p className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground">
             Chọn ngày
           </p>
           <Calendar
@@ -1404,13 +1383,16 @@ function AssemblyDateTimePicker({
               if (!date) return;
               const next = new Date(date);
               next.setHours(draft.getHours(), draft.getMinutes(), 0, 0);
-              setDraft(clampToMinimumDate(next, minAllowedDate));
+              const clamped = clampToCurrentOrFuture(next);
+              setDraft(clamped);
+              setHourInput(String(clamped.getHours()).padStart(2, "0"));
+              setMinuteInput(String(clamped.getMinutes()).padStart(2, "0"));
             }}
             locale={vi}
             disabled={(date) => {
               const dayEnd = new Date(date);
               dayEnd.setHours(23, 59, 59, 999);
-              return dayEnd.getTime() < minAllowedDate.getTime();
+              return dayEnd.getTime() < getMinimumGatheringDate().getTime();
             }}
             initialFocus
             className="rounded-md border border-border/60 bg-background p-2"
@@ -1423,7 +1405,7 @@ function AssemblyDateTimePicker({
               weekdays: "grid grid-cols-7 gap-0",
               week: "mt-1 grid grid-cols-7 gap-0",
               weekday:
-                "rounded-md text-center text-[11px] font-normal text-muted-foreground",
+                "rounded-md text-center text-xs font-normal text-muted-foreground",
               day: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
               day_button:
                 "h-7 w-full rounded-none p-0 text-xs font-normal aria-selected:opacity-100",
@@ -1432,7 +1414,7 @@ function AssemblyDateTimePicker({
         </div>
 
         <div className="border-t pt-2.5">
-          <p className="mb-2 text-[11px] font-medium text-muted-foreground">
+          <p className="mb-2 text-xs font-medium text-muted-foreground">
             Chọn thời gian
           </p>
           <div className="grid grid-cols-2 gap-1.5">
