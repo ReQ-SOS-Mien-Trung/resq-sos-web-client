@@ -52,9 +52,6 @@ export interface GetRescuersParams {
   abilitySubgroupCode?: string;
   abilityCategoryCode?: string;
   search?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
 }
 
 export interface GetRescuersResponse {

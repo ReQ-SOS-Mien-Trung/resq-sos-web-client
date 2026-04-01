@@ -141,11 +141,14 @@ export interface Depot {
   capacity: number;
   currentUtilization: number;
   status: "Available" | "Full" | "PendingAssignment" | "Closed";
+  imageUrl?: string | null;
   manager: {
     id: string;
-    fullName: string;
+    firstName: string;
+    lastName: string;
     email: string | null;
-    phone: string;
+    phone: string | null;
+    fullName?: string | null;
   } | null;
   lastUpdatedAt: string;
 }
@@ -899,11 +902,14 @@ export interface CoordinatorMapProps {
     capacity: number;
     currentUtilization: number;
     status: "Available" | "Full" | "PendingAssignment" | "Closed";
+    imageUrl?: string | null;
     manager: {
       id: string;
-      fullName: string;
+      firstName: string;
+      lastName: string;
       email: string | null;
-      phone: string;
+      phone: string | null;
+      fullName?: string | null;
     } | null;
     lastUpdatedAt: string;
   }[];
@@ -1343,11 +1349,14 @@ export interface WindyLeafletMapProps {
     capacity: number;
     currentUtilization: number;
     status: "Available" | "Full" | "PendingAssignment" | "Closed";
+    imageUrl?: string | null;
     manager: {
       id: string;
-      fullName: string;
+      firstName: string;
+      lastName: string;
       email: string | null;
-      phone: string;
+      phone: string | null;
+      fullName?: string | null;
     } | null;
     lastUpdatedAt: string;
   }[];

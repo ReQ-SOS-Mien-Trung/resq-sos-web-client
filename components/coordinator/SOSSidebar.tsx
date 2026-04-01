@@ -42,6 +42,8 @@ import {
   Play,
   Circle,
   Truck,
+  User,
+  Phone,
 } from "@phosphor-icons/react";
 
 // Client-side time elapsed hook
@@ -127,6 +129,29 @@ function WaterLevelIcon({ className }: { className?: string }) {
   );
 }
 
+function getIncidentReporterName(
+  reportedBy: TeamIncidentEntity["reportedBy"],
+): string {
+  if (!reportedBy) return "Chưa rõ người báo cáo";
+  if (typeof reportedBy === "string") return reportedBy;
+
+  const fullName = [reportedBy.firstName, reportedBy.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    fullName || reportedBy.phone || reportedBy.email || "Chưa rõ người báo cáo"
+  );
+}
+
+function getIncidentReporterPhone(
+  reportedBy: TeamIncidentEntity["reportedBy"],
+): string | null {
+  if (!reportedBy || typeof reportedBy === "string") return null;
+  return reportedBy.phone;
+}
+
 const SOSSidebar = ({
   sosRequests,
   rescuers,
@@ -201,7 +226,7 @@ const SOSSidebar = ({
   // Backend clusters that are still active in operations (pending/assigned/mission-created)
   const activeClusters = backendClusters.filter((c) => {
     const clusterSOS = sosRequests.filter((s) =>
-      c.sosRequestIds.includes(Number(s.id)),
+      c.sosRequestIds.some((id) => String(id) === String(s.id)),
     );
     const hasActiveSOS = clusterSOS.some((s) => s.status !== "RESCUED");
 
@@ -345,7 +370,9 @@ const SOSSidebar = ({
                       cluster.sosRequestCount || cluster.sosRequestIds.length;
                     const isExpanded = expandedClusters.has(cluster.id);
                     const clusterSOS = sosRequests.filter((s) =>
-                      cluster.sosRequestIds.includes(Number(s.id)),
+                      cluster.sosRequestIds.some(
+                        (id) => String(id) === String(s.id),
+                      ),
                     );
                     const pendingClusterSOS = clusterSOS.filter(
                       (s) => s.status === "PENDING",
@@ -353,6 +380,14 @@ const SOSSidebar = ({
                     const assignedClusterSOS = clusterSOS.filter(
                       (s) => s.status === "ASSIGNED",
                     );
+                    const rescuedClusterSOS = clusterSOS.filter(
+                      (s) => s.status === "RESCUED",
+                    );
+                    const displayClusterSOS = [
+                      ...pendingClusterSOS,
+                      ...assignedClusterSOS,
+                      ...rescuedClusterSOS,
+                    ];
 
                     return (
                       <div
@@ -405,7 +440,9 @@ const SOSSidebar = ({
                                   ? `${pendingClusterSOS.length} chờ xử lý`
                                   : assignedClusterSOS.length > 0
                                     ? `${assignedClusterSOS.length} đang cứu hộ`
-                                    : `${sosCount} SOS`}
+                                    : rescuedClusterSOS.length > 0
+                                      ? `${rescuedClusterSOS.length} đã cứu hộ`
+                                      : `${sosCount} SOS`}
                               </span>
                               {isExpanded ? (
                                 <CaretUp className="h-3.5 w-3.5 text-muted-foreground" />
@@ -436,12 +473,8 @@ const SOSSidebar = ({
                         {isExpanded && (
                           <>
                             <div className="border-t border-inherit divide-y divide-inherit">
-                              {pendingClusterSOS.length > 0 ||
-                              assignedClusterSOS.length > 0 ? (
-                                [
-                                  ...pendingClusterSOS,
-                                  ...assignedClusterSOS,
-                                ].map((sos) => (
+                              {displayClusterSOS.length > 0 ? (
+                                displayClusterSOS.map((sos) => (
                                   <div
                                     key={sos.id}
                                     className={cn(
@@ -468,13 +501,17 @@ const SOSSidebar = ({
                                           variant={
                                             sos.status === "PENDING"
                                               ? "warning"
-                                              : "info"
+                                              : sos.status === "ASSIGNED"
+                                                ? "info"
+                                                : "success"
                                           }
                                           className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
                                         >
                                           {sos.status === "PENDING"
                                             ? "Chờ"
-                                            : "Đang cứu"}
+                                            : sos.status === "ASSIGNED"
+                                              ? "Đang cứu"
+                                              : "Đã cứu"}
                                         </Badge>
                                       </div>
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground self-end sm:self-auto whitespace-nowrap">
@@ -913,6 +950,8 @@ function TeamIncidentCard({
         day: "2-digit",
         month: "2-digit",
       });
+  const reporterName = getIncidentReporterName(incident.reportedBy);
+  const reporterPhone = getIncidentReporterPhone(incident.reportedBy);
 
   return (
     <Card
@@ -940,6 +979,19 @@ function TeamIncidentCard({
         <p className="text-xs text-muted-foreground line-clamp-2">
           {incident.description}
         </p>
+
+        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+          <p className="flex items-center gap-1">
+            <User className="h-3 w-3 shrink-0" />
+            <span className="line-clamp-1">{reporterName}</span>
+          </p>
+          {reporterPhone && (
+            <p className="flex items-center gap-1">
+              <Phone className="h-3 w-3 shrink-0" />
+              <span>{reporterPhone}</span>
+            </p>
+          )}
+        </div>
 
         <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
           <span className="flex items-center gap-1">

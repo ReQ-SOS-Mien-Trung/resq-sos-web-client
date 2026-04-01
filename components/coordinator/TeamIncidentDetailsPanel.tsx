@@ -3,12 +3,21 @@
 import { useMemo } from "react";
 import { TeamIncidentDetailsPanelProps } from "@/type";
 import { useTeamIncidentsByMission } from "@/services/team_incidents/hooks";
+import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Clock, MapPin, ShieldWarning, User, X } from "@phosphor-icons/react";
+import {
+  Clock,
+  EnvelopeSimple,
+  MapPin,
+  Phone,
+  ShieldWarning,
+  User,
+  X,
+} from "@phosphor-icons/react";
 
 const PANEL_WIDTH = 420;
 
@@ -21,6 +30,36 @@ function formatDateTime(value: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function getIncidentReporterName(
+  reportedBy: TeamIncidentEntity["reportedBy"],
+): string {
+  if (!reportedBy) return "Chưa rõ người báo cáo";
+  if (typeof reportedBy === "string") return reportedBy;
+
+  const fullName = [reportedBy.firstName, reportedBy.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    fullName || reportedBy.phone || reportedBy.email || "Chưa rõ người báo cáo"
+  );
+}
+
+function getIncidentReporterPhone(
+  reportedBy: TeamIncidentEntity["reportedBy"],
+): string | null {
+  if (!reportedBy || typeof reportedBy === "string") return null;
+  return reportedBy.phone;
+}
+
+function getIncidentReporterEmail(
+  reportedBy: TeamIncidentEntity["reportedBy"],
+): string | null {
+  if (!reportedBy || typeof reportedBy === "string") return null;
+  return reportedBy.email;
 }
 
 function statusMeta(status: string): { label: string; className: string } {
@@ -99,6 +138,9 @@ const TeamIncidentDetailsPanel = ({
   }
 
   const currentStatus = statusMeta(activeIncident.status);
+  const reporterName = getIncidentReporterName(activeIncident.reportedBy);
+  const reporterPhone = getIncidentReporterPhone(activeIncident.reportedBy);
+  const reporterEmail = getIncidentReporterEmail(activeIncident.reportedBy);
 
   return (
     <div
@@ -178,8 +220,20 @@ const TeamIncidentDetailsPanel = ({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <User className="h-3.5 w-3.5" />
-                  <span>{activeIncident.reportedBy}</span>
+                  <span>{reporterName}</span>
                 </div>
+                {reporterPhone && (
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5" />
+                    <span>{reporterPhone}</span>
+                  </div>
+                )}
+                {reporterEmail && (
+                  <div className="flex items-center gap-1.5">
+                    <EnvelopeSimple className="h-3.5 w-3.5" />
+                    <span className="break-all">{reporterEmail}</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5">
                   <MapPin className="h-3.5 w-3.5" />
                   <span>
@@ -215,6 +269,12 @@ const TeamIncidentDetailsPanel = ({
                     const meta = statusMeta(item.status);
                     const isActive =
                       item.incidentId === activeIncident.incidentId;
+                    const itemReporterName = getIncidentReporterName(
+                      item.reportedBy,
+                    );
+                    const itemReporterPhone = getIncidentReporterPhone(
+                      item.reportedBy,
+                    );
 
                     return (
                       <div
@@ -242,6 +302,10 @@ const TeamIncidentDetailsPanel = ({
                         </p>
                         <p className="text-xs text-muted-foreground mt-1.5">
                           {formatDateTime(item.reportedAt)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Người báo: {itemReporterName}
+                          {itemReporterPhone ? ` • ${itemReporterPhone}` : ""}
                         </p>
                       </div>
                     );

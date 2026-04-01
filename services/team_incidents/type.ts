@@ -4,6 +4,15 @@ export type TeamIncidentStatus =
   | "Resolved"
   | string;
 
+export interface TeamIncidentReporter {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+}
+
 export interface TeamIncidentEntity {
   incidentId: number;
   missionTeamId: number;
@@ -11,7 +20,7 @@ export interface TeamIncidentEntity {
   longitude: number;
   description: string;
   status: TeamIncidentStatus;
-  reportedBy: string;
+  reportedBy: TeamIncidentReporter | string | null;
   reportedAt: string;
 }
 

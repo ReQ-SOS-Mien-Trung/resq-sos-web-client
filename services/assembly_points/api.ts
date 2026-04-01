@@ -190,9 +190,7 @@ export async function getAssemblyPointCheckedInRescuers(
         rescuerType: params?.rescuerType,
         abilitySubgroupCode: params?.abilitySubgroupCode,
         abilityCategoryCode: params?.abilityCategoryCode,
-        firstName: params?.firstName,
-        lastName: params?.lastName,
-        email: params?.email,
+        search: params?.search,
       },
     },
   );

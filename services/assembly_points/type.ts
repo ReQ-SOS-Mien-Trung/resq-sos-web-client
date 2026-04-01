@@ -29,6 +29,7 @@ export interface AssemblyPointEntity {
   longitude: number;
   maxCapacity: number;
   status: AssemblyPointStatus;
+  imageUrl?: string | null;
   lastUpdatedAt: string;
   hasActiveEvent: boolean;
   activeEventId?: number | null;
@@ -102,6 +103,7 @@ export interface CreateAssemblyPointResponse {
   name: string;
   maxCapacity: number;
   status: AssemblyPointStatus;
+  imageUrl?: string | null;
 }
 
 // Update Assembly Point Request
@@ -122,6 +124,7 @@ export interface UpdateAssemblyPointResponse {
   longitude: number;
   maxCapacity: number;
   status: AssemblyPointStatus;
+  imageUrl?: string | null;
   lastUpdatedAt: string | null;
 }
 
@@ -225,9 +228,7 @@ export interface GetAssemblyPointCheckedInRescuersParams {
   rescuerType?: Exclude<RescuerType, null>;
   abilitySubgroupCode?: string;
   abilityCategoryCode?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
+  search?: string;
 }
 
 // Paginated response for checked-in rescuers by event

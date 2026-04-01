@@ -189,9 +189,7 @@ function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
     victimName: victimInfo?.user_name ?? undefined,
     reporterPhone: reporterInfo?.user_phone ?? undefined,
     reporterName:
-      reporterInfo?.user_name ??
-      entity.createdByCoordinatorName ??
-      undefined,
+      reporterInfo?.user_name ?? entity.createdByCoordinatorName ?? undefined,
     createdByCoordinatorId: entity.createdByCoordinatorId ?? null,
     createdByCoordinatorName:
       entity.createdByCoordinatorName ??
@@ -1123,7 +1121,7 @@ const CoordinatorDashboardContent = () => {
         <aside
           className={cn(
             "shrink-0 transition-all duration-300 ease-in-out overflow-hidden",
-            sidebarOpen ? "w-80" : "w-0",
+            sidebarOpen ? "w-88" : "w-0",
           )}
         >
           {sidebarOpen && (
@@ -1362,7 +1360,7 @@ const CoordinatorDashboardPage = () => {
           </header>
           {/* Body Skeleton */}
           <div className="flex-1 flex overflow-hidden">
-            <aside className="w-80 shrink-0 border-r bg-background p-4 space-y-4">
+            <aside className="w-88 shrink-0 border-r bg-background p-4 space-y-4">
               <Skeleton className="h-10 w-full rounded-lg" />
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (

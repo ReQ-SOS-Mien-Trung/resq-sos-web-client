@@ -108,9 +108,6 @@ export async function getRescuers(
         abilitySubgroupCode: params?.abilitySubgroupCode,
         abilityCategoryCode: params?.abilityCategoryCode,
         search: params?.search,
-        firstName: params?.firstName,
-        lastName: params?.lastName,
-        email: params?.email,
       },
     },
   );

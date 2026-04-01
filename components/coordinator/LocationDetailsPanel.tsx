@@ -39,7 +39,6 @@ import { vi } from "date-fns/locale";
 import {
   X,
   MapPin,
-  Factory,
   Clock,
   User,
   Phone,
@@ -387,6 +386,18 @@ function getInventoryQuantities(item: InventoryItemEntity): {
   return { total, reserved, available };
 }
 
+function getDepotManagerDisplayName(manager: DepotEntity["manager"]): string {
+  if (!manager) return "Chưa có quản lý";
+  if (manager.fullName?.trim()) return manager.fullName.trim();
+
+  const fullName = [manager.firstName, manager.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return fullName || manager.email || manager.phone || "Chưa có quản lý";
+}
+
 const LocationDetailsPanel = ({
   open,
   onOpenChange,
@@ -466,6 +477,8 @@ function DepotDetails({
         : utilizationPercent >= 40
           ? "bg-yellow-500"
           : "bg-green-500";
+  const depotImageUrl = depot.imageUrl?.trim() || null;
+  const depotManagerName = getDepotManagerDisplayName(depot.manager);
 
   const inventorySummary = useMemo(() => {
     const summary = getBackendInventorySummary(inventoryData);
@@ -497,20 +510,35 @@ function DepotDetails({
     <>
       {/* Header Banner */}
       <div className="relative shrink-0">
-        <div className="h-36 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 relative overflow-hidden">
+        <div
+          className={cn(
+            "h-36 relative overflow-hidden",
+            depotImageUrl
+              ? "bg-slate-900"
+              : "bg-linear-to-br from-blue-500 via-blue-600 to-indigo-700",
+          )}
+        >
+          {depotImageUrl && (
+            <>
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${depotImageUrl})` }}
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-black/40 via-black/15 to-transparent" />
+            </>
+          )}
+
           {/* Abstract warehouse pattern */}
-          <div className="absolute inset-0 opacity-10">
+          <div
+            className={cn(
+              "absolute inset-0 opacity-10",
+              depotImageUrl && "opacity-0",
+            )}
+          >
             <div className="absolute top-4 left-4 w-16 h-16 border-2 border-white rounded-lg" />
             <div className="absolute top-8 left-24 w-12 h-12 border-2 border-white rounded-lg" />
             <div className="absolute bottom-4 right-8 w-20 h-14 border-2 border-white rounded-lg" />
             <div className="absolute bottom-8 right-32 w-10 h-10 border-2 border-white rounded-lg" />
-          </div>
-
-          {/* Main icon */}
-          <div className="absolute bottom-4 left-5 flex items-end gap-3">
-            <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-              <Factory className="h-7 w-7 text-white" weight="fill" />
-            </div>
           </div>
 
           {/* Close button */}
@@ -625,7 +653,7 @@ function DepotDetails({
           <>
             <InfoRow
               icon={<User className="h-5 w-5" />}
-              primary={depot.manager.fullName}
+              primary={depotManagerName}
               secondary="Quản lý kho"
             />
 
@@ -633,9 +661,9 @@ function DepotDetails({
 
             <InfoRow
               icon={<Phone className="h-5 w-5" />}
-              primary={depot.manager.phone}
+              primary={depot.manager.phone || "Chưa cập nhật"}
               secondary="Số điện thoại"
-              isLink
+              isLink={!!depot.manager.phone}
             />
 
             {depot.manager.email && (
@@ -1001,6 +1029,7 @@ function AssemblyPointDetails({
     hasActiveEvent && selectedEvent?.status !== "Gathering";
   const shouldShowCreateTeam =
     hasActiveEvent && selectedEvent?.status === "Gathering";
+  const assemblyPointImageUrl = displayAssemblyPoint.imageUrl?.trim() || null;
 
   const handleCreateTeam = () => {
     const eventId = selectedEvent?.eventId ?? selectedEventId;
@@ -1021,22 +1050,31 @@ function AssemblyPointDetails({
     <>
       {/* Header Banner */}
       <div className="relative shrink-0">
-        <div className="h-36 bg-gradient-to-br from-purple-500 via-purple-600 to-violet-700 relative overflow-hidden">
-          {/* Abstract pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-6 left-6 w-8 h-8 rounded-full border-2 border-white" />
-            <div className="absolute top-3 left-20 w-6 h-6 rounded-full border-2 border-white" />
-            <div className="absolute bottom-6 left-12 w-10 h-10 rounded-full border-2 border-white" />
-            <div className="absolute top-10 right-10 w-12 h-12 rounded-full border-2 border-white" />
-            <div className="absolute bottom-4 right-20 w-7 h-7 rounded-full border-2 border-white" />
-          </div>
+        <div
+          className={cn(
+            "h-36 relative overflow-hidden",
+            assemblyPointImageUrl
+              ? "bg-slate-900"
+              : "bg-linear-to-br from-purple-500 via-purple-600 to-violet-700",
+          )}
+        >
+          {assemblyPointImageUrl && (
+            <>
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${assemblyPointImageUrl})` }}
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-black/40 via-black/15 to-transparent" />
+            </>
+          )}
 
-          {/* Main icon */}
-          <div className="absolute bottom-4 left-5 flex items-end gap-3">
-            <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-              <MapPin className="h-7 w-7 text-white" weight="fill" />
-            </div>
-          </div>
+          {/* Abstract pattern */}
+          <div
+            className={cn(
+              "absolute inset-0 opacity-10",
+              assemblyPointImageUrl && "opacity-0",
+            )}
+          ></div>
 
           {/* Close button */}
           <Button
