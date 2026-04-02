@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getRescueTeams,
+  getRescueTeamsByCluster,
   getRescueTeamById,
   getRescueTeamTypes,
   getRescueTeamStatuses,
@@ -12,6 +13,7 @@ import {
 import type {
   GetRescueTeamsParams,
   GetRescueTeamsResponse,
+  GetRescueTeamsByClusterResponse,
   GetRescueTeamByIdResponse,
   RescueTeamTypeOption,
   RescueTeamStatusOption,
@@ -25,6 +27,10 @@ import type {
 import { AxiosError } from "axios";
 
 export const RESCUE_TEAMS_QUERY_KEY = ["rescue-teams"] as const;
+export const RESCUE_TEAMS_BY_CLUSTER_QUERY_KEY = [
+  ...RESCUE_TEAMS_QUERY_KEY,
+  "by-cluster",
+] as const;
 export const RESCUE_TEAM_TYPES_QUERY_KEY = ["rescue-team-types"] as const;
 export const RESCUE_TEAM_STATUSES_QUERY_KEY = ["rescue-team-statuses"] as const;
 
@@ -34,6 +40,10 @@ export interface UseRescueTeamsOptions {
 }
 
 export interface UseRescueTeamByIdOptions {
+  enabled?: boolean;
+}
+
+export interface UseRescueTeamsByClusterOptions {
   enabled?: boolean;
 }
 
@@ -59,6 +69,17 @@ export function useRescueTeamById(
     queryKey: [...RESCUE_TEAMS_QUERY_KEY, id],
     queryFn: () => getRescueTeamById(id),
     enabled: options?.enabled ?? true,
+  });
+}
+
+export function useRescueTeamsByCluster(
+  clusterId: number,
+  options?: UseRescueTeamsByClusterOptions,
+) {
+  return useQuery<GetRescueTeamsByClusterResponse>({
+    queryKey: [...RESCUE_TEAMS_BY_CLUSTER_QUERY_KEY, clusterId],
+    queryFn: () => getRescueTeamsByCluster(clusterId),
+    enabled: (options?.enabled ?? true) && Number.isFinite(clusterId),
   });
 }
 

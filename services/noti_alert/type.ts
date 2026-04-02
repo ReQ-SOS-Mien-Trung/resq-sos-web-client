@@ -30,3 +30,31 @@ export interface BroadcastNotificationPayload {
   location: BroadcastNotificationLocation;
   activeAlerts: BroadcastNotificationAlert[];
 }
+
+export interface NotificationListParams {
+  page?: number;
+  pageSize?: number;
+}
+
+export interface UserNotificationItem {
+  userNotificationId: number;
+  title: string;
+  type: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  items: UserNotificationItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  unreadCount: number;
+}
+
+export type NotificationRealtimePayload = UserNotificationItem;
+
+export interface RegisterFcmTokenPayload {
+  token: string;
+}

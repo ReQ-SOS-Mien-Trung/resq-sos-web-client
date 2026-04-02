@@ -2,6 +2,7 @@
 
 import {
   Suspense,
+  useEffect,
   useState,
   useMemo,
   useRef,
@@ -124,13 +125,13 @@ const TEAM_TYPE_ABILITY_FILTER: Record<
   }
 > = {
   Rescue: {
-    abilityCategoryCode: "Rescue",
+    abilityCategoryCode: "RESCUE",
   },
   Medical: {
-    abilityCategoryCode: "Medical",
+    abilityCategoryCode: "MEDICAL",
   },
   Transportation: {
-    abilityCategoryCode: "Transportation",
+    abilityCategoryCode: "TRANSPORTATION",
   },
   Mixed: {},
 };
@@ -419,9 +420,18 @@ function CreateRescueTeamContent() {
     [],
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [rescuerTypeFilter, setRescuerTypeFilter] = useState<
     Exclude<RescuerType, null> | "all"
   >("all");
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
   // ─── Data Fetching ───
   const { data: teamTypes, isLoading: isLoadingTypes } = useRescueTeamTypes();
@@ -465,6 +475,7 @@ function CreateRescueTeamContent() {
       rescuerType?: Exclude<RescuerType, null>;
       abilityCategoryCode?: string;
       abilitySubgroupCode?: string;
+      search?: string;
     } = {
       hasTeam: false,
     };
@@ -479,8 +490,17 @@ function CreateRescueTeamContent() {
       filters.rescuerType = rescuerTypeFilter;
     }
 
+    if (debouncedSearchQuery) {
+      filters.search = debouncedSearchQuery;
+    }
+
     return filters;
-  }, [rescuerTypeFilter, teamType]);
+  }, [
+    rescuerTypeFilter,
+    teamType,
+    isEventScopedTeamCreation,
+    debouncedSearchQuery,
+  ]);
 
   const {
     data: usersData,
@@ -504,6 +524,7 @@ function CreateRescueTeamContent() {
           rescuerTypeFilter !== "all" ? rescuerTypeFilter : undefined,
         abilityCategoryCode: rescuerFilters.abilityCategoryCode,
         abilitySubgroupCode: rescuerFilters.abilitySubgroupCode,
+        search: debouncedSearchQuery || undefined,
       },
     });
 
@@ -592,20 +613,7 @@ function CreateRescueTeamContent() {
     [rescuerFilters.abilityCategoryCode, rescuerFilters.abilitySubgroupCode],
   );
 
-  const displayedRescuers = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return eligibleRescuers;
-
-    return eligibleRescuers.filter((user) => {
-      const fullName = `${user.firstName || ""} ${user.lastName || ""}`
-        .trim()
-        .toLowerCase();
-      const email = (user.email || "").toLowerCase();
-      const phone = user.phone || "";
-
-      return fullName.includes(q) || email.includes(q) || phone.includes(q);
-    });
-  }, [eligibleRescuers, searchQuery]);
+  const displayedRescuers = useMemo(() => eligibleRescuers, [eligibleRescuers]);
 
   const selectedTeamTypeLabel = useMemo(() => {
     if (!teamType) {

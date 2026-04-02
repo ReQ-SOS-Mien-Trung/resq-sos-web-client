@@ -7,10 +7,13 @@ import {
   mockShipments,
   mockActivityLogs,
 } from "@/lib/mock-data";
+import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useRouter } from "next/navigation";
+import { NotificationBell } from "@/components/ui/notification-bell";
+import { Card, CardContent } from "@/components/ui/card";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +24,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   SidebarSimple,
-  Bell,
   Gear,
   User,
   ArrowsClockwise,
@@ -196,6 +198,38 @@ const mapApiSupplyRequestToSidebar = (
   };
 };
 
+const requestingStatusLabels: Record<string, string> = {
+  WaitingForApproval: "Chờ phê duyệt",
+  Approved: "Đã duyệt",
+  InTransit: "Đang được chi viện đến",
+  Received: "Đã nhận",
+  Rejected: "Từ chối",
+};
+
+const requestingStatusColors: Record<string, string> = {
+  WaitingForApproval: "bg-amber-100 text-amber-700 border-amber-200",
+  Approved: "bg-violet-100 text-violet-700 border-violet-200",
+  InTransit: "bg-blue-100 text-blue-700 border-blue-200",
+  Received: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  Rejected: "bg-red-100 text-red-700 border-red-200",
+};
+
+const INVENTORY_TABS = new Set([
+  "inventory",
+  "incoming",
+  "vattu",
+  "shipments",
+  "requests",
+]);
+
+function resolveInventoryTab(rawTab: string | null): string {
+  if (!rawTab) {
+    return "inventory";
+  }
+
+  return INVENTORY_TABS.has(rawTab) ? rawTab : "inventory";
+}
+
 // --- Page Component ---
 
 const InventoryDashboardPage = () => {
@@ -207,8 +241,10 @@ const InventoryDashboardPage = () => {
   );
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [itemSheetOpen, setItemSheetOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("inventory");
-  const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
+  const searchParams = useSearchParams();
+  const activeTab = resolveInventoryTab(searchParams.get("tab"));
+  const [vatTuSelectedItem, setVatTuSelectedItem] =
+    useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
@@ -217,22 +253,67 @@ const InventoryDashboardPage = () => {
 
   const router = useRouter();
 
+  const handleActiveTabChange = useCallback(
+    (tab: string) => {
+      const nextTab = resolveInventoryTab(tab);
+      const currentTab = resolveInventoryTab(searchParams.get("tab"));
+
+      if (nextTab === currentTab) {
+        return;
+      }
+
+      const params = new URLSearchParams(searchParams.toString());
+      if (nextTab === "inventory") {
+        params.delete("tab");
+      } else {
+        params.set("tab", nextTab);
+      }
+
+      if (nextTab === "shipments") {
+        setRequestsPageNumber(1);
+      }
+
+      const query = params.toString();
+      router.replace(
+        query ? `/dashboard/inventory?${query}` : "/dashboard/inventory",
+      );
+    },
+    [router, searchParams],
+  );
+
   // ── Auth ──
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
   const { data: userMe } = useUserMe();
 
-  // Prefer fresh API data, fallback to auth store
-  const displayName = userMe?.firstName
-    ? `${userMe.lastName ?? ""} ${userMe.firstName}`.trim()
-    : (user?.fullName ?? "—");
+  const displayName = useMemo(
+    () =>
+      userMe
+        ? getUserDisplayName(
+            {
+              firstName: userMe.firstName,
+              lastName: userMe.lastName,
+              username: userMe.username,
+            },
+            getUserDisplayName(user),
+          )
+        : getUserDisplayName(user),
+    [userMe, user],
+  );
 
   const userInitials = useMemo(
     () =>
-      displayName && displayName !== "—"
-        ? displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
-        : "U",
-    [displayName],
+      userMe
+        ? getUserAvatarInitials(
+            {
+              firstName: userMe.firstName,
+              lastName: userMe.lastName,
+              username: userMe.username,
+            },
+            getUserAvatarInitials(user),
+          )
+        : getUserAvatarInitials(user),
+    [userMe, user],
   );
 
   // ── Fetch depot data from API ──
@@ -250,10 +331,8 @@ const InventoryDashboardPage = () => {
     refetch: refetchCategories,
   } = useItemCategories({ params: { pageNumber: 1, pageSize: 50 } });
 
-  const {
-    data: quantityByCategoryData,
-    refetch: refetchQuantityByCategory,
-  } = useMyDepotQuantityByCategory();
+  const { data: quantityByCategoryData, refetch: refetchQuantityByCategory } =
+    useMyDepotQuantityByCategory();
 
   const {
     data: supplyRequestsData,
@@ -314,6 +393,15 @@ const InventoryDashboardPage = () => {
     [supplyRequestsData],
   );
 
+  const allSupplyRequestsSorted = useMemo(
+    () =>
+      [...(allRequestsPagedData?.items ?? [])].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
+    [allRequestsPagedData],
+  );
+
   const categoryOverviewData = useMemo(
     () =>
       (quantityByCategoryData ?? []).map((category) => ({
@@ -321,7 +409,8 @@ const InventoryDashboardPage = () => {
         code: category.categoryCode,
         name: category.categoryName,
         quantity:
-          category.availableConsumableQuantity + category.availableReusableUnits,
+          category.availableConsumableQuantity +
+          category.availableReusableUnits,
         description: "",
       })),
     [quantityByCategoryData],
@@ -452,7 +541,6 @@ const InventoryDashboardPage = () => {
             )}
           </Button>
           <div className="flex items-center">
-            
             <span className="font-semibold tracking-tighter text-lg hidden sm:inline">
               ResQ-SOS | Quản Lý Kho
             </span>
@@ -474,7 +562,11 @@ const InventoryDashboardPage = () => {
           {/* Quick Actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden md:flex gap-2"
+              >
                 <Plus className="h-4 w-4" />
                 Nhập kho
                 <CaretDown className="h-3.5 w-3.5 opacity-60" />
@@ -490,7 +582,9 @@ const InventoryDashboardPage = () => {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="gap-2 cursor-pointer tracking-tighter"
-                onClick={() => router.push("/dashboard/inventory/import-regular")}
+                onClick={() =>
+                  router.push("/dashboard/inventory/import-regular")
+                }
               >
                 <Package className="h-4 w-4" />
                 Nhập kho thường
@@ -506,9 +600,9 @@ const InventoryDashboardPage = () => {
             <FileArrowDown className="h-4 w-4" />
             Xuất báo cáo
           </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="hidden md:flex gap-2"
             onClick={() => router.push("/dashboard/inventory/stock-movements")}
           >
@@ -526,14 +620,7 @@ const InventoryDashboardPage = () => {
           </Button>
 
           {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            {stats.criticalStock > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                {stats.criticalStock}
-              </span>
-            )}
-          </Button>
+          <NotificationBell />
 
           {/* Dark Mode Toggle */}
           <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
@@ -561,9 +648,7 @@ const InventoryDashboardPage = () => {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span className="font-semibold">
-                    {displayName !== "—" ? displayName : "Người dùng"}
-                  </span>
+                  <span className="font-semibold">{displayName}</span>
                   <span className="text-xs text-muted-foreground">
                     Quản lý kho
                   </span>
@@ -625,26 +710,24 @@ const InventoryDashboardPage = () => {
               onCategorySelect={handleCategorySelect}
               apiCategories={categoriesData?.items}
               activeTab={activeTab}
-              onActiveTabChange={(tab) => {
-                setActiveTab(tab);
-              }}
+              onActiveTabChange={handleActiveTabChange}
             />
           )}
         </aside>
 
         {/* Main Content */}
-        <main
-          ref={mainRef}
-          className="flex-1 overflow-auto bg-muted/30"
-        >
+        <main ref={mainRef} className="flex-1 overflow-auto bg-muted/30">
           <div className="p-6 space-y-6">
             {/* Page Title — hidden on supply-management tab (it has its own header) */}
             {activeTab !== "supply-management" && (
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-2xl font-semibold tracking-tighter">Dashboard Kho Hàng</h1>
+                  <h1 className="text-2xl font-semibold tracking-tighter">
+                    Dashboard Kho Hàng
+                  </h1>
                   <p className="text-muted-foreground tracking-tighter">
-                    {user?.depotName ?? depotInfo?.name ?? "Đang tải..."} • Quản lý bởi {displayName}
+                    {user?.depotName ?? depotInfo?.name ?? "Đang tải..."} • Quản
+                    lý bởi {displayName}
                   </p>
                 </div>
                 <Button
@@ -654,7 +737,13 @@ const InventoryDashboardPage = () => {
                   onClick={handleRefresh}
                   disabled={isDepotsFetching || isSupplyRequestsFetching}
                 >
-                  <ArrowsClockwise className={cn("h-4 w-4", (isDepotsFetching || isSupplyRequestsFetching) && "animate-spin")} />
+                  <ArrowsClockwise
+                    className={cn(
+                      "h-4 w-4",
+                      (isDepotsFetching || isSupplyRequestsFetching) &&
+                        "animate-spin",
+                    )}
+                  />
                   Làm mới
                 </Button>
               </div>
@@ -663,27 +752,184 @@ const InventoryDashboardPage = () => {
             {activeTab === "supply-management" ? (
               <SupplyRequestManagement />
             ) : activeTab === "vattu" ? (
-              <VatTuSection onItemSelect={(item) => {
-                setVatTuSelectedItem(item);
-                setVatTuSheetOpen(true);
-              }} />
+              <VatTuSection
+                onItemSelect={(item) => {
+                  setVatTuSelectedItem(item);
+                  setVatTuSheetOpen(true);
+                }}
+              />
+            ) : activeTab === "shipments" ? (
+              <div className="space-y-4">
+                {allSupplyRequestsSorted.length === 0 ? (
+                  <Card className="border-border/60">
+                    <CardContent className="p-4 text-sm text-muted-foreground tracking-tighter">
+                      Chưa có yêu cầu nào.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="border-border/60">
+                    <CardContent className="p-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-230 text-sm tracking-tighter">
+                          <thead className="bg-muted/40">
+                            <tr className="border-b border-border/60 text-left">
+                              <th className="px-4 py-3 font-semibold">
+                                Mã yêu cầu
+                              </th>
+                              <th className="px-4 py-3 font-semibold">
+                                Kho nguồn
+                              </th>
+                              <th className="px-4 py-3 font-semibold">
+                                Trạng thái
+                              </th>
+                              <th className="px-4 py-3 font-semibold">
+                                Vật tư
+                              </th>
+                              <th className="px-4 py-3 font-semibold">
+                                Thời gian tạo
+                              </th>
+                              <th className="px-4 py-3 font-semibold w-44">
+                                Ghi chú
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {allSupplyRequestsSorted.map((request) => (
+                              <tr
+                                key={request.id}
+                                className="border-b border-border/50 align-top cursor-pointer hover:bg-muted/40 transition-colors"
+                                onClick={() => {
+                                  setTrackerRequestId(request.id);
+                                  setTrackerOpen(true);
+                                }}
+                              >
+                                <td className="px-4 py-3 font-semibold">
+                                  Đơn yêu cầu số {request.id}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {request.sourceDepotName}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {/* <Badge variant="warning">
+                                        {sourceStatusLabels[request.sourceStatus] ?? request.sourceStatus}
+                                      </Badge> */}
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        requestingStatusColors[
+                                          request.requestingStatus
+                                        ] ??
+                                        "bg-gray-100 text-gray-700 border-gray-200"
+                                      }
+                                    >
+                                      {requestingStatusLabels[
+                                        request.requestingStatus
+                                      ] ?? request.requestingStatus}
+                                    </Badge>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="space-y-1.5">
+                                    {request.items.map((item) => (
+                                      <div
+                                        key={`${request.id}-${item.itemModelId}`}
+                                        className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5"
+                                      >
+                                        <span>{item.itemModelName}</span>
+                                        <span className="font-semibold text-primary whitespace-nowrap">
+                                          {item.quantity.toLocaleString(
+                                            "vi-VN",
+                                          )}{" "}
+                                          {item.unit}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {new Date(request.createdAt).toLocaleString(
+                                    "vi-VN",
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-muted-foreground w-44 max-w-44 whitespace-normal wrap-break-word leading-snug">
+                                  {request.note || "-"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground tracking-tighter">
+                    Trang {requestsPageNumber}
+                    {allRequestsPagedData?.totalPages
+                      ? ` / ${allRequestsPagedData.totalPages}`
+                      : ""}
+                    {allRequestsPagedData?.totalCount !== undefined
+                      ? ` • ${allRequestsPagedData.totalCount} yêu cầu`
+                      : ""}
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!canPrevRequestsPage || isAllRequestsFetching}
+                      onClick={() =>
+                        setRequestsPageNumber((prev) => Math.max(1, prev - 1))
+                      }
+                    >
+                      Trước
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!canNextRequestsPage || isAllRequestsFetching}
+                      onClick={() => setRequestsPageNumber((prev) => prev + 1)}
+                    >
+                      Sau
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refetchAllRequests()}
+                      disabled={isAllRequestsFetching || isAllRequestsLoading}
+                    >
+                      <ArrowsClockwise
+                        size={15}
+                        className={isAllRequestsFetching ? "animate-spin" : ""}
+                      />
+                    </Button>
+                  </div>
+                </div>
+              </div>
             ) : activeTab === "requests" ? (
-                <SupplyRequestSection
-                  onSelectionSidebarOpen={() => {
-                    if (sidebarOpen) setSidebarOpen(false);
-                  }}
-                  onSelectionSidebarChange={(open) => {
-                    if (mainRef.current) {
-                      mainRef.current.style.marginRight = open ? `${panelWidthRef.current}px` : "0px";
-                    }
-                  }}
-                  onPanelWidthChange={(w) => {
-                    panelWidthRef.current = w;
-                    if (mainRef.current) {
-                      mainRef.current.style.marginRight = `${w}px`;
-                    }
-                  }}
-                />
+              <SupplyRequestSection
+                onSelectionSidebarOpen={() => {
+                  if (sidebarOpen) setSidebarOpen(false);
+                }}
+                onSelectionSidebarChange={(open) => {
+                  if (mainRef.current) {
+                    mainRef.current.style.marginRight = open
+                      ? `${panelWidthRef.current}px`
+                      : "0px";
+                  }
+                }}
+                onPanelWidthChange={(w) => {
+                  panelWidthRef.current = w;
+                  if (mainRef.current) {
+                    mainRef.current.style.marginRight = `${w}px`;
+                  }
+                }}
+              />
             ) : (
               <>
                 {/* Stats Overview */}
@@ -733,6 +979,16 @@ const InventoryDashboardPage = () => {
         onOpenChange={setVatTuSheetOpen}
       />
 
+      {/* Supply Request Tracker Sheet */}
+      <SupplyRequestTracker
+        request={trackerRequest}
+        open={trackerOpen}
+        onOpenChange={setTrackerOpen}
+        onActionSuccess={() => {
+          refetchSupplyRequests();
+          refetchAllRequests();
+        }}
+      />
     </div>
   );
 };

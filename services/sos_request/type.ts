@@ -149,6 +149,7 @@ export interface SOSStructuredData {
   supply_details?: SOSSupplyDetails | null;
   additional_description: string | null;
   injured_persons: InjuredPerson[];
+  address?: string | null;
 }
 
 // Network metadata from mesh relay
@@ -157,8 +158,15 @@ export interface SOSNetworkMetadata {
   hop_count: number;
 }
 
-// Sender information
-export interface SOSSenderInfo {
+// Victim information
+export interface SOSVictimInfo {
+  user_id?: string | null;
+  user_name: string | null;
+  user_phone: string | null;
+}
+
+// Reporter information
+export interface SOSReporterInfo {
   device_id: string;
   user_id: string;
   user_name: string | null;
@@ -166,6 +174,9 @@ export interface SOSSenderInfo {
   battery_level: number | null;
   is_online: boolean;
 }
+
+// Legacy sender information for backward compatibility while BE is being updated
+export type SOSSenderInfo = SOSReporterInfo;
 
 // SOS Request Entity
 export interface SOSRequestEntity {
@@ -177,7 +188,10 @@ export interface SOSRequestEntity {
   msg: string;
   structuredData: SOSStructuredData | null;
   networkMetadata: SOSNetworkMetadata | null;
-  senderInfo: SOSSenderInfo | null;
+  victimInfo?: SOSVictimInfo | null;
+  reporterInfo?: SOSReporterInfo | null;
+  isSentOnBehalf?: boolean | null;
+  senderInfo?: SOSSenderInfo | null;
   originId: string | null;
   status: SOSRequestStatus;
   priorityLevel: SOSPriorityLevel;
@@ -231,6 +245,10 @@ export interface CreateSOSRequestPayload {
   msg: string;
   structured_data?: Partial<SOSStructuredData>;
   network_metadata?: Partial<SOSNetworkMetadata>;
+  victim_info?: Partial<SOSVictimInfo>;
+  reporter_info?: Partial<SOSReporterInfo>;
+  is_sent_on_behalf?: boolean;
+  // Transitional field so the current BE still accepts web-created SOS before its contract is updated.
   sender_info?: Partial<SOSSenderInfo>;
 }
 

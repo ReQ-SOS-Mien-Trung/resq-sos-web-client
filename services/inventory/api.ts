@@ -5,6 +5,7 @@ import {
   GetDepotInventoryResponse,
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
+  InventoryItemEntity,
   GetMyDepotCategoryQuantitiesResponse,
   ImportInventoryRequest,
   ImportRegularRequest,
@@ -41,6 +42,97 @@ import {
   SupplyRequestPriorityLevel,
 } from "./type";
 
+type InventoryItemLike = Partial<InventoryItemEntity> & {
+  itemType?: unknown;
+  quantity?: unknown;
+  reservedQuantity?: unknown;
+  availableQuantity?: unknown;
+  unit?: unknown;
+  reservedUnit?: unknown;
+  availableUnit?: unknown;
+  totalReservedQuantity?: unknown;
+  reservedForMissionQuantity?: unknown;
+};
+
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function isReusableItemType(value: unknown): boolean {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    normalized === "reusable" ||
+    normalized.includes("tai su dung") ||
+    normalized.includes("tái sử dụng")
+  );
+}
+
+function normalizeInventoryItem(item: InventoryItemLike): InventoryItemEntity {
+  const reusable = isReusableItemType(item.itemType);
+
+  if (reusable) {
+    const unit = toFiniteNumber(item.unit ?? item.quantity, 0);
+    const reservedUnit = toFiniteNumber(
+      item.reservedUnit ?? item.reservedQuantity ?? item.totalReservedQuantity,
+      0,
+    );
+    const availableUnit = toFiniteNumber(
+      item.availableUnit ?? item.availableQuantity,
+      Math.max(unit - reservedUnit, 0),
+    );
+
+    return {
+      ...(item as object),
+      itemType: "Reusable",
+      unit,
+      reservedUnit,
+      availableUnit,
+    } as InventoryItemEntity;
+  }
+
+  const quantity = toFiniteNumber(item.quantity ?? item.unit, 0);
+  const reservedQuantity = toFiniteNumber(
+    item.reservedQuantity ??
+      item.totalReservedQuantity ??
+      item.reservedForMissionQuantity,
+    0,
+  );
+  const availableQuantity = toFiniteNumber(
+    item.availableQuantity ?? item.availableUnit,
+    Math.max(quantity - reservedQuantity, 0),
+  );
+
+  return {
+    ...(item as object),
+    itemType: "Consumable",
+    quantity,
+    reservedQuantity,
+    availableQuantity,
+  } as InventoryItemEntity;
+}
+
+function normalizeInventoryResponse<T extends { items?: unknown[] }>(
+  data: T,
+): T {
+  if (!Array.isArray(data?.items)) return data;
+
+  return {
+    ...data,
+    items: data.items.map((item) =>
+      normalizeInventoryItem(item as InventoryItemLike),
+    ),
+  } as T;
+}
+
 /**
  * Get inventory by depot ID with optional filters
  * GET /logistics/inventory/depot/{depotId}
@@ -55,7 +147,7 @@ export async function getDepotInventory(
       indexes: null,
     },
   });
-  return data;
+  return normalizeInventoryResponse<GetDepotInventoryResponse>(data);
 }
 
 /**
@@ -71,7 +163,7 @@ export async function getMyDepotInventory(
       indexes: null,
     },
   });
-  return data;
+  return normalizeInventoryResponse<GetMyDepotInventoryResponse>(data);
 }
 
 /**

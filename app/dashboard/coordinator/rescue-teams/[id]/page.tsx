@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
@@ -284,11 +284,20 @@ export default function RescueTeamDetailPage() {
   const teamId = Number(params?.id);
   const [assemblyAtDraft, setAssemblyAtDraft] = useState<string | null>(null);
   const [rescuerSearch, setRescuerSearch] = useState("");
+  const [debouncedRescuerSearch, setDebouncedRescuerSearch] = useState("");
   const [selectedRescuerId, setSelectedRescuerId] = useState("");
   const [addAsLeader, setAddAsLeader] = useState(false);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [memberPendingRemove, setMemberPendingRemove] =
     useState<RescueTeamMemberDetail | null>(null);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedRescuerSearch(rescuerSearch.trim());
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [rescuerSearch]);
 
   const { data, isLoading, isError } = useRescueTeamById(teamId, {
     enabled: Number.isFinite(teamId) && teamId > 0,
@@ -299,6 +308,7 @@ export default function RescueTeamDetailPage() {
         pageNumber: 1,
         pageSize: 100,
         hasTeam: false,
+        search: debouncedRescuerSearch || undefined,
       },
       enabled: Number.isFinite(teamId) && teamId > 0,
     });
@@ -330,27 +340,18 @@ export default function RescueTeamDetailPage() {
     return pool.filter((rescuer) => !memberIds.has(rescuer.id));
   }, [freeRescuersData?.items, data?.members]);
 
-  const filteredRescuers = useMemo(() => {
-    const query = rescuerSearch.trim().toLowerCase();
-    if (!query) return availableRescuers;
-
-    return availableRescuers.filter((rescuer) => {
-      const fullName = `${rescuer.firstName || ""} ${rescuer.lastName || ""}`
-        .trim()
-        .toLowerCase();
-      const phone = (rescuer.phone || "").toLowerCase();
-      const email = (rescuer.email || "").toLowerCase();
-      return (
-        fullName.includes(query) ||
-        phone.includes(query) ||
-        email.includes(query)
-      );
-    });
-  }, [availableRescuers, rescuerSearch]);
+  useEffect(() => {
+    if (
+      selectedRescuerId &&
+      !availableRescuers.some((rescuer) => rescuer.id === selectedRescuerId)
+    ) {
+      setSelectedRescuerId("");
+    }
+  }, [availableRescuers, selectedRescuerId]);
 
   const selectedCandidate = useMemo(
-    () => filteredRescuers.find((rescuer) => rescuer.id === selectedRescuerId),
-    [filteredRescuers, selectedRescuerId],
+    () => availableRescuers.find((rescuer) => rescuer.id === selectedRescuerId),
+    [availableRescuers, selectedRescuerId],
   );
 
   const remainingSlots = Math.max(
@@ -699,12 +700,12 @@ export default function RescueTeamDetailPage() {
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredRescuers.length === 0 ? (
+                    {availableRescuers.length === 0 ? (
                       <div className="px-2 py-2 text-xs text-muted-foreground">
                         Không có cứu hộ phù hợp để thêm.
                       </div>
                     ) : (
-                      filteredRescuers.map((rescuer) => (
+                      availableRescuers.map((rescuer) => (
                         <SelectItem key={rescuer.id} value={rescuer.id}>
                           {rescuer.firstName} {rescuer.lastName}
                         </SelectItem>

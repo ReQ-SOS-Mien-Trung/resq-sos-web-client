@@ -2,9 +2,11 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { NotificationBell } from "@/components/ui/notification-bell";
 import {
   Select,
   SelectContent,
@@ -22,7 +24,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   SidebarSimple,
-  Bell,
   Gear,
   User,
   WifiHigh,
@@ -36,7 +37,13 @@ import {
   CaretDown,
   Package,
 } from "@phosphor-icons/react";
-import { FileTextIcon, FileSpreadsheet, CalendarRange, CalendarDays, ChevronRight } from "lucide-react";
+import {
+  FileTextIcon,
+  FileSpreadsheet,
+  CalendarRange,
+  CalendarDays,
+  ChevronRight,
+} from "lucide-react";
 import { DepotSidebar } from "@/components/inventory";
 import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
@@ -74,9 +81,12 @@ const mapDepotEntityToInfo = (
   manager: managerName,
   totalItems: mockInventoryItems.length,
   totalCategories,
-  criticalAlerts: mockInventoryItems.filter((i) => i.stockLevel === "CRITICAL").length,
-  lowStockAlerts: mockInventoryItems.filter((i) => i.stockLevel === "LOW").length,
-  pendingRequests: mockSupplyRequests.filter((r) => r.status === "PENDING").length,
+  criticalAlerts: mockInventoryItems.filter((i) => i.stockLevel === "CRITICAL")
+    .length,
+  lowStockAlerts: mockInventoryItems.filter((i) => i.stockLevel === "LOW")
+    .length,
+  pendingRequests: mockSupplyRequests.filter((r) => r.status === "PENDING")
+    .length,
   activeShipments: mockShipments.filter(
     (s) => s.status === "PREPARING" || s.status === "IN_TRANSIT",
   ).length,
@@ -84,7 +94,20 @@ const mapDepotEntityToInfo = (
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MONTHS = ["01","02","03","04","05","06","07","08","09","10","11","12"];
+const MONTHS = [
+  "01",
+  "02",
+  "03",
+  "04",
+  "05",
+  "06",
+  "07",
+  "08",
+  "09",
+  "10",
+  "11",
+  "12",
+];
 const currentYear = new Date().getFullYear();
 const YEARS = Array.from({ length: 6 }, (_, i) => String(currentYear - 2 + i));
 const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0");
@@ -104,7 +127,8 @@ export default function ExportReportPage() {
   // ── Layout state ──
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("inventory");
-  const [vatTuSelectedItem, setVatTuSelectedItem] = useState<InventoryItemEntity | null>(null);
+  const [vatTuSelectedItem, setVatTuSelectedItem] =
+    useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
@@ -113,24 +137,43 @@ export default function ExportReportPage() {
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
   const { data: userMe } = useUserMe();
-  const displayName = userMe?.firstName
-    ? `${userMe.lastName ?? ""} ${userMe.firstName}`.trim()
-    : (user?.fullName ?? "—");
+  const displayName = useMemo(
+    () =>
+      userMe
+        ? getUserDisplayName(
+            {
+              firstName: userMe.firstName,
+              lastName: userMe.lastName,
+              username: userMe.username,
+            },
+            getUserDisplayName(user),
+          )
+        : getUserDisplayName(user),
+    [userMe, user],
+  );
   const userInitials = useMemo(
     () =>
-      displayName && displayName !== "—"
-        ? displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
-        : "U",
-    [displayName],
+      userMe
+        ? getUserAvatarInitials(
+            {
+              firstName: userMe.firstName,
+              lastName: userMe.lastName,
+              username: userMe.username,
+            },
+            getUserAvatarInitials(user),
+          )
+        : getUserAvatarInitials(user),
+    [userMe, user],
   );
 
   // ── API data ──
   const { data: depotsData, isLoading: isDepotsLoading } = useDepots({
     params: { pageNumber: 1, pageSize: 50 },
   });
-  const { data: categoriesData, isLoading: isCategoriesLoading } = useItemCategories({
-    params: { pageNumber: 1, pageSize: 50 },
-  });
+  const { data: categoriesData, isLoading: isCategoriesLoading } =
+    useItemCategories({
+      params: { pageNumber: 1, pageSize: 50 },
+    });
   const currentDepot = depotsData?.items?.[0] ?? null;
   const totalCategories = categoriesData?.totalCount ?? 0;
   const depotInfo = useMemo<DepotInfo | null>(() => {
@@ -144,13 +187,22 @@ export default function ExportReportPage() {
   const [rightYear, setRightYear] = useState(String(currentYear));
 
   // ── Export mutation ──
-  const { mutate: exportMovements, isPending: isExporting } = useExportInventoryMovements();
+  const { mutate: exportMovements, isPending: isExporting } =
+    useExportInventoryMovements();
 
   const handleExport = (panel: "range" | "month") => {
     const params =
       panel === "range"
-        ? { periodType: "ByDateRange" as const, fromDate: leftFromDate, toDate: leftToDate }
-        : { periodType: "ByMonth" as const, month: Number(rightMonth), year: Number(rightYear) };
+        ? {
+            periodType: "ByDateRange" as const,
+            fromDate: leftFromDate,
+            toDate: leftToDate,
+          }
+        : {
+            periodType: "ByMonth" as const,
+            month: Number(rightMonth),
+            year: Number(rightYear),
+          };
 
     exportMovements(params, {
       onSuccess: ({ blob, filename }) => {
@@ -207,7 +259,12 @@ export default function ExportReportPage() {
   }
 
   return (
-    <div className={cn("h-screen flex flex-col overflow-hidden", isDarkMode && "dark")}>
+    <div
+      className={cn(
+        "h-screen flex flex-col overflow-hidden",
+        isDarkMode && "dark",
+      )}
+    >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0 z-20">
         <div className="flex items-center gap-4">
@@ -242,7 +299,11 @@ export default function ExportReportPage() {
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden md:flex gap-2"
+              >
                 <Plus className="h-4 w-4" />
                 Nhập kho
                 <CaretDown className="h-3.5 w-3.5 opacity-60" />
@@ -258,7 +319,9 @@ export default function ExportReportPage() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="gap-2 cursor-pointer tracking-tighter"
-                onClick={() => router.push("/dashboard/inventory/import-regular")}
+                onClick={() =>
+                  router.push("/dashboard/inventory/import-regular")
+                }
               >
                 <Package className="h-4 w-4" />
                 Nhập kho thường
@@ -266,11 +329,7 @@ export default function ExportReportPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            variant="default"
-            size="sm"
-            className="hidden md:flex gap-2"
-          >
+          <Button variant="default" size="sm" className="hidden md:flex gap-2">
             <FileArrowDown className="h-4 w-4" />
             Xuất báo cáo
           </Button>
@@ -285,9 +344,7 @@ export default function ExportReportPage() {
             Truy xuất
           </Button>
 
-          <Button variant="ghost" size="icon">
-            <Bell className="h-5 w-5" />
-          </Button>
+          <NotificationBell />
           <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
             {isDarkMode ? (
               <Sun className="h-5 w-5" weight="fill" />
@@ -310,10 +367,10 @@ export default function ExportReportPage() {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span className="font-semibold">
-                    {displayName !== "—" ? displayName : "Người dùng"}
+                  <span className="font-semibold">{displayName}</span>
+                  <span className="text-xs text-muted-foreground">
+                    Quản lý kho
                   </span>
-                  <span className="text-xs text-muted-foreground">Quản lý kho</span>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -381,13 +438,19 @@ export default function ExportReportPage() {
         <main className="flex-1 overflow-auto bg-muted/30">
           {activeTab === "vattu" ? (
             <div className="p-6 md:p-8">
-              <VatTuSection onItemSelect={(item) => {
-                setVatTuSelectedItem(item);
-                setVatTuSheetOpen(true);
-              }} />
+              <VatTuSection
+                onItemSelect={(item) => {
+                  setVatTuSelectedItem(item);
+                  setVatTuSheetOpen(true);
+                }}
+              />
             </div>
           ) : null}
-          <div className={activeTab === "vattu" ? "hidden" : "p-6 md:p-8 space-y-8"}>
+          <div
+            className={
+              activeTab === "vattu" ? "hidden" : "p-6 md:p-8 space-y-8"
+            }
+          >
             {/* ── Hero / Page header ── */}
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -398,9 +461,13 @@ export default function ExportReportPage() {
                   Dashboard Kho Hàng
                 </span>
                 <ChevronRight className="h-3 w-3" />
-                <span className="text-foreground tracking-tighter font-medium">Xuất báo cáo</span>
+                <span className="text-foreground tracking-tighter font-medium">
+                  Xuất báo cáo
+                </span>
               </div>
-              <h1 className="text-3xl font-bold tracking-tighter">Xuất báo cáo</h1>
+              <h1 className="text-3xl font-bold tracking-tighter">
+                Xuất báo cáo
+              </h1>
               <p className="text-muted-foreground tracking-tighter">
                 Tạo báo cáo theo khoảng thời gian hoặc theo tháng
               </p>
@@ -420,8 +487,12 @@ export default function ExportReportPage() {
                       <CalendarRange className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <h2 className="font-semibold tracking-tighter text-base">Báo cáo theo khoảng ngày</h2>
-                      <p className="text-sm tracking-tighter text-muted-foreground mt-0.5">Chọn ngày bắt đầu & kết thúc</p>
+                      <h2 className="font-semibold tracking-tighter text-base">
+                        Báo cáo theo khoảng ngày
+                      </h2>
+                      <p className="text-sm tracking-tighter text-muted-foreground mt-0.5">
+                        Chọn ngày bắt đầu & kết thúc
+                      </p>
                     </div>
                   </div>
 
@@ -429,7 +500,9 @@ export default function ExportReportPage() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <Label className="text-sm font-medium tracking-tighter text-muted-foreground">Từ ngày</Label>
+                        <Label className="text-sm font-medium tracking-tighter text-muted-foreground">
+                          Từ ngày
+                        </Label>
                         <DatePickerInput
                           value={leftFromDate}
                           onChange={setLeftFromDate}
@@ -438,7 +511,9 @@ export default function ExportReportPage() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-sm font-medium tracking-tighter text-muted-foreground">Đến ngày</Label>
+                        <Label className="text-sm font-medium tracking-tighter text-muted-foreground">
+                          Đến ngày
+                        </Label>
                         <DatePickerInput
                           value={leftToDate}
                           onChange={setLeftToDate}
@@ -479,8 +554,12 @@ export default function ExportReportPage() {
                       <CalendarDays className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                     </div>
                     <div>
-                      <h2 className="font-semibold text-base tracking-tighter">Báo cáo theo tháng</h2>
-                      <p className="text-sm tracking-tighter text-muted-foreground mt-0.5">Xem báo cáo tổng hợp hàng tháng</p>
+                      <h2 className="font-semibold text-base tracking-tighter">
+                        Báo cáo theo tháng
+                      </h2>
+                      <p className="text-sm tracking-tighter text-muted-foreground mt-0.5">
+                        Xem báo cáo tổng hợp hàng tháng
+                      </p>
                     </div>
                   </div>
 
@@ -488,8 +567,13 @@ export default function ExportReportPage() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <Label className="text-sm tracking-tighter font-medium text-muted-foreground">Tháng</Label>
-                        <Select value={rightMonth} onValueChange={setRightMonth}>
+                        <Label className="text-sm tracking-tighter font-medium text-muted-foreground">
+                          Tháng
+                        </Label>
+                        <Select
+                          value={rightMonth}
+                          onValueChange={setRightMonth}
+                        >
                           <SelectTrigger className="h-10 mt-1 text-sm rounded-lg">
                             <SelectValue />
                           </SelectTrigger>
@@ -503,7 +587,9 @@ export default function ExportReportPage() {
                         </Select>
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-sm tracking-tighter font-medium text-muted-foreground">Năm</Label>
+                        <Label className="text-sm tracking-tighter font-medium text-muted-foreground">
+                          Năm
+                        </Label>
                         <Select value={rightYear} onValueChange={setRightYear}>
                           <SelectTrigger className="h-10 mt-1 text-sm rounded-lg border-emerald-500/50 ring-1 ring-emerald-500/20">
                             <SelectValue />

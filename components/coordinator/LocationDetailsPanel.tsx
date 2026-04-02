@@ -45,7 +45,6 @@ import { vi } from "date-fns/locale";
 import {
   X,
   MapPin,
-  Factory,
   Clock,
   User,
   Phone,
@@ -69,6 +68,7 @@ import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
 
 // Panel width
 const PANEL_WIDTH = 420;
+const INVENTORY_PAGE_SIZE = 10;
 
 const assemblyTeamTypeLabel: Record<AssemblyPointTeam["teamType"], string> = {
   Rescue: "Cứu hộ",
@@ -250,16 +250,152 @@ function getDefaultEventId(
   return events[0]?.eventId ?? null;
 }
 
+function parseFiniteNumber(value: unknown): number | null {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : Number.NaN;
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const parsed = parseFiniteNumber(value);
+  return parsed ?? fallback;
+}
+
+function readNumericFromObject(
+  source: Record<string, unknown> | null | undefined,
+  keys: readonly string[],
+): number | null {
+  if (!source) return null;
+
+  for (const key of keys) {
+    const value = parseFiniteNumber(source[key]);
+    if (value !== null) return value;
+  }
+
+  return null;
+}
+
+function getBackendInventorySummary(inventoryData: unknown): {
+  totalStock: number | null;
+  reservedStock: number | null;
+  availableStock: number | null;
+} {
+  const root =
+    inventoryData && typeof inventoryData === "object"
+      ? (inventoryData as Record<string, unknown>)
+      : null;
+  const summary =
+    root && typeof root.summary === "object" && root.summary !== null
+      ? (root.summary as Record<string, unknown>)
+      : null;
+
+  const totalKeys = [
+    "totalQuantity",
+    "totalStock",
+    "totalInventoryQuantity",
+    "sumQuantity",
+    "tongSoLuong",
+    "tongTon",
+    "tongTonKho",
+  ] as const;
+  const reservedKeys = [
+    "totalReservedQuantity",
+    "reservedStock",
+    "reservedQuantity",
+    "reservedForMissionQuantity",
+    "sumReservedQuantity",
+    "tongSoLuongDaGiuCho",
+    "tongDaGiuCho",
+  ] as const;
+  const availableKeys = [
+    "totalAvailableQuantity",
+    "availableStock",
+    "availableQuantity",
+    "sumAvailableQuantity",
+    "tongSoLuongKhaDung",
+    "tongKhaDung",
+  ] as const;
+
+  return {
+    totalStock:
+      readNumericFromObject(summary, totalKeys) ??
+      readNumericFromObject(root, totalKeys),
+    reservedStock:
+      readNumericFromObject(summary, reservedKeys) ??
+      readNumericFromObject(root, reservedKeys),
+    availableStock:
+      readNumericFromObject(summary, availableKeys) ??
+      readNumericFromObject(root, availableKeys),
+  };
+}
+
+function isReusableItemType(value: unknown): boolean {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  return (
+    normalized === "reusable" ||
+    normalized.includes("tai su dung") ||
+    normalized.includes("tái sử dụng")
+  );
+}
+
+function getInventoryItemTypeLabel(item: InventoryItemEntity): string {
+  return isReusableItemType(item.itemType) ? "Tái sử dụng" : "Tiêu thụ";
+}
+
 function getInventoryQuantities(item: InventoryItemEntity): {
   total: number;
   reserved: number;
   available: number;
 } {
-  return {
-    total: getInventoryTotal(item),
-    reserved: getInventoryTotalReserved(item),
-    available: getInventoryAvailable(item),
-  };
+  if (item.itemType === "Reusable") {
+    const total = toFiniteNumber(item.unit, 0);
+    const reserved = toFiniteNumber(
+      item.reservedUnit ??
+        item.totalReservedQuantity ??
+        item.reservedForMissionQuantity,
+      0,
+    );
+    const available = toFiniteNumber(
+      item.availableUnit,
+      Math.max(total - reserved, 0),
+    );
+
+    return { total, reserved, available };
+  }
+
+  const total = toFiniteNumber(item.quantity, 0);
+  const reserved = toFiniteNumber(
+    item.reservedQuantity ??
+      item.totalReservedQuantity ??
+      item.reservedForMissionQuantity,
+    0,
+  );
+  const available = toFiniteNumber(
+    item.availableQuantity,
+    Math.max(total - reserved, 0),
+  );
+
+  return { total, reserved, available };
+}
+
+function getDepotManagerDisplayName(manager: DepotEntity["manager"]): string {
+  if (!manager) return "Chưa có quản lý";
+  if (manager.fullName?.trim()) return manager.fullName.trim();
+
+  const fullName = [manager.firstName, manager.lastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
+
+  return fullName || manager.email || manager.phone || "Chưa có quản lý";
 }
 
 const LocationDetailsPanel = ({
@@ -306,14 +442,20 @@ function DepotDetails({
   depot: DepotEntity;
   onClose: () => void;
 }) {
+  const [inventoryPageNumber, setInventoryPageNumber] = useState(1);
+
+  useEffect(() => {
+    setInventoryPageNumber(1);
+  }, [depot.id]);
+
   const {
     data: inventoryData,
     isLoading: isInventoryLoading,
     isError: isInventoryError,
   } = useDepotInventory({
     depotId: depot.id,
-    pageNumber: 1,
-    pageSize: 8,
+    pageNumber: inventoryPageNumber,
+    pageSize: INVENTORY_PAGE_SIZE,
   });
 
   const statusConfig = depotStatusConfig[depot.status];
@@ -335,50 +477,68 @@ function DepotDetails({
         : utilizationPercent >= 40
           ? "bg-yellow-500"
           : "bg-green-500";
+  const depotImageUrl = depot.imageUrl?.trim() || null;
+  const depotManagerName = getDepotManagerDisplayName(depot.manager);
 
   const inventorySummary = useMemo(() => {
-    if (!inventoryData?.items) {
-      return {
-        totalStock: 0,
-        reservedStock: 0,
-        availableStock: 0,
-      };
+    const summary = getBackendInventorySummary(inventoryData);
+
+    return {
+      ...summary,
+      hasCompleteValues:
+        summary.totalStock !== null &&
+        summary.reservedStock !== null &&
+        summary.availableStock !== null,
+    };
+  }, [inventoryData]);
+
+  const inventoryRange = useMemo(() => {
+    if (!inventoryData || inventoryData.totalCount === 0) {
+      return { start: 0, end: 0 };
     }
 
-    return inventoryData.items.reduce(
-      (acc, item) => {
-        const qty = getInventoryQuantities(item);
-        acc.totalStock += qty.total;
-        acc.reservedStock += qty.reserved;
-        acc.availableStock += qty.available;
-        return acc;
-      },
-      {
-        totalStock: 0,
-        reservedStock: 0,
-        availableStock: 0,
-      },
+    const start = (inventoryData.pageNumber - 1) * inventoryData.pageSize + 1;
+    const end = Math.min(
+      inventoryData.pageNumber * inventoryData.pageSize,
+      inventoryData.totalCount,
     );
+
+    return { start, end };
   }, [inventoryData]);
 
   return (
     <>
       {/* Header Banner */}
       <div className="relative shrink-0">
-        <div className="h-36 bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 relative overflow-hidden">
+        <div
+          className={cn(
+            "h-36 relative overflow-hidden",
+            depotImageUrl
+              ? "bg-slate-900"
+              : "bg-linear-to-br from-blue-500 via-blue-600 to-indigo-700",
+          )}
+        >
+          {depotImageUrl && (
+            <>
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${depotImageUrl})` }}
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-black/40 via-black/15 to-transparent" />
+            </>
+          )}
+
           {/* Abstract warehouse pattern */}
-          <div className="absolute inset-0 opacity-10">
+          <div
+            className={cn(
+              "absolute inset-0 opacity-10",
+              depotImageUrl && "opacity-0",
+            )}
+          >
             <div className="absolute top-4 left-4 w-16 h-16 border-2 border-white rounded-lg" />
             <div className="absolute top-8 left-24 w-12 h-12 border-2 border-white rounded-lg" />
             <div className="absolute bottom-4 right-8 w-20 h-14 border-2 border-white rounded-lg" />
             <div className="absolute bottom-8 right-32 w-10 h-10 border-2 border-white rounded-lg" />
-          </div>
-
-          {/* Main icon */}
-          <div className="absolute bottom-4 left-5 flex items-end gap-3">
-            <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-              <Factory className="h-7 w-7 text-white" weight="fill" />
-            </div>
           </div>
 
           {/* Close button */}
@@ -493,7 +653,7 @@ function DepotDetails({
           <>
             <InfoRow
               icon={<User className="h-5 w-5" />}
-              primary={depot.manager.fullName}
+              primary={depotManagerName}
               secondary="Quản lý kho"
             />
 
@@ -501,9 +661,9 @@ function DepotDetails({
 
             <InfoRow
               icon={<Phone className="h-5 w-5" />}
-              primary={depot.manager.phone}
+              primary={depot.manager.phone || "Chưa cập nhật"}
               secondary="Số điện thoại"
-              isLink
+              isLink={!!depot.manager.phone}
             />
 
             {depot.manager.email && (
@@ -563,26 +723,33 @@ function DepotDetails({
             </div>
           ) : inventoryData?.items && inventoryData.items.length > 0 ? (
             <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
-                  <p className="text-xs text-muted-foreground">Tổng tồn</p>
-                  <p className="text-sm font-bold text-slate-800">
-                    {inventorySummary.totalStock.toLocaleString("vi-VN")}
-                  </p>
+              {inventorySummary.hasCompleteValues ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
+                    <p className="text-xs text-muted-foreground">Tổng tồn</p>
+                    <p className="text-sm font-bold text-slate-800">
+                      {inventorySummary.totalStock?.toLocaleString("vi-VN")}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2">
+                    <p className="text-xs text-amber-700">Đã giữ chỗ</p>
+                    <p className="text-sm font-bold text-amber-800">
+                      {inventorySummary.reservedStock?.toLocaleString("vi-VN")}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
+                    <p className="text-xs text-emerald-700">Còn khả dụng</p>
+                    <p className="text-sm font-bold text-emerald-800">
+                      {inventorySummary.availableStock?.toLocaleString("vi-VN")}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-2">
-                  <p className="text-xs text-amber-700">Đã giữ chỗ</p>
-                  <p className="text-sm font-bold text-amber-800">
-                    {inventorySummary.reservedStock.toLocaleString("vi-VN")}
-                  </p>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  Backend chưa trả số liệu tổng kho, đang hiển thị chi tiết theo
+                  từng vật phẩm.
                 </div>
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
-                  <p className="text-xs text-emerald-700">Còn khả dụng</p>
-                  <p className="text-sm font-bold text-emerald-800">
-                    {inventorySummary.availableStock.toLocaleString("vi-VN")}
-                  </p>
-                </div>
-              </div>
+              )}
 
               {inventoryData.items.map((item) => {
                 const qty = getInventoryQuantities(item);
@@ -597,9 +764,7 @@ function DepotDetails({
                         {item.itemModelName}
                       </p>
                       <Badge variant="secondary" className="text-xs shrink-0">
-                        {item.itemType === "Consumable"
-                          ? "Tiêu thụ"
-                          : "Tái sử dụng"}
+                        {getInventoryItemTypeLabel(item)}
                       </Badge>
                     </div>
 
@@ -614,20 +779,20 @@ function DepotDetails({
                     </div>
 
                     <div className="mt-2 grid grid-cols-3 gap-1.5">
-                      <div className="min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
-                        <p className="text-xs text-slate-600">Tổng tồn</p>
+                      <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
+                        <p className="text-[11px] text-slate-600">Tổng tồn</p>
                         <p className="text-sm font-semibold leading-none text-slate-800">
                           {qty.total.toLocaleString("vi-VN")}
                         </p>
                       </div>
-                      <div className="min-w-0 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
-                        <p className="text-xs text-amber-700">Đã giữ</p>
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+                        <p className="text-[11px] text-amber-700">Giữ chỗ</p>
                         <p className="text-sm font-semibold leading-none text-amber-800">
                           {qty.reserved.toLocaleString("vi-VN")}
                         </p>
                       </div>
-                      <div className="min-w-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5">
-                        <p className="text-xs text-emerald-700">Còn khả dụng</p>
+                      <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5">
+                        <p className="text-[11px] text-emerald-700">Khả dụng</p>
                         <p className="text-sm font-semibold leading-none text-emerald-800">
                           {qty.available.toLocaleString("vi-VN")}
                         </p>
@@ -636,6 +801,45 @@ function DepotDetails({
                   </div>
                 );
               })}
+
+              {inventoryData.totalPages > 1 ? (
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2.5 text-xs"
+                    disabled={!inventoryData.hasPreviousPage}
+                    onClick={() =>
+                      setInventoryPageNumber((prev) => Math.max(1, prev - 1))
+                    }
+                  >
+                    Trang trước
+                  </Button>
+
+                  <p className="text-center text-xs text-muted-foreground">
+                    Trang {inventoryData.pageNumber}/{inventoryData.totalPages}
+                    <br />
+                    {inventoryRange.start}-{inventoryRange.end}/
+                    {inventoryData.totalCount} vật phẩm
+                  </p>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2.5 text-xs"
+                    disabled={!inventoryData.hasNextPage}
+                    onClick={() =>
+                      setInventoryPageNumber((prev) =>
+                        Math.min(inventoryData.totalPages, prev + 1),
+                      )
+                    }
+                  >
+                    Trang sau
+                  </Button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
@@ -825,6 +1029,7 @@ function AssemblyPointDetails({
     hasActiveEvent && selectedEvent?.status !== "Gathering";
   const shouldShowCreateTeam =
     hasActiveEvent && selectedEvent?.status === "Gathering";
+  const assemblyPointImageUrl = displayAssemblyPoint.imageUrl?.trim() || null;
 
   const handleCreateTeam = () => {
     const eventId = selectedEvent?.eventId ?? selectedEventId;
@@ -845,22 +1050,31 @@ function AssemblyPointDetails({
     <>
       {/* Header Banner */}
       <div className="relative shrink-0">
-        <div className="h-36 bg-gradient-to-br from-purple-500 via-purple-600 to-violet-700 relative overflow-hidden">
-          {/* Abstract pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-6 left-6 w-8 h-8 rounded-full border-2 border-white" />
-            <div className="absolute top-3 left-20 w-6 h-6 rounded-full border-2 border-white" />
-            <div className="absolute bottom-6 left-12 w-10 h-10 rounded-full border-2 border-white" />
-            <div className="absolute top-10 right-10 w-12 h-12 rounded-full border-2 border-white" />
-            <div className="absolute bottom-4 right-20 w-7 h-7 rounded-full border-2 border-white" />
-          </div>
+        <div
+          className={cn(
+            "h-36 relative overflow-hidden",
+            assemblyPointImageUrl
+              ? "bg-slate-900"
+              : "bg-linear-to-br from-purple-500 via-purple-600 to-violet-700",
+          )}
+        >
+          {assemblyPointImageUrl && (
+            <>
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${assemblyPointImageUrl})` }}
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-black/40 via-black/15 to-transparent" />
+            </>
+          )}
 
-          {/* Main icon */}
-          <div className="absolute bottom-4 left-5 flex items-end gap-3">
-            <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-              <MapPin className="h-7 w-7 text-white" weight="fill" />
-            </div>
-          </div>
+          {/* Abstract pattern */}
+          <div
+            className={cn(
+              "absolute inset-0 opacity-10",
+              assemblyPointImageUrl && "opacity-0",
+            )}
+          ></div>
 
           {/* Close button */}
           <Button
@@ -1226,33 +1440,6 @@ function AssemblyPointDetails({
 
         {/* Additional Info */}
         <div className="h-2 bg-muted/50" />
-
-        <div className="px-5 py-4">
-          <h4 className="text-sm font-semibold mb-3">Thông tin bổ sung</h4>
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard
-              label="ID"
-              value={`#${displayAssemblyPoint.id}`}
-              icon={<Hash className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Tình trạng"
-              value={statusConfig.label}
-              icon={<StatusIcon className="h-4 w-4" />}
-              statusColor={statusConfig.textColor}
-            />
-            <StatCard
-              label="Sức chứa"
-              value={`${displayAssemblyPoint.maxCapacity} người`}
-              icon={<Users className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Mã"
-              value={displayAssemblyPoint.code}
-              icon={<Info className="h-4 w-4" />}
-            />
-          </div>
-        </div>
       </div>
     </>
   );

@@ -84,7 +84,7 @@ export interface SOSRequest {
     medicalIssues?: string[];
     severity?: string;
   }>;
-  // Extended fields from backend structuredData / senderInfo
+  // Extended fields from backend structuredData / victimInfo / reporterInfo
   peopleCount?: { adult: number; child: number; elderly: number };
   waitTimeMinutes?: number;
   sosType?: string;
@@ -107,11 +107,15 @@ export interface SOSRequest {
   foodDuration?: string | null;
   areBlanketsEnough?: boolean | null;
   blanketRequestCount?: number | null;
-  senderPhone?: string;
-  senderName?: string;
+  address?: string | null;
+  victimPhone?: string;
+  victimName?: string;
+  reporterPhone?: string;
+  reporterName?: string;
   createdByCoordinatorId?: string | null;
   createdByCoordinatorName?: string | null;
-  isOnline?: boolean;
+  isSentOnBehalf?: boolean;
+  reporterIsOnline?: boolean;
   hopCount?: number;
   locationAccuracy?: number | null;
 }
@@ -137,11 +141,14 @@ export interface Depot {
   capacity: number;
   currentUtilization: number;
   status: "Available" | "Full" | "PendingAssignment" | "Closed";
+  imageUrl?: string | null;
   manager: {
     id: string;
-    fullName: string;
+    firstName: string;
+    lastName: string;
     email: string | null;
-    phone: string;
+    phone: string | null;
+    fullName?: string | null;
   } | null;
   lastUpdatedAt: string;
 }
@@ -844,6 +851,12 @@ export interface SOSDetailsPanelProps {
   allSOSRequests: SOSRequest[];
 }
 
+export interface TeamIncidentDetailsPanelProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  incident: import("@/services/team_incidents/type").TeamIncidentEntity | null;
+}
+
 export interface RescuePlanPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -875,6 +888,10 @@ export interface SeverityConfig {
 export interface CoordinatorMapProps {
   sosRequests: SOSRequest[];
   rescuers: Rescuer[];
+  teamIncidents?: import("@/services/team_incidents/type").TeamIncidentEntity[];
+  selectedTeamIncident?:
+    | import("@/services/team_incidents/type").TeamIncidentEntity
+    | null;
   // DepotEntity from backend
   depots: {
     id: number;
@@ -885,11 +902,14 @@ export interface CoordinatorMapProps {
     capacity: number;
     currentUtilization: number;
     status: "Available" | "Full" | "PendingAssignment" | "Closed";
+    imageUrl?: string | null;
     manager: {
       id: string;
-      fullName: string;
+      firstName: string;
+      lastName: string;
       email: string | null;
-      phone: string;
+      phone: string | null;
+      fullName?: string | null;
     } | null;
     lastUpdatedAt: string;
   }[];
@@ -901,12 +921,7 @@ export interface CoordinatorMapProps {
     latitude: number;
     longitude: number;
     maxCapacity: number;
-    status:
-      | "Created"
-      | "Active"
-      | "Overloaded"
-      | "UnderMaintenance"
-      | "Closed";
+    status: "Created" | "Active" | "Overloaded" | "UnderMaintenance" | "Closed";
     lastUpdatedAt: string | null;
     hasActiveEvent?: boolean;
   }[];
@@ -919,6 +934,9 @@ export interface CoordinatorMapProps {
   aiDecision?: AIDispatchDecision | null;
   onSOSSelect: (sos: SOSRequest) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
+  onTeamIncidentSelect?: (
+    incident: import("@/services/team_incidents/type").TeamIncidentEntity,
+  ) => void;
   onDepotSelect?: (depot: CoordinatorMapProps["depots"][number]) => void;
   onAssemblyPointSelect?: (
     point: NonNullable<CoordinatorMapProps["assemblyPoints"]>[number],
@@ -953,12 +971,7 @@ export interface AssemblyPoint {
   latitude: number;
   longitude: number;
   maxCapacity: number;
-  status:
-    | "Created"
-    | "Active"
-    | "Overloaded"
-    | "UnderMaintenance"
-    | "Closed";
+  status: "Created" | "Active" | "Overloaded" | "UnderMaintenance" | "Closed";
   lastUpdatedAt: string | null;
   hasActiveEvent?: boolean;
 }
@@ -966,10 +979,17 @@ export interface AssemblyPoint {
 export interface SOSSidebarProps {
   sosRequests: SOSRequest[];
   rescuers: Rescuer[];
+  teamIncidents?: import("@/services/team_incidents/type").TeamIncidentEntity[];
   missions: Mission[];
   onSOSSelect: (sos: SOSRequest) => void;
   onRescuerSelect: (rescuer: Rescuer) => void;
+  onTeamIncidentSelect?: (
+    incident: import("@/services/team_incidents/type").TeamIncidentEntity,
+  ) => void;
   selectedSOS?: SOSRequest | null;
+  selectedTeamIncident?:
+    | import("@/services/team_incidents/type").TeamIncidentEntity
+    | null;
   /** Auto-detected clusters of nearby PENDING SOS requests (within 10 km) */
   autoClusters: SOSRequest[][];
   onCreateCluster: (sosIds: string[]) => void;
@@ -1329,11 +1349,14 @@ export interface WindyLeafletMapProps {
     capacity: number;
     currentUtilization: number;
     status: "Available" | "Full" | "PendingAssignment" | "Closed";
+    imageUrl?: string | null;
     manager: {
       id: string;
-      fullName: string;
+      firstName: string;
+      lastName: string;
       email: string | null;
-      phone: string;
+      phone: string | null;
+      fullName?: string | null;
     } | null;
     lastUpdatedAt: string;
   }[];

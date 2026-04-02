@@ -52,7 +52,7 @@ interface InventoryItemEntityBase {
   categoryId: number;
   categoryName: string;
   targetGroups: string[];
-  lastStockedAt: string;
+  lastStockedAt: string | null;
 }
 
 export interface ConsumableItemEntity extends InventoryItemEntityBase {
@@ -64,7 +64,7 @@ export interface ConsumableItemEntity extends InventoryItemEntityBase {
   availableQuantity: number;
   reusableBreakdown?: null;
   /** Số lô hiện tại */
-  lotCount: number;
+  lotCount?: number;
   /** Ngày hết hạn gần nhất trong các lô */
   nearestExpiryDate?: string | null;
   /** true nếu có lô sắp hết hạn */
@@ -107,6 +107,15 @@ export interface GetDepotInventoryParams {
   pageSize?: number;
 }
 
+export interface InventoryTotalsSummary {
+  totalQuantity?: number | string | null;
+  totalReservedQuantity?: number | string | null;
+  totalAvailableQuantity?: number | string | null;
+  totalStock?: number | string | null;
+  reservedStock?: number | string | null;
+  availableStock?: number | string | null;
+}
+
 export interface GetMyDepotInventoryResponse {
   items: InventoryItemEntity[];
   pageNumber: number;
@@ -115,6 +124,13 @@ export interface GetMyDepotInventoryResponse {
   totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
+  totalQuantity?: number | string | null;
+  totalReservedQuantity?: number | string | null;
+  totalAvailableQuantity?: number | string | null;
+  totalStock?: number | string | null;
+  reservedStock?: number | string | null;
+  availableStock?: number | string | null;
+  summary?: InventoryTotalsSummary;
 }
 
 // ─── Import from Organization ───
