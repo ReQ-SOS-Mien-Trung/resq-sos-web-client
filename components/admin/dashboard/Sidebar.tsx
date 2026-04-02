@@ -14,7 +14,11 @@ import {
   Question,
 } from "@phosphor-icons/react";
 import { SidebarProps } from "@/type";
-import { getFavoriteHref, getFavoriteIcon, navigationItems } from "@/lib/constants";
+import {
+  getFavoriteHref,
+  getFavoriteIcon,
+  navigationItems,
+} from "@/lib/constants";
 
 const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
   const pathname = usePathname();
@@ -27,7 +31,9 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
     const initial: Record<string, boolean> = {};
     navigationItems.forEach((item) => {
       if ("children" in item && item.children) {
-        const hasActive = item.children.some((c) => pathname === c.href || pathname?.startsWith(c.href));
+        const hasActive = item.children.some(
+          (c) => pathname === c.href || pathname?.startsWith(c.href),
+        );
         if (hasActive) initial[item.label] = true;
       }
     });
@@ -38,8 +44,11 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
   useEffect(() => {
     navigationItems.forEach((item) => {
       if ("children" in item && item.children) {
-        const hasActive = item.children.some((c) => pathname === c.href || pathname?.startsWith(c.href));
-        if (hasActive) setOpenGroups((prev) => ({ ...prev, [item.label]: true }));
+        const hasActive = item.children.some(
+          (c) => pathname === c.href || pathname?.startsWith(c.href),
+        );
+        if (hasActive)
+          setOpenGroups((prev) => ({ ...prev, [item.label]: true }));
       }
     });
   }, [pathname]);
@@ -94,7 +103,7 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                   alt="ResQ SOS"
                   width={80}
                   height={40}
-                  className="dark:invert"
+                  className="dark:invert h-auto w-auto object-contain"
                 />
               </div>
             </div>
@@ -126,9 +135,14 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                     >
                       <Icon
                         size={20}
-                        className={cn("transition-colors shrink-0", hasActiveChild && "text-red-500")}
+                        className={cn(
+                          "transition-colors shrink-0",
+                          hasActiveChild && "text-red-500",
+                        )}
                       />
-                      <span className="truncate tracking-tighter flex-1 text-left">{item.label}</span>
+                      <span className="truncate tracking-tighter flex-1 text-left">
+                        {item.label}
+                      </span>
                       <CaretDown
                         size={14}
                         className={cn(
@@ -142,7 +156,9 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                     <div
                       className={cn(
                         "overflow-hidden transition-all duration-300",
-                        isGroupOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0",
+                        isGroupOpen
+                          ? "max-h-96 opacity-100"
+                          : "max-h-0 opacity-0",
                       )}
                     >
                       <div className="ml-3 mt-0.5 border-l border-sidebar-border/60 pl-2 space-y-0.5">
@@ -150,7 +166,8 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                           const ChildIcon = child.icon;
                           const isActive =
                             pathname === child.href ||
-                            (child.href !== "/dashboard/admin" && pathname?.startsWith(child.href));
+                            (child.href !== "/dashboard/admin" &&
+                              pathname?.startsWith(child.href));
                           return (
                             <Link
                               key={child.label}
@@ -165,9 +182,14 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                             >
                               <ChildIcon
                                 size={16}
-                                className={cn("transition-colors shrink-0", isActive && "text-red-500")}
+                                className={cn(
+                                  "transition-colors shrink-0",
+                                  isActive && "text-red-500",
+                                )}
                               />
-                              <span className="truncate tracking-tighter">{child.label}</span>
+                              <span className="truncate tracking-tighter">
+                                {child.label}
+                              </span>
                               {isActive && (
                                 <div className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
                               )}
@@ -183,7 +205,8 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
               // ── Regular flat item ────────────────────────────────────
               const isActive =
                 pathname === item.href ||
-                (item.href !== "/dashboard/admin" && pathname?.startsWith(item.href as string));
+                (item.href !== "/dashboard/admin" &&
+                  pathname?.startsWith(item.href as string));
               return (
                 <Link
                   key={item.label}
@@ -198,9 +221,14 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
                 >
                   <Icon
                     size={20}
-                    className={cn("transition-colors shrink-0", isActive && "text-red-500")}
+                    className={cn(
+                      "transition-colors shrink-0",
+                      isActive && "text-red-500",
+                    )}
                   />
-                  <span className="truncate tracking-tighter">{item.label}</span>
+                  <span className="truncate tracking-tighter">
+                    {item.label}
+                  </span>
                   {isActive && (
                     <div className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
                   )}

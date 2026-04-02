@@ -277,6 +277,75 @@
   }
 }
 
+@layer utilities {
+  /*
+   * Dark-mode safeguard for legacy hard-coded palette classes.
+   * This keeps old "text-black / bg-white / border-black" UIs readable
+   * without overriding elements that already declare explicit dark variants.
+   */
+  :where(.dark) [class~="text-black"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-900"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-800"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-700"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-900"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-800"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-700"]:not([class*="dark:text-"]) {
+    color: var(--foreground) !important;
+  }
+
+  :where(.dark) [class~="text-black/80"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/75"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/70"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/65"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/60"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/55"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/50"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/45"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/40"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/30"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-600"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-500"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-400"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-700/85"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-600"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-500"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-400"]:not([class*="dark:text-"]) {
+    color: var(--muted-foreground) !important;
+  }
+
+  :where(.dark) [class~="bg-white"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/95"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/90"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/85"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/80"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/70"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/60"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-slate-50"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-slate-100"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-gray-50"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-gray-100"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-black/4"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-black/[0.03]"]:not([class*="dark:bg-"]) {
+    background-color: var(--card) !important;
+  }
+
+  :where(.dark) [class~="border-black"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/50"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/40"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/30"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/20"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/15"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/10"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-slate-300"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-slate-200"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-slate-200/80"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-slate-100"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-gray-200"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-gray-200/60"]:not([class*="dark:border-"]) {
+    border-color: var(--border) !important;
+  }
+}
+
 /* Auth page gradient backgrounds */
 .auth-gradient {
   background: linear-gradient(

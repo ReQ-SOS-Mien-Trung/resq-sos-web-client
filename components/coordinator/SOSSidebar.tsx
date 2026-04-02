@@ -274,28 +274,28 @@ const SOSSidebar = ({
         onValueChange={setActiveTab}
         className="flex-1 flex flex-col overflow-hidden"
       >
-        <TabsList className="mx-3 mt-3 grid h-auto w-auto grid-cols-4 rounded-2xl border border-black/10 bg-black/4 p-1 shadow-inner">
+        <TabsList className="mx-3 mt-3 grid h-auto w-auto grid-cols-4 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-inner dark:border-white/10 dark:bg-white/5">
           <TabsTrigger
             value="incoming"
-            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=inactive]:text-black/55"
+            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
           >
             SOS Mới
           </TabsTrigger>
           <TabsTrigger
             value="missions"
-            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=inactive]:text-black/55"
+            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
           >
             Nhiệm vụ
           </TabsTrigger>
           <TabsTrigger
             value="rescuers"
-            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=inactive]:text-black/55"
+            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
           >
             Đội cứu hộ
           </TabsTrigger>
           <TabsTrigger
             value="incidents"
-            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm data-[state=inactive]:text-black/55"
+            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
           >
             Sự cố đội
           </TabsTrigger>

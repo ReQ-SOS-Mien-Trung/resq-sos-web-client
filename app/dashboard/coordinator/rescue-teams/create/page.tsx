@@ -125,13 +125,13 @@ const TEAM_TYPE_ABILITY_FILTER: Record<
   }
 > = {
   Rescue: {
-    abilityCategoryCode: "Rescue",
+    abilityCategoryCode: "RESCUE",
   },
   Medical: {
-    abilityCategoryCode: "Medical",
+    abilityCategoryCode: "MEDICAL",
   },
   Transportation: {
-    abilityCategoryCode: "Transportation",
+    abilityCategoryCode: "TRANSPORTATION",
   },
   Mixed: {},
 };

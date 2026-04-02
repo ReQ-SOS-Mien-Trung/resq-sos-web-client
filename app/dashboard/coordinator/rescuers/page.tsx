@@ -27,7 +27,10 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import { useRescuers } from "@/services/rescuers/hooks";
+import {
+  useRescuerAssemblyPointMetadata,
+  useRescuers,
+} from "@/services/rescuers/hooks";
 import type { GetRescuersParams } from "@/services/rescuers/type";
 import {
   useAssemblyPointMetadata,
@@ -38,6 +41,7 @@ const DEFAULT_RESCUER_AVATAR =
   "https://res.cloudinary.com/dezgwdrfs/image/upload/v1773504004/611251674_1432765175119052_6622750233977483141_n_sgxqxd.png";
 const ASSIGNED_SELECT_VALUE = "__assigned__";
 const UNASSIGN_SELECT_VALUE = "__unassign__";
+const ALL_ASSEMBLY_POINT_FILTER_VALUE = "__all_assembly_points__";
 
 type AssignmentFilter = "all" | "assigned" | "unassigned";
 type TeamFilter = "all" | "inTeam" | "notInTeam";
@@ -56,6 +60,9 @@ export default function CoordinatorRescuerManagementPage() {
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("all");
   const [rescuerTypeFilter, setRescuerTypeFilter] =
     useState<RescuerTypeFilter>("all");
+  const [selectedAssemblyPointCode, setSelectedAssemblyPointCode] = useState(
+    ALL_ASSEMBLY_POINT_FILTER_VALUE,
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(20);
   const [rowSelectedAssemblyPointIds, setRowSelectedAssemblyPointIds] =
@@ -91,12 +98,22 @@ export default function CoordinatorRescuerManagementPage() {
       params.rescuerType = rescuerTypeFilter;
     }
 
+    if (selectedAssemblyPointCode !== ALL_ASSEMBLY_POINT_FILTER_VALUE) {
+      params.assemblyPointCodes = [selectedAssemblyPointCode];
+    }
+
     if (debouncedSearchQuery) {
       params.search = debouncedSearchQuery;
     }
 
     return params;
-  }, [assignmentFilter, teamFilter, rescuerTypeFilter, debouncedSearchQuery]);
+  }, [
+    assignmentFilter,
+    teamFilter,
+    rescuerTypeFilter,
+    selectedAssemblyPointCode,
+    debouncedSearchQuery,
+  ]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -104,9 +121,15 @@ export default function CoordinatorRescuerManagementPage() {
     assignmentFilter,
     teamFilter,
     rescuerTypeFilter,
+    selectedAssemblyPointCode,
     pageSize,
     debouncedSearchQuery,
   ]);
+
+  const {
+    data: rescuerAssemblyPointOptions,
+    isLoading: isRescuerAssemblyPointLoading,
+  } = useRescuerAssemblyPointMetadata({ enabled: true });
 
   const {
     data: rescuersData,
@@ -420,7 +443,7 @@ export default function CoordinatorRescuerManagementPage() {
               Tìm kiếm và bộ lọc rescuer
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-5">
+          <CardContent className="grid gap-3 md:grid-cols-6">
             <div className="relative md:col-span-2">
               <MagnifyingGlass
                 className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-[#FF5722]"
@@ -447,6 +470,31 @@ export default function CoordinatorRescuerManagementPage() {
                 <SelectItem value="all">Tất cả rescuer</SelectItem>
                 <SelectItem value="assigned">Đã có điểm tập kết</SelectItem>
                 <SelectItem value="unassigned">Chưa có điểm tập kết</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedAssemblyPointCode}
+              onValueChange={setSelectedAssemblyPointCode}
+            >
+              <SelectTrigger className="h-10 w-full">
+                <SelectValue
+                  placeholder={
+                    isRescuerAssemblyPointLoading
+                      ? "Đang tải điểm tập kết..."
+                      : "Lọc theo điểm tập kết"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_ASSEMBLY_POINT_FILTER_VALUE}>
+                  Tất cả điểm tập kết
+                </SelectItem>
+                {(rescuerAssemblyPointOptions ?? []).map((point) => (
+                  <SelectItem key={point.key} value={point.key}>
+                    {point.value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 

@@ -45,6 +45,7 @@ import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { NotificationBell } from "@/components/ui/notification-bell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,7 +56,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   SidebarSimple,
-  Bell,
   Gear,
   User,
   WifiHigh,
@@ -85,6 +85,7 @@ import { useThemeStore } from "@/stores/theme.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { deriveSOSNeeds } from "@/lib/sos";
+import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 
 // ── Lazy-loaded map components ──
 
@@ -405,7 +406,6 @@ const CoordinatorDashboardContent = () => {
   // ─── Refs ───
   const sidebarBeforeRescuePlanRef = useRef(true);
   const initialSelectionAppliedRef = useRef(false);
-  const [notificationCount] = useState(3);
 
   // ─── Data Fetching ───
   const { data: sosData } = useSOSRequests({
@@ -462,14 +462,8 @@ const CoordinatorDashboardContent = () => {
   // ─── Auth ───
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
-  const userInitials = user?.fullName
-    ? user.fullName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "U";
+  const userDisplayName = getUserDisplayName(user);
+  const userInitials = getUserAvatarInitials(user);
 
   // ─── Mutations ───
   const { mutate: createCluster, isPending: isCreatingCluster } =
@@ -1049,14 +1043,7 @@ const CoordinatorDashboardContent = () => {
           </Button>
 
           {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            {notificationCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
-                {notificationCount}
-              </span>
-            )}
-          </Button>
+          <NotificationBell />
 
           {/* Settings */}
           <Button variant="ghost" size="icon">
@@ -1075,9 +1062,7 @@ const CoordinatorDashboardContent = () => {
             <DropdownMenuContent align="end" className="w-48 z-[1200]">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span className="font-semibold">
-                    {user?.fullName || "Người dùng"}
-                  </span>
+                  <span className="font-semibold">{userDisplayName}</span>
                   <span className="text-xs text-muted-foreground">
                     Điều phối viên
                   </span>

@@ -4,6 +4,7 @@ import type {
   RescueTeamStatusOption,
   GetRescueTeamsParams,
   GetRescueTeamsResponse,
+  GetRescueTeamsByClusterResponse,
   GetRescueTeamByIdResponse,
   CreateRescueTeamRequest,
   CreateRescueTeamResponse,
@@ -25,6 +26,19 @@ export async function getRescueTeams(
       pageSize: params?.pageSize ?? 10,
     },
   });
+  return data;
+}
+
+/**
+ * Get rescue teams by cluster ID.
+ * GET /personnel/rescue-teams/by-cluster/{clusterId}
+ */
+export async function getRescueTeamsByCluster(
+  clusterId: number,
+): Promise<GetRescueTeamsByClusterResponse> {
+  const { data } = await api.get(
+    `/personnel/rescue-teams/by-cluster/${clusterId}`,
+  );
   return data;
 }
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NotificationBell } from "@/components/ui/notification-bell";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +17,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   SidebarSimple,
   MagnifyingGlass,
-  Bell,
   User,
   CaretDown,
   Gear,
@@ -31,23 +31,16 @@ import {
 import { HeaderProps } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
+import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { FloodAlertModal } from "./FloodAlertModal";
 
 const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
-  const [notificationCount] = useState(3);
   const [floodAlertOpen, setFloodAlertOpen] = useState(false);
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
 
-  // Get user initials for avatar
-  const userInitials = user?.fullName
-    ? user.fullName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "U";
+  const userDisplayName = getUserDisplayName(user);
+  const userInitials = getUserAvatarInitials(user);
 
   // Get role name based on roleId
   const getRoleName = (roleId?: number) => {
@@ -167,7 +160,10 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
           Phát cảnh báo lũ
         </Button>
 
-        <FloodAlertModal open={floodAlertOpen} onOpenChange={setFloodAlertOpen} />
+        <FloodAlertModal
+          open={floodAlertOpen}
+          onOpenChange={setFloodAlertOpen}
+        />
 
         {/* Exports Dropdown */}
         <DropdownMenu>
@@ -205,18 +201,10 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
         </DropdownMenu>
 
         {/* Notifications */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative h-9 w-9 rounded-lg hover:bg-muted/80 transition-colors"
-        >
-          <Bell size={20} />
-          {notificationCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-linear-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg shadow-red-500/30 animate-pulse">
-              {notificationCount}
-            </span>
-          )}
-        </Button>
+        <NotificationBell
+          buttonClassName="h-9 w-9 rounded-lg hover:bg-muted/80 transition-colors"
+          contentClassName="w-95"
+        />
 
         {/* Share Button */}
         <Button
@@ -248,9 +236,7 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
           >
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-semibold">
-                  {user?.fullName || "Người dùng"}
-                </p>
+                <p className="text-sm font-semibold">{userDisplayName}</p>
                 <p className="text-xs text-muted-foreground">
                   {getRoleName(user?.roleId)}
                 </p>

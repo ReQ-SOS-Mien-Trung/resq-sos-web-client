@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { useEffect, useState } from "react";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
+import { useNotificationPushLifecycle } from "@/hooks/useNotificationPushLifecycle";
 import { useThemeStore } from "@/stores/theme.store";
 
 function TokenRefreshProvider({ children }: { children: React.ReactNode }) {
@@ -25,6 +26,11 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function NotificationPushProvider({ children }: { children: React.ReactNode }) {
+  useNotificationPushLifecycle();
+  return <>{children}</>;
+}
+
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -43,9 +49,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <TokenRefreshProvider>{children}</TokenRefreshProvider>
-        </ThemeProvider>
+        <NotificationPushProvider>
+          <ThemeProvider>
+            <TokenRefreshProvider>{children}</TokenRefreshProvider>
+          </ThemeProvider>
+        </NotificationPushProvider>
       </QueryClientProvider>
     </GoogleOAuthProvider>
   );
