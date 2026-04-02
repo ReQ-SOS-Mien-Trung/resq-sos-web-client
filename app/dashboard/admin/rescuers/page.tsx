@@ -5,8 +5,10 @@ import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import { RescuerStats, RescuerTable } from "@/components/admin/rescuers";
 import { UserDetailSheet } from "@/components/admin/users";
+import { RescuerRadarChart } from "@/components/admin/users/RescuerRadarChart";
 import {
   useAdminRescuers,
+  useAdminUserById,
   useBanUser,
   useUnbanUser,
   ADMIN_RESCUERS_QUERY_KEY,
@@ -39,6 +41,10 @@ const RescuersPage = () => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [detailSheetMode, setDetailSheetMode] = useState<"view" | "edit">("view");
+
+  const { data: selectedUser } = useAdminUserById(selectedUserId!, {
+    enabled: !!selectedUserId && detailSheetOpen,
+  });
 
   useEffect(() => {
     getDashboardData().then(setDashboardData).catch(console.error);
@@ -163,6 +169,15 @@ const RescuersPage = () => {
           }}
         />
       </div>
+
+      {/* ── Floating Radar Chart (left side) ── */}
+      {detailSheetOpen && selectedUser?.roleId === 3 && selectedUser?.rescuerScore && selectedUser.rescuerScore.evaluationCount > 0 && (
+        <div className="fixed inset-0 z-102 pointer-events-none flex items-center justify-center sm:pr-140">
+          <div className="pointer-events-auto w-150 bg-background/96 backdrop-blur-xl border border-border/40 rounded-2xl shadow-2xl px-6 py-4">
+            <RescuerRadarChart score={selectedUser.rescuerScore} />
+          </div>
+        </div>
+      )}
 
       <UserDetailSheet
         userId={selectedUserId}

@@ -9,10 +9,17 @@ import {
 } from "@microsoft/signalr";
 import { useAuthStore } from "@/stores/auth.store";
 import { NOTIFICATION_HUB_CONFIG } from "./config";
-import { NotificationRealtimePayload } from "./type";
+import {
+  BroadcastAlertRealtimePayload,
+  NotificationRealtimePayload,
+} from "./type";
 
 type ReceiveNotificationHandler = (
   payload: NotificationRealtimePayload,
+) => void;
+
+type ReceiveBroadcastAlertHandler = (
+  payload: BroadcastAlertRealtimePayload,
 ) => void;
 
 const STOP_DEBOUNCE_MS = 1200;
@@ -20,6 +27,7 @@ const STOP_DEBOUNCE_MS = 1200;
 export class NotificationRealtimeClient {
   private connection: HubConnection | null = null;
   private listeners = new Set<ReceiveNotificationHandler>();
+  private broadcastListeners = new Set<ReceiveBroadcastAlertHandler>();
   private isReceiveEventBound = false;
   private pendingStopTimer: ReturnType<typeof setTimeout> | null = null;
   private startPromise: Promise<void> | null = null;
@@ -106,6 +114,12 @@ export class NotificationRealtimeClient {
           this.listeners.forEach((listener) => listener(payload));
         },
       );
+      this.connection.on(
+        NOTIFICATION_HUB_CONFIG.events.receiveBroadcast,
+        (payload: BroadcastAlertRealtimePayload) => {
+          this.broadcastListeners.forEach((listener) => listener(payload));
+        },
+      );
       this.isReceiveEventBound = true;
     }
 
@@ -115,7 +129,7 @@ export class NotificationRealtimeClient {
   async start(): Promise<void> {
     this.clearPendingStop();
 
-    if (this.listeners.size === 0) {
+    if (this.listeners.size === 0 && this.broadcastListeners.size === 0) {
       return;
     }
 
@@ -142,7 +156,7 @@ export class NotificationRealtimeClient {
         await this.waitForDisconnected(connection);
       }
 
-      if (this.listeners.size === 0) {
+      if (this.listeners.size === 0 && this.broadcastListeners.size === 0) {
         return;
       }
 
@@ -165,7 +179,7 @@ export class NotificationRealtimeClient {
         this.startPromise = null;
 
         if (
-          this.listeners.size > 0 &&
+          (this.listeners.size > 0 || this.broadcastListeners.size > 0) &&
           this.connection?.state === HubConnectionState.Disconnected
         ) {
           void this.start().catch(() => null);
@@ -182,13 +196,13 @@ export class NotificationRealtimeClient {
       return;
     }
 
-    if (this.listeners.size > 0) {
+    if (this.listeners.size > 0 || this.broadcastListeners.size > 0) {
       return;
     }
 
     if (this.startPromise) {
       await this.startPromise.catch(() => null);
-      if (this.listeners.size > 0) {
+      if (this.listeners.size > 0 || this.broadcastListeners.size > 0) {
         return;
       }
     }
@@ -199,7 +213,7 @@ export class NotificationRealtimeClient {
 
     await this.connection.stop();
 
-    if (this.listeners.size > 0) {
+    if (this.listeners.size > 0 || this.broadcastListeners.size > 0) {
       await this.start();
     }
   }
@@ -215,7 +229,24 @@ export class NotificationRealtimeClient {
     return () => {
       this.listeners.delete(handler);
 
-      if (this.listeners.size === 0) {
+      if (this.listeners.size === 0 && this.broadcastListeners.size === 0) {
+        this.scheduleStop();
+      }
+    };
+  }
+
+  subscribeBroadcast(handler: ReceiveBroadcastAlertHandler): () => void {
+    this.broadcastListeners.add(handler);
+    this.clearPendingStop();
+
+    void this.start().catch((error) => {
+      console.error("Failed to connect notification hub:", error);
+    });
+
+    return () => {
+      this.broadcastListeners.delete(handler);
+
+      if (this.listeners.size === 0 && this.broadcastListeners.size === 0) {
         this.scheduleStop();
       }
     };

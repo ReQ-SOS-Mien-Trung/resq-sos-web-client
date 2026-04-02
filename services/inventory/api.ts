@@ -26,6 +26,7 @@ import {
   GetDepotStockMovementsResponse,
   ExportMovementsParams,
   GetInventoryLotsResponse,
+  GetThresholdsParams,
   GetThresholdsResponse,
   GetThresholdsHistoryParams,
   GetThresholdsHistoryResponse,
@@ -35,6 +36,10 @@ import {
   DeleteThresholdResponse,
   GetLowStockParams,
   GetLowStockResponse,
+  WarningBandConfig,
+  SupplyRequestPriorityConfig,
+  UpdateSupplyRequestPriorityConfigPayload,
+  SupplyRequestPriorityLevel,
 } from "./type";
 
 type InventoryItemLike = Partial<InventoryItemEntity> & {
@@ -509,6 +514,42 @@ export async function exportInventoryMovements(
 // ─── Thresholds ───
 
 /**
+ * Get warning band config (Admin)
+ * GET /logistics/inventory/warning-band-config
+ */
+export async function getWarningBandConfig(): Promise<WarningBandConfig[]> {
+  const { data } = await api.get("/logistics/inventory/warning-band-config");
+  return data;
+}
+
+/**
+ * Update warning band config (Admin)
+ * PUT /logistics/inventory/warning-band-config
+ */
+export async function updateWarningBandConfig(
+  payload: WarningBandConfig[],
+): Promise<WarningBandConfig[]> {
+  const { data } = await api.put(
+    "/logistics/inventory/warning-band-config",
+    payload,
+  );
+  return data;
+}
+
+/**
+ * Get threshold configs (Admin)
+ * GET /logistics/inventory/thresholds
+ */
+export async function getThresholds(
+  params?: GetThresholdsParams,
+): Promise<GetThresholdsResponse> {
+  const { data } = await api.get("/logistics/inventory/thresholds", {
+    params,
+  });
+  return data;
+}
+
+/**
  * Get current threshold configs (global + overrides) for my depot
  * GET /logistics/inventory/my-depot/thresholds
  */
@@ -562,6 +603,19 @@ export async function deleteMyDepotThreshold(
 // ─── Low Stock ───
 
 /**
+ * Get low-stock items across depots (Admin)
+ * GET /logistics/inventory/low-stock
+ */
+export async function getLowStock(
+  params?: GetLowStockParams,
+): Promise<GetLowStockResponse> {
+  const { data } = await api.get("/logistics/inventory/low-stock", {
+    params,
+  });
+  return data;
+}
+
+/**
  * Get low-stock items for my depot (resolved by threshold precedence)
  * GET /logistics/inventory/my-depot/low-stock
  */
@@ -571,5 +625,45 @@ export async function getMyDepotLowStock(
   const { data } = await api.get("/logistics/inventory/my-depot/low-stock", {
     params,
   });
+  return data;
+}
+
+// ─── Supply Request Priority Config ───
+
+/**
+ * Get supply request priority config (Admin / Depot Manager)
+ * GET /logistics/inventory/supply-request-priority-config
+ */
+export async function getSupplyRequestPriorityConfig(): Promise<SupplyRequestPriorityConfig> {
+  const { data } = await api.get(
+    "/logistics/inventory/supply-request-priority-config",
+  );
+  return data;
+}
+
+/**
+ * Update supply request priority config (Admin)
+ * PUT /logistics/inventory/supply-request-priority-config
+ */
+export async function updateSupplyRequestPriorityConfig(
+  payload: UpdateSupplyRequestPriorityConfigPayload,
+): Promise<SupplyRequestPriorityConfig> {
+  const { data } = await api.put(
+    "/logistics/inventory/supply-request-priority-config",
+    payload,
+  );
+  return data;
+}
+
+/**
+ * Get supply request priority levels metadata
+ * GET /logistics/inventory/metadata/supply-request-priority-levels
+ */
+export async function getSupplyRequestPriorityLevels(): Promise<
+  SupplyRequestPriorityLevel[]
+> {
+  const { data } = await api.get(
+    "/logistics/inventory/metadata/supply-request-priority-levels",
+  );
   return data;
 }

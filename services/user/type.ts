@@ -71,6 +71,16 @@ export interface AdminUserRescuerApplicationDocumentEntity {
   uploadedAt: string;
 }
 
+export interface RescuerScoreEntity {
+  responseTimeScore: number;
+  rescueEffectivenessScore: number;
+  decisionHandlingScore: number;
+  safetyMedicalSkillScore: number;
+  teamworkCommunicationScore: number;
+  overallAverageScore: number;
+  evaluationCount: number;
+}
+
 export interface GetAdminUserByIdResponse {
   id: string;
   roleId: number;
@@ -84,6 +94,7 @@ export interface GetAdminUserByIdResponse {
   isEmailVerified: boolean;
   isOnboarded: boolean;
   isEligibleRescuer: boolean;
+  rescuerStep: number;
   isBanned: boolean;
   bannedBy: string | null;
   bannedAt: string | null;
@@ -97,6 +108,7 @@ export interface GetAdminUserByIdResponse {
   approvedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  rescuerScore: RescuerScoreEntity | null;
   abilities: AdminUserAbilityEntity[];
   rescuerApplicationDocuments: AdminUserRescuerApplicationDocumentEntity[];
 }

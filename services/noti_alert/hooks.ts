@@ -298,6 +298,8 @@ export function useNotificationCenter(options?: NotificationCenterOptions) {
 
   const notificationsQuery = useNotifications(normalizedParams, {
     enabled: isEnabled,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   const markAsReadMutation = useMarkNotificationAsRead();

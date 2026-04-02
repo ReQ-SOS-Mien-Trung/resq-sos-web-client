@@ -19,6 +19,7 @@ export const NOTIFICATION_HUB_CONFIG = {
   path: "/hubs/notifications",
   events: {
     receive: "ReceiveNotification",
+    receiveBroadcast: "ReceiveBroadcastAlert",
   },
   reconnectDelaysMs: [0, 1000, 3000, 5000, 10000] as const,
 } as const;

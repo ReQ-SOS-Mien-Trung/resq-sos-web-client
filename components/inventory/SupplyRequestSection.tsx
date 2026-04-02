@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -45,6 +46,7 @@ import {
   useCreateSupplyRequests,
   useInventoryReliefItemsByCategory,
   useSearchDepotsByReliefItems,
+  useSupplyRequestPriorityLevels,
 } from "@/services/inventory";
 import {
   SearchDepotsParams,
@@ -132,7 +134,7 @@ function RequestLineRow({
           }
           disabled={isCategoriesLoading}
         >
-          <SelectTrigger className="w-full h-10 leading-normal">
+          <SelectTrigger className="w-full">
             <SelectValue
               placeholder={isCategoriesLoading ? "Đang tải danh mục..." : "Chọn danh mục"}
             />
@@ -156,7 +158,7 @@ function RequestLineRow({
           onValueChange={(value) => onChange(line.id, { reliefItemKey: value })}
           disabled={!line.categoryCode || isLoadingReliefItems}
         >
-          <SelectTrigger className="w-full h-10 leading-normal">
+          <SelectTrigger className="w-full">
             <SelectValue
               placeholder={
                 !line.categoryCode
@@ -187,7 +189,7 @@ function RequestLineRow({
           value={line.quantity}
           onChange={(e) => onChange(line.id, { quantity: e.target.value })}
           placeholder="Nhập SL"
-          className="h-10 py-2 leading-normal"
+          className="h-9 px-3 py-1 text-sm rounded-md"
         />
       </div>
 
@@ -216,6 +218,7 @@ export default function SupplyRequestSection({
     useInventoryCategories();
   const { mutateAsync: createSupplyRequests, isPending: isSubmittingRequest } =
     useCreateSupplyRequests();
+  const { data: priorityLevels = [] } = useSupplyRequestPriorityLevels();
 
   const [lines, setLines] = useState<RequestLine[]>([
     { id: crypto.randomUUID(), categoryCode: "", reliefItemKey: "", quantity: "" },
@@ -226,6 +229,7 @@ export default function SupplyRequestSection({
     Record<number, SelectedDepotByItem>
   >({});
   const [depotNotes, setDepotNotes] = useState<Record<number, string>>({});
+  const [depotPriorities, setDepotPriorities] = useState<Record<number, string>>({});
   const [isSelectionSheetOpen, setIsSelectionSheetOpen] = useState(false);
   const [animatedDepotId, setAnimatedDepotId] = useState<number | null>(null);
   const [flyTokens, setFlyTokens] = useState<FlyToken[]>([]);
@@ -386,6 +390,7 @@ export default function SupplyRequestSection({
 
     setSelectedDepotByItem({});
     setDepotNotes({});
+    setDepotPriorities({});
     setSelectionSheetOpen(false);
   };
 
@@ -544,6 +549,7 @@ export default function SupplyRequestSection({
     const requests = groupedSelectedDepots
       .map((depot) => ({
       sourceDepotId: depot.depotId,
+      priorityLevel: depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "Urgent"),
       items: depot.items
         .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
         .map((item) => ({
@@ -575,6 +581,7 @@ export default function SupplyRequestSection({
       ]);
       setSelectedDepotByItem({});
       setDepotNotes({});
+      setDepotPriorities({});
       setFlyTokens([]);
       setAnimatedDepotId(null);
       setSelectionSheetOpen(false);
@@ -898,6 +905,51 @@ export default function SupplyRequestSection({
                             </span>
                           </div>
                         ))}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs mt-1 text-muted-foreground tracking-tighter">
+                          Mức độ ưu tiên
+                        </Label>
+                        <Select
+                          value={depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "")}
+                          onValueChange={(value) =>
+                            setDepotPriorities((prev) => ({
+                              ...prev,
+                              [depot.depotId]: value,
+                            }))
+                          }
+                        >
+                          <SelectTrigger
+                            className={cn(
+                              "w-full h-9 leading-normal font-medium",
+                              (depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "URGENT")).toUpperCase() === "URGENT"
+                                ? "text-red-700 bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800/60 dark:text-red-300"
+                                : (depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "URGENT")).toUpperCase() === "HIGH"
+                                  ? "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/60 dark:text-amber-300"
+                                  : (depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "URGENT")).toUpperCase() === "MEDIUM"
+                                    ? "text-sky-700 bg-sky-50 border-sky-200 dark:bg-sky-950/20 dark:border-sky-800/60 dark:text-sky-300"
+                                    : ""
+                            )}
+                          >
+                            <SelectValue placeholder="Chọn mức ưu tiên" />
+                          </SelectTrigger>
+                          <SelectContent disablePortal position="popper" sideOffset={4}>
+                            {priorityLevels.map((level) => (
+                              <SelectItem 
+                                key={level.key} 
+                                value={level.key}
+                                className={
+                                  level.key.toUpperCase() === "URGENT" ? "text-red-700 focus:text-red-800 focus:bg-red-50 font-medium" :
+                                  level.key.toUpperCase() === "HIGH" ? "text-amber-700 focus:text-amber-800 focus:bg-amber-50 font-medium" :
+                                  level.key.toUpperCase() === "MEDIUM" ? "text-sky-700 focus:text-sky-800 focus:bg-sky-50 font-medium" : ""
+                                }
+                              >
+                                {level.value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-1.5">

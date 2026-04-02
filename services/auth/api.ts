@@ -1,6 +1,5 @@
 import api from "@/config/axios";
 import {
-  GoogleLoginPayload,
   LoginPayload,
   LoginResponse,
   LogoutResponse,
@@ -10,13 +9,6 @@ import {
 
 export async function login(body: LoginPayload): Promise<LoginResponse> {
   const { data } = await api.post("/identity/auth/login", body);
-  return data;
-}
-
-export async function googleLogin(
-  body: GoogleLoginPayload,
-): Promise<LoginResponse> {
-  const { data } = await api.post("/identity/auth/google-login", body);
   return data;
 }
 
