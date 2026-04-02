@@ -314,6 +314,7 @@ export interface CreateSupplyRequestItem {
 
 export interface CreateSupplyRequestEntry {
   sourceDepotId: number;
+  priorityLevel: string;
   items: CreateSupplyRequestItem[];
   note?: string;
 }
@@ -543,3 +544,21 @@ export interface GetLowStockParams {
   // Legacy filter name kept during backend rollout.
   level?: LowStockLevel;
 }
+
+// ─── Supply Request Priority Config ───
+
+export interface SupplyRequestPriorityConfig {
+  urgentMinutes: number;
+  highMinutes: number;
+  mediumMinutes: number;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface UpdateSupplyRequestPriorityConfigPayload {
+  urgentMinutes: number;
+  highMinutes: number;
+  mediumMinutes: number;
+}
+
+export type SupplyRequestPriorityLevel = InventoryCategory;

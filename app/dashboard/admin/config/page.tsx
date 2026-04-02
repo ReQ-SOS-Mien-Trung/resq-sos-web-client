@@ -20,6 +20,7 @@ import {
   WarningCircle,
   X,
   Plus,
+  Info,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
@@ -31,6 +32,13 @@ import {
   UpdateSosPriorityRuleConfigRequest,
 } from "@/services/config/type";
 import { WarningBandConfigCard } from "@/components/admin/inventory/WarningBandConfigCard";
+import { SupplyRequestPriorityConfigCard } from "@/components/admin/inventory/SupplyRequestPriorityConfigCard";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,12 +52,12 @@ type JsonFieldConfig = {
 };
 
 const JSON_FIELDS: JsonFieldConfig[] = [
-  { key: "issueWeightsJson",        label: "Issue Weights",         description: "Trọng số mức độ ưu tiên theo loại vấn đề" },
+  { key: "issueWeightsJson", label: "Issue Weights", description: "Trọng số mức độ ưu tiên theo loại vấn đề" },
   { key: "medicalSevereIssuesJson", label: "Medical Severe Issues", description: "Danh sách điều kiện y tế nghiêm trọng" },
-  { key: "ageWeightsJson",          label: "Age Weights",           description: "Trọng số theo nhóm tuổi" },
-  { key: "requestTypeScoresJson",   label: "Request Type Scores",   description: "Điểm ưu tiên theo loại yêu cầu cứu trợ" },
-  { key: "situationMultipliersJson",label: "Situation Multipliers", description: "Hệ số nhân theo ngữ cảnh/tình huống", editorType: "situation-multiplier" },
-  { key: "priorityThresholdsJson",  label: "Priority Thresholds",   description: "Ngưỡng phân loại mức độ ưu tiên",    editorType: "priority-thresholds" },
+  { key: "ageWeightsJson", label: "Age Weights", description: "Trọng số theo nhóm tuổi" },
+  { key: "requestTypeScoresJson", label: "Request Type Scores", description: "Điểm ưu tiên theo loại yêu cầu cứu trợ" },
+  { key: "situationMultipliersJson", label: "Situation Multipliers", description: "Hệ số nhân theo ngữ cảnh/tình huống", editorType: "situation-multiplier" },
+  { key: "priorityThresholdsJson", label: "Priority Thresholds", description: "Ngưỡng phân loại mức độ ưu tiên", editorType: "priority-thresholds" },
 ];
 
 const emptyForm: UpdateSosPriorityRuleConfigRequest = {
@@ -63,12 +71,12 @@ const emptyForm: UpdateSosPriorityRuleConfigRequest = {
 
 function mapEntityToForm(data: SosPriorityRuleConfigEntity): UpdateSosPriorityRuleConfigRequest {
   return {
-    issueWeightsJson:         data.issueWeightsJson,
-    medicalSevereIssuesJson:  data.medicalSevereIssuesJson,
-    ageWeightsJson:           data.ageWeightsJson,
-    requestTypeScoresJson:    data.requestTypeScoresJson,
+    issueWeightsJson: data.issueWeightsJson,
+    medicalSevereIssuesJson: data.medicalSevereIssuesJson,
+    ageWeightsJson: data.ageWeightsJson,
+    requestTypeScoresJson: data.requestTypeScoresJson,
     situationMultipliersJson: data.situationMultipliersJson,
-    priorityThresholdsJson:   data.priorityThresholdsJson,
+    priorityThresholdsJson: data.priorityThresholdsJson,
   };
 }
 
@@ -81,7 +89,7 @@ function detectFieldType(value: string): "numeric-object" | "string-array" | "un
       const vals = Object.values(parsed);
       if (vals.length === 0 || vals.every((v) => typeof v === "number")) return "numeric-object";
     }
-  } catch {}
+  } catch { }
   return "unknown";
 }
 
@@ -101,7 +109,7 @@ function NumericObjectEditor({
       const obj = JSON.parse(value || "{}");
       if (obj && typeof obj === "object" && !Array.isArray(obj))
         return Object.entries(obj) as [string, number][];
-    } catch {}
+    } catch { }
     return [];
   }, [value]);
 
@@ -225,7 +233,7 @@ function StringArrayEditor({
     try {
       const arr = JSON.parse(value || "[]");
       if (Array.isArray(arr)) return arr as string[];
-    } catch {}
+    } catch { }
     return [];
   }, [value]);
 
@@ -327,7 +335,7 @@ function SituationMultiplierEditor({
     try {
       const arr = JSON.parse(value || "[]");
       if (Array.isArray(arr)) return arr as SituationMultiplierItem[];
-    } catch {}
+    } catch { }
     return [];
   }, [value]);
 
@@ -396,7 +404,7 @@ function SituationMultiplierEditor({
                 <span className="text-sm text-muted-foreground font-mono">×</span>
                 <input type="number" step="0.1" value={item.multiplier} disabled={disabled}
                   onChange={(e) => updateItem(idx, { multiplier: parseFloat(e.target.value) || 1 })}
-                className="h-9 w-24 rounded-md border border-amber-300 bg-amber-50 px-2 text-center font-mono text-sm font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200" />
+                  className="h-9 w-24 rounded-md border border-amber-300 bg-amber-50 px-2 text-center font-mono text-sm font-semibold text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200" />
               </div>
               <button disabled={disabled} onClick={() => removeItem(idx)}
                 className="flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100">
@@ -442,7 +450,7 @@ function PriorityThresholdsEditor({
       const obj = JSON.parse(value || "{}");
       if (obj && typeof obj === "object" && !Array.isArray(obj))
         return Object.entries(obj) as [string, PriorityThresholdValue][];
-    } catch {}
+    } catch { }
     return [];
   }, [value]);
 
@@ -471,9 +479,9 @@ function PriorityThresholdsEditor({
         {entries.map(([key, val]) => {
           const chipColor =
             key === "critical" ? "border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300"
-            : key === "high"   ? "border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300"
-            : key === "medium" ? "border-yellow-300 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300"
-            :                   "border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300";
+              : key === "high" ? "border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300"
+                : key === "medium" ? "border-yellow-300 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-300"
+                  : "border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300";
           return (
             <div key={key} className="group flex items-center gap-2">
               <span className={`w-20 shrink-0 rounded-md border px-2.5 py-1.5 font-mono text-sm font-semibold tracking-tight ${chipColor}`}>
@@ -628,6 +636,13 @@ const AdminConfigPage = () => {
               <WarningCircle size={14} className="text-amber-500" />
               Dải cảnh báo kho
             </TabsTrigger>
+            <TabsTrigger
+              value="supply-priority"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm tracking-tighter font-medium data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none flex items-center gap-1.5"
+            >
+              <Info size={14} className="text-sky-500" />
+              Thời gian tiếp tế
+            </TabsTrigger>
           </TabsList>
 
           {/* ── Tab: SOS Priority ── */}
@@ -659,9 +674,9 @@ const AdminConfigPage = () => {
                 const autoType = detectFieldType(currentValue);
                 const cardAccent =
                   field.editorType === "situation-multiplier" ? "border-l-4 border-l-amber-400"
-                  : field.editorType === "priority-thresholds" ? "border-l-4 border-l-rose-400"
-                  : autoType === "string-array" ? "border-l-4 border-l-teal-400"
-                  : "border-l-4 border-l-indigo-400";
+                    : field.editorType === "priority-thresholds" ? "border-l-4 border-l-rose-400"
+                      : autoType === "string-array" ? "border-l-4 border-l-teal-400"
+                        : "border-l-4 border-l-indigo-400";
                 return (
                   <Card key={field.key} className={`border-border/60 ${cardAccent}`}>
                     <CardHeader className="pb-1">
@@ -730,6 +745,11 @@ const AdminConfigPage = () => {
               </div>
             </div>
             <WarningBandConfigCard />
+          </TabsContent>
+
+          {/* ── Tab: Supply Request Priority ── */}
+          <TabsContent value="supply-priority" className="mt-5 space-y-4">
+            <SupplyRequestPriorityConfigCard />
           </TabsContent>
         </Tabs>
       </div>

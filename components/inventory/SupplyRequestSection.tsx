@@ -45,6 +45,7 @@ import {
   useCreateSupplyRequests,
   useInventoryReliefItemsByCategory,
   useSearchDepotsByReliefItems,
+  useSupplyRequestPriorityLevels,
 } from "@/services/inventory";
 import {
   SearchDepotsParams,
@@ -216,6 +217,7 @@ export default function SupplyRequestSection({
     useInventoryCategories();
   const { mutateAsync: createSupplyRequests, isPending: isSubmittingRequest } =
     useCreateSupplyRequests();
+  const { data: priorityLevels = [] } = useSupplyRequestPriorityLevels();
 
   const [lines, setLines] = useState<RequestLine[]>([
     { id: crypto.randomUUID(), categoryCode: "", reliefItemKey: "", quantity: "" },
@@ -226,6 +228,7 @@ export default function SupplyRequestSection({
     Record<number, SelectedDepotByItem>
   >({});
   const [depotNotes, setDepotNotes] = useState<Record<number, string>>({});
+  const [depotPriorities, setDepotPriorities] = useState<Record<number, string>>({});
   const [isSelectionSheetOpen, setIsSelectionSheetOpen] = useState(false);
   const [animatedDepotId, setAnimatedDepotId] = useState<number | null>(null);
   const [flyTokens, setFlyTokens] = useState<FlyToken[]>([]);
@@ -386,6 +389,7 @@ export default function SupplyRequestSection({
 
     setSelectedDepotByItem({});
     setDepotNotes({});
+    setDepotPriorities({});
     setSelectionSheetOpen(false);
   };
 
@@ -544,6 +548,7 @@ export default function SupplyRequestSection({
     const requests = groupedSelectedDepots
       .map((depot) => ({
       sourceDepotId: depot.depotId,
+      priorityLevel: depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "Urgent"),
       items: depot.items
         .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
         .map((item) => ({
@@ -575,6 +580,7 @@ export default function SupplyRequestSection({
       ]);
       setSelectedDepotByItem({});
       setDepotNotes({});
+      setDepotPriorities({});
       setFlyTokens([]);
       setAnimatedDepotId(null);
       setSelectionSheetOpen(false);
@@ -898,6 +904,32 @@ export default function SupplyRequestSection({
                             </span>
                           </div>
                         ))}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs mt-1 text-muted-foreground tracking-tighter">
+                          Mức độ ưu tiên
+                        </Label>
+                        <Select
+                          value={depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "")}
+                          onValueChange={(value) =>
+                            setDepotPriorities((prev) => ({
+                              ...prev,
+                              [depot.depotId]: value,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="w-full h-9 leading-normal">
+                            <SelectValue placeholder="Chọn mức ưu tiên" />
+                          </SelectTrigger>
+                          <SelectContent disablePortal>
+                            {priorityLevels.map((level) => (
+                              <SelectItem key={level.key} value={level.key}>
+                                {level.value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-1.5">

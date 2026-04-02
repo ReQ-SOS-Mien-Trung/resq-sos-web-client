@@ -40,6 +40,9 @@ import {
   deleteMyDepotThreshold,
   getLowStock,
   getMyDepotLowStock,
+  getSupplyRequestPriorityConfig,
+  updateSupplyRequestPriorityConfig,
+  getSupplyRequestPriorityLevels,
 } from "./api";
 import {
   GetDepotInventoryParams,
@@ -77,6 +80,9 @@ import {
   GetLowStockParams,
   GetLowStockResponse,
   WarningBandConfig,
+  SupplyRequestPriorityConfig,
+  UpdateSupplyRequestPriorityConfigPayload,
+  SupplyRequestPriorityLevel,
 } from "./type";
 
 export const INVENTORY_KEYS = {
@@ -113,6 +119,10 @@ export const INVENTORY_KEYS = {
     [...INVENTORY_KEYS.all, "inventoryLowStock", params] as const,
   lowStock: (params?: GetLowStockParams) =>
     [...INVENTORY_KEYS.all, "lowStock", params] as const,
+  supplyRequestPriorityConfig: () =>
+    [...INVENTORY_KEYS.all, "supplyRequestPriorityConfig"] as const,
+  supplyRequestPriorityLevels: () =>
+    [...INVENTORY_KEYS.all, "supplyRequestPriorityLevels"] as const,
 };
 
 export function useDepotInventory(
@@ -542,6 +552,51 @@ export function useMyDepotLowStock(
   return useQuery<GetLowStockResponse>({
     queryKey: INVENTORY_KEYS.lowStock(params),
     queryFn: () => getMyDepotLowStock(params),
+    ...options,
+  });
+}
+
+// ─── Supply Request Priority Config ───
+
+export function useSupplyRequestPriorityConfig(
+  options?: Omit<
+    UseQueryOptions<SupplyRequestPriorityConfig, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<SupplyRequestPriorityConfig>({
+    queryKey: INVENTORY_KEYS.supplyRequestPriorityConfig(),
+    queryFn: getSupplyRequestPriorityConfig,
+    ...options,
+  });
+}
+
+export function useUpdateSupplyRequestPriorityConfig() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    SupplyRequestPriorityConfig,
+    Error,
+    UpdateSupplyRequestPriorityConfigPayload
+  >({
+    mutationFn: updateSupplyRequestPriorityConfig,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: INVENTORY_KEYS.supplyRequestPriorityConfig(),
+      });
+    },
+  });
+}
+
+export function useSupplyRequestPriorityLevels(
+  options?: Omit<
+    UseQueryOptions<SupplyRequestPriorityLevel[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<SupplyRequestPriorityLevel[]>({
+    queryKey: INVENTORY_KEYS.supplyRequestPriorityLevels(),
+    queryFn: getSupplyRequestPriorityLevels,
+    staleTime: Infinity,
     ...options,
   });
 }

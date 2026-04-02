@@ -36,6 +36,9 @@ import {
   GetLowStockParams,
   GetLowStockResponse,
   WarningBandConfig,
+  SupplyRequestPriorityConfig,
+  UpdateSupplyRequestPriorityConfigPayload,
+  SupplyRequestPriorityLevel,
 } from "./type";
 
 /**
@@ -530,5 +533,45 @@ export async function getMyDepotLowStock(
   const { data } = await api.get("/logistics/inventory/my-depot/low-stock", {
     params,
   });
+  return data;
+}
+
+// ─── Supply Request Priority Config ───
+
+/**
+ * Get supply request priority config (Admin / Depot Manager)
+ * GET /logistics/inventory/supply-request-priority-config
+ */
+export async function getSupplyRequestPriorityConfig(): Promise<SupplyRequestPriorityConfig> {
+  const { data } = await api.get(
+    "/logistics/inventory/supply-request-priority-config",
+  );
+  return data;
+}
+
+/**
+ * Update supply request priority config (Admin)
+ * PUT /logistics/inventory/supply-request-priority-config
+ */
+export async function updateSupplyRequestPriorityConfig(
+  payload: UpdateSupplyRequestPriorityConfigPayload,
+): Promise<SupplyRequestPriorityConfig> {
+  const { data } = await api.put(
+    "/logistics/inventory/supply-request-priority-config",
+    payload,
+  );
+  return data;
+}
+
+/**
+ * Get supply request priority levels metadata
+ * GET /logistics/inventory/metadata/supply-request-priority-levels
+ */
+export async function getSupplyRequestPriorityLevels(): Promise<
+  SupplyRequestPriorityLevel[]
+> {
+  const { data } = await api.get(
+    "/logistics/inventory/metadata/supply-request-priority-levels",
+  );
   return data;
 }
