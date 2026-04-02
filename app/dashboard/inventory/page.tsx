@@ -51,6 +51,7 @@ import {
 import SupplyRequestManagement from "@/components/inventory/SupplyRequestManagement";
 import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
+import SupplyRequestTracker from "@/components/inventory/SupplyRequestTracker";
 import {
   InventoryItemEntity,
   SupplyRequestListItem,
@@ -246,6 +247,7 @@ const InventoryDashboardPage = () => {
   const [vatTuSelectedItem, setVatTuSelectedItem] =
     useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
+  const [requestsPageNumber, setRequestsPageNumber] = useState(1);
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
   const mainRef = useRef<HTMLElement>(null);
@@ -338,9 +340,33 @@ const InventoryDashboardPage = () => {
     data: supplyRequestsData,
     isLoading: isSupplyRequestsLoading,
     isFetching: isSupplyRequestsFetching,
+    refetch: refetchSupplyRequests,
   } = useSupplyRequests(
     { pageNumber: 1, pageSize: 10 },
     { refetchInterval: 10_000, refetchOnWindowFocus: true },
+  );
+
+  const {
+    data: allRequestsPagedData,
+    isLoading: isAllRequestsLoading,
+    isFetching: isAllRequestsFetching,
+    refetch: refetchAllRequests,
+  } = useSupplyRequests(
+    { pageNumber: requestsPageNumber, pageSize: 10 },
+    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+  );
+
+  const canPrevRequestsPage = requestsPageNumber > 1;
+  const canNextRequestsPage =
+    requestsPageNumber < (allRequestsPagedData?.totalPages ?? 1);
+
+  const [trackerOpen, setTrackerOpen] = useState(false);
+  const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
+  const trackerRequest = useMemo(
+    () =>
+      allRequestsPagedData?.items?.find((r) => r.id === trackerRequestId) ??
+      null,
+    [allRequestsPagedData, trackerRequestId],
   );
 
   // Use the first depot as the current managed depot

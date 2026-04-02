@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
 import { useNotificationPushLifecycle } from "@/hooks/useNotificationPushLifecycle";
+import { useBroadcastAlertListener } from "@/hooks/useBroadcastAlertListener";
 import { useThemeStore } from "@/stores/theme.store";
 
 function TokenRefreshProvider({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,7 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 function NotificationPushProvider({ children }: { children: React.ReactNode }) {
   useNotificationPushLifecycle();
+  useBroadcastAlertListener();
   return <>{children}</>;
 }
 

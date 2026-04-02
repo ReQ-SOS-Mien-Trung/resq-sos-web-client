@@ -1,29 +1,16 @@
-self.addEventListener("push", (event) => {
-  if (!event.data) {
-    return;
-  }
+importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
+// Config is injected from server env vars at runtime
+importScripts('/api/sw-firebase-init');
 
-  let payload = {};
+const messaging = firebase.messaging();
 
-  try {
-    payload = event.data.json();
-  } catch {
-    payload = { body: event.data.text() };
-  }
-
-  const notification = payload.notification || payload.data || payload;
-  const title = notification.title || "Thong bao moi";
-
-  const options = {
-    body: notification.body || "Ban co thong bao moi tu RESQ.",
+messaging.onBackgroundMessage((payload) => {
+  const notification = payload.notification || {};
+  self.registration.showNotification(notification.title, {
+    body: notification.body,
     icon: "/icons/logo.svg",
-    badge: "/icons/logo.svg",
-    data: {
-      url: notification.click_action || notification.url || "/",
-    },
-  };
-
-  event.waitUntil(self.registration.showNotification(title, options));
+  });
 });
 
 self.addEventListener("notificationclick", (event) => {
