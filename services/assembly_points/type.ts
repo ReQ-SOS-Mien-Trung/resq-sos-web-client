@@ -212,6 +212,7 @@ export interface AssemblyPointCheckedInRescuerEntity {
   firstName: string;
   lastName: string;
   phone: string | null;
+  email: string | null;
   avatarUrl: string | null;
   rescuerType: RescuerType;
   checkedInAt: string;

@@ -48,6 +48,7 @@ import {
   useMissions,
   useActivityRoute,
 } from "@/services/mission/hooks";
+import { useRescueTeamsByCluster } from "@/services/rescue_teams/hooks";
 import { useDepotInventoryRealtime } from "@/hooks/useDepotInventoryRealtime";
 import { getActivityRoute } from "@/services/mission/api";
 import type {
@@ -69,6 +70,7 @@ import {
 } from "@/services/sos_cluster/type";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
+import type { RescueTeamByClusterEntity } from "@/services/rescue_teams/type";
 import { SOSRequest } from "@/type";
 import {
   X,
@@ -104,6 +106,7 @@ import {
 // Extract lat/lng from activity description text
 // Matches patterns like "17.214, 106.785" or "17.2195,106.792"
 const COORD_REGEX = /(\d{1,2}\.\d{2,6})[,\s]\s*(\d{2,3}\.\d{2,6})/;
+const CLEAR_ACTIVITY_TEAM_VALUE = "__clear_activity_team__";
 const extractCoordsFromDescription = (
   desc: string,
 ): { lat: number; lng: number } | null => {
@@ -170,6 +173,33 @@ const formatCoordinateLabel = (
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   return `${lat!.toFixed(4)}, ${lng!.toFixed(4)}`;
 };
+
+const formatDistanceKmLabel = (distanceKm?: number | null) => {
+  if (!Number.isFinite(distanceKm)) return "--";
+  return `${distanceKm!.toFixed(1)} km`;
+};
+
+function getRescueTeamOperationalRank(status?: string | null): number {
+  const normalizedStatus = (status ?? "").trim().toLowerCase();
+
+  if (normalizedStatus === "ready" || normalizedStatus === "available") {
+    return 0;
+  }
+
+  if (normalizedStatus === "gathering") {
+    return 1;
+  }
+
+  if (normalizedStatus === "awaitingacceptance") {
+    return 2;
+  }
+
+  if (normalizedStatus === "assigned" || normalizedStatus === "onmission") {
+    return 3;
+  }
+
+  return 4;
+}
 
 const buildLeafletMapKey = (points: [number, number][]) =>
   points.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join("|");
@@ -723,6 +753,17 @@ const ActivityRoutePreview = ({
     { enabled: open && !!originCoords },
   );
 
+  const routeStatusMeta = useMemo(
+    () => getActivityRouteStatusMeta(data?.status),
+    [data?.status],
+  );
+  const routeErrorMessage =
+    typeof data?.errorMessage === "string" &&
+    data.errorMessage.trim().length > 0
+      ? data.errorMessage.trim()
+      : null;
+  const routeSteps = data?.route?.steps ?? [];
+
   const decodedRoutePoints = useMemo(() => {
     if (!data?.route?.overviewPolyline) return [] as [number, number][];
     return polylineDecode.decode(data.route.overviewPolyline) as [
@@ -754,10 +795,20 @@ const ActivityRoutePreview = ({
   return (
     <div className="mt-1.5 rounded-lg border bg-muted/30 p-2 space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-          <NavigationArrow className="h-3 w-3" weight="fill" />
-          Lộ trình
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+            <NavigationArrow className="h-3 w-3" weight="fill" />
+            Lộ trình
+          </span>
+          {data ? (
+            <Badge
+              variant="outline"
+              className={cn("h-5 px-1.5 text-[9px]", routeStatusMeta.className)}
+            >
+              {routeStatusMeta.label}
+            </Badge>
+          ) : null}
+        </div>
         <div className="flex items-center gap-1.5">
           {/* Vehicle selector */}
           <div className="flex items-center gap-0.5 rounded border bg-background overflow-hidden">
@@ -815,6 +866,11 @@ const ActivityRoutePreview = ({
       {isError && (
         <p className="text-[10px] text-red-500">Không thể tải lộ trình</p>
       )}
+      {routeErrorMessage ? (
+        <p className="text-[10px] text-amber-700 dark:text-amber-300">
+          {routeErrorMessage}
+        </p>
+      ) : null}
       {data?.route && (
         <>
           <div className="flex items-center gap-3 text-[11px]">
@@ -838,6 +894,36 @@ const ActivityRoutePreview = ({
               destination={{ lat: activityLat, lng: activityLng }}
             />
           )}
+
+          {routeSteps.length > 0 ? (
+            <div className="space-y-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Chỉ dẫn đường đi ({routeSteps.length} chặng)
+              </p>
+              <ScrollArea className="max-h-36 rounded-md border bg-background/80">
+                <div className="space-y-1 p-2">
+                  {routeSteps.map((step, index) => (
+                    <div
+                      key={`${step.startLat}-${step.startLng}-${index}`}
+                      className="flex items-start gap-1.5 text-[10px]"
+                    >
+                      <span className="mt-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/10 px-1 font-semibold text-primary">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="leading-snug text-foreground/90">
+                          {step.instruction}
+                        </p>
+                        <p className="text-muted-foreground">
+                          {step.distanceText} · {step.durationText}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          ) : null}
         </>
       )}
       {data && !data.route && (
@@ -853,7 +939,7 @@ const ActivityRoutePreview = ({
             </strong>
           </p>
           <p className="text-[9px] text-muted-foreground/70">
-            Điễm đến có thể nằm trong khu vực không có đường. Hãy thử đổi loại
+            Điểm đến có thể nằm trong khu vực không có đường. Hãy thử đổi loại
             phương tiện khác.
           </p>
         </div>
@@ -874,6 +960,11 @@ interface RouteSegment {
   index: number;
   waypoint: UniqueWaypoint;
   points: [number, number][];
+  steps: Array<{
+    instruction: string;
+    distanceText: string;
+    durationText: string;
+  }>;
   distance: string;
   duration: string;
   distanceMeters: number;
@@ -890,6 +981,47 @@ const VEHICLE_LABELS: Record<RouteVehicle, string> = {
   taxi: "Taxi",
   hd: "Xe tải",
 };
+
+function getActivityRouteStatusMeta(status?: string | null): {
+  label: string;
+  className: string;
+} {
+  const normalized = (status ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "")
+    .replaceAll(" ", "");
+
+  if (normalized === "ok") {
+    return {
+      label: "Tuyến hợp lệ",
+      className:
+        "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
+    };
+  }
+
+  if (normalized === "noroute") {
+    return {
+      label: "Chưa có tuyến",
+      className:
+        "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-200",
+    };
+  }
+
+  if (normalized === "error") {
+    return {
+      label: "Lỗi định tuyến",
+      className:
+        "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-700 dark:bg-rose-900/30 dark:text-rose-200",
+    };
+  }
+
+  return {
+    label: status?.trim() ? `Trạng thái: ${status}` : "Đang kiểm tra",
+    className:
+      "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-200",
+  };
+}
 
 function buildVehicleTryOrder(preferred: RouteVehicle): RouteVehicle[] {
   const next = [preferred, ...VEHICLE_PRIORITY.filter((v) => v !== preferred)];
@@ -1652,6 +1784,7 @@ const MissionRoutePreview = ({
                 index: i,
                 waypoint: wp,
                 points: decoded,
+                steps: resp.route.steps ?? [],
                 distance: resp.route.totalDistanceText,
                 duration: resp.route.totalDurationText,
                 distanceMeters: resp.route.totalDistanceMeters,
@@ -1688,6 +1821,7 @@ const MissionRoutePreview = ({
                 [currentOrigin.lat, currentOrigin.lng],
                 [wp.lat, wp.lng],
               ],
+              steps: [],
               distance:
                 distanceMeters < 1000
                   ? `${distanceMeters}m`
@@ -1861,7 +1995,7 @@ const MissionRoutePreview = ({
           )}
 
           {originCoords && allPoints.length > 1 && (
-            <div className="h-[28rem] overflow-hidden rounded-lg border bg-background">
+            <div className="h-112 overflow-hidden rounded-lg border bg-background">
               <MapContainer
                 key={missionRouteMapKey}
                 center={allPoints[0]}
@@ -1969,6 +2103,14 @@ const MissionRoutePreview = ({
                       </span>
                     </div>
                   )}
+                  {seg?.steps?.[0]?.instruction ? (
+                    <p className="pl-6 text-[10px] text-muted-foreground">
+                      {seg.steps[0].instruction}
+                      {seg.steps.length > 1
+                        ? ` (+${seg.steps.length - 1} chặng)`
+                        : ""}
+                    </p>
+                  ) : null}
                   {meta?.labels.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1 pl-6">
                       {meta.labels.map((label) => (
@@ -2754,6 +2896,131 @@ const RescuePlanPanel = ({
     enabled: !!clusterId && open,
   });
 
+  const {
+    data: nearbyTeamsByClusterData,
+    isLoading: isNearbyTeamsByClusterLoading,
+  } = useRescueTeamsByCluster(clusterId ?? 0, {
+    enabled: open && isEditMode && !!clusterId && clusterId > 0,
+  });
+
+  const nearbyRescueTeams = useMemo(() => {
+    const sourceTeams = nearbyTeamsByClusterData ?? [];
+
+    return [...sourceTeams].sort((a, b) => {
+      const statusRankDiff =
+        getRescueTeamOperationalRank(a.status) -
+        getRescueTeamOperationalRank(b.status);
+      if (statusRankDiff !== 0) {
+        return statusRankDiff;
+      }
+
+      const distanceA = Number.isFinite(a.distanceKm)
+        ? a.distanceKm
+        : Number.POSITIVE_INFINITY;
+      const distanceB = Number.isFinite(b.distanceKm)
+        ? b.distanceKm
+        : Number.POSITIVE_INFINITY;
+      if (distanceA !== distanceB) {
+        return distanceA - distanceB;
+      }
+
+      return a.name.localeCompare(b.name, "vi");
+    });
+  }, [nearbyTeamsByClusterData]);
+
+  const nearbyRescueTeamById = useMemo(
+    () => new Map(nearbyRescueTeams.map((team) => [team.id, team])),
+    [nearbyRescueTeams],
+  );
+
+  const updateEditActivitySuggestedTeam = useCallback(
+    (activityId: string, team: RescueTeamByClusterEntity | null) => {
+      setEditActivities((previous) =>
+        previous.map((activity) => {
+          if (activity._id !== activityId) {
+            return activity;
+          }
+
+          if (!team) {
+            return {
+              ...activity,
+              suggestedTeam: null,
+            };
+          }
+
+          return {
+            ...activity,
+            suggestedTeam: {
+              teamId: team.id,
+              teamName: team.name,
+              teamType: team.teamType,
+              assemblyPointName: team.assemblyPointName,
+              reason: `Điều phối viên cập nhật từ danh sách đội gần cụm SOS (${formatDistanceKmLabel(team.distanceKm)}).`,
+            },
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  const handleSelectNearbyTeamForActivity = useCallback(
+    (activityId: string, value: string) => {
+      if (value === CLEAR_ACTIVITY_TEAM_VALUE) {
+        updateEditActivitySuggestedTeam(activityId, null);
+        return;
+      }
+
+      const teamId = Number(value);
+      if (!Number.isFinite(teamId)) {
+        return;
+      }
+
+      const team = nearbyRescueTeamById.get(teamId);
+      if (!team) {
+        return;
+      }
+
+      updateEditActivitySuggestedTeam(activityId, team);
+    },
+    [nearbyRescueTeamById, updateEditActivitySuggestedTeam],
+  );
+
+  const getNearbyTeamsForActivity = useCallback(
+    (activity: EditableActivity) => {
+      const normalizedAssemblyPointName =
+        typeof activity.assemblyPointName === "string"
+          ? activity.assemblyPointName.trim().toLowerCase()
+          : "";
+
+      if (!normalizedAssemblyPointName) {
+        return nearbyRescueTeams.slice(0, 8);
+      }
+
+      const sameAssemblyPointTeams: RescueTeamByClusterEntity[] = [];
+      const otherTeams: RescueTeamByClusterEntity[] = [];
+
+      for (const team of nearbyRescueTeams) {
+        const normalizedTeamAssemblyPointName =
+          typeof team.assemblyPointName === "string"
+            ? team.assemblyPointName.trim().toLowerCase()
+            : "";
+
+        if (
+          normalizedTeamAssemblyPointName &&
+          normalizedTeamAssemblyPointName === normalizedAssemblyPointName
+        ) {
+          sameAssemblyPointTeams.push(team);
+        } else {
+          otherTeams.push(team);
+        }
+      }
+
+      return [...sameAssemblyPointTeams, ...otherTeams].slice(0, 8);
+    },
+    [nearbyRescueTeams],
+  );
+
   // ── Active tab: "plan" for AI plan view, "missions" for existing missions ──
   const [activeTab, setActiveTab] = useState<"plan" | "missions">(
     defaultTab ?? "missions",
@@ -2850,6 +3117,10 @@ const RescuePlanPanel = ({
         return a.id - b.id;
       });
 
+      const missionTeamsByMissionTeamId = new Map(
+        (mission.teams ?? []).map((team) => [team.missionTeamId, team]),
+      );
+
       setEditActivities(
         sortedActivities.map((a, i) => {
           const inferredSosRequestId = inferSOSRequestIdFromActivity(
@@ -2857,6 +3128,10 @@ const RescuePlanPanel = ({
             clusterSOSRequests,
           );
           const isDepot = a.activityType === "COLLECT_SUPPLIES";
+          const linkedMissionTeam =
+            typeof a.missionTeamId === "number"
+              ? missionTeamsByMissionTeamId.get(a.missionTeamId)
+              : null;
 
           return {
             _id: `edit-m-${i}-${Date.now()}`,
@@ -2870,14 +3145,25 @@ const RescuePlanPanel = ({
               : inferredSosRequestId
                 ? Number(inferredSosRequestId)
                 : null,
-            depotId: isDepot ? a.depotId ?? null : null,
-            depotName: isDepot ? a.depotName ?? a.target ?? null : null,
-            depotAddress: isDepot ? a.depotAddress ?? null : null,
+            depotId: isDepot ? (a.depotId ?? null) : null,
+            depotName: isDepot ? (a.depotName ?? a.target ?? null) : null,
+            depotAddress: isDepot ? (a.depotAddress ?? null) : null,
             assemblyPointId: a.assemblyPointId ?? null,
             assemblyPointName: a.assemblyPointName ?? null,
             assemblyPointLatitude: a.assemblyPointLatitude ?? null,
             assemblyPointLongitude: a.assemblyPointLongitude ?? null,
             suppliesToCollect: a.suppliesToCollect,
+            suggestedTeam: linkedMissionTeam
+              ? {
+                  teamId: linkedMissionTeam.rescueTeamId,
+                  teamName: linkedMissionTeam.teamName,
+                  teamType: linkedMissionTeam.teamType,
+                  assemblyPointName: linkedMissionTeam.assemblyPointName,
+                  latitude: linkedMissionTeam.latitude,
+                  longitude: linkedMissionTeam.longitude,
+                  reason: "Đồng bộ từ nhiệm vụ hiện tại.",
+                }
+              : null,
           };
         }),
       );
@@ -3062,7 +3348,7 @@ const RescuePlanPanel = ({
   return (
     <div
       className={cn(
-        "absolute inset-0 z-[1100] transition-all duration-500 ease-out",
+        "absolute inset-0 z-1100 transition-all duration-500 ease-out",
         open
           ? "opacity-100 translate-y-0"
           : "opacity-0 translate-y-full pointer-events-none",
@@ -3070,7 +3356,7 @@ const RescuePlanPanel = ({
     >
       <div className="h-full bg-background backdrop-blur-sm shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 z-30 p-3 pb-2 border-b shrink-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-sm">
+        <div className="sticky top-0 z-30 p-3 pb-2 border-b shrink-0 bg-linear-to-r from-emerald-500/10 to-teal-500/10 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 shadow-sm">
@@ -4272,7 +4558,7 @@ const RescuePlanPanel = ({
                                 <SelectTrigger className="h-8 text-xs mt-1">
                                   <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="z-[1200]">
+                                <SelectContent className="z-1200">
                                   <SelectItem value="RESCUE">Cứu hộ</SelectItem>
                                   <SelectItem value="RELIEF">
                                     Cứu trợ
@@ -4371,6 +4657,38 @@ const RescuePlanPanel = ({
                                 activityTypeConfig["ASSESS"];
                               const isManual =
                                 activity._id.startsWith("edit-new-");
+                              const activityNearbyTeams =
+                                getNearbyTeamsForActivity(activity);
+                              const parsedSuggestedTeamId = Number(
+                                activity.suggestedTeam?.teamId,
+                              );
+                              const hasValidSuggestedTeamId =
+                                Number.isFinite(parsedSuggestedTeamId) &&
+                                parsedSuggestedTeamId > 0;
+                              const selectedNearbyTeam = hasValidSuggestedTeamId
+                                ? nearbyRescueTeamById.get(
+                                    parsedSuggestedTeamId,
+                                  )
+                                : undefined;
+                              const selectedNearbyTeamStatusMeta =
+                                selectedNearbyTeam
+                                  ? getRescueTeamStatusMeta(
+                                      selectedNearbyTeam.status,
+                                    )
+                                  : null;
+                              const selectedTeamValue = hasValidSuggestedTeamId
+                                ? String(parsedSuggestedTeamId)
+                                : "";
+                              const selectedTeamInNearbyOptions =
+                                hasValidSuggestedTeamId &&
+                                activityNearbyTeams.some(
+                                  (team) => team.id === parsedSuggestedTeamId,
+                                );
+                              const selectedTeamDisplayName =
+                                activity.suggestedTeam?.teamName ||
+                                (hasValidSuggestedTeamId
+                                  ? `Đội #${parsedSuggestedTeamId}`
+                                  : "Chưa chọn đội");
                               return (
                                 <div
                                   key={activity._id}
@@ -4417,10 +4735,10 @@ const RescuePlanPanel = ({
                                           )
                                         }
                                       >
-                                        <SelectTrigger className="h-7 text-[11px] w-[140px] font-semibold">
+                                        <SelectTrigger className="h-7 w-35 text-[11px] font-semibold">
                                           <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent className="z-[1200]">
+                                        <SelectContent className="z-1200">
                                           {Object.entries(
                                             activityTypeConfig,
                                           ).map(([key, cfg]) => (
@@ -4549,7 +4867,7 @@ const RescuePlanPanel = ({
                                         <SelectTrigger className="h-10 w-full text-xs">
                                           <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent className="z-[1200]">
+                                        <SelectContent className="z-1200">
                                           <SelectItem value="Critical">
                                             Critical
                                           </SelectItem>
@@ -4565,6 +4883,170 @@ const RescuePlanPanel = ({
                                         </SelectContent>
                                       </Select>
                                     </div>
+                                  </div>
+
+                                  {/* Team assignment override (nearby assembly points) */}
+                                  <div className="rounded-lg border border-emerald-200/70 bg-emerald-50/50 p-2.5 dark:border-emerald-700/50 dark:bg-emerald-900/15">
+                                    <div className="mb-2 flex items-start justify-between gap-2">
+                                      <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                                          Điều phối đội cứu hộ
+                                        </p>
+                                        <p className="mt-0.5 text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
+                                          {selectedTeamDisplayName}
+                                        </p>
+                                      </div>
+
+                                      {selectedNearbyTeam ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 border-emerald-300/70 bg-white px-1.5 text-[10px] text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                        >
+                                          {formatDistanceKmLabel(
+                                            selectedNearbyTeam.distanceKm,
+                                          )}
+                                        </Badge>
+                                      ) : null}
+                                    </div>
+
+                                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                                      <Select
+                                        value={selectedTeamValue || undefined}
+                                        onValueChange={(value) =>
+                                          handleSelectNearbyTeamForActivity(
+                                            activity._id,
+                                            value,
+                                          )
+                                        }
+                                      >
+                                        <SelectTrigger className="h-9 text-xs bg-white/90 dark:bg-emerald-950/25">
+                                          <SelectValue
+                                            placeholder={
+                                              isNearbyTeamsByClusterLoading
+                                                ? "Đang tải đội gần cụm SOS..."
+                                                : "Chọn đội gần điểm tập kết để thay thế"
+                                            }
+                                          />
+                                        </SelectTrigger>
+                                        <SelectContent className="z-1200">
+                                          {hasValidSuggestedTeamId &&
+                                          !selectedTeamInNearbyOptions ? (
+                                            <SelectItem
+                                              value={selectedTeamValue}
+                                              className="text-xs"
+                                            >
+                                              {selectedTeamDisplayName} (đang
+                                              chọn)
+                                            </SelectItem>
+                                          ) : null}
+
+                                          {activityNearbyTeams.map((team) => (
+                                            <SelectItem
+                                              key={team.id}
+                                              value={String(team.id)}
+                                              className="text-xs"
+                                            >
+                                              {team.name} •{" "}
+                                              {formatDistanceKmLabel(
+                                                team.distanceKm,
+                                              )}
+                                            </SelectItem>
+                                          ))}
+
+                                          <SelectItem
+                                            value={CLEAR_ACTIVITY_TEAM_VALUE}
+                                            className="text-xs text-rose-700"
+                                          >
+                                            Bỏ gán đội cho bước này
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-9 border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-800/50 dark:text-rose-300 dark:hover:bg-rose-900/20"
+                                        onClick={() =>
+                                          updateEditActivitySuggestedTeam(
+                                            activity._id,
+                                            null,
+                                          )
+                                        }
+                                        disabled={!activity.suggestedTeam}
+                                      >
+                                        Bỏ đội
+                                      </Button>
+                                    </div>
+
+                                    {activityNearbyTeams.length > 0 && (
+                                      <div className="mt-2 flex flex-wrap gap-1.5">
+                                        {activityNearbyTeams
+                                          .slice(0, 4)
+                                          .map((team) => {
+                                            const isSelectedTeam =
+                                              hasValidSuggestedTeamId &&
+                                              parsedSuggestedTeamId === team.id;
+
+                                            return (
+                                              <Button
+                                                key={team.id}
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className={cn(
+                                                  "h-7 gap-1 rounded-full px-2 text-[10px]",
+                                                  isSelectedTeam
+                                                    ? "border-emerald-500 bg-emerald-100 text-emerald-800 dark:border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-200"
+                                                    : "border-emerald-200/80 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/25 dark:text-emerald-300",
+                                                )}
+                                                onClick={() =>
+                                                  updateEditActivitySuggestedTeam(
+                                                    activity._id,
+                                                    team,
+                                                  )
+                                                }
+                                              >
+                                                <span className="max-w-30 truncate">
+                                                  {team.name}
+                                                </span>
+                                                <span className="font-semibold">
+                                                  {formatDistanceKmLabel(
+                                                    team.distanceKm,
+                                                  )}
+                                                </span>
+                                              </Button>
+                                            );
+                                          })}
+                                      </div>
+                                    )}
+
+                                    {selectedNearbyTeam ? (
+                                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
+                                        <Badge
+                                          variant="outline"
+                                          className={cn(
+                                            "h-5 border px-1.5 text-[10px]",
+                                            selectedNearbyTeamStatusMeta?.className,
+                                          )}
+                                        >
+                                          {selectedNearbyTeamStatusMeta?.label}
+                                        </Badge>
+                                        {selectedNearbyTeam.assemblyPointName ? (
+                                          <span>
+                                            Điểm tập kết:{" "}
+                                            {
+                                              selectedNearbyTeam.assemblyPointName
+                                            }
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    ) : activity.suggestedTeam?.reason ? (
+                                      <p className="mt-2 text-[11px] leading-relaxed text-emerald-700/75 dark:text-emerald-300/75">
+                                        Lý do AI:{" "}
+                                        {activity.suggestedTeam.reason}
+                                      </p>
+                                    ) : null}
                                   </div>
 
                                   {/* Supply drop zone (for supply activities) */}
@@ -5488,7 +5970,7 @@ const RescuePlanPanel = ({
             </Button>
             {isEditMode ? (
               <Button
-                className="flex-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg shadow-amber-500/20"
+                className="flex-1 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg shadow-amber-500/20"
                 onClick={handleOpenSubmitConfirm}
                 disabled={isCreatingMission}
               >
@@ -5501,7 +5983,7 @@ const RescuePlanPanel = ({
               </Button>
             ) : activeSuggestion ? (
               <Button
-                className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/20"
+                className="flex-1 bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/20"
                 onClick={() => {
                   enterEditMode();
                 }}
@@ -5558,7 +6040,7 @@ const RescuePlanPanel = ({
                 Quay lại chỉnh sửa
               </Button>
               <Button
-                className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
                 onClick={handleSubmitEdit}
                 disabled={isCreatingMission}
               >

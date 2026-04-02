@@ -266,7 +266,9 @@ export interface ActivityRouteResponse {
   destinationLongitude: number;
   originLatitude: number;
   originLongitude: number;
-  vehicle: string;
+  vehicle: RouteVehicle | string;
+  status?: string | null;
+  errorMessage?: string | null;
   route: RouteData | null;
 }
 

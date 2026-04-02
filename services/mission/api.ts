@@ -30,6 +30,30 @@ function toNumberOrZero(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeActivityRouteResponse(
+  response: ActivityRouteResponse,
+): ActivityRouteResponse {
+  const normalizedStatus =
+    typeof response?.status === "string" && response.status.trim()
+      ? response.status.trim()
+      : response?.route
+        ? "OK"
+        : "NO_ROUTE";
+
+  const normalizedErrorMessage =
+    typeof response?.errorMessage === "string" &&
+    response.errorMessage.trim().length > 0
+      ? response.errorMessage.trim()
+      : null;
+
+  return {
+    ...response,
+    status: normalizedStatus,
+    errorMessage: normalizedErrorMessage,
+    route: response?.route ?? null,
+  };
+}
+
 function normalizeCreateMissionRequest(
   request: CreateMissionRequest,
 ): CreateMissionRequest {
@@ -192,5 +216,5 @@ export async function getActivityRoute(
       },
     },
   );
-  return data;
+  return normalizeActivityRouteResponse(data as ActivityRouteResponse);
 }
