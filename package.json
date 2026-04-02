@@ -38,6 +38,7 @@
     "framer-motion": "^12.35.1",
     "gsap": "^3.14.2",
     "leaflet": "^1.9.4",
+    "leaflet-draw": "^1.0.4",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "pdfjs-dist": "^5.5.207",
