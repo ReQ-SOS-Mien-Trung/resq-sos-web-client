@@ -11,6 +11,7 @@ import {
   RefreshTokenResponse,
 } from "./type";
 import { useAuthStore } from "@/stores/auth.store";
+import { unregisterStoredFcmToken } from "@/services/noti_alert/push";
 
 export const LOGIN_MUTATION_KEY = ["auth", "login"] as const;
 export const GOOGLE_LOGIN_MUTATION_KEY = ["auth", "google-login"] as const;
@@ -112,11 +113,13 @@ export function useLogout() {
   return useMutation<LogoutResponse, Error, void>({
     mutationKey: LOGOUT_MUTATION_KEY,
     mutationFn: logout,
-    onSuccess: () => {
+    onSuccess: async () => {
+      await unregisterStoredFcmToken();
       clearAuth();
       router.push("/sign-in");
     },
-    onError: (error) => {
+    onError: async (error) => {
+      await unregisterStoredFcmToken();
       // Even on error, clear local auth state
       clearAuth();
       console.error("Logout error:", error);

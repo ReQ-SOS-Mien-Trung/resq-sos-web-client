@@ -49,12 +49,15 @@ export interface GetRescuersParams {
   hasAssemblyPoint?: boolean;
   hasTeam?: boolean;
   rescuerType?: Exclude<RescuerType, null>;
+  assemblyPointCodes?: string[];
   abilitySubgroupCode?: string;
   abilityCategoryCode?: string;
   search?: string;
-  firstName?: string;
-  lastName?: string;
-  email?: string;
+}
+
+export interface RescuerAssemblyPointMetadataOption {
+  key: string;
+  value: string;
 }
 
 export interface GetRescuersResponse {

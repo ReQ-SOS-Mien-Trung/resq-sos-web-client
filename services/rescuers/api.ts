@@ -3,6 +3,7 @@ import type {
   GetRescuersParams,
   GetRescuersRawResponse,
   GetRescuersResponse,
+  RescuerAssemblyPointMetadataOption,
   RescuerApiEntity,
   RescuerType,
 } from "./type";
@@ -95,6 +96,7 @@ export async function getRescuers(
 ): Promise<GetRescuersResponse> {
   const pageNumber = params?.pageNumber ?? 1;
   const pageSize = params?.pageSize ?? 10;
+  const assemblyPointCodes = params?.assemblyPointCodes?.filter(Boolean);
 
   const { data } = await api.get<GetRescuersRawResponse>(
     "/personnel/rescuers",
@@ -105,15 +107,30 @@ export async function getRescuers(
         hasAssemblyPoint: params?.hasAssemblyPoint,
         hasTeam: params?.hasTeam,
         rescuerType: params?.rescuerType,
+        assemblyPointCodes,
         abilitySubgroupCode: params?.abilitySubgroupCode,
         abilityCategoryCode: params?.abilityCategoryCode,
         search: params?.search,
-        firstName: params?.firstName,
-        lastName: params?.lastName,
-        email: params?.email,
+      },
+      paramsSerializer: {
+        indexes: null,
       },
     },
   );
 
   return normalizeRescuersResponse(data, pageNumber, pageSize);
+}
+
+/**
+ * Get assembly point metadata for rescuer filters.
+ * GET /personnel/rescuers/assembly-point-metadata
+ */
+export async function getRescuerAssemblyPointMetadata(): Promise<
+  RescuerAssemblyPointMetadataOption[]
+> {
+  const { data } = await api.get<RescuerAssemblyPointMetadataOption[]>(
+    "/personnel/rescuers/assembly-point-metadata",
+  );
+
+  return data;
 }

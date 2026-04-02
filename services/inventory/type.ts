@@ -44,20 +44,27 @@ export interface ReusableBreakdown {
 interface InventoryItemEntityBase {
   itemModelId: number;
   itemModelName: string;
+  imageUrl?: string | null;
   categoryId: number;
   categoryName: string;
   targetGroups: string[];
-  lastStockedAt: string;
+  lastStockedAt: string | null;
 }
 
 export interface ConsumableItemEntity extends InventoryItemEntityBase {
   itemType: "Consumable";
   quantity: number;
   reservedQuantity: number;
+  /** Alias from backend payload */
+  totalReservedQuantity?: number;
+  /** Reserved amount for missions */
+  reservedForMissionQuantity?: number;
+  /** Reserved amount for transfer requests */
+  reservedForTransferQuantity?: number;
   availableQuantity: number;
   reusableBreakdown?: null;
   /** Số lô hiện tại */
-  lotCount: number;
+  lotCount?: number;
   /** Ngày hết hạn gần nhất trong các lô */
   nearestExpiryDate?: string | null;
   /** true nếu có lô sắp hết hạn */
@@ -69,6 +76,12 @@ export interface ReusableItemEntity extends InventoryItemEntityBase {
   /** Total unit count */
   unit: number;
   reservedUnit: number;
+  /** Alias from backend payload */
+  totalReservedQuantity?: number;
+  /** Reserved amount for missions */
+  reservedForMissionQuantity?: number;
+  /** Reserved amount for transfer requests */
+  reservedForTransferQuantity?: number;
   availableUnit: number;
   reusableBreakdown?: ReusableBreakdown;
 }
@@ -92,6 +105,15 @@ export interface GetDepotInventoryParams {
   pageSize?: number;
 }
 
+export interface InventoryTotalsSummary {
+  totalQuantity?: number | string | null;
+  totalReservedQuantity?: number | string | null;
+  totalAvailableQuantity?: number | string | null;
+  totalStock?: number | string | null;
+  reservedStock?: number | string | null;
+  availableStock?: number | string | null;
+}
+
 export interface GetMyDepotInventoryResponse {
   items: InventoryItemEntity[];
   pageNumber: number;
@@ -100,6 +122,13 @@ export interface GetMyDepotInventoryResponse {
   totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
+  totalQuantity?: number | string | null;
+  totalReservedQuantity?: number | string | null;
+  totalAvailableQuantity?: number | string | null;
+  totalStock?: number | string | null;
+  reservedStock?: number | string | null;
+  availableStock?: number | string | null;
+  summary?: InventoryTotalsSummary;
 }
 
 // ─── Import from Organization ───

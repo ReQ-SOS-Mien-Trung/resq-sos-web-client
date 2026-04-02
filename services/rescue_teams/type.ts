@@ -60,6 +60,21 @@ export interface RescueTeamEntity {
   createdAt: string;
 }
 
+export interface RescueTeamByClusterEntity {
+  id: number;
+  code: string;
+  name: string;
+  teamType: string;
+  status: string;
+  assemblyPointId: number;
+  assemblyPointName: string;
+  distanceKm: number;
+  maxMembers: number;
+  currentMemberCount: number;
+}
+
+export type GetRescueTeamsByClusterResponse = RescueTeamByClusterEntity[];
+
 export interface GetRescueTeamsParams {
   pageNumber?: number;
   pageSize?: number;

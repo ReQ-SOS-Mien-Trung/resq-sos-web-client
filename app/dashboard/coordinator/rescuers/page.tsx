@@ -27,7 +27,10 @@ import {
   WarningCircle,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
-import { useRescuers } from "@/services/rescuers/hooks";
+import {
+  useRescuerAssemblyPointMetadata,
+  useRescuers,
+} from "@/services/rescuers/hooks";
 import type { GetRescuersParams } from "@/services/rescuers/type";
 import {
   useAssemblyPointMetadata,
@@ -38,6 +41,7 @@ const DEFAULT_RESCUER_AVATAR =
   "https://res.cloudinary.com/dezgwdrfs/image/upload/v1773504004/611251674_1432765175119052_6622750233977483141_n_sgxqxd.png";
 const ASSIGNED_SELECT_VALUE = "__assigned__";
 const UNASSIGN_SELECT_VALUE = "__unassign__";
+const ALL_ASSEMBLY_POINT_FILTER_VALUE = "__all_assembly_points__";
 
 type AssignmentFilter = "all" | "assigned" | "unassigned";
 type TeamFilter = "all" | "inTeam" | "notInTeam";
@@ -50,11 +54,15 @@ function getInitials(firstName?: string, lastName?: string) {
 
 export default function CoordinatorRescuerManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [assignmentFilter, setAssignmentFilter] =
     useState<AssignmentFilter>("all");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("all");
   const [rescuerTypeFilter, setRescuerTypeFilter] =
     useState<RescuerTypeFilter>("all");
+  const [selectedAssemblyPointCode, setSelectedAssemblyPointCode] = useState(
+    ALL_ASSEMBLY_POINT_FILTER_VALUE,
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(20);
   const [rowSelectedAssemblyPointIds, setRowSelectedAssemblyPointIds] =
@@ -64,6 +72,14 @@ export default function CoordinatorRescuerManagementPage() {
   const [bulkSelectedAssemblyPointId, setBulkSelectedAssemblyPointId] =
     useState("");
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
   const rescuerParams = useMemo<
     Omit<GetRescuersParams, "pageNumber" | "pageSize">
@@ -82,12 +98,38 @@ export default function CoordinatorRescuerManagementPage() {
       params.rescuerType = rescuerTypeFilter;
     }
 
+    if (selectedAssemblyPointCode !== ALL_ASSEMBLY_POINT_FILTER_VALUE) {
+      params.assemblyPointCodes = [selectedAssemblyPointCode];
+    }
+
+    if (debouncedSearchQuery) {
+      params.search = debouncedSearchQuery;
+    }
+
     return params;
-  }, [assignmentFilter, teamFilter, rescuerTypeFilter]);
+  }, [
+    assignmentFilter,
+    teamFilter,
+    rescuerTypeFilter,
+    selectedAssemblyPointCode,
+    debouncedSearchQuery,
+  ]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [assignmentFilter, teamFilter, rescuerTypeFilter, pageSize]);
+  }, [
+    assignmentFilter,
+    teamFilter,
+    rescuerTypeFilter,
+    selectedAssemblyPointCode,
+    pageSize,
+    debouncedSearchQuery,
+  ]);
+
+  const {
+    data: rescuerAssemblyPointOptions,
+    isLoading: isRescuerAssemblyPointLoading,
+  } = useRescuerAssemblyPointMetadata({ enabled: true });
 
   const {
     data: rescuersData,
@@ -111,39 +153,19 @@ export default function CoordinatorRescuerManagementPage() {
     useUpdateRescuerAssemblyPointAssignment();
 
   const rescuers = useMemo(() => rescuersData?.items ?? [], [rescuersData]);
+  const visibleRescuers = rescuers;
   const totalPages = rescuersData?.totalPages ?? 1;
   const totalCount = rescuersData?.totalCount ?? rescuers.length;
 
-  const filteredRescuers = useMemo(() => {
-    const keyword = searchQuery.trim().toLowerCase();
-    if (!keyword) {
-      return rescuers;
-    }
-
-    return rescuers.filter((rescuer) => {
-      const firstName = rescuer.firstName?.toLowerCase() ?? "";
-      const lastName = rescuer.lastName?.toLowerCase() ?? "";
-      const email = rescuer.email?.toLowerCase() ?? "";
-      const fullName = `${firstName} ${lastName}`.trim();
-
-      return (
-        firstName.includes(keyword) ||
-        lastName.includes(keyword) ||
-        email.includes(keyword) ||
-        fullName.includes(keyword)
-      );
-    });
-  }, [rescuers, searchQuery]);
-
   useEffect(() => {
     const visibleRescuerIds = new Set(
-      filteredRescuers.map((rescuer) => rescuer.id),
+      visibleRescuers.map((rescuer) => rescuer.id),
     );
 
     setSelectedRescuerIds((previous) =>
       previous.filter((rescuerId) => visibleRescuerIds.has(rescuerId)),
     );
-  }, [filteredRescuers]);
+  }, [visibleRescuers]);
 
   const assemblyPointNameById = useMemo(() => {
     const entries = (assemblyPointOptions ?? [])
@@ -172,17 +194,17 @@ export default function CoordinatorRescuerManagementPage() {
 
   const selectedVisibleRescuerCount = useMemo(
     () =>
-      filteredRescuers.reduce(
+      visibleRescuers.reduce(
         (count, rescuer) =>
           count + (selectedRescuerIdSet.has(rescuer.id) ? 1 : 0),
         0,
       ),
-    [filteredRescuers, selectedRescuerIdSet],
+    [visibleRescuers, selectedRescuerIdSet],
   );
 
   const areAllVisibleRescuersSelected =
-    filteredRescuers.length > 0 &&
-    selectedVisibleRescuerCount === filteredRescuers.length;
+    visibleRescuers.length > 0 &&
+    selectedVisibleRescuerCount === visibleRescuers.length;
   const hasPartialVisibleSelection =
     selectedVisibleRescuerCount > 0 && !areAllVisibleRescuersSelected;
   const isAssignmentBusy = isUpdatingAssignment || isBulkUpdating;
@@ -271,7 +293,7 @@ export default function CoordinatorRescuerManagementPage() {
 
   const handleToggleSelectAllVisible = (shouldSelect: boolean) => {
     setSelectedRescuerIds(
-      shouldSelect ? filteredRescuers.map((rescuer) => rescuer.id) : [],
+      shouldSelect ? visibleRescuers.map((rescuer) => rescuer.id) : [],
     );
   };
 
@@ -421,7 +443,7 @@ export default function CoordinatorRescuerManagementPage() {
               Tìm kiếm và bộ lọc rescuer
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-5">
+          <CardContent className="grid gap-3 md:grid-cols-6">
             <div className="relative md:col-span-2">
               <MagnifyingGlass
                 className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-[#FF5722]"
@@ -448,6 +470,31 @@ export default function CoordinatorRescuerManagementPage() {
                 <SelectItem value="all">Tất cả rescuer</SelectItem>
                 <SelectItem value="assigned">Đã có điểm tập kết</SelectItem>
                 <SelectItem value="unassigned">Chưa có điểm tập kết</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedAssemblyPointCode}
+              onValueChange={setSelectedAssemblyPointCode}
+            >
+              <SelectTrigger className="h-10 w-full">
+                <SelectValue
+                  placeholder={
+                    isRescuerAssemblyPointLoading
+                      ? "Đang tải điểm tập kết..."
+                      : "Lọc theo điểm tập kết"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_ASSEMBLY_POINT_FILTER_VALUE}>
+                  Tất cả điểm tập kết
+                </SelectItem>
+                {(rescuerAssemblyPointOptions ?? []).map((point) => (
+                  <SelectItem key={point.key} value={point.key}>
+                    {point.value}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -486,7 +533,7 @@ export default function CoordinatorRescuerManagementPage() {
         <Card className="border-black/10 shadow-none">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base tracking-tight">
-              Danh sách rescuer ({filteredRescuers.length})
+              Danh sách rescuer ({totalCount})
             </CardTitle>
             <Button
               type="button"
@@ -506,7 +553,7 @@ export default function CoordinatorRescuerManagementPage() {
           <CardContent className="space-y-3">
             {!isRescuersLoading &&
             !isRescuersError &&
-            filteredRescuers.length > 0 ? (
+            visibleRescuers.length > 0 ? (
               <div className="rounded-lg border border-[#FF5722]/15 bg-[#FF5722]/[0.04] p-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex flex-wrap items-center gap-3">
@@ -615,13 +662,13 @@ export default function CoordinatorRescuerManagementPage() {
               <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
                 Không thể tải danh sách rescuer.
               </div>
-            ) : filteredRescuers.length === 0 ? (
+            ) : visibleRescuers.length === 0 ? (
               <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
                 Không tìm thấy rescuer phù hợp với điều kiện hiện tại.
               </div>
             ) : (
               <>
-                {filteredRescuers.map((rescuer) => {
+                {visibleRescuers.map((rescuer) => {
                   const isRowPending = pendingUserId === rescuer.id;
                   const isRowSelected = selectedRescuerIdSet.has(rescuer.id);
                   const fullName = `${rescuer.firstName} ${rescuer.lastName}`;
@@ -911,10 +958,8 @@ export default function CoordinatorRescuerManagementPage() {
             )}
 
             <p className="text-xs text-muted-foreground">
-              Gợi ý: ô tìm kiếm đang lọc trực tiếp ở frontend theo
-              firstName/lastName/email trên dữ liệu đã tải của trang hiện tại;
-              các filter hasAssemblyPoint/hasTeam/rescuerType vẫn truy vấn
-              backend.
+              Gợi ý: ô tìm kiếm và các bộ lọc đang gửi trực tiếp lên backend,
+              danh sách hiện tại là kết quả đã được backend lọc sẵn.
             </p>
           </CardContent>
         </Card>

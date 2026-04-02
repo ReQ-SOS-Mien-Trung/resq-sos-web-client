@@ -16,9 +16,11 @@ export interface DepotMetadataItem {
 // Depot Manager
 export interface DepotManager {
   id: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   email: string | null;
-  phone: string;
+  phone: string | null;
+  fullName?: string | null;
 }
 
 // Depot Entity
@@ -31,6 +33,7 @@ export interface DepotEntity {
   capacity: number;
   currentUtilization: number;
   status: DepotStatus;
+  imageUrl?: string | null;
   manager: DepotManager | null;
   lastUpdatedAt: string;
 }
