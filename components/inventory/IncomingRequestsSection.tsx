@@ -108,13 +108,13 @@ function getRoleInfo(role: "Source" | "Requester"): {
 } {
   return role === "Source"
     ? {
-        label: "Kho nguồn",
-        className: "bg-orange-100 text-orange-700 border-orange-200",
-      }
+      label: "Kho nguồn",
+      className: "bg-orange-100 text-orange-700 border-orange-200",
+    }
     : {
-        label: "Kho yêu cầu",
-        className: "bg-sky-100 text-sky-700 border-sky-200",
-      };
+      label: "Kho yêu cầu",
+      className: "bg-sky-100 text-sky-700 border-sky-200",
+    };
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -642,18 +642,16 @@ function RequestCard({
             )}
           </div>
           <div className="text-right shrink-0 space-y-0.5">
-            <p className="text-xs font-bold text-muted-foreground/60 tracking-tight">#{request.id}</p>
-            <div className="flex items-center gap-0.5 justify-end text-[10px] text-muted-foreground/50">
-              <Clock className="h-2.5 w-2.5" />
-              <span className="tracking-tighter">{formattedTime}</span>
+            <p className="text-xs font-bold tracking-tight">#{request.id}</p>
+            <div className="flex items-center justify-end text-xs">
+              <span className="tracking-tighter font-medium">{formattedTime}</span>
             </div>
           </div>
         </div>
 
         {/* Route pill */}
         <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2 min-w-0">
-          <MapPin className="h-3 w-3 text-muted-foreground/60 shrink-0" />
-          <span className="text-xs font-semibold tracking-tighter text-foreground truncate flex-1 min-w-0">
+          <span className="text-xs font-medium tracking-tighter text-foreground truncate flex-1 min-w-0">
             {request.sourceDepotName}
           </span>
           <ArrowRight className="h-3.5 w-3.5 text-primary/60 shrink-0" />
@@ -664,7 +662,7 @@ function RequestCard({
 
         {/* Items */}
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 flex items-center gap-1 mb-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-1 mb-2">
             <Package className="h-3 w-3" />
             {request.items.length} mặt hàng
           </p>
@@ -682,7 +680,7 @@ function RequestCard({
             ))}
           </div>
           {request.items.length > 3 && (
-            <p className="text-[11px] text-muted-foreground tracking-tighter pt-1.5">
+            <p className="text-xs text-muted-foreground tracking-tighter pt-1.5">
               +{request.items.length - 3} mặt hàng khác…
             </p>
           )}

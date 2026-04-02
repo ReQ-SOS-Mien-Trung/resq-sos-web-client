@@ -358,8 +358,10 @@ const InventoryDashboardPage = () => {
   }, []);
 
   const handleRefresh = useCallback(() => {
-    window.location.reload();
-  }, []);
+    refetchDepots();
+    refetchCategories();
+    refetchQuantityByCategory();
+  }, [refetchDepots, refetchCategories, refetchQuantityByCategory]);
 
   // ── Loading state ──
   if (isDepotsLoading || isCategoriesLoading || isSupplyRequestsLoading) {

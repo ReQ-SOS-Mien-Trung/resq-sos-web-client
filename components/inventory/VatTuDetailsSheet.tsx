@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Sheet,
   SheetContent,
@@ -49,6 +51,8 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
     itemTypesData?.find((t) => t.key === key)?.value ?? key;
   const targetGroupLabel = (key: string) =>
     targetGroupsData?.find((g) => g.key === key)?.value ?? key;
+
+  const [barTooltip, setBarTooltip] = useState<{ label: string; color: string; value: number; x: number; y: number } | null>(null);
 
   if (!item) return null;
 
@@ -115,31 +119,48 @@ export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsShee
               </div>
 
               {/* Progress bar container */}
-              <div className="h-4 overflow-hidden rounded-full bg-slate-200/80 p-px">
-                <div className="flex h-full w-full gap-px overflow-hidden rounded-full bg-background/80">
-                  {reservedForMissionQty > 0 && (
-                    <div
-                      className="h-full bg-blue-500 transition-all"
-                      style={{ width: `${missionPercent}%` }}
-                      title={`Nhiệm vụ: ${reservedForMissionQty.toLocaleString()}`}
-                    />
-                  )}
-                  {reservedForTransferQty > 0 && (
-                    <div
-                      className="h-full bg-emerald-500 transition-all"
-                      style={{ width: `${transferPercent}%` }}
-                      title={`Điều chuyển: ${reservedForTransferQty.toLocaleString()}`}
-                    />
-                  )}
-                  {availableQty > 0 && (
-                    <div
-                      className="h-full bg-slate-400 transition-all"
-                      style={{ width: `${availablePercent}%` }}
-                      title={`Còn lại: ${availableQty.toLocaleString()}`}
-                    />
-                  )}
+              <div className="relative">
+                <div className="h-4 overflow-hidden rounded-full bg-slate-200/80 p-px">
+                  <div className="flex h-full w-full gap-px overflow-hidden rounded-full bg-background/80">
+                    {reservedForMissionQty > 0 && (
+                      <div
+                        className="h-full bg-blue-500 transition-all cursor-crosshair"
+                        style={{ width: `${missionPercent}%` }}
+                        onMouseMove={(e) => setBarTooltip({ label: "Nhiệm vụ", color: "bg-blue-500", value: reservedForMissionQty, x: e.clientX, y: e.clientY })}
+                        onMouseLeave={() => setBarTooltip(null)}
+                      />
+                    )}
+                    {reservedForTransferQty > 0 && (
+                      <div
+                        className="h-full bg-emerald-500 transition-all cursor-crosshair"
+                        style={{ width: `${transferPercent}%` }}
+                        onMouseMove={(e) => setBarTooltip({ label: "Điều chuyển", color: "bg-emerald-500", value: reservedForTransferQty, x: e.clientX, y: e.clientY })}
+                        onMouseLeave={() => setBarTooltip(null)}
+                      />
+                    )}
+                    {availableQty > 0 && (
+                      <div
+                        className="h-full bg-slate-400 transition-all cursor-crosshair"
+                        style={{ width: `${availablePercent}%` }}
+                        onMouseMove={(e) => setBarTooltip({ label: "Còn lại", color: "bg-slate-400", value: availableQty, x: e.clientX, y: e.clientY })}
+                        onMouseLeave={() => setBarTooltip(null)}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {/* Floating cursor tooltip — portal to escape Sheet stacking context */}
+              {barTooltip && typeof window !== "undefined" && createPortal(
+                <div
+                  className="fixed pointer-events-none px-2.5 py-1.5 rounded-lg border bg-popover text-popover-foreground shadow-lg text-xs font-medium tracking-tighter flex items-center gap-1.5"
+                  style={{ left: barTooltip.x + 12, top: barTooltip.y - 36, zIndex: 99999 }}
+                >
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${barTooltip.color}`} />
+                  {barTooltip.label}: <strong>{barTooltip.value.toLocaleString()}</strong>
+                </div>,
+                document.body,
+              )}
 
               <div className="flex justify-between text-sm text-muted-foreground mt-2">
                 <span className="text-slate-700 tracking-tighter font-semibold">

@@ -37,6 +37,7 @@ import {
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { StockMovementEntity } from "@/services/inventory/type";
+import { useInventoryItemTypes } from "@/services/inventory/hooks";
 
 interface StockMovementDetailSheetProps {
   movement: StockMovementEntity | null;
@@ -60,11 +61,6 @@ const SOURCE_TYPE_MAP: Record<string, string> = {
   Adjustment: "Điều chỉnh",
   Transfer:   "Chuyển kho",
   Manual:     "Thủ công",
-};
-
-const ITEM_TYPE_MAP: Record<string, string> = {
-  Consumable: "Tiêu hao",
-  Reusable:   "Tái sử dụng",
 };
 
 const TARGET_GROUP_MAP: Record<string, string> = {
@@ -98,6 +94,11 @@ export function StockMovementDetailSheet({
   open,
   onOpenChange,
 }: StockMovementDetailSheetProps) {
+  const { data: itemTypesData } = useInventoryItemTypes();
+
+  const itemTypeLabel = (key: string) =>
+    itemTypesData?.find((t) => t.key === key)?.value ?? key;
+
   if (!movement) return null;
 
   const actionConfig = ACTION_TYPE_MAP[movement.actionType];
@@ -240,7 +241,7 @@ export function StockMovementDetailSheet({
 
                         <TableCell className="py-2.5">
                           <span className="text-sm font-medium tracking-tighter">
-                            {ITEM_TYPE_MAP[item.itemType] ?? item.itemType}
+                            {itemTypeLabel(item.itemType)}
                           </span>
                         </TableCell>
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -133,7 +134,7 @@ function RequestLineRow({
           }
           disabled={isCategoriesLoading}
         >
-          <SelectTrigger className="w-full h-10 leading-normal">
+          <SelectTrigger className="w-full">
             <SelectValue
               placeholder={isCategoriesLoading ? "Đang tải danh mục..." : "Chọn danh mục"}
             />
@@ -157,7 +158,7 @@ function RequestLineRow({
           onValueChange={(value) => onChange(line.id, { reliefItemKey: value })}
           disabled={!line.categoryCode || isLoadingReliefItems}
         >
-          <SelectTrigger className="w-full h-10 leading-normal">
+          <SelectTrigger className="w-full">
             <SelectValue
               placeholder={
                 !line.categoryCode
@@ -188,7 +189,7 @@ function RequestLineRow({
           value={line.quantity}
           onChange={(e) => onChange(line.id, { quantity: e.target.value })}
           placeholder="Nhập SL"
-          className="h-10 py-2 leading-normal"
+          className="h-9 px-3 py-1 text-sm rounded-md"
         />
       </div>
 
@@ -919,12 +920,31 @@ export default function SupplyRequestSection({
                             }))
                           }
                         >
-                          <SelectTrigger className="w-full h-9 leading-normal">
+                          <SelectTrigger
+                            className={cn(
+                              "w-full h-9 leading-normal font-medium",
+                              (depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "URGENT")).toUpperCase() === "URGENT"
+                                ? "text-red-700 bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800/60 dark:text-red-300"
+                                : (depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "URGENT")).toUpperCase() === "HIGH"
+                                  ? "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/60 dark:text-amber-300"
+                                  : (depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "URGENT")).toUpperCase() === "MEDIUM"
+                                    ? "text-sky-700 bg-sky-50 border-sky-200 dark:bg-sky-950/20 dark:border-sky-800/60 dark:text-sky-300"
+                                    : ""
+                            )}
+                          >
                             <SelectValue placeholder="Chọn mức ưu tiên" />
                           </SelectTrigger>
-                          <SelectContent disablePortal>
+                          <SelectContent disablePortal position="popper" sideOffset={4}>
                             {priorityLevels.map((level) => (
-                              <SelectItem key={level.key} value={level.key}>
+                              <SelectItem 
+                                key={level.key} 
+                                value={level.key}
+                                className={
+                                  level.key.toUpperCase() === "URGENT" ? "text-red-700 focus:text-red-800 focus:bg-red-50 font-medium" :
+                                  level.key.toUpperCase() === "HIGH" ? "text-amber-700 focus:text-amber-800 focus:bg-amber-50 font-medium" :
+                                  level.key.toUpperCase() === "MEDIUM" ? "text-sky-700 focus:text-sky-800 focus:bg-sky-50 font-medium" : ""
+                                }
+                              >
                                 {level.value}
                               </SelectItem>
                             ))}
