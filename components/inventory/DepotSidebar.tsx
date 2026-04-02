@@ -18,11 +18,9 @@ import {
   CheckCircle,
   ArrowRight,
   ChartBar,
-  ListBullets,
   Cube,
   ShieldWarning,
   ArrowFatLinesRight,
-  BellRinging,
 } from "@phosphor-icons/react";
 import {
   DepotSidebarProps,
@@ -150,8 +148,7 @@ const DepotSidebar = ({
           <TabTriggerWithDot value="inventory" dot={hasUrgent} label="Kho hàng" icon={<ChartBar className="h-4 w-4" />} />
           <TabTriggerWithDot value="vattu" dot={false} label="Vật tư" icon={<Cube className="h-4 w-4" />} />
           <TabTriggerWithDot value="requests" dot={hasPendingReqs} label="Tạo yêu cầu" icon={<ClipboardText className="h-4 w-4" />} />
-          <TabTriggerWithDot value="incoming" dot={hasIncomingItems} label="Tiếp nhận yêu cầu" icon={<BellRinging className="h-4 w-4" />} />
-          <TabTriggerWithDot value="shipments" dot={hasAnyRequests} label="Theo dõi tiến trình" icon={<Truck className="h-4 w-4" />} />
+          <TabTriggerWithDot value="supply-management" dot={hasIncomingItems || hasAnyRequests} label="Quản lý tiếp tế" icon={<Truck className="h-4 w-4" />} />
         </TabsList>
 
         {/* ── Inventory Tab ─────────────────────────────────────────────── */}
@@ -270,21 +267,21 @@ const DepotSidebar = ({
           </ScrollArea>
         </TabsContent>
 
-        {/* ── Shipments / Theo dõi Tab ───────────────────────────────────── */}
-        <TabsContent value="shipments" className="flex-1 m-0 min-h-0 flex flex-col items-center justify-center p-6 text-center">
+        {/* ── Supply Management Tab (merged incoming + shipments) ────── */}
+        <TabsContent value="supply-management" className="flex-1 m-0 min-h-0 flex flex-col items-center justify-center p-6 text-center">
           <div className="flex flex-col items-center gap-3">
             <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-              <ListBullets className="h-6 w-6 text-primary" weight="fill" />
+              <Truck className="h-6 w-6 text-primary" weight="fill" />
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-tighter">Bảng theo dõi tiến trình</p>
+              <p className="text-sm font-semibold tracking-tighter">Quản lý tiếp tế</p>
               <p className="text-xs text-muted-foreground tracking-tighter mt-1 leading-relaxed">
-                Toàn bộ yêu cầu tiếp tế đang hiển thị tại khu vực bên phải
+                Xem đơn đến và đơn đã gửi tại khu vực bên phải
               </p>
             </div>
             <div className="flex items-center gap-1.5 text-[10px] font-semibold text-primary tracking-wide uppercase mt-1">
               <ArrowFatLinesRight className="h-3.5 w-3.5" weight="fill" />
-              Xem bảng bên phải
+              Xem trang bên phải
             </div>
           </div>
         </TabsContent>
@@ -308,24 +305,6 @@ const DepotSidebar = ({
           </div>
         </TabsContent>
 
-        {/* ── Incoming Tab ──────────────────────────────────────────────── */}
-        <TabsContent value="incoming" className="flex-1 m-0 min-h-0 flex flex-col items-center justify-center p-6 text-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-              <BellRinging className="h-6 w-6 text-primary" weight="fill" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold tracking-tighter">Tiếp nhận yêu cầu</p>
-              <p className="text-xs text-muted-foreground tracking-tighter mt-1 leading-relaxed">
-                Trang quản lý và xử lý yêu cầu đang hiển thị bên phải
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-primary tracking-wide uppercase mt-1">
-              <ArrowFatLinesRight className="h-3.5 w-3.5" weight="fill" />
-              Xem trang bên phải
-            </div>
-          </div>
-        </TabsContent>
       </Tabs>
     </div>
   );

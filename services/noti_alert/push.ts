@@ -8,6 +8,9 @@ const NOTIFICATION_SERVICE_WORKER_PATH = "/firebase-messaging-sw.js";
 const FIREBASE_WEB_PUSH_APP_NAME = "resq-web-push";
 let hasWarnedMissingFirebaseConfig = false;
 
+/** Cached Messaging instance created during getToken(). Reused by onMessage(). */
+let _cachedMessaging: import("firebase/messaging").Messaging | null = null;
+
 interface StoredFcmRegistration {
   token: string;
   userId: string | null;
@@ -198,6 +201,59 @@ export async function resetNotificationServiceWorker(): Promise<ServiceWorkerReg
   return ensureNotificationServiceWorker();
 }
 
+/**
+ * Get the Firebase Messaging instance for foreground onMessage() handler.
+ * Returns the same Messaging instance that was created during getBrowserFcmToken()
+ * so that onMessage() correctly receives FCM messages.
+ * If the cached instance is not yet available (token sync not done), it creates
+ * a new one and also calls getToken() to ensure the instance is fully registered.
+ */
+export async function getFirebaseMessagingForForeground(): Promise<
+  import("firebase/messaging").Messaging | null
+> {
+  // Prefer the cached instance that was fully registered with getToken()
+  if (_cachedMessaging) return _cachedMessaging;
+
+  if (!isBrowserEnvironment()) return null;
+
+  const envConfig = getFirebaseEnvConfig();
+  if (!envConfig) return null;
+
+  const [{ getApps, initializeApp }, messagingModule] = await Promise.all([
+    import("firebase/app"),
+    import("firebase/messaging"),
+  ]);
+
+  const isSupported = await messagingModule.isSupported();
+  if (!isSupported) return null;
+
+  let app = getApps().find(
+    (candidate) => candidate.name === FIREBASE_WEB_PUSH_APP_NAME,
+  );
+
+  if (!app) {
+    app = initializeApp(envConfig.firebase, FIREBASE_WEB_PUSH_APP_NAME);
+  }
+
+  const messaging = messagingModule.getMessaging(app);
+
+  // Ensure getToken was called so onMessage works — use existing SW registration
+  const swRegistration = await navigator.serviceWorker?.getRegistration("/");
+  if (swRegistration) {
+    try {
+      await messagingModule.getToken(messaging, {
+        vapidKey: envConfig.vapidKey,
+        serviceWorkerRegistration: swRegistration,
+      });
+    } catch {
+      // getToken may fail if permission not granted yet; messaging still usable
+    }
+  }
+
+  _cachedMessaging = messaging;
+  return messaging;
+}
+
 export async function getBrowserFcmToken(
   serviceWorkerRegistration: ServiceWorkerRegistration,
 ): Promise<string | null> {
@@ -238,6 +294,7 @@ export async function getBrowserFcmToken(
     serviceWorkerRegistration,
   );
   const messaging = messagingModule.getMessaging(app);
+  _cachedMessaging = messaging;
   let token: string | null;
 
   try {

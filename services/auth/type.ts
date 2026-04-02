@@ -4,11 +4,6 @@ export interface LoginPayload {
   password: string;
 }
 
-// Google Login Request Payload
-export interface GoogleLoginPayload {
-  idToken: string;
-}
-
 // Login Hook Options
 export interface LoginHookOptions {
   onSuccess?: (data: LoginResponse) => void;

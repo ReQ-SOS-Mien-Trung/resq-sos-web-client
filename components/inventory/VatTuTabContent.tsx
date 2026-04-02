@@ -166,7 +166,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
           {isLoading ? (
             <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="aspect-square border border-border/40 p-3 flex flex-col justify-between">
+                <div key={i} className="aspect-[4/5] border border-border/40 p-3 flex flex-col justify-between">
                   <Skeleton className="h-3 w-3/4 mb-2" />
                   <Skeleton className="h-8 w-1/2" />
                 </div>
@@ -202,7 +202,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                     <div
                       key={item.itemModelId}
                       onClick={() => onItemSelect?.(item)}
-                      className="group border border-black/10 dark:border-white/10 p-3 hover:border-[#FF5722] hover:-translate-y-1 transition-all cursor-pointer flex flex-col justify-between aspect-square relative bg-card shadow-sm hover:shadow-md"
+                      className="group relative flex aspect-4/5 cursor-pointer flex-col justify-between border border-black/10 bg-card px-3 pt-3 shadow-sm transition-all hover:-translate-y-1 hover:border-[#FF5722] hover:shadow-md dark:border-white/10"
                     >
                       {/* Minimalist Top Indicator */}
                       <div className="flex justify-between items-start mb-2">
@@ -213,12 +213,29 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                       </div>
 
                       {/* Item Name */}
-                      <h3 className="text-lg font-bold tracking-tighter leading-tight group-hover:text-[#FF5722] transition-colors mb-2 line-clamp-3">
+                      <h3 className="h-14 overflow-hidden text-lg font-bold leading-tight tracking-tighter transition-colors group-hover:text-[#FF5722] line-clamp-2">
                         {item.itemModelName}
                       </h3>
 
+                      <div className="mb-3 flex items-center justify-center h-40 overflow-hidden">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.itemModelName}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <div className="flex h-40 items-center justify-center gap-2 px-3 text-[11px] tracking-tighter text-muted-foreground">
+                            <Package className="h-4 w-4 opacity-50" weight="duotone" />
+                            Chưa có ảnh
+                          </div>
+                        )}
+                      </div>
+
                       {/* Bottom Quantity Section */}
-                      <div className="mt-auto border-t border-black/5 dark:border-white/5 pt-2 flex flex-col">
+                      <div className="mt-auto flex min-h-[5.5rem] flex-col border-t border-black/5 pt-2 dark:border-white/5">
                         <span className="text-[12px] tracking-tighter text-muted-foreground uppercase mb-0.5 max-w-full truncate">
                           {itemTypesData?.find((t) => t.key === item.itemType)?.value ?? item.itemType}
                         </span>

@@ -66,8 +66,7 @@ axiosInstance.interceptors.response.use(
     // Bỏ qua nếu request là refresh-token hoặc login (tránh vòng lặp vô tận)
     const isAuthEndpoint =
       originalRequest?.url?.includes("/auth/refresh-token") ||
-      originalRequest?.url?.includes("/auth/login") ||
-      originalRequest?.url?.includes("/auth/google-login");
+      originalRequest?.url?.includes("/auth/login");
 
     if (
       error.response?.status === 401 &&

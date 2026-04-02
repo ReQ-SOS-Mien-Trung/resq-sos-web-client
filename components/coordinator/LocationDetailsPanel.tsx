@@ -35,6 +35,12 @@ import {
 } from "@/components/ui/select";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import type { InventoryItemEntity } from "@/services/inventory/type";
+import {
+  formatInventoryTargetGroups,
+  getInventoryAvailable,
+  getInventoryTotal,
+  getInventoryTotalReserved,
+} from "@/services/inventory/utils";
 import { vi } from "date-fns/locale";
 import {
   X,
@@ -44,7 +50,6 @@ import {
   Phone,
   EnvelopeSimple,
   Package,
-  ChartBar,
   NavigationArrow,
   ShareNetwork,
   BookmarkSimple,
@@ -164,11 +169,6 @@ function formatLastUpdated(dateStr: string | null): string {
   } catch {
     return dateStr;
   }
-}
-
-function formatDateTimeLocal(date: Date): string {
-  const offsetMs = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
 function formatDateTimeVi(date: Date): string {
@@ -1156,7 +1156,7 @@ function AssemblyPointDetails({
               icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
               label={showScheduleForm ? "Ẩn triệu tập" : "Triệu tập mới"}
               color="text-[#FF5722]"
-              active={showScheduleForm}
+              active={!hasActiveEvent && showScheduleForm}
               onClick={() => setShowScheduleForm((prev) => !prev)}
             />
           )}
@@ -1523,7 +1523,15 @@ function AssemblyDateTimePicker({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) {
+          setDraft(value ?? getMinimumGatheringDate());
+        }
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"

@@ -1,99 +1,112 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRouter } from "next/navigation";
+import { ArrowRight, CheckCircle, Gear, Warning, Wrench } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import {
-  Warning,
-  ArrowRight,
-  Stethoscope,
-  ForkKnife,
-  Drop,
-  Wrench,
-  Tent,
-  TShirt,
-  TrendDown,
-  Gear,
-  CheckCircle,
-} from "@phosphor-icons/react";
 import { useMyDepotLowStock } from "@/services/inventory/hooks";
-import type { LowStockItem } from "@/services/inventory/type";
-import { useRouter } from "next/navigation";
-
-// Map categoryName (Vietnamese) → icon
-const categoryIconMap: Record<string, React.ReactNode> = {
-  "Y tế": <Stethoscope className="h-4 w-4" weight="fill" />,
-  Medical: <Stethoscope className="h-4 w-4" weight="fill" />,
-  "Thực phẩm": <ForkKnife className="h-4 w-4" weight="fill" />,
-  Food: <ForkKnife className="h-4 w-4" weight="fill" />,
-  "Nước uống": <Drop className="h-4 w-4" weight="fill" />,
-  Water: <Drop className="h-4 w-4" weight="fill" />,
-  "Công cụ sửa chữa": <Wrench className="h-4 w-4" weight="fill" />,
-  RepairTools: <Wrench className="h-4 w-4" weight="fill" />,
-  "Thiết bị cứu hộ": <Wrench className="h-4 w-4" weight="fill" />,
-  RescueEquipment: <Wrench className="h-4 w-4" weight="fill" />,
-  "Nơi trú ẩn": <Tent className="h-4 w-4" weight="fill" />,
-  Shelter: <Tent className="h-4 w-4" weight="fill" />,
-  "Quần áo": <TShirt className="h-4 w-4" weight="fill" />,
-  Clothing: <TShirt className="h-4 w-4" weight="fill" />,
-};
-
-function getIcon(item: LowStockItem) {
-  return categoryIconMap[item.categoryName] ?? <Wrench className="h-4 w-4" weight="fill" />;
-}
+import {
+  compareLowStockItems,
+  getLowStockSeverityRatio,
+  getLowStockWarningLabel,
+  getLowStockWarningLevel,
+  getResolvedThresholdScopeLabel,
+  getWarningLevelPriority,
+} from "@/services/inventory/utils";
 
 const MAX_VISIBLE = 5;
+
+const WARNING_LEVEL_COLORS: Record<string, string> = {
+  CRITICAL: "bg-red-100 text-red-700",
+  HIGH: "bg-orange-100 text-orange-700",
+  MEDIUM: "bg-amber-100 text-amber-700",
+  LOW: "bg-yellow-100 text-yellow-700",
+  OK: "bg-emerald-100 text-emerald-700",
+  UNCONFIGURED: "bg-slate-100 text-slate-700",
+};
+
+function getContainerTone(level: string): string {
+  switch (level) {
+    case "CRITICAL":
+      return "border-red-200 bg-red-50";
+    case "HIGH":
+      return "border-orange-200 bg-orange-50";
+    case "MEDIUM":
+      return "border-amber-200 bg-amber-50";
+    case "LOW":
+      return "border-yellow-200 bg-yellow-50";
+    default:
+      return "border-slate-200 bg-slate-50";
+  }
+}
 
 const LowStockAlerts = () => {
   const router = useRouter();
   const { data: lowStock, isLoading } = useMyDepotLowStock();
 
-  const items = lowStock?.items ?? [];
-  const dangerCount = lowStock?.summary?.dangerCount ?? 0;
-  const warningCount = lowStock?.summary?.warningCount ?? 0;
+  const items = (lowStock?.items ?? [])
+    .filter((item) => getLowStockWarningLevel(item) !== "OK")
+    .sort(compareLowStockItems);
 
-  // Sort: Danger first, then by availableRatio ascending
-  const sorted = [...items].sort((a, b) => {
-    if (a.alertLevel === "Danger" && b.alertLevel !== "Danger") return -1;
-    if (a.alertLevel !== "Danger" && b.alertLevel === "Danger") return 1;
-    return a.availableRatio - b.availableRatio;
-  });
+  const levelCounts = items.reduce<Record<string, number>>((acc, item) => {
+    const level = getLowStockWarningLevel(item);
+    acc[level] = (acc[level] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const highlightedLevels: string[] = Object.keys(levelCounts)
+    .sort(
+      (left, right) =>
+        getWarningLevelPriority(left) - getWarningLevelPriority(right),
+    )
+    .slice(0, 2);
 
   const navigateToFull = () => {
     router.push("/dashboard/inventory/threshold-config?tab=lowstock");
   };
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="flex h-full flex-col">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Warning className="h-5 w-5 text-red-500" weight="fill" />
             Cảnh Báo Tồn Kho
           </CardTitle>
-          <div className="flex items-center gap-2">
-            {dangerCount > 0 && (
-              <Badge variant="destructive" className="text-xs">
-                {dangerCount} nghiêm trọng
+          <div className="flex flex-wrap items-center gap-2">
+            {highlightedLevels.map((level) => (
+              <Badge
+                key={level}
+                className={cn(
+                  "border-0 text-xs shadow-none",
+                  WARNING_LEVEL_COLORS[level] ?? "bg-slate-100 text-slate-700",
+                )}
+              >
+                {levelCounts[level]} {getLowStockWarningLabel(level)}
               </Badge>
-            )}
-            {warningCount > 0 && (
-              <Badge variant="warning" className="text-xs">
-                {warningCount} sắp hết
+            ))}
+            {items.length > 0 ? (
+              <Badge variant="secondary" className="text-xs">
+                {items.length} mục
               </Badge>
-            )}
+            ) : null}
           </div>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 p-0">
+
+      <CardContent className="flex flex-1 flex-col p-0">
         {isLoading ? (
-          <div className="px-6 space-y-3 py-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-lg border">
-                <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+          <div className="space-y-3 px-6 py-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-3 rounded-lg border p-3"
+              >
+                <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-3 w-1/2" />
@@ -101,111 +114,117 @@ const LowStockAlerts = () => {
               </div>
             ))}
           </div>
-        ) : sorted.length > 0 ? (
+        ) : items.length > 0 ? (
           <ScrollArea className="h-85 px-6">
             <div className="space-y-2 pb-4">
-              {sorted.slice(0, MAX_VISIBLE).map((item) => {
-                const isDanger = item.alertLevel === "Danger";
-                const pct = Math.round(item.availableRatio * 100);
-                const needsAmount = item.quantity - item.availableQuantity;
+              {items.slice(0, MAX_VISIBLE).map((item) => {
+                const level = getLowStockWarningLevel(item);
+                const severity = getLowStockSeverityRatio(item);
+                const shortage =
+                  item.minimumThreshold != null
+                    ? Math.max(item.minimumThreshold - item.availableQuantity, 0)
+                    : null;
 
                 return (
                   <div
-                    key={`${item.depotId}-${item.itemModelId}`}
+                    key={`${item.depotId ?? "my"}-${item.itemModelId}`}
                     onClick={navigateToFull}
                     className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all hover:shadow-md",
-                      isDanger
-                        ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800"
-                        : "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800",
+                      "cursor-pointer rounded-lg border p-3 transition-all hover:shadow-md",
+                      getContainerTone(level),
                     )}
                   >
-                    {/* Icon */}
-                    <div
-                      className={cn(
-                        "p-2 rounded-lg shrink-0",
-                        isDanger ? "bg-red-500/20" : "bg-orange-500/20",
-                      )}
-                    >
-                      {getIcon(item)}
-                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="shrink-0 rounded-lg bg-white/80 p-2">
+                        <Wrench className="h-4 w-4 text-current" weight="fill" />
+                      </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <h4 className="font-medium text-sm truncate">
-                          {item.itemModelName}
-                        </h4>
-                        <Badge
-                          variant={isDanger ? "destructive" : "warning"}
-                          className="shrink-0 text-xs"
-                        >
-                          {isDanger ? "Cực Kỳ Thiếu" : "Sắp Hết"}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-xs text-muted-foreground">
-                          {item.categoryName}
-                        </span>
-                        <span
-                          className={cn(
-                            "text-xs font-medium",
-                            isDanger ? "text-red-600" : "text-orange-600",
-                          )}
-                        >
-                          {item.availableQuantity} / {item.quantity} {item.unit} ({pct}%)
-                        </span>
-                      </div>
-                      {needsAmount > 0 && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <TrendDown
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="truncate text-sm font-medium">
+                            {item.itemModelName}
+                          </h4>
+                          <Badge
                             className={cn(
-                              "h-3 w-3",
-                              isDanger ? "text-red-500" : "text-orange-500",
+                              "border-0 text-xs shadow-none",
+                              WARNING_LEVEL_COLORS[level] ??
+                                "bg-slate-100 text-slate-700",
                             )}
-                          />
-                          <span className="text-xs text-muted-foreground">
-                            Đã giữ: <strong>{item.reservedQuantity} {item.unit}</strong>
+                          >
+                            {getLowStockWarningLabel(level)}
+                          </Badge>
+                        </div>
+
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <span className="truncate text-xs text-muted-foreground">
+                            {item.categoryName ?? "Chưa rõ danh mục"}
+                          </span>
+                          <span className="text-xs font-medium">
+                            Khả dụng {item.availableQuantity}
+                            {item.minimumThreshold != null
+                              ? ` / Ngưỡng ${item.minimumThreshold}`
+                              : ""}
                           </span>
                         </div>
-                      )}
-                    </div>
 
-                    {/* Arrow */}
-                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span className="truncate">
+                            {getResolvedThresholdScopeLabel(
+                              item.resolvedThresholdScope,
+                            )}
+                            {item.isUsingGlobalDefault
+                              ? " · mặc định hệ thống"
+                              : ""}
+                          </span>
+                          <span>
+                            {item.minimumThreshold != null
+                              ? `ratio ${severity.toFixed(2)}`
+                              : "chưa cấu hình ngưỡng"}
+                          </span>
+                        </div>
+
+                        {shortage != null ? (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Thiếu <strong>{shortage}</strong> để đạt ngưỡng tối
+                            thiểu
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+                    </div>
                   </div>
                 );
               })}
             </div>
           </ScrollArea>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center py-8">
-            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-4">
+          <div className="flex h-full flex-col items-center justify-center py-8 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <CheckCircle className="h-8 w-8 text-green-500" weight="fill" />
             </div>
-            <h3 className="font-medium text-lg">Tuyệt vời!</h3>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h3 className="text-lg font-medium">Tuyệt vời!</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
               Tất cả mặt hàng đều đủ tồn kho
             </p>
           </div>
         )}
 
-        {/* Footer: xem tất cả + cấu hình */}
-        <div className="px-4 pt-2 border-t flex gap-2">
-          {sorted.length > MAX_VISIBLE && (
+        <div className="flex gap-2 border-t px-4 pt-2">
+          {items.length > MAX_VISIBLE ? (
             <Button variant="outline" className="flex-1" onClick={navigateToFull}>
               Xem tất cả ({items.length} mặt hàng)
-              <ArrowRight className="h-4 w-4 ml-2" />
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-          )}
+          ) : null}
           <Button
             variant="ghost"
-            size={sorted.length > MAX_VISIBLE ? "icon" : "default"}
-            className={cn(sorted.length <= MAX_VISIBLE && "w-full gap-1.5")}
+            size={items.length > MAX_VISIBLE ? "icon" : "default"}
+            className={cn(items.length <= MAX_VISIBLE && "w-full gap-1.5")}
             onClick={() => router.push("/dashboard/inventory/threshold-config")}
           >
             <Gear className="h-4 w-4" />
-            {sorted.length <= MAX_VISIBLE && "Cấu hình ngưỡng tồn kho"}
+            {items.length <= MAX_VISIBLE ? "Cấu hình ngưỡng tồn kho" : null}
           </Button>
         </div>
       </CardContent>

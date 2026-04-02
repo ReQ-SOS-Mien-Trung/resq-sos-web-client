@@ -55,6 +55,19 @@ export interface NotificationListResponse {
 
 export type NotificationRealtimePayload = UserNotificationItem;
 
+export interface BroadcastAlertRealtimePayload {
+  title: string;
+  type: string;
+  body: string;
+  location?: {
+    city: string;
+    lat: number;
+    lon: number;
+  };
+  activeAlerts?: unknown[];
+  sentAt?: string;
+}
+
 export interface RegisterFcmTokenPayload {
   token: string;
 }

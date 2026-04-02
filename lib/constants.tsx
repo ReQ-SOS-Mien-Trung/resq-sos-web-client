@@ -356,39 +356,10 @@ export const navigationItems = [
       { icon: ChatCircle, label: "Cấu hình phòng chat", href: "/dashboard/admin/chat-config" },
     ],
   },
-    {
+  {
     icon: IdentificationCardIcon,
     label: "Quản lý điểm tập kết",
     href: "/dashboard/admin/assembly-points",
-    label: "Quản lý hồ sơ cứu hộ viên",
-    href: "/dashboard/admin/rescuer-verification",
-  },
-  {
-    icon: FadersIcon,
-    label: "Điều chỉnh tham số hệ thống",
-    href: "/dashboard/admin/config",
-  },
-  {
-    icon: CloudSun,
-    label: "Bài đăng thời tiết",
-    href: "/dashboard/admin/weather-posts",
-  },
-  {
-    icon: Drop,
-    label: "Thời tiết & Lũ lụt",
-    href: "/dashboard/admin/weather-flood",
-  },
-  { icon: ChartBar, label: "Báo cáo cứu hộ", href: "/dashboard/admin/reports" },
-
-  {
-    icon: Robot,
-    label: "Cấu hình AI Prompt",
-    href: "/dashboard/admin/ai-prompt",
-  },
-  {
-    icon: ChatCircle,
-    label: "Cấu hình phòng chat",
-    href: "/dashboard/admin/chat-config",
   },
   { icon: ChartBar, label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
   { icon: Folder, label: "Quản lý quỹ chiến dịch", href: "/dashboard/admin/campaigns" },
@@ -529,15 +500,15 @@ export const WINDY_LAYERS: {
   label: string;
   icon: React.ReactNode;
 }[] = [
-  { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
-  { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
-  {
-    id: "rain",
-    label: "Mưa",
-    icon: <Drop className="h-4 w-4" weight="fill" />,
-  },
-  { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
-];
+    { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
+    { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
+    {
+      id: "rain",
+      label: "Mưa",
+      icon: <Drop className="h-4 w-4" weight="fill" />,
+    },
+    { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
+  ];
 
 // ════════════════════════════════
 // Location Details Panel - Status Configs

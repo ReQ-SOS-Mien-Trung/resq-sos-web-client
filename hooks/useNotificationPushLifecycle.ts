@@ -10,6 +10,7 @@ import {
   clearStoredFcmRegistration,
   ensureNotificationServiceWorker,
   getBrowserFcmToken,
+  getFirebaseMessagingForForeground,
   getStoredFcmRegistration,
   isFcmRegistrationAbortError,
   resetNotificationServiceWorker,
@@ -25,6 +26,7 @@ export function useNotificationPushLifecycle() {
   const userId = useAuthStore((state) => state.user?.userId ?? null);
   const roleId = useAuthStore((state) => state.user?.roleId);
 
+  // ── 1. Register FCM token with backend ──
   useEffect(() => {
     let cancelled = false;
 
@@ -34,56 +36,31 @@ export function useNotificationPushLifecycle() {
         return;
       }
 
-      if (!shouldEnableNotificationPush(roleId)) {
-        return;
-      }
-
-      if (!isWebPushSupported()) {
-        return;
-      }
+      if (!shouldEnableNotificationPush(roleId)) return;
+      if (!isWebPushSupported()) return;
 
       const permission = await requestNotificationPermissionIfNeeded();
-      if (permission !== "granted") {
-        return;
-      }
+      if (permission !== "granted") return;
 
       const registration = await ensureNotificationServiceWorker();
-      if (!registration || cancelled) {
-        return;
-      }
+      if (!registration || cancelled) return;
 
       let latestToken: string | null;
 
       try {
         latestToken = await getBrowserFcmToken(registration);
       } catch (error) {
-        if (!isFcmRegistrationAbortError(error)) {
-          throw error;
-        }
+        if (!isFcmRegistrationAbortError(error)) throw error;
 
-        console.warn(
-          "FCM token registration aborted. Resetting notification service worker and retrying once.",
-        );
-
-        const recoveredRegistration = await resetNotificationServiceWorker();
-        if (!recoveredRegistration || cancelled) {
-          throw error;
-        }
-
-        latestToken = await getBrowserFcmToken(recoveredRegistration);
+        const recovered = await resetNotificationServiceWorker();
+        if (!recovered || cancelled) throw error;
+        latestToken = await getBrowserFcmToken(recovered);
       }
 
-      if (!latestToken || cancelled) {
-        return;
-      }
+      if (!latestToken || cancelled) return;
 
       const stored = getStoredFcmRegistration();
-
-      const isSameUser = stored?.userId === userId;
-      const isSameToken = stored?.token === latestToken;
-      if (isSameUser && isSameToken) {
-        return;
-      }
+      if (stored?.userId === userId && stored?.token === latestToken) return;
 
       if (stored?.token) {
         await unregisterFcmToken(stored.token).catch(() => null);
@@ -91,22 +68,66 @@ export function useNotificationPushLifecycle() {
 
       await registerFcmToken({ token: latestToken });
 
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
 
-      setStoredFcmRegistration({
-        token: latestToken,
-        userId,
-      });
+      setStoredFcmRegistration({ token: latestToken, userId });
     }
 
-    void syncPushToken().catch((error) => {
-      console.error("Failed to sync FCM token:", error);
-    });
+    void syncPushToken().catch(() => null);
 
     return () => {
       cancelled = true;
     };
   }, [accessToken, isAuthenticated, roleId, userId]);
+
+  // ── 2. Firebase onMessage() — show OS notification when tab is active ──
+  useEffect(() => {
+    if (!isAuthenticated || !shouldEnableNotificationPush(roleId)) return;
+
+    let unsubscribe: (() => void) | null = null;
+
+    async function setup() {
+      const messaging = await getFirebaseMessagingForForeground();
+      if (!messaging) return;
+
+      const { onMessage } = await import("firebase/messaging");
+
+      unsubscribe = onMessage(messaging, (payload) => {
+        if (Notification.permission !== "granted") return;
+
+        const notification =
+          payload.notification ??
+          (payload.data as Record<string, string> | undefined);
+        const title = notification?.title ?? "Thông báo mới từ RESQ";
+        const body =
+          (notification as Record<string, string> | undefined)?.body ?? "";
+
+        navigator.serviceWorker?.ready
+          .then((reg) =>
+            reg.showNotification(title, {
+              body: body || undefined,
+              icon: "/icons/logo.svg",
+              tag: `fcm-${Date.now()}`,
+              requireInteraction: true,
+            } as NotificationOptions),
+          )
+          .catch(() => {
+            try {
+              new Notification(title, {
+                body: body || undefined,
+                icon: "/icons/logo.svg",
+              });
+            } catch {
+              // ignore
+            }
+          });
+      });
+    }
+
+    void setup().catch(() => null);
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [isAuthenticated, roleId]);
 }

@@ -47,11 +47,11 @@ import {
   LowStockAlerts,
   RecentActivity,
   SupplyRequestSection,
-  SupplyRequestTracker,
 } from "@/components/inventory";
-import IncomingRequestsSection from "@/components/inventory/IncomingRequestsSection";
+import SupplyRequestManagement from "@/components/inventory/SupplyRequestManagement";
 import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
+import SupplyRequestTracker from "@/components/inventory/SupplyRequestTracker";
 import {
   InventoryItemEntity,
   SupplyRequestListItem,
@@ -247,14 +247,11 @@ const InventoryDashboardPage = () => {
   const [vatTuSelectedItem, setVatTuSelectedItem] =
     useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
+  const [requestsPageNumber, setRequestsPageNumber] = useState(1);
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
   const mainRef = useRef<HTMLElement>(null);
   const panelWidthRef = useRef(480);
-  const [requestsPageNumber, setRequestsPageNumber] = useState(1);
-  const requestsPageSize = 8;
-  const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
-  const [trackerOpen, setTrackerOpen] = useState(false);
 
   const router = useRouter();
 
@@ -355,12 +352,21 @@ const InventoryDashboardPage = () => {
     isFetching: isAllRequestsFetching,
     refetch: refetchAllRequests,
   } = useSupplyRequests(
-    { pageNumber: requestsPageNumber, pageSize: requestsPageSize },
-    {
-      enabled: activeTab === "shipments",
-      refetchInterval: 10_000,
-      refetchOnWindowFocus: true,
-    },
+    { pageNumber: requestsPageNumber, pageSize: 10 },
+    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+  );
+
+  const canPrevRequestsPage = requestsPageNumber > 1;
+  const canNextRequestsPage =
+    requestsPageNumber < (allRequestsPagedData?.totalPages ?? 1);
+
+  const [trackerOpen, setTrackerOpen] = useState(false);
+  const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
+  const trackerRequest = useMemo(
+    () =>
+      allRequestsPagedData?.items?.find((r) => r.id === trackerRequestId) ??
+      null,
+    [allRequestsPagedData, trackerRequestId],
   );
 
   // Use the first depot as the current managed depot
@@ -436,22 +442,6 @@ const InventoryDashboardPage = () => {
     [quantityByCategoryData],
   );
 
-  // Find the live request from sidebar or table data for the tracker
-  const trackerRequest = useMemo(() => {
-    if (trackerRequestId === null) return null;
-    return (
-      supplyRequestsData?.items?.find((r) => r.id === trackerRequestId) ??
-      allRequestsPagedData?.items?.find((r) => r.id === trackerRequestId) ??
-      null
-    );
-  }, [trackerRequestId, supplyRequestsData, allRequestsPagedData]);
-
-  const canPrevRequestsPage =
-    allRequestsPagedData?.hasPreviousPage ?? requestsPageNumber > 1;
-  const canNextRequestsPage =
-    allRequestsPagedData?.hasNextPage ??
-    (allRequestsPagedData?.items?.length ?? 0) >= requestsPageSize;
-
   // ── Compute stats (will use real item APIs when available) ──
   const stats = useMemo<IInventoryStats>(
     () =>
@@ -483,8 +473,10 @@ const InventoryDashboardPage = () => {
   }, []);
 
   const handleRefresh = useCallback(() => {
-    window.location.reload();
-  }, []);
+    refetchDepots();
+    refetchCategories();
+    refetchQuantityByCategory();
+  }, [refetchDepots, refetchCategories, refetchQuantityByCategory]);
 
   // ── Loading state ──
   if (isDepotsLoading || isCategoriesLoading || isSupplyRequestsLoading) {
@@ -752,8 +744,8 @@ const InventoryDashboardPage = () => {
         {/* Main Content */}
         <main ref={mainRef} className="flex-1 overflow-auto bg-muted/30">
           <div className="p-6 space-y-6">
-            {/* Page Title — hidden on incoming tab (it has its own header) */}
-            {activeTab !== "incoming" && (
+            {/* Page Title — hidden on supply-management tab (it has its own header) */}
+            {activeTab !== "supply-management" && (
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-2xl font-semibold tracking-tighter">
@@ -783,8 +775,8 @@ const InventoryDashboardPage = () => {
               </div>
             )}
 
-            {activeTab === "incoming" ? (
-              <IncomingRequestsSection />
+            {activeTab === "supply-management" ? (
+              <SupplyRequestManagement />
             ) : activeTab === "vattu" ? (
               <VatTuSection
                 onItemSelect={(item) => {
