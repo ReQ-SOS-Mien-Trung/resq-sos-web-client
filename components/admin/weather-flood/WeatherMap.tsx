@@ -3,10 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowsCounterClockwise,
-  MapPin,
   WarningCircle,
 } from "@phosphor-icons/react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WINDY_LAYERS } from "@/lib/constants";
@@ -189,53 +187,42 @@ export default function WeatherMap({
   }
 
   return (
-    <Card className="border border-border/50">
-      <CardHeader>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-red-500" />
-              Bản đồ thời tiết miền Trung & Lũ lụt
-            </CardTitle>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRefreshWeather}
-            disabled={weatherLoading}
-            className="gap-2"
-            title="Tải lại dữ liệu WeatherAPI"
-          >
-            <ArrowsCounterClockwise
-              className={weatherLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"}
-            />
-            Tải lại dữ liệu
-          </Button>
-        </div>
-      </CardHeader>
+    <div>
+      <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <Tabs
+          value={activeLayer}
+          onValueChange={(value) => setActiveLayer(value as WeatherLayer)}
+        >
+          <TabsList className="grid h-auto w-full grid-cols-4 rounded-xl bg-muted/40 p-1 lg:w-auto">
+            {WINDY_LAYERS.map((layer) => (
+              <TabsTrigger
+                key={layer.id}
+                value={layer.id}
+                className="gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold"
+              >
+                {layer.icon}
+                <span className="hidden sm:inline">{layer.label}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
-      <CardContent>
-        <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <Tabs
-            value={activeLayer}
-            onValueChange={(value) => setActiveLayer(value as WeatherLayer)}
-          >
-            <TabsList className="grid h-auto w-full grid-cols-4 rounded-xl bg-muted/40 p-1 lg:w-auto">
-              {WINDY_LAYERS.map((layer) => (
-                <TabsTrigger
-                  key={layer.id}
-                  value={layer.id}
-                  className="gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold"
-                >
-                  {layer.icon}
-                  <span className="hidden sm:inline">{layer.label}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefreshWeather}
+          disabled={weatherLoading}
+          className="gap-2"
+          title="Tải lại dữ liệu WeatherAPI"
+        >
+          <ArrowsCounterClockwise
+            className={weatherLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+          />
+          Tải lại dữ liệu
+        </Button>
+      </div>
 
-        <div className="relative h-[640px] overflow-hidden rounded-xl border border-border/60 bg-slate-100">
+        <div className="relative h-105 overflow-hidden rounded-xl border border-border/60 bg-slate-100">
           <div id="windy" className="h-full w-full" />
 
           {!isMapReady && !effectiveWindyError && (
@@ -267,21 +254,6 @@ export default function WeatherMap({
             </div>
           )}
         </div>
-
-        {weatherError && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50/50 p-3 text-sm">
-            <WarningCircle className="mt-0.5 h-4 w-4 text-rose-600" />
-            <div className="text-rose-800">
-              Không lấy được dữ liệu WeatherAPI: {weatherError}
-              <div className="mt-1 text-xs text-rose-700/80">
-                Marker thời tiết sẽ không hiển thị cho đến khi WeatherAPI hoạt
-                động lại. Bạn vẫn có thể xem nền bản đồ Windy nếu
-                `NEXT_PUBLIC_WINDY_API_KEY` đã được cấu hình.
-              </div>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    </div>
   );
 }

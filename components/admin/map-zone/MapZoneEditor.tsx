@@ -4,7 +4,6 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import { useEffect, useRef } from "react";
 import L from "leaflet";
-import "leaflet-draw";
 import type { Coordinate, ServiceZoneEntity } from "@/services/map/type";
 
 // ─── Props ───
@@ -108,7 +107,8 @@ export default function MapZoneEditor({
 
     applyI18n();
 
-    // HMR safety: clear any stale _leaflet_id left on the DOM node
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require("leaflet-draw");
     if ((container as any)._leaflet_id != null) {
       delete (container as any)._leaflet_id;
     }
@@ -128,7 +128,8 @@ export default function MapZoneEditor({
     fg.addTo(map);
     featureGroupRef.current = fg;
 
-    const drawControl = new L.Control.Draw({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const drawControl = new (L.Control as any).Draw({
       position: "topright",
       edit: { featureGroup: fg },
       draw: {

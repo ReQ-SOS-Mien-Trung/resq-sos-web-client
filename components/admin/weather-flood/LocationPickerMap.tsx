@@ -71,9 +71,16 @@ export default function LocationPickerMap({
   onPick,
   heightClassName = "h-64",
 }: LocationPickerMapProps) {
+  const [mounted, setMounted] = useState(false);
   const [cssReady, setCssReady] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
     const existingLink = document.querySelector('link[href*="leaflet.css"]');
     if (existingLink) {
       setCssReady(true);
@@ -87,7 +94,7 @@ export default function LocationPickerMap({
     link.crossOrigin = "";
     link.onload = () => setCssReady(true);
     document.head.appendChild(link);
-  }, []);
+  }, [mounted]);
 
   const hasMarker =
     lat !== undefined &&
@@ -98,7 +105,7 @@ export default function LocationPickerMap({
   const center: [number, number] = hasMarker ? [lat, lon] : DEFAULT_CENTER;
   const zoom = hasMarker ? 13 : DEFAULT_ZOOM;
 
-  if (!cssReady) {
+  if (!mounted || !cssReady) {
     return (
       <div
         className={`w-full animate-pulse rounded-xl border border-border/60 bg-muted/30 ${heightClassName}`}
