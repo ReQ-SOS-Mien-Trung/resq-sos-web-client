@@ -24,6 +24,8 @@ export function PwaInstallBanner() {
 
     const handler = (e: Event) => {
       e.preventDefault();
+      // Re-check: user may have dismissed after the effect ran
+      if (localStorage.getItem(DISMISSED_KEY)) return;
       setInstallPrompt(e as BeforeInstallPromptEvent);
       setShowBanner(true);
     };
