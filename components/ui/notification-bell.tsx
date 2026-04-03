@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -136,6 +136,8 @@ export function NotificationBell({
   const roleId = useAuthStore((state) => state.user?.roleId);
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(0);
+  const [isRinging, setIsRinging] = useState(false);
+  const prevIdsRef = useRef<Set<number>>(new Set());
 
   const {
     notifications,
@@ -153,6 +155,36 @@ export function NotificationBell({
     page * PAGE_SIZE,
     page * PAGE_SIZE + PAGE_SIZE,
   );
+
+  // ── Detect new notifications → ring + sound ──
+  useEffect(() => {
+    if (notifications.length === 0) return;
+
+    const currentIds = new Set(notifications.map((n) => n.userNotificationId));
+    const prevIds = prevIdsRef.current;
+
+    // First load: just record IDs, don't ring yet
+    if (prevIds.size === 0) {
+      prevIdsRef.current = currentIds;
+      return;
+    }
+
+    const hasNew = notifications.some((n) => !prevIds.has(n.userNotificationId));
+    if (hasNew) {
+      setIsRinging(true);
+      setTimeout(() => setIsRinging(false), 950);
+
+      try {
+        const audio = new Audio("/sounds/notification.mp3");
+        audio.volume = 0.6;
+        void audio.play().catch(() => null);
+      } catch {
+        // ignore autoplay policy errors
+      }
+    }
+
+    prevIdsRef.current = currentIds;
+  }, [notifications]);
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
@@ -193,7 +225,10 @@ export function NotificationBell({
           aria-label="Mở bảng thông báo"
         >
           {unreadCount > 0 ? (
-            <BellRinging className="h-5 w-5" weight="duotone" />
+            <BellRinging
+              className={cn("h-5 w-5", isRinging && "bell-ring")}
+              weight="duotone"
+            />
           ) : (
             <Bell className="h-5 w-5" />
           )}

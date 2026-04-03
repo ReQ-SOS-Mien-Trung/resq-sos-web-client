@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,147 +26,167 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-type PriorityField = "urgentMinutes" | "highMinutes" | "mediumMinutes";
+const MAX_MINUTES = 60;
+const MIN_GAP = 1; // handles must be at least this far apart
 
-const SLIDER_MAX = 240; // 4 hours max
+type Handle = "urgentMinutes" | "highMinutes" | "mediumMinutes";
 
-const PRIORITY_FIELDS: {
-  key: PriorityField;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatMinutes(m: number): string {
+  if (m < 60) return `${m} phút`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem > 0 ? `${h}h ${rem}p` : `${h} giờ`;
+}
+
+function pct(value: number): number {
+  return (value / MAX_MINUTES) * 100;
+}
+
+// ─── Metadata ─────────────────────────────────────────────────────────────────
+
+const HANDLES: {
+  key: Handle;
   label: string;
-  description: string;
-  icon: typeof Lightning;
+  sub: string;
+  Icon: typeof Lightning;
   iconWeight: "fill" | "bold";
   color: string;
-  textColor: string;
-  bg: string;
-  sliderTrack: string;
-  sliderThumb: string;
+  fillClass: string;
+  badgeClass: string;
+  borderClass: string;
+  ringColor: string;
 }[] = [
     {
       key: "urgentMinutes",
       label: "Urgent",
-      description: "Khẩn cấp",
-      icon: Lightning,
+      sub: "Khẩn cấp",
+      Icon: Lightning,
       iconWeight: "fill",
-      color: "text-red-600 dark:text-red-400",
-      textColor: "text-red-700 dark:text-red-300",
-      bg: "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800",
-      sliderTrack: "bg-red-500",
-      sliderThumb:
-        "border-red-500 bg-white shadow-[0_0_0_3px_rgba(239,68,68,0.2)] hover:shadow-[0_0_0_5px_rgba(239,68,68,0.25)]",
+      color: "text-red-600",
+      fillClass: "bg-red-500",
+      badgeClass: "bg-red-100 text-red-700 border-red-200",
+      borderClass: "border-red-500",
+      ringColor: "rgba(239,68,68,0.3)",
     },
     {
       key: "highMinutes",
       label: "High",
-      description: "Cao",
-      icon: Warning,
+      sub: "Cao",
+      Icon: Warning,
       iconWeight: "fill",
-      color: "text-amber-600 dark:text-amber-400",
-      textColor: "text-amber-700 dark:text-amber-300",
-      bg: "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800",
-      sliderTrack: "bg-amber-400",
-      sliderThumb:
-        "border-amber-400 bg-white shadow-[0_0_0_3px_rgba(251,191,36,0.2)] hover:shadow-[0_0_0_5px_rgba(251,191,36,0.25)]",
+      color: "text-amber-600",
+      fillClass: "bg-amber-400",
+      badgeClass: "bg-amber-100 text-amber-700 border-amber-200",
+      borderClass: "border-amber-400",
+      ringColor: "rgba(251,191,36,0.3)",
     },
     {
       key: "mediumMinutes",
       label: "Medium",
-      description: "Bình thường",
-      icon: Timer,
+      sub: "Bình thường",
+      Icon: Timer,
       iconWeight: "bold",
-      color: "text-sky-600 dark:text-sky-400",
-      textColor: "text-sky-700 dark:text-sky-300",
-      bg: "bg-sky-50 border-sky-200 dark:bg-sky-950/20 dark:border-sky-800",
-      sliderTrack: "bg-sky-400",
-      sliderThumb:
-        "border-sky-400 bg-white shadow-[0_0_0_3px_rgba(56,189,248,0.2)] hover:shadow-[0_0_0_5px_rgba(56,189,248,0.25)]",
+      color: "text-sky-500",
+      fillClass: "bg-sky-400",
+      badgeClass: "bg-sky-100 text-sky-700 border-sky-200",
+      borderClass: "border-sky-400",
+      ringColor: "rgba(56,189,248,0.3)",
     },
   ];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatMinutes(minutes: number): string {
-  if (minutes < 60) return `${minutes} phút`;
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return mins > 0 ? `${hours}h ${mins}p` : `${hours} giờ`;
-}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function SupplyRequestPriorityConfigCard() {
-  const {
-    data: serverData,
-    isLoading,
-    refetch,
-  } = useSupplyRequestPriorityConfig();
+  const { data: serverData, isLoading, refetch } = useSupplyRequestPriorityConfig();
   const mutation = useUpdateSupplyRequestPriorityConfig();
 
-  const [overrides, setOverrides] = useState<
-    Partial<Record<PriorityField, number>>
-  >({});
+  const server = useMemo(() => ({
+    urgentMinutes: Math.min(serverData?.urgentMinutes ?? 10, MAX_MINUTES - 2),
+    highMinutes: Math.min(serverData?.highMinutes ?? 20, MAX_MINUTES - 1),
+    mediumMinutes: Math.min(serverData?.mediumMinutes ?? 30, MAX_MINUTES),
+  }), [serverData]);
 
-  const effectiveValues = useMemo(
-    () => ({
-      urgentMinutes: serverData?.urgentMinutes ?? 10,
-      highMinutes: serverData?.highMinutes ?? 30,
-      mediumMinutes: serverData?.mediumMinutes ?? 120,
-    }),
-    [serverData],
-  );
+  const [vals, setVals] = useState<{ urgentMinutes: number; highMinutes: number; mediumMinutes: number } | null>(null);
 
-  const getValue = (key: PriorityField): number =>
-    overrides[key] ?? effectiveValues[key];
+  // Sync from server when loaded for first time
+  const effective = vals ?? server;
 
-  const handleSliderChange = (key: PriorityField, value: number) => {
-    setOverrides((prev) => ({ ...prev, [key]: value }));
-  };
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef<Handle | null>(null);
+  const isDirty = vals !== null;
 
-  const validate = (): string | null => {
-    const urgent = getValue("urgentMinutes");
-    const high = getValue("highMinutes");
-    const medium = getValue("mediumMinutes");
-    if (urgent <= 0) return "Urgent phải lớn hơn 0";
-    if (high <= urgent) return "High phải lớn hơn Urgent";
-    if (medium <= high) return "Medium phải lớn hơn High";
-    return null;
+  const getMinutes = useCallback((clientX: number): number => {
+    if (!trackRef.current) return 0;
+    const rect = trackRef.current.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return Math.round(ratio * MAX_MINUTES);
+  }, []);
+
+  const onPointerMove = useCallback((e: PointerEvent) => {
+    if (!dragging.current) return;
+    const raw = getMinutes(e.clientX);
+    const handle = dragging.current;
+
+    setVals((prev) => {
+      const cur = prev ?? server;
+      const u = cur.urgentMinutes;
+      const h = cur.highMinutes;
+      const m = cur.mediumMinutes;
+
+      if (handle === "urgentMinutes") {
+        return { ...cur, urgentMinutes: Math.min(Math.max(1, raw), h - MIN_GAP) };
+      }
+      if (handle === "highMinutes") {
+        return { ...cur, highMinutes: Math.min(Math.max(u + MIN_GAP, raw), m - MIN_GAP) };
+      }
+      // mediumMinutes
+      return { ...cur, mediumMinutes: Math.min(Math.max(h + MIN_GAP, raw), MAX_MINUTES) };
+    });
+  }, [getMinutes, server]);
+
+  const onPointerUp = useCallback(() => {
+    dragging.current = null;
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [onPointerMove, onPointerUp]);
+
+  const startDrag = (handle: Handle) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    dragging.current = handle;
   };
 
   const handleSave = () => {
-    const err = validate();
-    if (err) {
-      toast.error(err);
-      return;
-    }
-
-    const payload = {
-      urgentMinutes: getValue("urgentMinutes"),
-      highMinutes: getValue("highMinutes"),
-      mediumMinutes: getValue("mediumMinutes"),
-    };
-
-    const toastId = toast.loading("Đang lưu cấu hình thời gian tiếp tế...");
-    mutation.mutate(payload, {
+    const toastId = toast.loading("Đang lưu cấu hình...");
+    mutation.mutate(effective, {
       onSuccess: async () => {
         toast.dismiss(toastId);
-        toast.success("Cập nhật cấu hình thời gian tiếp tế thành công");
-        setOverrides({});
+        toast.success("Cập nhật thành công");
+        setVals(null);
         await refetch();
       },
       onError: (err: any) => {
         toast.dismiss(toastId);
-        toast.error(
-          `Lỗi: ${err?.response?.data?.message ?? err?.message ?? "Không xác định"}`,
-        );
+        toast.error(`Lỗi: ${err?.response?.data?.message ?? "Không xác định"}`);
       },
     });
   };
 
-  const handleReset = () => {
-    setOverrides({});
-  };
+  const u = effective.urgentMinutes;
+  const h = effective.highMinutes;
+  const m = effective.mediumMinutes;
 
-  const isDirty = Object.keys(overrides).length > 0;
+  const uPct = pct(u);
+  const hPct = pct(h);
+  const mPct = pct(m);
 
   return (
     <Card className="border-border/60">
@@ -178,14 +198,14 @@ export function SupplyRequestPriorityConfigCard() {
               Thời gian tiếp tế theo mức độ ưu tiên
             </CardTitle>
             <CardDescription className="tracking-tighter text-sm mt-0.5">
-              Kéo thanh trượt để điều chỉnh thời gian phản hồi (phút) cho từng mức.
+              Kéo từng điểm mốc trên thanh. Tối đa <strong>60 phút</strong>.
+              Thứ tự luôn: Urgent &lt; High &lt; Medium.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
+              variant="outline" size="sm"
+              onClick={() => setVals(null)}
               disabled={isLoading || mutation.isPending || !isDirty}
             >
               <ArrowCounterClockwise size={13} className="mr-1.5" />
@@ -196,114 +216,115 @@ export function SupplyRequestPriorityConfigCard() {
               onClick={handleSave}
               disabled={isLoading || mutation.isPending || !isDirty}
             >
-              {mutation.isPending ? (
-                <SpinnerGap size={13} className="mr-1.5 animate-spin" />
-              ) : (
-                <FloppyDisk size={13} className="mr-1.5" />
-              )}
+              {mutation.isPending
+                ? <SpinnerGap size={13} className="mr-1.5 animate-spin" />
+                : <FloppyDisk size={13} className="mr-1.5" />}
               Lưu
             </Button>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {PRIORITY_FIELDS.map((field) => {
-          const Icon = field.icon;
-          const value = getValue(field.key);
-          const pct = Math.min((value / SLIDER_MAX) * 100, 100);
+      <CardContent className="space-y-6">
 
-          return (
-            <div
-              key={field.key}
-              className={`rounded-xl border px-5 py-4 transition-all ${field.bg}`}
-            >
-              {/* Header row */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2.5">
-                  <Icon
-                    size={20}
-                    weight={field.iconWeight}
-                    className={field.color}
-                  />
-                  <div>
-                    <span
-                      className={`text-sm font-bold tracking-tighter ${field.textColor}`}
-                    >
-                      {field.label} -
-                    </span>
-                    <span className={`text-sm font-bold tracking-tighter ml-1 ${field.textColor}`}>
-                      {field.description}
-                    </span>
+        {/* ── Single unified slider track ── */}
+        <div className="px-2 pt-2 pb-1 select-none">
+
+          {/* Legend rows */}
+          <div className="space-y-3 mb-8">
+            {HANDLES.map((hd) => {
+              const val = hd.key === "urgentMinutes" ? u : hd.key === "highMinutes" ? h : m;
+              const { Icon } = hd;
+              return (
+                <div key={hd.key} className="flex items-center gap-3">
+                  <div className="flex items-baseline gap-1.5 w-40 shrink-0">
+                    <Icon size={14} weight={hd.iconWeight} className={hd.color} />
+                    <span className={`text-sm font-bold tracking-tighter ${hd.color}`}>{hd.label}</span>
+                    <span className="text-xs text-muted-foreground tracking-tighter">— {hd.sub}</span>
+                  </div>
+                  <span className={`text-sm font-bold tabular-nums tracking-tighter px-2.5 py-0.5 rounded-full border ${hd.badgeClass}`}>
+                    {formatMinutes(val)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Track ── */}
+          <div
+            ref={trackRef}
+            className="relative mx-2.5 cursor-crosshair"
+            style={{ height: 48 }}
+          >
+            {/* Background rail */}
+            <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-3 rounded-full bg-muted/60 overflow-hidden">
+              {/* Zone Urgent: 0 → u */}
+              <div
+                className="absolute left-0 top-0 h-full bg-red-500 transition-all duration-75"
+                style={{ width: `${uPct}%` }}
+              />
+              {/* Zone High: u → h */}
+              <div
+                className="absolute top-0 h-full bg-amber-400 transition-all duration-75"
+                style={{ left: `${uPct}%`, width: `${hPct - uPct}%` }}
+              />
+              {/* Zone Medium: h → m */}
+              <div
+                className="absolute top-0 h-full bg-sky-400 transition-all duration-75"
+                style={{ left: `${hPct}%`, width: `${mPct - hPct}%` }}
+              />
+            </div>
+
+            {/* ── Handles (render in reverse so earlier ones stay on top) ── */}
+            {[...HANDLES].reverse().map((hd, idx) => {
+              const val = hd.key === "urgentMinutes" ? u : hd.key === "highMinutes" ? h : m;
+              const p = pct(val);
+              const { Icon } = hd;
+              const zIndex = HANDLES.length - idx; // urgent=3, high=2, medium=1
+              return (
+                <div
+                  key={hd.key}
+                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
+                  style={{ left: `${p}%`, zIndex, touchAction: "none" }}
+                  onPointerDown={startDrag(hd.key)}
+                >
+                  {/* Thumb */}
+                  <div
+                    className={`w-7 h-7 rounded-full bg-white border-2 flex items-center justify-center cursor-grab active:cursor-grabbing transition-shadow duration-150 hover:shadow-lg ${hd.borderClass}`}
+                    style={{ boxShadow: `0 0 0 3px ${hd.ringColor}` }}
+                  >
+                    <Icon size={11} weight={hd.iconWeight} className={hd.color} />
+                  </div>
+
+                  {/* Tooltip above thumb */}
+                  <div
+                    className={`absolute -top-8 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[10px] font-bold tabular-nums tracking-tighter whitespace-nowrap border ${hd.badgeClass}`}
+                  >
+                    {val}p
                   </div>
                 </div>
+              );
+            })}
+          </div>
 
-                {/* Time badge */}
-                <div
-                  className={`rounded-full px-3 py-1 text-sm font-bold tracking-tighter tabular-nums ${field.textColor} bg-white/80 dark:bg-black/20 border border-current/10`}
-                >
-                  {formatMinutes(value)}
-                </div>
-              </div>
+          {/* Time axis */}
+          <div className="flex justify-between mt-2 mx-2.5 text-[10px] tabular-nums tracking-tighter text-muted-foreground/55">
+            {[0, 10, 20, 30, 40, 50, 60].map((t) => (
+              <span key={t}>{t === 0 ? "0" : `${t}p`}</span>
+            ))}
+          </div>
+        </div>
 
-              {/* Slider */}
-              <div className="relative group">
-                {/* Track background */}
-                <div className="h-2 w-full rounded-full bg-black/[0.06] dark:bg-white/[0.08]">
-                  {/* Filled track */}
-                  <div
-                    className={`h-full rounded-full transition-all duration-75 ${field.sliderTrack}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-
-                {/* Native range input — invisible but handles all interaction */}
-                <input
-                  type="range"
-                  min={1}
-                  max={SLIDER_MAX}
-                  step={1}
-                  value={value}
-                  disabled={isLoading}
-                  onChange={(e) =>
-                    handleSliderChange(field.key, parseInt(e.target.value, 10))
-                  }
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                  style={{ margin: 0, padding: 0 }}
-                />
-
-                {/* Custom thumb */}
-                <div
-                  className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full border-[2.5px] transition-shadow duration-150 pointer-events-none ${field.sliderThumb}`}
-                  style={{ left: `calc(${pct}% - 10px)` }}
-                />
-              </div>
-
-              {/* Scale labels */}
-              <div className="flex justify-between mt-2 font-medium text-xs tabular-nums tracking-tighter">
-                <span>1p</span>
-                <span>1h</span>
-                <span>2h</span>
-                <span>3h</span>
-                <span>4h</span>
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Meta info */}
+        {/* Meta */}
         {serverData?.updatedAt && (
-          <p className="text-sm tracking-tighter pt-1">
+          <p className="text-sm tracking-tighter text-muted-foreground/70">
             Cập nhật lần cuối:{" "}
-            <strong>
+            <strong className="text-foreground/80">
               {new Date(serverData.updatedAt).toLocaleString("vi-VN")}
             </strong>
-            {serverData.updatedBy && (
-              <span>
-                {" "}
-                bởi <strong>{serverData.updatedBy}</strong>
-              </span>
-            )}
+            {/* {serverData.updatedBy && (
+              <span> bởi <strong className="text-foreground/80">{serverData.updatedBy}</strong></span>
+            )} */}
           </p>
         )}
       </CardContent>
