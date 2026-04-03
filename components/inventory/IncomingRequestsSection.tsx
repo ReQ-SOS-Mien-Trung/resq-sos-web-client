@@ -32,6 +32,7 @@ import {
 } from "@/services/inventory/hooks";
 import type { SupplyRequestListItem } from "@/services/inventory/type";
 import { SupplyRequestTracker } from "./SupplyRequestTracker";
+import { ResponseCountdown } from "./ResponseCountdown";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -594,7 +595,7 @@ function RequestCard({
   const isInTransit = request.sourceStatus === "Shipping" || request.requestingStatus === "InTransit";
 
   const topStrip = isRejected
-    ? "bg-red-400"
+    ? "bg-slate-300"
     : isDone
       ? "bg-emerald-400"
       : needsAction
@@ -617,16 +618,19 @@ function RequestCard({
       tabIndex={0}
       onClick={onViewDetail}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onViewDetail(); }}
-      className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer flex flex-col group"
+      className={cn(
+        "rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer flex flex-col group",
+        isRejected && "opacity-60 grayscale-[40%]",
+      )}
     >
       {/* ── Colored top strip ── */}
       <div className={cn("h-1 w-full shrink-0", topStrip)} />
 
       {/* ── Card body ── */}
-      <div className="p-4 flex flex-col gap-3 flex-1">
+      <div className="p-4 flex flex-col gap-2 flex-1">
 
-        {/* Row 1: Badges left | ID + time right */}
-        <div className="flex items-start justify-between gap-2">
+        {/* Row 1: Badges left | ID right */}
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className={cn("inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border tracking-tighter", roleInfo.className)}>
               {roleInfo.label}
@@ -641,12 +645,19 @@ function RequestCard({
               </span>
             )}
           </div>
-          <div className="text-right shrink-0 space-y-0.5">
-            <p className="text-xs font-bold tracking-tight">#{request.id}</p>
-            <div className="flex items-center justify-end text-xs">
-              <span className="tracking-tighter font-medium">{formattedTime}</span>
-            </div>
+          <p className="text-xs font-bold tracking-tight shrink-0">#{request.id}</p>
+        </div>
+
+        {/* Row 2: Countdown left | Created time right */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1">
+            {request.responseDeadline && !request.respondedAt ? (
+              <ResponseCountdown deadline={request.responseDeadline} />
+            ) : null}
           </div>
+          <span className="text-xs tracking-tighter font-medium text-muted-foreground shrink-0">
+            {formattedTime}
+          </span>
         </div>
 
         {/* Route pill */}

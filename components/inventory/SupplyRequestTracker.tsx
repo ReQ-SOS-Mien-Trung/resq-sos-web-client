@@ -31,6 +31,7 @@ import {
   useRejectSupplyRequest,
 } from "@/services/inventory/hooks";
 import { toast } from "sonner";
+import { ResponseCountdown } from "./ResponseCountdown";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -324,19 +325,24 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
 
         {/* ── Sticky header ── */}
         <SheetHeader className="px-6 pt-5 pb-4 border-b sticky top-0 bg-background z-10">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Truck className="h-4 w-4 text-primary" weight="fill" />
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Truck className="h-4 w-4 text-primary" weight="fill" />
+              </div>
+              <div>
+                <SheetTitle className="tracking-tighter text-base mb-0.5 leading-tight">
+                  Theo dõi yêu cầu tiếp tế
+                </SheetTitle>
+                <p className="text-sm text-muted-foreground tracking-tighter">
+                  Đơn yêu cầu số{" "}
+                  <span className="font-semibold text-foreground">{request.id}</span>
+                </p>
+              </div>
             </div>
-            <div>
-              <SheetTitle className="tracking-tighter text-base mb-0.5 leading-tight">
-                Theo dõi yêu cầu tiếp tế
-              </SheetTitle>
-              <p className="text-sm text-muted-foreground tracking-tighter">
-                Đơn yêu cầu số{" "}
-                <span className="font-semibold text-foreground">{request.id}</span>
-              </p>
-            </div>
+            {!request.respondedAt && (
+              <ResponseCountdown deadline={request.responseDeadline} />
+            )}
           </div>
         </SheetHeader>
 

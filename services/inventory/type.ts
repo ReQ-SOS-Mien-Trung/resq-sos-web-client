@@ -378,6 +378,7 @@ export interface SupplyRequestListItem {
   requestingDepotName: string;
   sourceDepotId: number;
   sourceDepotName: string;
+  priorityLevel: string | null;
   role: SupplyRequestRole;
   sourceStatus: SourceSupplyRequestStatus;
   requestingStatus: RequestingSupplyRequestStatus;
@@ -385,6 +386,8 @@ export interface SupplyRequestListItem {
   rejectedReason: string | null;
   requestedBy: string;
   createdAt: string;
+  responseDeadline: string | null;
+  remainingSeconds: number | null;
   respondedAt: string | null;
   shippedAt: string | null;
   completedAt: string | null;

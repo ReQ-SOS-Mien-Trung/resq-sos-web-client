@@ -293,7 +293,8 @@ export async function getSupplyRequests(
   const { data } = await api.get("/logistics/inventory/supply-requests", {
     params,
   });
-  return data;
+  // API wraps response in { data: { items: [...], ... }, serverTime: "..." }
+  return data?.data ?? data;
 }
 
 /**
