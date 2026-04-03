@@ -116,14 +116,15 @@ export async function deleteAssemblyPoint(id: number): Promise<void> {
 }
 
 /**
- * Assign or unassign a rescuer to an assembly point
- * PUT /personnel/assembly-point/rescuers/{userId}/assignment
+ * Assign or unassign one or many rescuers to an assembly point
+ * POST /personnel/assembly-point/rescuers/assignment
  */
 export async function updateRescuerAssemblyPointAssignment(
   payload: UpdateRescuerAssemblyPointAssignmentRequest,
 ): Promise<void> {
-  const { userId, assemblyPointId } = payload;
-  await api.put(`/personnel/assembly-point/rescuers/${userId}/assignment`, {
+  const { userIds, assemblyPointId } = payload;
+  await api.post(`/personnel/assembly-point/rescuers/assignment`, {
+    userIds,
     assemblyPointId,
   });
 }

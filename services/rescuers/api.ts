@@ -29,7 +29,22 @@ function normalizeAssemblyPointId(
   return Number.isNaN(numericValue) ? null : numericValue;
 }
 
+function normalizeNullableBoolean(value: unknown): boolean | null {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  return null;
+}
+
 function normalizeRescuer(entity: RescuerApiEntity) {
+  const attendanceConfirmed = normalizeNullableBoolean(
+    entity.hasAttendanceConfirmed ??
+      entity.hasPresenceConfirmation ??
+      entity.checkedIn ??
+      entity.isCheckedIn,
+  );
+
   return {
     id: entity.id ?? entity.userId ?? "",
     firstName: entity.firstName ?? entity.givenName ?? "",
@@ -50,6 +65,7 @@ function normalizeRescuer(entity: RescuerApiEntity) {
     hasAssemblyPoint:
       entity.hasAssemblyPoint ?? Boolean(entity.assemblyPointId),
     assemblyPointId: normalizeAssemblyPointId(entity.assemblyPointId),
+    attendanceConfirmed,
   };
 }
 

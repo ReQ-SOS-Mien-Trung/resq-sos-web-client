@@ -164,7 +164,7 @@ function mapCheckedInRescuerToRescuerEntity(
     id: rescuer.userId,
     firstName: rescuer.firstName,
     lastName: rescuer.lastName,
-    email: null,
+    email: rescuer.email ?? null,
     phone: rescuer.phone,
     avatarUrl: rescuer.avatarUrl,
     address: null,

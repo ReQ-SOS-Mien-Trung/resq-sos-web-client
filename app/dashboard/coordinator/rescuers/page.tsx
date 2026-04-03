@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import gsap from "gsap";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +32,10 @@ import {
   useRescuerAssemblyPointMetadata,
   useRescuers,
 } from "@/services/rescuers/hooks";
-import type { GetRescuersParams } from "@/services/rescuers/type";
+import type {
+  GetRescuersParams,
+  RescuerEntity,
+} from "@/services/rescuers/type";
 import {
   useAssemblyPointMetadata,
   useUpdateRescuerAssemblyPointAssignment,
@@ -46,10 +50,19 @@ const ALL_ASSEMBLY_POINT_FILTER_VALUE = "__all_assembly_points__";
 type AssignmentFilter = "all" | "assigned" | "unassigned";
 type TeamFilter = "all" | "inTeam" | "notInTeam";
 type RescuerTypeFilter = "all" | "Core" | "Volunteer";
+type SplitPanelSide = "left" | "right";
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 function getInitials(firstName?: string, lastName?: string) {
   return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase() || "?";
+}
+
+function isRescuerPresenceConfirmed(rescuer: RescuerEntity) {
+  if (typeof rescuer.attendanceConfirmed === "boolean") {
+    return rescuer.attendanceConfirmed;
+  }
+
+  return rescuer.hasTeam;
 }
 
 export default function CoordinatorRescuerManagementPage() {
@@ -72,6 +85,28 @@ export default function CoordinatorRescuerManagementPage() {
   const [bulkSelectedAssemblyPointId, setBulkSelectedAssemblyPointId] =
     useState("");
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [draggingRescuerId, setDraggingRescuerId] = useState<string | null>(
+    null,
+  );
+  const [dragSourcePanel, setDragSourcePanel] = useState<SplitPanelSide | null>(
+    null,
+  );
+  const [activeDropPanel, setActiveDropPanel] = useState<SplitPanelSide | null>(
+    null,
+  );
+  const [splitPanelOverrides, setSplitPanelOverrides] = useState<
+    Record<string, SplitPanelSide>
+  >({});
+  const [splitPanelMoveOrderByRescuerId, setSplitPanelMoveOrderByRescuerId] =
+    useState<Record<string, number>>({});
+  const [latestDroppedRescuerId, setLatestDroppedRescuerId] = useState<
+    string | null
+  >(null);
+  const splitDropSequenceRef = useRef(0);
+  const leftPanelRef = useRef<HTMLDivElement | null>(null);
+  const rightPanelRef = useRef<HTMLDivElement | null>(null);
+  const isSplitByAssemblyPointView =
+    selectedAssemblyPointCode !== ALL_ASSEMBLY_POINT_FILTER_VALUE;
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -115,6 +150,29 @@ export default function CoordinatorRescuerManagementPage() {
     debouncedSearchQuery,
   ]);
 
+  const splitSharedRescuerParams = useMemo<
+    Pick<GetRescuersParams, "hasTeam" | "rescuerType" | "search">
+  >(() => {
+    const params: Pick<
+      GetRescuersParams,
+      "hasTeam" | "rescuerType" | "search"
+    > = {};
+
+    if (teamFilter !== "all") {
+      params.hasTeam = teamFilter === "inTeam";
+    }
+
+    if (rescuerTypeFilter !== "all") {
+      params.rescuerType = rescuerTypeFilter;
+    }
+
+    if (debouncedSearchQuery) {
+      params.search = debouncedSearchQuery;
+    }
+
+    return params;
+  }, [teamFilter, rescuerTypeFilter, debouncedSearchQuery]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [
@@ -125,6 +183,19 @@ export default function CoordinatorRescuerManagementPage() {
     pageSize,
     debouncedSearchQuery,
   ]);
+
+  useEffect(() => {
+    if (isSplitByAssemblyPointView && assignmentFilter !== "all") {
+      setAssignmentFilter("all");
+    }
+  }, [isSplitByAssemblyPointView, assignmentFilter]);
+
+  useEffect(() => {
+    setSplitPanelOverrides({});
+    setSplitPanelMoveOrderByRescuerId({});
+    setLatestDroppedRescuerId(null);
+    splitDropSequenceRef.current = 0;
+  }, [selectedAssemblyPointCode]);
 
   const {
     data: rescuerAssemblyPointOptions,
@@ -143,7 +214,56 @@ export default function CoordinatorRescuerManagementPage() {
       pageNumber: currentPage,
       pageSize,
     },
-    enabled: true,
+    enabled: !isSplitByAssemblyPointView,
+  });
+
+  const {
+    data: assignedInSelectedPointData,
+    isLoading: isAssignedInSelectedPointLoading,
+    isError: isAssignedInSelectedPointError,
+    refetch: refetchAssignedInSelectedPoint,
+    isRefetching: isRefetchingAssignedInSelectedPoint,
+  } = useRescuers({
+    params: {
+      ...splitSharedRescuerParams,
+      hasAssemblyPoint: true,
+      assemblyPointCodes: [selectedAssemblyPointCode],
+      pageNumber: 1,
+      pageSize: 500,
+    },
+    enabled: isSplitByAssemblyPointView,
+  });
+
+  const {
+    data: unassignedRescuersData,
+    isLoading: isUnassignedRescuersLoading,
+    isError: isUnassignedRescuersError,
+    refetch: refetchUnassignedRescuers,
+    isRefetching: isRefetchingUnassignedRescuers,
+  } = useRescuers({
+    params: {
+      ...splitSharedRescuerParams,
+      hasAssemblyPoint: false,
+      pageNumber: 1,
+      pageSize: 500,
+    },
+    enabled: isSplitByAssemblyPointView,
+  });
+
+  const {
+    data: assignedCandidateRescuersData,
+    isLoading: isAssignedCandidateRescuersLoading,
+    isError: isAssignedCandidateRescuersError,
+    refetch: refetchAssignedCandidateRescuers,
+    isRefetching: isRefetchingAssignedCandidateRescuers,
+  } = useRescuers({
+    params: {
+      ...splitSharedRescuerParams,
+      hasAssemblyPoint: true,
+      pageNumber: 1,
+      pageSize: 500,
+    },
+    enabled: isSplitByAssemblyPointView,
   });
 
   const { data: assemblyPointOptions, isLoading: isAssemblyPointLoading } =
@@ -153,19 +273,250 @@ export default function CoordinatorRescuerManagementPage() {
     useUpdateRescuerAssemblyPointAssignment();
 
   const rescuers = useMemo(() => rescuersData?.items ?? [], [rescuersData]);
-  const visibleRescuers = rescuers;
+  const assignedInSelectedPointRescuers = useMemo(
+    () => assignedInSelectedPointData?.items ?? [],
+    [assignedInSelectedPointData],
+  );
+  const unassignedRescuers = useMemo(
+    () => unassignedRescuersData?.items ?? [],
+    [unassignedRescuersData],
+  );
+  const assignedCandidateRescuers = useMemo(
+    () => assignedCandidateRescuersData?.items ?? [],
+    [assignedCandidateRescuersData],
+  );
+
+  const assignedWithoutConfirmationRescuers = useMemo(
+    () =>
+      assignedCandidateRescuers.filter(
+        (rescuer) => !isRescuerPresenceConfirmed(rescuer),
+      ),
+    [assignedCandidateRescuers],
+  );
+
+  const rightPanelRescuers = useMemo(() => {
+    if (!isSplitByAssemblyPointView) {
+      return [];
+    }
+
+    const mergedRescuers = [
+      ...unassignedRescuers,
+      ...assignedWithoutConfirmationRescuers,
+    ];
+    const rescuerMap = new Map<string, RescuerEntity>();
+
+    for (const rescuer of mergedRescuers) {
+      rescuerMap.set(rescuer.id, rescuer);
+    }
+
+    return Array.from(rescuerMap.values());
+  }, [
+    isSplitByAssemblyPointView,
+    unassignedRescuers,
+    assignedWithoutConfirmationRescuers,
+  ]);
+
+  const baseSplitRescuerMap = useMemo(() => {
+    const rescuerMap = new Map<string, RescuerEntity>();
+
+    for (const rescuer of assignedInSelectedPointRescuers) {
+      rescuerMap.set(rescuer.id, rescuer);
+    }
+
+    for (const rescuer of rightPanelRescuers) {
+      if (!rescuerMap.has(rescuer.id)) {
+        rescuerMap.set(rescuer.id, rescuer);
+      }
+    }
+
+    return rescuerMap;
+  }, [assignedInSelectedPointRescuers, rightPanelRescuers]);
+
+  const baseLeftRescuerIdSet = useMemo(
+    () => new Set(assignedInSelectedPointRescuers.map((rescuer) => rescuer.id)),
+    [assignedInSelectedPointRescuers],
+  );
+
+  const baseRightRescuerIdSet = useMemo(
+    () => new Set(rightPanelRescuers.map((rescuer) => rescuer.id)),
+    [rightPanelRescuers],
+  );
+
+  const splitBaseAssemblyPointByRescuerId = useMemo(() => {
+    const assemblyPointByRescuerId = new Map<string, number | null>();
+
+    for (const rescuer of assignedCandidateRescuers) {
+      assemblyPointByRescuerId.set(rescuer.id, rescuer.assemblyPointId ?? null);
+    }
+
+    for (const rescuer of assignedInSelectedPointRescuers) {
+      assemblyPointByRescuerId.set(rescuer.id, rescuer.assemblyPointId ?? null);
+    }
+
+    for (const rescuer of unassignedRescuers) {
+      assemblyPointByRescuerId.set(rescuer.id, null);
+    }
+
+    for (const rescuer of rightPanelRescuers) {
+      if (!assemblyPointByRescuerId.has(rescuer.id)) {
+        assemblyPointByRescuerId.set(
+          rescuer.id,
+          rescuer.assemblyPointId ?? null,
+        );
+      }
+    }
+
+    return assemblyPointByRescuerId;
+  }, [
+    assignedCandidateRescuers,
+    assignedInSelectedPointRescuers,
+    unassignedRescuers,
+    rightPanelRescuers,
+  ]);
+
+  const splitLeftPanelRescuers = useMemo(() => {
+    if (!isSplitByAssemblyPointView) {
+      return [];
+    }
+
+    const displayedIds = new Set<string>();
+    const items: RescuerEntity[] = [];
+
+    const movedIntoLeftRescuerIds = Object.entries(splitPanelOverrides)
+      .filter(
+        ([rescuerId, targetPanel]) =>
+          targetPanel === "left" && !baseLeftRescuerIdSet.has(rescuerId),
+      )
+      .sort(
+        ([leftRescuerId], [rightRescuerId]) =>
+          (splitPanelMoveOrderByRescuerId[rightRescuerId] ?? 0) -
+          (splitPanelMoveOrderByRescuerId[leftRescuerId] ?? 0),
+      )
+      .map(([rescuerId]) => rescuerId);
+
+    for (const rescuerId of movedIntoLeftRescuerIds) {
+      const rescuer = baseSplitRescuerMap.get(rescuerId);
+      if (!rescuer || displayedIds.has(rescuer.id)) {
+        continue;
+      }
+
+      items.push(rescuer);
+      displayedIds.add(rescuer.id);
+    }
+
+    for (const rescuer of assignedInSelectedPointRescuers) {
+      if (splitPanelOverrides[rescuer.id] === "right") {
+        continue;
+      }
+
+      if (displayedIds.has(rescuer.id)) {
+        continue;
+      }
+
+      items.push(rescuer);
+      displayedIds.add(rescuer.id);
+    }
+
+    return items;
+  }, [
+    isSplitByAssemblyPointView,
+    baseLeftRescuerIdSet,
+    baseSplitRescuerMap,
+    assignedInSelectedPointRescuers,
+    splitPanelOverrides,
+    splitPanelMoveOrderByRescuerId,
+  ]);
+
+  const splitRightPanelRescuers = useMemo(() => {
+    if (!isSplitByAssemblyPointView) {
+      return [];
+    }
+
+    const displayedIds = new Set<string>();
+    const items: RescuerEntity[] = [];
+
+    const movedIntoRightRescuerIds = Object.entries(splitPanelOverrides)
+      .filter(
+        ([rescuerId, targetPanel]) =>
+          targetPanel === "right" && !baseRightRescuerIdSet.has(rescuerId),
+      )
+      .sort(
+        ([leftRescuerId], [rightRescuerId]) =>
+          (splitPanelMoveOrderByRescuerId[rightRescuerId] ?? 0) -
+          (splitPanelMoveOrderByRescuerId[leftRescuerId] ?? 0),
+      )
+      .map(([rescuerId]) => rescuerId);
+
+    for (const rescuerId of movedIntoRightRescuerIds) {
+      const rescuer = baseSplitRescuerMap.get(rescuerId);
+      if (!rescuer || displayedIds.has(rescuer.id)) {
+        continue;
+      }
+
+      items.push(rescuer);
+      displayedIds.add(rescuer.id);
+    }
+
+    for (const rescuer of rightPanelRescuers) {
+      if (splitPanelOverrides[rescuer.id] === "left") {
+        continue;
+      }
+
+      if (displayedIds.has(rescuer.id)) {
+        continue;
+      }
+
+      items.push(rescuer);
+      displayedIds.add(rescuer.id);
+    }
+
+    return items;
+  }, [
+    isSplitByAssemblyPointView,
+    baseRightRescuerIdSet,
+    baseSplitRescuerMap,
+    rightPanelRescuers,
+    splitPanelOverrides,
+    splitPanelMoveOrderByRescuerId,
+  ]);
+
+  const visibleRescuers = isSplitByAssemblyPointView
+    ? splitLeftPanelRescuers
+    : rescuers;
+  const selectableRescuers = isSplitByAssemblyPointView
+    ? splitRightPanelRescuers
+    : visibleRescuers;
   const totalPages = rescuersData?.totalPages ?? 1;
-  const totalCount = rescuersData?.totalCount ?? rescuers.length;
+  const splitUniqueRescuerCount = useMemo(() => {
+    if (!isSplitByAssemblyPointView) {
+      return 0;
+    }
+
+    const rescuerIds = new Set<string>([
+      ...splitLeftPanelRescuers.map((rescuer) => rescuer.id),
+      ...splitRightPanelRescuers.map((rescuer) => rescuer.id),
+    ]);
+
+    return rescuerIds.size;
+  }, [
+    isSplitByAssemblyPointView,
+    splitLeftPanelRescuers,
+    splitRightPanelRescuers,
+  ]);
+
+  const totalCount = isSplitByAssemblyPointView
+    ? splitUniqueRescuerCount
+    : (rescuersData?.totalCount ?? rescuers.length);
 
   useEffect(() => {
     const visibleRescuerIds = new Set(
-      visibleRescuers.map((rescuer) => rescuer.id),
+      selectableRescuers.map((rescuer) => rescuer.id),
     );
 
     setSelectedRescuerIds((previous) =>
       previous.filter((rescuerId) => visibleRescuerIds.has(rescuerId)),
     );
-  }, [visibleRescuers]);
+  }, [selectableRescuers]);
 
   const assemblyPointNameById = useMemo(() => {
     const entries = (assemblyPointOptions ?? [])
@@ -182,10 +533,132 @@ export default function CoordinatorRescuerManagementPage() {
     return new Map<number, string>(entries);
   }, [assemblyPointOptions]);
 
-  const assignedCount = useMemo(
-    () => rescuers.filter((rescuer) => rescuer.hasAssemblyPoint).length,
-    [rescuers],
+  const selectedAssemblyPointLabel = useMemo(() => {
+    if (!isSplitByAssemblyPointView) {
+      return null;
+    }
+
+    const selectedPoint = (rescuerAssemblyPointOptions ?? []).find(
+      (point) => point.key === selectedAssemblyPointCode,
+    );
+
+    return selectedPoint?.value ?? selectedAssemblyPointCode;
+  }, [
+    isSplitByAssemblyPointView,
+    rescuerAssemblyPointOptions,
+    selectedAssemblyPointCode,
+  ]);
+
+  const splitTargetAssemblyPointId = useMemo(() => {
+    if (!isSplitByAssemblyPointView || !bulkSelectedAssemblyPointId) {
+      return null;
+    }
+
+    const parsedPointId = Number(bulkSelectedAssemblyPointId);
+    return Number.isNaN(parsedPointId) ? null : parsedPointId;
+  }, [isSplitByAssemblyPointView, bulkSelectedAssemblyPointId]);
+
+  const splitPendingAssignmentEntries = useMemo(
+    () =>
+      isSplitByAssemblyPointView
+        ? Object.entries(rowSelectedAssemblyPointIds).filter(
+            ([rescuerId, selectedAssemblyPointId]) =>
+              Boolean(selectedAssemblyPointId) &&
+              baseSplitRescuerMap.has(rescuerId),
+          )
+        : [],
+    [
+      isSplitByAssemblyPointView,
+      rowSelectedAssemblyPointIds,
+      baseSplitRescuerMap,
+    ],
   );
+
+  const splitPendingSaveCount = splitPendingAssignmentEntries.length;
+
+  const assignedCount = useMemo(() => {
+    if (isSplitByAssemblyPointView) {
+      return splitLeftPanelRescuers.length;
+    }
+
+    return rescuers.filter((rescuer) => rescuer.hasAssemblyPoint).length;
+  }, [isSplitByAssemblyPointView, splitLeftPanelRescuers, rescuers]);
+
+  const unassignedCount = useMemo(() => {
+    if (isSplitByAssemblyPointView) {
+      return unassignedRescuersData?.totalCount ?? unassignedRescuers.length;
+    }
+
+    return Math.max(
+      0,
+      (rescuersData?.totalCount ?? rescuers.length) - assignedCount,
+    );
+  }, [
+    isSplitByAssemblyPointView,
+    unassignedRescuersData,
+    unassignedRescuers,
+    rescuersData,
+    rescuers,
+    assignedCount,
+  ]);
+
+  const isRescuerListLoading = isSplitByAssemblyPointView
+    ? isAssignedInSelectedPointLoading ||
+      isUnassignedRescuersLoading ||
+      isAssignedCandidateRescuersLoading
+    : isRescuersLoading;
+  const isRescuerListError = isSplitByAssemblyPointView
+    ? isAssignedInSelectedPointError ||
+      isUnassignedRescuersError ||
+      isAssignedCandidateRescuersError
+    : isRescuersError;
+  const isRescuerListRefetching = isSplitByAssemblyPointView
+    ? isRefetchingAssignedInSelectedPoint ||
+      isRefetchingUnassignedRescuers ||
+      isRefetchingAssignedCandidateRescuers
+    : isRefetching;
+
+  useEffect(() => {
+    if (!isSplitByAssemblyPointView) {
+      setDraggingRescuerId(null);
+      setDragSourcePanel(null);
+      setActiveDropPanel(null);
+      setSplitPanelOverrides({});
+      setSplitPanelMoveOrderByRescuerId({});
+      setLatestDroppedRescuerId(null);
+      splitDropSequenceRef.current = 0;
+      return;
+    }
+
+    const leftPanel = leftPanelRef.current;
+    const rightPanel = rightPanelRef.current;
+
+    if (leftPanel) {
+      gsap.to(leftPanel, {
+        duration: 0.18,
+        borderColor:
+          activeDropPanel === "left" ? "#FF5722" : "rgba(14, 165, 233, 0.5)",
+        boxShadow:
+          activeDropPanel === "left"
+            ? "0 0 0 2px rgba(255, 87, 34, 0.25)"
+            : "0 0 0 0 rgba(255, 87, 34, 0)",
+        ease: "power2.out",
+      });
+    }
+
+    if (rightPanel) {
+      gsap.to(rightPanel, {
+        duration: 0.18,
+        borderColor:
+          activeDropPanel === "right" ? "#FF5722" : "rgba(255, 87, 34, 0.45)",
+        boxShadow:
+          activeDropPanel === "right"
+            ? "0 0 0 2px rgba(255, 87, 34, 0.25)"
+            : "0 0 0 0 rgba(255, 87, 34, 0)",
+        ease: "power2.out",
+      });
+    }
+  }, [isSplitByAssemblyPointView, activeDropPanel]);
 
   const selectedRescuerIdSet = useMemo(
     () => new Set(selectedRescuerIds),
@@ -194,20 +667,25 @@ export default function CoordinatorRescuerManagementPage() {
 
   const selectedVisibleRescuerCount = useMemo(
     () =>
-      visibleRescuers.reduce(
+      selectableRescuers.reduce(
         (count, rescuer) =>
           count + (selectedRescuerIdSet.has(rescuer.id) ? 1 : 0),
         0,
       ),
-    [visibleRescuers, selectedRescuerIdSet],
+    [selectableRescuers, selectedRescuerIdSet],
   );
 
   const areAllVisibleRescuersSelected =
-    visibleRescuers.length > 0 &&
-    selectedVisibleRescuerCount === visibleRescuers.length;
+    selectableRescuers.length > 0 &&
+    selectedVisibleRescuerCount === selectableRescuers.length;
   const hasPartialVisibleSelection =
     selectedVisibleRescuerCount > 0 && !areAllVisibleRescuersSelected;
   const isAssignmentBusy = isUpdatingAssignment || isBulkUpdating;
+  const shouldShowAssignmentToolbar =
+    !isRescuerListLoading &&
+    !isRescuerListError &&
+    (selectableRescuers.length > 0 ||
+      (isSplitByAssemblyPointView && splitPendingSaveCount > 0));
 
   const pageItems = useMemo(() => {
     if (totalPages <= 7) {
@@ -248,7 +726,7 @@ export default function CoordinatorRescuerManagementPage() {
       setPendingUserId(userId);
 
       if (selectedAssemblyPointId === UNASSIGN_SELECT_VALUE) {
-        await updateAssignment({ userId, assemblyPointId: null });
+        await updateAssignment({ userIds: [userId], assemblyPointId: null });
         toast.success("Đã bỏ phân công rescuer khỏi điểm tập kết.");
       } else {
         const pointId = Number(selectedAssemblyPointId);
@@ -257,7 +735,7 @@ export default function CoordinatorRescuerManagementPage() {
           return;
         }
 
-        await updateAssignment({ userId, assemblyPointId: pointId });
+        await updateAssignment({ userIds: [userId], assemblyPointId: pointId });
         toast.success("Đã lưu rescuer vào điểm tập kết.");
       }
 
@@ -268,7 +746,28 @@ export default function CoordinatorRescuerManagementPage() {
       setSelectedRescuerIds((previous) =>
         previous.filter((rescuerId) => rescuerId !== userId),
       );
-      await refetch();
+      await refetchCurrentView();
+      setSplitPanelOverrides((previous) => {
+        if (!previous[userId]) {
+          return previous;
+        }
+
+        const nextOverrides = { ...previous };
+        delete nextOverrides[userId];
+        return nextOverrides;
+      });
+      setSplitPanelMoveOrderByRescuerId((previous) => {
+        if (previous[userId] == null) {
+          return previous;
+        }
+
+        const nextMoveOrder = { ...previous };
+        delete nextMoveOrder[userId];
+        return nextMoveOrder;
+      });
+      setLatestDroppedRescuerId((previous) =>
+        previous === userId ? null : previous,
+      );
     } catch {
       toast.error("Không thể cập nhật phân công. Vui lòng thử lại.");
     } finally {
@@ -293,9 +792,217 @@ export default function CoordinatorRescuerManagementPage() {
 
   const handleToggleSelectAllVisible = (shouldSelect: boolean) => {
     setSelectedRescuerIds(
-      shouldSelect ? visibleRescuers.map((rescuer) => rescuer.id) : [],
+      shouldSelect ? selectableRescuers.map((rescuer) => rescuer.id) : [],
     );
   };
+
+  const refetchCurrentView = async () => {
+    if (isSplitByAssemblyPointView) {
+      await Promise.all([
+        refetchAssignedInSelectedPoint(),
+        refetchUnassignedRescuers(),
+        refetchAssignedCandidateRescuers(),
+      ]);
+      return;
+    }
+
+    await refetch();
+  };
+
+  const resetDragState = () => {
+    setDraggingRescuerId(null);
+    setDragSourcePanel(null);
+    setActiveDropPanel(null);
+  };
+
+  const handleDragStart = (
+    event: React.DragEvent<HTMLDivElement>,
+    rescuer: RescuerEntity,
+    sourcePanel: SplitPanelSide,
+  ) => {
+    if (!isSplitByAssemblyPointView || isAssignmentBusy) {
+      event.preventDefault();
+      return;
+    }
+
+    setDraggingRescuerId(rescuer.id);
+    setDragSourcePanel(sourcePanel);
+    setActiveDropPanel(sourcePanel === "left" ? "right" : "left");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", rescuer.id);
+
+    gsap.to(event.currentTarget, {
+      scale: 0.98,
+      opacity: 0.72,
+      duration: 0.16,
+      ease: "power2.out",
+    });
+  };
+
+  const handleDragEnd = (event: React.DragEvent<HTMLDivElement>) => {
+    gsap.to(event.currentTarget, {
+      scale: 1,
+      opacity: 1,
+      duration: 0.16,
+      ease: "power2.out",
+    });
+    resetDragState();
+  };
+
+  const handlePanelDragOver = (
+    event: React.DragEvent<HTMLDivElement>,
+    targetPanel: SplitPanelSide,
+  ) => {
+    if (
+      !draggingRescuerId ||
+      !dragSourcePanel ||
+      dragSourcePanel === targetPanel
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+
+    if (activeDropPanel !== targetPanel) {
+      setActiveDropPanel(targetPanel);
+    }
+  };
+
+  const handlePanelDragLeave = (targetPanel: SplitPanelSide) => {
+    setActiveDropPanel((previous) =>
+      previous === targetPanel ? null : previous,
+    );
+  };
+
+  const handlePanelDrop = (
+    event: React.DragEvent<HTMLDivElement>,
+    targetPanel: SplitPanelSide,
+  ) => {
+    event.preventDefault();
+
+    if (
+      !draggingRescuerId ||
+      !dragSourcePanel ||
+      dragSourcePanel === targetPanel ||
+      isAssignmentBusy
+    ) {
+      resetDragState();
+      return;
+    }
+
+    const droppedRescuerId = draggingRescuerId;
+    const shouldResetToBasePanel =
+      (targetPanel === "left" && baseLeftRescuerIdSet.has(droppedRescuerId)) ||
+      (targetPanel === "right" && baseRightRescuerIdSet.has(droppedRescuerId));
+
+    if (dragSourcePanel === "right" && targetPanel === "left") {
+      if (splitTargetAssemblyPointId === null) {
+        toast.error("Không tìm thấy điểm tập kết đích để kéo thả.");
+        resetDragState();
+        return;
+      }
+    }
+
+    setSplitPanelOverrides((previous) => {
+      const nextOverrides = { ...previous };
+
+      if (shouldResetToBasePanel) {
+        delete nextOverrides[droppedRescuerId];
+      } else {
+        nextOverrides[droppedRescuerId] = targetPanel;
+      }
+
+      return nextOverrides;
+    });
+
+    if (shouldResetToBasePanel) {
+      setSplitPanelMoveOrderByRescuerId((previous) => {
+        if (previous[droppedRescuerId] == null) {
+          return previous;
+        }
+
+        const nextMoveOrder = { ...previous };
+        delete nextMoveOrder[droppedRescuerId];
+        return nextMoveOrder;
+      });
+      setLatestDroppedRescuerId((previous) =>
+        previous === droppedRescuerId ? null : previous,
+      );
+    } else {
+      splitDropSequenceRef.current += 1;
+      const nextMoveOrder = splitDropSequenceRef.current;
+      setSplitPanelMoveOrderByRescuerId((previous) => ({
+        ...previous,
+        [droppedRescuerId]: nextMoveOrder,
+      }));
+      setLatestDroppedRescuerId(droppedRescuerId);
+    }
+
+    setRowSelectedAssemblyPointIds((previous) => {
+      const nextSelections = { ...previous };
+
+      if (shouldResetToBasePanel) {
+        nextSelections[droppedRescuerId] = "";
+        return nextSelections;
+      }
+
+      const currentAssemblyPointId =
+        splitBaseAssemblyPointByRescuerId.get(droppedRescuerId) ?? null;
+
+      if (targetPanel === "left") {
+        nextSelections[droppedRescuerId] =
+          splitTargetAssemblyPointId !== null &&
+          currentAssemblyPointId !== splitTargetAssemblyPointId
+            ? String(splitTargetAssemblyPointId)
+            : "";
+      } else {
+        nextSelections[droppedRescuerId] =
+          currentAssemblyPointId !== null ? UNASSIGN_SELECT_VALUE : "";
+      }
+
+      return nextSelections;
+    });
+
+    setSelectedRescuerIds((previous) =>
+      previous.filter((rescuerId) => rescuerId !== droppedRescuerId),
+    );
+
+    const targetPanelElement =
+      targetPanel === "left" ? leftPanelRef.current : rightPanelRef.current;
+    if (targetPanelElement) {
+      gsap.fromTo(
+        targetPanelElement,
+        { boxShadow: "0 0 0 0 rgba(255, 87, 34, 0.35)" },
+        {
+          boxShadow: "0 0 0 14px rgba(255, 87, 34, 0)",
+          duration: 0.45,
+          ease: "power2.out",
+        },
+      );
+    }
+
+    resetDragState();
+  };
+
+  useEffect(() => {
+    if (!isSplitByAssemblyPointView) {
+      return;
+    }
+
+    const matchedAssemblyPoint = (assemblyPointOptions ?? []).find(
+      (point) =>
+        point.key === selectedAssemblyPointCode ||
+        point.value === selectedAssemblyPointLabel,
+    );
+
+    setBulkSelectedAssemblyPointId(matchedAssemblyPoint?.key ?? "");
+  }, [
+    isSplitByAssemblyPointView,
+    selectedAssemblyPointCode,
+    selectedAssemblyPointLabel,
+    assemblyPointOptions,
+  ]);
 
   const handleBulkSaveAssignment = async () => {
     if (selectedRescuerIds.length === 0) {
@@ -323,19 +1030,10 @@ export default function CoordinatorRescuerManagementPage() {
     try {
       setIsBulkUpdating(true);
 
-      const results = await Promise.allSettled(
-        targetRescuerIds.map((userId) =>
-          updateAssignment({
-            userId,
-            assemblyPointId: nextAssemblyPointId,
-          }),
-        ),
-      );
-
-      const failedRescuerIds = results.flatMap((result, index) =>
-        result.status === "rejected" ? [targetRescuerIds[index]] : [],
-      );
-      const successCount = results.length - failedRescuerIds.length;
+      await updateAssignment({
+        userIds: targetRescuerIds,
+        assemblyPointId: nextAssemblyPointId,
+      });
 
       setRowSelectedAssemblyPointIds((previous) => {
         const nextSelections = { ...previous };
@@ -346,16 +1044,178 @@ export default function CoordinatorRescuerManagementPage() {
 
         return nextSelections;
       });
-      setSelectedRescuerIds(failedRescuerIds);
-      setBulkSelectedAssemblyPointId("");
+      setSelectedRescuerIds([]);
+      setSplitPanelOverrides((previous) => {
+        let hasChange = false;
+        const nextOverrides = { ...previous };
 
-      if (successCount > 0) {
-        toast.success(
-          nextAssemblyPointId === null
-            ? `Đã bỏ gán ${successCount} rescuer khỏi điểm tập kết.`
-            : `Đã thêm ${successCount} rescuer vào điểm tập kết.`,
+        for (const rescuerId of targetRescuerIds) {
+          if (nextOverrides[rescuerId]) {
+            delete nextOverrides[rescuerId];
+            hasChange = true;
+          }
+        }
+
+        return hasChange ? nextOverrides : previous;
+      });
+      setSplitPanelMoveOrderByRescuerId((previous) => {
+        let hasChange = false;
+        const nextMoveOrder = { ...previous };
+
+        for (const rescuerId of targetRescuerIds) {
+          if (nextMoveOrder[rescuerId] != null) {
+            delete nextMoveOrder[rescuerId];
+            hasChange = true;
+          }
+        }
+
+        return hasChange ? nextMoveOrder : previous;
+      });
+      setLatestDroppedRescuerId((previous) =>
+        previous && targetRescuerIds.includes(previous) ? null : previous,
+      );
+      if (!isSplitByAssemblyPointView) {
+        setBulkSelectedAssemblyPointId("");
+      }
+
+      toast.success(
+        nextAssemblyPointId === null
+          ? `Đã bỏ gán ${targetRescuerIds.length} rescuer khỏi điểm tập kết.`
+          : `Đã thêm ${targetRescuerIds.length} rescuer vào điểm tập kết.`,
+      );
+      await refetchCurrentView();
+    } catch {
+      toast.error("Không thể cập nhật phân công hàng loạt. Vui lòng thử lại.");
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  const handleSaveAllSplitPendingAssignments = async () => {
+    if (!isSplitByAssemblyPointView) {
+      return;
+    }
+
+    if (splitPendingAssignmentEntries.length === 0) {
+      toast.error("Không có thay đổi kéo-thả nào để lưu.");
+      return;
+    }
+
+    const groupedPayloadByAssemblyPoint = new Map<
+      string,
+      { userIds: string[]; assemblyPointId: number | null }
+    >();
+
+    for (const [
+      rescuerId,
+      selectedAssemblyPointId,
+    ] of splitPendingAssignmentEntries) {
+      const nextAssemblyPointId =
+        selectedAssemblyPointId === UNASSIGN_SELECT_VALUE
+          ? null
+          : Number(selectedAssemblyPointId);
+
+      if (nextAssemblyPointId !== null && Number.isNaN(nextAssemblyPointId)) {
+        toast.error("Có thay đổi không hợp lệ. Vui lòng kiểm tra lại.");
+        return;
+      }
+
+      const groupKey =
+        nextAssemblyPointId === null
+          ? UNASSIGN_SELECT_VALUE
+          : String(nextAssemblyPointId);
+      const currentGroup = groupedPayloadByAssemblyPoint.get(groupKey);
+
+      if (currentGroup) {
+        currentGroup.userIds.push(rescuerId);
+      } else {
+        groupedPayloadByAssemblyPoint.set(groupKey, {
+          userIds: [rescuerId],
+          assemblyPointId: nextAssemblyPointId,
+        });
+      }
+    }
+
+    const groupedPayloads = Array.from(groupedPayloadByAssemblyPoint.values());
+
+    if (groupedPayloads.length === 0) {
+      toast.error("Không có thay đổi hợp lệ để lưu.");
+      return;
+    }
+
+    try {
+      setIsBulkUpdating(true);
+
+      const results = await Promise.allSettled(
+        groupedPayloads.map((payload) => updateAssignment(payload)),
+      );
+
+      const successfulRescuerIds: string[] = [];
+      const failedRescuerIds: string[] = [];
+
+      groupedPayloads.forEach((payload, index) => {
+        if (results[index]?.status === "fulfilled") {
+          successfulRescuerIds.push(...payload.userIds);
+        } else {
+          failedRescuerIds.push(...payload.userIds);
+        }
+      });
+
+      if (successfulRescuerIds.length > 0) {
+        const successfulRescuerIdSet = new Set(successfulRescuerIds);
+
+        setRowSelectedAssemblyPointIds((previous) => {
+          const nextSelections = { ...previous };
+
+          for (const rescuerId of successfulRescuerIds) {
+            nextSelections[rescuerId] = "";
+          }
+
+          return nextSelections;
+        });
+
+        setSplitPanelOverrides((previous) => {
+          let hasChange = false;
+          const nextOverrides = { ...previous };
+
+          for (const rescuerId of successfulRescuerIds) {
+            if (nextOverrides[rescuerId]) {
+              delete nextOverrides[rescuerId];
+              hasChange = true;
+            }
+          }
+
+          return hasChange ? nextOverrides : previous;
+        });
+
+        setSplitPanelMoveOrderByRescuerId((previous) => {
+          let hasChange = false;
+          const nextMoveOrder = { ...previous };
+
+          for (const rescuerId of successfulRescuerIds) {
+            if (nextMoveOrder[rescuerId] != null) {
+              delete nextMoveOrder[rescuerId];
+              hasChange = true;
+            }
+          }
+
+          return hasChange ? nextMoveOrder : previous;
+        });
+
+        setSelectedRescuerIds((previous) =>
+          previous.filter(
+            (rescuerId) => !successfulRescuerIdSet.has(rescuerId),
+          ),
         );
-        await refetch();
+
+        setLatestDroppedRescuerId((previous) =>
+          previous && successfulRescuerIdSet.has(previous) ? null : previous,
+        );
+
+        toast.success(
+          `Đã lưu ${successfulRescuerIds.length} thay đổi phân công.`,
+        );
+        await refetchCurrentView();
       }
 
       if (failedRescuerIds.length > 0) {
@@ -363,9 +1223,225 @@ export default function CoordinatorRescuerManagementPage() {
           `Có ${failedRescuerIds.length} rescuer chưa được cập nhật. Vui lòng thử lại.`,
         );
       }
+    } catch {
+      toast.error("Không thể lưu tất cả thay đổi kéo-thả. Vui lòng thử lại.");
     } finally {
       setIsBulkUpdating(false);
     }
+  };
+
+  const renderRescuerRow = (
+    rescuer: RescuerEntity,
+    options?: {
+      showSelection?: boolean;
+      draggableSide?: SplitPanelSide;
+    },
+  ) => {
+    const showSelection = options?.showSelection ?? true;
+    const draggableSide = options?.draggableSide;
+    const isRowDraggable = Boolean(draggableSide) && !isAssignmentBusy;
+    const isRowPending = pendingUserId === rescuer.id;
+    const isRowSelected = showSelection && selectedRescuerIdSet.has(rescuer.id);
+    const isRowBeingDragged = draggingRescuerId === rescuer.id;
+    const fullName = `${rescuer.firstName} ${rescuer.lastName}`;
+    const assemblyPointName =
+      rescuer.assemblyPointId != null
+        ? (assemblyPointNameById.get(rescuer.assemblyPointId) ??
+          `Điểm tập kết #${rescuer.assemblyPointId}`)
+        : null;
+    const hasAssemblyPointOption =
+      rescuer.assemblyPointId != null &&
+      assemblyPointNameById.has(rescuer.assemblyPointId);
+    const rawRowSelectedAssemblyPointId =
+      rowSelectedAssemblyPointIds[rescuer.id] ?? "";
+    const assignedAssemblyPointValue =
+      rescuer.assemblyPointId != null
+        ? String(rescuer.assemblyPointId)
+        : ASSIGNED_SELECT_VALUE;
+    const rowSelectedAssemblyPointId =
+      rawRowSelectedAssemblyPointId ||
+      (rescuer.hasAssemblyPoint ? assignedAssemblyPointValue : "");
+    const isRecentlyDraggedRow =
+      isSplitByAssemblyPointView &&
+      Boolean(rawRowSelectedAssemblyPointId) &&
+      (splitPanelMoveOrderByRescuerId[rescuer.id] != null ||
+        latestDroppedRescuerId === rescuer.id);
+
+    return (
+      <div
+        key={rescuer.id}
+        draggable={isRowDraggable}
+        onDragStart={
+          isRowDraggable && draggableSide
+            ? (event) => handleDragStart(event, rescuer, draggableSide)
+            : undefined
+        }
+        onDragEnd={isRowDraggable ? handleDragEnd : undefined}
+        className={cn(
+          "rounded-lg border border-border bg-card p-2.5 transition-colors md:p-3",
+          isRowDraggable && "cursor-grab active:cursor-grabbing",
+          isRecentlyDraggedRow &&
+            "border-[#FF5722]/65 bg-[#FFF7F2] shadow-[0_0_0_2px_rgba(255,87,34,0.2)]",
+          isRowSelected && "border-[#FF5722]/35 bg-[#FF5722]/3",
+          isRowBeingDragged && "opacity-70",
+        )}
+      >
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            {showSelection ? (
+              <div className="flex h-9 items-center">
+                <Checkbox
+                  checked={isRowSelected}
+                  onCheckedChange={(checked) =>
+                    handleToggleRescuerSelection(rescuer.id, checked === true)
+                  }
+                  disabled={isAssignmentBusy}
+                  aria-label={`Chọn rescuer ${fullName}`}
+                  className="border-[#FF5722]/40 data-[state=checked]:border-[#FF5722] data-[state=checked]:bg-[#FF5722]"
+                />
+              </div>
+            ) : null}
+
+            <Avatar className="h-9 w-9 border border-black/10">
+              <AvatarImage
+                src={rescuer.avatarUrl ?? DEFAULT_RESCUER_AVATAR}
+                alt={fullName}
+              />
+              <AvatarFallback>
+                {getInitials(rescuer.firstName, rescuer.lastName)}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold tracking-tight">
+                {fullName}
+              </p>
+
+              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                {rescuer.phone ? <span>{rescuer.phone}</span> : null}
+                {rescuer.email ? <span>{rescuer.email}</span> : null}
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "border px-2 py-0.5 text-xs",
+                    rescuer.hasAssemblyPoint
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                      : "border-amber-300 bg-amber-50 text-amber-700",
+                  )}
+                >
+                  {rescuer.hasAssemblyPoint
+                    ? "Đã có điểm tập kết"
+                    : "Chưa có điểm tập kết"}
+                </Badge>
+
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "border px-2 py-0.5 text-xs",
+                    rescuer.hasTeam
+                      ? "border-indigo-300 bg-indigo-50 text-indigo-700"
+                      : "border-slate-300 bg-slate-50 text-slate-700",
+                  )}
+                >
+                  {rescuer.hasTeam ? "Đã vào team" : "Chưa vào team"}
+                </Badge>
+
+                {rescuer.rescuerType ? (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "border px-2 py-0.5 text-xs font-semibold",
+                      rescuer.rescuerType === "Core"
+                        ? "border-sky-300 bg-sky-50 text-sky-700"
+                        : "border-[#FF5722]/40 bg-[#FF5722]/10 text-[#C2410C]",
+                    )}
+                  >
+                    {rescuer.rescuerType === "Core"
+                      ? "Nhân viên cố định"
+                      : "Tình nguyện"}
+                  </Badge>
+                ) : null}
+
+                {rawRowSelectedAssemblyPointId ? (
+                  <Badge
+                    variant="outline"
+                    className="border-[#FF5722]/35 bg-[#FF5722]/10 px-2 py-0.5 text-xs text-[#C2410C]"
+                  >
+                    Chưa lưu
+                  </Badge>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 md:justify-end">
+            <Select
+              value={rowSelectedAssemblyPointId}
+              onValueChange={(value) =>
+                setRowSelectedAssemblyPointIds((previous) => ({
+                  ...previous,
+                  [rescuer.id]: value,
+                }))
+              }
+              disabled={isAssignmentBusy}
+            >
+              <SelectTrigger className="h-8 w-55">
+                <SelectValue
+                  placeholder={
+                    isAssemblyPointLoading
+                      ? "Đang tải điểm tập kết..."
+                      : "Chọn điểm tập kết"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {rescuer.hasAssemblyPoint &&
+                !rawRowSelectedAssemblyPointId &&
+                !hasAssemblyPointOption ? (
+                  <SelectItem value={assignedAssemblyPointValue} disabled>
+                    {assemblyPointName ?? "Đã có điểm tập kết"}
+                  </SelectItem>
+                ) : null}
+                <SelectItem value={UNASSIGN_SELECT_VALUE}>
+                  Bỏ gán khỏi điểm tập kết
+                </SelectItem>
+                {(assemblyPointOptions ?? []).map((point) => (
+                  <SelectItem key={point.key} value={point.key}>
+                    {point.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {!isSplitByAssemblyPointView ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 border-[#FF5722]/35 text-[#FF5722] hover:bg-[#FF5722]/10"
+                onClick={() =>
+                  handleSaveAssignment(
+                    rescuer.id,
+                    rawRowSelectedAssemblyPointId,
+                  )
+                }
+                disabled={
+                  isAssignmentBusy ||
+                  isRowPending ||
+                  !rawRowSelectedAssemblyPointId
+                }
+              >
+                <MapPin className="mr-1 h-3.5 w-3.5" />
+                Lưu thay đổi
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -401,7 +1477,7 @@ export default function CoordinatorRescuerManagementPage() {
                   Tổng rescuer đã tải
                 </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight">
-                  {rescuers.length}
+                  {totalCount}
                 </p>
               </div>
               <UsersThree className="h-6 w-6 text-black/70" />
@@ -429,7 +1505,7 @@ export default function CoordinatorRescuerManagementPage() {
                   Chưa phân công
                 </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight">
-                  {Math.max(0, rescuers.length - assignedCount)}
+                  {unassignedCount}
                 </p>
               </div>
               <WarningCircle className="h-6 w-6 text-[#FF5722]" />
@@ -462,6 +1538,7 @@ export default function CoordinatorRescuerManagementPage() {
               onValueChange={(value) =>
                 setAssignmentFilter(value as AssignmentFilter)
               }
+              disabled={isSplitByAssemblyPointView}
             >
               <SelectTrigger className="h-10 w-full">
                 <SelectValue placeholder="Lọc phân công" />
@@ -540,21 +1617,22 @@ export default function CoordinatorRescuerManagementPage() {
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() => refetch()}
-              disabled={isRefetching}
+              onClick={refetchCurrentView}
+              disabled={isRescuerListRefetching}
             >
               <ArrowsClockwise
-                className={cn("h-4 w-4", isRefetching && "animate-spin")}
+                className={cn(
+                  "h-4 w-4",
+                  isRescuerListRefetching && "animate-spin",
+                )}
               />
               Làm mới
             </Button>
           </CardHeader>
 
           <CardContent className="space-y-3">
-            {!isRescuersLoading &&
-            !isRescuersError &&
-            visibleRescuers.length > 0 ? (
-              <div className="rounded-lg border border-[#FF5722]/15 bg-[#FF5722]/[0.04] p-3">
+            {shouldShowAssignmentToolbar ? (
+              <div className="rounded-lg border border-[#FF5722]/15 bg-[#FF5722]/4 p-3">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex flex-wrap items-center gap-3">
                     <label
@@ -576,7 +1654,11 @@ export default function CoordinatorRescuerManagementPage() {
                         disabled={isAssignmentBusy}
                         className="border-[#FF5722]/40 data-[state=checked]:border-[#FF5722] data-[state=checked]:bg-[#FF5722]"
                       />
-                      <span>Chọn tất cả trên danh sách hiện tại</span>
+                      <span>
+                        {isSplitByAssemblyPointView
+                          ? "Tất cả"
+                          : "Chọn tất cả trên danh sách hiện tại"}
+                      </span>
                     </label>
 
                     <Badge
@@ -585,6 +1667,15 @@ export default function CoordinatorRescuerManagementPage() {
                     >
                       {selectedVisibleRescuerCount} rescuer đã chọn
                     </Badge>
+
+                    {isSplitByAssemblyPointView && splitPendingSaveCount > 0 ? (
+                      <Badge
+                        variant="outline"
+                        className="border-[#FF5722]/25 bg-white text-[#C2410C]"
+                      >
+                        {splitPendingSaveCount} thay đổi chờ lưu
+                      </Badge>
+                    ) : null}
 
                     {selectedVisibleRescuerCount > 0 ? (
                       <Button
@@ -601,33 +1692,40 @@ export default function CoordinatorRescuerManagementPage() {
                   </div>
 
                   <div className="flex w-full flex-col gap-2 sm:flex-row xl:max-w-2xl">
-                    <Select
-                      value={bulkSelectedAssemblyPointId}
-                      onValueChange={setBulkSelectedAssemblyPointId}
-                      disabled={
-                        isAssignmentBusy || selectedVisibleRescuerCount === 0
-                      }
-                    >
-                      <SelectTrigger className="h-9 w-full sm:flex-1">
-                        <SelectValue
-                          placeholder={
-                            isAssemblyPointLoading
-                              ? "Đang tải điểm tập kết..."
-                              : "Chọn điểm tập kết cho nhóm đã chọn"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={UNASSIGN_SELECT_VALUE}>
-                          Bỏ gán khỏi điểm tập kết
-                        </SelectItem>
-                        {(assemblyPointOptions ?? []).map((point) => (
-                          <SelectItem key={point.key} value={point.key}>
-                            {point.value}
+                    {isSplitByAssemblyPointView ? (
+                      <div className="flex h-9 items-center rounded-md border border-[#FF5722]/30 bg-white px-3 text-sm text-foreground sm:flex-1">
+                        Điểm tập kết:{" "}
+                        {selectedAssemblyPointLabel ?? "Đang tải..."}
+                      </div>
+                    ) : (
+                      <Select
+                        value={bulkSelectedAssemblyPointId}
+                        onValueChange={setBulkSelectedAssemblyPointId}
+                        disabled={
+                          isAssignmentBusy || selectedVisibleRescuerCount === 0
+                        }
+                      >
+                        <SelectTrigger className="h-9 w-full sm:flex-1">
+                          <SelectValue
+                            placeholder={
+                              isAssemblyPointLoading
+                                ? "Đang tải điểm tập kết..."
+                                : "Chọn điểm tập kết cho nhóm đã chọn"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={UNASSIGN_SELECT_VALUE}>
+                            Bỏ gán khỏi điểm tập kết
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          {(assemblyPointOptions ?? []).map((point) => (
+                            <SelectItem key={point.key} value={point.key}>
+                              {point.value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
 
                     <Button
                       type="button"
@@ -640,223 +1738,123 @@ export default function CoordinatorRescuerManagementPage() {
                       }
                     >
                       <MapPin className="h-4 w-4" />
-                      Áp dụng cho nhóm đã chọn
+                      {isSplitByAssemblyPointView
+                        ? "Thêm vào điểm tập kết đang chọn"
+                        : "Áp dụng cho nhóm đã chọn"}
                     </Button>
+
+                    {isSplitByAssemblyPointView ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 gap-2 border-[#FF5722]/35 text-[#FF5722] hover:bg-[#FF5722]/10"
+                        onClick={handleSaveAllSplitPendingAssignments}
+                        disabled={
+                          isAssignmentBusy || splitPendingSaveCount === 0
+                        }
+                      >
+                        <MapPin className="h-4 w-4" />
+                        Lưu tất cả thay đổi ({splitPendingSaveCount})
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
 
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Coordinator có thể tick nhiều rescuer rồi gán chung vào cùng
-                  một assembly point ngay trên trang hiện tại.
+                  {isSplitByAssemblyPointView
+                    ? "Danh sách bên phải gồm rescuer chưa có điểm tập kết hoặc đã có điểm tập kết nhưng chưa xác nhận có mặt. Kéo-thả chỉ di chuyển tạm thời giữa hai cột, cần bấm Lưu tất cả thay đổi hoặc Áp dụng để cập nhật chính thức."
+                    : "Coordinator có thể tick nhiều rescuer rồi gán chung vào cùng một assembly point ngay trên trang hiện tại."}
                 </p>
               </div>
             ) : null}
 
-            {isRescuersLoading ? (
+            {isRescuerListLoading ? (
               <div className="space-y-2">
                 {Array.from({ length: 6 }).map((_, idx) => (
                   <Skeleton key={idx} className="h-20 w-full" />
                 ))}
               </div>
-            ) : isRescuersError ? (
+            ) : isRescuerListError ? (
               <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
                 Không thể tải danh sách rescuer.
               </div>
-            ) : visibleRescuers.length === 0 ? (
+            ) : visibleRescuers.length === 0 && !isSplitByAssemblyPointView ? (
               <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
                 Không tìm thấy rescuer phù hợp với điều kiện hiện tại.
               </div>
+            ) : isSplitByAssemblyPointView ? (
+              <div className="grid gap-3 xl:grid-cols-2">
+                <div
+                  ref={leftPanelRef}
+                  onDragOver={(event) => handlePanelDragOver(event, "left")}
+                  onDragLeave={() => handlePanelDragLeave("left")}
+                  onDrop={(event) => {
+                    void handlePanelDrop(event, "left");
+                  }}
+                  className="rounded-lg border border-sky-200 bg-sky-50/55"
+                >
+                  <div className="border-b border-sky-200/90 bg-sky-50/70 px-3 py-2">
+                    <p className="text-sm font-semibold tracking-tight text-sky-900">
+                      Rescuer trong điểm tập kết {selectedAssemblyPointLabel}
+                    </p>
+                    <p className="text-xs text-sky-800/80">
+                      {assignedCount} rescuer đang thuộc điểm tập kết này. Kéo
+                      từ bên phải qua để thêm tạm, rồi bấm Lưu tất cả thay đổi.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 p-3">
+                    {splitLeftPanelRescuers.length === 0 ? (
+                      <div className="rounded-md border border-dashed border-sky-200 bg-white/90 p-3 text-sm text-sky-900/70">
+                        Chưa có rescuer nào trong điểm tập kết này.
+                      </div>
+                    ) : (
+                      splitLeftPanelRescuers.map((rescuer) =>
+                        renderRescuerRow(rescuer, {
+                          showSelection: false,
+                          draggableSide: "left",
+                        }),
+                      )
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  ref={rightPanelRef}
+                  onDragOver={(event) => handlePanelDragOver(event, "right")}
+                  onDragLeave={() => handlePanelDragLeave("right")}
+                  onDrop={(event) => {
+                    void handlePanelDrop(event, "right");
+                  }}
+                  className="rounded-lg border border-[#FF5722]/40 bg-[#FF5722]/10"
+                >
+                  <div className="border-b border-[#FF5722]/25 bg-[#FF5722]/8 px-3 py-2">
+                    <p className="text-sm font-semibold tracking-tight text-[#7C2D12]">
+                      Chưa xác nhận có mặt hoặc chưa có điểm tập kết
+                    </p>
+                    <p className="text-xs text-[#9A3412]/80">
+                      {splitRightPanelRescuers.length} rescuer có thể thêm vào
+                      điểm tập kết. Kéo ngược từ trái qua để bỏ gán tạm.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 p-3">
+                    {splitRightPanelRescuers.length === 0 ? (
+                      <div className="rounded-md border border-dashed border-[#FF5722]/35 bg-white/90 p-3 text-sm text-[#9A3412]/80">
+                        Không còn rescuer phù hợp với điều kiện chưa xác nhận có
+                        mặt hoặc chưa có điểm tập kết theo bộ lọc hiện tại.
+                      </div>
+                    ) : (
+                      splitRightPanelRescuers.map((rescuer) =>
+                        renderRescuerRow(rescuer, { draggableSide: "right" }),
+                      )
+                    )}
+                  </div>
+                </div>
+              </div>
             ) : (
               <>
-                {visibleRescuers.map((rescuer) => {
-                  const isRowPending = pendingUserId === rescuer.id;
-                  const isRowSelected = selectedRescuerIdSet.has(rescuer.id);
-                  const fullName = `${rescuer.firstName} ${rescuer.lastName}`;
-                  const assemblyPointName =
-                    rescuer.assemblyPointId != null
-                      ? (assemblyPointNameById.get(rescuer.assemblyPointId) ??
-                        `Điểm tập kết #${rescuer.assemblyPointId}`)
-                      : null;
-                  const hasAssemblyPointOption =
-                    rescuer.assemblyPointId != null &&
-                    assemblyPointNameById.has(rescuer.assemblyPointId);
-                  const rawRowSelectedAssemblyPointId =
-                    rowSelectedAssemblyPointIds[rescuer.id] ?? "";
-                  const assignedAssemblyPointValue =
-                    rescuer.assemblyPointId != null
-                      ? String(rescuer.assemblyPointId)
-                      : ASSIGNED_SELECT_VALUE;
-                  const rowSelectedAssemblyPointId =
-                    rawRowSelectedAssemblyPointId ||
-                    (rescuer.hasAssemblyPoint
-                      ? assignedAssemblyPointValue
-                      : "");
-
-                  return (
-                    <div
-                      key={rescuer.id}
-                      className={cn(
-                        "rounded-lg border border-border bg-card p-2.5 transition-colors md:p-3",
-                        isRowSelected &&
-                          "border-[#FF5722]/35 bg-[#FF5722]/[0.03]",
-                      )}
-                    >
-                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        <div className="flex min-w-0 items-start gap-3">
-                          <div className="flex h-9 items-center">
-                            <Checkbox
-                              checked={isRowSelected}
-                              onCheckedChange={(checked) =>
-                                handleToggleRescuerSelection(
-                                  rescuer.id,
-                                  checked === true,
-                                )
-                              }
-                              disabled={isAssignmentBusy}
-                              aria-label={`Chọn rescuer ${fullName}`}
-                              className="border-[#FF5722]/40 data-[state=checked]:border-[#FF5722] data-[state=checked]:bg-[#FF5722]"
-                            />
-                          </div>
-
-                          <Avatar className="h-9 w-9 border border-black/10">
-                            <AvatarImage
-                              src={rescuer.avatarUrl ?? DEFAULT_RESCUER_AVATAR}
-                              alt={fullName}
-                            />
-                            <AvatarFallback>
-                              {getInitials(rescuer.firstName, rescuer.lastName)}
-                            </AvatarFallback>
-                          </Avatar>
-
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold tracking-tight">
-                              {fullName}
-                            </p>
-
-                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                              {rescuer.phone ? (
-                                <span>{rescuer.phone}</span>
-                              ) : null}
-                              {rescuer.email ? (
-                                <span>{rescuer.email}</span>
-                              ) : null}
-                            </div>
-
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "border px-2 py-0.5 text-xs",
-                                  rescuer.hasAssemblyPoint
-                                    ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                                    : "border-amber-300 bg-amber-50 text-amber-700",
-                                )}
-                              >
-                                {rescuer.hasAssemblyPoint
-                                  ? "Đã có điểm tập kết"
-                                  : "Chưa có điểm tập kết"}
-                              </Badge>
-
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  "border px-2 py-0.5 text-xs",
-                                  rescuer.hasTeam
-                                    ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                                    : "border-slate-300 bg-slate-50 text-slate-700",
-                                )}
-                              >
-                                {rescuer.hasTeam
-                                  ? "Đã vào team"
-                                  : "Chưa vào team"}
-                              </Badge>
-
-                              {rescuer.rescuerType ? (
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    "border px-2 py-0.5 text-xs font-semibold",
-                                    rescuer.rescuerType === "Core"
-                                      ? "border-sky-300 bg-sky-50 text-sky-700"
-                                      : "border-[#FF5722]/40 bg-[#FF5722]/10 text-[#C2410C]",
-                                  )}
-                                >
-                                  {rescuer.rescuerType === "Core"
-                                    ? "Nhân viên cố định"
-                                    : "Tình nguyện"}
-                                </Badge>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                          <Select
-                            value={rowSelectedAssemblyPointId}
-                            onValueChange={(value) =>
-                              setRowSelectedAssemblyPointIds((previous) => ({
-                                ...previous,
-                                [rescuer.id]: value,
-                              }))
-                            }
-                            disabled={isAssignmentBusy}
-                          >
-                            <SelectTrigger className="h-8 w-55">
-                              <SelectValue
-                                placeholder={
-                                  isAssemblyPointLoading
-                                    ? "Đang tải điểm tập kết..."
-                                    : "Chọn điểm tập kết"
-                                }
-                              />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {rescuer.hasAssemblyPoint &&
-                              !rawRowSelectedAssemblyPointId &&
-                              !hasAssemblyPointOption ? (
-                                <SelectItem
-                                  value={assignedAssemblyPointValue}
-                                  disabled
-                                >
-                                  {assemblyPointName ?? "Đã có điểm tập kết"}
-                                </SelectItem>
-                              ) : null}
-                              <SelectItem value={UNASSIGN_SELECT_VALUE}>
-                                Bỏ gán khỏi điểm tập kết
-                              </SelectItem>
-                              {(assemblyPointOptions ?? []).map((point) => (
-                                <SelectItem key={point.key} value={point.key}>
-                                  {point.value}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 border-[#FF5722]/35 text-[#FF5722] hover:bg-[#FF5722]/10"
-                            onClick={() =>
-                              handleSaveAssignment(
-                                rescuer.id,
-                                rawRowSelectedAssemblyPointId,
-                              )
-                            }
-                            disabled={
-                              isAssignmentBusy ||
-                              isRowPending ||
-                              !rawRowSelectedAssemblyPointId
-                            }
-                          >
-                            <MapPin className="mr-1 h-3.5 w-3.5" />
-                            Lưu thay đổi
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {visibleRescuers.map((rescuer) => renderRescuerRow(rescuer))}
 
                 {totalPages > 1 ? (
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
@@ -900,7 +1898,7 @@ export default function CoordinatorRescuerManagementPage() {
                             Math.max(1, previous - 1),
                           )
                         }
-                        disabled={currentPage <= 1 || isRefetching}
+                        disabled={currentPage <= 1 || isRescuerListRefetching}
                       >
                         Trước
                       </Button>
@@ -931,7 +1929,7 @@ export default function CoordinatorRescuerManagementPage() {
                                 "bg-[#FF5722] text-white hover:bg-[#FF5722]/90",
                             )}
                             onClick={() => setCurrentPage(item)}
-                            disabled={isRefetching}
+                            disabled={isRescuerListRefetching}
                           >
                             {item}
                           </Button>
@@ -947,7 +1945,9 @@ export default function CoordinatorRescuerManagementPage() {
                             Math.min(Math.max(totalPages, 1), previous + 1),
                           )
                         }
-                        disabled={currentPage >= totalPages || isRefetching}
+                        disabled={
+                          currentPage >= totalPages || isRescuerListRefetching
+                        }
                       >
                         Sau
                       </Button>
@@ -958,8 +1958,9 @@ export default function CoordinatorRescuerManagementPage() {
             )}
 
             <p className="text-xs text-muted-foreground">
-              Gợi ý: ô tìm kiếm và các bộ lọc đang gửi trực tiếp lên backend,
-              danh sách hiện tại là kết quả đã được backend lọc sẵn.
+              {isSplitByAssemblyPointView
+                ? "Gợi ý: rescuer mới kéo-thả sẽ lên đầu cột đích và chỉ cập nhật backend khi bấm Lưu tất cả thay đổi hoặc Áp dụng."
+                : "Gợi ý: ô tìm kiếm và các bộ lọc đang gửi trực tiếp lên backend, danh sách hiện tại là kết quả đã được backend lọc sẵn."}
             </p>
           </CardContent>
         </Card>

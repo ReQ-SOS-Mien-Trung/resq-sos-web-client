@@ -266,13 +266,49 @@ export interface ActivityRouteResponse {
   destinationLongitude: number;
   originLatitude: number;
   originLongitude: number;
-  vehicle: string;
+  vehicle: RouteVehicle | string;
+  status?: string | null;
+  errorMessage?: string | null;
   route: RouteData | null;
 }
 
 export interface GetActivityRouteParams {
   missionId: number;
   activityId: number;
+  originLat: number;
+  originLng: number;
+  vehicle?: RouteVehicle;
+}
+
+export interface MissionTeamRouteWaypoint {
+  activityId: number;
+  step: number;
+  activityType: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface MissionTeamRouteLeg {
+  distanceMeters: number;
+  distanceText: string;
+  durationSeconds: number;
+  durationText: string;
+}
+
+export interface MissionTeamRouteResponse {
+  status?: string | null;
+  errorMessage?: string | null;
+  totalDistanceMeters: number;
+  totalDurationSeconds: number;
+  overviewPolyline?: string | null;
+  waypoints: MissionTeamRouteWaypoint[];
+  legs: MissionTeamRouteLeg[];
+}
+
+export interface GetMissionTeamRouteParams {
+  missionId: number;
+  missionTeamId: number;
   originLat: number;
   originLng: number;
   vehicle?: RouteVehicle;
