@@ -109,7 +109,7 @@ export default function RescueTeamsPage() {
       dotClassName: "bg-sky-500",
     },
     Available: {
-      label: "Trống",
+      label: "Sẵn sàng",
       className: "border-teal-200 bg-teal-50 text-teal-800",
       dotClassName: "bg-teal-500",
     },
@@ -279,16 +279,13 @@ export default function RescueTeamsPage() {
     if (
       status === "AwaitingAcceptance" ||
       status === "Ready" ||
+      status === "Gathering" ||
       status === "Available"
     ) {
       return "todo";
     }
 
-    if (
-      status === "Gathering" ||
-      status === "Assigned" ||
-      status === "OnMission"
-    ) {
+    if (status === "Assigned" || status === "OnMission") {
       return "in-progress";
     }
 
@@ -298,8 +295,8 @@ export default function RescueTeamsPage() {
   const statusOrderMap: Record<RescueTeamStatusKey, number> = {
     AwaitingAcceptance: 0,
     Ready: 1,
-    Available: 2,
-    Gathering: 0,
+    Gathering: 2,
+    Available: 3,
     Assigned: 1,
     OnMission: 2,
     Stuck: 0,
@@ -337,7 +334,8 @@ export default function RescueTeamsPage() {
     {
       key: "todo",
       title: "Chờ điều phối",
-      description: "Đội đang chờ xác nhận hoặc đã sẵn sàng nhận nhiệm vụ mới.",
+      description:
+        "Đội đang chờ xác nhận, đang tập hợp hoặc đã sẵn sàng nhận nhiệm vụ mới.",
       dotClassName: "bg-amber-500",
       cardClassName:
         "border-amber-200/80 bg-gradient-to-b from-amber-50/90 to-white",
@@ -346,8 +344,7 @@ export default function RescueTeamsPage() {
     {
       key: "in-progress",
       title: "Đang triển khai",
-      description:
-        "Đội đang tập hợp, đã được phân công hoặc đang làm nhiệm vụ.",
+      description: "Đội đã được phân công hoặc đang làm nhiệm vụ.",
       dotClassName: "bg-sky-500",
       cardClassName:
         "border-sky-200/80 bg-gradient-to-b from-sky-50/80 to-white",
@@ -367,8 +364,8 @@ export default function RescueTeamsPage() {
     RescueTeamColumnKey,
     Array<"all" | RescueTeamStatusKey>
   > = {
-    todo: ["all", "AwaitingAcceptance", "Ready", "Available"],
-    "in-progress": ["all", "Gathering", "Assigned", "OnMission"],
+    todo: ["all", "AwaitingAcceptance", "Ready", "Gathering", "Available"],
+    "in-progress": ["all", "Assigned", "OnMission"],
     completed: ["all", "Stuck", "Unavailable", "Disbanded"],
   };
   const columnFilterTheme: Record<
@@ -490,7 +487,7 @@ export default function RescueTeamsPage() {
     (team) => team.status === "Ready" || team.status === "Available",
   ).length;
   const activeTeams = filteredTeams.filter((team) =>
-    ["Gathering", "Assigned", "OnMission"].includes(team.status),
+    ["Assigned", "OnMission"].includes(team.status),
   ).length;
   const shortageTeams = filteredTeams.filter(
     (team) =>
@@ -535,14 +532,15 @@ export default function RescueTeamsPage() {
     {
       title: "Sẵn sàng điều phối",
       value: numberFormatter.format(readyTeams),
-      description: "Đội có thể nhận nhiệm vụ ngay hoặc đang ở trạng thái trống",
+      description:
+        "Đội có thể nhận nhiệm vụ ngay hoặc đang ở trạng thái sẵn sàng",
       icon: CheckCircle,
       iconClassName: "bg-emerald-500 text-white",
     },
     {
       title: "Đang triển khai",
       value: numberFormatter.format(activeTeams),
-      description: "Đội đang tập hợp, đã phân công hoặc đang làm nhiệm vụ",
+      description: "Đội đã phân công hoặc đang làm nhiệm vụ",
       icon: Pulse,
       iconClassName: "bg-sky-500 text-white",
     },
@@ -884,34 +882,33 @@ export default function RescueTeamsPage() {
           const visibleColumnTeams = filteredTeamsByColumn[column.key];
           const currentColumnFilter = columnStatusFilters[column.key];
           const currentColumnTypeFilter = columnTypeFilters[column.key];
-          const currentColumnOccupancyFilter = columnOccupancyFilters[column.key];
+          const currentColumnOccupancyFilter =
+            columnOccupancyFilters[column.key];
           const filterTheme = columnFilterTheme[column.key];
           const columnTeams = [
-            ...visibleColumnTeams.filter(
-              (team) => {
-                const occupancy = getOccupancyPercent(
-                  team.currentMemberCount,
-                  team.maxMembers,
-                );
+            ...visibleColumnTeams.filter((team) => {
+              const occupancy = getOccupancyPercent(
+                team.currentMemberCount,
+                team.maxMembers,
+              );
 
-                const matchesColumnStatus =
-                  currentColumnFilter === "all" ||
-                  team.status === currentColumnFilter;
-                const matchesColumnType =
-                  currentColumnTypeFilter === "all" ||
-                  team.teamType === currentColumnTypeFilter;
-                const matchesColumnOccupancy = matchesOccupancyFilter(
-                  occupancy,
-                  currentColumnOccupancyFilter,
-                );
+              const matchesColumnStatus =
+                currentColumnFilter === "all" ||
+                team.status === currentColumnFilter;
+              const matchesColumnType =
+                currentColumnTypeFilter === "all" ||
+                team.teamType === currentColumnTypeFilter;
+              const matchesColumnOccupancy = matchesOccupancyFilter(
+                occupancy,
+                currentColumnOccupancyFilter,
+              );
 
-                return (
-                  matchesColumnStatus &&
-                  matchesColumnType &&
-                  matchesColumnOccupancy
-                );
-              },
-            ),
+              return (
+                matchesColumnStatus &&
+                matchesColumnType &&
+                matchesColumnOccupancy
+              );
+            }),
           ].sort(compareTeams);
           const totalColumnTeams = teamsByColumn[column.key].length;
           const hasColumnScopedFilter =
@@ -1040,8 +1037,12 @@ export default function RescueTeamsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Tất cả quân số</SelectItem>
-                        <SelectItem value="empty">0% - Trống quân số</SelectItem>
-                        <SelectItem value="low">1% - 49%: Thiếu nhiều</SelectItem>
+                        <SelectItem value="empty">
+                          0% - Trống quân số
+                        </SelectItem>
+                        <SelectItem value="low">
+                          1% - 49%: Thiếu nhiều
+                        </SelectItem>
                         <SelectItem value="medium">
                           50% - 99%: Đang bổ sung
                         </SelectItem>

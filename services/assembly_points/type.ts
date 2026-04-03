@@ -141,9 +141,9 @@ export interface UpdateAssemblyPointStatusResponse {
   message: string;
 }
 
-// Assign or unassign rescuer to assembly point request
+// Assign or unassign one or many rescuers to an assembly point request
 export interface UpdateRescuerAssemblyPointAssignmentRequest {
-  userId: string;
+  userIds: string[];
   assemblyPointId: number | null;
 }
 
@@ -212,6 +212,7 @@ export interface AssemblyPointCheckedInRescuerEntity {
   firstName: string;
   lastName: string;
   phone: string | null;
+  email: string | null;
   avatarUrl: string | null;
   rescuerType: RescuerType;
   checkedInAt: string;

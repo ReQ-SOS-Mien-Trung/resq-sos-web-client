@@ -222,12 +222,12 @@ function TopBar({
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
             AI Mission Suggestion
             {clusterId && (
-              <Badge variant="outline" className="text-[9px] font-mono px-1.5">
+              <Badge variant="outline" className="text-xs font-mono px-1.5">
                 Cụm #{clusterId}
               </Badge>
             )}
           </h3>
-          <p className="text-[10px] text-muted-foreground font-mono">
+          <p className="text-xs text-muted-foreground font-mono">
             {loading
               ? phaseLabel(phase)
               : result
@@ -243,7 +243,7 @@ function TopBar({
           <Button
             variant="destructive"
             size="sm"
-            className="h-7 text-[10px]"
+            className="h-7 text-xs"
             onClick={onStop}
           >
             <Stop className="h-3 w-3 mr-1" weight="fill" />
@@ -467,7 +467,10 @@ function SonarRadar({
             </defs>
           </svg>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <Brain className="h-6 w-6 text-primary animate-pulse" weight="fill" />
+            <Brain
+              className="h-6 w-6 text-primary animate-pulse"
+              weight="fill"
+            />
           </div>
         </div>
 
@@ -488,9 +491,7 @@ function SonarRadar({
                     key={entry.id}
                     className={cn(
                       "status-ticker-item flex items-center justify-center gap-2 py-1 text-center transition-opacity",
-                      isLatest
-                        ? "text-primary/85"
-                        : "text-muted-foreground/65",
+                      isLatest ? "text-primary/85" : "text-muted-foreground/65",
                     )}
                   >
                     <span
@@ -502,7 +503,7 @@ function SonarRadar({
                     <p
                       className={cn(
                         "font-mono break-words",
-                        isLatest ? "text-sm" : "text-[11px]",
+                        isLatest ? "text-sm" : "text-xs",
                       )}
                     >
                       {entry.message}
@@ -523,7 +524,7 @@ function SonarRadar({
             ref={thinkingRef}
             className="mt-4 max-h-28 w-full max-w-xl overflow-y-auto px-3 text-center scrollbar-none"
           >
-            <p className="text-[11px] font-mono leading-5 text-primary/55 whitespace-pre-wrap break-words">
+            <p className="text-xs font-mono leading-5 text-primary/55 whitespace-pre-wrap break-words">
               {thinkingText}
               <span className="ml-1 inline-block h-3 w-1.5 animate-pulse bg-primary/60 align-middle" />
             </p>
@@ -598,7 +599,7 @@ function ActionFlowTimeline({
       </div>
       {revealedCount < activities.length && (
         <div className="ml-12 border-l-2 border-dashed border-primary/20 py-3 pl-4">
-          <div className="flex items-center gap-2 text-[10px] font-mono text-primary/40">
+          <div className="flex items-center gap-2 text-xs font-mono text-primary/40">
             <span className="h-2 w-2 rounded-full bg-primary/30 animate-pulse" />
             Đang tải bước {revealedCount + 1}/{activities.length}...
           </div>
@@ -647,11 +648,11 @@ function MissionBanner({
             {result.suggestedMissionTitle}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge className="text-[9px] bg-primary text-white border-primary hover:bg-primary/90">
+            <Badge className="text-xs bg-primary text-white border-primary hover:bg-primary/90">
               {severityConfig[result.suggestedSeverityLevel]?.label ||
                 result.suggestedSeverityLevel}
             </Badge>
-            <span className="text-[10px] font-mono text-muted-foreground">
+            <span className="text-xs font-mono text-muted-foreground">
               {result.modelName} • {result.responseTimeMs}ms
             </span>
           </div>
@@ -725,7 +726,7 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
             <span className={cn("text-sm font-bold font-mono", s.color)}>
               {s.value}
             </span>
-            <span className="text-[9px] text-muted-foreground uppercase tracking-wider">
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">
               {s.label}
             </span>
           </div>
@@ -755,7 +756,7 @@ function AiOriginNode() {
       </div>
       <div>
         <span className="text-xs font-bold text-primary">AI Engine</span>
-        <p className="text-[10px] text-muted-foreground font-mono">
+        <p className="text-xs text-muted-foreground font-mono">
           Bắt đầu thực thi kế hoạch
         </p>
       </div>
@@ -889,13 +890,13 @@ function ActivityFlowNode({
                 strokeWidth="1"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-primary">
+            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-primary">
               {activity.step}
             </span>
           </div>
           <Badge
             className={cn(
-              "text-[9px] px-1.5 h-5 border",
+              "text-xs px-1.5 h-5 border",
               config.bgColor,
               config.color,
               "border-current/20",
@@ -904,11 +905,11 @@ function ActivityFlowNode({
             <Icon className="h-3 w-3 mr-0.5" weight="fill" />
             {config.label}
           </Badge>
-          <Badge className="text-[9px] px-1.5 h-5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+          <Badge className="text-xs px-1.5 h-5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
             {severityConfig[activity.priority]?.label || activity.priority}
           </Badge>
           {activity.estimatedTime && (
-            <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-0.5 ml-auto">
+            <span className="text-xs font-mono text-muted-foreground flex items-center gap-0.5 ml-auto">
               <Clock className="h-3 w-3" />
               {activity.estimatedTime}
             </span>
@@ -920,17 +921,17 @@ function ActivityFlowNode({
 
         {activity.suggestedTeam && (
           <div className="ml-9 mb-2 rounded-lg border border-emerald-300/40 bg-emerald-50/50 dark:bg-emerald-900/15 dark:border-emerald-700/40 p-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
               <ShieldCheck className="h-3 w-3" weight="fill" />
               Đội đề xuất
             </p>
-            <p className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
+            <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
               {activity.suggestedTeam.teamName ||
                 (activity.suggestedTeam.teamId
                   ? `Đội #${activity.suggestedTeam.teamId}`
                   : "Đội chưa đặt tên")}
             </p>
-            <p className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
               {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
               {activity.suggestedTeam.contactPhone
                 ? ` • SĐT: ${activity.suggestedTeam.contactPhone}`
@@ -940,12 +941,12 @@ function ActivityFlowNode({
                 : ""}
             </p>
             {activity.suggestedTeam.reason && (
-              <p className="text-[10px] text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
+              <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
                 Lý do: {activity.suggestedTeam.reason}
               </p>
             )}
             {activity.suggestedTeam.assemblyPointName && (
-              <p className="text-[10px] text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
+              <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
                 Điểm tập kết đội: {activity.suggestedTeam.assemblyPointName}
               </p>
             )}
@@ -956,18 +957,18 @@ function ActivityFlowNode({
           (activity.assemblyPointLatitude != null &&
             activity.assemblyPointLongitude != null)) && (
           <div className="ml-9 mb-2 rounded-lg border border-blue-300/40 bg-blue-50/50 dark:bg-blue-900/15 dark:border-blue-700/40 p-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
               <MapPin className="h-3 w-3" weight="fill" />
               Điểm tập kết hoạt động
             </p>
             {activity.assemblyPointName && (
-              <p className="text-[11px] font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
+              <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
                 {activity.assemblyPointName}
               </p>
             )}
             {activity.assemblyPointLatitude != null &&
               activity.assemblyPointLongitude != null && (
-                <p className="text-[10px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-0.5">
                   Tọa độ: {activity.assemblyPointLatitude.toFixed(4)},{" "}
                   {activity.assemblyPointLongitude.toFixed(4)}
                 </p>
@@ -991,11 +992,11 @@ function ActivityFlowNode({
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400 truncate">
+              <p className="text-xs font-bold text-amber-600 dark:text-amber-400 truncate">
                 {activity.depotName}
               </p>
               {activity.depotAddress && (
-                <p className="text-[10px] text-amber-600/50 dark:text-amber-500/50 truncate">
+                <p className="text-xs text-amber-600/50 dark:text-amber-500/50 truncate">
                   {activity.depotAddress}
                 </p>
               )}
@@ -1018,7 +1019,7 @@ function ActivityFlowNode({
               className="h-3.5 w-3.5 text-red-500 shrink-0"
               weight="fill"
             />
-            <span className="text-[10px] font-mono text-red-500/70">
+            <span className="text-xs font-mono text-red-500/70">
               SOS #{activity.sosRequestId}
             </span>
           </div>
@@ -1030,7 +1031,7 @@ function ActivityFlowNode({
               {activity.suppliesToCollect.map((supply) => (
                 <div
                   key={supply.itemId}
-                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-[10px]"
+                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-xs"
                 >
                   <Package className="h-2.5 w-2.5 text-primary" weight="fill" />
                   <span className="text-primary">{supply.itemName}</span>
@@ -1070,7 +1071,7 @@ function AssessmentBlock({ text }: { text: string }) {
           className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400"
           weight="fill"
         />
-        <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+        <span className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
           Đánh giá tổng thể
         </span>
       </div>
@@ -1118,7 +1119,7 @@ function ResourcesBlock({
           className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400"
           weight="fill"
         />
-        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+        <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
           Tài nguyên cần thiết
         </span>
       </div>
@@ -1138,10 +1139,10 @@ function ResourcesBlock({
                 {res.description}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-[10px] font-mono text-blue-500 dark:text-blue-400">
+                <span className="text-xs font-mono text-blue-500 dark:text-blue-400">
                   SL: {res.quantity}
                 </span>
-                <Badge variant="outline" className="text-[9px] px-1 h-3.5">
+                <Badge variant="outline" className="h-5 px-1.5 text-xs">
                   {res.priority}
                 </Badge>
               </div>
@@ -1196,7 +1197,7 @@ function WarningsBlock({
             weight="fill"
           />
           <div>
-            <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
+            <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
               Lưu ý đặc biệt
             </p>
             <p className="text-xs text-amber-600/70 dark:text-amber-400/70 leading-relaxed">

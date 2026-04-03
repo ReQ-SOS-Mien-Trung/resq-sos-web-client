@@ -26,9 +26,7 @@ type DepotSubscriptionHandlers = {
     delta: unknown,
     envelope: DepotRealtimeEventEnvelope,
   ) => void | Promise<void>;
-  onVersionGap: (
-    ctx: DepotRealtimeVersionGapContext,
-  ) => void | Promise<void>;
+  onVersionGap: (ctx: DepotRealtimeVersionGapContext) => void | Promise<void>;
   onDuplicate?: (envelope: DepotRealtimeEventEnvelope) => void;
 };
 
@@ -180,7 +178,11 @@ export class DepotRealtimeClient {
 
     await this.start();
     const connection = this.getOrCreateConnection();
-    await connection.invoke(DEPOT_REALTIME_METHODS.JoinDepotGroup, missionId, depotId);
+    await connection.invoke(
+      DEPOT_REALTIME_METHODS.JoinDepotGroup,
+      missionId,
+      depotId,
+    );
     this.joinedGroups.set(streamKey, { missionId, depotId, refCount: 1 });
   }
 
@@ -231,7 +233,17 @@ export class DepotRealtimeClient {
 
     const callback = (envelope: DepotRealtimeEventEnvelope) => {
       if (envelope.depotId !== depotId) return;
-      if ((envelope.missionId ?? null) !== (missionId ?? null)) return;
+
+      const normalizedMissionId = missionId ?? null;
+      const normalizedEnvelopeMissionId = envelope.missionId ?? null;
+
+      // missionId = null is treated as the global depot stream (wildcard mission).
+      if (
+        normalizedMissionId !== null &&
+        normalizedEnvelopeMissionId !== normalizedMissionId
+      ) {
+        return;
+      }
 
       this.cleanupSeenEventIds();
 

@@ -275,7 +275,7 @@ export function useDeleteAssemblyPoint() {
 }
 
 /**
- * Hook to assign or unassign rescuer to assembly point
+ * Hook to assign or unassign one or many rescuers to an assembly point
  */
 export function useUpdateRescuerAssemblyPointAssignment() {
   const queryClient = useQueryClient();

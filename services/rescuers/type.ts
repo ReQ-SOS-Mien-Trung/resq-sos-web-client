@@ -24,6 +24,10 @@ export interface RescuerApiEntity {
   hasAssemblyPoint?: boolean;
   teamId?: number | null;
   assemblyPointId?: number | string | null;
+  checkedIn?: boolean | null;
+  isCheckedIn?: boolean | null;
+  hasAttendanceConfirmed?: boolean | null;
+  hasPresenceConfirmation?: boolean | null;
 }
 
 export interface RescuerEntity {
@@ -41,6 +45,7 @@ export interface RescuerEntity {
   hasTeam: boolean;
   hasAssemblyPoint: boolean;
   assemblyPointId?: number | null;
+  attendanceConfirmed?: boolean | null;
 }
 
 export interface GetRescuersParams {

@@ -32,9 +32,11 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft,
+  House,
   Shield,
   UserRoundPlus,
   Phone,
+  Mail,
   CalendarClock,
   Building2,
   Crown,
@@ -205,6 +207,16 @@ function MemberCard({
     label: member.status,
     className: "border-black bg-white text-black",
   };
+  const rescuerTypeBadge =
+    member.rescuerType === "Core"
+      ? {
+          label: "Nhân viên cố định",
+          className: "border-sky-500 bg-sky-100 text-sky-900",
+        }
+      : {
+          label: "Tình nguyện",
+          className: "border-[#FF5722] bg-[#FFF2EB] text-[#C2410C]",
+        };
 
   return (
     <Card className="border-black bg-white transition hover:-translate-y-0.5">
@@ -249,10 +261,10 @@ function MemberCard({
 
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-black/70">
               <Badge
-                variant="secondary"
-                className="h-5 rounded-none border border-black px-1.5 text-[10px]"
+                variant="outline"
+                className={`h-5 rounded-none px-1.5 text-[10px] ${rescuerTypeBadge.className}`}
               >
-                {member.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
+                {rescuerTypeBadge.label}
               </Badge>
               <Badge
                 variant="outline"
@@ -260,17 +272,17 @@ function MemberCard({
               >
                 {status.label}
               </Badge>
-              <Badge
-                variant="outline"
-                className="h-5 rounded-none border-black px-1.5 text-[10px]"
-              >
-                {member.checkedIn ? "Đã check-in" : "Chưa check-in"}
-              </Badge>
             </div>
 
             <div className="mt-2 flex items-center gap-1.5 text-xs text-black/70">
               <Phone className="h-3.5 w-3.5" />
               <span>{member.phone || "Không có số điện thoại"}</span>
+            </div>
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-black/70">
+              <Mail className="h-3.5 w-3.5" />
+              <span className="min-w-0 truncate">
+                {member.email || "Không có email"}
+              </span>
             </div>
           </div>
         </div>
@@ -522,15 +534,26 @@ export default function RescueTeamDetailPage() {
     <div className="mx-auto w-full max-w-[1320px] space-y-5 bg-[linear-gradient(to_right,rgba(0,0,0,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.08)_1px,transparent_1px)] bg-[size:30px_30px] bg-white p-4 tracking-tighter md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1.5">
-          <Link href="/dashboard/coordinator/rescue-teams">
-            <Button
-              variant="ghost"
-              className="-ml-1.5 h-8 gap-1.5 rounded-none border border-black px-2.5 text-xs"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Danh sách đội cứu hộ
-            </Button>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/dashboard/coordinator/rescue-teams">
+              <Button
+                variant="ghost"
+                className="-ml-1.5 h-8 gap-1.5 rounded-none border border-black px-2.5 text-xs"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Danh sách đội cứu hộ
+              </Button>
+            </Link>
+            <Link href="/dashboard/coordinator">
+              <Button
+                variant="outline"
+                className="h-8 gap-1.5 rounded-none border-black px-2.5 text-xs"
+              >
+                <House className="h-4 w-4" />
+                Về dashboard
+              </Button>
+            </Link>
+          </div>
           <h1 className="text-2xl font-bold uppercase tracking-[0.06em] md:text-[1.95rem]">
             Chi tiết đội cứu hộ
           </h1>
