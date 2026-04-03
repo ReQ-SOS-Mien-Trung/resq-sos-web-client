@@ -2,10 +2,10 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
+import { CaretDown, CaretUp, MapTrifold } from "@phosphor-icons/react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { mockFloodAlerts } from "@/lib/mock-data/admin-weather-flood";
 import { DashboardSkeleton } from "@/components/admin";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloodAlert, WeatherApiCurrentPoint } from "@/type";
 import { DashboardLayout } from "@/components/admin/dashboard";
 
@@ -32,6 +32,7 @@ const WeatherFloodPage = () => {
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mapExpanded, setMapExpanded] = useState(false);
 
   const loadWeather = useCallback(async () => {
     try {
@@ -95,40 +96,55 @@ const WeatherFloodPage = () => {
       projects={dashboardData.projects}
       cloudStorage={dashboardData.cloudStorage}
     >
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">
-            Thời tiết & Lũ lụt
-          </h1>
-          <p className="text-muted-foreground">
-            Theo dõi thời tiết và cảnh báo lũ lụt
-          </p>
+      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Compact header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter text-foreground leading-tight">
+              Thời tiết & Cảnh báo lũ
+            </h1>
+            <p className="text-base tracking-tighter text-muted-foreground mt-1.5">
+              Phát cảnh báo lũ lụt đến người dùng
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(360px,0.95fr)]">
-          <WeatherMap
-            floodAlerts={floodAlerts}
-            liveWeather={liveWeather}
-            weatherLoading={weatherLoading}
-            weatherError={weatherError}
-            onRefreshWeather={loadWeather}
-          />
+        {/* Full-width Composer — primary action */}
+        <FloodAlertComposer
+          liveWeather={liveWeather}
+          weatherLoading={weatherLoading}
+          weatherError={weatherError}
+          onRefreshWeather={loadWeather}
+        />
 
-          <Card className="border border-border/50">
-            <CardHeader>
-              <CardTitle>Phát cảnh báo lũ</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FloodAlertComposer
+        {/* Collapsible Weather Map — secondary context */}
+        <div className="rounded-xl border border-border/50 bg-background">
+          <button
+            type="button"
+            onClick={() => setMapExpanded((prev) => !prev)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left"
+          >
+            <span className="flex items-center gap-2 tracking-tighter text-sm font-semibold text-foreground">
+              <MapTrifold size={18} weight="duotone" className="text-sky-600" />
+              Bản đồ thời tiết miền Trung
+            </span>
+            <span className="flex items-center gap-1.5 text-xs tracking-tighter text-muted-foreground">
+              {mapExpanded ? "Thu gọn" : "Mở rộng"}
+              {mapExpanded ? <CaretUp size={14} /> : <CaretDown size={14} />}
+            </span>
+          </button>
+          {mapExpanded && (
+            <div className="border-t border-border/40 px-4 pb-4">
+              <WeatherMap
+                floodAlerts={floodAlerts}
                 liveWeather={liveWeather}
                 weatherLoading={weatherLoading}
                 weatherError={weatherError}
                 onRefreshWeather={loadWeather}
               />
-            </CardContent>
-          </Card>
+            </div>
+          )}
         </div>
-
       </div>
     </DashboardLayout>
   );

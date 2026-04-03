@@ -378,6 +378,7 @@ export interface SupplyRequestListItem {
   requestingDepotName: string;
   sourceDepotId: number;
   sourceDepotName: string;
+  priorityLevel: string | null;
   role: SupplyRequestRole;
   sourceStatus: SourceSupplyRequestStatus;
   requestingStatus: RequestingSupplyRequestStatus;
@@ -385,6 +386,8 @@ export interface SupplyRequestListItem {
   rejectedReason: string | null;
   requestedBy: string;
   createdAt: string;
+  responseDeadline: string | null;
+  remainingSeconds: number | null;
   respondedAt: string | null;
   shippedAt: string | null;
   completedAt: string | null;
@@ -417,9 +420,18 @@ export type ThresholdScopeType =
 export type ResolvedThresholdScopeType = ThresholdScopeType | "None";
 
 export interface WarningBandConfig {
-  name: string;
-  from: number;
-  to: number | null;
+  id?: number;
+  critical: number;
+  medium: number;
+  low: number;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface UpdateWarningBandConfigPayload {
+  critical: number;
+  medium: number;
+  low: number;
 }
 
 export interface ThresholdConfig {

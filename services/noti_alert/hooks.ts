@@ -298,8 +298,8 @@ export function useNotificationCenter(options?: NotificationCenterOptions) {
 
   const notificationsQuery = useNotifications(normalizedParams, {
     enabled: isEnabled,
-    refetchInterval: 15_000,
     refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1_000, // consider fresh for 5 min; realtime keeps it up to date
   });
 
   const markAsReadMutation = useMarkNotificationAsRead();

@@ -5,6 +5,7 @@ import "./globals.css";
 import { sfUIDisplay } from "./fonts";
 import Providers from "./providers";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PwaInstallBanner } from "@/components/ui/PwaInstallBanner";
 
 export const metadata: Metadata = {
   title: "ResQ SOS Mien Trung",
@@ -46,6 +47,7 @@ export default function RootLayout({
         <Providers>
           <TooltipProvider>{children}</TooltipProvider>
         </Providers>
+        <PwaInstallBanner />
         <Toaster richColors position="top-right" />
       </body>
     </html>

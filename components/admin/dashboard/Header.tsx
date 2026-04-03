@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,10 +32,9 @@ import { HeaderProps } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
-import { FloodAlertModal } from "./FloodAlertModal";
 
 const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
-  const [floodAlertOpen, setFloodAlertOpen] = useState(false);
+  const router = useRouter();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
 
@@ -153,17 +152,12 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
         {/* Flood Alert Button */}
         <Button
           size="sm"
-          onClick={() => setFloodAlertOpen(true)}
+          onClick={() => router.push("/dashboard/admin/weather-flood")}
           className="hidden md:flex gap-1.5 h-9 rounded-lg bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-200"
         >
           <Warning size={16} weight="fill" />
           Phát cảnh báo lũ
         </Button>
-
-        <FloodAlertModal
-          open={floodAlertOpen}
-          onOpenChange={setFloodAlertOpen}
-        />
 
         {/* Exports Dropdown */}
         <DropdownMenu>

@@ -221,6 +221,7 @@ const INVENTORY_TABS = new Set([
   "vattu",
   "shipments",
   "requests",
+  "supply-management",
 ]);
 
 function resolveInventoryTab(rawTab: string | null): string {

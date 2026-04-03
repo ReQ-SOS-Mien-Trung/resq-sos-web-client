@@ -27,7 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
@@ -65,24 +64,24 @@ const ALERT_TYPE_META: Record<
 > = {
   FLOOD_WARNING: {
     label: "Cảnh báo lũ",
-    icon: <WaveSine size={14} />,
-    activeClassName: "border-amber-500 bg-amber-50 text-amber-700",
+    icon: <WaveSine size={16} weight="duotone" />,
+    activeClassName: "border-amber-500 bg-amber-50 text-amber-700 shadow-sm ring-2 ring-amber-300",
     inactiveClassName:
-      "border-border/60 bg-muted/30 text-muted-foreground hover:border-amber-300",
+      "border-amber-200 bg-amber-50/50 text-amber-600 hover:bg-amber-50 hover:border-amber-300",
   },
   FLOOD_EMERGENCY: {
     label: "Khẩn cấp lũ",
-    icon: <Lightning size={14} />,
-    activeClassName: "border-red-500 bg-red-50 text-red-700",
+    icon: <Lightning size={16} weight="fill" />,
+    activeClassName: "border-red-500 bg-red-50 text-red-700 shadow-sm ring-2 ring-red-300",
     inactiveClassName:
-      "border-border/60 bg-muted/30 text-muted-foreground hover:border-red-300",
+      "border-red-200 bg-red-50/50 text-red-600 hover:bg-red-50 hover:border-red-300",
   },
   EVACUATION: {
     label: "Sơ tán",
-    icon: <BellRinging size={14} />,
-    activeClassName: "border-orange-500 bg-orange-50 text-orange-700",
+    icon: <BellRinging size={16} weight="fill" />,
+    activeClassName: "border-orange-500 bg-orange-50 text-orange-700 shadow-sm ring-2 ring-orange-300",
     inactiveClassName:
-      "border-border/60 bg-muted/30 text-muted-foreground hover:border-orange-300",
+      "border-orange-200 bg-orange-50/50 text-orange-600 hover:bg-orange-50 hover:border-orange-300",
   },
 };
 
@@ -92,17 +91,17 @@ const MANUAL_PRESETS: Array<{
   type: BroadcastNotificationType;
 }> = [
   {
-    title: "🌊 CẢNH BÁO LŨ LỤT",
+    title: "CẢNH BÁO LŨ LỤT",
     body: "Mực nước sông đang tăng cao. Người dân vùng ven sông cần di chuyển đến nơi an toàn ngay lập tức.",
     type: "FLOOD_WARNING",
   },
   {
-    title: "🚨 KHẨN CẤP: LŨ LỚN",
+    title: "KHẨN CẤP: LŨ LỚN",
     body: "Lũ lớn bất thường đang xảy ra. Toàn bộ cư dân khu vực thấp trũng cần sơ tán khẩn cấp. Liên hệ 114 nếu cần hỗ trợ.",
     type: "FLOOD_EMERGENCY",
   },
   {
-    title: "⚠️ LỆNH SƠ TÁN",
+    title: "LỆNH SƠ TÁN",
     body: "Chính quyền địa phương ban hành lệnh sơ tán bắt buộc. Vui lòng rời khỏi khu vực ngập lụt ngay lập tức.",
     type: "EVACUATION",
   },
@@ -197,7 +196,8 @@ function buildWeatherDraft(point: WeatherPointOk): {
     return {
       type: "EVACUATION",
       severityLabel: "Rất cao",
-      title: `🚨 ĐỀ NGHỊ SƠ TÁN KHẨN TẠI ${point.name.toUpperCase()}`,
+      title: `ĐỀ NGHỊ SƠ TÁN KHẨN TẠI ${point.name.toUpperCase()}`,
+
       body: `WeatherAPI ghi nhận tại ${point.name} lúc ${formatDateTime(point.last_updated)}: ${point.condition_text}, mưa ${point.precip_mm}mm, độ ẩm ${point.humidity}%, gió ${point.wind_kph} km/h (${point.wind_dir}). Nguy cơ ngập sâu tăng nhanh, đề nghị sơ tán người dân khỏi khu vực trũng thấp và chuẩn bị lực lượng ứng cứu.`,
       advisory:
         "Ưu tiên sơ tán khu vực thấp trũng và cảnh báo người dân rời khỏi vùng nguy cơ cao.",
@@ -208,7 +208,8 @@ function buildWeatherDraft(point: WeatherPointOk): {
     return {
       type: "FLOOD_EMERGENCY",
       severityLabel: "Cao",
-      title: `🚨 KHẨN CẤP NGẬP LỤT TẠI ${point.name.toUpperCase()}`,
+      title: `KHẨN CẤP NGẬP LỤT TẠI ${point.name.toUpperCase()}`,
+
       body: `WeatherAPI ghi nhận tại ${point.name} lúc ${formatDateTime(point.last_updated)}: ${point.condition_text}, mưa ${point.precip_mm}mm, độ ẩm ${point.humidity}%, gió ${point.wind_kph} km/h (${point.wind_dir}). Nguy cơ lũ và ngập đô thị đang ở mức cao, đề nghị lực lượng tại chỗ trực chiến và người dân hạn chế di chuyển qua khu vực ven sông, ngầm tràn.`,
       advisory:
         "Tăng cường theo dõi mực nước, chuẩn bị lực lượng ứng cứu và hạn chế di chuyển qua điểm ngập.",
@@ -218,7 +219,8 @@ function buildWeatherDraft(point: WeatherPointOk): {
   return {
     type: "FLOOD_WARNING",
     severityLabel: "Theo dõi",
-    title: `🌧️ THEO DÕI MƯA LŨ TẠI ${point.name.toUpperCase()}`,
+    title: `THEO DÕI MƯA LŨ TẠI ${point.name.toUpperCase()}`,
+
     body: `WeatherAPI ghi nhận tại ${point.name} lúc ${formatDateTime(point.last_updated)}: ${point.condition_text}, mưa ${point.precip_mm}mm, độ ẩm ${point.humidity}%, gió ${point.wind_kph} km/h (${point.wind_dir}). Khu vực cần tiếp tục theo dõi sát diễn biến thời tiết và chủ động phương án phòng chống ngập cục bộ.`,
     advisory:
       "Tiếp tục theo dõi mưa, thông báo sớm cho người dân tại các khu vực ven sông và vùng trũng.",
@@ -406,66 +408,94 @@ export default function FloodAlertComposer({
     confirmed;
 
   return (
-    <div className="space-y-5">
-      <Tabs
-        value={effectiveMode}
-        onValueChange={(value) => setMode(value as ComposerMode)}
-        className="gap-4"
-      >
-        <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl bg-muted/50 p-1">
-          <TabsTrigger
-            value="weather_api"
-            className="rounded-lg py-2 text-sm font-semibold"
+    <div className="rounded-xl border border-border/50 bg-background">
+      {/* ── Top bar: Mode toggle + Alert type ── */}
+      <div className="flex flex-col gap-3 border-b border-border/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* Source mode toggle */}
+        <div className="inline-flex items-center rounded-lg bg-muted/50 p-0.5">
+          <button
+            type="button"
+            onClick={() => setMode("weather_api")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm tracking-tighter font-semibold transition-all",
+              effectiveMode === "weather_api"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
           >
-            Gợi ý từ WeatherAPI
-          </TabsTrigger>
-          <TabsTrigger
-            value="manual"
-            className="rounded-lg py-2 text-sm font-semibold"
+            <CloudRain size={14} className="mr-1.5 inline" />
+            WeatherAPI
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("manual")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm tracking-tighter font-semibold transition-all",
+              effectiveMode === "manual"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
           >
             Nhập tay
-          </TabsTrigger>
-        </TabsList>
+          </button>
+        </div>
 
-        <TabsContent value="weather_api" className="space-y-4">
-          <div className="rounded-xl border border-sky-200/70 bg-linear-to-br from-sky-50 to-cyan-50 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-sky-900">
-                  Tạo gợi ý cảnh báo từ dữ liệu thời tiết
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-sky-800/80">
-                  Hệ thống lấy dữ liệu WeatherAPI hiện tại của các tỉnh miền
-                  Trung để gợi ý mức cảnh báo, tiêu đề và nội dung. Admin vẫn có
-                  thể chỉnh sửa trước khi phát đi.
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 border-sky-300 bg-white/80"
-                onClick={onRefreshWeather}
-                disabled={weatherLoading}
+        {/* Alert type selector */}
+        <div className="flex gap-1.5">
+          {BROADCAST_NOTIFICATION_TYPES.map((item) => {
+            const meta = ALERT_TYPE_META[item];
+            return (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setType(item)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg tracking-tighter border px-3 py-1.5 text-sm font-semibold transition-all",
+                  type === item
+                    ? meta.activeClassName
+                    : meta.inactiveClassName,
+                )}
               >
-                <ArrowsCounterClockwise
-                  className={cn("h-4 w-4", weatherLoading && "animate-spin")}
-                />
-                Làm mới
-              </Button>
-            </div>
+                {meta.icon}
+                {meta.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-            <div className="mt-4 space-y-4">
+      {/* ── Main 2-column content ── */}
+      <div className="grid gap-4 px-4 py-2 lg:grid-cols-[400px_minmax(0,1fr)]">
+        {/* ── Left column: Data source + Location ── */}
+        <div className="space-y-3">
+          {effectiveMode === "weather_api" ? (
+            <>
+              {/* Region selector */}
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium text-sky-900">
-                  Chọn khu vực cần lấy dữ liệu
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium text-muted-foreground">
+                    Khu vực
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={onRefreshWeather}
+                    disabled={weatherLoading}
+                    className="flex items-center gap-1 text-[11px] text-sky-600 hover:text-sky-700 disabled:opacity-50"
+                  >
+                    <ArrowsCounterClockwise
+                      size={12}
+                      className={cn(weatherLoading && "animate-spin")}
+                    />
+                    Làm mới
+                  </button>
+                </div>
                 <Select
                   value={selectedRegionValue}
                   onValueChange={setSelectedRegion}
                   disabled={weatherOptions.length === 0}
                 >
-                  <SelectTrigger className="w-full border-sky-200 bg-white">
-                    <SelectValue placeholder="Chọn tỉnh/thành miền Trung" />
+                  <SelectTrigger className="h-9 border-sky-200 bg-sky-50/50 text-sm">
+                    <SelectValue placeholder="Chọn tỉnh/thành" />
                   </SelectTrigger>
                   <SelectContent>
                     {weatherOptions.map((point) => (
@@ -477,211 +507,107 @@ export default function FloodAlertComposer({
                 </Select>
               </div>
 
+              {/* Weather stats compact */}
               {selectedWeatherPoint ? (
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-xl border border-white/70 bg-white/90 p-4 shadow-sm">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <MapPin size={16} className="text-sky-600" />
-                      {selectedWeatherPoint.name}
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                      <div className="rounded-lg bg-muted/40 p-3">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Thermometer size={14} />
-                          Nhiệt độ
-                        </div>
-                        <p className="mt-1 font-semibold text-foreground">
-                          {selectedWeatherPoint.temp_c}°C
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/40 p-3">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Droplets className="h-4 w-4" />
-                          Độ ẩm
-                        </div>
-                        <p className="mt-1 font-semibold text-foreground">
-                          {selectedWeatherPoint.humidity}%
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/40 p-3">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <CloudRain size={14} />
-                          Lượng mưa
-                        </div>
-                        <p className="mt-1 font-semibold text-foreground">
-                          {selectedWeatherPoint.precip_mm} mm
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/40 p-3">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Wind size={14} />
-                          Gió
-                        </div>
-                        <p className="mt-1 font-semibold text-foreground">
-                          {selectedWeatherPoint.wind_kph} km/h
-                        </p>
-                      </div>
-                    </div>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Cập nhật:{" "}
+                <div className="rounded-lg border border-sky-200/60 bg-sky-50/40 p-3">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <MapPin size={14} className="text-sky-600" />
+                    {selectedWeatherPoint.name}
+                    <span className="ml-auto text-[10px] font-normal text-muted-foreground">
                       {formatDateTime(selectedWeatherPoint.last_updated)}
-                    </p>
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-4 gap-1.5">
+                    {[
+                      { icon: <Thermometer size={12} />, val: `${selectedWeatherPoint.temp_c}°C` },
+                      { icon: <Droplets className="h-3 w-3" />, val: `${selectedWeatherPoint.humidity}%` },
+                      { icon: <CloudRain size={12} />, val: `${selectedWeatherPoint.precip_mm}mm` },
+                      { icon: <Wind size={12} />, val: `${selectedWeatherPoint.wind_kph}km/h` },
+                    ].map((s, i) => (
+                      <div key={i} className="rounded-md bg-white/80 px-2 py-1.5 text-center">
+                        <div className="flex justify-center text-muted-foreground">{s.icon}</div>
+                        <p className="mt-0.5 text-xs font-semibold text-foreground">{s.val}</p>
+                      </div>
+                    ))}
                   </div>
 
                   {suggestedDraft && (
-                    <div className="rounded-xl border border-amber-200 bg-white/90 p-4 shadow-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">
-                            Gợi ý nội dung cảnh báo
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Mức cảnh báo suy luận:{" "}
-                            {suggestedDraft.severityLabel}
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                    <div className="mt-2 rounded-md border border-amber-200/70 bg-amber-50/60 p-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-muted-foreground">
+                          Gợi ý: <strong className="text-foreground">{suggestedDraft.severityLabel}</strong>
+                        </span>
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
                           {ALERT_TYPE_META[suggestedDraft.type].label}
                         </span>
                       </div>
-
-                      <div className="mt-3 rounded-lg bg-amber-50/70 p-3 text-sm text-foreground">
+                      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
                         {suggestedDraft.advisory}
-                      </div>
-
+                      </p>
                       <Button
                         type="button"
-                        className="mt-4 w-full gap-2 bg-sky-600 text-white hover:bg-sky-700"
+                        size="sm"
+                        className="mt-2 h-7 w-full gap-1.5 bg-sky-600 text-[11px] text-white hover:bg-sky-700"
                         onClick={applyWeatherDraft}
                       >
-                        <CloudRain size={16} weight="fill" />
-                        Dùng dữ liệu này để điền biểu mẫu
+                        <CloudRain size={12} weight="fill" />
+                        Áp dụng vào form
                       </Button>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-sky-300 bg-white/70 p-4 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-sky-200 p-3 text-xs text-muted-foreground">
                   {weatherLoading
-                    ? "Đang lấy dữ liệu WeatherAPI..."
-                    : "Chưa có dữ liệu WeatherAPI để import. Bạn vẫn có thể chuyển sang nhập tay."}
+                    ? "Đang tải dữ liệu..."
+                    : "Chưa có dữ liệu WeatherAPI."}
                 </div>
               )}
 
               {weatherError && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-sm text-rose-700">
-                  Không lấy được dữ liệu WeatherAPI: {weatherError}
+                <div className="rounded-lg border border-rose-200 bg-rose-50/80 p-2 text-xs text-rose-700">
+                  {weatherError}
                 </div>
               )}
+            </>
+          ) : (
+            /* Manual presets */
+            <div className="space-y-1.5">
+              <Label className="text-sm tracking-tighter font-medium text-muted-foreground">
+                Mẫu nhanh
+              </Label>
+              <div className="space-y-1.5">
+                {MANUAL_PRESETS.map((preset) => {
+                  const meta = ALERT_TYPE_META[preset.type];
+                  const isActive = title === preset.title && type === preset.type;
+                  return (
+                    <button
+                      key={preset.type}
+                      type="button"
+                      onClick={() => applyManualPreset(preset)}
+                      className={cn(
+                        "flex w-full items-center gap-2 tracking-tighter mt-1 rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-all hover:shadow-sm",
+                        isActive ? meta.activeClassName : meta.inactiveClassName,
+                      )}
+                    >
+                      {meta.icon}
+                      {preset.title}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </TabsContent>
+          )}
 
-        <TabsContent value="manual" className="space-y-4">
-          <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
-            <p className="text-sm font-semibold text-foreground">
-              Nhập tay thông báo lũ lụt
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Dùng khi admin muốn chủ động soạn nội dung riêng, không phụ thuộc
-              vào dữ liệu WeatherAPI.
-            </p>
-            <div className="mt-4 grid gap-2 md:grid-cols-3">
-              {MANUAL_PRESETS.map((preset) => (
-                <button
-                  key={preset.title}
-                  type="button"
-                  onClick={() => applyManualPreset(preset)}
-                  className={cn(
-                    "rounded-xl border p-3 text-left text-xs leading-relaxed transition-all hover:-translate-y-0.5 hover:shadow-sm",
-                    title === preset.title && type === preset.type
-                      ? "border-orange-400 bg-orange-50 text-orange-700"
-                      : "border-border/60 bg-background text-muted-foreground hover:border-orange-300 hover:bg-orange-50/50",
-                  )}
-                >
-                  {preset.title}
-                </button>
-              ))}
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      <div className="space-y-4 rounded-xl border border-border/60 bg-background p-4">
-        <div>
-          <Label className="mb-2 block text-sm font-medium">
-            Loại cảnh báo
-          </Label>
-          <div className="grid gap-2 md:grid-cols-3">
-            {BROADCAST_NOTIFICATION_TYPES.map((item) => {
-              const meta = ALERT_TYPE_META[item];
-              return (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setType(item)}
-                  className={cn(
-                    "flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-all",
-                    type === item
-                      ? meta.activeClassName
-                      : meta.inactiveClassName,
-                  )}
-                >
-                  {meta.icon}
-                  {meta.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <Label
-            htmlFor="flood-alert-title"
-            className="mb-1.5 block text-sm font-medium"
-          >
-            Tiêu đề <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="flood-alert-title"
-            placeholder="Nhập tiêu đề cảnh báo..."
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            maxLength={120}
-          />
-          <p className="mt-1 text-right text-[11px] text-muted-foreground">
-            {title.length}/120
-          </p>
-        </div>
-
-        <div>
-          <Label
-            htmlFor="flood-alert-body"
-            className="mb-1.5 block text-sm font-medium"
-          >
-            Nội dung <span className="text-red-500">*</span>
-          </Label>
-          <Textarea
-            id="flood-alert-body"
-            placeholder="Nhập nội dung cảnh báo chi tiết..."
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            className="min-h-28 resize-none"
-            maxLength={500}
-          />
-          <p className="mt-1 text-right text-[11px] text-muted-foreground">
-            {body.length}/500
-          </p>
-        </div>
-
-        <div>
-          <Label className="mb-1.5 block text-sm font-medium">
-            Vị trí cảnh báo <span className="text-red-500">*</span>
-          </Label>
-          <div className="space-y-2">
-            <div className="flex gap-2">
+          {/* Location section */}
+          <div className="space-y-1.5">
+            <Label className="text-sm tracking-tighter font-medium text-muted-foreground">
+              Vị trí cảnh báo <span className="text-red-500">*</span>
+            </Label>
+            <div className="flex mt-1 gap-1.5">
               <Input
-                placeholder="Nhập thành phố (VD: Da Nang, Quang Nam...)"
+                className="h-9 text-sm"
+                placeholder="Thành phố (VD: Da Nang)"
                 value={city}
                 onChange={(event) => setCity(event.target.value)}
                 onKeyDown={(event) => {
@@ -694,74 +620,118 @@ export default function FloodAlertComposer({
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
+                className="h-9 shrink-0 px-3"
                 onClick={() => void handleSearchCity()}
                 disabled={isPending || isGeocoding}
-                className="shrink-0"
               >
-                {isGeocoding ? "Đang tìm..." : "Tìm"}
+                {isGeocoding ? <Spinner size={14} className="animate-spin" /> : <MapPin size={14} />}
               </Button>
             </div>
-            <LocationPickerMap
-              lat={manualLocation?.lat}
-              lon={manualLocation?.lon}
-              onPick={(lat, lon) => setManualLocation({ lat, lon })}
-            />
-            <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-              {manualLocation
-                ? "Đã chọn vị trí trên bản đồ"
-                : "Nhập thành phố để tìm nhanh hoặc nhấn trực tiếp vào bản đồ"}
+            <div className="overflow-hidden rounded-lg border border-border/60">
+              <LocationPickerMap
+                lat={manualLocation?.lat}
+                lon={manualLocation?.lon}
+                onPick={(lat, lon) => setManualLocation({ lat, lon })}
+              />
             </div>
+            {manualLocation && (
+              <p className="flex items-center gap-1 text-xs tracking-tighter text-emerald-600">
+                <MapPin size={10} weight="fill" />
+                Đã chọn vị trí ({manualLocation.lat.toFixed(4)}, {manualLocation.lon.toFixed(4)})
+              </p>
+            )}
           </div>
         </div>
 
-        <label className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
-          <input
-            type="checkbox"
-            checked={confirmed}
-            onChange={(event) => setConfirmed(event.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-border accent-red-600"
-          />
-          <span className="text-xs leading-relaxed text-amber-900">
-            Tôi xác nhận phát thông báo này đến toàn bộ người dùng. Hành động
-            này sẽ gửi push notification ngay và không thể hoàn tác.
-          </span>
-        </label>
+        {/* ── Right column: Form fields ── */}
+        <div className="space-y-1">
+          {/* Title */}
+          <div>
+            <Label htmlFor="flood-alert-title" className="mb-2 block text-sm tracking-tighter font-medium text-muted-foreground">
+              Tiêu đề <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="flood-alert-title"
+              className="h-9 text-sm"
+              placeholder="Nhập tiêu đề cảnh báo..."
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              maxLength={120}
+            />
+            <p className="mt-0.5 tracking-tighter text-right text-xs text-muted-foreground">
+              {title.length}/120
+            </p>
+          </div>
 
-        <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-xs text-red-700">
-          <Warning size={16} weight="fill" className="mt-0.5 shrink-0" />
-          <p>
-            Khi dùng chế độ import, nội dung chỉ là gợi ý dựa trên dữ liệu thời
-            tiết hiện tại của WeatherAPI, chưa phải cảnh báo lũ chính thức từ cơ
-            quan chuyên trách.
-          </p>
-        </div>
+          {/* Body */}
+          <div>
+            <Label htmlFor="flood-alert-body" className="mb-2 block text-sm tracking-tighter font-medium text-muted-foreground">
+              Nội dung <span className="text-red-500">*</span>
+            </Label>
+            <Textarea
+              id="flood-alert-body"
+              placeholder="Nhập nội dung cảnh báo chi tiết..."
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              className="min-h-24 resize-none text-sm"
+              maxLength={500}
+            />
+            <p className="mt-0.5 text-right text-xs tracking-tighter text-muted-foreground">
+              {body.length}/500
+            </p>
+          </div>
 
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            className="flex-1"
-            disabled={isPending}
-            onClick={resetComposer}
-          >
-            Xóa nội dung
-          </Button>
-          <Button
-            className={cn(
-              "flex-1 gap-2 font-semibold",
-              canSend
-                ? "bg-linear-to-r from-red-600 to-orange-500 text-white hover:from-red-700 hover:to-orange-600"
-                : "bg-muted text-muted-foreground",
-            )}
-            disabled={!canSend || isPending}
-            onClick={handleSend}
-          >
-            {isPending ? (
-              <Spinner size={16} className="animate-spin" />
-            ) : (
-              <BellRinging size={16} weight="fill" />
-            )}
-            {isPending ? "Đang gửi..." : "Phát cảnh báo"}
-          </Button>
+          {/* Confirm + Warning */}
+          <label className="flex items-start gap-2.5 mt-2 rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(event) => setConfirmed(event.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-border accent-red-600"
+            />
+            <span className="text-sm tracking-tighter leading-relaxed text-amber-900">
+              Tôi xác nhận phát cảnh báo này đến <strong>toàn bộ người dùng</strong>. Thông báo sẽ gửi ngay và không thể hoàn tác.
+            </span>
+          </label>
+
+          <div className="flex items-start gap-2 rounded-lg border border-red-200/60 bg-red-50/50 px-3 py-2 text-sm text-red-700">
+            <Warning size={18} weight="fill" className="mt-0.5 shrink-0" />
+            <p>
+              Nội dung gợi ý từ WeatherAPI chưa phải cảnh báo chính thức từ cơ quan chuyên trách.
+            </p>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-2 pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              disabled={isPending}
+              onClick={resetComposer}
+            >
+              Xóa nội dung
+            </Button>
+            <Button
+              size="sm"
+              className={cn(
+                "h-9 flex-1 gap-1.5 font-semibold",
+                canSend
+                  ? "bg-linear-to-r from-red-600 to-orange-500 text-white hover:from-red-700 hover:to-orange-600"
+                  : "bg-muted text-muted-foreground",
+              )}
+              disabled={!canSend || isPending}
+              onClick={handleSend}
+            >
+              {isPending ? (
+                <Spinner size={14} className="animate-spin" />
+              ) : (
+                <BellRinging size={14} weight="fill" />
+              )}
+              {isPending ? "Đang gửi..." : "Phát cảnh báo lũ"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

@@ -93,6 +93,14 @@ export function useNotificationPushLifecycle() {
       const { onMessage } = await import("firebase/messaging");
 
       unsubscribe = onMessage(messaging, (payload) => {
+        const data = payload.data as Record<string, string> | undefined;
+        const isBroadcastAlert = data?.type === "broadcast_alert";
+
+        // broadcast_alert is handled by SignalR (useBroadcastAlertListener) when
+        // web is open — it plays sound + shows overlay. Skip here to avoid doubles.
+        if (isBroadcastAlert) return;
+
+        // ── Normal per-user notification ────────────────────────────────────
         if (Notification.permission !== "granted") return;
 
         const notification =
@@ -106,16 +114,17 @@ export function useNotificationPushLifecycle() {
           .then((reg) =>
             reg.showNotification(title, {
               body: body || undefined,
-              icon: "/icons/logo.svg",
+              icon: "/icons/logo-192.png",
+              badge: "/icons/logo-192.png",
               tag: `fcm-${Date.now()}`,
-              requireInteraction: true,
+              requireInteraction: false,
             } as NotificationOptions),
           )
           .catch(() => {
             try {
               new Notification(title, {
                 body: body || undefined,
-                icon: "/icons/logo.svg",
+                icon: "/icons/logo-192.png",
               });
             } catch {
               // ignore
