@@ -3,86 +3,90 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FloppyDisk, ArrowCounterClockwise, SpinnerGap } from "@phosphor-icons/react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  FloppyDisk,
+  ArrowCounterClockwise,
+  SpinnerGap,
+  Warning,
+  ShieldWarning,
+  ShieldCheck,
+  CheckCircle,
+} from "@phosphor-icons/react";
 import {
   useWarningBandConfig,
   useUpdateWarningBandConfig,
 } from "@/services/inventory/hooks";
-import type { WarningBandConfig } from "@/services/inventory/type";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const BAND_NAMES = ["CRITICAL", "MEDIUM", "LOW", "OK"] as const;
-type BandName = (typeof BAND_NAMES)[number];
+type EditableBand = "CRITICAL" | "MEDIUM" | "LOW";
 
-const BAND_META: Record<
-  BandName,
-  { label: string; color: string; bg: string; bar: string; description: string }
-> = {
-  CRITICAL: {
-    label: "Nguy cấp",
-    color: "text-red-700",
-    bg: "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800",
-    bar: "bg-red-500",
-    description: "Dưới mức này hệ thống sẽ gửi cảnh báo mức nguy cấp",
-  },
-  MEDIUM: {
-    label: "Trung bình",
-    color: "text-amber-700",
-    bg: "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800",
-    bar: "bg-amber-400",
-    description: "Dưới mức này hệ thống sẽ gửi cảnh báo mức trung bình",
-  },
-  LOW: {
-    label: "Thấp",
-    color: "text-yellow-700",
-    bg: "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-800",
-    bar: "bg-yellow-400",
-    description: "Dưới mức này hệ thống sẽ gửi cảnh báo mức thấp",
-  },
-  OK: {
-    label: "Đủ kho",
-    color: "text-emerald-700",
-    bg: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800",
-    bar: "bg-emerald-500",
-    description: "Trên mức LOW — kho đạt mức an toàn",
-  },
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Convert server ratio (0–1) to user-facing percent (0–100) */
-const toPercent = (v: number) => Math.round(v * 100 * 10) / 10;
-/** Convert user-facing percent back to ratio */
-const toRatio = (p: number) => Math.round((p / 100) * 1000) / 1000;
-
-/** Build the default draft from server data */
-function buildDraft(bands: WarningBandConfig[] | null | undefined): Record<BandName, number | null> {
-  const map: Record<string, number | null> = {};
-  if (Array.isArray(bands)) {
-    bands.forEach((b) => (map[b.name] = b.to));
-  }
-  return {
-    CRITICAL: map["CRITICAL"] !== undefined ? map["CRITICAL"] : 0.4,
-    MEDIUM: map["MEDIUM"] !== undefined ? map["MEDIUM"] : 0.7,
-    LOW: map["LOW"] !== undefined ? map["LOW"] : 1.0,
-    OK: null,
-  };
-}
-
-/** Derive "from" values from "to" values */
-function deriveFrom(
-  draft: Record<BandName, number | null>,
-): Record<BandName, number> {
-  return {
-    CRITICAL: 0,
-    MEDIUM: draft.CRITICAL ?? 0,
-    LOW: draft.MEDIUM ?? 0,
-    OK: draft.LOW ?? 0,
-  };
-}
+const BAND_CONFIG: {
+  key: EditableBand;
+  label: string;
+  description: string;
+  icon: typeof Warning;
+  iconWeight: "fill" | "bold";
+  color: string;
+  textColor: string;
+  bg: string;
+  sliderTrack: string;
+  sliderThumb: string;
+  badgeBg: string;
+}[] = [
+    {
+      key: "CRITICAL",
+      label: "Nguy cấp",
+      description: "Kho dưới mức này → cảnh báo khẩn",
+      icon: ShieldWarning,
+      iconWeight: "fill",
+      color: "text-red-600",
+      textColor: "text-red-700 dark:text-red-300",
+      bg: "bg-gradient-to-r from-red-50 to-red-100/50 border-red-200 dark:from-red-950/30 dark:to-red-900/10 dark:border-red-800/60",
+      sliderTrack: "bg-red-500",
+      sliderThumb:
+        "border-red-500 bg-white shadow-[0_0_0_3px_rgba(239,68,68,0.2)] hover:shadow-[0_0_0_6px_rgba(239,68,68,0.25)]",
+      badgeBg:
+        "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700",
+    },
+    {
+      key: "MEDIUM",
+      label: "Trung bình",
+      description: "Kho ở mức cần chú ý theo dõi",
+      icon: Warning,
+      iconWeight: "fill",
+      color: "text-amber-600",
+      textColor: "text-amber-700 dark:text-amber-300",
+      bg: "bg-gradient-to-r from-amber-50 to-yellow-50/50 border-amber-200 dark:from-amber-950/30 dark:to-amber-900/10 dark:border-amber-800/60",
+      sliderTrack: "bg-amber-400",
+      sliderThumb:
+        "border-amber-400 bg-white shadow-[0_0_0_3px_rgba(251,191,36,0.2)] hover:shadow-[0_0_0_6px_rgba(251,191,36,0.25)]",
+      badgeBg:
+        "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700",
+    },
+    {
+      key: "LOW",
+      label: "Thấp",
+      description: "Kho dưới mức an toàn nhưng chưa khẩn",
+      icon: CheckCircle,
+      iconWeight: "bold",
+      color: "text-emerald-600",
+      textColor: "text-emerald-700 dark:text-emerald-300",
+      bg: "bg-gradient-to-r from-emerald-50 to-teal-50/50 border-emerald-200 dark:from-emerald-950/30 dark:to-emerald-900/10 dark:border-emerald-800/60",
+      sliderTrack: "bg-emerald-500",
+      sliderThumb:
+        "border-emerald-500 bg-white shadow-[0_0_0_3px_rgba(16,185,129,0.2)] hover:shadow-[0_0_0_6px_rgba(16,185,129,0.25)]",
+      badgeBg:
+        "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700",
+    },
+  ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -90,67 +94,34 @@ export function WarningBandConfigCard() {
   const { data: serverData, isLoading, refetch } = useWarningBandConfig();
   const mutation = useUpdateWarningBandConfig();
 
-  // User overrides: only what the user has explicitly changed.
-  // If null, falls back to server values.
-  const [inputOverrides, setInputOverrides] = useState<
-    Partial<Record<Exclude<BandName, "OK">, string>>
-  >({});
-  const [ratioOverrides, setRatioOverrides] = useState<
-    Partial<Record<Exclude<BandName, "OK">, number>>
+  const [overrides, setOverrides] = useState<
+    Partial<Record<EditableBand, number>>
   >({});
 
-  // Server-derived "to" values (ratios)
-  const serverDraft = useMemo(
-    () => buildDraft(serverData),
+  const serverValues = useMemo(
+    () => ({
+      CRITICAL: serverData?.critical ?? 40,
+      MEDIUM: serverData?.medium ?? 70,
+      LOW: serverData?.low ?? 100,
+    }),
     [serverData],
   );
 
-  // Effective ratio for each editable band (user override wins)
-  const effectiveRatios = {
-    CRITICAL: ratioOverrides.CRITICAL ?? serverDraft.CRITICAL,
-    MEDIUM: ratioOverrides.MEDIUM ?? serverDraft.MEDIUM,
-    LOW: ratioOverrides.LOW ?? serverDraft.LOW,
-    OK: null,
-  } as Record<BandName, number | null>;
+  const getValue = (key: EditableBand): number =>
+    overrides[key] ?? serverValues[key];
 
-  // Display strings for inputs (user override wins, otherwise from server)
-  const inputs: Record<Exclude<BandName, "OK">, string> = {
-    CRITICAL:
-      inputOverrides.CRITICAL ??
-      (serverDraft.CRITICAL !== null
-        ? String(toPercent(serverDraft.CRITICAL))
-        : ""),
-    MEDIUM:
-      inputOverrides.MEDIUM ??
-      (serverDraft.MEDIUM !== null
-        ? String(toPercent(serverDraft.MEDIUM))
-        : ""),
-    LOW:
-      inputOverrides.LOW ??
-      (serverDraft.LOW !== null ? String(toPercent(serverDraft.LOW)) : ""),
-  };
-
-  const froms = deriveFrom(effectiveRatios);
-
-  const handleInputChange = (band: Exclude<BandName, "OK">, raw: string) => {
-    setInputOverrides((prev) => ({ ...prev, [band]: raw }));
-    const parsed = parseFloat(raw);
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
-      setRatioOverrides((prev) => ({ ...prev, [band]: toRatio(parsed) }));
-    }
+  const handleSliderChange = (key: EditableBand, value: number) => {
+    setOverrides((prev) => ({ ...prev, [key]: value }));
   };
 
   const validate = (): string | null => {
-    const critical = effectiveRatios.CRITICAL;
-    const medium = effectiveRatios.MEDIUM;
-    const low = effectiveRatios.LOW;
-
-    if (critical === null || medium === null || low === null)
-      return "Vui lòng nhập đủ các mức";
+    const critical = getValue("CRITICAL");
+    const medium = getValue("MEDIUM");
+    const low = getValue("LOW");
     if (critical <= 0) return "CRITICAL phải > 0%";
     if (medium <= critical) return "MEDIUM phải lớn hơn CRITICAL";
     if (low <= medium) return "LOW phải lớn hơn MEDIUM";
-    if (low > 1) return "LOW không được vượt quá 100%";
+    if (low > 100) return "LOW không được vượt quá 100%";
     return null;
   };
 
@@ -161,20 +132,18 @@ export function WarningBandConfigCard() {
       return;
     }
 
-    const payload: WarningBandConfig[] = [
-      { name: "CRITICAL", from: froms.CRITICAL, to: effectiveRatios.CRITICAL! },
-      { name: "MEDIUM", from: froms.MEDIUM, to: effectiveRatios.MEDIUM! },
-      { name: "LOW", from: froms.LOW, to: effectiveRatios.LOW! },
-      { name: "OK", from: froms.OK, to: null },
-    ];
+    const payload = {
+      critical: getValue("CRITICAL"),
+      medium: getValue("MEDIUM"),
+      low: getValue("LOW"),
+    };
 
     const toastId = toast.loading("Đang lưu cấu hình dải cảnh báo...");
     mutation.mutate(payload, {
       onSuccess: async () => {
         toast.dismiss(toastId);
         toast.success("Cập nhật dải cảnh báo thành công");
-        setInputOverrides({});
-        setRatioOverrides({});
+        setOverrides({});
         await refetch();
       },
       onError: (err: any) => {
@@ -187,31 +156,28 @@ export function WarningBandConfigCard() {
   };
 
   const handleReset = () => {
-    setInputOverrides({});
-    setRatioOverrides({});
+    setOverrides({});
   };
 
+  const isDirty = Object.keys(overrides).length > 0;
+
   // Visual bar widths
-  const criticalPct = effectiveRatios.CRITICAL !== null ? toPercent(effectiveRatios.CRITICAL) : 0;
-  const mediumPct = effectiveRatios.MEDIUM !== null ? toPercent(effectiveRatios.MEDIUM) : 0;
-  const lowPct = effectiveRatios.LOW !== null ? toPercent(effectiveRatios.LOW) : 0;
-  const criticalWidth = criticalPct;
-  const mediumWidth = Math.max(mediumPct - criticalPct, 0);
-  const lowWidth = Math.max(lowPct - mediumPct, 0);
-  const okWidth = Math.max(100 - lowPct, 0);
+  const criticalPct = getValue("CRITICAL");
+  const mediumPct = getValue("MEDIUM");
+  const lowPct = getValue("LOW");
 
   return (
     <Card className="border-border/60">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <CardTitle className="text-[16px] tracking-tighter">
+            <CardTitle className="text-[16px] tracking-tighter flex items-center gap-2">
+              <ShieldCheck size={18} className="text-primary" />
               Dải cảnh báo kho hàng
             </CardTitle>
             <CardDescription className="tracking-tighter text-[14px] mt-0.5">
-              Điều chỉnh ngưỡng phần trăm (%) tồn kho cho 4 mức cảnh báo cố
-              định. Giá trị được tính theo tỉ lệ tồn kho hiện tại / ngưỡng
-              tối thiểu.
+              Kéo thanh trượt để điều chỉnh ngưỡng (%) từng mức cảnh báo. Các
+              mức phải tăng dần: CRITICAL &lt; MEDIUM &lt; LOW.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -219,7 +185,7 @@ export function WarningBandConfigCard() {
               variant="outline"
               size="sm"
               onClick={handleReset}
-              disabled={isLoading || mutation.isPending}
+              disabled={isLoading || mutation.isPending || !isDirty}
             >
               <ArrowCounterClockwise size={13} className="mr-1.5" />
               Hoàn tác
@@ -227,7 +193,7 @@ export function WarningBandConfigCard() {
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={isLoading || mutation.isPending}
+              disabled={isLoading || mutation.isPending || !isDirty}
             >
               {mutation.isPending ? (
                 <SpinnerGap size={13} className="mr-1.5 animate-spin" />
@@ -241,131 +207,197 @@ export function WarningBandConfigCard() {
       </CardHeader>
 
       <CardContent className="space-y-5">
-        {/* Visual bar */}
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted-foreground tracking-tighter font-medium uppercase">
-            Biểu đồ phân bổ dải
-          </p>
-          <div className="flex h-5 w-full overflow-hidden rounded-full border border-border/40">
-            {isLoading ? (
-              <div className="h-full w-full animate-pulse bg-muted" />
-            ) : (
-              <>
-                <div
-                  className="h-full bg-red-500 transition-all duration-300"
-                  style={{ width: `${Math.max(criticalWidth, 0)}%` }}
-                  title={`CRITICAL: 0% – ${criticalWidth}%`}
-                />
-                <div
-                  className="h-full bg-amber-400 transition-all duration-300"
-                  style={{ width: `${Math.max(mediumWidth, 0)}%` }}
-                  title={`MEDIUM: ${criticalWidth}% – ${criticalWidth + mediumWidth}%`}
-                />
-                <div
-                  className="h-full bg-yellow-400 transition-all duration-300"
-                  style={{ width: `${Math.max(lowWidth, 0)}%` }}
-                  title={`LOW: ${criticalWidth + mediumWidth}% – ${criticalWidth + mediumWidth + lowWidth}%`}
-                />
-                <div
-                  className="h-full bg-emerald-500 transition-all duration-300 flex-1"
-                  style={{ width: `${Math.max(okWidth, 0)}%` }}
-                  title={`OK: ${criticalWidth + mediumWidth + lowWidth}% – 100%`}
-                />
-              </>
-            )}
+        {/* ── Unified zone bar ── */}
+        <div className="space-y-2">
+          <div className="relative">
+            {/* Multi-zone bar */}
+            <div className="flex h-8 w-full overflow-hidden rounded-full border border-border/40 shadow-inner">
+              {isLoading ? (
+                <div className="h-full w-full animate-pulse bg-muted" />
+              ) : (
+                <>
+                  <div
+                    className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-300 flex items-center justify-center"
+                    style={{ width: `${criticalPct}%` }}
+                  >
+                    {criticalPct > 8 && (
+                      <span className="text-[10px] font-bold text-white/90 tracking-tight">
+                        {criticalPct}%
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-400 to-yellow-400 transition-all duration-300 flex items-center justify-center"
+                    style={{
+                      width: `${Math.max(mediumPct - criticalPct, 0)}%`,
+                    }}
+                  >
+                    {mediumPct - criticalPct > 8 && (
+                      <span className="text-[10px] font-bold text-amber-900/70 tracking-tight">
+                        {mediumPct - criticalPct}%
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="h-full bg-gradient-to-r from-yellow-300 to-lime-300 transition-all duration-300 flex items-center justify-center"
+                    style={{ width: `${Math.max(lowPct - mediumPct, 0)}%` }}
+                  >
+                    {lowPct - mediumPct > 8 && (
+                      <span className="text-[10px] font-bold text-yellow-900/70 tracking-tight">
+                        {lowPct - mediumPct}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-300 flex-1 flex items-center justify-center">
+                    {100 - lowPct > 8 && (
+                      <span className="text-[10px] font-bold text-white/90 tracking-tight">
+                        OK
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Tick marks */}
+            <div className="flex justify-between mt-1.5 px-0.5">
+              <span className="text-xs text-muted-foreground/60 font-medium tabular-nums">
+                0%
+              </span>
+              <span className="text-xs text-muted-foreground/60 font-medium tabular-nums">
+                25%
+              </span>
+              <span className="text-xs text-muted-foreground/60 font-medium tabular-nums">
+                50%
+              </span>
+              <span className="text-xs text-muted-foreground/60 font-medium tabular-nums">
+                75%
+              </span>
+              <span className="text-xs text-muted-foreground/60 font-medium tabular-nums">
+                100%
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between text-[10px] text-muted-foreground">
-            <span>0%</span>
-            <span>50%</span>
-            <span>100%</span>
+
+          {/* Legend chips */}
+          <div className="flex items-center gap-2 justify-center pt-1">
+            {[
+              { label: "Nguy cấp", color: "bg-red-500" },
+              { label: "Trung bình", color: "bg-amber-400" },
+              { label: "Thấp", color: "bg-yellow-300" },
+              { label: "An toàn", color: "bg-emerald-500" },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground tracking-tighter"
+              >
+                <div
+                  className={`h-2 w-2 rounded-full ${item.color} ring-1 ring-black/5`}
+                />
+                {item.label}
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Band rows */}
-        <div className="space-y-2">
-          {BAND_NAMES.map((band) => {
-            const meta = BAND_META[band];
-            const isOK = band === "OK";
-            const fromVal = froms[band];
-            const fromPct = toPercent(fromVal);
+        {/* ── Slider rows ── */}
+        <div className="space-y-3">
+          {BAND_CONFIG.map((field) => {
+            const Icon = field.icon;
+            const value = getValue(field.key);
+            const pct = value;
 
             return (
               <div
-                key={band}
-                className={`flex items-center gap-4 rounded-lg border px-4 py-3 ${meta.bg}`}
+                key={field.key}
+                className={`rounded-xl border px-5 py-4 transition-all ${field.bg}`}
               >
-                {/* Color dot + label */}
-                <div className="flex items-center gap-2 w-32 shrink-0">
-                  <div className={`h-2.5 w-2.5 rounded-full ${meta.bar}`} />
-                  <div>
-                    <p className={`text-sm font-bold tracking-tighter ${meta.color}`}>
-                      {band}
-                    </p>
-                    <p className={`text-[11px] tracking-tighter ${meta.color} opacity-75`}>
-                      {meta.label}
-                    </p>
-                  </div>
-                </div>
-
-                {/* From (readonly, derived) */}
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-tighter">
-                    Từ
-                  </span>
-                  <div className="h-8 w-16 flex items-center justify-center rounded-md border bg-background/60 text-sm font-mono text-muted-foreground select-none">
-                    {isLoading ? "…" : `${fromPct}%`}
-                  </div>
-                </div>
-
-                <span className="text-muted-foreground text-sm">→</span>
-
-                {/* To (editable or fixed for OK) */}
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-tighter">
-                    Đến
-                  </span>
-                  {isOK ? (
-                    <div className="h-8 w-20 flex items-center justify-center rounded-md border bg-background/60 text-sm font-mono text-muted-foreground select-none">
-                      ∞
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.5}
-                        value={inputs[band as Exclude<BandName, "OK">] ?? ""}
-                        onChange={(e) =>
-                          handleInputChange(
-                            band as Exclude<BandName, "OK">,
-                            e.target.value,
-                          )
-                        }
-                        disabled={isLoading}
-                        className="h-8 w-24 pr-7 text-sm font-mono"
-                      />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                        %
+                {/* Header row */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <Icon
+                      size={20}
+                      weight={field.iconWeight}
+                      className={field.color}
+                    />
+                    <div className="flex items-baseline gap-2">
+                      <span
+                        className={`text-sm font-bold tracking-tighter ${field.textColor}`}
+                      >
+                        {field.key} - {field.label}
+                      </span>
+                      <span className={`text-sm font-medium tracking-tighter ${field.textColor} opacity-60`}>
+                        ({field.description})
                       </span>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Percentage badge */}
+                  <div
+                    className={`rounded-full px-3 py-1 text-sm font-bold tracking-tighter tabular-nums border ${field.badgeBg}`}
+                  >
+                    {value}%
+                  </div>
                 </div>
 
-                {/* Description */}
-                <p className="ml-auto text-[12px] text-muted-foreground tracking-tighter hidden sm:block max-w-xs text-right">
-                  {meta.description}
-                </p>
+                {/* Slider */}
+                <div className="relative group">
+                  {/* Track background */}
+                  <div className="h-2 w-full rounded-full bg-black/[0.06] dark:bg-white/[0.08]">
+                    {/* Filled track */}
+                    <div
+                      className={`h-full rounded-full transition-all duration-75 ${field.sliderTrack}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+
+                  {/* Native range input — invisible but handles all interaction */}
+                  <input
+                    type="range"
+                    min={1}
+                    max={100}
+                    step={1}
+                    value={value}
+                    disabled={isLoading}
+                    onChange={(e) =>
+                      handleSliderChange(
+                        field.key,
+                        parseInt(e.target.value, 10),
+                      )
+                    }
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                    style={{ margin: 0, padding: 0 }}
+                  />
+
+                  {/* Custom thumb */}
+                  <div
+                    className={`absolute top-1/2 -translate-y-1/2 h-5 w-5 rounded-full border-[2.5px] transition-shadow duration-150 pointer-events-none ${field.sliderThumb}`}
+                    style={{ left: `calc(${pct}% - 10px)` }}
+                  />
+                </div>
+
+                {/* Scale + description */}
+                <div className="flex items-end justify-between mt-2">
+                  <div className="flex gap-0 w-full font-medium text-xs tabular-nums tracking-tighter text-muted-foreground/60">
+                    <span>0%</span>
+                    <span className="ml-auto">50%</span>
+                    <span className="ml-auto">100%</span>
+                  </div>
+                </div>
               </div>
             );
           })}
         </div>
 
-        {/* Note */}
-        <p className="text-[12px] text-muted-foreground tracking-tighter">
-          💡 Giá trị <strong>Từ</strong> được tự động suy ra từ mức trên. Chỉ
-          cần điều chỉnh cột <strong>Đến</strong> của CRITICAL, MEDIUM và LOW.
-        </p>
+        {/* Meta info */}
+        {serverData?.updatedAt && (
+          <p className="text-sm tracking-tighter pt-1">
+            Cập nhật lần cuối:{" "}
+            <strong>
+              {new Date(serverData.updatedAt).toLocaleString("vi-VN")}
+            </strong>
+          </p>
+        )}
       </CardContent>
     </Card>
   );

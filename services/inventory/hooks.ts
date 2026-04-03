@@ -80,6 +80,7 @@ import {
   GetLowStockParams,
   GetLowStockResponse,
   WarningBandConfig,
+  UpdateWarningBandConfigPayload,
   SupplyRequestPriorityConfig,
   UpdateSupplyRequestPriorityConfigPayload,
   SupplyRequestPriorityLevel,
@@ -442,11 +443,11 @@ export function useDownloadPurchaseImportTemplate() {
 
 export function useWarningBandConfig(
   options?: Omit<
-    UseQueryOptions<WarningBandConfig[], Error>,
+    UseQueryOptions<WarningBandConfig, Error>,
     "queryKey" | "queryFn"
   >,
 ) {
-  return useQuery<WarningBandConfig[]>({
+  return useQuery<WarningBandConfig>({
     queryKey: INVENTORY_KEYS.warningBandConfig(),
     queryFn: getWarningBandConfig,
     ...options,
@@ -455,7 +456,7 @@ export function useWarningBandConfig(
 
 export function useUpdateWarningBandConfig() {
   const queryClient = useQueryClient();
-  return useMutation<WarningBandConfig[], Error, WarningBandConfig[]>({
+  return useMutation<WarningBandConfig, Error, UpdateWarningBandConfigPayload>({
     mutationFn: updateWarningBandConfig,
     onSuccess: () => {
       queryClient.invalidateQueries({

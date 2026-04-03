@@ -730,20 +730,7 @@ const AdminConfigPage = () => {
           </TabsContent>
 
           {/* ── Tab: Warning Band ── */}
-          <TabsContent value="warning-band" className="mt-5 space-y-4">
-            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/20">
-              <WarningCircle size={18} weight="fill" className="mt-0.5 shrink-0 text-amber-500" />
-              <div className="space-y-0.5">
-                <p className="text-sm font-semibold tracking-tighter text-amber-700 dark:text-amber-300">
-                  Lưu ý khi chỉnh dải cảnh báo
-                </p>
-                <p className="text-xs tracking-tighter text-amber-700/90 dark:text-amber-200/80">
-                  Thay đổi cấu hình này sẽ ảnh hưởng đến toàn bộ hệ thống kho.
-                  Các mức CRITICAL, MEDIUM, LOW, OK phải tăng dần và không được chồng lấn nhau.
-                  Cài đặt có hiệu lực ngay sau khi lưu.
-                </p>
-              </div>
-            </div>
+          <TabsContent value="warning-band" className="space-y-4">
             <WarningBandConfigCard />
           </TabsContent>
 

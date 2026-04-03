@@ -417,9 +417,18 @@ export type ThresholdScopeType =
 export type ResolvedThresholdScopeType = ThresholdScopeType | "None";
 
 export interface WarningBandConfig {
-  name: string;
-  from: number;
-  to: number | null;
+  id?: number;
+  critical: number;
+  medium: number;
+  low: number;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface UpdateWarningBandConfigPayload {
+  critical: number;
+  medium: number;
+  low: number;
 }
 
 export interface ThresholdConfig {

@@ -173,11 +173,11 @@ export function SupplyRequestPriorityConfigCard() {
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <CardTitle className="text-[16px] tracking-tighter flex items-center gap-2">
+            <CardTitle className="text-base tracking-tighter flex items-center gap-2">
               <Clock size={18} className="text-primary" />
               Thời gian tiếp tế theo mức độ ưu tiên
             </CardTitle>
-            <CardDescription className="tracking-tighter text-[14px] mt-0.5">
+            <CardDescription className="tracking-tighter text-sm mt-0.5">
               Kéo thanh trượt để điều chỉnh thời gian phản hồi (phút) cho từng mức.
             </CardDescription>
           </div>

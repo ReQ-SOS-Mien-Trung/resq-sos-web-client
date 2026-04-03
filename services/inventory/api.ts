@@ -37,6 +37,7 @@ import {
   GetLowStockParams,
   GetLowStockResponse,
   WarningBandConfig,
+  UpdateWarningBandConfigPayload,
   SupplyRequestPriorityConfig,
   UpdateSupplyRequestPriorityConfigPayload,
   SupplyRequestPriorityLevel,
@@ -517,7 +518,7 @@ export async function exportInventoryMovements(
  * Get warning band config (Admin)
  * GET /logistics/inventory/warning-band-config
  */
-export async function getWarningBandConfig(): Promise<WarningBandConfig[]> {
+export async function getWarningBandConfig(): Promise<WarningBandConfig> {
   const { data } = await api.get("/logistics/inventory/warning-band-config");
   return data;
 }
@@ -527,8 +528,8 @@ export async function getWarningBandConfig(): Promise<WarningBandConfig[]> {
  * PUT /logistics/inventory/warning-band-config
  */
 export async function updateWarningBandConfig(
-  payload: WarningBandConfig[],
-): Promise<WarningBandConfig[]> {
+  payload: UpdateWarningBandConfigPayload,
+): Promise<WarningBandConfig> {
   const { data } = await api.put(
     "/logistics/inventory/warning-band-config",
     payload,
