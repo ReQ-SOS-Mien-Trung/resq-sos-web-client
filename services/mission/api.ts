@@ -18,6 +18,8 @@ import {
   UpdateMissionStatusResponse,
   ActivityRouteResponse,
   GetActivityRouteParams,
+  GetMissionTeamRouteParams,
+  MissionTeamRouteResponse,
 } from "./type";
 
 function toNumberOrZero(value: unknown): number {
@@ -51,6 +53,37 @@ function normalizeActivityRouteResponse(
     status: normalizedStatus,
     errorMessage: normalizedErrorMessage,
     route: response?.route ?? null,
+  };
+}
+
+function normalizeMissionTeamRouteResponse(
+  response: MissionTeamRouteResponse,
+): MissionTeamRouteResponse {
+  const normalizedStatus =
+    typeof response?.status === "string" && response.status.trim()
+      ? response.status.trim()
+      : response?.overviewPolyline
+        ? "OK"
+        : "NO_ROUTE";
+
+  const normalizedErrorMessage =
+    typeof response?.errorMessage === "string" &&
+    response.errorMessage.trim().length > 0
+      ? response.errorMessage.trim()
+      : null;
+
+  return {
+    ...response,
+    status: normalizedStatus,
+    errorMessage: normalizedErrorMessage,
+    totalDistanceMeters: toNumberOrZero(response?.totalDistanceMeters),
+    totalDurationSeconds: toNumberOrZero(response?.totalDurationSeconds),
+    overviewPolyline:
+      typeof response?.overviewPolyline === "string"
+        ? response.overviewPolyline
+        : null,
+    waypoints: Array.isArray(response?.waypoints) ? response.waypoints : [],
+    legs: Array.isArray(response?.legs) ? response.legs : [],
   };
 }
 
@@ -217,4 +250,22 @@ export async function getActivityRoute(
     },
   );
   return normalizeActivityRouteResponse(data as ActivityRouteResponse);
+}
+
+export async function getMissionTeamRoute(
+  params: GetMissionTeamRouteParams,
+): Promise<MissionTeamRouteResponse> {
+  const { missionId, missionTeamId, originLat, originLng, vehicle } = params;
+  const { data } = await api.get(
+    `/operations/missions/${missionId}/teams/${missionTeamId}/route`,
+    {
+      params: {
+        originLat,
+        originLng,
+        vehicle: vehicle ?? "car",
+      },
+    },
+  );
+
+  return normalizeMissionTeamRouteResponse(data as MissionTeamRouteResponse);
 }

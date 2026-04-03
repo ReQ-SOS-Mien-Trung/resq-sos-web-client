@@ -47,6 +47,7 @@ import {
   useCreateMission,
   useMissions,
   useActivityRoute,
+  useMissionTeamRoute,
 } from "@/services/mission/hooks";
 import { useRescueTeamsByCluster } from "@/services/rescue_teams/hooks";
 import { useDepotInventoryRealtime } from "@/hooks/useDepotInventoryRealtime";
@@ -490,13 +491,11 @@ const DepotInventoryCard = ({
   depotName,
   depotAddress,
   isDraggable,
-  draftedQuantitiesByItemId,
 }: {
   depotId: number;
   depotName: string;
   depotAddress: string | null;
   isDraggable: boolean;
-  draftedQuantitiesByItemId?: Record<number, number>;
 }) => {
   const [page, setPage] = useState(1);
   const { data, isLoading } = useDepotInventory({
@@ -545,12 +544,6 @@ const DepotInventoryCard = ({
                   item.itemType === "Reusable"
                     ? item.availableUnit
                     : item.availableQuantity;
-                const draftedQuantity =
-                  draftedQuantitiesByItemId?.[item.itemModelId] ?? 0;
-                const previewAvailableQuantity = Math.max(
-                  availableQuantity - draftedQuantity,
-                  0,
-                );
                 const itemId = item.itemModelId;
                 const itemName = item.itemModelName;
 
@@ -608,13 +601,9 @@ const DepotInventoryCard = ({
                     </div>
                     <Badge
                       variant="outline"
-                      className={cn(
-                        "text-[9px] h-4 px-1 shrink-0 font-bold",
-                        draftedQuantity > 0 &&
-                          "border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300",
-                      )}
+                      className="text-[9px] h-4 px-1 shrink-0 font-bold"
                     >
-                      {previewAvailableQuantity}
+                      {availableQuantity}
                     </Badge>
                   </div>
                 );
@@ -2167,6 +2156,557 @@ const MissionRoutePreview = ({
   );
 };
 
+const MissionTeamRoutePreview = ({
+  mission,
+  sosRequests,
+}: {
+  mission: MissionEntity;
+  sosRequests: SOSRequest[];
+}) => {
+  const [open, setOpen] = useState(false);
+  const [vehicle, setVehicle] = useState<RouteVehicle>("car");
+
+  const missionRouteTeams = useMemo(() => {
+    const teams = mission.teams ?? [];
+    const activeTeams = teams.filter(isMissionTeamActive);
+    const sourceTeams = activeTeams.length > 0 ? activeTeams : teams;
+
+    return sourceTeams.filter(
+      (team) => Number.isFinite(team.missionTeamId) && team.missionTeamId > 0,
+    );
+  }, [mission.teams]);
+
+  const [selectedMissionTeamId, setSelectedMissionTeamId] = useState<
+    number | null
+  >(null);
+
+  useEffect(() => {
+    if (missionRouteTeams.length === 0) {
+      setSelectedMissionTeamId(null);
+      return;
+    }
+
+    setSelectedMissionTeamId((prev) => {
+      if (
+        prev != null &&
+        missionRouteTeams.some((team) => team.missionTeamId === prev)
+      ) {
+        return prev;
+      }
+      return missionRouteTeams[0]?.missionTeamId ?? null;
+    });
+  }, [missionRouteTeams]);
+
+  const selectedMissionTeam = useMemo(
+    () =>
+      missionRouteTeams.find(
+        (team) => team.missionTeamId === selectedMissionTeamId,
+      ) ??
+      missionRouteTeams[0] ??
+      null,
+    [missionRouteTeams, selectedMissionTeamId],
+  );
+
+  const originCoords = useMemo(() => {
+    const lat = selectedMissionTeam?.latitude;
+    const lng = selectedMissionTeam?.longitude;
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return {
+        lat: HUE_DEFAULT_ORIGIN.lat,
+        lng: HUE_DEFAULT_ORIGIN.lng,
+      };
+    }
+
+    return { lat: lat as number, lng: lng as number };
+  }, [selectedMissionTeam?.latitude, selectedMissionTeam?.longitude]);
+
+  const isFallbackOrigin = useMemo(() => {
+    const lat = selectedMissionTeam?.latitude;
+    const lng = selectedMissionTeam?.longitude;
+    return !Number.isFinite(lat) || !Number.isFinite(lng);
+  }, [selectedMissionTeam?.latitude, selectedMissionTeam?.longitude]);
+
+  const {
+    data: teamRouteData,
+    isLoading: isTeamRouteLoading,
+    isFetching: isTeamRouteFetching,
+    isError: isTeamRouteError,
+  } = useMissionTeamRoute(
+    open && selectedMissionTeam
+      ? {
+          missionId: mission.id,
+          missionTeamId: selectedMissionTeam.missionTeamId,
+          originLat: originCoords.lat,
+          originLng: originCoords.lng,
+          vehicle,
+        }
+      : null,
+    { enabled: open && !!selectedMissionTeam },
+  );
+
+  const routeStatusMeta = useMemo(
+    () => getActivityRouteStatusMeta(teamRouteData?.status),
+    [teamRouteData?.status],
+  );
+
+  const routeErrorMessage =
+    typeof teamRouteData?.errorMessage === "string" &&
+    teamRouteData.errorMessage.trim().length > 0
+      ? teamRouteData.errorMessage.trim()
+      : null;
+
+  const routeWaypoints = teamRouteData?.waypoints ?? [];
+  const routeLegs = teamRouteData?.legs ?? [];
+
+  const waypointGroups = useMemo(() => {
+    if (routeWaypoints.length === 0) return [] as UniqueWaypoint[];
+
+    return routeWaypoints.map((waypoint) => {
+      const byId = mission.activities.find(
+        (activity) => activity.id === waypoint.activityId,
+      );
+
+      if (byId) {
+        return {
+          lat: waypoint.latitude,
+          lng: waypoint.longitude,
+          activities: [byId],
+        };
+      }
+
+      const byStep = mission.activities.filter(
+        (activity) => activity.step === waypoint.step,
+      );
+
+      if (byStep.length > 0) {
+        return {
+          lat: waypoint.latitude,
+          lng: waypoint.longitude,
+          activities: byStep,
+        };
+      }
+
+      const byCoords = mission.activities.filter(
+        (activity) =>
+          Math.abs(activity.targetLatitude - waypoint.latitude) <
+            COORD_EPSILON &&
+          Math.abs(activity.targetLongitude - waypoint.longitude) <
+            COORD_EPSILON,
+      );
+
+      return {
+        lat: waypoint.latitude,
+        lng: waypoint.longitude,
+        activities: byCoords,
+      };
+    });
+  }, [routeWaypoints, mission.activities]);
+
+  const waypointMetaList = useMemo(
+    () =>
+      waypointGroups.map((waypoint) => getWaypointMeta(waypoint, sosRequests)),
+    [waypointGroups, sosRequests],
+  );
+
+  const decodedRoutePoints = useMemo(() => {
+    if (!teamRouteData?.overviewPolyline) return [] as [number, number][];
+
+    try {
+      return polylineDecode.decode(teamRouteData.overviewPolyline) as [
+        number,
+        number,
+      ][];
+    } catch {
+      return [] as [number, number][];
+    }
+  }, [teamRouteData?.overviewPolyline]);
+
+  const displayPoints = useMemo(() => {
+    if (decodedRoutePoints.length > 1) return decodedRoutePoints;
+    return waypointGroups.map((waypoint) => [waypoint.lat, waypoint.lng]) as [
+      number,
+      number,
+    ][];
+  }, [decodedRoutePoints, waypointGroups]);
+
+  const missionRouteMapKey = useMemo(() => {
+    if (displayPoints.length > 0) {
+      return buildLeafletMapKey(displayPoints);
+    }
+
+    return "mission-team-route-empty";
+  }, [displayPoints]);
+
+  const totalDistanceMeters = useMemo(() => {
+    if (
+      teamRouteData &&
+      Number.isFinite(teamRouteData.totalDistanceMeters) &&
+      teamRouteData.totalDistanceMeters > 0
+    ) {
+      return teamRouteData.totalDistanceMeters;
+    }
+
+    return routeLegs.reduce(
+      (sum, leg) =>
+        sum + (Number.isFinite(leg.distanceMeters) ? leg.distanceMeters : 0),
+      0,
+    );
+  }, [teamRouteData, routeLegs]);
+
+  const totalDurationSeconds = useMemo(() => {
+    if (
+      teamRouteData &&
+      Number.isFinite(teamRouteData.totalDurationSeconds) &&
+      teamRouteData.totalDurationSeconds > 0
+    ) {
+      return teamRouteData.totalDurationSeconds;
+    }
+
+    return routeLegs.reduce(
+      (sum, leg) =>
+        sum + (Number.isFinite(leg.durationSeconds) ? leg.durationSeconds : 0),
+      0,
+    );
+  }, [teamRouteData, routeLegs]);
+
+  const formatDuration = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    if (mins < 60) return `${mins} phút`;
+    const hrs = Math.floor(mins / 60);
+    const remainMins = mins % 60;
+    return remainMins > 0 ? `${hrs}h ${remainMins}p` : `${hrs}h`;
+  };
+
+  const formatDistance = (meters: number) => {
+    if (meters < 1000) return `${meters}m`;
+    return `${(meters / 1000).toFixed(1)} km`;
+  };
+
+  const isLoadingRoute = isTeamRouteLoading || isTeamRouteFetching;
+
+  if (missionRouteTeams.length === 0) return null;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-1 flex items-center gap-1 text-[10px] text-blue-600 hover:underline dark:text-blue-400"
+      >
+        <Path className="h-3 w-3" weight="bold" />
+        Xem lộ trình tổng hợp ({missionRouteTeams.length} đội)
+      </button>
+    );
+  }
+
+  const selectedTeamLabel =
+    selectedMissionTeam?.teamName ||
+    (selectedMissionTeam ? `Đội #${selectedMissionTeam.rescueTeamId}` : "-");
+
+  return (
+    <div className="mt-2 space-y-1.5 rounded-lg border bg-muted/30 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <NavigationArrow className="h-3 w-3" weight="fill" />
+            Lộ trình tổng hợp
+          </span>
+          {teamRouteData ? (
+            <Badge
+              variant="outline"
+              className={cn("h-5 px-1.5 text-[9px]", routeStatusMeta.className)}
+            >
+              {routeStatusMeta.label}
+            </Badge>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Select
+            value={
+              selectedMissionTeamId != null ? String(selectedMissionTeamId) : ""
+            }
+            onValueChange={(value) => setSelectedMissionTeamId(Number(value))}
+          >
+            <SelectTrigger className="h-7 w-45 text-[10px]">
+              <SelectValue placeholder="Chọn đội" />
+            </SelectTrigger>
+            <SelectContent>
+              {missionRouteTeams.map((team) => {
+                const label = team.teamName || `Đội #${team.rescueTeamId}`;
+                return (
+                  <SelectItem
+                    key={team.missionTeamId}
+                    value={String(team.missionTeamId)}
+                    className="text-[10px]"
+                  >
+                    {label}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-0.5 overflow-hidden rounded border bg-background">
+            {(
+              [
+                { key: "bike", label: VEHICLE_LABELS.bike },
+                { key: "car", label: VEHICLE_LABELS.car },
+                { key: "hd", label: VEHICLE_LABELS.hd },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setVehicle(option.key)}
+                className={cn(
+                  "px-1.5 py-0.5 text-[9px] font-medium transition-colors",
+                  vehicle === option.key
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+
+      <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <ShieldCheck className="h-3 w-3" weight="fill" />
+        Đội: {selectedTeamLabel}
+      </p>
+
+      <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <MapPin className="h-3 w-3" weight="fill" />
+        {isFallbackOrigin
+          ? `Vị trí xuất phát mặc định (Huế): ${originCoords.lat.toFixed(4)}, ${originCoords.lng.toFixed(4)}`
+          : `Vị trí đội: ${originCoords.lat.toFixed(4)}, ${originCoords.lng.toFixed(4)}`}
+      </p>
+
+      {isLoadingRoute && (
+        <div className="space-y-1">
+          <p className="flex items-center gap-1 text-[10px] text-muted-foreground animate-pulse">
+            <CircleNotch className="h-3 w-3 animate-spin" />
+            Đang tải lộ trình đội...
+          </p>
+          <Skeleton className="h-48 w-full rounded" />
+        </div>
+      )}
+
+      {isTeamRouteError && !isLoadingRoute && (
+        <p className="text-[10px] text-red-500">
+          Không thể tải lộ trình tổng hợp.
+        </p>
+      )}
+
+      {routeErrorMessage ? (
+        <p className="text-[10px] text-amber-700 dark:text-amber-300">
+          {routeErrorMessage}
+        </p>
+      ) : null}
+
+      {!isLoadingRoute && teamRouteData && (
+        <div className="flex items-center gap-3 text-[11px]">
+          <span className="font-bold text-primary">
+            {formatDistance(totalDistanceMeters)}
+          </span>
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            {formatDuration(totalDurationSeconds)}
+          </span>
+          <span className="text-muted-foreground">
+            {routeWaypoints.length} điểm · {routeLegs.length} chặng
+          </span>
+        </div>
+      )}
+
+      {!isLoadingRoute && displayPoints.length > 1 && (
+        <div className="h-112 overflow-hidden rounded-lg border bg-background">
+          <MapContainer
+            key={missionRouteMapKey}
+            center={displayPoints[0]}
+            zoom={10}
+            scrollWheelZoom={true}
+            dragging={true}
+            zoomControl={true}
+            attributionControl={false}
+            className="h-full w-full"
+          >
+            <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            <RoutePreviewFitBounds points={displayPoints} />
+
+            <Polyline
+              positions={displayPoints}
+              pathOptions={{
+                color: "#FF6B35",
+                weight: 5,
+                opacity: 0.85,
+                lineJoin: "round",
+                lineCap: "round",
+              }}
+            />
+
+            {originCoords ? (
+              <CircleMarker
+                center={[originCoords.lat, originCoords.lng]}
+                radius={8}
+                pathOptions={{
+                  color: "#ffffff",
+                  weight: 2,
+                  fillColor: "#16a34a",
+                  fillOpacity: 1,
+                }}
+              />
+            ) : null}
+
+            {waypointGroups.map((waypoint, index) => {
+              const isLast = index === waypointGroups.length - 1;
+              const meta = waypointMetaList[index];
+              const apiWaypoint = routeWaypoints[index];
+              const tooltipLabel =
+                meta?.labels.length > 0
+                  ? meta.labels.join(" • ")
+                  : apiWaypoint
+                    ? `Bước ${apiWaypoint.step}`
+                    : `Điểm ${index + 1}`;
+
+              const markerColor = isLast
+                ? "#dc2626"
+                : meta?.hasSOS
+                  ? "#2563eb"
+                  : meta?.hasDepot
+                    ? "#a16207"
+                    : "#FF6B35";
+
+              return (
+                <CircleMarker
+                  key={`mission-team-waypoint-${index}`}
+                  center={[waypoint.lat, waypoint.lng]}
+                  radius={isLast ? 9 : 7}
+                  pathOptions={{
+                    color: "#ffffff",
+                    weight: 2,
+                    fillColor: markerColor,
+                    fillOpacity: 1,
+                  }}
+                >
+                  <Tooltip
+                    direction="top"
+                    offset={[0, -10]}
+                    opacity={1}
+                    permanent
+                  >
+                    <div className="whitespace-nowrap text-[10px] font-semibold">
+                      {tooltipLabel}
+                    </div>
+                  </Tooltip>
+                </CircleMarker>
+              );
+            })}
+          </MapContainer>
+        </div>
+      )}
+
+      {!isLoadingRoute && waypointGroups.length > 0 && (
+        <div className="mt-1 space-y-1.5">
+          {waypointGroups.map((waypoint, index) => {
+            const leg = index > 0 ? routeLegs[index - 1] : null;
+            const meta = waypointMetaList[index];
+            const apiWaypoint = routeWaypoints[index];
+
+            return (
+              <div
+                key={`mission-team-waypoint-legend-${index}`}
+                className="space-y-0.5"
+              >
+                {leg ? (
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="h-1 w-4 shrink-0 rounded-full bg-[#FF6B35]" />
+                    <NavigationArrow
+                      className="h-2.5 w-2.5 text-muted-foreground"
+                      weight="bold"
+                    />
+                    <span className="text-muted-foreground">
+                      {leg.distanceText || formatDistance(leg.distanceMeters)} ·{" "}
+                      {leg.durationText || formatDuration(leg.durationSeconds)}
+                    </span>
+                  </div>
+                ) : null}
+
+                {meta?.labels.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1 pl-6">
+                    {meta.labels.map((label) => (
+                      <Badge
+                        key={`${index}-${label}`}
+                        variant="outline"
+                        className="h-4 px-1.5 text-[9px]"
+                      >
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                ) : null}
+
+                {waypoint.activities.length > 0 ? (
+                  waypoint.activities.map((activity) => {
+                    const config =
+                      activityTypeConfig[activity.activityType] ||
+                      activityTypeConfig["ASSESS"];
+
+                    return (
+                      <div
+                        key={`mission-team-activity-${activity.id}`}
+                        className="flex items-center gap-2 pl-6 text-[10px]"
+                      >
+                        <span className="font-bold text-muted-foreground">
+                          {activity.step}.
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-3.5 px-1 text-[9px]",
+                            config.color,
+                            config.bgColor,
+                            "border-transparent",
+                          )}
+                        >
+                          {config.label}
+                        </Badge>
+                      </div>
+                    );
+                  })
+                ) : apiWaypoint ? (
+                  <p className="pl-6 text-[10px] text-muted-foreground">
+                    Bước {apiWaypoint.step}: {apiWaypoint.description}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!isLoadingRoute && displayPoints.length <= 1 && !routeErrorMessage && (
+        <p className="text-[10px] text-muted-foreground">
+          Không đủ dữ liệu waypoint để hiển thị bản đồ lộ trình.
+        </p>
+      )}
+    </div>
+  );
+};
+
 // ── Card hiển thị 1 AI suggestion đã lưu ──
 const SuggestionCard = ({
   suggestion,
@@ -3206,33 +3746,10 @@ const RescuePlanPanel = ({
 
   const showSidebar = hasSidebar || sidebarDepots.length > 0;
 
-  const draftedDepotItemQuantities = useMemo(() => {
-    const next: Record<number, Record<number, number>> = {};
-
-    for (const activity of editActivities) {
-      if (activity.activityType !== "COLLECT_SUPPLIES") continue;
-      if (typeof activity.depotId !== "number" || activity.depotId <= 0) {
-        continue;
-      }
-
-      const depotDrafts = (next[activity.depotId] ??= {});
-      for (const supply of activity.suppliesToCollect ?? []) {
-        if (typeof supply.itemId !== "number" || supply.itemId <= 0) {
-          continue;
-        }
-
-        depotDrafts[supply.itemId] =
-          (depotDrafts[supply.itemId] ?? 0) + Math.max(0, supply.quantity);
-      }
-    }
-
-    return next;
-  }, [editActivities]);
-
   useDepotInventoryRealtime({
     depotIds: sidebarDepots.map((depot) => depot.depotId),
     missionId: editingMissionId,
-    enabled: open && isEditMode && sidebarDepots.length > 0,
+    enabled: open && sidebarDepots.length > 0,
   });
 
   const sortedMissions = useMemo(() => {
@@ -4471,7 +4988,7 @@ const RescuePlanPanel = ({
                                   </div>
                                 )}
                                 {/* Consolidated route for entire mission */}
-                                <MissionRoutePreview
+                                <MissionTeamRoutePreview
                                   mission={mission}
                                   sosRequests={clusterSOSRequests}
                                 />
@@ -5933,9 +6450,6 @@ const RescuePlanPanel = ({
                               depotName={depot.depotName}
                               depotAddress={depot.depotAddress}
                               isDraggable={isEditMode}
-                              draftedQuantitiesByItemId={
-                                draftedDepotItemQuantities[depot.depotId]
-                              }
                             />
                           ))}
                         </div>

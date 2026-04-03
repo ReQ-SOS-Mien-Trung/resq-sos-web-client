@@ -65,6 +65,7 @@ import { toast } from "sonner";
 import type { AxiosError } from "axios";
 import { LocationDetailsPanelProps } from "@/type";
 import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
+import { ChartBar } from "lucide-react";
 
 // Panel width
 const PANEL_WIDTH = 420;

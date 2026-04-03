@@ -12,10 +12,7 @@ interface UseDepotInventoryRealtimeOptions {
   enabled?: boolean;
 }
 
-function isDepotInventoryQuery(
-  query: Query,
-  depotId: number,
-): boolean {
+function isDepotInventoryQuery(query: Query, depotId: number): boolean {
   const [rootKey, scopeKey, params] = query.queryKey;
 
   if (rootKey !== INVENTORY_KEYS.all[0] || scopeKey !== "depot") {
@@ -35,6 +32,10 @@ export function useDepotInventoryRealtime({
   enabled = true,
 }: UseDepotInventoryRealtimeOptions): void {
   const queryClient = useQueryClient();
+  const missionIdsToSubscribe = useMemo(
+    () => (missionId == null ? [null] : [missionId, null]),
+    [missionId],
+  );
   const uniqueDepotIds = useMemo(
     () =>
       Array.from(new Set(depotIds))
@@ -62,25 +63,33 @@ export function useDepotInventoryRealtime({
       if (disposed) return;
 
       for (const depotId of uniqueDepotIds) {
-        await depotRealtimeClient.joinDepotGroup(missionId, depotId);
-        if (disposed) {
-          void depotRealtimeClient.leaveDepotGroup(missionId, depotId);
-          continue;
-        }
+        for (const subscribedMissionId of missionIdsToSubscribe) {
+          await depotRealtimeClient.joinDepotGroup(
+            subscribedMissionId,
+            depotId,
+          );
+          if (disposed) {
+            void depotRealtimeClient.leaveDepotGroup(
+              subscribedMissionId,
+              depotId,
+            );
+            continue;
+          }
 
-        cleanups.push(
-          depotRealtimeClient.onDepotUpdated(missionId, depotId, {
-            onApplyFull: async () => {
-              requeryDepot(depotId);
-            },
-            onApplyDelta: async () => {
-              requeryDepot(depotId);
-            },
-            onVersionGap: async () => {
-              requeryDepot(depotId);
-            },
-          }),
-        );
+          cleanups.push(
+            depotRealtimeClient.onDepotUpdated(subscribedMissionId, depotId, {
+              onApplyFull: async () => {
+                requeryDepot(depotId);
+              },
+              onApplyDelta: async () => {
+                requeryDepot(depotId);
+              },
+              onVersionGap: async () => {
+                requeryDepot(depotId);
+              },
+            }),
+          );
+        }
       }
     };
 
@@ -99,8 +108,13 @@ export function useDepotInventoryRealtime({
       unsubscribeReconnected();
       cleanups.forEach((cleanup) => cleanup());
       uniqueDepotIds.forEach((depotId) => {
-        void depotRealtimeClient.leaveDepotGroup(missionId, depotId);
+        missionIdsToSubscribe.forEach((subscribedMissionId) => {
+          void depotRealtimeClient.leaveDepotGroup(
+            subscribedMissionId,
+            depotId,
+          );
+        });
       });
     };
-  }, [enabled, missionId, queryClient, uniqueDepotIds]);
+  }, [enabled, missionIdsToSubscribe, queryClient, uniqueDepotIds]);
 }

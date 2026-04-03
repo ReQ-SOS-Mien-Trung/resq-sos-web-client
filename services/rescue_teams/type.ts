@@ -39,6 +39,7 @@ export interface RescueTeamMemberDetail {
   firstName: string;
   lastName: string;
   phone: string;
+  email?: string | null;
   avatarUrl: string | null;
   rescuerType: "Volunteer" | "Core" | null;
   status: RescueTeamMemberStatus;

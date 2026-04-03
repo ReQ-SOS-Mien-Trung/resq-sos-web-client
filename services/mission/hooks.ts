@@ -11,6 +11,7 @@ import {
   updateMission,
   updateMissionStatus,
   getActivityRoute,
+  getMissionTeamRoute,
 } from "./api";
 import {
   CreateActivityResponse,
@@ -30,6 +31,8 @@ import {
   UpdateMissionStatusResponse,
   ActivityRouteResponse,
   GetActivityRouteParams,
+  GetMissionTeamRouteParams,
+  MissionTeamRouteResponse,
 } from "./type";
 
 export const MISSIONS_QUERY_KEY = ["missions"] as const;
@@ -203,6 +206,26 @@ export function useActivityRoute(
       params?.vehicle,
     ],
     queryFn: () => getActivityRoute(params!),
+    enabled: (options?.enabled ?? true) && !!params,
+  });
+}
+
+export const MISSION_TEAM_ROUTE_QUERY_KEY = ["mission-team-route"] as const;
+
+export function useMissionTeamRoute(
+  params: GetMissionTeamRouteParams | null,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<MissionTeamRouteResponse>({
+    queryKey: [
+      ...MISSION_TEAM_ROUTE_QUERY_KEY,
+      params?.missionId,
+      params?.missionTeamId,
+      params?.originLat,
+      params?.originLng,
+      params?.vehicle,
+    ],
+    queryFn: () => getMissionTeamRoute(params!),
     enabled: (options?.enabled ?? true) && !!params,
   });
 }
