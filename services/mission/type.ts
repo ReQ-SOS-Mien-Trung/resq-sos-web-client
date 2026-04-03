@@ -12,12 +12,15 @@ export type MissionStatus =
   | "Completed"
   | "Cancelled";
 
-export type ActivityStatus =
+export type MissionActivityStatus =
   | "Planned"
-  | "Pending"
-  | "InProgress"
-  | "Completed"
+  | "OnGoing"
+  | "Succeed"
+  | "PendingConfirmation"
+  | "Failed"
   | "Cancelled";
+
+export type ActivityStatus = MissionActivityStatus;
 
 export interface MissionTeam {
   missionTeamId: number;
