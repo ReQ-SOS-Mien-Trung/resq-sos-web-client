@@ -19,7 +19,7 @@ export function PwaInstallBanner() {
 
   useEffect(() => {
     // Already dismissed or running as installed PWA
-    if (sessionStorage.getItem(DISMISSED_KEY)) return;
+    if (localStorage.getItem(DISMISSED_KEY)) return;
     if (isStandalone) return;
 
     const handler = (e: Event) => {
@@ -37,7 +37,7 @@ export function PwaInstallBanner() {
   }, [isStandalone]);
 
   function dismiss() {
-    sessionStorage.setItem(DISMISSED_KEY, "1");
+    localStorage.setItem(DISMISSED_KEY, "1");
     setShowBanner(false);
   }
 
