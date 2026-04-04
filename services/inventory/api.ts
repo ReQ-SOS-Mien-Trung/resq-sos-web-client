@@ -41,6 +41,8 @@ import {
   SupplyRequestPriorityConfig,
   UpdateSupplyRequestPriorityConfigPayload,
   SupplyRequestPriorityLevel,
+  GetUpcomingPickupsParams,
+  GetUpcomingPickupsResponse,
 } from "./type";
 
 type InventoryItemLike = Partial<InventoryItemEntity> & {
@@ -295,6 +297,22 @@ export async function getSupplyRequests(
   });
   // API wraps response in { data: { items: [...], ... }, serverTime: "..." }
   return data?.data ?? data;
+}
+
+/**
+ * Get upcoming pickup activities for current depot manager
+ * GET /logistics/inventory/my-depot/upcoming-pickups
+ */
+export async function getMyDepotUpcomingPickups(
+  params: GetUpcomingPickupsParams,
+): Promise<GetUpcomingPickupsResponse> {
+  const { data } = await api.get(
+    "/logistics/inventory/my-depot/upcoming-pickups",
+    {
+      params,
+    },
+  );
+  return data;
 }
 
 /**

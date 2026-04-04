@@ -71,6 +71,7 @@ import { toast } from "sonner";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
   useFundingRequests,
+  useFundingRequestItems,
   useFundingRequestStatuses,
   useApproveFundingRequest,
   useRejectFundingRequest,
@@ -337,7 +338,18 @@ export default function FundingRequestsPage() {
   const { mutate: allocate, isPending: isAllocating } =
     useAllocateDisbursement();
 
+  const { data: selectedItemsData, isLoading: loadingSelectedItems } =
+    useFundingRequestItems({
+      fundingRequestId: selectedItem?.id,
+      params: { pageNumber: 1, pageSize: 200 },
+      enabled: panelOpen && !!selectedItem?.id,
+    });
+
   const items = useMemo(() => data?.items ?? [], [data]);
+  const selectedRequestItems = useMemo(
+    () => selectedItemsData?.items ?? selectedItem?.items ?? [],
+    [selectedItemsData, selectedItem],
+  );
 
   // Push content when panel opens
   const handlePanelChange = useCallback(
@@ -1172,9 +1184,15 @@ export default function FundingRequestsPage() {
               <div>
                 <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
                   <Package size={15} className="text-primary" />
-                  Danh sách vật tư ({selectedItem.items.length})
+                  Danh sách vật tư ({selectedRequestItems.length})
                 </h4>
-                {selectedItem.items.length === 0 ? (
+                {loadingSelectedItems ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <Skeleton key={idx} className="h-18 w-full rounded-xl" />
+                    ))}
+                  </div>
+                ) : selectedRequestItems.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
                     <Package
                       size={28}
@@ -1186,7 +1204,7 @@ export default function FundingRequestsPage() {
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-75 overflow-y-auto pr-1">
-                    {selectedItem.items.map((item, idx) => (
+                    {selectedRequestItems.map((item, idx) => (
                       <div
                         key={item.id || idx}
                         className="rounded-xl border border-border/60 bg-background p-3"
@@ -1196,7 +1214,7 @@ export default function FundingRequestsPage() {
                             {item.itemName}
                           </p>
                           <span className="text-base tracking-tighter font-bold text-emerald-600 shrink-0">
-                            {formatMoney(item.totalPrice)}
+                            {formatMoney(item.totalPrice ?? item.quantity * item.unitPrice)}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground tracking-tighter">
@@ -1207,7 +1225,9 @@ export default function FundingRequestsPage() {
                             Đơn giá: {formatMoney(item.unitPrice)}
                           </span>
                           <span>Danh mục: {categoryMap[item.categoryCode] ?? item.categoryCode}</span>
-                          {item.notes && <span>Ghi chú: {item.notes}</span>}
+                          {(item.notes || item.description) && (
+                            <span>Ghi chú: {item.notes ?? item.description}</span>
+                          )}
                         </div>
                       </div>
                     ))}

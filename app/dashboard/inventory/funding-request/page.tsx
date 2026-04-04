@@ -66,6 +66,7 @@ import { useMyDepotFund, MY_DEPOT_FUND_QUERY_KEY, useMyDepotFundTransactions } f
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useFundingRequests,
+  useFundingRequestItems,
   useCreateFundingRequest,
   useDownloadFundingRequestTemplate,
 } from "@/services/funding_request";
@@ -439,6 +440,13 @@ export default function FundingRequestPage() {
   const [detailItem, setDetailItem] =
     useState<FundingRequestEntity | null>(null);
 
+  const { data: detailItemsData, isLoading: loadingDetailItems } =
+    useFundingRequestItems({
+      fundingRequestId: detailItem?.id,
+      params: { pageNumber: 1, pageSize: 200 },
+      enabled: !!detailItem?.id,
+    });
+
   const { mutate: createRequest, isPending } = useCreateFundingRequest();
   const {
     mutateAsync: downloadTemplate,
@@ -666,6 +674,7 @@ export default function FundingRequestPage() {
       itemType: r.itemType,
       targetGroup: r.targetGroup,
       notes: r.notes,
+      description: r.notes,
     }));
     createRequest(
       { description: description.trim(), items },
@@ -1658,6 +1667,11 @@ export default function FundingRequestPage() {
 
           {detailItem && (
             <div className="space-y-4">
+              {(() => {
+                const detailItems = detailItemsData?.items ?? detailItem.items ?? [];
+
+                return (
+                  <>
               {/* Status + amount */}
               <div className="flex items-center justify-between">
                 <Badge
@@ -1740,39 +1754,59 @@ export default function FundingRequestPage() {
                     size={14}
                     className="text-primary"
                   />
-                  Vật tư ({detailItem.items.length})
+                  Vật tư ({detailItems.length})
                 </h4>
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                  {detailItem.items.map((item, idx) => (
-                    <div
-                      key={item.id || idx}
-                      className="rounded-lg border border-border/60 bg-background p-2.5"
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <p className="text-sm font-semibold tracking-tighter">
-                          {item.itemName}
-                        </p>
-                        <span className="text-sm font-bold text-emerald-600 shrink-0">
-                          {formatMoney(item.totalPrice)}
-                        </span>
+                {loadingDetailItems ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <Skeleton key={idx} className="h-16 w-full rounded-xl" />
+                    ))}
+                  </div>
+                ) : detailItems.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border/60 p-4 text-center">
+                    <p className="text-xs text-muted-foreground tracking-tight">
+                      Không có danh sách vật tư chi tiết
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                    {detailItems.map((item, idx) => (
+                      <div
+                        key={item.id || idx}
+                        className="rounded-lg border border-border/60 bg-background p-2.5"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-semibold tracking-tighter">
+                            {item.itemName}
+                          </p>
+                          <span className="text-sm font-bold text-emerald-600 shrink-0">
+                            {formatMoney(item.totalPrice ?? item.quantity * item.unitPrice)}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground tracking-tight">
+                          <span>
+                            SL: {item.quantity} {item.unit}
+                          </span>
+                          <span>
+                            Đơn giá: {formatMoney(item.unitPrice)}
+                          </span>
+                          <span>
+                            Danh mục:{" "}
+                            {categoryMap[item.categoryCode] ??
+                              item.categoryCode}
+                          </span>
+                          {(item.notes || item.description) && (
+                            <span>Ghi chú: {item.notes ?? item.description}</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground tracking-tight">
-                        <span>
-                          SL: {item.quantity} {item.unit}
-                        </span>
-                        <span>
-                          Đơn giá: {formatMoney(item.unitPrice)}
-                        </span>
-                        <span>
-                          Danh mục:{" "}
-                          {categoryMap[item.categoryCode] ??
-                            item.categoryCode}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
+                  </>
+                );
+              })()}
             </div>
           )}
 

@@ -1,13 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
-import { getSosPriorityRuleConfig, updateSosPriorityRuleConfig } from "./api";
 import {
+  getRescuerScoreVisibilityConfig,
+  getSosPriorityRuleConfig,
+  updateRescuerScoreVisibilityConfig,
+  updateSosPriorityRuleConfig,
+} from "./api";
+import {
+  RescuerScoreVisibilityConfigEntity,
   SosPriorityRuleConfigEntity,
+  UpdateRescuerScoreVisibilityConfigRequest,
   UpdateSosPriorityRuleConfigRequest,
 } from "./type";
 
 export const SOS_PRIORITY_RULE_CONFIG_QUERY_KEY = [
   "sos-priority-rule-config",
+] as const;
+
+export const RESCUER_SCORE_VISIBILITY_CONFIG_QUERY_KEY = [
+  "rescuer-score-visibility-config",
 ] as const;
 
 /**
@@ -36,6 +47,37 @@ export function useUpdateSosPriorityRuleConfig() {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: SOS_PRIORITY_RULE_CONFIG_QUERY_KEY,
+      });
+    },
+  });
+}
+
+/**
+ * Hook to fetch rescuer score visibility config
+ */
+export function useRescuerScoreVisibilityConfig(enabled = true) {
+  return useQuery<RescuerScoreVisibilityConfigEntity>({
+    queryKey: RESCUER_SCORE_VISIBILITY_CONFIG_QUERY_KEY,
+    queryFn: getRescuerScoreVisibilityConfig,
+    enabled,
+  });
+}
+
+/**
+ * Hook to update rescuer score visibility config
+ */
+export function useUpdateRescuerScoreVisibilityConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    AxiosError<{ message: string }>,
+    UpdateRescuerScoreVisibilityConfigRequest
+  >({
+    mutationFn: (data) => updateRescuerScoreVisibilityConfig(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: RESCUER_SCORE_VISIBILITY_CONFIG_QUERY_KEY,
       });
     },
   });
