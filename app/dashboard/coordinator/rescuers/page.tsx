@@ -81,6 +81,7 @@ export default function CoordinatorRescuerManagementPage() {
   const [selectedAssemblyPointCode, setSelectedAssemblyPointCode] = useState(
     ALL_ASSEMBLY_POINT_FILTER_VALUE,
   );
+  const [isSplitLayoutEnabled, setIsSplitLayoutEnabled] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(20);
   const [rowSelectedAssemblyPointIds, setRowSelectedAssemblyPointIds] =
@@ -111,8 +112,10 @@ export default function CoordinatorRescuerManagementPage() {
   const leftPanelRef = useRef<HTMLDivElement | null>(null);
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
   const splitRowLayoutsRef = useRef<Record<string, SplitRowLayout>>({});
-  const isSplitByAssemblyPointView =
+  const hasSelectedAssemblyPoint =
     selectedAssemblyPointCode !== ALL_ASSEMBLY_POINT_FILTER_VALUE;
+  const isSplitByAssemblyPointView =
+    isSplitLayoutEnabled && hasSelectedAssemblyPoint;
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -202,6 +205,12 @@ export default function CoordinatorRescuerManagementPage() {
     setLatestDroppedRescuerId(null);
     splitDropSequenceRef.current = 0;
   }, [selectedAssemblyPointCode]);
+
+  useEffect(() => {
+    if (!hasSelectedAssemblyPoint && isSplitLayoutEnabled) {
+      setIsSplitLayoutEnabled(false);
+    }
+  }, [hasSelectedAssemblyPoint, isSplitLayoutEnabled]);
 
   const {
     data: rescuerAssemblyPointOptions,
@@ -808,7 +817,7 @@ export default function CoordinatorRescuerManagementPage() {
 
       if (selectedAssemblyPointId === UNASSIGN_SELECT_VALUE) {
         await updateAssignment({ userIds: [userId], assemblyPointId: null });
-        toast.success("Đã bỏ phân công rescuer khỏi điểm tập kết.");
+        toast.success("Đã bỏ phân công người cứu hộ khỏi điểm tập kết.");
       } else {
         const pointId = Number(selectedAssemblyPointId);
         if (Number.isNaN(pointId)) {
@@ -817,7 +826,7 @@ export default function CoordinatorRescuerManagementPage() {
         }
 
         await updateAssignment({ userIds: [userId], assemblyPointId: pointId });
-        toast.success("Đã lưu rescuer vào điểm tập kết.");
+        toast.success("Đã lưu người cứu hộ vào điểm tập kết.");
       }
 
       setRowSelectedAssemblyPointIds((previous) => ({
@@ -875,6 +884,15 @@ export default function CoordinatorRescuerManagementPage() {
     setSelectedRescuerIds(
       shouldSelect ? selectableRescuers.map((rescuer) => rescuer.id) : [],
     );
+  };
+
+  const handleToggleLayoutMode = () => {
+    if (!isSplitLayoutEnabled && !hasSelectedAssemblyPoint) {
+      toast.error("Vui lòng chọn một điểm tập kết để bật giao diện chia đôi.");
+      return;
+    }
+
+    setIsSplitLayoutEnabled((previous) => !previous);
   };
 
   const refetchCurrentView = async () => {
@@ -1087,7 +1105,7 @@ export default function CoordinatorRescuerManagementPage() {
 
   const handleBulkSaveAssignment = async () => {
     if (selectedRescuerIds.length === 0) {
-      toast.error("Vui lòng chọn ít nhất một rescuer.");
+      toast.error("Vui lòng chọn ít nhất một người cứu hộ.");
       return;
     }
 
@@ -1161,8 +1179,8 @@ export default function CoordinatorRescuerManagementPage() {
 
       toast.success(
         nextAssemblyPointId === null
-          ? `Đã bỏ gán ${targetRescuerIds.length} rescuer khỏi điểm tập kết.`
-          : `Đã thêm ${targetRescuerIds.length} rescuer vào điểm tập kết.`,
+          ? `Đã bỏ gán ${targetRescuerIds.length} người cứu hộ khỏi điểm tập kết.`
+          : `Đã thêm ${targetRescuerIds.length} người cứu hộ vào điểm tập kết.`,
       );
       await refetchCurrentView();
     } catch {
@@ -1301,7 +1319,7 @@ export default function CoordinatorRescuerManagementPage() {
 
       if (failedRescuerIds.length > 0) {
         toast.error(
-          `Có ${failedRescuerIds.length} rescuer chưa được cập nhật. Vui lòng thử lại.`,
+          `Có ${failedRescuerIds.length} người cứu hộ chưa được cập nhật. Vui lòng thử lại.`,
         );
       }
     } catch {
@@ -1381,7 +1399,7 @@ export default function CoordinatorRescuerManagementPage() {
                     handleToggleRescuerSelection(rescuer.id, checked === true)
                   }
                   disabled={isAssignmentBusy}
-                  aria-label={`Chọn rescuer ${fullName}`}
+                  aria-label={`Chọn người cứu hộ ${fullName}`}
                   className="border-[#FF5722]/40 data-[state=checked]:border-[#FF5722] data-[state=checked]:bg-[#FF5722]"
                 />
               </div>
@@ -1411,7 +1429,7 @@ export default function CoordinatorRescuerManagementPage() {
                 <Badge
                   variant="outline"
                   className={cn(
-                    "border px-2 py-0.5 text-xs",
+                    "border px-2 py-0.5 text-sm",
                     rescuer.hasAssemblyPoint
                       ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                       : "border-amber-300 bg-amber-50 text-amber-700",
@@ -1425,7 +1443,7 @@ export default function CoordinatorRescuerManagementPage() {
                 <Badge
                   variant="outline"
                   className={cn(
-                    "border px-2 py-0.5 text-xs",
+                    "border px-2 py-0.5 text-sm",
                     rescuer.hasTeam
                       ? "border-indigo-300 bg-indigo-50 text-indigo-700"
                       : "border-slate-300 bg-slate-50 text-slate-700",
@@ -1438,7 +1456,7 @@ export default function CoordinatorRescuerManagementPage() {
                   <Badge
                     variant="outline"
                     className={cn(
-                      "border px-2 py-0.5 text-xs font-semibold",
+                      "border px-2 py-0.5 text-sm font-semibold",
                       rescuer.rescuerType === "Core"
                         ? "border-sky-300 bg-sky-50 text-sky-700"
                         : "border-[#FF5722]/40 bg-[#FF5722]/10 text-[#C2410C]",
@@ -1453,7 +1471,7 @@ export default function CoordinatorRescuerManagementPage() {
                 {rawRowSelectedAssemblyPointId ? (
                   <Badge
                     variant="outline"
-                    className="border-[#FF5722]/35 bg-[#FF5722]/10 px-2 py-0.5 text-xs text-[#C2410C]"
+                    className="border-[#FF5722]/35 bg-[#FF5722]/10 px-2 py-0.5 text-sm text-[#C2410C]"
                   >
                     Chưa lưu
                   </Badge>
@@ -1473,7 +1491,7 @@ export default function CoordinatorRescuerManagementPage() {
               }
               disabled={isAssignmentBusy}
             >
-              <SelectTrigger className="h-8 w-55 border-white bg-white/95 shadow-[0_1px_2px_rgba(15,23,42,0.08)]">
+              <SelectTrigger className="h-8 w-55 border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:border-slate-400 data-[state=open]:border-[#FF5722]/55 data-[state=open]:ring-1 data-[state=open]:ring-[#FF5722]/20">
                 <SelectValue
                   placeholder={
                     isAssemblyPointLoading
@@ -1538,11 +1556,11 @@ export default function CoordinatorRescuerManagementPage() {
               Coordinator Dashboard
             </p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-              Quản lý rescuer theo điểm tập kết
+              Quản lý người cứu hộ theo điểm tập kết
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Gán hoặc bỏ gán rescuer vào assembly point bằng dữ liệu thời gian
-              thực.
+              Gán hoặc bỏ gán người cứu hộ vào điểm tập kết bằng dữ liệu thời
+              gian thực.
             </p>
           </div>
 
@@ -1559,7 +1577,7 @@ export default function CoordinatorRescuerManagementPage() {
             <CardContent className="flex items-center justify-between p-3">
               <div>
                 <p className="text-sm uppercase tracking-wide text-muted-foreground">
-                  Tổng rescuer đã tải
+                  Tổng người cứu hộ đã tải
                 </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight">
                   {totalCount}
@@ -1601,7 +1619,7 @@ export default function CoordinatorRescuerManagementPage() {
         <Card className="border-black/10 shadow-none">
           <CardHeader className="pb-3">
             <CardTitle className="text-base tracking-tight">
-              Tìm kiếm và bộ lọc rescuer
+              Tìm kiếm và bộ lọc người cứu hộ
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-6">
@@ -1629,7 +1647,7 @@ export default function CoordinatorRescuerManagementPage() {
                 <SelectValue placeholder="Lọc phân công" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả rescuer</SelectItem>
+                <SelectItem value="all">Tất cả người cứu hộ</SelectItem>
                 <SelectItem value="assigned">Đã có điểm tập kết</SelectItem>
                 <SelectItem value="unassigned">Chưa có điểm tập kết</SelectItem>
               </SelectContent>
@@ -1681,7 +1699,7 @@ export default function CoordinatorRescuerManagementPage() {
               }
             >
               <SelectTrigger className="h-10 w-full">
-                <SelectValue placeholder="Lọc theo loại rescuer" />
+                <SelectValue placeholder="Lọc theo loại người cứu hộ" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả loại</SelectItem>
@@ -1695,24 +1713,50 @@ export default function CoordinatorRescuerManagementPage() {
         <Card className="border-black/10 shadow-none">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base tracking-tight">
-              Danh sách rescuer ({totalCount})
+              Danh sách người cứu hộ ({totalCount})
             </CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={refetchCurrentView}
-              disabled={isRescuerListRefetching}
-            >
-              <ArrowsClockwise
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant={isSplitByAssemblyPointView ? "default" : "outline"}
+                size="sm"
                 className={cn(
-                  "h-4 w-4",
-                  isRescuerListRefetching && "animate-spin",
+                  "gap-2",
+                  isSplitByAssemblyPointView &&
+                    "bg-[#FF5722] text-white hover:bg-[#FF5722]/90",
                 )}
-              />
-              Làm mới
-            </Button>
+                onClick={handleToggleLayoutMode}
+                disabled={
+                  !hasSelectedAssemblyPoint && !isSplitByAssemblyPointView
+                }
+                title={
+                  !hasSelectedAssemblyPoint
+                    ? "Chọn điểm tập kết để bật giao diện chia đôi"
+                    : undefined
+                }
+              >
+                {isSplitByAssemblyPointView
+                  ? "Chuyển về giao diện thường"
+                  : "Chuyển sang giao diện chia đôi"}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={refetchCurrentView}
+                disabled={isRescuerListRefetching}
+              >
+                <ArrowsClockwise
+                  className={cn(
+                    "h-4 w-4",
+                    isRescuerListRefetching && "animate-spin",
+                  )}
+                />
+                Làm mới
+              </Button>
+            </div>
           </CardHeader>
 
           <CardContent className="space-y-3">
@@ -1750,7 +1794,7 @@ export default function CoordinatorRescuerManagementPage() {
                       variant="outline"
                       className="border-[#FF5722]/25 bg-white text-[#C2410C]"
                     >
-                      {selectedVisibleRescuerCount} rescuer đã chọn
+                      {selectedVisibleRescuerCount} người cứu hộ đã chọn
                     </Badge>
 
                     {isSplitByAssemblyPointView && splitPendingSaveCount > 0 ? (
@@ -1801,7 +1845,7 @@ export default function CoordinatorRescuerManagementPage() {
                           isAssignmentBusy || selectedVisibleRescuerCount === 0
                         }
                       >
-                        <SelectTrigger className="h-9 w-full sm:flex-1">
+                        <SelectTrigger className="h-9 w-full border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:border-slate-400 data-[state=open]:border-[#FF5722]/55 data-[state=open]:ring-1 data-[state=open]:ring-[#FF5722]/20 sm:flex-1">
                           <SelectValue
                             placeholder={
                               isAssemblyPointLoading
@@ -1864,8 +1908,8 @@ export default function CoordinatorRescuerManagementPage() {
 
                 <p className="mt-2 text-sm text-muted-foreground">
                   {isSplitByAssemblyPointView
-                    ? "Danh sách bên phải gồm rescuer chưa có điểm tập kết hoặc đã có điểm tập kết nhưng chưa xác nhận có mặt. Kéo-thả chỉ di chuyển tạm thời giữa hai cột, cần bấm Lưu tất cả thay đổi hoặc Áp dụng để cập nhật chính thức."
-                    : "Coordinator có thể tick nhiều rescuer rồi gán chung vào cùng một assembly point ngay trên trang hiện tại."}
+                    ? "Danh sách bên phải gồm người cứu hộ chưa có điểm tập kết hoặc đã có điểm tập kết nhưng chưa xác nhận có mặt. Kéo-thả chỉ di chuyển tạm thời giữa hai cột, cần bấm Lưu tất cả thay đổi hoặc Áp dụng để cập nhật chính thức."
+                    : "Điều phối viên có thể chọn nhiều người cứu hộ rồi gán chung vào cùng một điểm tập kết ngay trên trang hiện tại."}
                 </p>
               </div>
             ) : null}
@@ -1878,11 +1922,11 @@ export default function CoordinatorRescuerManagementPage() {
               </div>
             ) : isRescuerListError ? (
               <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-                Không thể tải danh sách rescuer.
+                Không thể tải danh sách người cứu hộ.
               </div>
             ) : visibleRescuers.length === 0 && !isSplitByAssemblyPointView ? (
               <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-                Không tìm thấy rescuer phù hợp với điều kiện hiện tại.
+                Không tìm thấy người cứu hộ phù hợp với điều kiện hiện tại.
               </div>
             ) : isSplitByAssemblyPointView ? (
               <div className="grid gap-3 xl:grid-cols-2">
@@ -1897,18 +1941,20 @@ export default function CoordinatorRescuerManagementPage() {
                 >
                   <div className="border-b border-sky-200/90 bg-sky-50/70 px-3 py-2">
                     <p className="text-sm font-semibold tracking-tight text-sky-900">
-                      Rescuer trong điểm tập kết {selectedAssemblyPointLabel}
+                      Người cứu hộ trong điểm tập kết{" "}
+                      {selectedAssemblyPointLabel}
                     </p>
-                    <p className="text-xs text-sky-800/80">
-                      {assignedCount} rescuer đang thuộc điểm tập kết này. Kéo
-                      từ bên phải qua để thêm tạm, rồi bấm Lưu tất cả thay đổi.
+                    <p className="text-sm text-sky-800/80">
+                      {assignedCount} người cứu hộ đang thuộc điểm tập kết này.
+                      Kéo từ bên phải qua để thêm tạm, rồi bấm Lưu tất cả thay
+                      đổi.
                     </p>
                   </div>
 
                   <div className="space-y-2 p-3">
                     {splitLeftPanelRescuers.length === 0 ? (
                       <div className="rounded-md border border-dashed border-sky-200 bg-white/90 p-3 text-sm text-sky-900/70">
-                        Chưa có rescuer nào trong điểm tập kết này.
+                        Chưa có người cứu hộ nào trong điểm tập kết này.
                       </div>
                     ) : (
                       splitLeftPanelRescuers.map((rescuer) =>
@@ -1934,17 +1980,18 @@ export default function CoordinatorRescuerManagementPage() {
                     <p className="text-sm font-semibold tracking-tight text-[#7C2D12]">
                       Chưa xác nhận có mặt hoặc chưa có điểm tập kết
                     </p>
-                    <p className="text-xs text-[#9A3412]/80">
-                      {splitRightPanelRescuers.length} rescuer có thể thêm vào
-                      điểm tập kết. Kéo ngược từ trái qua để bỏ gán tạm.
+                    <p className="text-sm text-[#9A3412]/80">
+                      {splitRightPanelRescuers.length} người cứu hộ có thể thêm
+                      vào điểm tập kết. Kéo ngược từ trái qua để bỏ gán tạm.
                     </p>
                   </div>
 
                   <div className="space-y-2 p-3">
                     {splitRightPanelRescuers.length === 0 ? (
                       <div className="rounded-md border border-dashed border-[#FF5722]/35 bg-white/90 p-3 text-sm text-[#9A3412]/80">
-                        Không còn rescuer phù hợp với điều kiện chưa xác nhận có
-                        mặt hoặc chưa có điểm tập kết theo bộ lọc hiện tại.
+                        Không còn người cứu hộ phù hợp với điều kiện chưa xác
+                        nhận có mặt hoặc chưa có điểm tập kết theo bộ lọc hiện
+                        tại.
                       </div>
                     ) : (
                       splitRightPanelRescuers.map((rescuer) =>
@@ -1963,7 +2010,7 @@ export default function CoordinatorRescuerManagementPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm text-muted-foreground">
                         Trang {currentPage}/{Math.max(totalPages, 1)} • Tổng{" "}
-                        {totalCount} rescuer
+                        {totalCount} người cứu hộ
                       </p>
                       <div className="flex items-center gap-1">
                         <span className="text-sm text-muted-foreground">
@@ -2059,9 +2106,9 @@ export default function CoordinatorRescuerManagementPage() {
               </>
             )}
 
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {isSplitByAssemblyPointView
-                ? "Gợi ý: rescuer mới kéo-thả sẽ lên đầu cột đích và chỉ cập nhật backend khi bấm Lưu tất cả thay đổi hoặc Áp dụng."
+                ? "Gợi ý: người cứu hộ mới kéo-thả sẽ lên đầu cột đích và chỉ cập nhật hệ thống khi bấm Lưu tất cả thay đổi hoặc Áp dụng."
                 : "Gợi ý: ô tìm kiếm và các bộ lọc đang gửi trực tiếp lên backend, danh sách hiện tại là kết quả đã được backend lọc sẵn."}
             </p>
           </CardContent>
