@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import gsap from "gsap";
@@ -52,6 +52,11 @@ type TeamFilter = "all" | "inTeam" | "notInTeam";
 type RescuerTypeFilter = "all" | "Core" | "Volunteer";
 type SplitPanelSide = "left" | "right";
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
+
+type SplitRowLayout = {
+  top: number;
+  left: number;
+};
 
 function getInitials(firstName?: string, lastName?: string) {
   return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase() || "?";
@@ -105,6 +110,7 @@ export default function CoordinatorRescuerManagementPage() {
   const splitDropSequenceRef = useRef(0);
   const leftPanelRef = useRef<HTMLDivElement | null>(null);
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
+  const splitRowLayoutsRef = useRef<Record<string, SplitRowLayout>>({});
   const isSplitByAssemblyPointView =
     selectedAssemblyPointCode !== ALL_ASSEMBLY_POINT_FILTER_VALUE;
 
@@ -659,6 +665,81 @@ export default function CoordinatorRescuerManagementPage() {
       });
     }
   }, [isSplitByAssemblyPointView, activeDropPanel]);
+
+  useLayoutEffect(() => {
+    if (!isSplitByAssemblyPointView) {
+      splitRowLayoutsRef.current = {};
+      return;
+    }
+
+    const rowElements = [
+      ...(leftPanelRef.current?.querySelectorAll<HTMLElement>(
+        "[data-split-rescuer-id]",
+      ) ?? []),
+      ...(rightPanelRef.current?.querySelectorAll<HTMLElement>(
+        "[data-split-rescuer-id]",
+      ) ?? []),
+    ];
+
+    const previousLayouts = splitRowLayoutsRef.current;
+    const nextLayouts: Record<string, SplitRowLayout> = {};
+
+    for (const rowElement of rowElements) {
+      const rescuerId = rowElement.dataset.splitRescuerId;
+      if (!rescuerId) {
+        continue;
+      }
+
+      const rowRect = rowElement.getBoundingClientRect();
+      nextLayouts[rescuerId] = { top: rowRect.top, left: rowRect.left };
+
+      const previousLayout = previousLayouts[rescuerId];
+      if (previousLayout) {
+        const deltaX = previousLayout.left - rowRect.left;
+        const deltaY = previousLayout.top - rowRect.top;
+
+        if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+          gsap.fromTo(
+            rowElement,
+            { x: deltaX, y: deltaY },
+            {
+              x: 0,
+              y: 0,
+              duration: 0.32,
+              ease: "power2.out",
+              clearProps: "transform",
+              overwrite: "auto",
+            },
+          );
+        }
+
+        continue;
+      }
+
+      if (rescuerId === latestDroppedRescuerId) {
+        gsap.fromTo(
+          rowElement,
+          { y: -18, opacity: 0.35, scale: 0.98 },
+          {
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            duration: 0.28,
+            ease: "power2.out",
+            clearProps: "transform,opacity",
+            overwrite: "auto",
+          },
+        );
+      }
+    }
+
+    splitRowLayoutsRef.current = nextLayouts;
+  }, [
+    isSplitByAssemblyPointView,
+    splitLeftPanelRescuers,
+    splitRightPanelRescuers,
+    latestDroppedRescuerId,
+  ]);
 
   const selectedRescuerIdSet = useMemo(
     () => new Set(selectedRescuerIds),
@@ -1270,6 +1351,7 @@ export default function CoordinatorRescuerManagementPage() {
     return (
       <div
         key={rescuer.id}
+        data-split-rescuer-id={draggableSide ? rescuer.id : undefined}
         draggable={isRowDraggable}
         onDragStart={
           isRowDraggable && draggableSide
@@ -1280,6 +1362,9 @@ export default function CoordinatorRescuerManagementPage() {
         className={cn(
           "rounded-lg border border-border bg-card p-2.5 transition-colors md:p-3",
           isRowDraggable && "cursor-grab active:cursor-grabbing",
+          isSplitByAssemblyPointView &&
+            draggableSide &&
+            "will-change-transform",
           isRecentlyDraggedRow &&
             "border-[#FF5722]/65 bg-[#FFF7F2] shadow-[0_0_0_2px_rgba(255,87,34,0.2)]",
           isRowSelected && "border-[#FF5722]/35 bg-[#FF5722]/3",
@@ -1388,7 +1473,7 @@ export default function CoordinatorRescuerManagementPage() {
               }
               disabled={isAssignmentBusy}
             >
-              <SelectTrigger className="h-8 w-55">
+              <SelectTrigger className="h-8 w-55 border-white bg-white/95 shadow-[0_1px_2px_rgba(15,23,42,0.08)]">
                 <SelectValue
                   placeholder={
                     isAssemblyPointLoading
@@ -1691,11 +1776,22 @@ export default function CoordinatorRescuerManagementPage() {
                     ) : null}
                   </div>
 
-                  <div className="flex w-full flex-col gap-2 sm:flex-row xl:max-w-2xl">
+                  <div
+                    className={cn(
+                      "w-full gap-2 xl:max-w-2xl",
+                      isSplitByAssemblyPointView
+                        ? "flex flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-stretch"
+                        : "flex flex-col sm:flex-row",
+                    )}
+                  >
                     {isSplitByAssemblyPointView ? (
-                      <div className="flex h-9 items-center rounded-md border border-[#FF5722]/30 bg-white px-3 text-sm text-foreground sm:flex-1">
-                        Điểm tập kết:{" "}
-                        {selectedAssemblyPointLabel ?? "Đang tải..."}
+                      <div
+                        className="flex min-h-9 min-w-0 items-center rounded-md border border-[#FF5722]/30 bg-white px-3 py-1.5 text-sm font-medium text-foreground sm:h-full"
+                        title={selectedAssemblyPointLabel ?? "Đang tải..."}
+                      >
+                        <span className="leading-5">
+                          {selectedAssemblyPointLabel ?? "Đang tải..."}
+                        </span>
                       </div>
                     ) : (
                       <Select
@@ -1729,7 +1825,10 @@ export default function CoordinatorRescuerManagementPage() {
 
                     <Button
                       type="button"
-                      className="h-9 gap-2 bg-[#FF5722] text-white hover:bg-[#FF5722]/90"
+                      className={cn(
+                        "h-9 gap-2 bg-[#FF5722] text-white hover:bg-[#FF5722]/90",
+                        isSplitByAssemblyPointView && "sm:h-full",
+                      )}
                       onClick={handleBulkSaveAssignment}
                       disabled={
                         isAssignmentBusy ||
@@ -1747,7 +1846,10 @@ export default function CoordinatorRescuerManagementPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-9 gap-2 border-[#FF5722]/35 text-[#FF5722] hover:bg-[#FF5722]/10"
+                        className={cn(
+                          "h-9 gap-2 border-[#FF5722]/35 text-[#FF5722] hover:bg-[#FF5722]/10",
+                          "sm:h-full",
+                        )}
                         onClick={handleSaveAllSplitPendingAssignments}
                         disabled={
                           isAssignmentBusy || splitPendingSaveCount === 0
