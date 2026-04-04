@@ -1,7 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowRight, CheckCircle, Gear, Warning, Wrench } from "@phosphor-icons/react";
+import {
+  ArrowRight,
+  CheckCircle,
+  Gear,
+  Warning,
+  Wrench,
+} from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,26 +27,28 @@ import {
 const MAX_VISIBLE = 5;
 
 const WARNING_LEVEL_COLORS: Record<string, string> = {
-  CRITICAL: "bg-red-100 text-red-700",
-  HIGH: "bg-orange-100 text-orange-700",
-  MEDIUM: "bg-amber-100 text-amber-700",
-  LOW: "bg-yellow-100 text-yellow-700",
-  OK: "bg-emerald-100 text-emerald-700",
-  UNCONFIGURED: "bg-slate-100 text-slate-700",
+  CRITICAL: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+  HIGH: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+  MEDIUM:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  LOW: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+  OK: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  UNCONFIGURED:
+    "bg-slate-100 text-slate-700 dark:bg-slate-800/70 dark:text-slate-300",
 };
 
 function getContainerTone(level: string): string {
   switch (level) {
     case "CRITICAL":
-      return "border-red-200 bg-red-50";
+      return "border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-950/25";
     case "HIGH":
-      return "border-orange-200 bg-orange-50";
+      return "border-orange-200 bg-orange-50 dark:border-orange-800/60 dark:bg-orange-950/25";
     case "MEDIUM":
-      return "border-amber-200 bg-amber-50";
+      return "border-amber-200 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/25";
     case "LOW":
-      return "border-yellow-200 bg-yellow-50";
+      return "border-yellow-200 bg-yellow-50 dark:border-yellow-800/60 dark:bg-yellow-950/25";
     default:
-      return "border-slate-200 bg-slate-50";
+      return "border-slate-200 bg-slate-50 dark:border-slate-700/70 dark:bg-slate-900/50";
   }
 }
 
@@ -122,7 +130,10 @@ const LowStockAlerts = () => {
                 const severity = getLowStockSeverityRatio(item);
                 const shortage =
                   item.minimumThreshold != null
-                    ? Math.max(item.minimumThreshold - item.availableQuantity, 0)
+                    ? Math.max(
+                        item.minimumThreshold - item.availableQuantity,
+                        0,
+                      )
                     : null;
 
                 return (
@@ -135,8 +146,11 @@ const LowStockAlerts = () => {
                     )}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="shrink-0 rounded-lg bg-white/80 p-2">
-                        <Wrench className="h-4 w-4 text-current" weight="fill" />
+                      <div className="shrink-0 rounded-lg bg-white/80 p-2 dark:bg-background/60">
+                        <Wrench
+                          className="h-4 w-4 text-current"
+                          weight="fill"
+                        />
                       </div>
 
                       <div className="min-w-0 flex-1">
@@ -212,7 +226,11 @@ const LowStockAlerts = () => {
 
         <div className="flex gap-2 border-t px-4 pt-2">
           {items.length > MAX_VISIBLE ? (
-            <Button variant="outline" className="flex-1" onClick={navigateToFull}>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={navigateToFull}
+            >
               Xem tất cả ({items.length} mặt hàng)
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>

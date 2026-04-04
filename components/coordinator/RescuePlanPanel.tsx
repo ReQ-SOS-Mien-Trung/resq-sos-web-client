@@ -49,7 +49,10 @@ import {
   useActivityRoute,
   useMissionTeamRoute,
 } from "@/services/mission/hooks";
-import { useRescueTeamsByCluster } from "@/services/rescue_teams/hooks";
+import {
+  useRescueTeamStatuses,
+  useRescueTeamsByCluster,
+} from "@/services/rescue_teams/hooks";
 import { useDepotInventoryRealtime } from "@/hooks/useDepotInventoryRealtime";
 import { getActivityRoute } from "@/services/mission/api";
 import type {
@@ -71,7 +74,10 @@ import {
 } from "@/services/sos_cluster/type";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
-import type { RescueTeamByClusterEntity } from "@/services/rescue_teams/type";
+import type {
+  RescueTeamByClusterEntity,
+  RescueTeamStatusKey,
+} from "@/services/rescue_teams/type";
 import { SOSRequest } from "@/type";
 import {
   X,
@@ -592,9 +598,7 @@ const DepotInventoryCard = ({
                   >
                     <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate">
-                        {itemName}
-                      </p>
+                      <p className="text-xs font-medium truncate">{itemName}</p>
                       <p className="text-xs text-muted-foreground">
                         {item.categoryName}
                       </p>
@@ -1390,40 +1394,70 @@ function isMissionTeamActive(team: MissionTeam): boolean {
   );
 }
 
-function getRescueTeamStatusMeta(status: string | null | undefined): {
+const RESCUE_TEAM_STATUS_LABELS_VI: Record<RescueTeamStatusKey, string> = {
+  AwaitingAcceptance: "Chờ xác nhận",
+  Ready: "Sẵn sàng",
+  Gathering: "Đang tập hợp",
+  Available: "Sẵn sàng",
+  Assigned: "Đã phân công",
+  OnMission: "Đang làm nhiệm vụ",
+  Stuck: "Mắc kẹt",
+  Unavailable: "Không khả dụng",
+  Disbanded: "Đã giải tán",
+};
+
+const RESCUE_TEAM_STATUS_COLOR_MAP: Record<string, string> = {
+  awaitingacceptance:
+    "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+  ready:
+    "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+  gathering:
+    "bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-700",
+  available:
+    "bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-700",
+  assigned:
+    "bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700",
+  onmission:
+    "bg-violet-100 text-violet-800 border-violet-300 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-700",
+  stuck:
+    "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700",
+  unavailable:
+    "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
+  disbanded:
+    "bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800/60 dark:text-zinc-200 dark:border-zinc-600",
+};
+
+function normalizeRescueTeamStatusKey(status?: string | null): string {
+  return (status ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "")
+    .replaceAll(" ", "");
+}
+
+function getRescueTeamStatusMeta(
+  status: string | null | undefined,
+  configuredLabels?: ReadonlyMap<string, string>,
+): {
   label: string;
   className: string;
 } {
-  const normalizedStatus = (status ?? "").trim().toLowerCase();
-
-  if (normalizedStatus === "ready") {
-    return {
-      label: "Sẵn sàng",
-      className:
-        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
-    };
-  }
-
-  if (normalizedStatus === "gathering") {
-    return {
-      label: "Đang tập hợp",
-      className:
-        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
-    };
-  }
-
-  if (normalizedStatus === "awaitingacceptance") {
-    return {
-      label: "Chờ xác nhận",
-      className:
-        "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
-    };
-  }
+  const normalizedStatus = normalizeRescueTeamStatusKey(status);
+  const configuredLabel =
+    normalizedStatus && configuredLabels
+      ? configuredLabels.get(normalizedStatus)
+      : undefined;
+  const fallbackViLabel =
+    status && status in RESCUE_TEAM_STATUS_LABELS_VI
+      ? RESCUE_TEAM_STATUS_LABELS_VI[status as RescueTeamStatusKey]
+      : undefined;
 
   return {
-    label: status || "Chưa rõ",
-    className:
-      "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
+    label: configuredLabel || fallbackViLabel || status || "Chưa rõ",
+    className: normalizedStatus
+      ? (RESCUE_TEAM_STATUS_COLOR_MAP[normalizedStatus] ??
+        "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600")
+      : "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
   };
 }
 
@@ -2527,9 +2561,7 @@ const MissionTeamRoutePreview = ({
       )}
 
       {isTeamRouteError && !isLoadingRoute && (
-        <p className="text-xs text-red-500">
-          Không thể tải lộ trình tổng hợp.
-        </p>
+        <p className="text-xs text-red-500">Không thể tải lộ trình tổng hợp.</p>
       )}
 
       {routeErrorMessage ? (
@@ -3464,6 +3496,35 @@ const RescuePlanPanel = ({
     enabled: open && isEditMode && !!clusterId && clusterId > 0,
   });
 
+  const { data: rescueTeamStatusOptions } = useRescueTeamStatuses({
+    enabled: open,
+  });
+
+  const rescueTeamStatusLabelsByKey = useMemo(() => {
+    const labels = new Map<string, string>();
+
+    for (const option of rescueTeamStatusOptions ?? []) {
+      const normalizedKey = normalizeRescueTeamStatusKey(option.key);
+      if (!normalizedKey) {
+        continue;
+      }
+
+      const fallbackViLabel = RESCUE_TEAM_STATUS_LABELS_VI[option.key];
+      if (fallbackViLabel) {
+        labels.set(normalizedKey, fallbackViLabel);
+        continue;
+      }
+
+      const configuredLabel =
+        typeof option.value === "string" ? option.value.trim() : "";
+      if (configuredLabel) {
+        labels.set(normalizedKey, configuredLabel);
+      }
+    }
+
+    return labels;
+  }, [rescueTeamStatusOptions]);
+
   const nearbyRescueTeams = useMemo(() => {
     const sourceTeams = nearbyTeamsByClusterData ?? [];
 
@@ -4128,10 +4189,7 @@ const RescuePlanPanel = ({
             <ListChecks className="h-3.5 w-3.5 inline mr-1.5" weight="bold" />
             Nhiệm vụ đã tạo
             {missionsData?.missions && missionsData.missions.length > 0 && (
-              <Badge
-                variant="secondary"
-                className="text-xs h-4 px-1.5 ml-1.5"
-              >
+              <Badge variant="secondary" className="text-xs h-4 px-1.5 ml-1.5">
                 {missionsData.missions.length}
               </Badge>
             )}
@@ -4849,6 +4907,7 @@ const RescuePlanPanel = ({
                                                                     const rescueTeamStatusMeta =
                                                                       getRescueTeamStatusMeta(
                                                                         team.teamStatus,
+                                                                        rescueTeamStatusLabelsByKey,
                                                                       );
 
                                                                     return (
@@ -5212,6 +5271,7 @@ const RescuePlanPanel = ({
                                 selectedNearbyTeam
                                   ? getRescueTeamStatusMeta(
                                       selectedNearbyTeam.status,
+                                      rescueTeamStatusLabelsByKey,
                                     )
                                   : null;
                               const selectedTeamValue = hasValidSuggestedTeamId
