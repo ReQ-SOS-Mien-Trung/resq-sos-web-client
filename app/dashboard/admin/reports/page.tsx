@@ -15,6 +15,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -663,7 +671,7 @@ export default function FundingRequestsPage() {
 
         {/* ── Depot Funds ──────────────────────────────── */}
         <Card className="border border-border/50">
-          <CardContent className="p-5">
+          <CardContent className="px-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold tracking-tighter flex items-center gap-1.5">
                 <Storefront size={15} className="text-primary" />
@@ -1334,91 +1342,96 @@ export default function FundingRequestsPage() {
                     <p className="text-sm text-muted-foreground tracking-tight">Chưa có giao dịch</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {(depotTxData?.items ?? []).map((tx) => {
-                      const isIn = tx.amount >= 0;
-                      return (
-                        <div
-                          key={tx.id}
-                          className="rounded-xl border border-border/50 bg-background p-3"
-                        >
-                          <div className="flex items-start gap-2.5">
-                            <div className={`mt-0.5 w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-                              isIn ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-rose-50 dark:bg-rose-950/30"
-                            }`}>
-                              {isIn
-                                ? <ArrowUp size={13} weight="bold" className="text-emerald-600" />
-                                : <ArrowDown size={13} weight="bold" className="text-rose-600" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-sm font-semibold tracking-tighter truncate">
-                                  {txTypeMap[tx.transactionType] ?? tx.transactionType}
-                                </p>
-                                <p className={`text-sm font-bold tracking-tight shrink-0 ${
+                  <div className="rounded-lg border border-border/60 overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableHead className="w-10 text-center text-sm">#</TableHead>
+                          <TableHead className="text-sm">Loại giao dịch</TableHead>
+                          <TableHead className="text-sm">Nguồn tham chiếu</TableHead>
+                          <TableHead className="text-sm min-w-36">Ghi chú</TableHead>
+                          <TableHead className="text-sm text-right">Số tiền</TableHead>
+                          <TableHead className="text-sm text-right">Thời gian</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(depotTxData?.items ?? []).map((tx, idx) => {
+                          const isIn = tx.amount >= 0;
+                          return (
+                            <TableRow key={tx.id}>
+                              <TableCell className="text-center text-sm text-muted-foreground">
+                                {(depotTxPage - 1) * depotTxPageSize + idx + 1}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium">
+                                <span className={`inline-flex items-center gap-1 ${
                                   isIn ? "text-emerald-600" : "text-rose-600"
                                 }`}>
-                                  {isIn ? "+" : ""}{tx.amount.toLocaleString("vi-VN")}đ
-                                </p>
-                              </div>
-                              {tx.referenceType && (
-                                <p className="text-xs text-muted-foreground tracking-tight truncate">
-                                  {refTypeMap[tx.referenceType] ?? tx.referenceType}{tx.referenceId ? ` #${tx.referenceId}` : ""}
-                                </p>
-                              )}
-                              {tx.note && (
-                                <p className="text-xs text-muted-foreground/70 tracking-tight truncate mt-0.5">
-                                  {tx.note}
-                                </p>
-                              )}
-                              <p className="text-xs text-muted-foreground/60 tracking-tight mt-1">
+                                  {isIn
+                                    ? <ArrowUp size={12} weight="bold" />
+                                    : <ArrowDown size={12} weight="bold" />}
+                                  {txTypeMap[tx.transactionType] ?? tx.transactionType}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {tx.referenceType
+                                  ? `${refTypeMap[tx.referenceType] ?? tx.referenceType}${tx.referenceId ? ` #${tx.referenceId}` : ""}`
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-48 truncate">
+                                {tx.note || "—"}
+                              </TableCell>
+                              <TableCell className={`text-sm font-bold text-right ${
+                                isIn ? "text-emerald-600" : "text-rose-600"
+                              }`}>
+                                {isIn ? "+" : ""}{tx.amount.toLocaleString("vi-VN")}đ
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground text-right whitespace-nowrap">
                                 {new Date(tx.createdAt).toLocaleString("vi-VN")}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
 
                 {/* Pagination */}
-                {(depotTxData?.totalPages ?? 0) > 1 && (
-                  <div className="flex items-center justify-between pt-3 border-t border-border/40 mt-3">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-muted-foreground tracking-tight">
-                        Trang {depotTxPage}/{depotTxData?.totalPages}
-                      </p>
-                      <Select value={String(depotTxPageSize)} onValueChange={(v) => { setDepotTxPageSize(Number(v)); setDepotTxPage(1); }}>
-                        <SelectTrigger className="w-14 h-6 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <span className="text-xs text-muted-foreground tracking-tight">/ trang</span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => setDepotTxPage((p) => Math.max(1, p - 1))}
-                        disabled={!depotTxData?.hasPreviousPage}
-                        className="px-2.5 py-1 text-xs rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
-                      >
-                        Trước
-                      </button>
-                      <button
-                        onClick={() => setDepotTxPage((p) => p + 1)}
-                        disabled={!depotTxData?.hasNextPage}
-                        className="px-2.5 py-1 text-xs rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
-                      >
-                        Sau
-                      </button>
-                    </div>
+                <div className="flex items-center justify-between pt-3 border-t border-border/40 mt-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground tracking-tight">
+                      Trang {depotTxPage}/{depotTxData?.totalPages ?? 1}
+                    </p>
+                    <Select value={String(depotTxPageSize)} onValueChange={(v) => { setDepotTxPageSize(Number(v)); setDepotTxPage(1); }}>
+                      <SelectTrigger className="w-16 h-7 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-muted-foreground tracking-tight">/ trang</span>
                   </div>
-                )}
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => setDepotTxPage((p) => Math.max(1, p - 1))}
+                      disabled={!depotTxData?.hasPreviousPage}
+                      className="px-2.5 py-1 text-sm rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
+                    >
+                      Trước
+                    </button>
+                    <button
+                      onClick={() => setDepotTxPage((p) => p + 1)}
+                      disabled={!depotTxData?.hasNextPage}
+                      className="px-2.5 py-1 text-sm rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
+                    >
+                      Sau
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

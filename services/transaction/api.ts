@@ -51,6 +51,41 @@ export async function getDepotFundTransactions(
 }
 
 /**
+ * Get campaign transaction type metadata
+ * GET /finance/campaigns/metadata/transaction-types
+ */
+export async function getCampaignTransactionTypes(): Promise<
+  DepotFundMetadataItem[]
+> {
+  const { data } = await api.get(
+    "/finance/campaigns/metadata/transaction-types",
+  );
+  return data;
+}
+
+/**
+ * Get campaign reference type metadata
+ * GET /finance/campaigns/metadata/reference-types
+ */
+export async function getCampaignReferenceTypes(): Promise<
+  DepotFundMetadataItem[]
+> {
+  const { data } = await api.get("/finance/campaigns/metadata/reference-types");
+  return data;
+}
+
+/**
+ * Get campaign direction metadata
+ * GET /finance/campaigns/metadata/directions
+ */
+export async function getCampaignDirections(): Promise<
+  DepotFundMetadataItem[]
+> {
+  const { data } = await api.get("/finance/campaigns/metadata/directions");
+  return data;
+}
+
+/**
  * Get financial transaction history of a campaign
  * GET /finance/campaigns/{id}/transactions
  */
@@ -60,6 +95,7 @@ export async function getCampaignTransactions(
   const { id, ...query } = params;
   const { data } = await api.get(`/finance/campaigns/${id}/transactions`, {
     params: query,
+    paramsSerializer: { indexes: null },
   });
   return data;
 }

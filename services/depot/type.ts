@@ -104,7 +104,7 @@ export interface DepotFundTransaction {
   transactionType: string;
   amount: number;
   referenceType: string;
-  referenceId: number;
+  referenceId: number | null;
   note: string;
   createdBy: string;
   createdAt: string;

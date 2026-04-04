@@ -64,6 +64,7 @@ export interface CampaignEntity {
   region: string;
   targetAmount: number;
   totalAmount: number;
+  currentBalance: number;
   status: CampaignStatus;
   campaignStartDate: string;
   campaignEndDate: string;

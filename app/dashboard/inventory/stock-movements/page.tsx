@@ -24,9 +24,9 @@ const StockMovementsPage: React.FC = () => {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-2xl tracking-tighter font-bold text-foreground">Truy xuất xuất nhập kho</h1>
+              <h1 className="text-2xl tracking-tighter font-bold text-foreground">Truy xuất biến động kho</h1>
               <p className="text-sm tracking-tighter text-muted-foreground">
-                Theo dõi tất cả các lần xuất nhập kho
+                Theo dõi tất cả các lần biến động kho
               </p>
             </div>
           </div>

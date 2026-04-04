@@ -8,6 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -42,7 +50,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import { useCampaigns, useCampaignStatuses } from "@/services/campaign_disbursement";
 import type { CampaignStatus, CampaignEntity } from "@/services/campaign_disbursement";
-import { useCampaignTransactions } from "@/services/transaction";
+import { useCampaignTransactions, useCampaignTransactionTypes, useCampaignReferenceTypes, useCampaignDirections } from "@/services/transaction";
 import {
   Select,
   SelectContent,
@@ -74,46 +82,61 @@ export default function CampaignsPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<CampaignStatus[]>([]);
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // Panel state
   const [selectedCampaign, setSelectedCampaign] = useState<CampaignEntity | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [txPage, setTxPage] = useState(1);
   const [txPageSize, setTxPageSize] = useState(10);
+  const [txTypeFilter, setTxTypeFilter] = useState("");
+  const [txDirectionFilter, setTxDirectionFilter] = useState("");
+  const [txRefTypeFilter, setTxRefTypeFilter] = useState("");
 
   const openPanel = (campaign: CampaignEntity) => {
     setSelectedCampaign(campaign);
     setTxPage(1);
+    setTxTypeFilter("");
+    setTxDirectionFilter("");
+    setTxRefTypeFilter("");
     setPanelOpen(true);
   };
 
   const { data, isLoading } = useCampaigns({
-    params: { pageNumber: 1, pageSize: 200 },
+    params: { pageNumber: page, pageSize, statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined },
   });
   const { data: campaignStatuses = [] } = useCampaignStatuses();
 
   // Transactions for selected campaign
   const { data: txData, isLoading: txLoading } = useCampaignTransactions(
-    { id: selectedCampaign?.id ?? 0, pageNumber: txPage, pageSize: txPageSize },
+    {
+      id: selectedCampaign?.id ?? 0,
+      pageNumber: txPage,
+      pageSize: txPageSize,
+      types: txTypeFilter ? [txTypeFilter] : undefined,
+      directions: txDirectionFilter ? [txDirectionFilter] : undefined,
+      referenceTypes: txRefTypeFilter ? [txRefTypeFilter] : undefined,
+    },
     { enabled: !!selectedCampaign },
   );
+
+  const { data: txTypesMeta = [] } = useCampaignTransactionTypes();
+  const { data: txRefTypesMeta = [] } = useCampaignReferenceTypes();
+  const { data: txDirectionsMeta = [] } = useCampaignDirections();
+
+  const txTypeMap = useMemo(() => Object.fromEntries(txTypesMeta.map((m) => [m.key, m.value])), [txTypesMeta]);
+  const txRefTypeMap = useMemo(() => Object.fromEntries(txRefTypesMeta.map((m) => [m.key, m.value])), [txRefTypesMeta]);
 
   const campaigns = useMemo(() => data?.items ?? [], [data]);
 
   const filtered = useMemo(() => {
-    let result = campaigns;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.region.toLowerCase().includes(q),
-      );
-    }
-    if (selectedStatuses.length > 0) {
-      result = result.filter((c) => selectedStatuses.includes(c.status));
-    }
-    return result;
-  }, [campaigns, search, selectedStatuses]);
+    if (!search.trim()) return campaigns;
+    const q = search.toLowerCase();
+    return campaigns.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.region.toLowerCase().includes(q),
+    );
+  }, [campaigns, search]);
 
   const statusCounts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -125,13 +148,13 @@ export default function CampaignsPage() {
 
   const stats = useMemo(
     () => ({
-      total: campaigns.length,
+      total: data?.totalCount ?? campaigns.length,
       active: campaigns.filter((c) => c.status === "Active").length,
       closed: campaigns.filter((c) => c.status === "Closed").length,
       totalRaised: campaigns.reduce((s, c) => s + c.totalAmount, 0),
       totalTarget: campaigns.reduce((s, c) => s + c.targetAmount, 0),
     }),
-    [campaigns],
+    [campaigns, data?.totalCount],
   );
 
   return (
@@ -226,7 +249,7 @@ export default function CampaignsPage() {
             <Input
               placeholder="Tìm theo tên, vùng..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               className="pl-9 h-9 text-sm"
               autoComplete="off"
             />
@@ -259,11 +282,12 @@ export default function CampaignsPage() {
                 return (
                   <button
                     key={s.key}
-                    onClick={() =>
+                    onClick={() => {
                       setSelectedStatuses((prev) =>
                         checked ? prev.filter((v) => v !== s.key) : [...prev, s.key],
-                      )
-                    }
+                      );
+                      setPage(1);
+                    }}
                     className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
                   >
                     <span
@@ -286,7 +310,7 @@ export default function CampaignsPage() {
               })}
               {selectedStatuses.length > 0 && (
                 <button
-                  onClick={() => setSelectedStatuses([])}
+                  onClick={() => { setSelectedStatuses([]); setPage(1); }}
                   className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
                 >
                   <X size={11} />
@@ -346,19 +370,19 @@ export default function CampaignsPage() {
                   onClick={() => openPanel(campaign)}
                   className="border border-border/50 hover:border-border transition-colors overflow-hidden cursor-pointer hover:shadow-sm"
                 >
-                  <CardContent className="p-5 space-y-4">
+                  <CardContent className="px-5 space-y-4">
                     {/* Header */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-sm font-bold tracking-tighter text-foreground line-clamp-2 leading-snug">
+                        <h3 className="text-lg font-bold tracking-tighter text-foreground line-clamp-2 leading-snug">
                           {campaign.name}
                         </h3>
-                        <div className="flex items-center gap-1.5 mt-1.5">
+                        <div className="flex items-center gap-1 mt-1.5">
                           <MapPin
                             size={12}
                             className="text-muted-foreground shrink-0"
                           />
-                          <span className="text-xs text-muted-foreground tracking-tighter">
+                          <span className="text-sm text-muted-foreground tracking-tighter">
                             {campaign.region}
                           </span>
                         </div>
@@ -381,8 +405,8 @@ export default function CampaignsPage() {
 
                     {/* Progress */}
                     <div>
-                      <div className="flex items-center justify-between text-xs tracking-tight mb-1.5">
-                        <span className="text-muted-foreground font-medium">
+                      <div className="flex items-center justify-between text-sm tracking-tight mb-1.5">
+                        <span className="tracking-tighter font-medium">
                           Tiến độ
                         </span>
                         <span className="font-semibold">
@@ -400,39 +424,35 @@ export default function CampaignsPage() {
                     </div>
 
                     {/* Amounts */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                        <div className="flex items-center gap-1 mb-1">
-                          <TrendUp
-                            size={11}
-                            className="text-emerald-600"
-                          />
-                          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                            Đã quyên góp
-                          </p>
-                        </div>
-                        <p className="text-sm font-bold tracking-tighter text-emerald-600">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-lg border border-border/60 bg-muted/20 p-2">
+                        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider whitespace-nowrap mb-1">
+                          Quyên góp
+                        </p>
+                        <p className="text-xs font-bold tracking-tighter text-emerald-600 truncate">
                           {formatMoney(campaign.totalAmount)}
                         </p>
                       </div>
-                      <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                        <div className="flex items-center gap-1 mb-1">
-                          <Target
-                            size={11}
-                            className="text-blue-600"
-                          />
-                          <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                            Mục tiêu
-                          </p>
-                        </div>
-                        <p className="text-sm font-bold tracking-tighter text-blue-600">
+                      <div className="rounded-lg border border-border/60 bg-muted/20 p-2">
+                        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider whitespace-nowrap mb-1">
+                          Mục tiêu
+                        </p>
+                        <p className="text-xs font-bold tracking-tighter text-blue-600 truncate">
                           {formatMoney(campaign.targetAmount)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-border/60 bg-muted/20 p-2">
+                        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider whitespace-nowrap mb-1">
+                          Số dư
+                        </p>
+                        <p className="text-xs font-bold tracking-tighter text-violet-600 truncate">
+                          {formatMoney(campaign.currentBalance)}
                         </p>
                       </div>
                     </div>
 
                     {/* Dates */}
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground tracking-tight pt-1 border-t border-border/40">
+                    <div className="flex items-center gap-3 text-xs font-medium tracking-tighter pt-1 border-t border-border/40">
                       <div className="flex items-center gap-1">
                         <CalendarBlank size={11} />
                         <span>
@@ -447,6 +467,43 @@ export default function CampaignsPage() {
             })}
           </div>
         )}
+
+        {/* ── Pagination ── */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-muted-foreground tracking-tight">
+              Trang {page}/{data?.totalPages ?? 1}
+            </p>
+            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+              <SelectTrigger className="w-16 h-7 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground tracking-tight">/ trang</span>
+          </div>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={!data?.hasPreviousPage}
+              className="px-2.5 py-1 text-sm rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
+            >
+              Trước
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!data?.hasNextPage}
+              className="px-2.5 py-1 text-sm rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
+            >
+              Sau
+            </button>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
 
@@ -499,10 +556,59 @@ export default function CampaignsPage() {
 
               {/* Transaction list */}
               <div>
-                <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
-                  <ArrowsLeftRight size={20} className="text-muted-foreground" />
-                  Giao dịch ({txData?.totalCount ?? 0})
-                </h4>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <h4 className="text-base font-semibold tracking-tighter flex items-center gap-1.5">
+                    <ArrowsLeftRight size={20} className="text-muted-foreground" />
+                    Giao dịch ({txData?.totalCount ?? 0})
+                  </h4>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Type filter */}
+                    <Select value={txTypeFilter} onValueChange={(v) => { setTxTypeFilter(v === "__all" ? "" : v); setTxPage(1); }}>
+                      <SelectTrigger className="h-7 text-sm w-44">
+                        <SelectValue placeholder="Loại giao dịch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all">Tất cả loại</SelectItem>
+                        {txTypesMeta.map((m) => (
+                          <SelectItem key={m.key} value={m.key}>{m.value}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {/* Direction filter */}
+                    <Select value={txDirectionFilter} onValueChange={(v) => { setTxDirectionFilter(v === "__all" ? "" : v); setTxPage(1); }}>
+                      <SelectTrigger className="h-7 text-sm w-36">
+                        <SelectValue placeholder="Hướng" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all">Tất cả</SelectItem>
+                        {txDirectionsMeta.map((m) => (
+                          <SelectItem key={m.key} value={m.key}>{m.value}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {/* Reference type filter */}
+                    <Select value={txRefTypeFilter} onValueChange={(v) => { setTxRefTypeFilter(v === "__all" ? "" : v); setTxPage(1); }}>
+                      <SelectTrigger className="h-7 text-sm w-44">
+                        <SelectValue placeholder="Nguồn tham chiếu" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all">Tất cả nguồn</SelectItem>
+                        {txRefTypesMeta.map((m) => (
+                          <SelectItem key={m.key} value={m.key}>{m.value}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {(txTypeFilter || txDirectionFilter || txRefTypeFilter) && (
+                      <button
+                        onClick={() => { setTxTypeFilter(""); setTxDirectionFilter(""); setTxRefTypeFilter(""); setTxPage(1); }}
+                        className="flex items-center gap-1 px-2 py-1 text-sm text-muted-foreground hover:text-foreground border border-border/60 rounded-md hover:bg-muted/50 transition-colors"
+                      >
+                        <X size={11} />
+                        Xóa bộ lọc
+                      </button>
+                    )}
+                  </div>
+                </div>
 
                 {txLoading ? (
                   <div className="space-y-2">
@@ -516,90 +622,90 @@ export default function CampaignsPage() {
                     <p className="text-sm text-muted-foreground tracking-tight">Chưa có giao dịch nào</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {txData.items.map((tx) => {
-                      const isIn = tx.direction?.toLowerCase() === "in";
-                      return (
-                        <div
-                          key={tx.id}
-                          className="rounded-xl border border-border/60 bg-background p-3 flex items-start gap-3"
-                        >
-                          <div
-                            className={`mt-0.5 rounded-md p-1.5 shrink-0 ${
-                              isIn
-                                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40"
-                                : "bg-rose-100 text-rose-600 dark:bg-rose-950/40"
-                            }`}
-                          >
-                            {isIn ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <p className="text-base font-semibold tracking-tighter">
-                                  {tx.type || tx.referenceType || "—"}
-                                </p>
-                                <p className="text-sm text-muted-foreground tracking-tight mt-0.5">
-                                  {new Date(tx.createdAt).toLocaleString("vi-VN")}
-                                </p>
-                              </div>
-                              <p
-                                className={`text-sm font-bold tracking-tighter shrink-0 ${
+                  <div className="rounded-lg border border-border/60 overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableHead className="w-10 text-center text-sm">#</TableHead>
+                          <TableHead className="text-sm">Loại giao dịch</TableHead>
+                          <TableHead className="text-sm">Tham chiếu</TableHead>
+                          <TableHead className="text-sm text-right">Số tiền</TableHead>
+                          <TableHead className="text-sm text-right">Thời gian</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {txData.items.map((tx, idx) => {
+                          const isIn = tx.direction?.toLowerCase() === "in";
+                          return (
+                            <TableRow key={tx.id}>
+                              <TableCell className="text-center text-sm text-muted-foreground">
+                                {(txPage - 1) * txPageSize + idx + 1}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium">
+                                <span className={`inline-flex items-center gap-1 ${
                                   isIn ? "text-emerald-600" : "text-rose-600"
-                                }`}
-                              >
+                                }`}>
+                                  {isIn ? <ArrowUp size={12} weight="bold" /> : <ArrowDown size={12} weight="bold" />}
+                                  {(txTypeMap[tx.type] ?? tx.type) || "—"}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {tx.referenceId != null
+                                  ? `${txRefTypeMap[tx.referenceType] ?? tx.referenceType}${tx.referenceId ? ` #${tx.referenceId}` : ""}`
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className={`text-sm font-bold text-right ${
+                                isIn ? "text-emerald-600" : "text-rose-600"
+                              }`}>
                                 {isIn ? "+" : "-"}{formatMoney(tx.amount)}
-                              </p>
-                            </div>
-                            {tx.referenceId != null && (
-                              <p className="text-sm text-muted-foreground tracking-tighter mt-1">
-                                Giao dịch số {tx.referenceId} · {tx.referenceType}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground text-right whitespace-nowrap">
+                                {new Date(tx.createdAt).toLocaleString("vi-VN")}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
 
                 {/* Pagination */}
-                {txData && txData.totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/40">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-muted-foreground tracking-tight">
-                        Trang {txPage} / {txData.totalPages}
-                      </p>
-                      <Select value={String(txPageSize)} onValueChange={(v) => { setTxPageSize(Number(v)); setTxPage(1); }}>
-                        <SelectTrigger className="w-14 h-6 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <span className="text-xs text-muted-foreground tracking-tight">/ trang</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline" size="sm"
-                        onClick={() => setTxPage((p) => Math.max(1, p - 1))}
-                        disabled={!txData.hasPreviousPage}
-                      >
-                        Trước
-                      </Button>
-                      <Button
-                        variant="outline" size="sm"
-                        onClick={() => setTxPage((p) => p + 1)}
-                        disabled={!txData.hasNextPage}
-                      >
-                        Sau
-                      </Button>
-                    </div>
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/40">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground tracking-tight">
+                      Trang {txPage} / {txData?.totalPages ?? 1}
+                    </p>
+                    <Select value={String(txPageSize)} onValueChange={(v) => { setTxPageSize(Number(v)); setTxPage(1); }}>
+                      <SelectTrigger className="w-16 h-7 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-muted-foreground tracking-tight">/ trang</span>
                   </div>
-                )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setTxPage((p) => Math.max(1, p - 1))}
+                      disabled={!txData?.hasPreviousPage}
+                      className="px-2.5 py-1 text-sm rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
+                    >
+                      Trước
+                    </button>
+                    <button
+                      onClick={() => setTxPage((p) => p + 1)}
+                      disabled={!txData?.hasNextPage}
+                      className="px-2.5 py-1 text-sm rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
+                    >
+                      Sau
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
