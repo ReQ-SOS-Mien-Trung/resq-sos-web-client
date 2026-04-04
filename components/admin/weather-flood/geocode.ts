@@ -4,6 +4,12 @@ export interface GeocodeResult {
   displayName: string;
 }
 
+export interface ReverseGeocodeResult {
+  lat: number;
+  lon: number;
+  displayName: string;
+}
+
 interface GeocodeApiResponse {
   results?: Array<{
     lat: string;
@@ -31,5 +37,37 @@ export async function geocodeCity(
     lat: Number(first.lat),
     lon: Number(first.lon),
     displayName: first.display_name,
+  };
+}
+
+interface ReverseGeocodeApiResponse {
+  result?: {
+    lat: string;
+    lon: string;
+    display_name: string;
+  };
+}
+
+export async function reverseGeocodeCoordinates(
+  lat: number,
+  lon: number,
+): Promise<ReverseGeocodeResult | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+  const response = await fetch(
+    `/api/geocode?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lon)}`,
+  );
+  if (!response.ok) {
+    throw new Error("Reverse geocode request failed");
+  }
+
+  const payload = (await response.json()) as ReverseGeocodeApiResponse;
+  const result = payload.result;
+  if (!result) return null;
+
+  return {
+    lat: Number(result.lat),
+    lon: Number(result.lon),
+    displayName: result.display_name,
   };
 }

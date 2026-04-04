@@ -133,8 +133,9 @@ function toStatus(status: string): "PENDING" | "ASSIGNED" | "RESCUED" {
 /** Convert SOSRequestEntity from API to SOSRequest used by UI */
 function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
   const sd = entity.structuredData;
-  const victimInfo = entity.victimInfo ?? entity.senderInfo ?? null;
-  const reporterInfo = entity.reporterInfo ?? null;
+  const victimInfo = entity.victimInfo ?? null;
+  // Prefer explicit reporter info. Keep senderInfo as backward-compatible fallback.
+  const reporterInfo = entity.reporterInfo ?? entity.senderInfo ?? null;
   const nm = entity.networkMetadata;
   const supplies = sd?.supplies ?? [];
   const supplyDetails = sd?.supply_details;

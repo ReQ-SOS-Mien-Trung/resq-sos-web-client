@@ -380,12 +380,12 @@ const SOSRequestSidebarCard = ({ sos }: { sos: SOSRequest }) => {
           )}
           weight="fill"
         />
-        <span className="text-xs font-bold truncate">SOS {sos.id}</span>
+        <span className="text-sm font-bold truncate">SOS {sos.id}</span>
 
         {isLoading && (
           <Badge
             variant="outline"
-            className="text-xs px-1 h-3.5 ml-1 animate-pulse border-blue-200 bg-blue-50 text-blue-600"
+            className="text-sm px-1 h-5 ml-1 animate-pulse border-blue-200 bg-blue-50 text-blue-600"
           >
             Đang tải điểm...
           </Badge>
@@ -394,7 +394,7 @@ const SOSRequestSidebarCard = ({ sos }: { sos: SOSRequest }) => {
         {isError && (
           <Badge
             variant="outline"
-            className="text-xs px-1 h-3.5 ml-1 border-red-200 bg-red-50 text-red-600"
+            className="text-sm px-1 h-5 ml-1 border-red-200 bg-red-50 text-red-600"
             title={error?.message}
           >
             Lỗi tải
@@ -404,19 +404,19 @@ const SOSRequestSidebarCard = ({ sos }: { sos: SOSRequest }) => {
         {ruleScore !== undefined && !isLoading && !isError && (
           <Badge
             variant="outline"
-            className="text-xs px-1 h-3.5 ml-1 border-primary/20 bg-primary/5 text-primary"
+            className="text-sm px-1 h-5 ml-1 border-primary/20 bg-primary/5 text-primary"
           >
             Điểm: {ruleScore.toFixed(1)}
           </Badge>
         )}
         <Badge
           variant={PRIORITY_BADGE_VARIANT[sos.priority]}
-          className="text-xs px-1 h-3.5 ml-auto shrink-0"
+          className="text-sm px-1 h-5 ml-auto shrink-0"
         >
           {PRIORITY_LABELS[sos.priority]}
         </Badge>
       </div>
-      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+      <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
         {sos.message}
       </p>
     </div>
@@ -461,7 +461,7 @@ const SOSGroupHeader = ({
           {isLoading && (
             <Badge
               variant="outline"
-              className="text-xs px-1.5 h-4 animate-pulse"
+              className="text-sm px-1.5 h-5 animate-pulse"
             >
               ...
             </Badge>
@@ -469,23 +469,23 @@ const SOSGroupHeader = ({
           {ruleScore !== undefined && !isLoading && !isError && (
             <Badge
               variant="outline"
-              className="text-xs px-1.5 h-4 border-primary/20 bg-primary/5 text-primary"
+              className="text-sm px-1.5 h-5 border-primary/20 bg-primary/5 text-primary"
             >
               Điểm: {ruleScore.toFixed(1)}
             </Badge>
           )}
           <Badge
             variant={PRIORITY_BADGE_VARIANT[matchedSOS.priority]}
-            className="text-xs px-1.5 h-4"
+            className="text-sm px-1.5 h-5"
           >
             {PRIORITY_LABELS[matchedSOS.priority]}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+        <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
           {matchedSOS.message}
         </p>
       </div>
-      <Badge variant="outline" className="text-xs h-5 px-1.5 shrink-0">
+      <Badge variant="outline" className="text-sm h-5 px-1.5 shrink-0">
         {groupActivitiesLength} bước
       </Badge>
     </>
@@ -515,9 +515,9 @@ const DepotInventoryCard = ({
       <div className="flex items-center gap-2 px-2.5 py-2 bg-amber-50/50 dark:bg-amber-900/10 border-b">
         <Storefront className="h-3.5 w-3.5 text-amber-600" weight="fill" />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold truncate">{depotName}</p>
+          <p className="text-sm font-bold truncate">{depotName}</p>
           {depotAddress && (
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-sm text-muted-foreground truncate">
               {depotAddress}
             </p>
           )}
@@ -525,7 +525,7 @@ const DepotInventoryCard = ({
         {data ? (
           <Badge
             variant="secondary"
-            className="h-5 shrink-0 rounded-full px-2 text-xs font-semibold"
+            className="h-5 shrink-0 rounded-full px-2 text-sm font-semibold"
           >
             {data.totalCount} vật tư
           </Badge>
@@ -598,14 +598,14 @@ const DepotInventoryCard = ({
                   >
                     <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium truncate">{itemName}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm font-medium truncate">{itemName}</p>
+                      <p className="text-sm text-muted-foreground">
                         {item.categoryName}
                       </p>
                     </div>
                     <Badge
                       variant="outline"
-                      className="text-xs h-4 px-1 shrink-0 font-bold"
+                      className="text-sm h-5 px-1 shrink-0 font-bold"
                     >
                       {availableQuantity}
                     </Badge>
@@ -614,7 +614,7 @@ const DepotInventoryCard = ({
               })(),
             )
         ) : (
-          <p className="text-xs text-muted-foreground text-center py-2">
+          <p className="text-sm text-muted-foreground text-center py-2">
             Kho trống
           </p>
         )}
@@ -625,7 +625,7 @@ const DepotInventoryCard = ({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-6 gap-1 px-2 text-xs font-semibold"
+              className="h-6 gap-1 px-2 text-sm font-semibold"
               disabled={!data.hasPreviousPage}
               onClick={() => setPage((prev) => Math.max(1, prev - 1))}
             >
@@ -634,10 +634,10 @@ const DepotInventoryCard = ({
             </Button>
 
             <div className="text-center leading-none">
-              <p className="text-xs font-semibold text-foreground">
+              <p className="text-sm font-semibold text-foreground">
                 Trang {data.pageNumber}/{data.totalPages}
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 6 vật tư mỗi trang
               </p>
             </div>
@@ -646,7 +646,7 @@ const DepotInventoryCard = ({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-6 gap-1 px-2 text-xs font-semibold"
+              className="h-6 gap-1 px-2 text-sm font-semibold"
               disabled={!data.hasNextPage}
               onClick={() => setPage((prev) => prev + 1)}
             >
@@ -777,7 +777,7 @@ const ActivityRoutePreview = ({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1"
+        className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline mt-1"
       >
         <Path className="h-3 w-3" weight="bold" />
         Xem lộ trình
@@ -789,14 +789,14 @@ const ActivityRoutePreview = ({
     <div className="mt-1.5 rounded-lg border bg-muted/30 p-2 space-y-1.5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+          <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
             <NavigationArrow className="h-3 w-3" weight="fill" />
             Lộ trình
           </span>
           {data ? (
             <Badge
               variant="outline"
-              className={cn("h-5 px-1.5 text-xs", routeStatusMeta.className)}
+              className={cn("h-5 px-1.5 text-sm", routeStatusMeta.className)}
             >
               {routeStatusMeta.label}
             </Badge>
@@ -817,7 +817,7 @@ const ActivityRoutePreview = ({
                 type="button"
                 onClick={() => setVehicle(v.key)}
                 className={cn(
-                  "px-1.5 py-0.5 text-xs font-medium transition-colors",
+                  "px-1.5 py-0.5 text-sm font-medium transition-colors",
                   vehicle === v.key
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-accent",
@@ -838,14 +838,14 @@ const ActivityRoutePreview = ({
       </div>
       {/* Chưa có vị trí GPS — đang lấy */}
       {!originCoords && (
-        <p className="text-xs text-muted-foreground flex items-center gap-1 animate-pulse">
+        <p className="text-sm text-muted-foreground flex items-center gap-1 animate-pulse">
           <CircleNotch className="h-3 w-3 animate-spin" />
           Đang lấy vị trí hiện tại...
         </p>
       )}
       {/* Dùng vị trí mặc định nếu GPS bị từ chối */}
       {geoError && (
-        <p className="text-xs text-orange-500 flex items-center gap-1">
+        <p className="text-sm text-orange-500 flex items-center gap-1">
           <Warning className="h-3 w-3" weight="fill" />
           Dùng vị trí mặc định (Huế) — hãy cấp quyền địa điểm để chính xác hơn
         </p>
@@ -857,16 +857,16 @@ const ActivityRoutePreview = ({
         </div>
       )}
       {isError && (
-        <p className="text-xs text-red-500">Không thể tải lộ trình</p>
+        <p className="text-sm text-red-500">Không thể tải lộ trình</p>
       )}
       {routeErrorMessage ? (
-        <p className="text-xs text-amber-700 dark:text-amber-300">
+        <p className="text-sm text-amber-700 dark:text-amber-300">
           {routeErrorMessage}
         </p>
       ) : null}
       {data?.route && (
         <>
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-3 text-sm">
             <span className="font-bold text-primary">
               {data.route.totalDistanceText}
             </span>
@@ -890,7 +890,7 @@ const ActivityRoutePreview = ({
 
           {routeSteps.length > 0 ? (
             <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 Chỉ dẫn đường đi ({routeSteps.length} chặng)
               </p>
               <ScrollArea className="max-h-36 rounded-md border bg-background/80">
@@ -898,7 +898,7 @@ const ActivityRoutePreview = ({
                   {routeSteps.map((step, index) => (
                     <div
                       key={`${step.startLat}-${step.startLng}-${index}`}
-                      className="flex items-start gap-1.5 text-xs"
+                      className="flex items-start gap-1.5 text-sm"
                     >
                       <span className="mt-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary/10 px-1 font-semibold text-primary">
                         {index + 1}
@@ -921,7 +921,7 @@ const ActivityRoutePreview = ({
       )}
       {data && !data.route && (
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Không tìm được tuyến đường bằng{" "}
             <strong>
               {vehicle === "bike"
@@ -931,7 +931,7 @@ const ActivityRoutePreview = ({
                   : "xe tải"}
             </strong>
           </p>
-          <p className="text-xs text-muted-foreground/70">
+          <p className="text-sm text-muted-foreground/70">
             Điểm đến có thể nằm trong khu vực không có đường. Hãy thử đổi loại
             phương tiện khác.
           </p>
@@ -1916,7 +1916,7 @@ const MissionRoutePreview = ({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1"
+        className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline mt-1"
       >
         <Path className="h-3 w-3" weight="bold" />
         Xem lộ trình tổng hợp ({uniqueWaypoints.length} điểm ·{" "}
@@ -1957,7 +1957,7 @@ const MissionRoutePreview = ({
   return (
     <div className="mt-2 rounded-lg border bg-muted/30 p-2 space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+        <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
           <NavigationArrow className="h-3 w-3" weight="fill" />
           Lộ trình tổng hợp
         </span>
@@ -1975,7 +1975,7 @@ const MissionRoutePreview = ({
                 type="button"
                 onClick={() => setVehicle(v.key)}
                 className={cn(
-                  "px-1.5 py-0.5 text-xs font-medium transition-colors",
+                  "px-1.5 py-0.5 text-sm font-medium transition-colors",
                   vehicle === v.key
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-accent",
@@ -1995,7 +1995,7 @@ const MissionRoutePreview = ({
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground flex items-center gap-1">
+      <p className="text-sm text-muted-foreground flex items-center gap-1">
         <MapPin className="h-3 w-3" weight="fill" />
         {routeOrigin.isFallback
           ? `Xuất phát mặc định: Huế (${originCoords.lat.toFixed(4)}, ${originCoords.lng.toFixed(4)})`
@@ -2003,18 +2003,18 @@ const MissionRoutePreview = ({
       </p>
       {loading && (
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground flex items-center gap-1 animate-pulse">
+          <p className="text-sm text-muted-foreground flex items-center gap-1 animate-pulse">
             <CircleNotch className="h-3 w-3 animate-spin" />
             Đang tải lộ trình ({fetchProgress}/{uniqueWaypoints.length} điểm)...
           </p>
           <Skeleton className="h-48 w-full rounded" />
         </div>
       )}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-sm text-red-500">{error}</p>}
 
       {!loading && segments.length > 0 && (
         <>
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-3 text-sm">
             <span className="font-bold text-primary">
               {formatDistance(totalDistance)}
             </span>
@@ -2028,7 +2028,7 @@ const MissionRoutePreview = ({
           </div>
 
           {(fallbackSegments > 0 || alternativeVehicleSegments > 0) && (
-            <p className="text-xs text-amber-700 dark:text-amber-300">
+            <p className="text-sm text-amber-700 dark:text-amber-300">
               {alternativeVehicleSegments > 0
                 ? `${alternativeVehicleSegments} đoạn đã tự đổi phương tiện để tìm đường. `
                 : ""}
@@ -2109,7 +2109,7 @@ const MissionRoutePreview = ({
                           opacity={1}
                           permanent
                         >
-                          <div className="text-xs font-semibold whitespace-nowrap">
+                          <div className="text-sm font-semibold whitespace-nowrap">
                             {meta.labels.join(" • ")}
                           </div>
                         </Tooltip>
@@ -2130,7 +2130,7 @@ const MissionRoutePreview = ({
                 <div key={wpIdx} className="space-y-0.5">
                   {/* Route distance to this waypoint */}
                   {seg && (
-                    <div className="flex items-center gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-sm">
                       <span
                         className="w-4 h-1 rounded-full shrink-0"
                         style={{
@@ -2148,7 +2148,7 @@ const MissionRoutePreview = ({
                     </div>
                   )}
                   {seg?.steps?.[0]?.instruction ? (
-                    <p className="pl-6 text-xs text-muted-foreground">
+                    <p className="pl-6 text-sm text-muted-foreground">
                       {seg.steps[0].instruction}
                       {seg.steps.length > 1
                         ? ` (+${seg.steps.length - 1} chặng)`
@@ -2161,7 +2161,7 @@ const MissionRoutePreview = ({
                         <Badge
                           key={`${wpIdx}-${label}`}
                           variant="outline"
-                          className="h-4 px-1.5 text-xs"
+                          className="h-5 px-1.5 text-sm"
                         >
                           {label}
                         </Badge>
@@ -2176,7 +2176,7 @@ const MissionRoutePreview = ({
                     return (
                       <div
                         key={act.id}
-                        className="flex items-center gap-2 text-xs pl-6"
+                        className="flex items-center gap-2 text-sm pl-6"
                       >
                         <span className="font-bold text-muted-foreground">
                           {act.step}.
@@ -2184,7 +2184,7 @@ const MissionRoutePreview = ({
                         <Badge
                           variant="outline"
                           className={cn(
-                            "text-xs h-3.5 px-1",
+                            "text-sm h-5 px-1",
                             config.color,
                             config.bgColor,
                             "border-transparent",
@@ -2203,7 +2203,7 @@ const MissionRoutePreview = ({
       )}
 
       {!loading && segments.length === 0 && originCoords && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Không tìm được tuyến đường. Hãy thử đổi loại phương tiện.
         </p>
       )}
@@ -2448,7 +2448,7 @@ const MissionTeamRoutePreview = ({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-1 flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"
+        className="mt-1 flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
       >
         <Path className="h-3 w-3" weight="bold" />
         Xem lộ trình tổng hợp ({missionRouteTeams.length} đội)
@@ -2464,14 +2464,14 @@ const MissionTeamRoutePreview = ({
     <div className="mt-2 space-y-1.5 rounded-lg border bg-muted/30 p-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <span className="flex items-center gap-1 text-sm font-bold uppercase tracking-wider text-muted-foreground">
             <NavigationArrow className="h-3 w-3" weight="fill" />
             Lộ trình tổng hợp
           </span>
           {teamRouteData ? (
             <Badge
               variant="outline"
-              className={cn("h-5 px-1.5 text-xs", routeStatusMeta.className)}
+              className={cn("h-5 px-1.5 text-sm", routeStatusMeta.className)}
             >
               {routeStatusMeta.label}
             </Badge>
@@ -2485,7 +2485,7 @@ const MissionTeamRoutePreview = ({
             }
             onValueChange={(value) => setSelectedMissionTeamId(Number(value))}
           >
-            <SelectTrigger className="h-7 w-45 text-xs">
+            <SelectTrigger className="h-7 w-45 text-sm">
               <SelectValue placeholder="Chọn đội" />
             </SelectTrigger>
             <SelectContent>
@@ -2495,7 +2495,7 @@ const MissionTeamRoutePreview = ({
                   <SelectItem
                     key={team.missionTeamId}
                     value={String(team.missionTeamId)}
-                    className="text-xs"
+                    className="text-sm"
                   >
                     {label}
                   </SelectItem>
@@ -2517,7 +2517,7 @@ const MissionTeamRoutePreview = ({
                 type="button"
                 onClick={() => setVehicle(option.key)}
                 className={cn(
-                  "px-1.5 py-0.5 text-xs font-medium transition-colors",
+                  "px-1.5 py-0.5 text-sm font-medium transition-colors",
                   vehicle === option.key
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-accent",
@@ -2538,12 +2538,12 @@ const MissionTeamRoutePreview = ({
         </div>
       </div>
 
-      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+      <p className="flex items-center gap-1 text-sm text-muted-foreground">
         <ShieldCheck className="h-3 w-3" weight="fill" />
         Đội: {selectedTeamLabel}
       </p>
 
-      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+      <p className="flex items-center gap-1 text-sm text-muted-foreground">
         <MapPin className="h-3 w-3" weight="fill" />
         {isFallbackOrigin
           ? `Vị trí xuất phát mặc định (Huế): ${originCoords.lat.toFixed(4)}, ${originCoords.lng.toFixed(4)}`
@@ -2552,7 +2552,7 @@ const MissionTeamRoutePreview = ({
 
       {isLoadingRoute && (
         <div className="space-y-1">
-          <p className="flex items-center gap-1 text-xs text-muted-foreground animate-pulse">
+          <p className="flex items-center gap-1 text-sm text-muted-foreground animate-pulse">
             <CircleNotch className="h-3 w-3 animate-spin" />
             Đang tải lộ trình đội...
           </p>
@@ -2561,17 +2561,17 @@ const MissionTeamRoutePreview = ({
       )}
 
       {isTeamRouteError && !isLoadingRoute && (
-        <p className="text-xs text-red-500">Không thể tải lộ trình tổng hợp.</p>
+        <p className="text-sm text-red-500">Không thể tải lộ trình tổng hợp.</p>
       )}
 
       {routeErrorMessage ? (
-        <p className="text-xs text-amber-700 dark:text-amber-300">
+        <p className="text-sm text-amber-700 dark:text-amber-300">
           {routeErrorMessage}
         </p>
       ) : null}
 
       {!isLoadingRoute && teamRouteData && (
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-3 text-sm">
           <span className="font-bold text-primary">
             {formatDistance(totalDistanceMeters)}
           </span>
@@ -2661,7 +2661,7 @@ const MissionTeamRoutePreview = ({
                     opacity={1}
                     permanent
                   >
-                    <div className="whitespace-nowrap text-xs font-semibold">
+                    <div className="whitespace-nowrap text-sm font-semibold">
                       {tooltipLabel}
                     </div>
                   </Tooltip>
@@ -2685,7 +2685,7 @@ const MissionTeamRoutePreview = ({
                 className="space-y-0.5"
               >
                 {leg ? (
-                  <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-sm">
                     <span className="h-1 w-4 shrink-0 rounded-full bg-[#FF6B35]" />
                     <NavigationArrow
                       className="h-2.5 w-2.5 text-muted-foreground"
@@ -2704,7 +2704,7 @@ const MissionTeamRoutePreview = ({
                       <Badge
                         key={`${index}-${label}`}
                         variant="outline"
-                        className="h-4 px-1.5 text-xs"
+                        className="h-5 px-1.5 text-sm"
                       >
                         {label}
                       </Badge>
@@ -2721,7 +2721,7 @@ const MissionTeamRoutePreview = ({
                     return (
                       <div
                         key={`mission-team-activity-${activity.id}`}
-                        className="flex items-center gap-2 pl-6 text-xs"
+                        className="flex items-center gap-2 pl-6 text-sm"
                       >
                         <span className="font-bold text-muted-foreground">
                           {activity.step}.
@@ -2729,7 +2729,7 @@ const MissionTeamRoutePreview = ({
                         <Badge
                           variant="outline"
                           className={cn(
-                            "h-3.5 px-1 text-xs",
+                            "h-5 px-1 text-sm",
                             config.color,
                             config.bgColor,
                             "border-transparent",
@@ -2741,7 +2741,7 @@ const MissionTeamRoutePreview = ({
                     );
                   })
                 ) : apiWaypoint ? (
-                  <p className="pl-6 text-xs text-muted-foreground">
+                  <p className="pl-6 text-sm text-muted-foreground">
                     Bước {apiWaypoint.step}: {apiWaypoint.description}
                   </p>
                 ) : null}
@@ -2752,7 +2752,7 @@ const MissionTeamRoutePreview = ({
       )}
 
       {!isLoadingRoute && displayPoints.length <= 1 && !routeErrorMessage && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Không đủ dữ liệu waypoint để hiển thị bản đồ lộ trình.
         </p>
       )}
@@ -2790,7 +2790,7 @@ const SuggestionCard = ({
             <Button
               variant="outline"
               size="sm"
-              className="h-6 text-xs gap-1 px-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+              className="h-6 text-sm gap-1 px-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
               onClick={onEdit}
             >
               <PencilSimpleLine className="h-3 w-3" />
@@ -2799,7 +2799,7 @@ const SuggestionCard = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
             {new Date(suggestion.createdAt).toLocaleString("vi-VN", {
@@ -2822,7 +2822,7 @@ const SuggestionCard = ({
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
         >
           {expanded ? (
             <CaretUp className="h-3 w-3" />
@@ -2845,7 +2845,7 @@ const SuggestionCard = ({
                 >
                   <div
                     className={cn(
-                      "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5",
+                      "w-5 h-5 rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5",
                       config.bgColor,
                       config.color,
                     )}
@@ -2857,7 +2857,7 @@ const SuggestionCard = ({
                       <Badge
                         variant="outline"
                         className={cn(
-                          "text-xs font-semibold px-1.5 py-0 h-4",
+                          "text-sm font-semibold px-1.5 py-0 h-5",
                           config.color,
                           config.bgColor,
                           "border-transparent",
@@ -2866,28 +2866,28 @@ const SuggestionCard = ({
                         {config.label}
                       </Badge>
                       {act.estimatedTime && (
-                        <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                        <span className="text-sm text-muted-foreground flex items-center gap-0.5">
                           <Clock className="h-2.5 w-2.5" />
                           {act.estimatedTime}
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-foreground/80 mt-0.5 leading-relaxed">
+                    <p className="text-sm text-foreground/80 mt-0.5 leading-relaxed">
                       {act.description}
                     </p>
                     {act.suggestedTeam && (
                       <div className="mt-1.5 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15 px-2 py-1.5">
-                        <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                        <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
                           <ShieldCheck className="h-3 w-3" weight="fill" />
                           Đội đề xuất
                         </p>
-                        <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
+                        <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
                           {act.suggestedTeam.teamName ||
                             (act.suggestedTeam.teamId
                               ? `Đội #${act.suggestedTeam.teamId}`
                               : "Đội chưa đặt tên")}
                         </p>
-                        <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                        <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
                           {`Loại: ${formatTeamTypeLabel(act.suggestedTeam.teamType)}`}
                           {act.suggestedTeam.contactPhone
                             ? ` • SĐT: ${act.suggestedTeam.contactPhone}`
@@ -2897,12 +2897,12 @@ const SuggestionCard = ({
                             : ""}
                         </p>
                         {act.suggestedTeam.reason && (
-                          <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
+                          <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
                             Lý do: {act.suggestedTeam.reason}
                           </p>
                         )}
                         {act.suggestedTeam.assemblyPointName && (
-                          <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
+                          <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
                             Điểm tập kết đội:{" "}
                             {act.suggestedTeam.assemblyPointName}
                           </p>
@@ -2913,12 +2913,12 @@ const SuggestionCard = ({
                       (act.assemblyPointLatitude != null &&
                         act.assemblyPointLongitude != null)) && (
                       <div className="mt-1 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15 px-2 py-1.5">
-                        <p className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                        <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
                           <MapPin className="h-3 w-3" weight="fill" />
                           Điểm tập kết hoạt động
                         </p>
                         {act.assemblyPointName && (
-                          <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
+                          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
                             {act.assemblyPointName}
                           </p>
                         )}
@@ -2926,7 +2926,7 @@ const SuggestionCard = ({
                           act.assemblyPointLatitude,
                           act.assemblyPointLongitude,
                         ) && (
-                          <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                          <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
                             Tọa độ:{" "}
                             {formatCoordinateLabel(
                               act.assemblyPointLatitude,
@@ -2942,7 +2942,7 @@ const SuggestionCard = ({
                           {act.suppliesToCollect.map((supply, sIdx) => (
                             <div
                               key={sIdx}
-                              className="flex items-center gap-1.5 text-xs text-blue-700 dark:text-blue-400"
+                              className="flex items-center gap-1.5 text-sm text-blue-700 dark:text-blue-400"
                             >
                               <Package className="h-3 w-3 shrink-0" />
                               <span className="font-medium">
@@ -3975,20 +3975,20 @@ const RescuePlanPanel = ({
                     <>
                       <Badge
                         variant="outline"
-                        className="text-xs px-1.5 py-0 h-5 gap-1"
+                        className="text-sm px-1.5 py-0 h-5 gap-1"
                       >
                         <TreeStructure className="h-3 w-3" weight="fill" />
                         {clusterSOSRequests.length} SOS
                       </Badge>
                       <Badge
                         variant={severity!.variant}
-                        className="text-xs px-1.5 py-0 h-5"
+                        className="text-sm px-1.5 py-0 h-5"
                       >
                         {severity!.label}
                       </Badge>
                       <Badge
                         variant="outline"
-                        className="text-xs px-1.5 py-0 h-5"
+                        className="text-sm px-1.5 py-0 h-5"
                       >
                         {formatMissionTypeLabel(
                           activeSuggestion.suggestedMissionType,
@@ -3997,7 +3997,7 @@ const RescuePlanPanel = ({
                       {activeSuggestion.multiDepotRecommended && (
                         <Badge
                           variant="outline"
-                          className="text-xs px-1.5 py-0 h-5 border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-300"
+                          className="text-sm px-1.5 py-0 h-5 border-blue-300 text-blue-700 dark:border-blue-700 dark:text-blue-300"
                         >
                           Nhiều kho
                         </Badge>
@@ -4005,7 +4005,7 @@ const RescuePlanPanel = ({
                       {activeSuggestion.needsManualReview && (
                         <Badge
                           variant="outline"
-                          className="text-xs px-1.5 py-0 h-5 border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300"
+                          className="text-sm px-1.5 py-0 h-5 border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300"
                         >
                           Cần duyệt tay
                         </Badge>
@@ -4014,7 +4014,7 @@ const RescuePlanPanel = ({
                   ) : (
                     <Badge
                       variant="outline"
-                      className="text-xs px-1.5 py-0 h-5 gap-1"
+                      className="text-sm px-1.5 py-0 h-5 gap-1"
                     >
                       {aiStream.loading ? (
                         <CircleNotch className="h-3 w-3 animate-spin" />
@@ -4037,7 +4037,7 @@ const RescuePlanPanel = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 gap-1.5 text-xs"
+                  className="h-8 gap-1.5 text-sm"
                   onClick={exitEditMode}
                 >
                   <X className="h-3.5 w-3.5" />
@@ -4047,7 +4047,7 @@ const RescuePlanPanel = ({
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 gap-1.5 text-xs"
+                className="h-8 gap-1.5 text-sm"
                 onClick={() => {
                   handleStreamAnalyze();
                 }}
@@ -4064,7 +4064,7 @@ const RescuePlanPanel = ({
               </Button>
               <Badge
                 variant="outline"
-                className="text-xs gap-1 px-1.5 py-0 h-5"
+                className="text-sm gap-1 px-1.5 py-0 h-5"
               >
                 <Lightning className="h-3 w-3" weight="fill" />
                 {activeSuggestion?.modelName ?? "AI"}
@@ -4148,7 +4148,7 @@ const RescuePlanPanel = ({
                     {stat.value}
                   </div>
                   {!isStatsCollapsed && (
-                    <div className="text-xs text-muted-foreground truncate">
+                    <div className="text-sm text-muted-foreground truncate">
                       {stat.label}
                     </div>
                   )}
@@ -4189,7 +4189,7 @@ const RescuePlanPanel = ({
             <ListChecks className="h-3.5 w-3.5 inline mr-1.5" weight="bold" />
             Nhiệm vụ đã tạo
             {missionsData?.missions && missionsData.missions.length > 0 && (
-              <Badge variant="secondary" className="text-xs h-4 px-1.5 ml-1.5">
+              <Badge variant="secondary" className="text-sm h-5 px-1.5 ml-1.5">
                 {missionsData.missions.length}
               </Badge>
             )}
@@ -4210,7 +4210,7 @@ const RescuePlanPanel = ({
                   <section>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                           <ListChecks className="h-3.5 w-3.5" weight="bold" />
                           Nhiệm vụ đã tạo cho cụm này
                         </h3>
@@ -4218,13 +4218,13 @@ const RescuePlanPanel = ({
                           <>
                             <Badge
                               variant="outline"
-                              className="text-xs h-5 px-1.5 border-emerald-300/70 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
+                              className="text-sm h-5 px-1.5 border-emerald-300/70 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
                             >
                               Đã phân công: {assignedMissionCount}
                             </Badge>
                             <Badge
                               variant="outline"
-                              className="text-xs h-5 px-1.5 border-amber-300/70 text-amber-700 dark:border-amber-700 dark:text-amber-300"
+                              className="text-sm h-5 px-1.5 border-amber-300/70 text-amber-700 dark:border-amber-700 dark:text-amber-300"
                             >
                               Chờ phân công:{" "}
                               {sortedMissions.length - assignedMissionCount}
@@ -4235,7 +4235,7 @@ const RescuePlanPanel = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-7 text-xs gap-1"
+                        className="h-7 text-sm gap-1"
                         onClick={() => refetchMissions()}
                         disabled={isMissionsLoading}
                       >
@@ -4318,7 +4318,7 @@ const RescuePlanPanel = ({
                                         </span>
                                         <Badge
                                           variant="outline"
-                                          className="text-xs h-5 px-2 shrink-0 font-semibold"
+                                          className="text-sm h-5 px-2 shrink-0 font-semibold"
                                         >
                                           {formatMissionTypeLabel(
                                             mission.missionType,
@@ -4329,7 +4329,7 @@ const RescuePlanPanel = ({
                                         <Button
                                           variant="outline"
                                           size="sm"
-                                          className="h-7 text-xs gap-1 px-2.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                                          className="h-7 text-sm gap-1 px-2.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
                                           onClick={() =>
                                             enterEditFromMission(mission)
                                           }
@@ -4340,7 +4340,7 @@ const RescuePlanPanel = ({
                                         <Badge
                                           variant="outline"
                                           className={cn(
-                                            "text-xs h-7 px-3 font-extrabold uppercase tracking-wide border-2",
+                                            "text-sm h-7 px-3 font-extrabold uppercase tracking-wide border-2",
                                             statusClass,
                                           )}
                                         >
@@ -4362,7 +4362,7 @@ const RescuePlanPanel = ({
                                   <div className="flex items-center justify-between gap-2 flex-wrap">
                                     <p
                                       className={cn(
-                                        "text-xs font-bold uppercase tracking-wider flex items-center gap-1",
+                                        "text-sm font-bold uppercase tracking-wider flex items-center gap-1",
                                         hasAssignedTeams
                                           ? "text-emerald-700 dark:text-emerald-300"
                                           : "text-amber-700 dark:text-amber-300",
@@ -4379,7 +4379,7 @@ const RescuePlanPanel = ({
                                     <Badge
                                       variant="outline"
                                       className={cn(
-                                        "text-xs h-5 px-1.5",
+                                        "text-sm h-5 px-1.5",
                                         hasAssignedTeams
                                           ? "border-emerald-300/80 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
                                           : "border-amber-300/80 text-amber-700 dark:border-amber-700 dark:text-amber-300",
@@ -4391,7 +4391,7 @@ const RescuePlanPanel = ({
                                     </Badge>
                                   </div>
                                   {hasAssignedTeams && (
-                                    <p className="text-xs text-foreground/75 mt-1 line-clamp-2">
+                                    <p className="text-sm text-foreground/75 mt-1 line-clamp-2">
                                       {activeMissionTeams
                                         .map(
                                           (team) =>
@@ -4406,13 +4406,13 @@ const RescuePlanPanel = ({
                                 {/* AI assessment */}
                                 {mission.overallAssessment && (
                                   <div className="bg-muted/40 rounded-lg p-2.5 border border-border/50">
-                                    <p className="text-xs text-foreground/80 leading-relaxed line-clamp-3">
+                                    <p className="text-sm text-foreground/80 leading-relaxed line-clamp-3">
                                       {mission.overallAssessment}
                                     </p>
                                   </div>
                                 )}
 
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                                <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                                   <span className="flex items-center gap-1">
                                     <Clock className="h-3 w-3" />
                                     {new Date(mission.startTime).toLocaleString(
@@ -4471,7 +4471,7 @@ const RescuePlanPanel = ({
                                 {mission.suggestedResources &&
                                   mission.suggestedResources.length > 0 && (
                                     <div className="mt-1">
-                                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                                      <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
                                         <Cube
                                           className="h-3 w-3"
                                           weight="bold"
@@ -4494,10 +4494,10 @@ const RescuePlanPanel = ({
                                                 <div className="p-1 rounded bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 shrink-0">
                                                   {icon}
                                                 </div>
-                                                <span className="text-xs font-medium truncate flex-1 min-w-0">
+                                                <span className="text-sm font-medium truncate flex-1 min-w-0">
                                                   {resource.description}
                                                 </span>
-                                                <span className="text-xs font-bold text-primary shrink-0">
+                                                <span className="text-sm font-bold text-primary shrink-0">
                                                   x{resource.quantity}
                                                 </span>
                                               </div>
@@ -4511,14 +4511,14 @@ const RescuePlanPanel = ({
                                 {/* Special Notes */}
                                 {mission.specialNotes && (
                                   <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-lg p-2">
-                                    <p className="text-xs font-bold uppercase tracking-wider text-orange-600 mb-0.5 flex items-center gap-1">
+                                    <p className="text-sm font-bold uppercase tracking-wider text-orange-600 mb-0.5 flex items-center gap-1">
                                       <Warning
                                         className="h-3 w-3"
                                         weight="fill"
                                       />
                                       Lưu ý
                                     </p>
-                                    <p className="text-xs text-foreground/75 leading-relaxed">
+                                    <p className="text-sm text-foreground/75 leading-relaxed">
                                       {mission.specialNotes}
                                     </p>
                                   </div>
@@ -4643,7 +4643,7 @@ const RescuePlanPanel = ({
                                                   </div>
                                                   <Badge
                                                     variant="outline"
-                                                    className="text-xs h-5 px-1.5 shrink-0 border-amber-400/60 text-amber-700 dark:text-amber-300 font-semibold"
+                                                    className="text-sm h-5 px-1.5 shrink-0 border-amber-400/60 text-amber-700 dark:text-amber-300 font-semibold"
                                                   >
                                                     {group.activities.length}{" "}
                                                     bước
@@ -4672,7 +4672,7 @@ const RescuePlanPanel = ({
                                                   </p>
                                                   <Badge
                                                     variant="outline"
-                                                    className="text-xs h-5 px-1.5 shrink-0"
+                                                    className="text-sm h-5 px-1.5 shrink-0"
                                                   >
                                                     {group.activities.length}{" "}
                                                     bước
@@ -4759,7 +4759,7 @@ const RescuePlanPanel = ({
                                                       <div className="flex items-start gap-3">
                                                         <div
                                                           className={cn(
-                                                            "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5",
+                                                            "w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5",
                                                             config.bgColor,
                                                             config.color,
                                                           )}
@@ -4771,7 +4771,7 @@ const RescuePlanPanel = ({
                                                             <Badge
                                                               variant="outline"
                                                               className={cn(
-                                                                "text-xs font-semibold px-2 py-0 h-5",
+                                                                "text-sm font-semibold px-2 py-0 h-5",
                                                                 config.color,
                                                                 config.bgColor,
                                                                 "border-transparent",
@@ -4782,7 +4782,7 @@ const RescuePlanPanel = ({
                                                             <Badge
                                                               variant="outline"
                                                               className={cn(
-                                                                "text-xs h-6 px-2 font-bold border flex items-center gap-1",
+                                                                "text-sm h-6 px-2 font-bold border flex items-center gap-1",
                                                                 stepStatus.className,
                                                               )}
                                                             >
@@ -4792,7 +4792,7 @@ const RescuePlanPanel = ({
                                                             {activity.priority ? (
                                                               <Badge
                                                                 variant="outline"
-                                                                className="text-xs h-6 px-2 font-semibold"
+                                                                className="text-sm h-6 px-2 font-semibold"
                                                               >
                                                                 Ưu tiên:{" "}
                                                                 {
@@ -4804,7 +4804,7 @@ const RescuePlanPanel = ({
                                                             "number" ? (
                                                               <Badge
                                                                 variant="outline"
-                                                                className="text-xs h-6 px-2 font-semibold"
+                                                                className="text-sm h-6 px-2 font-semibold"
                                                               >
                                                                 ETA:{" "}
                                                                 {
@@ -4824,7 +4824,7 @@ const RescuePlanPanel = ({
                                                               activity.assemblyPointLongitude !=
                                                                 null)) && (
                                                             <div className="mt-2 p-2 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15">
-                                                              <p className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
+                                                              <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
                                                                 <MapPin
                                                                   className="h-3 w-3"
                                                                   weight="fill"
@@ -4833,7 +4833,7 @@ const RescuePlanPanel = ({
                                                                 hoạt động
                                                               </p>
                                                               {activity.assemblyPointName && (
-                                                                <p className="text-xs font-semibold text-blue-800 dark:text-blue-200">
+                                                                <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
                                                                   {
                                                                     activity.assemblyPointName
                                                                   }
@@ -4843,7 +4843,7 @@ const RescuePlanPanel = ({
                                                                 activity.assemblyPointLatitude,
                                                                 activity.assemblyPointLongitude,
                                                               ) && (
-                                                                <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                                                                <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
                                                                   Tọa độ:{" "}
                                                                   {formatCoordinateLabel(
                                                                     activity.assemblyPointLatitude,
@@ -4857,7 +4857,7 @@ const RescuePlanPanel = ({
                                                           {(activity.completedBy ||
                                                             activity.completedAt) && (
                                                             <div className="mt-2 p-2 rounded-md border border-slate-200/80 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-900/20">
-                                                              <p className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                                                              <p className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
                                                                 <CheckCircle
                                                                   className="h-3 w-3"
                                                                   weight="fill"
@@ -4866,7 +4866,7 @@ const RescuePlanPanel = ({
                                                                 tất bước
                                                               </p>
                                                               {activity.completedBy && (
-                                                                <p className="text-xs text-slate-700/85 dark:text-slate-300/85">
+                                                                <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
                                                                   Người hoàn
                                                                   tất:{" "}
                                                                   {
@@ -4875,7 +4875,7 @@ const RescuePlanPanel = ({
                                                                 </p>
                                                               )}
                                                               {activity.completedAt && (
-                                                                <p className="text-xs text-slate-700/85 dark:text-slate-300/85">
+                                                                <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
                                                                   Thời điểm:{" "}
                                                                   {new Date(
                                                                     activity.completedAt,
@@ -4890,7 +4890,7 @@ const RescuePlanPanel = ({
                                                           {teamsForStep.length >
                                                             0 && (
                                                             <div className="mt-2 p-2 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
-                                                              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
+                                                              <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
                                                                 <ShieldCheck
                                                                   className="h-3 w-3"
                                                                   weight="fill"
@@ -4917,12 +4917,12 @@ const RescuePlanPanel = ({
                                                                         }
                                                                         className="rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-background/80 px-2 py-1.5"
                                                                       >
-                                                                        <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">
+                                                                        <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
                                                                           {team.teamName ||
                                                                             `Đội #${team.rescueTeamId}`}
                                                                         </p>
                                                                         {team.assemblyPointName && (
-                                                                          <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                                          <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
                                                                             Điểm
                                                                             tập
                                                                             kết:{" "}
@@ -4935,7 +4935,7 @@ const RescuePlanPanel = ({
                                                                           team.latitude,
                                                                           team.longitude,
                                                                         ) && (
-                                                                          <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                                          <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
                                                                             Vị
                                                                             trí
                                                                             đội:{" "}
@@ -4952,7 +4952,7 @@ const RescuePlanPanel = ({
                                                                           {team.teamCode && (
                                                                             <Badge
                                                                               variant="outline"
-                                                                              className="h-5 px-1.5 text-xs border-emerald-300/70 text-emerald-800 dark:border-emerald-700 dark:text-emerald-200"
+                                                                              className="h-5 px-1.5 text-sm border-emerald-300/70 text-emerald-800 dark:border-emerald-700 dark:text-emerald-200"
                                                                             >
                                                                               {
                                                                                 team.teamCode
@@ -4960,7 +4960,7 @@ const RescuePlanPanel = ({
                                                                             </Badge>
                                                                           )}
                                                                           {team.teamType && (
-                                                                            <span className="text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                                                                            <span className="text-sm text-emerald-700/80 dark:text-emerald-300/80">
                                                                               Loại:{" "}
                                                                               {formatTeamTypeLabel(
                                                                                 team.teamType,
@@ -4970,7 +4970,7 @@ const RescuePlanPanel = ({
                                                                           <Badge
                                                                             variant="outline"
                                                                             className={cn(
-                                                                              "h-5 px-1.5 text-xs font-semibold",
+                                                                              "h-5 px-1.5 text-sm font-semibold",
                                                                               teamStatusMeta.className,
                                                                             )}
                                                                           >
@@ -4982,7 +4982,7 @@ const RescuePlanPanel = ({
                                                                             <Badge
                                                                               variant="outline"
                                                                               className={cn(
-                                                                                "h-5 px-1.5 text-xs font-semibold",
+                                                                                "h-5 px-1.5 text-sm font-semibold",
                                                                                 rescueTeamStatusMeta.className,
                                                                               )}
                                                                             >
@@ -4996,7 +4996,7 @@ const RescuePlanPanel = ({
                                                                             "number" && (
                                                                             <Badge
                                                                               variant="outline"
-                                                                              className="h-5 px-1.5 text-xs"
+                                                                              className="h-5 px-1.5 text-sm"
                                                                             >
                                                                               {
                                                                                 team.memberCount
@@ -5016,7 +5016,7 @@ const RescuePlanPanel = ({
                                                           {supplyItems.length >
                                                             0 && (
                                                             <div className="mt-2.5 p-2.5 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                                                              <p className="text-xs font-bold uppercase tracking-wider text-blue-600/80 dark:text-blue-400 mb-1.5 flex items-center gap-1.5">
+                                                              <p className="text-sm font-bold uppercase tracking-wider text-blue-600/80 dark:text-blue-400 mb-1.5 flex items-center gap-1.5">
                                                                 <Package
                                                                   className="h-3 w-3"
                                                                   weight="fill"
@@ -5034,7 +5034,7 @@ const RescuePlanPanel = ({
                                                                   ) => (
                                                                     <div
                                                                       key={sIdx}
-                                                                      className="flex items-center justify-between gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
+                                                                      className="flex items-center justify-between gap-2 text-sm py-1 px-2 bg-background rounded border shadow-sm"
                                                                     >
                                                                       <div className="flex items-center gap-1.5 min-w-0">
                                                                         <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
@@ -5107,7 +5107,7 @@ const RescuePlanPanel = ({
                                 : "Tạo kế hoạch cứu hộ thủ công"}
                             </span>
                           </div>
-                          <p className="text-xs text-amber-700/70 dark:text-amber-400/70">
+                          <p className="text-sm text-amber-700/70 dark:text-amber-400/70">
                             {activeSuggestion ? (
                               <>
                                 Chỉnh sửa các bước, sau đó nhấn &quot;Xác nhận
@@ -5122,7 +5122,7 @@ const RescuePlanPanel = ({
                           </p>
                           {activeSuggestion && (
                             <div className="mt-2 rounded-md border border-orange-300/80 bg-orange-100/70 dark:border-orange-700/60 dark:bg-orange-900/20 px-2 py-1.5">
-                              <p className="text-xs text-orange-800 dark:text-orange-300 flex items-start gap-1.5 leading-relaxed">
+                              <p className="text-sm text-orange-800 dark:text-orange-300 flex items-start gap-1.5 leading-relaxed">
                                 <Warning
                                   className="h-3.5 w-3.5 mt-0.5 shrink-0"
                                   weight="fill"
@@ -5137,13 +5137,13 @@ const RescuePlanPanel = ({
 
                         {/* Mission config */}
                         <section className="rounded-xl border bg-card p-4 space-y-3">
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                             <Rocket className="h-3.5 w-3.5" weight="fill" />
                             Cấu hình nhiệm vụ
                           </h3>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                              <Label className="text-sm text-muted-foreground uppercase tracking-wider">
                                 Loại nhiệm vụ
                               </Label>
                               <Select
@@ -5152,7 +5152,7 @@ const RescuePlanPanel = ({
                                   setEditMissionType(v as MissionType)
                                 }
                               >
-                                <SelectTrigger className="h-8 text-xs mt-1">
+                                <SelectTrigger className="h-8 text-sm mt-1">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent className="z-1200">
@@ -5170,7 +5170,7 @@ const RescuePlanPanel = ({
                               </Select>
                             </div>
                             <div>
-                              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                              <Label className="text-sm text-muted-foreground uppercase tracking-wider">
                                 Điểm ưu tiên
                               </Label>
                               <Input
@@ -5184,11 +5184,11 @@ const RescuePlanPanel = ({
                                     parseFloat(e.target.value) || 5,
                                   )
                                 }
-                                className="h-8 text-xs mt-1"
+                                className="h-8 text-sm mt-1"
                               />
                             </div>
                             <div>
-                              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                              <Label className="text-sm text-muted-foreground uppercase tracking-wider">
                                 Bắt đầu
                               </Label>
                               <Input
@@ -5197,11 +5197,11 @@ const RescuePlanPanel = ({
                                 onChange={(e) =>
                                   setEditStartTime(e.target.value)
                                 }
-                                className="h-8 text-xs mt-1"
+                                className="h-8 text-sm mt-1"
                               />
                             </div>
                             <div>
-                              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                              <Label className="text-sm text-muted-foreground uppercase tracking-wider">
                                 Kết thúc dự kiến
                               </Label>
                               <Input
@@ -5210,7 +5210,7 @@ const RescuePlanPanel = ({
                                 onChange={(e) =>
                                   setEditExpectedEndTime(e.target.value)
                                 }
-                                className="h-8 text-xs mt-1"
+                                className="h-8 text-sm mt-1"
                               />
                             </div>
                           </div>
@@ -5221,7 +5221,7 @@ const RescuePlanPanel = ({
                         {/* Editable activities */}
                         <section>
                           <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                               <ListChecks
                                 className="h-3.5 w-3.5"
                                 weight="bold"
@@ -5231,14 +5231,14 @@ const RescuePlanPanel = ({
                             <div className="flex items-center gap-2">
                               <Badge
                                 variant="secondary"
-                                className="text-xs h-5 px-2"
+                                className="text-sm h-5 px-2"
                               >
                                 {editActivities.length} bước
                               </Badge>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-7 text-xs gap-1 border-dashed"
+                                className="h-7 text-sm gap-1 border-dashed"
                                 onClick={addEditActivity}
                               >
                                 <Plus className="h-3 w-3" weight="bold" />
@@ -5315,7 +5315,7 @@ const RescuePlanPanel = ({
                                     </div>
                                     <div
                                       className={cn(
-                                        "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+                                        "w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
                                         config.bgColor,
                                         config.color,
                                       )}
@@ -5333,7 +5333,7 @@ const RescuePlanPanel = ({
                                           )
                                         }
                                       >
-                                        <SelectTrigger className="h-7 w-35 text-xs font-semibold">
+                                        <SelectTrigger className="h-7 w-35 text-sm font-semibold">
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="z-1200">
@@ -5343,7 +5343,7 @@ const RescuePlanPanel = ({
                                             <SelectItem
                                               key={key}
                                               value={key}
-                                              className="text-xs"
+                                              className="text-sm"
                                             >
                                               {cfg.label}
                                             </SelectItem>
@@ -5354,7 +5354,7 @@ const RescuePlanPanel = ({
                                       <Badge
                                         variant="outline"
                                         className={cn(
-                                          "text-xs font-semibold px-2 py-0 h-6",
+                                          "text-sm font-semibold px-2 py-0 h-6",
                                           config.color,
                                           config.bgColor,
                                           "border-transparent",
@@ -5405,7 +5405,7 @@ const RescuePlanPanel = ({
 
                                   {/* Description */}
                                   <div>
-                                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                                    <Label className="text-sm text-muted-foreground uppercase tracking-wider">
                                       Mô tả
                                     </Label>
                                     {isManual ? (
@@ -5420,10 +5420,10 @@ const RescuePlanPanel = ({
                                         }
                                         placeholder="Mô tả hoạt động..."
                                         rows={2}
-                                        className="w-full mt-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs leading-relaxed ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+                                        className="w-full mt-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm leading-relaxed ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
                                       />
                                     ) : (
-                                      <p className="mt-1 text-xs leading-relaxed text-foreground/80 bg-muted/40 rounded-md px-3 py-1.5 border border-transparent">
+                                      <p className="mt-1 text-sm leading-relaxed text-foreground/80 bg-muted/40 rounded-md px-3 py-1.5 border border-transparent">
                                         {activity.description}
                                       </p>
                                     )}
@@ -5432,7 +5432,7 @@ const RescuePlanPanel = ({
                                   {/* Time + Priority */}
                                   <div className="grid grid-cols-2 gap-2">
                                     <div className="space-y-1">
-                                      <Label className="block h-4 text-xs leading-none text-muted-foreground uppercase tracking-wider">
+                                      <Label className="block min-h-5 text-sm leading-none text-muted-foreground uppercase tracking-wider">
                                         Thời gian ước tính
                                       </Label>
                                       <Input
@@ -5445,11 +5445,11 @@ const RescuePlanPanel = ({
                                           )
                                         }
                                         placeholder="VD: 30 phút"
-                                        className="h-10 w-full text-xs"
+                                        className="h-10 w-full text-sm"
                                       />
                                     </div>
                                     <div className="space-y-1">
-                                      <Label className="block h-4 text-xs leading-none text-muted-foreground uppercase tracking-wider">
+                                      <Label className="block min-h-5 text-sm leading-none text-muted-foreground uppercase tracking-wider">
                                         Độ ưu tiên
                                       </Label>
                                       <Select
@@ -5462,7 +5462,7 @@ const RescuePlanPanel = ({
                                           )
                                         }
                                       >
-                                        <SelectTrigger className="h-10 w-full text-xs">
+                                        <SelectTrigger className="h-10 w-full text-sm">
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="z-1200">
@@ -5487,10 +5487,10 @@ const RescuePlanPanel = ({
                                   <div className="rounded-lg border border-emerald-200/70 bg-emerald-50/50 p-2.5 dark:border-emerald-700/50 dark:bg-emerald-900/15">
                                     <div className="mb-2 flex items-start justify-between gap-2">
                                       <div>
-                                        <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                                        <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                                           Điều phối đội cứu hộ
                                         </p>
-                                        <p className="mt-0.5 text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                                        <p className="mt-0.5 text-sm text-emerald-700/80 dark:text-emerald-300/80">
                                           {selectedTeamDisplayName}
                                         </p>
                                       </div>
@@ -5498,7 +5498,7 @@ const RescuePlanPanel = ({
                                       {selectedNearbyTeam ? (
                                         <Badge
                                           variant="outline"
-                                          className="h-5 border-emerald-300/70 bg-white px-1.5 text-xs text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                          className="h-5 border-emerald-300/70 bg-white px-1.5 text-sm text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
                                         >
                                           {formatDistanceKmLabel(
                                             selectedNearbyTeam.distanceKm,
@@ -5517,7 +5517,7 @@ const RescuePlanPanel = ({
                                           )
                                         }
                                       >
-                                        <SelectTrigger className="h-9 text-xs bg-white/90 dark:bg-emerald-950/25">
+                                        <SelectTrigger className="h-9 text-sm bg-white/90 dark:bg-emerald-950/25">
                                           <SelectValue
                                             placeholder={
                                               isNearbyTeamsByClusterLoading
@@ -5531,7 +5531,7 @@ const RescuePlanPanel = ({
                                           !selectedTeamInNearbyOptions ? (
                                             <SelectItem
                                               value={selectedTeamValue}
-                                              className="text-xs"
+                                              className="text-sm"
                                             >
                                               {selectedTeamDisplayName} (đang
                                               chọn)
@@ -5542,7 +5542,7 @@ const RescuePlanPanel = ({
                                             <SelectItem
                                               key={team.id}
                                               value={String(team.id)}
-                                              className="text-xs"
+                                              className="text-sm"
                                             >
                                               {team.name} •{" "}
                                               {formatDistanceKmLabel(
@@ -5553,7 +5553,7 @@ const RescuePlanPanel = ({
 
                                           <SelectItem
                                             value={CLEAR_ACTIVITY_TEAM_VALUE}
-                                            className="text-xs text-rose-700"
+                                            className="text-sm text-rose-700"
                                           >
                                             Bỏ gán đội cho bước này
                                           </SelectItem>
@@ -5593,7 +5593,7 @@ const RescuePlanPanel = ({
                                                 variant="outline"
                                                 size="sm"
                                                 className={cn(
-                                                  "h-7 gap-1 rounded-full px-2 text-xs",
+                                                  "h-7 gap-1 rounded-full px-2 text-sm",
                                                   isSelectedTeam
                                                     ? "border-emerald-500 bg-emerald-100 text-emerald-800 dark:border-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-200"
                                                     : "border-emerald-200/80 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/25 dark:text-emerald-300",
@@ -5620,11 +5620,11 @@ const RescuePlanPanel = ({
                                     )}
 
                                     {selectedNearbyTeam ? (
-                                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-sm text-emerald-700/80 dark:text-emerald-300/80">
                                         <Badge
                                           variant="outline"
                                           className={cn(
-                                            "h-5 border px-1.5 text-xs",
+                                            "h-5 border px-1.5 text-sm",
                                             selectedNearbyTeamStatusMeta?.className,
                                           )}
                                         >
@@ -5640,7 +5640,7 @@ const RescuePlanPanel = ({
                                         ) : null}
                                       </div>
                                     ) : activity.suggestedTeam?.reason ? (
-                                      <p className="mt-2 text-xs leading-relaxed text-emerald-700/75 dark:text-emerald-300/75">
+                                      <p className="mt-2 text-sm leading-relaxed text-emerald-700/75 dark:text-emerald-300/75">
                                         Lý do AI:{" "}
                                         {activity.suggestedTeam.reason}
                                       </p>
@@ -5694,7 +5694,7 @@ const RescuePlanPanel = ({
                                         }
                                       }}
                                     >
-                                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                                      <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
                                         <Package className="h-3 w-3" />
                                         Vật tư
                                       </p>
@@ -5705,7 +5705,7 @@ const RescuePlanPanel = ({
                                             (supply, sIdx) => (
                                               <div
                                                 key={sIdx}
-                                                className="grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
+                                                className="grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 text-sm py-1 px-2 bg-background rounded border shadow-sm"
                                               >
                                                 <div className="flex min-w-0 items-center gap-1.5">
                                                   <Package className="h-3 w-3 text-blue-500 shrink-0" />
@@ -5735,9 +5735,9 @@ const RescuePlanPanel = ({
                                                       ) || 1,
                                                     )
                                                   }
-                                                  className="h-6 w-full text-xs text-center px-1"
+                                                  className="h-6 w-full text-sm text-center px-1"
                                                 />
-                                                <span className="text-right text-xs text-muted-foreground">
+                                                <span className="text-right text-sm text-muted-foreground">
                                                   {supply.unit}
                                                 </span>
                                                 <Button
@@ -5761,7 +5761,7 @@ const RescuePlanPanel = ({
                                           )}
                                         </div>
                                       ) : (
-                                        <p className="text-xs text-muted-foreground/60 text-center py-1">
+                                        <p className="text-sm text-muted-foreground/60 text-center py-1">
                                           Kéo vật tư từ kho bên phải vào đây
                                         </p>
                                       )}
@@ -5781,7 +5781,7 @@ const RescuePlanPanel = ({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="mt-3 gap-1.5 text-xs"
+                                className="mt-3 gap-1.5 text-sm"
                                 onClick={addEditActivity}
                               >
                                 <Plus className="h-3 w-3" weight="bold" />
@@ -5802,7 +5802,7 @@ const RescuePlanPanel = ({
                         {activeSuggestion.overallAssessment && (
                           <>
                             <section>
-                              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-2">
+                              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-2">
                                 <Lightning
                                   className="h-3.5 w-3.5 text-yellow-500"
                                   weight="fill"
@@ -5822,7 +5822,7 @@ const RescuePlanPanel = ({
 
                         {/* SOS Info — moved from right sidebar */}
                         <section>
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-3">
+                          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 mb-3">
                             <Info className="h-3.5 w-3.5" weight="fill" />
                             Thông tin SOS
                           </h3>
@@ -5846,7 +5846,7 @@ const RescuePlanPanel = ({
                         </p>
                         {aiStream.thinkingText && (
                           <div className="mt-3 mx-auto max-w-md bg-muted/40 rounded-lg p-3 border">
-                            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-4">
+                            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-4">
                               {aiStream.thinkingText.slice(-300)}
                             </p>
                           </div>
@@ -5858,7 +5858,7 @@ const RescuePlanPanel = ({
                     {!activeSuggestion && !aiStream.loading && !isEditMode && (
                       <section>
                         <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                             <Lightning
                               className="h-3.5 w-3.5 text-yellow-500"
                               weight="fill"
@@ -5869,7 +5869,7 @@ const RescuePlanPanel = ({
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 text-xs gap-1"
+                              className="h-7 text-sm gap-1"
                               onClick={() => refetchSuggestions()}
                               disabled={isSuggestionsLoading}
                             >
@@ -5879,7 +5879,7 @@ const RescuePlanPanel = ({
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 text-xs gap-1.5"
+                              className="h-7 text-sm gap-1.5"
                               onClick={handleStreamAnalyze}
                               disabled={!clusterId}
                             >
@@ -5951,7 +5951,7 @@ const RescuePlanPanel = ({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="gap-1.5 text-xs"
+                                className="gap-1.5 text-sm"
                                 onClick={handleStreamAnalyze}
                                 disabled={!clusterId}
                               >
@@ -5999,7 +5999,7 @@ const RescuePlanPanel = ({
                     <>
                       <section>
                         <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                             <ListChecks className="h-3.5 w-3.5" weight="bold" />
                             Kế hoạch thực hiện
                           </h3>
@@ -6007,7 +6007,7 @@ const RescuePlanPanel = ({
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-7 text-xs gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                              className="h-7 text-sm gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
                               onClick={enterEditMode}
                             >
                               <PencilSimpleLine className="h-3 w-3" />
@@ -6015,7 +6015,7 @@ const RescuePlanPanel = ({
                             </Button>
                             <Badge
                               variant="secondary"
-                              className="text-xs h-5 px-2"
+                              className="text-sm h-5 px-2"
                             >
                               {
                                 (activeSuggestion?.suggestedActivities ?? [])
@@ -6081,14 +6081,14 @@ const RescuePlanPanel = ({
                                           </span>
                                         </p>
                                         {group.depotAddress && (
-                                          <p className="text-xs text-amber-700/70 dark:text-amber-400/60 truncate mt-0.5">
+                                          <p className="text-sm text-amber-700/70 dark:text-amber-400/60 truncate mt-0.5">
                                             {group.depotAddress}
                                           </p>
                                         )}
                                       </div>
                                       <Badge
                                         variant="outline"
-                                        className="text-xs h-5 px-1.5 shrink-0 border-amber-400/60 text-amber-700 dark:text-amber-300 font-semibold"
+                                        className="text-sm h-5 px-1.5 shrink-0 border-amber-400/60 text-amber-700 dark:text-amber-300 font-semibold"
                                       >
                                         {group.activities.length} bước
                                       </Badge>
@@ -6113,7 +6113,7 @@ const RescuePlanPanel = ({
                                       </p>
                                       <Badge
                                         variant="outline"
-                                        className="text-xs h-5 px-1.5 shrink-0"
+                                        className="text-sm h-5 px-1.5 shrink-0"
                                       >
                                         {group.activities.length} bước
                                       </Badge>
@@ -6157,7 +6157,7 @@ const RescuePlanPanel = ({
                                         <div className="flex items-start gap-2.5">
                                           <div
                                             className={cn(
-                                              "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+                                              "w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
                                               config.bgColor,
                                               config.color,
                                             )}
@@ -6169,7 +6169,7 @@ const RescuePlanPanel = ({
                                               <Badge
                                                 variant="outline"
                                                 className={cn(
-                                                  "text-xs font-semibold px-2 py-0 h-5",
+                                                  "text-sm font-semibold px-2 py-0 h-5",
                                                   config.color,
                                                   config.bgColor,
                                                   "border-transparent",
@@ -6177,19 +6177,19 @@ const RescuePlanPanel = ({
                                               >
                                                 {config.label}
                                               </Badge>
-                                              <span className="text-xs text-muted-foreground flex items-center gap-1 bg-muted/60 px-1.5 py-0.5 rounded-md">
+                                              <span className="text-sm text-muted-foreground flex items-center gap-1 bg-muted/60 px-1.5 py-0.5 rounded-md">
                                                 <Clock className="h-3 w-3" />
                                                 {activity.estimatedTime}
                                               </span>
                                               {activity.priority && (
-                                                <span className="text-xs text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md">
+                                                <span className="text-sm text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md">
                                                   {activity.priority}
                                                 </span>
                                               )}
                                               <Badge
                                                 variant="outline"
                                                 className={cn(
-                                                  "text-xs h-6 px-2 font-bold border flex items-center gap-1",
+                                                  "text-sm h-6 px-2 font-bold border flex items-center gap-1",
                                                   stepStatus.className,
                                                 )}
                                               >
@@ -6203,14 +6203,14 @@ const RescuePlanPanel = ({
 
                                             {activity.suggestedTeam && (
                                               <div className="mt-2 p-2.5 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
-                                                <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
+                                                <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
                                                   <ShieldCheck
                                                     className="h-3 w-3"
                                                     weight="fill"
                                                   />
                                                   Đội đề xuất
                                                 </p>
-                                                <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                                                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
                                                   {activity.suggestedTeam
                                                     .teamName ||
                                                     (activity.suggestedTeam
@@ -6218,7 +6218,7 @@ const RescuePlanPanel = ({
                                                       ? `Đội #${activity.suggestedTeam.teamId}`
                                                       : "Đội chưa đặt tên")}
                                                 </p>
-                                                <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
                                                   {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
                                                   {activity.suggestedTeam
                                                     .contactPhone
@@ -6231,7 +6231,7 @@ const RescuePlanPanel = ({
                                                 </p>
                                                 {activity.suggestedTeam
                                                   .reason && (
-                                                  <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
+                                                  <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
                                                     Lý do:{" "}
                                                     {
                                                       activity.suggestedTeam
@@ -6241,7 +6241,7 @@ const RescuePlanPanel = ({
                                                 )}
                                                 {activity.suggestedTeam
                                                   .assemblyPointName && (
-                                                  <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
+                                                  <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
                                                     Điểm tập kết đội:{" "}
                                                     {
                                                       activity.suggestedTeam
@@ -6258,7 +6258,7 @@ const RescuePlanPanel = ({
                                                 activity.assemblyPointLongitude !=
                                                   null)) && (
                                               <div className="mt-2 p-2 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15">
-                                                <p className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
+                                                <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
                                                   <MapPin
                                                     className="h-3 w-3"
                                                     weight="fill"
@@ -6266,7 +6266,7 @@ const RescuePlanPanel = ({
                                                   Điểm tập kết hoạt động
                                                 </p>
                                                 {activity.assemblyPointName && (
-                                                  <p className="text-xs font-semibold text-blue-800 dark:text-blue-200">
+                                                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
                                                     {activity.assemblyPointName}
                                                   </p>
                                                 )}
@@ -6274,7 +6274,7 @@ const RescuePlanPanel = ({
                                                   activity.assemblyPointLatitude,
                                                   activity.assemblyPointLongitude,
                                                 ) && (
-                                                  <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                                                  <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
                                                     Tọa độ:{" "}
                                                     {formatCoordinateLabel(
                                                       activity.assemblyPointLatitude,
@@ -6287,7 +6287,7 @@ const RescuePlanPanel = ({
 
                                             {supplyItems.length > 0 && (
                                               <div className="mt-2 p-2 rounded-md bg-muted/50 border border-dashed">
-                                                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
+                                                <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
                                                   {activity.activityType ===
                                                   "DELIVER_SUPPLIES"
                                                     ? "Danh sách giao hàng"
@@ -6298,7 +6298,7 @@ const RescuePlanPanel = ({
                                                     (supply, sIdx) => (
                                                       <div
                                                         key={sIdx}
-                                                        className="flex items-center justify-between gap-2 text-xs py-1 px-2 bg-background rounded border shadow-sm"
+                                                        className="flex items-center justify-between gap-2 text-sm py-1 px-2 bg-background rounded border shadow-sm"
                                                       >
                                                         <div className="flex items-center gap-1.5 min-w-0">
                                                           <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
@@ -6336,7 +6336,7 @@ const RescuePlanPanel = ({
                   {activeSuggestion && (
                     <>
                       <section>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
                           <Cube className="h-3.5 w-3.5" weight="bold" />
                           Tài nguyên cần thiết
                         </h4>
@@ -6355,16 +6355,16 @@ const RescuePlanPanel = ({
                                     {icon}
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="text-xs font-semibold truncate">
+                                    <p className="text-sm font-semibold truncate">
                                       {resource.description}
                                     </p>
                                   </div>
-                                  <span className="text-xs font-bold text-primary shrink-0">
+                                  <span className="text-sm font-bold text-primary shrink-0">
                                     x{resource.quantity}
                                   </span>
                                   <Badge
                                     variant="outline"
-                                    className="text-xs h-5 px-1.5 shrink-0"
+                                    className="text-sm h-5 px-1.5 shrink-0"
                                   >
                                     {resource.priority}
                                   </Badge>
@@ -6381,13 +6381,13 @@ const RescuePlanPanel = ({
                         <>
                           <Separator />
                           <section className="space-y-2">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                               <Info className="h-3.5 w-3.5" weight="fill" />
                               Cảnh báo hệ thống
                             </h4>
                             {activeSuggestion.needsManualReview && (
                               <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg p-2.5">
-                                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                                <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
                                   {activeSuggestion.lowConfidenceWarning ||
                                     "Kế hoạch cần kiểm tra thủ công trước khi phê duyệt."}
                                 </p>
@@ -6396,14 +6396,14 @@ const RescuePlanPanel = ({
                             {!activeSuggestion.needsManualReview &&
                               activeSuggestion.lowConfidenceWarning && (
                                 <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg p-2.5">
-                                  <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                                  <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
                                     {activeSuggestion.lowConfidenceWarning}
                                   </p>
                                 </div>
                               )}
                             {activeSuggestion.multiDepotRecommended && (
                               <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30 rounded-lg p-2.5">
-                                <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
+                                <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
                                   Kế hoạch đề xuất phối hợp nhiều kho để đáp ứng
                                   đủ vật tư.
                                 </p>
@@ -6418,7 +6418,7 @@ const RescuePlanPanel = ({
                         <>
                           <Separator />
                           <section>
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
+                            <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
                               <Warning
                                 className="h-3.5 w-3.5 text-orange-500"
                                 weight="fill"
@@ -6426,7 +6426,7 @@ const RescuePlanPanel = ({
                               Lưu ý đặc biệt
                             </h4>
                             <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/30 rounded-lg p-2.5">
-                              <p className="text-xs text-foreground/75 leading-relaxed">
+                              <p className="text-sm text-foreground/75 leading-relaxed">
                                 {activeSuggestion.specialNotes}
                               </p>
                             </div>
@@ -6440,7 +6440,7 @@ const RescuePlanPanel = ({
 
                   {/* AI Confidence */}
                   <section>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
                       <ShieldCheck
                         className="h-3.5 w-3.5 text-emerald-500"
                         weight="fill"
@@ -6450,7 +6450,7 @@ const RescuePlanPanel = ({
                     <Card className="bg-card border">
                       <CardContent className="p-2.5">
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-sm text-muted-foreground">
                             Confidence
                           </span>
                           <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
@@ -6464,7 +6464,7 @@ const RescuePlanPanel = ({
                           value={(activeSuggestion?.confidenceScore ?? 0) * 100}
                           className="h-1.5"
                         />
-                        <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-muted-foreground">
+                        <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
                           <div>
                             <p className="text-muted-foreground/60">Model</p>
                             <p className="font-medium text-foreground/80">
@@ -6512,14 +6512,14 @@ const RescuePlanPanel = ({
                     <>
                       <Separator />
                       <section>
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1">
+                        <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-1">
                           <Storefront
                             className="h-3.5 w-3.5 text-amber-500"
                             weight="fill"
                           />
                           Kho vật tư
                         </h4>
-                        <p className="text-xs text-muted-foreground mb-2">
+                        <p className="text-sm text-muted-foreground mb-2">
                           {isEditMode
                             ? "Kéo vật tư vào bước thực hiện bên trái"
                             : "Vào chế độ chỉnh sửa để kéo vật tư vào bước"}

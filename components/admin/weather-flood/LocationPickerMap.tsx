@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 const DEFAULT_CENTER: [number, number] = [16.047079, 108.20623];
-const DEFAULT_ZOOM = 8;
+const DEFAULT_ZOOM = 12;
 
 interface LocationPickerMapProps {
   lat?: number;
@@ -51,28 +51,43 @@ export default function LocationPickerMap({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        iconRetinaUrl:
+          "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
         iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+        shadowUrl:
+          "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
       });
 
       const hasMarker =
-        lat !== undefined && lon !== undefined &&
-        Number.isFinite(lat) && Number.isFinite(lon);
+        lat !== undefined &&
+        lon !== undefined &&
+        Number.isFinite(lat) &&
+        Number.isFinite(lon);
 
-      const center: [number, number] = hasMarker ? [lat!, lon!] : DEFAULT_CENTER;
-      const zoom = hasMarker ? 13 : DEFAULT_ZOOM;
+      const center: [number, number] = hasMarker
+        ? [lat!, lon!]
+        : DEFAULT_CENTER;
+      const zoom = hasMarker ? 14 : DEFAULT_ZOOM;
 
-      const map = L.map(containerRef.current!, { zoomControl: true }).setView(center, zoom);
+      const map = L.map(containerRef.current!, { zoomControl: false }).setView(
+        center,
+        zoom,
+      );
       mapRef.current = map;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       }).addTo(map);
 
       map.getContainer().style.cursor = "crosshair";
 
       map.on("click", (e: import("leaflet").LeafletMouseEvent) => {
+        if (markerRef.current) {
+          markerRef.current.setLatLng(e.latlng);
+        } else {
+          markerRef.current = L.marker([e.latlng.lat, e.latlng.lng]).addTo(map);
+        }
         onPickRef.current(e.latlng.lat, e.latlng.lng);
       });
 
@@ -100,8 +115,10 @@ export default function LocationPickerMap({
     if (!map) return;
 
     const hasMarker =
-      lat !== undefined && lon !== undefined &&
-      Number.isFinite(lat) && Number.isFinite(lon);
+      lat !== undefined &&
+      lon !== undefined &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lon);
 
     if (!hasMarker) {
       markerRef.current?.remove();
@@ -118,7 +135,7 @@ export default function LocationPickerMap({
       });
     }
 
-    map.flyTo([lat!, lon!], Math.max(map.getZoom(), 13), { duration: 0.6 });
+    map.flyTo([lat!, lon!], Math.max(map.getZoom(), 14), { duration: 0.6 });
   }, [lat, lon]);
 
   return (
