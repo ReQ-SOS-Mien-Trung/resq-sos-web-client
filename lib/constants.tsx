@@ -51,7 +51,9 @@ import {
   SlidersIcon,
   UserIcon,
   Folder,
+  PiggyBankIcon,
 } from "@phosphor-icons/react";
+import { Icon as IconifyIcon } from "@iconify/react";
 
 export const navLinks = [
   { href: "#features", label: "Tính năng" },
@@ -357,7 +359,9 @@ export const navigationItems = [
     ],
   },
   {
-    icon: IdentificationCardIcon,
+    icon: ({ size, className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="fa7-solid:people-roof" width={size} height={size} className={className} />
+    ),
     label: "Quản lý điểm tập kết",
     href: "/dashboard/admin/assembly-points",
   },
@@ -366,8 +370,11 @@ export const navigationItems = [
     label: "Quản lý kho",
     href: "/dashboard/admin/depots",
   },
-  { icon: ChartBar, label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
-  { icon: Folder, label: "Quản lý quỹ chiến dịch", href: "/dashboard/admin/campaigns" },
+  { icon: ({ size, className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="solar:hand-money-outline" width={size} height={size} className={className} />
+    )
+    , label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
+  { icon: PiggyBankIcon, label: "Quản lý quỹ chiến dịch", href: "/dashboard/admin/campaigns" },
   {
     icon: LockKey,
     label: "Phân quyền người dùng",
@@ -382,8 +389,13 @@ export const navigationItems = [
     icon: CloudSun,
     label: "Thời tiết",
     children: [
-      { icon: CloudSun, label: "Bài đăng thời tiết", href: "/dashboard/admin/weather-posts" },
-      { icon: Drop, label: "Thời tiết & Lũ lụt", href: "/dashboard/admin/weather-flood" },
+      { icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="fluent-mdl2:news"  width={18} height={18} className={className} />
+    ), 
+    label: "Bài đăng thời tiết", href: "/dashboard/admin/weather-posts" },
+      { icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="wi:forecast-io-hail" width={24} height={24} className={className} />
+    ), label: "Thời tiết & Lũ lụt", href: "/dashboard/admin/weather-flood" },
     ],
   },
 ];

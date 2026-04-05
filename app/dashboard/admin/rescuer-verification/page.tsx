@@ -75,6 +75,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Icon } from "@iconify/react";
 
 type StatusFilter = "all" | "Pending" | "Approved" | "Rejected";
 type SortColumn = "name" | "email" | "region" | "status" | "submittedAt";
@@ -175,14 +176,6 @@ const RescuerVerificationPage = () => {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const { mutateAsync: updateAvatarMutate } = useUpdateUserAvatar();
 
-  const openReviewDialog = (
-    item: RescuerApplicationDetail,
-    isApproved: boolean,
-  ) => {
-    setReviewDialog({ open: true, item, isApproved });
-    setAdminNote("");
-  };
-
   const handleConfirmReview = async () => {
     if (!reviewDialog.item) return;
 
@@ -261,8 +254,8 @@ const RescuerVerificationPage = () => {
                   ? "Phê duyệt cứu hộ viên"
                   : "Từ chối cứu hộ viên"}
               </DialogTitle>
-              <DialogDescription>
-                {reviewDialog.item ? getFullName(reviewDialog.item) : ""}
+              <DialogDescription className="tracking-tighter mt-1 font-medium">
+                Cứu hộ viên: <span className="text-primary">{reviewDialog.item ? getFullName(reviewDialog.item) : ""}</span>
               </DialogDescription>
             </div>
           </div>
@@ -313,12 +306,12 @@ const RescuerVerificationPage = () => {
               </span>
             ) : reviewDialog.isApproved ? (
               <>
-                <CheckCircle size={16} className="mr-1.5" weight="bold" />
+                <CheckCircle size={16} className="mr-0.5" weight="bold" />
                 Xác nhận phê duyệt
               </>
             ) : (
               <>
-                <XCircle size={16} className="mr-1.5" weight="bold" />
+                <XCircle size={16} className="mr-0.5" weight="bold" />
                 Xác nhận từ chối
               </>
             )}
@@ -330,7 +323,7 @@ const RescuerVerificationPage = () => {
 
   const renderPreviewDialog = () => (
     <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
-      <DialogContent className="max-w-[100vw] sm:max-w-[75vw] w-full h-[100vh] sm:h-[85vh] p-0 border-none bg-transparent shadow-none flex flex-col items-center justify-center">
+      <DialogContent className="max-w-xl sm:max-w-2xl w-full p-0 border-none bg-transparent shadow-none flex flex-col items-center justify-center [&>button]:hidden">
         <DialogTitle className="sr-only">
           {previewDoc?.name || "Document Preview"}
         </DialogTitle>
@@ -339,23 +332,23 @@ const RescuerVerificationPage = () => {
         </DialogDescription>
 
         {previewDoc && (
-          <div className="relative w-full h-full p-3 sm:p-0">
+          <div className="relative w-full">
             {/* Floating Close Button */}
             <button
               onClick={() => setPreviewDoc(null)}
-              className="absolute top-2 right-2 sm:-top-4 sm:-right-4 lg:-right-12 lg:-top-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all z-[100] text-black hover:bg-gray-100"
+              className="absolute -top-4 -right-4 w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-all z-100 text-black hover:bg-gray-100"
               aria-label="Đóng"
             >
-              <X size={20} weight="bold" />
+              <X size={18} weight="bold" />
             </button>
 
             {/* Media Content */}
-            <div className="w-full h-full overflow-y-auto flex items-start justify-center rounded-md pb-12 sm:pb-0">
+            <div className="w-full flex items-center justify-center">
               {previewDoc.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) || previewDoc.url.startsWith("blob:") ? (
                 <img
                   src={previewDoc.url}
                   alt={previewDoc.name}
-                  className="max-w-full h-auto object-contain rounded-md"
+                  className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-xl"
                 />
               ) : (
                 <iframe
@@ -503,10 +496,10 @@ const RescuerVerificationPage = () => {
               <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
               <span className="uppercase tracking-wider text-sm font-semibold">Quay lại</span>
             </button>
-            <Skeleton className="h-[200px] w-full rounded-2xl" />
+            <Skeleton className="h-50 w-full rounded-2xl" />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Skeleton className="h-[400px] rounded-2xl" />
-              <Skeleton className="h-[400px] rounded-2xl" />
+              <Skeleton className="h-100 rounded-2xl" />
+              <Skeleton className="h-100 rounded-2xl" />
             </div>
           </div>
         </DashboardLayout>
@@ -539,75 +532,11 @@ const RescuerVerificationPage = () => {
               </span>
             </button>
 
-            {/* Profile Header */}
-            <div className="gsap-item border border-border/60 rounded-2xl overflow-hidden bg-card">
-              {/* Minimal top bar */}
-              <div className="h-1.5 bg-linear-to-r from-black/80 via-black/60 to-black/30 dark:from-white/30 dark:via-white/20 dark:to-white/5" />
-              <div className="p-4 sm:p-6">
-                <div className="flex items-start gap-4">
-                  {/* Avatar thumbnail */}
-                  {selectedItem.avatarUrl ? (
-                    <img
-                      src={selectedItem.avatarUrl}
-                      alt="Current avatar"
-                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-border/60 cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => setPreviewDoc({ url: selectedItem.avatarUrl!, name: "Ảnh đại diện hiện tại" })}
-                    />
-                  ) : avatarPreview ? (
-                    <img
-                      src={avatarPreview}
-                      alt="Avatar preview"
-                      className="w-20 h-20 rounded-xl object-cover shrink-0 border border-border/60 cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => setPreviewDoc({ url: avatarPreview, name: "Ảnh đại diện mới" })}
-                    />
-                  ) : (
-                    <div className="w-20 h-20 rounded-xl bg-black dark:bg-white/10 flex items-center justify-center text-white dark:text-white font-black text-2xl shrink-0">
-                      {selectedItem.firstName.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0 flex flex-col items-start gap-2.5">
-                    <h2 className="text-xl sm:text-2xl font-bold tracking-tighter text-foreground">
-                      {getFullName(selectedItem)}
-                    </h2>
-                    <Badge
-                      className={`${statusConfig.className} border text-[14px] gap-2 font-semibold`}
-                    >
-                      {statusConfig.icon}
-                      {statusConfig.label}
-                    </Badge>
-                  </div>
-                  {selectedItem.status === "Pending" && (
-                    <div className="flex gap-2 shrink-0">
-                      <Button
-                        size="sm"
-                        disabled={isReviewing}
-                        onClick={() => openReviewDialog(selectedItem, true)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm uppercase tracking-tighter font-semibold"
-                      >
-                        <CheckCircle size={15} className="mr-1" weight="bold" />
-                        Phê duyệt
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isReviewing}
-                        onClick={() => openReviewDialog(selectedItem, false)}
-                        className="border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 text-sm uppercase tracking-tighter font-semibold"
-                      >
-                        <XCircle size={15} className="mr-1" weight="bold" />
-                        Từ chối
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
             {/* Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Personal Info */}
-              <div className="gsap-item border border-border/60 rounded-2xl bg-card p-6">
-                <div className="border-b border-border/60 mb-8 pb-4">
+              <div className="gsap-item border border-border/60 rounded-2xl bg-card p-6 lg:col-span-3">
+                <div className="border-b border-border/60 mb-4 pb-4">
                   <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
                     Mục I
                   </p>
@@ -615,10 +544,36 @@ const RescuerVerificationPage = () => {
                     Thông tin cá nhân
                   </h2>
                 </div>
-                <div className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-5">
                   {[
                     {
-                      icon: <Briefcase size={20} />,
+                      icon: <IdentificationCard size={20} />,
+                      iconCls: "text-slate-500 bg-slate-500/10 border-slate-200 dark:border-slate-700",
+                      label: "Mã hồ sơ",
+                      value: (
+                        <p className="text-sm text-foreground font-mono font-semibold mt-0.5 tracking-tighter">
+                          #{selectedItem.userId.slice(-8).toUpperCase()}
+                        </p>
+                      ),
+                    },
+                    {
+                      icon: selectedItem.status === "Approved"
+                        ? <CheckCircle size={20} weight="fill" />
+                        : selectedItem.status === "Rejected"
+                        ? <XCircle size={20} weight="fill" />
+                        : <ClockCountdown size={20} weight="fill" />,
+                      iconCls: `${statusConfig.className} border`,
+                      label: "Trạng thái",
+                      value: (
+                        <Badge className={`mt-1 ${statusConfig.className} border text-sm gap-1.5 font-semibold`}>
+                          {statusConfig.icon}
+                          {statusConfig.label}
+                        </Badge>
+                      ),
+                    },
+                    {
+                      icon: <Icon icon="icon-park-twotone:love-and-help" width="20" height="20" />,
+                      iconCls: "text-violet-500 bg-violet-500/10 border-violet-200 dark:border-violet-800",
                       label: "Loại chứng nhận",
                       value: (
                         <Badge className="mt-1 bg-black/5 dark:bg-white/10 text-foreground border border-border/60 font-medium pb-px pt-0.5 px-2">
@@ -628,28 +583,33 @@ const RescuerVerificationPage = () => {
                     },
                     {
                       icon: <Envelope size={20} />,
+                      iconCls: "text-blue-500 bg-blue-500/10 border-blue-200 dark:border-blue-800",
                       label: "Email",
                       value: selectedItem.email,
                     },
                     {
-                      icon: <Phone size={20} />,
+                      icon: <Icon icon="mingcute:phone-line" width="20" height="20" />,
+                      iconCls: "text-emerald-500 bg-emerald-500/10 border-emerald-200 dark:border-emerald-800",
                       label: "Số điện thoại",
                       value: selectedItem.phone,
                     },
                     {
-                      icon: <MapPin size={20} />,
-                      label: "Địa chỉ",
-                      value: `${selectedItem.address ? selectedItem.address + ', ' : ''}${selectedItem.ward ? selectedItem.ward + ', ' : ''}${selectedItem.province}`,
-                    },
-                    {
                       icon: <CalendarBlank size={20} />,
+                      iconCls: "text-amber-500 bg-amber-500/10 border-amber-200 dark:border-amber-800",
                       label: "Ngày đăng ký",
                       value: new Date(selectedItem.submittedAt).toLocaleString("vi-VN"),
+                    },
+                    {
+                      icon: <MapPin size={20} />,
+                      iconCls: "text-red-500 bg-red-500/10 border-red-200 dark:border-red-800",
+                      label: "Địa chỉ",
+                      value: `${selectedItem.address ? selectedItem.address + ', ' : ''}${selectedItem.ward ? selectedItem.ward + ', ' : ''}${selectedItem.province}`,
                     },
                     ...(selectedItem.reviewedAt
                       ? [
                         {
-                          icon: <ShieldCheck size={20} />,
+                          icon: <Icon icon="mdi:approve" width="20" height="20" />,
+                          iconCls: "text-sky-500 bg-sky-500/10 border-sky-200 dark:border-sky-800",
                           label: "Ngày xét duyệt",
                           value: new Date(selectedItem.reviewedAt).toLocaleString("vi-VN"),
                         },
@@ -658,23 +618,24 @@ const RescuerVerificationPage = () => {
                     ...(selectedItem.adminNote
                       ? [
                         {
-                          icon: <FileText size={20} />,
-                          label: "Ghi chú của hệ thống",
+                          icon: <Icon icon="fluent:person-note-24-regular" width="20" height="20" />,
+                          iconCls: "text-orange-500 bg-orange-500/10 border-orange-200 dark:border-orange-800",
+                          label: "Ghi chú của quản trị viên",
                           value: selectedItem.adminNote,
                         },
                       ]
                       : []),
                   ].map((field, idx) => (
                     <div key={idx} className="flex items-start gap-3">
-                      <div className="p-1.5 rounded-lg border border-border/60 text-muted-foreground mt-0.5">
+                      <div className={`p-1.5 rounded-lg border mt-0.5 shrink-0 ${field.iconCls}`}>
                         {field.icon}
                       </div>
-                      <div>
-                        <p className="text-[11px] text-muted-foreground font-bold uppercase tracking-wider">
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground font-bold uppercase tracking-tight">
                           {field.label}
                         </p>
                         {typeof field.value === "string" ? (
-                          <p className="text-sm text-foreground font-medium mt-0.5">
+                          <p className="text-sm text-foreground font-medium mt-1 wrap-break-word tracking-tighter">
                             {field.value}
                           </p>
                         ) : (
@@ -755,7 +716,7 @@ const RescuerVerificationPage = () => {
                   </div>
                 ) : (
                   <div className="border border-border/60 rounded-2xl bg-card p-6 h-full flex flex-col">
-                    <div className="border-b border-border/60 mb-8 pb-4">
+                    <div className="border-b border-border/60 mb-4 pb-4">
                       <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2 sm:mb-1">
                         Mục II
                       </p>
@@ -763,19 +724,29 @@ const RescuerVerificationPage = () => {
                         Ảnh đại diện
                       </h2>
                     </div>
-                    <div className="flex-1 flex flex-col items-center justify-center">
+                    <div className="flex-1 flex flex-col items-center justify-center gap-3">
                       {selectedItem.avatarUrl ? (
-                        <img
-                          src={selectedItem.avatarUrl}
-                          alt="User Avatar"
-                          className="w-64 sm:w-80 h-auto aspect-3/4 object-cover shadow-sm border border-border/60 cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => setPreviewDoc({ url: selectedItem.avatarUrl!, name: "Ảnh đại diện" })}
-                          title="Phóng to"
-                        />
+                        <>
+                          <div
+                            className="relative group cursor-pointer"
+                            onClick={() => setPreviewDoc({ url: selectedItem.avatarUrl!, name: "Ảnh đại diện" })}
+                            title="Bấm để xem ảnh"
+                          >
+                            <img
+                              src={selectedItem.avatarUrl}
+                              alt="User Avatar"
+                              className="w-55 h-auto aspect-3/4 object-cover rounded-xl shadow-sm border border-border/60 group-hover:opacity-80 transition-opacity"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl bg-black/30">
+                              <MagnifyingGlass size={22} className="text-white" weight="bold" />
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground tracking-tighter">Bấm để xem ảnh</p>
+                        </>
                       ) : (
-                        <div className="w-64 sm:w-80 aspect-3/4 bg-muted/40 flex flex-col items-center justify-center border border-dashed border-border/60 text-muted-foreground">
-                          <ImageIcon size={48} weight="duotone" className="mb-3 opacity-50" />
-                          <span className="text-sm font-medium uppercase tracking-tighter">Chưa có ảnh</span>
+                        <div className="w-32 aspect-3/4 bg-muted/40 flex flex-col items-center justify-center border border-dashed border-border/60 text-muted-foreground rounded-xl">
+                          <ImageIcon size={28} weight="duotone" className="mb-2 opacity-50" />
+                          <span className="text-xs font-medium uppercase tracking-tighter">Chưa có ảnh</span>
                         </div>
                       )}
                     </div>
@@ -801,7 +772,7 @@ const RescuerVerificationPage = () => {
               const categories = [
                 {
                   label: "Kỹ năng cứu hộ",
-                  icon: <ShieldCheck size={22} weight="duotone" />,
+                  icon: <Icon icon="fluent-emoji-high-contrast:rescue-workers-helmet" width="22" height="22" />,
                   iconBg: "bg-[#FF5722] text-white",
                   dotColor: "text-[#FF5722]",
                   items: rescueAbilities,
@@ -819,7 +790,7 @@ const RescuerVerificationPage = () => {
                 },
                 {
                   label: "Kỹ năng vận chuyển",
-                  icon: <Briefcase size={22} weight="duotone" />,
+                  icon: <Icon icon="icon-park-twotone:transporter" width="22" height="22" />,
                   iconBg: "bg-[#FF5722] text-white",
                   dotColor: "text-[#FF5722]",
                   items: transportAbilities,
@@ -839,7 +810,7 @@ const RescuerVerificationPage = () => {
 
               return (
                 <div className="gsap-item mt-4 pt-4 border-t border-border/40 w-full">
-                  <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/60 mb-8 pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/60 mb-4 pb-4">
                     <div>
                       <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
                         Mục III
@@ -907,7 +878,7 @@ const RescuerVerificationPage = () => {
 
             {/* FULL WIDTH DOCUMENTS SECTION (MỤC IV) */}
             <div className="gsap-item mt-4 pt-4 border-t border-border/40">
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/60 mb-8 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-border/60 mb-4 pb-4">
                 <div>
                   <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-2 sm:mb-1">
                     Mục IV
@@ -946,7 +917,7 @@ const RescuerVerificationPage = () => {
                       }
                     >
                       {/* Image Preview Area */}
-                      <div className="aspect-[1.6] bg-muted/30 overflow-hidden mb-5 relative border border-border/60 shadow-sm rounded-sm">
+                      <div className="aspect-[1.6] bg-muted/30 overflow-hidden mb-3 relative border border-border/60 shadow-sm rounded-sm">
                         {doc.fileUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
                           <img
                             src={doc.fileUrl}
@@ -986,15 +957,15 @@ const RescuerVerificationPage = () => {
 
                       {/* Info Area */}
                       <div className="flex-1 flex flex-col">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#FF5722] mb-1.5 flex items-center gap-1.5">
+                        <p className="text-xs font-bold uppercase tracking-widest text-[#FF5722] mb-1.5 flex items-center gap-1.5">
                           Tài liệu {String(idx + 1).padStart(2, "0")}
                         </p>
                         <h4 className="text-base font-bold tracking-tighter text-foreground mb-1 leading-tight line-clamp-2">
                           {doc.fileTypeName || doc.fileTypeCode}
                         </h4>
 
-                        <div className="mt-auto pt-4">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 pt-3 border-t border-border/40">
+                        <div className="mt-auto">
+                          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 pt-2 border-t border-border/40">
                             Tải lên{" "}
                             {new Date(doc.uploadedAt).toLocaleDateString("vi-VN")}
                           </p>
