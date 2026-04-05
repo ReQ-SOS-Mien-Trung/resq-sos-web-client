@@ -293,10 +293,20 @@ export interface MissionTeamRouteWaypoint {
 }
 
 export interface MissionTeamRouteLeg {
+  fromStep?: number | null;
+  toStep?: number | null;
+  fromLatitude?: number | null;
+  fromLongitude?: number | null;
+  toLatitude?: number | null;
+  toLongitude?: number | null;
   distanceMeters: number;
   distanceText: string;
   durationSeconds: number;
   durationText: string;
+  overviewPolyline?: string | null;
+  vehicleUsed?: RouteVehicle | string | null;
+  status?: "OK" | "NO_ROUTE" | "FALLBACK" | string | null;
+  errorMessage?: string | null;
 }
 
 export interface MissionTeamRouteResponse {

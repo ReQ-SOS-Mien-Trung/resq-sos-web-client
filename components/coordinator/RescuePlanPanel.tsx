@@ -46,6 +46,7 @@ import {
 import {
   useCreateMission,
   useMissions,
+  useMissionActivities,
   useActivityRoute,
   useMissionTeamRoute,
 } from "@/services/mission/hooks";
@@ -962,11 +963,14 @@ interface RouteSegment {
   duration: string;
   distanceMeters: number;
   durationSeconds: number;
+  isFallback?: boolean;
+  usedVehicle?: RouteVehicle;
 }
 
 const COORD_EPSILON = 0.0005; // ~55m tolerance for "same location"
 const HUE_DEFAULT_ORIGIN = { lat: 16.4637, lng: 107.5909 };
 const SOS_COORD_MATCH_EPSILON = 0.003; // ~330m tolerance for SOS coordinate matching
+const MISSION_TEAM_ROUTE_WAYPOINT_EPSILON = 0.0015; // ~165m tolerance when checking whether route covers a waypoint
 const VEHICLE_PRIORITY: RouteVehicle[] = ["bike", "car", "hd"];
 const VEHICLE_LABELS: Record<RouteVehicle, string> = {
   bike: "Xe máy",
@@ -1014,6 +1018,21 @@ function getActivityRouteStatusMeta(status?: string | null): {
     className:
       "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-200",
   };
+}
+
+function hasRenderableWaypointCoords(
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+): boolean {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return false;
+  }
+
+  const lat = latitude as number;
+  const lng = longitude as number;
+
+  // 0,0 is used by backend as placeholder when coordinate is missing.
+  return Math.abs(lat) > 0.000001 || Math.abs(lng) > 0.000001;
 }
 
 function buildVehicleTryOrder(preferred: RouteVehicle): RouteVehicle[] {
@@ -2220,6 +2239,18 @@ const MissionTeamRoutePreview = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [vehicle, setVehicle] = useState<RouteVehicle>("car");
+  const [activityRouteSegments, setActivityRouteSegments] = useState<
+    RouteSegment[]
+  >([]);
+  const [isActivityRouteLoading, setIsActivityRouteLoading] = useState(false);
+  const [activityRouteProgress, setActivityRouteProgress] = useState(0);
+  const [activityRouteFallbackSegments, setActivityRouteFallbackSegments] =
+    useState(0);
+  const [
+    activityRouteAlternativeVehicleSegments,
+    setActivityRouteAlternativeVehicleSegments,
+  ] = useState(0);
+  const activityRouteAbortRef = useRef(false);
 
   const missionRouteTeams = useMemo(() => {
     const teams = mission.teams ?? [];
@@ -2300,6 +2331,10 @@ const MissionTeamRoutePreview = ({
     { enabled: open && !!selectedMissionTeam },
   );
 
+  const { data: missionActivitiesData } = useMissionActivities(mission.id, {
+    enabled: open && !!selectedMissionTeam,
+  });
+
   const routeStatusMeta = useMemo(
     () => getActivityRouteStatusMeta(teamRouteData?.status),
     [teamRouteData?.status],
@@ -2311,58 +2346,424 @@ const MissionTeamRoutePreview = ({
       ? teamRouteData.errorMessage.trim()
       : null;
 
-  const routeWaypoints = teamRouteData?.waypoints ?? [];
-  const routeLegs = teamRouteData?.legs ?? [];
+  const routeWaypoints = useMemo(
+    () => teamRouteData?.waypoints ?? [],
+    [teamRouteData?.waypoints],
+  );
+  const routeLegs = useMemo(
+    () => teamRouteData?.legs ?? [],
+    [teamRouteData?.legs],
+  );
 
   const waypointGroups = useMemo(() => {
+    const sourceActivities =
+      missionActivitiesData && missionActivitiesData.length > 0
+        ? missionActivitiesData
+        : mission.activities;
+
+    const selectedMissionTeamValue = selectedMissionTeam?.missionTeamId;
+    const selectedTeamActivities =
+      Number.isFinite(selectedMissionTeamValue) &&
+      selectedMissionTeamValue != null
+        ? sourceActivities.filter(
+            (activity) => activity.missionTeamId === selectedMissionTeamValue,
+          )
+        : sourceActivities;
+
+    const routeTeamActivities = selectedTeamActivities.filter((activity) =>
+      RESCUE_ROUTE_ACTIVITY_TYPES.has(activity.activityType),
+    );
+
+    const sortedActivities = routeTeamActivities
+      .slice()
+      .sort((a, b) => (a.step !== b.step ? a.step - b.step : a.id - b.id));
+
+    const enrichedActivities = sortedActivities
+      .map((activity) => {
+        if (
+          hasRenderableWaypointCoords(
+            activity.targetLatitude,
+            activity.targetLongitude,
+          )
+        ) {
+          return activity;
+        }
+
+        const parsed = extractCoordsFromDescription(activity.description);
+        if (!parsed) return null;
+
+        return {
+          ...activity,
+          targetLatitude: parsed.lat,
+          targetLongitude: parsed.lng,
+        };
+      })
+      .filter((activity): activity is MissionActivity => !!activity);
+
+    if (enrichedActivities.length > 0) {
+      const grouped: UniqueWaypoint[] = [];
+
+      for (const activity of enrichedActivities) {
+        const last = grouped[grouped.length - 1];
+
+        if (
+          last &&
+          Math.abs(last.lat - activity.targetLatitude) < COORD_EPSILON &&
+          Math.abs(last.lng - activity.targetLongitude) < COORD_EPSILON
+        ) {
+          last.activities.push(activity);
+          continue;
+        }
+
+        grouped.push({
+          lat: activity.targetLatitude,
+          lng: activity.targetLongitude,
+          activities: [activity],
+        });
+      }
+
+      return grouped;
+    }
+
     if (routeWaypoints.length === 0) return [] as UniqueWaypoint[];
 
-    return routeWaypoints.map((waypoint) => {
-      const byId = mission.activities.find(
-        (activity) => activity.id === waypoint.activityId,
-      );
+    const activityById = new Map(
+      selectedTeamActivities.map((activity) => [activity.id, activity]),
+    );
 
-      if (byId) {
+    const fallbackWaypoints = routeWaypoints
+      .map((waypoint) => {
+        let lat = waypoint.latitude;
+        let lng = waypoint.longitude;
+
+        if (!hasRenderableWaypointCoords(lat, lng)) {
+          const matched = activityById.get(waypoint.activityId);
+          if (
+            matched &&
+            hasRenderableWaypointCoords(
+              matched.targetLatitude,
+              matched.targetLongitude,
+            )
+          ) {
+            lat = matched.targetLatitude;
+            lng = matched.targetLongitude;
+          } else {
+            const parsed = matched
+              ? extractCoordsFromDescription(matched.description)
+              : null;
+            if (parsed) {
+              lat = parsed.lat;
+              lng = parsed.lng;
+            }
+          }
+        }
+
+        if (!hasRenderableWaypointCoords(lat, lng)) {
+          return null;
+        }
+
+        const byId = activityById.get(waypoint.activityId);
+        const byStep = selectedTeamActivities.filter(
+          (activity) => activity.step === waypoint.step,
+        );
+
         return {
-          lat: waypoint.latitude,
-          lng: waypoint.longitude,
-          activities: [byId],
-        };
+          lat,
+          lng,
+          activities: byId ? [byId] : byStep,
+        } as UniqueWaypoint;
+      })
+      .filter((waypoint): waypoint is UniqueWaypoint => !!waypoint);
+
+    const groupedFallback: UniqueWaypoint[] = [];
+
+    for (const waypoint of fallbackWaypoints) {
+      const last = groupedFallback[groupedFallback.length - 1];
+
+      if (
+        last &&
+        Math.abs(last.lat - waypoint.lat) < COORD_EPSILON &&
+        Math.abs(last.lng - waypoint.lng) < COORD_EPSILON
+      ) {
+        last.activities.push(...waypoint.activities);
+        continue;
       }
 
-      const byStep = mission.activities.filter(
-        (activity) => activity.step === waypoint.step,
-      );
+      groupedFallback.push({
+        lat: waypoint.lat,
+        lng: waypoint.lng,
+        activities: [...waypoint.activities],
+      });
+    }
 
-      if (byStep.length > 0) {
-        return {
-          lat: waypoint.latitude,
-          lng: waypoint.longitude,
-          activities: byStep,
-        };
-      }
-
-      const byCoords = mission.activities.filter(
-        (activity) =>
-          Math.abs(activity.targetLatitude - waypoint.latitude) <
-            COORD_EPSILON &&
-          Math.abs(activity.targetLongitude - waypoint.longitude) <
-            COORD_EPSILON,
-      );
-
-      return {
-        lat: waypoint.latitude,
-        lng: waypoint.longitude,
-        activities: byCoords,
-      };
-    });
-  }, [routeWaypoints, mission.activities]);
+    return groupedFallback;
+  }, [
+    missionActivitiesData,
+    mission.activities,
+    selectedMissionTeam?.missionTeamId,
+    routeWaypoints,
+  ]);
 
   const waypointMetaList = useMemo(
     () =>
       waypointGroups.map((waypoint) => getWaypointMeta(waypoint, sosRequests)),
     [waypointGroups, sosRequests],
   );
+
+  useEffect(() => {
+    if (!open) {
+      activityRouteAbortRef.current = true;
+      return;
+    }
+
+    if (
+      selectedMissionTeam?.missionTeamId == null ||
+      waypointGroups.length === 0
+    ) {
+      activityRouteAbortRef.current = true;
+      setActivityRouteSegments((previous) =>
+        previous.length === 0 ? previous : [],
+      );
+      setIsActivityRouteLoading(false);
+      setActivityRouteProgress(0);
+      setActivityRouteFallbackSegments(0);
+      setActivityRouteAlternativeVehicleSegments(0);
+      return;
+    }
+
+    activityRouteAbortRef.current = false;
+    setIsActivityRouteLoading(true);
+    setActivityRouteSegments((previous) =>
+      previous.length === 0 ? previous : [],
+    );
+    setActivityRouteProgress(0);
+    setActivityRouteFallbackSegments(0);
+    setActivityRouteAlternativeVehicleSegments(0);
+
+    let currentOrigin = { lat: originCoords.lat, lng: originCoords.lng };
+
+    void (async () => {
+      const nextSegments: RouteSegment[] = [];
+      let fallbackCount = 0;
+      let alternativeVehicleCount = 0;
+
+      for (let index = 0; index < waypointGroups.length; index += 1) {
+        if (activityRouteAbortRef.current) return;
+
+        const waypoint = waypointGroups[index];
+        const isSameAsOrigin =
+          Math.abs(currentOrigin.lat - waypoint.lat) < COORD_EPSILON &&
+          Math.abs(currentOrigin.lng - waypoint.lng) < COORD_EPSILON;
+
+        if (!isSameAsOrigin) {
+          let segmentAdded = false;
+          const representativeActivity = waypoint.activities[0];
+
+          if (representativeActivity) {
+            const tryVehicles = buildVehicleTryOrder(vehicle);
+
+            for (const tryVehicle of tryVehicles) {
+              try {
+                const resp = await getActivityRoute({
+                  missionId: mission.id,
+                  activityId: representativeActivity.id,
+                  originLat: currentOrigin.lat,
+                  originLng: currentOrigin.lng,
+                  vehicle: tryVehicle,
+                });
+
+                if (!resp.route?.overviewPolyline) {
+                  continue;
+                }
+
+                const decoded = polylineDecode.decode(
+                  resp.route.overviewPolyline,
+                ) as [number, number][];
+
+                if (decoded.length < 2) {
+                  continue;
+                }
+
+                const distanceMeters = Number.isFinite(
+                  resp.route.totalDistanceMeters,
+                )
+                  ? resp.route.totalDistanceMeters
+                  : Math.round(
+                      haversineDistanceMeters(currentOrigin, {
+                        lat: waypoint.lat,
+                        lng: waypoint.lng,
+                      }),
+                    );
+
+                const durationSeconds = Number.isFinite(
+                  resp.route.totalDurationSeconds,
+                )
+                  ? resp.route.totalDurationSeconds
+                  : estimateDurationSeconds(distanceMeters, tryVehicle);
+
+                nextSegments.push({
+                  index,
+                  waypoint,
+                  points: decoded,
+                  steps: resp.route.steps ?? [],
+                  distance:
+                    resp.route.totalDistanceText ||
+                    (distanceMeters < 1000
+                      ? `${distanceMeters}m`
+                      : `${(distanceMeters / 1000).toFixed(1)} km`),
+                  duration:
+                    resp.route.totalDurationText ||
+                    (durationSeconds < 3600
+                      ? `${Math.round(durationSeconds / 60)} phút`
+                      : `${Math.floor(durationSeconds / 3600)}h ${Math.round((durationSeconds % 3600) / 60)}p`),
+                  distanceMeters,
+                  durationSeconds,
+                  isFallback: false,
+                  usedVehicle: tryVehicle,
+                });
+
+                if (tryVehicle !== vehicle) {
+                  alternativeVehicleCount += 1;
+                }
+
+                segmentAdded = true;
+                break;
+              } catch {
+                // Try next vehicle profile for this leg.
+              }
+            }
+          }
+
+          if (!segmentAdded) {
+            const fallbackLegCandidates = [
+              routeLegs[index],
+              index > 0 ? routeLegs[index - 1] : null,
+            ].filter(
+              (leg): leg is NonNullable<(typeof routeLegs)[number]> => !!leg,
+            );
+
+            for (const leg of fallbackLegCandidates) {
+              if (
+                !leg.overviewPolyline ||
+                leg.overviewPolyline.trim().length === 0
+              ) {
+                continue;
+              }
+
+              try {
+                const legPoints = polylineDecode.decode(
+                  leg.overviewPolyline,
+                ) as [number, number][];
+
+                if (legPoints.length < 2) {
+                  continue;
+                }
+
+                const distanceMeters = Number.isFinite(leg.distanceMeters)
+                  ? leg.distanceMeters
+                  : Math.round(
+                      haversineDistanceMeters(currentOrigin, {
+                        lat: waypoint.lat,
+                        lng: waypoint.lng,
+                      }),
+                    );
+                const durationSeconds = Number.isFinite(leg.durationSeconds)
+                  ? leg.durationSeconds
+                  : estimateDurationSeconds(distanceMeters, vehicle);
+
+                nextSegments.push({
+                  index,
+                  waypoint,
+                  points: legPoints,
+                  steps: [],
+                  distance:
+                    leg.distanceText ||
+                    (distanceMeters < 1000
+                      ? `${distanceMeters}m`
+                      : `${(distanceMeters / 1000).toFixed(1)} km`),
+                  duration:
+                    leg.durationText ||
+                    (durationSeconds < 3600
+                      ? `${Math.round(durationSeconds / 60)} phút`
+                      : `${Math.floor(durationSeconds / 3600)}h ${Math.round((durationSeconds % 3600) / 60)}p`),
+                  distanceMeters,
+                  durationSeconds,
+                  isFallback: true,
+                  usedVehicle: vehicle,
+                });
+
+                fallbackCount += 1;
+                segmentAdded = true;
+                break;
+              } catch {
+                // Ignore invalid fallback leg polyline and continue.
+              }
+            }
+          }
+
+          if (!segmentAdded) {
+            const distanceMeters = Math.round(
+              haversineDistanceMeters(currentOrigin, {
+                lat: waypoint.lat,
+                lng: waypoint.lng,
+              }),
+            );
+            const durationSeconds = estimateDurationSeconds(
+              distanceMeters,
+              vehicle,
+            );
+
+            nextSegments.push({
+              index,
+              waypoint,
+              points: [
+                [currentOrigin.lat, currentOrigin.lng],
+                [waypoint.lat, waypoint.lng],
+              ],
+              steps: [],
+              distance:
+                distanceMeters < 1000
+                  ? `${distanceMeters}m`
+                  : `${(distanceMeters / 1000).toFixed(1)} km`,
+              duration:
+                durationSeconds < 3600
+                  ? `${Math.round(durationSeconds / 60)} phút`
+                  : `${Math.floor(durationSeconds / 3600)}h ${Math.round((durationSeconds % 3600) / 60)}p`,
+              distanceMeters,
+              durationSeconds,
+              isFallback: true,
+              usedVehicle: vehicle,
+            });
+
+            fallbackCount += 1;
+          }
+        }
+
+        currentOrigin = { lat: waypoint.lat, lng: waypoint.lng };
+        setActivityRouteProgress(index + 1);
+      }
+
+      if (!activityRouteAbortRef.current) {
+        setActivityRouteSegments(nextSegments);
+        setActivityRouteFallbackSegments(fallbackCount);
+        setActivityRouteAlternativeVehicleSegments(alternativeVehicleCount);
+        setIsActivityRouteLoading(false);
+      }
+    })();
+
+    return () => {
+      activityRouteAbortRef.current = true;
+    };
+  }, [
+    open,
+    selectedMissionTeam?.missionTeamId,
+    waypointGroups,
+    originCoords.lat,
+    originCoords.lng,
+    vehicle,
+    mission.id,
+    routeLegs,
+  ]);
 
   const decodedRoutePoints = useMemo(() => {
     if (!teamRouteData?.overviewPolyline) return [] as [number, number][];
@@ -2377,13 +2778,146 @@ const MissionTeamRoutePreview = ({
     }
   }, [teamRouteData?.overviewPolyline]);
 
-  const displayPoints = useMemo(() => {
-    if (decodedRoutePoints.length > 1) return decodedRoutePoints;
-    return waypointGroups.map((waypoint) => [waypoint.lat, waypoint.lng]) as [
-      number,
-      number,
-    ][];
+  const activityRoutePoints = useMemo(() => {
+    if (activityRouteSegments.length === 0) {
+      return [] as [number, number][];
+    }
+
+    const points: [number, number][] = [];
+
+    for (const segment of activityRouteSegments) {
+      for (const point of segment.points) {
+        const last = points[points.length - 1];
+        if (
+          last &&
+          Math.abs(last[0] - point[0]) < COORD_EPSILON &&
+          Math.abs(last[1] - point[1]) < COORD_EPSILON
+        ) {
+          continue;
+        }
+
+        points.push(point);
+      }
+    }
+
+    return points;
+  }, [activityRouteSegments]);
+
+  const activitySegmentByIndex = useMemo(
+    () =>
+      new Map(activityRouteSegments.map((segment) => [segment.index, segment])),
+    [activityRouteSegments],
+  );
+
+  const activityRouteDistanceMeters = useMemo(
+    () =>
+      activityRouteSegments.reduce(
+        (sum, segment) =>
+          sum +
+          (Number.isFinite(segment.distanceMeters)
+            ? segment.distanceMeters
+            : 0),
+        0,
+      ),
+    [activityRouteSegments],
+  );
+
+  const activityRouteDurationSeconds = useMemo(
+    () =>
+      activityRouteSegments.reduce(
+        (sum, segment) =>
+          sum +
+          (Number.isFinite(segment.durationSeconds)
+            ? segment.durationSeconds
+            : 0),
+        0,
+      ),
+    [activityRouteSegments],
+  );
+
+  const stopoverGuidePoints = useMemo(() => {
+    const points: [number, number][] = [[originCoords.lat, originCoords.lng]];
+
+    for (const waypoint of waypointGroups) {
+      const last = points[points.length - 1];
+
+      if (
+        last &&
+        Math.abs(last[0] - waypoint.lat) < COORD_EPSILON &&
+        Math.abs(last[1] - waypoint.lng) < COORD_EPSILON
+      ) {
+        continue;
+      }
+
+      points.push([waypoint.lat, waypoint.lng]);
+    }
+
+    return points;
+  }, [waypointGroups, originCoords.lat, originCoords.lng]);
+
+  const expectedLegCount = useMemo(
+    () => Math.max(0, stopoverGuidePoints.length - 1),
+    [stopoverGuidePoints],
+  );
+
+  const missingWaypointCount = useMemo(() => {
+    if (decodedRoutePoints.length <= 1 || waypointGroups.length === 0) {
+      return 0;
+    }
+
+    return waypointGroups.reduce((missing, waypoint) => {
+      const covered = decodedRoutePoints.some(
+        ([lat, lng]) =>
+          Math.abs(lat - waypoint.lat) < MISSION_TEAM_ROUTE_WAYPOINT_EPSILON &&
+          Math.abs(lng - waypoint.lng) < MISSION_TEAM_ROUTE_WAYPOINT_EPSILON,
+      );
+
+      return covered ? missing : missing + 1;
+    }, 0);
   }, [decodedRoutePoints, waypointGroups]);
+
+  const shouldPreferStopoverGuide = useMemo(() => {
+    if (waypointGroups.length <= 1) {
+      return false;
+    }
+
+    if (decodedRoutePoints.length <= 1) {
+      return true;
+    }
+
+    if (routeLegs.length > 0 && routeLegs.length < expectedLegCount) {
+      return true;
+    }
+
+    return missingWaypointCount > 0;
+  }, [
+    waypointGroups.length,
+    decodedRoutePoints.length,
+    routeLegs.length,
+    expectedLegCount,
+    missingWaypointCount,
+  ]);
+
+  const displayPoints = useMemo(() => {
+    if (activityRoutePoints.length > 1) {
+      return activityRoutePoints;
+    }
+
+    if (decodedRoutePoints.length > 1) {
+      return decodedRoutePoints;
+    }
+
+    if (shouldPreferStopoverGuide && stopoverGuidePoints.length > 1) {
+      return stopoverGuidePoints;
+    }
+
+    return stopoverGuidePoints;
+  }, [
+    activityRoutePoints,
+    decodedRoutePoints,
+    shouldPreferStopoverGuide,
+    stopoverGuidePoints,
+  ]);
 
   const missionRouteMapKey = useMemo(() => {
     if (displayPoints.length > 0) {
@@ -2394,6 +2928,14 @@ const MissionTeamRoutePreview = ({
   }, [displayPoints]);
 
   const totalDistanceMeters = useMemo(() => {
+    if (
+      activityRouteSegments.length > 0 &&
+      Number.isFinite(activityRouteDistanceMeters) &&
+      activityRouteDistanceMeters > 0
+    ) {
+      return activityRouteDistanceMeters;
+    }
+
     if (
       teamRouteData &&
       Number.isFinite(teamRouteData.totalDistanceMeters) &&
@@ -2407,9 +2949,22 @@ const MissionTeamRoutePreview = ({
         sum + (Number.isFinite(leg.distanceMeters) ? leg.distanceMeters : 0),
       0,
     );
-  }, [teamRouteData, routeLegs]);
+  }, [
+    activityRouteSegments.length,
+    activityRouteDistanceMeters,
+    teamRouteData,
+    routeLegs,
+  ]);
 
   const totalDurationSeconds = useMemo(() => {
+    if (
+      activityRouteSegments.length > 0 &&
+      Number.isFinite(activityRouteDurationSeconds) &&
+      activityRouteDurationSeconds > 0
+    ) {
+      return activityRouteDurationSeconds;
+    }
+
     if (
       teamRouteData &&
       Number.isFinite(teamRouteData.totalDurationSeconds) &&
@@ -2423,7 +2978,12 @@ const MissionTeamRoutePreview = ({
         sum + (Number.isFinite(leg.durationSeconds) ? leg.durationSeconds : 0),
       0,
     );
-  }, [teamRouteData, routeLegs]);
+  }, [
+    activityRouteSegments.length,
+    activityRouteDurationSeconds,
+    teamRouteData,
+    routeLegs,
+  ]);
 
   const formatDuration = (seconds: number) => {
     if (seconds < 60) return `${seconds}s`;
@@ -2439,7 +2999,8 @@ const MissionTeamRoutePreview = ({
     return `${(meters / 1000).toFixed(1)} km`;
   };
 
-  const isLoadingRoute = isTeamRouteLoading || isTeamRouteFetching;
+  const isLoadingRoute =
+    isTeamRouteLoading || isTeamRouteFetching || isActivityRouteLoading;
 
   if (missionRouteTeams.length === 0) return null;
 
@@ -2459,6 +3020,10 @@ const MissionTeamRoutePreview = ({
   const selectedTeamLabel =
     selectedMissionTeam?.teamName ||
     (selectedMissionTeam ? `Đội #${selectedMissionTeam.rescueTeamId}` : "-");
+  const displayedLegCount =
+    activityRouteSegments.length > 0
+      ? activityRouteSegments.length
+      : Math.max(routeLegs.length, expectedLegCount);
 
   return (
     <div className="mt-2 space-y-1.5 rounded-lg border bg-muted/30 p-2">
@@ -2554,7 +3119,9 @@ const MissionTeamRoutePreview = ({
         <div className="space-y-1">
           <p className="flex items-center gap-1 text-sm text-muted-foreground animate-pulse">
             <CircleNotch className="h-3 w-3 animate-spin" />
-            Đang tải lộ trình đội...
+            {isActivityRouteLoading && waypointGroups.length > 0
+              ? `Đang tải chỉ đường từng chặng (${activityRouteProgress}/${waypointGroups.length})...`
+              : "Đang tải lộ trình đội..."}
           </p>
           <Skeleton className="h-48 w-full rounded" />
         </div>
@@ -2570,6 +3137,36 @@ const MissionTeamRoutePreview = ({
         </p>
       ) : null}
 
+      {!isLoadingRoute && activityRouteSegments.length > 0 ? (
+        <p className="text-sm text-emerald-700 dark:text-emerald-300">
+          Đang hiển thị chỉ đường thật theo từng chặng từ activity-route.
+        </p>
+      ) : null}
+
+      {!isLoadingRoute &&
+      activityRouteSegments.length > 0 &&
+      (activityRouteFallbackSegments > 0 ||
+        activityRouteAlternativeVehicleSegments > 0) ? (
+        <p className="text-sm text-amber-700 dark:text-amber-300">
+          {activityRouteAlternativeVehicleSegments > 0
+            ? `${activityRouteAlternativeVehicleSegments} chặng đã tự đổi phương tiện để tìm đường. `
+            : ""}
+          {activityRouteFallbackSegments > 0
+            ? `${activityRouteFallbackSegments} chặng đang dùng fallback vì API chưa trả đủ tuyến.`
+            : ""}
+        </p>
+      ) : null}
+
+      {!isLoadingRoute &&
+      shouldPreferStopoverGuide &&
+      waypointGroups.length > 1 &&
+      activityRouteSegments.length === 0 ? (
+        <p className="text-sm text-amber-700 dark:text-amber-300">
+          Chưa lấy được chỉ đường từng chặng, đang tạm hiển thị tuyến nối
+          waypoint để giữ đúng thứ tự điểm dừng.
+        </p>
+      ) : null}
+
       {!isLoadingRoute && teamRouteData && (
         <div className="flex items-center gap-3 text-sm">
           <span className="font-bold text-primary">
@@ -2580,7 +3177,7 @@ const MissionTeamRoutePreview = ({
             {formatDuration(totalDurationSeconds)}
           </span>
           <span className="text-muted-foreground">
-            {routeWaypoints.length} điểm · {routeLegs.length} chặng
+            {waypointGroups.length} điểm · {displayedLegCount} chặng
           </span>
         </div>
       )}
@@ -2600,16 +3197,37 @@ const MissionTeamRoutePreview = ({
             <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <RoutePreviewFitBounds points={displayPoints} />
 
-            <Polyline
-              positions={displayPoints}
-              pathOptions={{
-                color: "#FF6B35",
-                weight: 5,
-                opacity: 0.85,
-                lineJoin: "round",
-                lineCap: "round",
-              }}
-            />
+            {activityRouteSegments.length > 0 ? (
+              activityRouteSegments.map((segment, segmentIndex) => (
+                <Polyline
+                  key={`mission-team-route-segment-${segment.index}-${segmentIndex}`}
+                  positions={segment.points}
+                  pathOptions={{
+                    color: "#FF6B35",
+                    weight: segment.isFallback ? 4 : 5,
+                    opacity: segment.isFallback ? 0.75 : 0.88,
+                    lineJoin: "round",
+                    lineCap: "round",
+                    dashArray: segment.isFallback ? "7 7" : undefined,
+                  }}
+                />
+              ))
+            ) : (
+              <Polyline
+                positions={displayPoints}
+                pathOptions={{
+                  color: "#FF6B35",
+                  weight: 5,
+                  opacity: 0.85,
+                  lineJoin: "round",
+                  lineCap: "round",
+                  dashArray:
+                    shouldPreferStopoverGuide && decodedRoutePoints.length <= 1
+                      ? "7 7"
+                      : undefined,
+                }}
+              />
+            )}
 
             {originCoords ? (
               <CircleMarker
@@ -2675,7 +3293,9 @@ const MissionTeamRoutePreview = ({
       {!isLoadingRoute && waypointGroups.length > 0 && (
         <div className="mt-1 space-y-1.5">
           {waypointGroups.map((waypoint, index) => {
-            const leg = index > 0 ? routeLegs[index - 1] : null;
+            const activitySegment = activitySegmentByIndex.get(index);
+            const routeLeg = index > 0 ? routeLegs[index - 1] : null;
+            const legendLeg = activitySegment ?? routeLeg;
             const meta = waypointMetaList[index];
             const apiWaypoint = routeWaypoints[index];
 
@@ -2684,16 +3304,26 @@ const MissionTeamRoutePreview = ({
                 key={`mission-team-waypoint-legend-${index}`}
                 className="space-y-0.5"
               >
-                {leg ? (
+                {legendLeg ? (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="h-1 w-4 shrink-0 rounded-full bg-[#FF6B35]" />
+                    <span
+                      className={cn(
+                        "h-1 w-4 shrink-0 rounded-full",
+                        activitySegment?.isFallback
+                          ? "bg-[#FF6B35]/70"
+                          : "bg-[#FF6B35]",
+                      )}
+                    />
                     <NavigationArrow
                       className="h-2.5 w-2.5 text-muted-foreground"
                       weight="bold"
                     />
                     <span className="text-muted-foreground">
-                      {leg.distanceText || formatDistance(leg.distanceMeters)} ·{" "}
-                      {leg.durationText || formatDuration(leg.durationSeconds)}
+                      {activitySegment
+                        ? `${activitySegment.distance || formatDistance(activitySegment.distanceMeters)} · ${activitySegment.duration || formatDuration(activitySegment.durationSeconds)}`
+                        : routeLeg
+                          ? `${routeLeg.distanceText || formatDistance(routeLeg.distanceMeters)} · ${routeLeg.durationText || formatDuration(routeLeg.durationSeconds)}`
+                          : ""}
                     </span>
                   </div>
                 ) : null}
