@@ -361,6 +361,11 @@ export const navigationItems = [
     label: "Quản lý điểm tập kết",
     href: "/dashboard/admin/assembly-points",
   },
+  {
+    icon: Warehouse,
+    label: "Quản lý kho",
+    href: "/dashboard/admin/depots",
+  },
   { icon: ChartBar, label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
   { icon: Folder, label: "Quản lý quỹ chiến dịch", href: "/dashboard/admin/campaigns" },
   {

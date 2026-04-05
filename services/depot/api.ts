@@ -12,6 +12,16 @@ import {
   UpdateDepotStatusResponse,
   GetDepotFundTransactionsResponse,
   GetDepotFundTransactionsParams,
+  DepotClosureMetadata,
+  InitiateDepotClosureRequest,
+  InitiateDepotClosureResponse,
+  ResolveDepotClosureRequest,
+  ResolveDepotClosureResponse,
+  CancelDepotClosureRequest,
+  CancelDepotClosureResponse,
+  DepotClosureTransfer,
+  DepotTransferActionRequest,
+  DepotTransferActionResponse,
 } from "./type";
 
 /**
@@ -141,5 +151,139 @@ export async function getMyDepotFundTransactions(
       pageSize: params?.pageSize ?? 20,
     },
   });
+  return data;
+}
+
+/**
+ * Get depot closure metadata (resolution type enum)
+ * GET /logistics/depot/metadata/closure
+ */
+export async function getDepotClosureMetadata(): Promise<DepotClosureMetadata> {
+  const { data } = await api.get("/logistics/depot/metadata/closure");
+  return data;
+}
+
+/**
+ * [Admin] Initiate depot closure
+ * Nếu kho trống → đóng ngay. Nếu còn hàng → chuyển sang Closing, chờ resolve.
+ * POST /logistics/depot/{id}/close/initiate
+ */
+export async function initiateDepotClosure(
+  request: InitiateDepotClosureRequest,
+): Promise<InitiateDepotClosureResponse> {
+  const { id, ...body } = request;
+  const { data } = await api.post(
+    `/logistics/depot/${id}/close/initiate`,
+    body,
+  );
+  return data;
+}
+
+/**
+ * [Admin] Resolve depot closure — chọn cách xử lý tồn kho trước khi đóng
+ * Option 1: TransferToDepot (cần targetDepotId)
+ * Option 2: ExternalResolution (ghi chú externalNote)
+ * POST /logistics/depot/{id}/close/{closureId}/resolve
+ */
+export async function resolveDepotClosure(
+  request: ResolveDepotClosureRequest,
+): Promise<ResolveDepotClosureResponse> {
+  const { id, closureId, ...body } = request;
+  const { data } = await api.post(
+    `/logistics/depot/${id}/close/${closureId}/resolve`,
+    body,
+  );
+  return data;
+}
+
+/**
+ * [Admin] Cancel depot closure — huỷ quy trình đóng kho, kho quay về Available/Full
+ * POST /logistics/depot/{id}/close/{closureId}/cancel
+ */
+export async function cancelDepotClosure(
+  request: CancelDepotClosureRequest,
+): Promise<CancelDepotClosureResponse> {
+  const { id, closureId, ...body } = request;
+  const { data } = await api.post(
+    `/logistics/depot/${id}/close/${closureId}/cancel`,
+    body,
+  );
+  return data;
+}
+
+// ── Depot Closure Transfer ───────────────────────────────────────────
+
+/**
+ * Get transfer record
+ * GET /logistics/depot/{id}/close/{closureId}/transfer/{transferId}
+ */
+export async function getDepotClosureTransfer(
+  id: number,
+  closureId: number,
+  transferId: number,
+): Promise<DepotClosureTransfer> {
+  const { data } = await api.get(
+    `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}`,
+  );
+  return data;
+}
+
+/**
+ * [Manager kho nguồn] Xác nhận đang chuẩn bị hàng — chuyển transfer sang Preparing
+ * POST /logistics/depot/{id}/close/{closureId}/transfer/{transferId}/prepare
+ */
+export async function prepareDepotTransfer(
+  request: DepotTransferActionRequest,
+): Promise<DepotTransferActionResponse> {
+  const { id, closureId, transferId, ...body } = request;
+  const { data } = await api.post(
+    `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}/prepare`,
+    body,
+  );
+  return data;
+}
+
+/**
+ * [Manager kho nguồn] Xác nhận đã xuất hàng — chuyển transfer sang Shipping
+ * POST /logistics/depot/{id}/close/{closureId}/transfer/{transferId}/ship
+ */
+export async function shipDepotTransfer(
+  request: DepotTransferActionRequest,
+): Promise<DepotTransferActionResponse> {
+  const { id, closureId, transferId, ...body } = request;
+  const { data } = await api.post(
+    `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}/ship`,
+    body,
+  );
+  return data;
+}
+
+/**
+ * [Manager kho nguồn] Xác nhận đã xuất toàn bộ hàng — chuyển transfer sang Completed
+ * POST /logistics/depot/{id}/close/{closureId}/transfer/{transferId}/complete
+ */
+export async function completeDepotTransfer(
+  request: DepotTransferActionRequest,
+): Promise<DepotTransferActionResponse> {
+  const { id, closureId, transferId, ...body } = request;
+  const { data } = await api.post(
+    `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}/complete`,
+    body,
+  );
+  return data;
+}
+
+/**
+ * [Manager kho đích] Xác nhận đã nhận hàng — kích hoạt bulk transfer và hoàn tất đóng kho
+ * POST /logistics/depot/{id}/close/{closureId}/transfer/{transferId}/receive
+ */
+export async function receiveDepotTransfer(
+  request: DepotTransferActionRequest,
+): Promise<DepotTransferActionResponse> {
+  const { id, closureId, transferId, ...body } = request;
+  const { data } = await api.post(
+    `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}/receive`,
+    body,
+  );
   return data;
 }

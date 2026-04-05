@@ -350,7 +350,7 @@ function DetailPanel({ item, open, onClose, mode }: DetailPanelProps) {
                     <InfoKV label="Thời gian ước tính" value={formatDuration(item.estimatedTime)} />
                     {item.description && (
                       <div className="pt-1.5 border-t border-border/30">
-                        <p className="text-xs text-muted-foreground leading-relaxed tracking-tighter">{item.description}</p>
+                        <p className="text-sm font-medium leading-relaxed tracking-tighter">{item.description}</p>
                       </div>
                     )}
                   </InfoCard>

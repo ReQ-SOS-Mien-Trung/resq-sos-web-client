@@ -11,6 +11,15 @@ import {
   updateDepotStatus,
   updateDepotAdvanceLimit,
   getMyDepotFundTransactions,
+  getDepotClosureMetadata,
+  initiateDepotClosure,
+  resolveDepotClosure,
+  cancelDepotClosure,
+  getDepotClosureTransfer,
+  prepareDepotTransfer,
+  shipDepotTransfer,
+  completeDepotTransfer,
+  receiveDepotTransfer,
 } from "./api";
 import {
   GetDepotsResponse,
@@ -25,6 +34,16 @@ import {
   UpdateDepotStatusResponse,
   GetDepotFundTransactionsResponse,
   GetDepotFundTransactionsParams,
+  DepotClosureMetadata,
+  InitiateDepotClosureRequest,
+  InitiateDepotClosureResponse,
+  ResolveDepotClosureRequest,
+  ResolveDepotClosureResponse,
+  CancelDepotClosureRequest,
+  CancelDepotClosureResponse,
+  DepotClosureTransfer,
+  DepotTransferActionRequest,
+  DepotTransferActionResponse,
 } from "./type";
 
 export const DEPOTS_QUERY_KEY = ["depots"] as const;
@@ -201,6 +220,208 @@ export function useUpdateDepotStatus() {
       queryClient.invalidateQueries({
         queryKey: [...DEPOTS_QUERY_KEY, variables.id],
       });
+    },
+  });
+}
+
+export const DEPOT_CLOSURE_METADATA_QUERY_KEY = [
+  "depot-closure-metadata",
+] as const;
+
+/**
+ * Hook to fetch depot closure metadata (resolution type enum)
+ */
+export function useDepotClosureMetadata(options?: { enabled?: boolean }) {
+  return useQuery<DepotClosureMetadata>({
+    queryKey: DEPOT_CLOSURE_METADATA_QUERY_KEY,
+    queryFn: getDepotClosureMetadata,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * [Admin] Hook to initiate depot closure
+ */
+export function useInitiateDepotClosure() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    InitiateDepotClosureResponse,
+    Error,
+    InitiateDepotClosureRequest
+  >({
+    mutationFn: initiateDepotClosure,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOTS_QUERY_KEY, variables.id],
+      });
+    },
+  });
+}
+
+/**
+ * [Admin] Hook to resolve depot closure (chọn cách xử lý tồn kho)
+ */
+export function useResolveDepotClosure() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    ResolveDepotClosureResponse,
+    Error,
+    ResolveDepotClosureRequest
+  >({
+    mutationFn: resolveDepotClosure,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOTS_QUERY_KEY, variables.id],
+      });
+    },
+  });
+}
+
+/**
+ * [Admin] Hook to cancel depot closure (kho quay về Available/Full)
+ */
+export function useCancelDepotClosure() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    CancelDepotClosureResponse,
+    Error,
+    CancelDepotClosureRequest
+  >({
+    mutationFn: cancelDepotClosure,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOTS_QUERY_KEY, variables.id],
+      });
+    },
+  });
+}
+// ── Depot Closure Transfer ─────────────────────────────────────────
+
+export const DEPOT_TRANSFER_QUERY_KEY = ["depot-closure-transfer"] as const;
+
+/**
+ * Hook to fetch a transfer record
+ * GET /logistics/depot/{id}/close/{closureId}/transfer/{transferId}
+ */
+export function useDepotClosureTransfer(
+  id: number,
+  closureId: number,
+  transferId: number,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<DepotClosureTransfer>({
+    queryKey: [...DEPOT_TRANSFER_QUERY_KEY, id, closureId, transferId],
+    queryFn: () => getDepotClosureTransfer(id, closureId, transferId),
+    enabled: options?.enabled ?? (!!id && !!closureId && !!transferId),
+  });
+}
+
+/**
+ * [Manager kho nguồn] Chuẩn bị hàng → Preparing
+ * POST .../prepare
+ */
+export function usePrepareDepotTransfer() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    DepotTransferActionResponse,
+    Error,
+    DepotTransferActionRequest
+  >({
+    mutationFn: prepareDepotTransfer,
+    onSuccess: (_, v) => {
+      queryClient.invalidateQueries({
+        queryKey: [
+          ...DEPOT_TRANSFER_QUERY_KEY,
+          v.id,
+          v.closureId,
+          v.transferId,
+        ],
+      });
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * [Manager kho nguồn] Xuất hàng → Shipping
+ * POST .../ship
+ */
+export function useShipDepotTransfer() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    DepotTransferActionResponse,
+    Error,
+    DepotTransferActionRequest
+  >({
+    mutationFn: shipDepotTransfer,
+    onSuccess: (_, v) => {
+      queryClient.invalidateQueries({
+        queryKey: [
+          ...DEPOT_TRANSFER_QUERY_KEY,
+          v.id,
+          v.closureId,
+          v.transferId,
+        ],
+      });
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * [Manager kho nguồn] Hoàn tất xuất → Completed
+ * POST .../complete
+ */
+export function useCompleteDepotTransfer() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    DepotTransferActionResponse,
+    Error,
+    DepotTransferActionRequest
+  >({
+    mutationFn: completeDepotTransfer,
+    onSuccess: (_, v) => {
+      queryClient.invalidateQueries({
+        queryKey: [
+          ...DEPOT_TRANSFER_QUERY_KEY,
+          v.id,
+          v.closureId,
+          v.transferId,
+        ],
+      });
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * [Manager kho đích] Xác nhận nhận hàng → kích hoạt bulk transfer + hoàn tất đóng kho
+ * POST .../receive
+ */
+export function useReceiveDepotTransfer() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    DepotTransferActionResponse,
+    Error,
+    DepotTransferActionRequest
+  >({
+    mutationFn: receiveDepotTransfer,
+    onSuccess: (_, v) => {
+      queryClient.invalidateQueries({
+        queryKey: [
+          ...DEPOT_TRANSFER_QUERY_KEY,
+          v.id,
+          v.closureId,
+          v.transferId,
+        ],
+      });
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
     },
   });
 }
