@@ -76,6 +76,7 @@ import type {
   FundingRequestStatus,
   CreateFundingRequestItem,
 } from "@/services/funding_request";
+import { motion, AnimatePresence } from "framer-motion";
 
 /* ── Excel column mapping ─────────────────────────────────── */
 
@@ -827,7 +828,12 @@ export default function FundingRequestPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-full mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <motion.div
+          className="flex items-start justify-between"
+          initial={{ opacity: 0, y: -18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+        >
           <div>
             <Button
               variant="ghost"
@@ -876,10 +882,15 @@ export default function FundingRequestPage() {
                 : "Tải file mẫu Excel"}
             </Button>
           )}
-        </div>
+        </motion.div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-muted/40 rounded-lg p-1 w-fit">
+        <motion.div
+          className="flex gap-1 bg-muted/40 rounded-lg p-1 w-fit"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+        >
           <button
             onClick={() => setActiveTab("create")}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${activeTab === "create"
@@ -915,13 +926,26 @@ export default function FundingRequestPage() {
             <ClockCounterClockwise size={14} />
             Biến động quỹ kho
           </button>
-        </div>
+        </motion.div>
 
         {/* ─── CREATE TAB ────────────────────────────────── */}
+        <AnimatePresence mode="wait">
         {activeTab === "create" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <motion.div
+            key="create"
+            className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+          >
             {/* ── Right column: Info + Summary ── */}
-            <div className="lg:col-span-3 lg:order-2 space-y-4 lg:sticky lg:top-6">
+            <motion.div
+              className="lg:col-span-3 lg:order-2 space-y-4 lg:sticky lg:top-6"
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
+            >
               {/* Fund balance */}
               <Card className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
                 <CardContent className="">
@@ -1093,10 +1117,15 @@ export default function FundingRequestPage() {
                   )}
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
 
             {/* ── Left column: Excel / Manual toggle ── */}
-            <div className="lg:col-span-9 lg:order-1">
+            <motion.div
+              className="lg:col-span-9 lg:order-1"
+              initial={{ opacity: 0, x: -24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
+            >
               <Card className="border border-border/50 overflow-hidden p-0">
                 {/* ── Header with mode toggle ── */}
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
@@ -1173,9 +1202,17 @@ export default function FundingRequestPage() {
                   </div>
                 </div>
 
-                {/* ── Excel upload area (default) ── */}
+                {/* ── Excel / Manual animated panels ── */}
+                <AnimatePresence mode="wait">
                 {inputMode === "excel" && (
-                  <div className="p-6">
+                  <motion.div
+                    key="excel-panel"
+                    className="p-6"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                  >
                     <div
                       onDrop={(e) => {
                         e.preventDefault();
@@ -1273,12 +1310,19 @@ export default function FundingRequestPage() {
                         nhập thủ công từng dòng
                       </button>
                     </p>
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* ── Manual table (when toggled) ── */}
                 {inputMode === "manual" && (
-                  <div className="overflow-auto">
+                  <motion.div
+                    key="manual-panel"
+                    className="overflow-auto"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                  >
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/40">
@@ -1457,8 +1501,9 @@ export default function FundingRequestPage() {
                         )}
                       </TableBody>
                     </Table>
-                  </div>
+                  </motion.div>
                 )}
+                </AnimatePresence>
 
                 {/* Hidden file input (shared) */}
                 <input
@@ -1473,12 +1518,19 @@ export default function FundingRequestPage() {
                   className="hidden"
                 />
               </Card>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         {/* ─── HISTORY TAB ───────────────────────────────── */}
         {activeTab === "history" && (
+          <motion.div
+            key="history"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+          >
           <Card className="border border-border/50">
             <CardContent className="px-5 space-y-4">
               <div className="flex items-center justify-between">
@@ -1524,10 +1576,13 @@ export default function FundingRequestPage() {
                         {requests.map((req, idx) => {
                           const st = statusConfig[req.status];
                           return (
-                            <TableRow
+                            <motion.tr
                               key={req.id}
-                              className="hover:bg-muted/30 cursor-pointer transition-colors"
+                              className="hover:bg-muted/30 cursor-pointer transition-colors border-b border-border/40"
                               onClick={() => setDetailItem(req)}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.28, delay: idx * 0.05, ease: "easeOut" }}
                             >
                               <TableCell className="text-center text-sm text-muted-foreground">
                                 {(histPage - 1) * histPageSize + idx + 1}
@@ -1566,7 +1621,7 @@ export default function FundingRequestPage() {
                                   <Eye size={14} />
                                 </Button>
                               </TableCell>
-                            </TableRow>
+                            </motion.tr>
                           );
                         })}
                       </TableBody>
@@ -1619,10 +1674,18 @@ export default function FundingRequestPage() {
               )}
             </CardContent>
           </Card>
+          </motion.div>
         )}
 
         {/* ─── TRANSACTIONS TAB ──────────────────────────────── */}
         {activeTab === "transactions" && (
+          <motion.div
+            key="transactions"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+          >
           <Card className="border border-border/50">
             <CardContent className="px-5 space-y-4">
               <div className="flex items-center justify-between">
@@ -1670,7 +1733,13 @@ export default function FundingRequestPage() {
                           const displayType = txTypeMap[tx.transactionType] ?? tx.transactionType;
                           const displayRef = refTypeMap[tx.referenceType] ?? tx.referenceType;
                           return (
-                            <TableRow key={tx.id} className="hover:bg-muted/30 transition-colors">
+                            <motion.tr
+                              key={tx.id}
+                              className="hover:bg-muted/30 transition-colors border-b border-border/40"
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.25, delay: idx * 0.04, ease: "easeOut" }}
+                            >
                               <TableCell className="text-center text-sm text-muted-foreground">
                                 {(txPage - 1) * txPageSize + idx + 1}
                               </TableCell>
@@ -1710,7 +1779,7 @@ export default function FundingRequestPage() {
                                   {new Date(tx.createdAt).toLocaleString("vi-VN")}
                                 </span>
                               </TableCell>
-                            </TableRow>
+                            </motion.tr>
                           );
                         })}
                       </TableBody>
@@ -1763,7 +1832,9 @@ export default function FundingRequestPage() {
               )}
             </CardContent>
           </Card>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
       {/* ── Detail Dialog ─────────────────────────────────── */}
@@ -1887,9 +1958,12 @@ export default function FundingRequestPage() {
                 ) : (
                   <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
                     {detailItems.map((item, idx) => (
-                      <div
+                      <motion.div
                         key={item.id || idx}
                         className="rounded-lg border border-border/60 bg-background p-2.5"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.22, delay: idx * 0.04, ease: "easeOut" }}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <p className="text-sm font-semibold tracking-tighter">
@@ -1915,7 +1989,7 @@ export default function FundingRequestPage() {
                             <span>Ghi chú: {item.notes ?? item.description}</span>
                           )}
                         </div>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 )}

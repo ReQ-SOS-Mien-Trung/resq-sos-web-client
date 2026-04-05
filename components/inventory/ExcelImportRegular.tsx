@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
@@ -1416,7 +1417,12 @@ export default function ExcelImportRegular() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="shrink-0 border-b bg-background px-6 py-4">
+      <motion.div
+        className="shrink-0 border-b bg-background px-6 py-4"
+        initial={{ opacity: 0, y: -18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
@@ -1446,15 +1452,29 @@ export default function ExcelImportRegular() {
             </Button>
           )}
         </div>
-      </div>
+      </motion.div>
 
       <div className="flex-1 overflow-auto bg-muted/30 p-6">
+        <AnimatePresence mode="wait">
         {step === "upload" && (
-          <div className="max-w-7xl mx-auto space-y-5">
+          <motion.div
+            key="upload"
+            className="max-w-7xl mx-auto space-y-5"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.32, ease: "easeOut" }}
+          >
             {groups.map((group, idx) => {
               const color = GROUP_COLORS[idx % GROUP_COLORS.length];
               return (
-                <div key={group.id} className={cn("rounded-xl border bg-card overflow-hidden border-l-4", color.border)}>
+                <motion.div
+                  key={group.id}
+                  className={cn("rounded-xl border bg-card overflow-hidden border-l-4", color.border)}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: idx * 0.07, ease: "easeOut" }}
+                >
                   <div className={cn("flex items-center justify-between px-5 py-3 border-b", color.header)}>
                     <div className="flex items-center gap-2 tracking-tighter">
                       <Receipt className={cn("h-4 w-4", color.icon)} weight="duotone" />
@@ -1641,7 +1661,7 @@ export default function ExcelImportRegular() {
                       </button>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
 
@@ -1693,11 +1713,18 @@ export default function ExcelImportRegular() {
                 ))}
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {step === "review" && (
-          <div className="space-y-5 flex flex-col">
+          <motion.div
+            key="review"
+            className="space-y-5 flex flex-col"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.32, ease: "easeOut" }}
+          >
             <div className="flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs tracking-tighter font-medium">
@@ -1997,8 +2024,9 @@ export default function ExcelImportRegular() {
                 )}
               </Button>
             </div>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
       <Dialog open={!!pdfPreview} onOpenChange={(open) => { if (!open) closePdfPreview(); }}>
         <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">

@@ -19,6 +19,7 @@ import {
   createSupplyRequests,
   getSupplyRequests,
   getMyDepotUpcomingPickups,
+  getMyDepotPickupHistory,
   acceptSupplyRequest,
   prepareSupplyRequest,
   shipSupplyRequest,
@@ -87,6 +88,8 @@ import {
   SupplyRequestPriorityLevel,
   GetUpcomingPickupsParams,
   GetUpcomingPickupsResponse,
+  GetPickupHistoryParams,
+  GetPickupHistoryResponse,
 } from "./type";
 
 export const INVENTORY_KEYS = {
@@ -110,6 +113,8 @@ export const INVENTORY_KEYS = {
     [...INVENTORY_KEYS.all, "supplyRequests", params] as const,
   upcomingPickups: (params: GetUpcomingPickupsParams) =>
     [...INVENTORY_KEYS.all, "upcomingPickups", params] as const,
+  pickupHistory: (params: GetPickupHistoryParams) =>
+    [...INVENTORY_KEYS.all, "pickupHistory", params] as const,
   organizations: () => [...INVENTORY_KEYS.all, "organizations"] as const,
   stockMovements: (params: GetDepotStockMovementsParams) =>
     [...INVENTORY_KEYS.all, "transactions", params] as const,
@@ -307,6 +312,20 @@ export function useMyDepotUpcomingPickups(
   return useQuery({
     queryKey: INVENTORY_KEYS.upcomingPickups(params),
     queryFn: () => getMyDepotUpcomingPickups(params),
+    ...options,
+  });
+}
+
+export function useMyDepotPickupHistory(
+  params: GetPickupHistoryParams,
+  options?: Omit<
+    UseQueryOptions<GetPickupHistoryResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.pickupHistory(params),
+    queryFn: () => getMyDepotPickupHistory(params),
     ...options,
   });
 }
