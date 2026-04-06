@@ -217,7 +217,15 @@ const SOSOverview = () => {
   const { data, isLoading, isError } = useSOSRequests();
 
   const stats = useMemo(() => {
-    if (!data?.items) return { total: 0, pending: 0, inProgress: 0, completed: 0, cancelled: 0, byPriority: {} as Record<string, number> };
+    if (!data?.items)
+      return {
+        total: 0,
+        pending: 0,
+        inProgress: 0,
+        completed: 0,
+        cancelled: 0,
+        byPriority: {} as Record<string, number>,
+      };
     const list = data.items;
     return {
       total: list.length,
@@ -279,7 +287,10 @@ const SOSOverview = () => {
     return (
       <Card className="border border-border/50">
         <CardContent className="p-6 text-center text-sm text-muted-foreground">
-          <Warning className="h-8 w-8 mx-auto mb-2 text-orange-500" weight="fill" />
+          <Warning
+            className="h-8 w-8 mx-auto mb-2 text-orange-500"
+            weight="fill"
+          />
           Không thể tải dữ liệu SOS. Vui lòng thử lại sau.
         </CardContent>
       </Card>
@@ -320,10 +331,7 @@ const SOSOverview = () => {
             label="Chờ xử lý"
             value={stats.pending}
             icon={
-              <HourglassHigh
-                className="h-4 w-4 text-amber-500"
-                weight="fill"
-              />
+              <HourglassHigh className="h-4 w-4 text-amber-500" weight="fill" />
             }
             color="bg-amber-500/5 border-amber-500/20"
             pulse
@@ -331,28 +339,21 @@ const SOSOverview = () => {
           <StatCard
             label="Đang thực thi"
             value={stats.inProgress}
-            icon={
-              <Spinner className="h-4 w-4 text-blue-500 animate-spin" />
-            }
+            icon={<Spinner className="h-4 w-4 text-blue-500 animate-spin" />}
             color="bg-blue-500/5 border-blue-500/20"
           />
           <StatCard
             label="Hoàn thành"
             value={stats.completed}
             icon={
-              <CheckCircle
-                className="h-4 w-4 text-emerald-500"
-                weight="fill"
-              />
+              <CheckCircle className="h-4 w-4 text-emerald-500" weight="fill" />
             }
             color="bg-emerald-500/5 border-emerald-500/20"
           />
           <StatCard
             label="Đã huỷ"
             value={stats.cancelled}
-            icon={
-              <XCircle className="h-4 w-4 text-gray-400" weight="fill" />
-            }
+            icon={<XCircle className="h-4 w-4 text-gray-400" weight="fill" />}
             color="bg-gray-500/5 border-gray-500/20"
           />
         </div>

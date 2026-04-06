@@ -1,0 +1,1297 @@
+"use client";
+
+import React, { useState } from "react";
+import Image from "next/image";
+import { useParams, useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { DashboardLayout } from "@/components/admin/dashboard";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { Card, CardContent } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Warehouse,
+  X,
+  MapPin,
+  Package,
+  ArrowClockwise,
+  UserCircle,
+  ProhibitInset,
+  ArrowsLeftRight,
+  Scales,
+  Phone,
+  EnvelopeSimple,
+  ClockCounterClockwise,
+  ArrowRight,
+  CheckFat,
+  XCircle,
+  HourglassHigh,
+  Truck,
+  ArrowFatLinesDown,
+  WarningCircle,
+  Spinner,
+  CaretLeft,
+} from "@phosphor-icons/react";
+import { toast } from "sonner";
+import {
+  useDepotById,
+  useDepots,
+  useDepotMetadata,
+  useDepotStatuses,
+  useInitiateDepotClosure,
+  useResolveDepotClosure,
+  useCancelDepotClosure,
+  useDepotClosureMetadata,
+  useDepotClosures,
+} from "@/services/depot/hooks";
+import type {
+  DepotStatus,
+  DepotStatusMetadata,
+  DepotClosureRecord,
+} from "@/services/depot/type";
+import { AxiosError } from "axios";
+
+/* ── helpers ──────────────────────────────────────────────────── */
+function getApiError(err: unknown, fallback: string): string {
+  if (err instanceof AxiosError) {
+    const msg = err.response?.data?.message;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+  }
+  return fallback;
+}
+
+/* ── Status config ────────────────────────────────────────────── */
+type StatusCfgMap = Record<
+  string,
+  { label: string; color: string; bg: string }
+>;
+
+const STATUS_STYLE: Record<DepotStatus, { color: string; bg: string }> = {
+  Available: {
+    color: "text-white",
+    bg: "bg-emerald-600 border-emerald-400 dark:bg-emerald-700",
+  },
+  Full: {
+    color: "text-white",
+    bg: "bg-amber-500  border-amber-400  dark:bg-amber-600",
+  },
+  PendingAssignment: {
+    color: "text-white",
+    bg: "bg-blue-600   border-blue-400   dark:bg-blue-700",
+  },
+  Closed: {
+    color: "text-white",
+    bg: "bg-zinc-500   border-zinc-400   dark:bg-zinc-600",
+  },
+  Closing: {
+    color: "text-white",
+    bg: "bg-red-600    border-red-400    dark:bg-red-700",
+  },
+  UnderMaintenance: {
+    color: "text-white",
+    bg: "bg-purple-600 border-purple-400 dark:bg-purple-700",
+  },
+};
+
+const STATUS_FALLBACK: Record<DepotStatus, string> = {
+  Available: "Đang hoạt động",
+  Full: "Đã đầy",
+  PendingAssignment: "Chưa có quản lý",
+  Closed: "Đã đóng",
+  Closing: "Đang tiến hành đóng kho",
+  UnderMaintenance: "Đang bảo trì",
+};
+
+function buildStatusCfg(apiStatuses?: DepotStatusMetadata[]): StatusCfgMap {
+  const result: StatusCfgMap = {};
+  const keys: DepotStatus[] = [
+    "Available",
+    "Full",
+    "PendingAssignment",
+    "Closed",
+    "Closing",
+    "UnderMaintenance",
+  ];
+  for (const key of keys) {
+    const apiLabel = apiStatuses?.find((s) => s.key === key)?.value;
+    const style = STATUS_STYLE[key] ?? STATUS_STYLE.Closed;
+    result[key] = { label: apiLabel ?? STATUS_FALLBACK[key] ?? key, ...style };
+  }
+  return result;
+}
+
+/* ── Closure status style ─────────────────────────────────────── */
+const CLOSURE_STATUS_STYLE: Record<
+  string,
+  { label: string; color: string; bg: string; Icon: React.ElementType }
+> = {
+  InProgress: {
+    label: "Đang xử lý",
+    color: "text-amber-700 dark:text-amber-400",
+    bg: "bg-amber-50  dark:bg-amber-950/30  border-amber-200  dark:border-amber-800",
+    Icon: HourglassHigh,
+  },
+  Completed: {
+    label: "Hoàn thành",
+    color: "text-emerald-700 dark:text-emerald-400",
+    bg: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800",
+    Icon: CheckFat,
+  },
+  Cancelled: {
+    label: "Đã hủy",
+    color: "text-zinc-600 dark:text-zinc-400",
+    bg: "bg-zinc-50   dark:bg-zinc-950/30   border-zinc-200   dark:border-zinc-700",
+    Icon: XCircle,
+  },
+  TimedOut: {
+    label: "Hết thời hạn",
+    color: "text-red-700 dark:text-red-400",
+    bg: "bg-red-50    dark:bg-red-950/30    border-red-200    dark:border-red-800",
+    Icon: XCircle,
+  },
+};
+
+function getClosureStatusCfg(status: string) {
+  return (
+    CLOSURE_STATUS_STYLE[status] ?? {
+      label: status,
+      color: "text-muted-foreground",
+      bg: "bg-muted border-border",
+      Icon: ClockCounterClockwise,
+    }
+  );
+}
+
+/* ── Page ─────────────────────────────────────────────────────── */
+export default function DepotDetailPage() {
+  const { id: rawId } = useParams<{ id: string }>();
+  const depotId = Number(rawId);
+  const router = useRouter();
+
+  /* ── Data ── */
+  const { data: depot, isLoading, refetch } = useDepotById(depotId);
+  const {
+    data: closures = [],
+    isLoading: closuresLoading,
+    refetch: refetchClosures,
+  } = useDepotClosures(depotId);
+  /* requests only comes from the list endpoint, not GET /depot/{id} */
+  const { data: allDepotsData } = useDepots({
+    params: { pageNumber: 1, pageSize: 200 },
+  });
+  const { data: depotOptions = [] } = useDepotMetadata();
+  const { data: statusMetadata } = useDepotStatuses();
+  const { data: closureMeta } = useDepotClosureMetadata();
+
+  const statusCfg = buildStatusCfg(statusMetadata);
+  const listDepot = allDepotsData?.items.find((d) => d.id === depotId);
+  const requests = listDepot?.requests ?? depot?.requests ?? [];
+
+  /* ── State ── */
+  const [knownClosureIds, setKnownClosureIds] = useState<
+    Record<number, number>
+  >({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const [initiateOpen, setInitiateOpen] = useState(false);
+  const [initiateReason, setInitiateReason] = useState("");
+
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [resolveClosureId, setResolveClosureId] = useState("");
+  const [resolutionType, setResolutionType] = useState<
+    "TransferToDepot" | "ExternalResolution"
+  >("TransferToDepot");
+  const [targetDepotId, setTargetDepotId] = useState("");
+  const [externalNote, setExternalNote] = useState("");
+
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelClosureId, setCancelClosureId] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+
+  const initiateMutation = useInitiateDepotClosure();
+  const resolveMutation = useResolveDepotClosure();
+  const cancelMutation = useCancelDepotClosure();
+
+  const resolutionTypes = closureMeta?.resolutionTypes ?? [
+    { key: "TransferToDepot", value: "Chuyển toàn bộ hàng sang kho khác" },
+    {
+      key: "ExternalResolution",
+      value: "Tự xử lý bên ngoài (admin ghi chú cách xử lý)",
+    },
+  ];
+
+  function handleRefresh() {
+    setIsRefreshing(true);
+    Promise.all([refetch(), refetchClosures()]).finally(() =>
+      setIsRefreshing(false),
+    );
+  }
+
+  function handleInitiate() {
+    if (!depot || !initiateReason.trim()) return;
+    initiateMutation.mutate(
+      { id: depot.id, reason: initiateReason.trim() },
+      {
+        onSuccess: (res) => {
+          if (res.closureId) {
+            setKnownClosureIds((prev) => ({
+              ...prev,
+              [depot.id]: res.closureId,
+            }));
+            toast.success("Kho còn hàng — đã chuyển sang Đang đóng.");
+          } else {
+            toast.success("Kho trống — đã đóng thành công!");
+          }
+          setInitiateOpen(false);
+          handleRefresh();
+        },
+        onError: (err) =>
+          toast.error(getApiError(err, "Không thể khởi tạo đóng kho.")),
+      },
+    );
+  }
+
+  function handleResolve() {
+    if (!depot) return;
+    const closureId = knownClosureIds[depot.id] ?? Number(resolveClosureId);
+    if (!closureId) return;
+    resolveMutation.mutate(
+      {
+        id: depot.id,
+        closureId,
+        resolutionType,
+        targetDepotId:
+          resolutionType === "TransferToDepot"
+            ? Number(targetDepotId)
+            : undefined,
+        externalNote:
+          resolutionType === "ExternalResolution"
+            ? externalNote.trim()
+            : undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Đã xử lý tồn kho — kho sẽ được đóng chính thức.");
+          setResolveOpen(false);
+          handleRefresh();
+        },
+        onError: (err) => toast.error(getApiError(err, "Giải quyết thất bại.")),
+      },
+    );
+  }
+
+  function handleCancel() {
+    if (!depot) return;
+    const closureId = knownClosureIds[depot.id] ?? Number(cancelClosureId);
+    if (!closureId) return;
+    cancelMutation.mutate(
+      { id: depot.id, closureId, cancellationReason: cancelReason.trim() },
+      {
+        onSuccess: () => {
+          toast.success("Đã hủy quy trình đóng kho.");
+          setCancelOpen(false);
+          handleRefresh();
+        },
+        onError: (err) => toast.error(getApiError(err, "Hủy thất bại.")),
+      },
+    );
+  }
+
+  /* ── Loading skeleton ── */
+  if (isLoading || !depot) {
+    return (
+      <DashboardLayout
+        favorites={[]}
+        projects={[]}
+        cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+      >
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-9 rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-8 w-72" />
+            </div>
+          </div>
+          <Skeleton className="h-80 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Skeleton className="h-40 rounded-2xl" />
+            <Skeleton className="h-40 rounded-2xl" />
+            <Skeleton className="h-40 rounded-2xl" />
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const cfg = statusCfg[depot.status] ?? {
+    label: depot.status,
+    color: "text-muted-foreground",
+    bg: "bg-muted",
+  };
+  const pct =
+    depot.capacity > 0
+      ? Math.min(
+          100,
+          Math.round((depot.currentUtilization / depot.capacity) * 100),
+        )
+      : 0;
+  const barColor =
+    pct > 80 ? "bg-red-500" : pct > 50 ? "bg-amber-500" : "bg-emerald-500";
+  const pctColor =
+    pct > 80
+      ? "text-red-600 dark:text-red-400"
+      : pct > 50
+        ? "text-amber-600 dark:text-amber-400"
+        : "text-emerald-600 dark:text-emerald-400";
+
+  return (
+    <DashboardLayout
+      favorites={[]}
+      projects={[]}
+      cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+    >
+      <div className="space-y-7 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* ══ Header ══ */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="h-9 w-9 p-0 shrink-0 rounded-xl"
+            >
+              <CaretLeft size={18} />
+            </Button>
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground tracking-wider uppercase mb-0.5">
+                Kho số {depot.id}
+              </p>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter leading-tight">
+                {depot.name}
+              </h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-1 flex-wrap justify-end">
+            <Badge
+              className={cn(
+                "text-sm font-semibold tracking-tight px-3 py-1.5 border",
+                cfg.bg,
+                cfg.color,
+              )}
+            >
+              {depot.status === "Closing" && (
+                <span className="mr-1.5 h-2 w-2 rounded-full bg-red-300 animate-pulse inline-block" />
+              )}
+              {cfg.label}
+            </Badge>
+
+            {/* ── Inline action buttons ── */}
+            {depot.status !== "Closed" && (
+              <>
+                {["Available", "Full", "PendingAssignment"].includes(
+                  depot.status,
+                ) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-800"
+                    onClick={() => {
+                      setInitiateReason("");
+                      setInitiateOpen(true);
+                    }}
+                  >
+                    <ProhibitInset size={15} />
+                    Đóng kho
+                  </Button>
+                )}
+                {depot.status === "Closing" && (
+                  <>
+                    <Button
+                      size="sm"
+                      className="gap-1.5 font-semibold"
+                      onClick={() => {
+                        setResolveClosureId(
+                          String(knownClosureIds[depot.id] ?? ""),
+                        );
+                        setResolutionType("TransferToDepot");
+                        setTargetDepotId("");
+                        setExternalNote("");
+                        setResolveOpen(true);
+                      }}
+                    >
+                      <Scales size={15} />
+                      Giải quyết
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 font-semibold"
+                      onClick={() => {
+                        setCancelClosureId(
+                          String(knownClosureIds[depot.id] ?? ""),
+                        );
+                        setCancelReason("");
+                        setCancelOpen(true);
+                      }}
+                    >
+                      <X size={15} />
+                      Hủy đóng
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="h-9 w-9 p-0 rounded-xl"
+            >
+              <ArrowClockwise
+                size={16}
+                className={isRefreshing ? "animate-spin" : ""}
+              />
+            </Button>
+          </div>
+        </div>
+
+        {/* ══ Hero image ══ */}
+        {depot.imageUrl ? (
+          <div className="relative h-80 sm:h-88 w-full overflow-hidden rounded-2xl">
+            <Image
+              src={depot.imageUrl}
+              alt={depot.name}
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-linear-to-t from-black/40 via-black/5 to-transparent rounded-2xl" />
+          </div>
+        ) : (
+          <div className="h-48 w-full rounded-2xl bg-muted/50 border border-border/50 flex items-center justify-center">
+            <Warehouse size={48} className="text-muted-foreground/20" />
+          </div>
+        )}
+
+        {/* ══ Info cards — 3 columns ══ */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Utilization */}
+          <Card className="border border-border/60 p-0">
+            <CardContent className="p-4 space-y-2.5">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Tình trạng tồn kho
+              </p>
+              <div className="flex items-end justify-between gap-2">
+                <div>
+                  <span className="text-2xl font-bold tracking-tighter tabular-nums">
+                    {depot.currentUtilization.toLocaleString("vi-VN")}
+                  </span>
+                  <span className="text-sm text-muted-foreground tracking-tighter ml-1.5">
+                    / {depot.capacity.toLocaleString("vi-VN")}
+                  </span>
+                </div>
+                <span
+                  className={cn(
+                    "text-2xl font-bold tabular-nums tracking-tighter",
+                    pctColor,
+                  )}
+                >
+                  {pct}%
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={cn("h-full transition-all rounded-full", barColor)}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground font-medium tracking-tighter">
+                  Còn trống
+                </span>
+                <span className="text-base font-bold tabular-nums tracking-tighter">
+                  {Math.max(
+                    0,
+                    depot.capacity - depot.currentUtilization,
+                  ).toLocaleString("vi-VN")}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Location */}
+          <Card className="border border-border/60 p-0">
+            <CardContent className="p-4 space-y-2.5">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Vị trí
+              </p>
+              <div className="flex items-start gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-red-50 dark:bg-red-950/30 flex items-center justify-center shrink-0">
+                  <MapPin size={18} weight="fill" className="text-primary" />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-base font-semibold tracking-tight leading-snug">
+                    {depot.address}
+                  </p>
+                  <p className="text-sm text-muted-foreground tracking-tight font-mono">
+                    Tọa độ:{" "}
+                    <span className="font-medium text-black dark:text-white">
+                      {depot.latitude.toFixed(6)}, {depot.longitude.toFixed(6)}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground tracking-tight border-t border-border/50 pt-2">
+                Cập nhật lần cuối:{" "}
+                <span className="font-semibold text-foreground/80">
+                  {new Date(depot.lastUpdatedAt).toLocaleString("vi-VN")}
+                </span>
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Manager */}
+          <Card className="border border-border/60 p-0">
+            <CardContent className="p-4 space-y-2.5">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                Quản lý kho
+              </p>
+              {depot.manager ? (
+                <div className="flex items-center gap-2.5">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <UserCircle
+                      size={26}
+                      weight="fill"
+                      className="text-primary"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-lg font-bold tracking-tighter">
+                      {depot.manager.lastName} {depot.manager.firstName}
+                    </p>
+                    <div className="mt-1 space-y-2">
+                      {depot.manager.email && (
+                        <p className="flex items-center gap-2 text-sm text-muted-foreground tracking-tight">
+                          <EnvelopeSimple size={18} className="shrink-0" />
+                          <span className="truncate">
+                            {depot.manager.email}
+                          </span>
+                        </p>
+                      )}
+                      {depot.manager.phone && (
+                        <p className="flex items-center gap-2 text-sm text-muted-foreground tracking-tight">
+                          <Phone size={18} className="shrink-0" />
+                          {depot.manager.phone}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5">
+                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                    <UserCircle
+                      size={26}
+                      className="text-muted-foreground/40"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground/60 tracking-tight">
+                    Chưa phân công
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Closing warning banner */}
+        {depot.status === "Closing" && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 text-sm text-red-700 dark:text-red-400 tracking-tight w-fit">
+            <WarningCircle
+              size={15}
+              className="text-red-500 shrink-0"
+              weight="fill"
+            />
+            <span className="font-semibold">
+              Chờ xử lý tồn kho trước khi đóng chính thức
+            </span>
+            {knownClosureIds[depot.id] && (
+              <span className="text-red-400 text-xs">
+                · Closure #{knownClosureIds[depot.id]}
+              </span>
+            )}
+          </div>
+        )}
+
+        <Separator className="mb-3" />
+
+        {/* ══ Active Requests ══ */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tighter">
+                Các đơn tiếp tế trong kho
+              </h2>
+            </div>
+            {requests.length > 0 && (
+              <Badge
+                variant="secondary"
+                className="text-sm text-white rounded-xl bg-green-600 border-green-100 border-4 font-semibold px-2.5 py-1.5"
+              >
+                Có {requests.length} yêu cầu
+              </Badge>
+            )}
+          </div>
+
+          {requests.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center border border-border/50 rounded-2xl bg-muted/10">
+              <Package size={36} className="text-muted-foreground/25 mb-3" />
+              <p className="text-base font-medium text-muted-foreground tracking-tighter">
+                Không có yêu cầu nào đang xử lý
+              </p>
+            </div>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1">
+              {requests.map((req) => {
+                const isRequester = req.role === "Requester";
+                const priorityStyle =
+                  req.priorityLevel === "Critical"
+                    ? "text-red-700    bg-red-50    border-red-200    dark:bg-red-950/30    dark:border-red-800    dark:text-red-400"
+                    : req.priorityLevel === "High"
+                      ? "text-orange-700 bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800 dark:text-orange-400"
+                      : req.priorityLevel === "Medium"
+                        ? "text-blue-700   bg-blue-50   border-blue-200   dark:bg-blue-950/30   dark:border-blue-800   dark:text-blue-400"
+                        : "text-zinc-600   bg-zinc-50   border-zinc-200   dark:bg-zinc-900/30   dark:border-zinc-700   dark:text-zinc-400";
+                return (
+                  <Card
+                    key={req.id}
+                    className="border border-border/60 py-0 shrink-0 w-88"
+                  >
+                    <CardContent className="p-5 space-y-3.5">
+                      {/* Role + Priority */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={cn(
+                              "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
+                              isRequester
+                                ? "bg-blue-50 dark:bg-blue-950/30"
+                                : "bg-emerald-50 dark:bg-emerald-950/30",
+                            )}
+                          >
+                            {isRequester ? (
+                              <ArrowFatLinesDown
+                                size={15}
+                                weight="fill"
+                                className="text-blue-500"
+                              />
+                            ) : (
+                              <Truck
+                                size={15}
+                                weight="fill"
+                                className="text-emerald-500"
+                              />
+                            )}
+                          </div>
+                          <span className="text-base font-bold tracking-tight">
+                            {isRequester ? "Nhận hàng" : "Cung cấp hàng"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`text-xs font-bold tracking-tighter px-2 py-0.5 rounded-md border ${priorityStyle}`}
+                          >
+                            {req.priorityLevel}
+                          </span>
+                          <span className="text-xs tracking-tighter text-muted-foreground font-mono">
+                            #{req.id}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Route */}
+                      <div className="flex items-start gap-2 p-2.5 rounded-xl bg-muted/40 text-sm tracking-tighter">
+                        <span
+                          className={cn(
+                            "font-semibold flex-1 text-right leading-snug",
+                            !isRequester && "text-primary",
+                          )}
+                        >
+                          {req.sourceDepotName}
+                        </span>
+                        <ArrowRight
+                          size={14}
+                          className="text-muted-foreground shrink-0 mt-0.5"
+                        />
+                        <span
+                          className={cn(
+                            "font-semibold flex-1 leading-snug",
+                            isRequester && "text-primary",
+                          )}
+                        >
+                          {req.requestingDepotName}
+                        </span>
+                      </div>
+
+                      {/* Statuses */}
+                      <div className="grid grid-cols-2 gap-8 text-sm">
+                        <div className="space-y-0.5">
+                          <p className="text-xs text-muted-foreground font-medium tracking-tighter">
+                            Trạng thái nguồn
+                          </p>
+                          <p className="font-semibold tracking-tighter">
+                            {req.sourceStatus}
+                          </p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-xs text-muted-foreground font-medium tracking-tighter">
+                            Trạng thái nhận
+                          </p>
+                          <p className="font-semibold tracking-tighter">
+                            {req.requestingStatus}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Time */}
+                      <p className="text-xs text-muted-foreground tracking-tighter border-t border-border/50 pt-2.5">
+                        Tạo lúc:{" "}
+                        <span className="font-semibold text-foreground/70">
+                          {new Date(req.createdAt).toLocaleString("vi-VN")}
+                        </span>
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <Separator className="mb-3" />
+
+        {/* ══ Closure History ══ */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tighter">
+                Lịch sử đóng kho
+              </h2>
+            </div>
+            {closures.length > 0 && (
+              <Badge
+                variant="secondary"
+                className="text-sm font-semibold px-2.5 py-1"
+              >
+                {closures.length} phiên
+              </Badge>
+            )}
+          </div>
+
+          {closuresLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl border border-border/50 p-5 space-y-3"
+                >
+                  <Skeleton className="h-5 w-28" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2 mt-2" />
+                </div>
+              ))}
+            </div>
+          ) : closures.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14 text-center border border-border/50 rounded-2xl bg-muted/10">
+              <ClockCounterClockwise
+                size={40}
+                className="text-muted-foreground/20 mb-3"
+              />
+              <p className="text-base font-medium text-muted-foreground tracking-tight">
+                Chưa có phiên đóng kho nào
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {closures.map((c: DepotClosureRecord) => {
+                const scfg = getClosureStatusCfg(c.status);
+                const StatusIcon = scfg.Icon;
+                return (
+                  <div
+                    key={c.id}
+                    className={cn("rounded-2xl border p-5 space-y-3", scfg.bg)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <StatusIcon
+                          size={16}
+                          weight="fill"
+                          className={scfg.color}
+                        />
+                        <span
+                          className={cn(
+                            "text-base font-bold tracking-tight",
+                            scfg.color,
+                          )}
+                        >
+                          {scfg.label}
+                        </span>
+                      </div>
+                      <span className="text-sm text-muted-foreground font-mono">
+                        #{c.id}
+                      </span>
+                    </div>
+
+                    {c.closeReason && (
+                      <p className="text-sm tracking-tight text-foreground/80 leading-relaxed">
+                        <span className="font-semibold">Lý do: </span>
+                        {c.closeReason}
+                      </p>
+                    )}
+
+                    {c.resolutionType && (
+                      <div className="flex items-center gap-2 text-sm tracking-tight">
+                        <ArrowsLeftRight
+                          size={14}
+                          className="text-muted-foreground shrink-0"
+                        />
+                        {c.resolutionType === "TransferToDepot" ? (
+                          <span>
+                            Chuyển sang{" "}
+                            <span className="font-semibold">
+                              {c.targetDepotName ?? `Kho #${c.targetDepotId}`}
+                            </span>
+                          </span>
+                        ) : (
+                          <span>{c.externalNote ?? "Tự xử lý bên ngoài"}</span>
+                        )}
+                      </div>
+                    )}
+
+                    {c.transfer && (
+                      <div className="flex items-center gap-2">
+                        <ArrowRight
+                          size={13}
+                          className="text-muted-foreground shrink-0"
+                        />
+                        <span className="text-sm tracking-tight text-muted-foreground">
+                          Transfer #{c.transfer.transferId} —{" "}
+                          <span className="font-semibold text-foreground/70">
+                            {c.transfer.status}
+                          </span>
+                        </span>
+                      </div>
+                    )}
+
+                    {c.cancellationReason && (
+                      <p className="text-sm tracking-tight text-muted-foreground">
+                        <span className="font-semibold">Hủy: </span>
+                        {c.cancellationReason}
+                      </p>
+                    )}
+
+                    <div className="pt-2 border-t border-current/10 space-y-1">
+                      <p className="text-xs text-muted-foreground tracking-tight">
+                        Khởi tạo:{" "}
+                        <span className="font-semibold text-foreground/70">
+                          {new Date(c.initiatedAt).toLocaleString("vi-VN")}
+                        </span>
+                        {" — "}
+                        {c.initiatedByFullName}
+                      </p>
+                      {c.completedAt && (
+                        <p className="text-xs text-muted-foreground tracking-tight">
+                          Hoàn thành:{" "}
+                          <span className="font-semibold text-foreground/70">
+                            {new Date(c.completedAt).toLocaleString("vi-VN")}
+                          </span>
+                        </p>
+                      )}
+                      {c.cancelledAt && c.cancelledByFullName && (
+                        <p className="text-xs text-muted-foreground tracking-tight">
+                          Hủy bởi:{" "}
+                          <span className="font-semibold text-foreground/70">
+                            {c.cancelledByFullName}
+                          </span>
+                          {" — "}
+                          {new Date(c.cancelledAt).toLocaleString("vi-VN")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════
+          Dialog: Initiate Closure
+      ═══════════════════════════════════ */}
+      <Dialog
+        open={initiateOpen}
+        onOpenChange={(o) => !o && setInitiateOpen(false)}
+      >
+        <DialogContent className="gap-2 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl tracking-tighter">
+              Xác nhận đóng kho
+            </DialogTitle>
+            <DialogDescription className="tracking-tighter text-base">
+              Kho:{" "}
+              <span className="text-primary font-semibold">{depot.name}</span>
+              <br />
+              <span className="text-sm">
+                (Nếu kho còn hàng, trạng thái sẽ chuyển sang <em>Đang đóng</em>{" "}
+                và chờ admin xử lý tồn kho)
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border border-border/50">
+              <div className="flex items-center gap-2">
+                <Package size={15} className="text-muted-foreground" />
+                <span className="text-sm tracking-tight text-muted-foreground">
+                  Tồn kho hiện tại
+                </span>
+              </div>
+              <span className="text-sm font-bold tracking-tighter">
+                {depot.currentUtilization.toLocaleString("vi-VN")} /{" "}
+                {depot.capacity.toLocaleString("vi-VN")}
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="initiate-reason"
+                className="text-sm font-semibold tracking-tight"
+              >
+                Lý do đóng kho <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="initiate-reason"
+                placeholder="Nhập lý do đóng kho..."
+                value={initiateReason}
+                onChange={(e) => setInitiateReason(e.target.value)}
+                rows={3}
+                className="text-sm tracking-tight resize-none mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="tracking-tight"
+              onClick={() => setInitiateOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="destructive"
+              className="tracking-tight gap-1.5"
+              disabled={!initiateReason.trim() || initiateMutation.isPending}
+              onClick={handleInitiate}
+            >
+              {initiateMutation.isPending && (
+                <Spinner size={13} className="animate-spin" />
+              )}
+              Xác nhận đóng kho
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════
+          Dialog: Resolve Closure
+      ═══════════════════════════════════ */}
+      <Dialog
+        open={resolveOpen}
+        onOpenChange={(o) => !o && setResolveOpen(false)}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 tracking-tighter">
+              <Scales size={18} className="text-blue-500" />
+              Xử lý tồn kho
+            </DialogTitle>
+            <DialogDescription className="tracking-tight">
+              Kho: <strong>{depot.name}</strong> — chọn phương án xử lý hàng
+              trước khi đóng kho chính thức.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            {!knownClosureIds[depot.id] ? (
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="resolve-cid"
+                  className="text-sm font-semibold tracking-tight"
+                >
+                  Closure ID <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="resolve-cid"
+                  type="number"
+                  placeholder="Nhập closureId từ bước khởi tạo..."
+                  value={resolveClosureId}
+                  onChange={(e) => setResolveClosureId(e.target.value)}
+                  className="text-sm tracking-tight"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border border-border/50">
+                <span className="text-sm text-muted-foreground tracking-tight">
+                  Closure ID
+                </span>
+                <span className="text-sm font-bold tabular-nums tracking-tighter">
+                  #{knownClosureIds[depot.id]}
+                </span>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold tracking-tight">
+                Phương án xử lý <span className="text-red-500">*</span>
+              </Label>
+              <div className="grid gap-2">
+                {resolutionTypes.map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() =>
+                      setResolutionType(opt.key as typeof resolutionType)
+                    }
+                    className={cn(
+                      "flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
+                      resolutionType === opt.key
+                        ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                        : "border-border/60 hover:border-border hover:bg-muted/30",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "h-9 w-9 rounded-lg flex items-center justify-center shrink-0",
+                        resolutionType === opt.key
+                          ? "bg-primary/10"
+                          : "bg-muted",
+                      )}
+                    >
+                      {opt.key === "TransferToDepot" ? (
+                        <ArrowsLeftRight
+                          size={16}
+                          className={
+                            resolutionType === opt.key
+                              ? "text-primary"
+                              : "text-muted-foreground"
+                          }
+                        />
+                      ) : (
+                        <Scales
+                          size={16}
+                          className={
+                            resolutionType === opt.key
+                              ? "text-primary"
+                              : "text-muted-foreground"
+                          }
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold tracking-tight">
+                        {opt.value}
+                      </p>
+                      <p className="text-sm text-muted-foreground tracking-tight mt-0.5">
+                        {opt.key === "TransferToDepot"
+                          ? "Chuyển toàn bộ sang kho đích"
+                          : "Admin ghi lại cách xử lý bên ngoài"}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {resolutionType === "TransferToDepot" && (
+              <div className="space-y-1.5">
+                <Label className="text-sm font-semibold tracking-tight">
+                  Kho nhận hàng <span className="text-red-500">*</span>
+                </Label>
+                <Select value={targetDepotId} onValueChange={setTargetDepotId}>
+                  <SelectTrigger className="text-sm tracking-tight">
+                    <SelectValue placeholder="Chọn kho nhận hàng..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {depotOptions
+                      .filter((d) => d.key !== depot.id)
+                      .map((d) => (
+                        <SelectItem
+                          key={d.key}
+                          value={String(d.key)}
+                          className="text-sm tracking-tight"
+                        >
+                          {d.value}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {resolutionType === "ExternalResolution" && (
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="ext-note"
+                  className="text-sm font-semibold tracking-tight"
+                >
+                  Ghi chú cách xử lý <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="ext-note"
+                  placeholder="Mô tả cách xử lý tồn kho bên ngoài..."
+                  value={externalNote}
+                  onChange={(e) => setExternalNote(e.target.value)}
+                  rows={3}
+                  className="text-sm tracking-tight resize-none"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="tracking-tight"
+              onClick={() => setResolveOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              className="tracking-tight gap-1.5"
+              disabled={
+                resolveMutation.isPending ||
+                (!knownClosureIds[depot.id] && !resolveClosureId) ||
+                (resolutionType === "TransferToDepot" && !targetDepotId) ||
+                (resolutionType === "ExternalResolution" &&
+                  !externalNote.trim())
+              }
+              onClick={handleResolve}
+            >
+              {resolveMutation.isPending && (
+                <Spinner size={13} className="animate-spin" />
+              )}
+              Xác nhận xử lý
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════
+          Dialog: Cancel Closure
+      ═══════════════════════════════════ */}
+      <Dialog
+        open={cancelOpen}
+        onOpenChange={(o) => !o && setCancelOpen(false)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 tracking-tighter">
+              <X size={18} className="text-amber-500" />
+              Hủy đóng kho
+            </DialogTitle>
+            <DialogDescription className="tracking-tight">
+              Kho: <strong>{depot.name}</strong>
+              <br />
+              Kho sẽ quay về trạng thái <strong>Available</strong> hoặc{" "}
+              <strong>Full</strong> tùy lượng tồn kho.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            {!knownClosureIds[depot.id] ? (
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="cancel-cid"
+                  className="text-sm font-semibold tracking-tight"
+                >
+                  Closure ID <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="cancel-cid"
+                  type="number"
+                  placeholder="Nhập closureId từ bước khởi tạo..."
+                  value={cancelClosureId}
+                  onChange={(e) => setCancelClosureId(e.target.value)}
+                  className="text-sm tracking-tight"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border border-border/50">
+                <span className="text-sm text-muted-foreground tracking-tight">
+                  Closure ID
+                </span>
+                <span className="text-sm font-bold tabular-nums tracking-tighter">
+                  #{knownClosureIds[depot.id]}
+                </span>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="cancel-reason"
+                className="text-sm font-semibold tracking-tight"
+              >
+                Lý do hủy <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="cancel-reason"
+                placeholder="Nhập lý do hủy quy trình đóng kho..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={3}
+                className="text-sm tracking-tight resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="tracking-tight"
+              onClick={() => setCancelOpen(false)}
+            >
+              Đóng
+            </Button>
+            <Button
+              className="tracking-tight gap-1.5 bg-amber-500 hover:bg-amber-600 text-white"
+              disabled={
+                cancelMutation.isPending ||
+                (!knownClosureIds[depot.id] && !cancelClosureId) ||
+                !cancelReason.trim()
+              }
+              onClick={handleCancel}
+            >
+              {cancelMutation.isPending && (
+                <Spinner size={13} className="animate-spin" />
+              )}
+              Xác nhận hủy đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </DashboardLayout>
+  );
+}

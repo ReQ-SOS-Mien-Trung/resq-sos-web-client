@@ -114,9 +114,9 @@ export default function AssemblyPointsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    AssemblyPointStatus | "all"
-  >("all");
+  const [statusFilter, setStatusFilter] = useState<AssemblyPointStatus | "all">(
+    "all",
+  );
 
   // Dialogs / sheets
   const [formOpen, setFormOpen] = useState(false);
@@ -132,15 +132,13 @@ export default function AssemblyPointsPage() {
   const contentRef = useRef<HTMLDivElement>(null);
   const PANEL_WIDTH = 448; // sm:max-w-md = 28rem = 448px
 
-  const handlePanelChange = useCallback(
-    (open: boolean) => {
-      if (contentRef.current) {
-        contentRef.current.style.marginRight = open ? `${PANEL_WIDTH}px` : "0px";
-        contentRef.current.style.transition = "margin-right 300ms cubic-bezier(0.32,0.72,0,1)";
-      }
-    },
-    [],
-  );
+  const handlePanelChange = useCallback((open: boolean) => {
+    if (contentRef.current) {
+      contentRef.current.style.marginRight = open ? `${PANEL_WIDTH}px` : "0px";
+      contentRef.current.style.transition =
+        "margin-right 300ms cubic-bezier(0.32,0.72,0,1)";
+    }
+  }, []);
 
   // API
   const { data, isLoading } = useAssemblyPoints({
@@ -176,16 +174,12 @@ export default function AssemblyPointsPage() {
 
   // Counts
   const activeCount = items.filter((i) => i.status === "Active").length;
-  const overloadedCount = items.filter(
-    (i) => i.status === "Overloaded",
-  ).length;
+  const overloadedCount = items.filter((i) => i.status === "Overloaded").length;
   const createdCount = items.filter((i) => i.status === "Created").length;
   const maintenanceCount = items.filter(
     (i) => i.status === "UnderMaintenance",
   ).length;
-  const closedCount = items.filter(
-    (i) => i.status === "Closed",
-  ).length;
+  const closedCount = items.filter((i) => i.status === "Closed").length;
 
   const handleDelete = () => {
     if (!deleteDialog.item) return;
@@ -215,17 +209,21 @@ export default function AssemblyPointsPage() {
   };
 
   return (
-    <DashboardLayout favorites={[]} projects={[]} cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}>
+    <DashboardLayout
+      favorites={[]}
+      projects={[]}
+      cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
+    >
       <div ref={contentRef} className="space-y-6">
         {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-             <div className="flex items-center gap-2.5 mb-1">
-               <GarageIcon size={24} className="text-foreground" />
-            <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Quản lý
-            </p>
-             </div>
+            <div className="flex items-center gap-2.5 mb-1">
+              <GarageIcon size={24} className="text-foreground" />
+              <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Quản lý điểm tập kết
+              </p>
+            </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter text-foreground leading-tight">
               Điểm tập kết
             </h1>
@@ -239,12 +237,17 @@ export default function AssemblyPointsPage() {
               size="sm"
               onClick={() => {
                 setIsRefreshing(true);
-                queryClient.invalidateQueries().finally(() => setIsRefreshing(false));
+                queryClient
+                  .invalidateQueries()
+                  .finally(() => setIsRefreshing(false));
               }}
               disabled={isRefreshing}
               className="gap-1.5 text-muted-foreground"
             >
-              <ArrowClockwise size={15} className={isRefreshing ? "animate-spin" : ""} />
+              <ArrowClockwise
+                size={15}
+                className={isRefreshing ? "animate-spin" : ""}
+              />
               Làm mới
             </Button>
             <Button
@@ -331,7 +334,6 @@ export default function AssemblyPointsPage() {
         {/* Search & filter */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-           
             <Input
               placeholder="Tìm theo tên hoặc mã..."
               value={search}
@@ -339,9 +341,9 @@ export default function AssemblyPointsPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="pl-10 tracking-tight"
+              className="pl-10 h-8 tracking-tighter"
             />
-             <MagnifyingGlass
+            <MagnifyingGlass
               size={16}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
@@ -408,7 +410,7 @@ export default function AssemblyPointsPage() {
               return (
                 <Card
                   key={point.id}
-                  className="group hover:shadow-md hover:border-primary/20 transition-all cursor-pointer"
+                  className="group py-0 hover:shadow-md hover:border-primary/60 transition-all cursor-pointer"
                   role="button"
                   onClick={() => openDetail(point.id)}
                 >
@@ -434,31 +436,30 @@ export default function AssemblyPointsPage() {
 
                     {/* Info rows */}
                     <div className="space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground tracking-tight">
+                      <div className="flex items-center gap-1.5 text-sm tracking-tighter">
                         <MapPin size={13} className="text-red-500 shrink-0" />
-                        <span className="font-mono truncate">
+                        <span className="font-medium truncate">
                           {point.latitude.toFixed(5)},{" "}
                           {point.longitude.toFixed(5)}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground tracking-tight">
+                      <div className="flex items-center gap-1.5 text-sm tracking-tighter">
                         <UsersThree
                           size={13}
                           className="text-blue-500 shrink-0"
                         />
                         <span>
                           Sức chứa:{" "}
-                          <span className="font-semibold text-foreground">
+                          <span className="font-bold text-primary">
                             {point.maxCapacity}
                           </span>{" "}
                           người
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground tracking-tight">
+                      <div className="flex items-center gap-1.5 text-sm tracking-tighter">
                         <Clock size={13} className="shrink-0" />
-                        <span>
-                          {formatLastUpdated(point.lastUpdatedAt)}
-                        </span>
+                        Cập nhật lần cuối:{" "}
+                        <span>{formatLastUpdated(point.lastUpdatedAt)}</span>
                       </div>
                     </div>
 
@@ -579,9 +580,7 @@ export default function AssemblyPointsPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() =>
-                setDeleteDialog({ open: false, item: null })
-              }
+              onClick={() => setDeleteDialog({ open: false, item: null })}
               disabled={isDeleting}
               className="tracking-tight"
             >

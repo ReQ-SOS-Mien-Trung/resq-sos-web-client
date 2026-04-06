@@ -37,6 +37,7 @@ import {
 } from "@/services/noti_alert";
 import { WeatherApiCurrentPoint } from "@/type";
 import { geocodeCity } from "./geocode";
+import { Icon } from "@iconify/react";
 
 const LocationPickerMap = dynamic(() => import("./LocationPickerMap"), {
   ssr: false,
@@ -63,22 +64,22 @@ const ALERT_TYPE_META: Record<
   }
 > = {
   FLOOD_WARNING: {
-    label: "Cảnh báo lũ",
-    icon: <WaveSine size={16} weight="duotone" />,
+    label: "Cảnh báo lũ lụt",
+    icon: <Icon icon="line-md:alert" width="22" height="22" />,
     activeClassName: "border-amber-500 bg-amber-50 text-amber-700 shadow-sm ring-2 ring-amber-300",
     inactiveClassName:
       "border-amber-200 bg-amber-50/50 text-amber-600 hover:bg-amber-50 hover:border-amber-300",
   },
   FLOOD_EMERGENCY: {
-    label: "Khẩn cấp lũ",
-    icon: <Lightning size={16} weight="fill" />,
+    label: "Khẩn cấp lũ lụt",
+    icon: <Icon icon="carbon:flood-warning" width="24" height="24" />,
     activeClassName: "border-red-500 bg-red-50 text-red-700 shadow-sm ring-2 ring-red-300",
     inactiveClassName:
       "border-red-200 bg-red-50/50 text-red-600 hover:bg-red-50 hover:border-red-300",
   },
   EVACUATION: {
     label: "Sơ tán",
-    icon: <BellRinging size={16} weight="fill" />,
+    icon: <Icon icon="tabler:run" width="24" height="24" />,
     activeClassName: "border-orange-500 bg-orange-50 text-orange-700 shadow-sm ring-2 ring-orange-300",
     inactiveClassName:
       "border-orange-200 bg-orange-50/50 text-orange-600 hover:bg-orange-50 hover:border-orange-300",
@@ -96,7 +97,7 @@ const MANUAL_PRESETS: Array<{
     type: "FLOOD_WARNING",
   },
   {
-    title: "KHẨN CẤP: LŨ LỚN",
+    title: "KHẨN CẤP LŨ LỚN",
     body: "Lũ lớn bất thường đang xảy ra. Toàn bộ cư dân khu vực thấp trũng cần sơ tán khẩn cấp. Liên hệ 114 nếu cần hỗ trợ.",
     type: "FLOOD_EMERGENCY",
   },
@@ -586,7 +587,7 @@ export default function FloodAlertComposer({
                       type="button"
                       onClick={() => applyManualPreset(preset)}
                       className={cn(
-                        "flex w-full items-center gap-2 tracking-tighter mt-1 rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-all hover:shadow-sm",
+                        "flex w-full items-center gap-2 tracking-tighter mt-1 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all hover:shadow-sm",
                         isActive ? meta.activeClassName : meta.inactiveClassName,
                       )}
                     >

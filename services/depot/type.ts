@@ -29,6 +29,21 @@ export interface DepotManager {
   fullName?: string | null;
 }
 
+// Active Request attached to a depot (from GET /logistics/depot)
+export interface DepotActiveRequest {
+  id: number;
+  requestingDepotId: number;
+  requestingDepotName: string;
+  sourceDepotId: number;
+  sourceDepotName: string;
+  role: string; // "Requester" | "Source"
+  priorityLevel: string; // "Low" | "Medium" | "High" | "Critical"
+  sourceStatus: string;
+  requestingStatus: string;
+  createdAt: string;
+  autoRejectAt: string | null;
+}
+
 // Depot Entity
 export interface DepotEntity {
   id: number;
@@ -42,6 +57,7 @@ export interface DepotEntity {
   imageUrl?: string | null;
   manager: DepotManager | null;
   lastUpdatedAt: string;
+  requests: DepotActiveRequest[];
 }
 
 // Paginated Response for Depots
@@ -59,6 +75,8 @@ export interface GetDepotsResponse {
 export interface GetDepotsParams {
   pageNumber?: number;
   pageSize?: number;
+  search?: string;
+  statuses?: string[];
 }
 
 // Create Depot Request
@@ -212,6 +230,37 @@ export interface DepotClosureTransfer {
   cancelledAt: string | null;
   cancelledBy: string | null;
   cancellationReason: string | null;
+}
+
+// GET /logistics/depot/{id}/closures — summary of a transfer inside a closure
+export interface DepotClosureTransferSummary {
+  transferId: number;
+  status: string;
+}
+
+// GET /logistics/depot/{id}/closures — one closure record
+export interface DepotClosureRecord {
+  id: number;
+  depotId: number;
+  status: string;
+  previousStatus: string;
+  closeReason: string;
+  resolutionType: string | null;
+  targetDepotId: number | null;
+  targetDepotName: string | null;
+  externalNote: string | null;
+  initiatedBy: string;
+  initiatedByFullName: string;
+  cancelledBy: string | null;
+  cancelledByFullName: string | null;
+  cancellationReason: string | null;
+  snapshotConsumableUnits: number;
+  snapshotReusableUnits: number;
+  initiatedAt: string;
+  closingTimeoutAt: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  transfer: DepotClosureTransferSummary | null;
 }
 
 // POST prepare / ship / complete / receive — shared request & response

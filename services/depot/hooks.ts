@@ -20,6 +20,7 @@ import {
   shipDepotTransfer,
   completeDepotTransfer,
   receiveDepotTransfer,
+  getDepotClosures,
 } from "./api";
 import {
   GetDepotsResponse,
@@ -44,6 +45,7 @@ import {
   DepotClosureTransfer,
   DepotTransferActionRequest,
   DepotTransferActionResponse,
+  DepotClosureRecord,
 } from "./type";
 
 export const DEPOTS_QUERY_KEY = ["depots"] as const;
@@ -221,6 +223,20 @@ export function useUpdateDepotStatus() {
         queryKey: [...DEPOTS_QUERY_KEY, variables.id],
       });
     },
+  });
+}
+
+export const DEPOT_CLOSURES_QUERY_KEY = ["depot-closures"] as const;
+
+/**
+ * [Admin] Hook to fetch all closure records for a depot
+ * GET /logistics/depot/{id}/closures
+ */
+export function useDepotClosures(id: number, options?: { enabled?: boolean }) {
+  return useQuery<DepotClosureRecord[]>({
+    queryKey: [...DEPOT_CLOSURES_QUERY_KEY, id],
+    queryFn: () => getDepotClosures(id),
+    enabled: options?.enabled ?? !!id,
   });
 }
 

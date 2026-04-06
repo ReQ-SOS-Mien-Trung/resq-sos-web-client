@@ -22,6 +22,7 @@ import {
   DepotClosureTransfer,
   DepotTransferActionRequest,
   DepotTransferActionResponse,
+  DepotClosureRecord,
 } from "./type";
 
 /**
@@ -35,7 +36,11 @@ export async function getDepots(
     params: {
       pageNumber: params?.pageNumber ?? 1,
       pageSize: params?.pageSize ?? 10,
+      ...(params?.search ? { search: params.search } : {}),
+      ...(params?.statuses?.length ? { statuses: params.statuses } : {}),
     },
+    // axios needs paramsSerializer to send array as repeated keys
+    paramsSerializer: { indexes: null },
   });
   return data;
 }
@@ -151,6 +156,17 @@ export async function getMyDepotFundTransactions(
       pageSize: params?.pageSize ?? 20,
     },
   });
+  return data;
+}
+
+/**
+ * [Admin] Get all closure records for a depot
+ * GET /logistics/depot/{id}/closures
+ */
+export async function getDepotClosures(
+  id: number,
+): Promise<DepotClosureRecord[]> {
+  const { data } = await api.get(`/logistics/depot/${id}/closures`);
   return data;
 }
 

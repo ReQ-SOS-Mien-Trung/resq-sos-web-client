@@ -8,6 +8,7 @@ import { mockFloodAlerts } from "@/lib/mock-data/admin-weather-flood";
 import { DashboardSkeleton } from "@/components/admin";
 import { FloodAlert, WeatherApiCurrentPoint } from "@/type";
 import { DashboardLayout } from "@/components/admin/dashboard";
+import { Icon } from "@iconify/react";
 
 const WeatherMap = dynamic(
   () =>
@@ -100,6 +101,17 @@ const WeatherFloodPage = () => {
         {/* Compact header */}
         <div className="flex items-center justify-between">
           <div>
+            <div className="flex items-center gap-2.5 mb-1">
+              <Icon
+                icon="wi:forecast-io-hail"
+                width="30"
+                height="30"
+                className="text-foreground"
+              />
+              <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
+                Cảnh báo tai ương
+              </p>
+            </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter text-foreground leading-tight">
               Thời tiết & Cảnh báo lũ
             </h1>

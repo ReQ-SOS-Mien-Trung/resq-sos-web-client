@@ -95,14 +95,22 @@ const _RESCUER_TYPE_OPTIONS = [
 
 // ─── Sort helpers ───────────────────────────────────────────────────────────
 
-const SortIcon = ({ column, sort }: { column: SortColumn; sort: SortState }) => {
+const SortIcon = ({
+  column,
+  sort,
+}: {
+  column: SortColumn;
+  sort: SortState;
+}) => {
   if (sort?.column === column)
     return sort.dir === "asc" ? (
       <ArrowUp size={13} className="text-primary shrink-0" />
     ) : (
       <ArrowDown size={13} className="text-primary shrink-0" />
     );
-  return <ArrowsDownUp size={13} className="text-muted-foreground/30 shrink-0" />;
+  return (
+    <ArrowsDownUp size={13} className="text-muted-foreground/30 shrink-0" />
+  );
 };
 
 const SortHeader = ({
@@ -131,7 +139,6 @@ const SortHeader = ({
 const getFullName = (item: { firstName: string; lastName: string }) =>
   `${item.lastName} ${item.firstName}`;
 
-
 const RescuerVerificationPage = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -150,11 +157,18 @@ const RescuerVerificationPage = () => {
         gsap.fromTo(
           ".gsap-item",
           { opacity: 0, y: 30 },
-          { opacity: 1, y: 0, stagger: 0.1, duration: 0.5, ease: "power2.out", clearProps: "all" }
+          {
+            opacity: 1,
+            y: 0,
+            stagger: 0.1,
+            duration: 0.5,
+            ease: "power2.out",
+            clearProps: "all",
+          },
         );
       }
     },
-    { scope: containerRef, dependencies: [selectedItem] }
+    { scope: containerRef, dependencies: [selectedItem] },
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -168,7 +182,10 @@ const RescuerVerificationPage = () => {
     isApproved: boolean;
   }>({ open: false, item: null, isApproved: true });
   const [adminNote, setAdminNote] = useState("");
-  const [previewDoc, setPreviewDoc] = useState<{ url: string; name: string } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{
+    url: string;
+    name: string;
+  } | null>(null);
 
   // Avatar upload
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -191,7 +208,7 @@ const RescuerVerificationPage = () => {
         toast.loading("Đang cập nhật hệ thống...");
         await updateAvatarMutate({
           userId: reviewDialog.item.userId,
-          avatarUrl: url
+          avatarUrl: url,
         });
         toast.dismiss();
       }
@@ -210,7 +227,12 @@ const RescuerVerificationPage = () => {
             setSelectedId(null);
             setAvatarFile(null);
             setAvatarPreview(null);
-            if (!avatarFile) toast.success(reviewDialog.isApproved ? "Phê duyệt thành công!" : "Từ chối thành công!");
+            if (!avatarFile)
+              toast.success(
+                reviewDialog.isApproved
+                  ? "Phê duyệt thành công!"
+                  : "Từ chối thành công!",
+              );
           },
         },
       );
@@ -237,10 +259,11 @@ const RescuerVerificationPage = () => {
         <DialogHeader>
           <div className="flex items-center gap-3 mb-1">
             <div
-              className={`p-2.5 rounded-xl ${reviewDialog.isApproved
-                ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-rose-500/10 text-rose-600"
-                }`}
+              className={`p-2.5 rounded-xl ${
+                reviewDialog.isApproved
+                  ? "bg-emerald-500/10 text-emerald-600"
+                  : "bg-rose-500/10 text-rose-600"
+              }`}
             >
               {reviewDialog.isApproved ? (
                 <CheckCircle size={22} weight="bold" />
@@ -255,7 +278,10 @@ const RescuerVerificationPage = () => {
                   : "Từ chối cứu hộ viên"}
               </DialogTitle>
               <DialogDescription className="tracking-tighter mt-1 font-medium">
-                Cứu hộ viên: <span className="text-primary">{reviewDialog.item ? getFullName(reviewDialog.item) : ""}</span>
+                Cứu hộ viên:{" "}
+                <span className="text-primary">
+                  {reviewDialog.item ? getFullName(reviewDialog.item) : ""}
+                </span>
               </DialogDescription>
             </div>
           </div>
@@ -299,7 +325,7 @@ const RescuerVerificationPage = () => {
                 : "bg-rose-600 hover:bg-rose-700 text-white"
             }
           >
-            {(isReviewing || isUploadingAvatar) ? (
+            {isReviewing || isUploadingAvatar ? (
               <span className="flex items-center gap-2">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 Đang xử lý...
@@ -322,7 +348,10 @@ const RescuerVerificationPage = () => {
   );
 
   const renderPreviewDialog = () => (
-    <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
+    <Dialog
+      open={!!previewDoc}
+      onOpenChange={(open) => !open && setPreviewDoc(null)}
+    >
       <DialogContent className="max-w-xl sm:max-w-2xl w-full p-0 border-none bg-transparent shadow-none flex flex-col items-center justify-center [&>button]:hidden">
         <DialogTitle className="sr-only">
           {previewDoc?.name || "Document Preview"}
@@ -344,7 +373,8 @@ const RescuerVerificationPage = () => {
 
             {/* Media Content */}
             <div className="w-full flex items-center justify-center">
-              {previewDoc.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) || previewDoc.url.startsWith("blob:") ? (
+              {previewDoc.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ||
+              previewDoc.url.startsWith("blob:") ? (
                 <img
                   src={previewDoc.url}
                   alt={previewDoc.name}
@@ -419,11 +449,22 @@ const RescuerVerificationPage = () => {
       result = [...result].sort((a, b) => {
         let aVal = "";
         let bVal = "";
-        if (sort.column === "name") { aVal = getFullName(a); bVal = getFullName(b); }
-        else if (sort.column === "email") { aVal = a.email; bVal = b.email; }
-        else if (sort.column === "region") { aVal = a.province; bVal = b.province; }
-        else if (sort.column === "status") { aVal = a.status; bVal = b.status; }
-        else if (sort.column === "submittedAt") { aVal = a.submittedAt; bVal = b.submittedAt; }
+        if (sort.column === "name") {
+          aVal = getFullName(a);
+          bVal = getFullName(b);
+        } else if (sort.column === "email") {
+          aVal = a.email;
+          bVal = b.email;
+        } else if (sort.column === "region") {
+          aVal = a.province;
+          bVal = b.province;
+        } else if (sort.column === "status") {
+          aVal = a.status;
+          bVal = b.status;
+        } else if (sort.column === "submittedAt") {
+          aVal = a.submittedAt;
+          bVal = b.submittedAt;
+        }
         const cmp = aVal.localeCompare(bVal, "vi");
         return sort.dir === "asc" ? cmp : -cmp;
       });
@@ -486,15 +527,27 @@ const RescuerVerificationPage = () => {
         <DashboardLayout
           favorites={dashboardData?.favorites ?? []}
           projects={dashboardData?.projects ?? []}
-          cloudStorage={dashboardData?.cloudStorage ?? { used: 0, total: 0, percentage: 0, unit: "GB" }}
+          cloudStorage={
+            dashboardData?.cloudStorage ?? {
+              used: 0,
+              total: 0,
+              percentage: 0,
+              unit: "GB",
+            }
+          }
         >
           <div className="space-y-6">
             <button
               onClick={() => setSelectedId(null)}
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-6"
             >
-              <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-              <span className="uppercase tracking-wider text-sm font-semibold">Quay lại</span>
+              <ArrowLeft
+                size={16}
+                className="group-hover:-translate-x-0.5 transition-transform"
+              />
+              <span className="uppercase tracking-wider text-sm font-semibold">
+                Quay lại
+              </span>
             </button>
             <Skeleton className="h-50 w-full rounded-2xl" />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -514,23 +567,57 @@ const RescuerVerificationPage = () => {
           cloudStorage={dashboardData.cloudStorage}
         >
           <div ref={containerRef} className="space-y-8">
-            {/* Back */}
-            <button
-              onClick={() => {
-                setSelectedId(null);
-                setAvatarFile(null);
-                setAvatarPreview(null);
-              }}
-              className="gsap-item flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group mb-6"
-            >
-              <ArrowLeft
-                size={16}
-                className="group-hover:-translate-x-0.5 transition-transform"
-              />
-              <span className="uppercase tracking-wider text-sm font-semibold">
-                Quay lại
-              </span>
-            </button>
+            {/* Back + Action buttons */}
+            <div className="gsap-item flex items-center justify-between gap-4 mb-6">
+              <button
+                onClick={() => {
+                  setSelectedId(null);
+                  setAvatarFile(null);
+                  setAvatarPreview(null);
+                }}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+              >
+                <ArrowLeft
+                  size={16}
+                  className="group-hover:-translate-x-0.5 transition-transform"
+                />
+                <span className="uppercase tracking-wider text-sm font-semibold">
+                  Quay lại
+                </span>
+              </button>
+
+              {selectedItem.status === "Pending" && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="gap-2 font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-800"
+                    onClick={() =>
+                      setReviewDialog({
+                        open: true,
+                        item: selectedItem,
+                        isApproved: false,
+                      })
+                    }
+                  >
+                    <XCircle size={16} weight="fill" />
+                    Từ chối
+                  </Button>
+                  <Button
+                    className="gap-2 font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() =>
+                      setReviewDialog({
+                        open: true,
+                        item: selectedItem,
+                        isApproved: true,
+                      })
+                    }
+                  >
+                    <CheckCircle size={16} weight="fill" />
+                    Duyệt đơn
+                  </Button>
+                </div>
+              )}
+            </div>
 
             {/* Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -548,32 +635,45 @@ const RescuerVerificationPage = () => {
                   {[
                     {
                       icon: <IdentificationCard size={20} />,
-                      iconCls: "text-slate-500 bg-slate-500/10 border-slate-200 dark:border-slate-700",
+                      iconCls:
+                        "text-slate-500 bg-slate-500/10 border-slate-200 dark:border-slate-700",
                       label: "Mã hồ sơ",
                       value: (
                         <p className="text-sm text-foreground font-mono font-semibold mt-0.5 tracking-tighter">
-                          #{selectedItem.userId.slice(-8).toUpperCase()}
+                          # {selectedItem.userId.slice(-8).toUpperCase()}
                         </p>
                       ),
                     },
                     {
-                      icon: selectedItem.status === "Approved"
-                        ? <CheckCircle size={20} weight="fill" />
-                        : selectedItem.status === "Rejected"
-                        ? <XCircle size={20} weight="fill" />
-                        : <ClockCountdown size={20} weight="fill" />,
+                      icon:
+                        selectedItem.status === "Approved" ? (
+                          <CheckCircle size={20} weight="fill" />
+                        ) : selectedItem.status === "Rejected" ? (
+                          <XCircle size={20} weight="fill" />
+                        ) : (
+                          <ClockCountdown size={20} weight="fill" />
+                        ),
                       iconCls: `${statusConfig.className} border`,
                       label: "Trạng thái",
                       value: (
-                        <Badge className={`mt-1 ${statusConfig.className} border text-sm gap-1.5 font-semibold`}>
+                        <Badge
+                          className={`mt-1 ${statusConfig.className} border text-sm gap-1.5 font-semibold`}
+                        >
                           {statusConfig.icon}
                           {statusConfig.label}
                         </Badge>
                       ),
                     },
                     {
-                      icon: <Icon icon="icon-park-twotone:love-and-help" width="20" height="20" />,
-                      iconCls: "text-violet-500 bg-violet-500/10 border-violet-200 dark:border-violet-800",
+                      icon: (
+                        <Icon
+                          icon="icon-park-twotone:love-and-help"
+                          width="20"
+                          height="20"
+                        />
+                      ),
+                      iconCls:
+                        "text-violet-500 bg-violet-500/10 border-violet-200 dark:border-violet-800",
                       label: "Loại chứng nhận",
                       value: (
                         <Badge className="mt-1 bg-black/5 dark:bg-white/10 text-foreground border border-border/60 font-medium pb-px pt-0.5 px-2">
@@ -583,51 +683,77 @@ const RescuerVerificationPage = () => {
                     },
                     {
                       icon: <Envelope size={20} />,
-                      iconCls: "text-blue-500 bg-blue-500/10 border-blue-200 dark:border-blue-800",
+                      iconCls:
+                        "text-blue-500 bg-blue-500/10 border-blue-200 dark:border-blue-800",
                       label: "Email",
                       value: selectedItem.email,
                     },
                     {
-                      icon: <Icon icon="mingcute:phone-line" width="20" height="20" />,
-                      iconCls: "text-emerald-500 bg-emerald-500/10 border-emerald-200 dark:border-emerald-800",
+                      icon: (
+                        <Icon
+                          icon="mingcute:phone-line"
+                          width="20"
+                          height="20"
+                        />
+                      ),
+                      iconCls:
+                        "text-emerald-500 bg-emerald-500/10 border-emerald-200 dark:border-emerald-800",
                       label: "Số điện thoại",
                       value: selectedItem.phone,
                     },
                     {
                       icon: <CalendarBlank size={20} />,
-                      iconCls: "text-amber-500 bg-amber-500/10 border-amber-200 dark:border-amber-800",
+                      iconCls:
+                        "text-amber-500 bg-amber-500/10 border-amber-200 dark:border-amber-800",
                       label: "Ngày đăng ký",
-                      value: new Date(selectedItem.submittedAt).toLocaleString("vi-VN"),
+                      value: new Date(selectedItem.submittedAt).toLocaleString(
+                        "vi-VN",
+                      ),
                     },
                     {
                       icon: <MapPin size={20} />,
-                      iconCls: "text-red-500 bg-red-500/10 border-red-200 dark:border-red-800",
+                      iconCls:
+                        "text-red-500 bg-red-500/10 border-red-200 dark:border-red-800",
                       label: "Địa chỉ",
-                      value: `${selectedItem.address ? selectedItem.address + ', ' : ''}${selectedItem.ward ? selectedItem.ward + ', ' : ''}${selectedItem.province}`,
+                      value: `${selectedItem.address ? selectedItem.address + ", " : ""}${selectedItem.ward ? selectedItem.ward + ", " : ""}${selectedItem.province}`,
                     },
                     ...(selectedItem.reviewedAt
                       ? [
-                        {
-                          icon: <Icon icon="mdi:approve" width="20" height="20" />,
-                          iconCls: "text-sky-500 bg-sky-500/10 border-sky-200 dark:border-sky-800",
-                          label: "Ngày xét duyệt",
-                          value: new Date(selectedItem.reviewedAt).toLocaleString("vi-VN"),
-                        },
-                      ]
+                          {
+                            icon: (
+                              <Icon icon="mdi:approve" width="20" height="20" />
+                            ),
+                            iconCls:
+                              "text-sky-500 bg-sky-500/10 border-sky-200 dark:border-sky-800",
+                            label: "Ngày xét duyệt",
+                            value: new Date(
+                              selectedItem.reviewedAt,
+                            ).toLocaleString("vi-VN"),
+                          },
+                        ]
                       : []),
                     ...(selectedItem.adminNote
                       ? [
-                        {
-                          icon: <Icon icon="fluent:person-note-24-regular" width="20" height="20" />,
-                          iconCls: "text-orange-500 bg-orange-500/10 border-orange-200 dark:border-orange-800",
-                          label: "Ghi chú của quản trị viên",
-                          value: selectedItem.adminNote,
-                        },
-                      ]
+                          {
+                            icon: (
+                              <Icon
+                                icon="fluent:person-note-24-regular"
+                                width="20"
+                                height="20"
+                              />
+                            ),
+                            iconCls:
+                              "text-orange-500 bg-orange-500/10 border-orange-200 dark:border-orange-800",
+                            label: "Ghi chú của quản trị viên",
+                            value: selectedItem.adminNote,
+                          },
+                        ]
                       : []),
                   ].map((field, idx) => (
                     <div key={idx} className="flex items-start gap-3">
-                      <div className={`p-1.5 rounded-lg border mt-0.5 shrink-0 ${field.iconCls}`}>
+                      <div
+                        className={`p-1.5 rounded-lg border mt-0.5 shrink-0 ${field.iconCls}`}
+                      >
                         {field.icon}
                       </div>
                       <div className="min-w-0">
@@ -667,7 +793,11 @@ const RescuerVerificationPage = () => {
                       {!avatarPreview ? (
                         <label className="flex flex-col items-center justify-center w-full h-full min-h-40 border-2 border-dashed border-emerald-500/40 rounded-xl cursor-pointer hover:bg-emerald-500/10 hover:border-emerald-500/60 transition-colors">
                           <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <UploadSimple size={24} className="text-emerald-600 mb-2" weight="duotone" />
+                            <UploadSimple
+                              size={24}
+                              className="text-emerald-600 mb-2"
+                              weight="duotone"
+                            />
                             <p className="text-sm tracking-tighter font-medium text-emerald-700 dark:text-emerald-400">
                               Ấn để chọn ảnh
                             </p>
@@ -692,11 +822,18 @@ const RescuerVerificationPage = () => {
                             src={avatarPreview}
                             alt="Avatar preview"
                             className="w-16 h-16 rounded-xl object-cover border border-border cursor-pointer hover:opacity-80 transition-opacity hover:border-emerald-500"
-                            onClick={() => setPreviewDoc({ url: avatarPreview, name: "Ảnh đại diện mới" })}
+                            onClick={() =>
+                              setPreviewDoc({
+                                url: avatarPreview,
+                                name: "Ảnh đại diện mới",
+                              })
+                            }
                             title="Phóng to"
                           />
                           <div className="flex-1 min-w-0 pt-1">
-                            <p className="text-sm tracking-tighter font-bold text-foreground truncate">{avatarFile?.name}</p>
+                            <p className="text-sm tracking-tighter font-bold text-foreground truncate">
+                              {avatarFile?.name}
+                            </p>
                             <p className="text-xs tracking-tighter text-muted-foreground mt-0.5">
                               {(avatarFile!.size / 1024 / 1024).toFixed(2)} MB
                             </p>
@@ -729,7 +866,12 @@ const RescuerVerificationPage = () => {
                         <>
                           <div
                             className="relative group cursor-pointer"
-                            onClick={() => setPreviewDoc({ url: selectedItem.avatarUrl!, name: "Ảnh đại diện" })}
+                            onClick={() =>
+                              setPreviewDoc({
+                                url: selectedItem.avatarUrl!,
+                                name: "Ảnh đại diện",
+                              })
+                            }
                             title="Bấm để xem ảnh"
                           >
                             <img
@@ -738,15 +880,27 @@ const RescuerVerificationPage = () => {
                               className="w-55 h-auto aspect-3/4 object-cover rounded-xl shadow-sm border border-border/60 group-hover:opacity-80 transition-opacity"
                             />
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-xl bg-black/30">
-                              <MagnifyingGlass size={22} className="text-white" weight="bold" />
+                              <MagnifyingGlass
+                                size={22}
+                                className="text-white"
+                                weight="bold"
+                              />
                             </div>
                           </div>
-                          <p className="text-xs text-muted-foreground tracking-tighter">Bấm để xem ảnh</p>
+                          <p className="text-xs text-muted-foreground tracking-tighter">
+                            Bấm để xem ảnh
+                          </p>
                         </>
                       ) : (
                         <div className="w-32 aspect-3/4 bg-muted/40 flex flex-col items-center justify-center border border-dashed border-border/60 text-muted-foreground rounded-xl">
-                          <ImageIcon size={28} weight="duotone" className="mb-2 opacity-50" />
-                          <span className="text-xs font-medium uppercase tracking-tighter">Chưa có ảnh</span>
+                          <ImageIcon
+                            size={28}
+                            weight="duotone"
+                            className="mb-2 opacity-50"
+                          />
+                          <span className="text-xs font-medium uppercase tracking-tighter">
+                            Chưa có ảnh
+                          </span>
                         </div>
                       )}
                     </div>
@@ -758,12 +912,24 @@ const RescuerVerificationPage = () => {
             {/* MỤC III: NĂNG LỰC CỨU HỘ */}
             {(() => {
               const abilities = selectedItem.abilities || [];
-              const rescueAbilities = abilities.filter(a => a.categoryCode === "RESCUE");
-              const medicalAbilities = abilities.filter(a => a.categoryCode === "MEDICAL");
-              const transportAbilities = abilities.filter(a => a.categoryCode === "TRANSPORTATION");
-              const experienceAbilities = abilities.filter(a =>
-                a.categoryCode === "EXPERIENCE" ||
-                (!["RESCUE", "MEDICAL", "TRANSPORTATION", "EXPERIENCE"].includes(a.categoryCode))
+              const rescueAbilities = abilities.filter(
+                (a) => a.categoryCode === "RESCUE",
+              );
+              const medicalAbilities = abilities.filter(
+                (a) => a.categoryCode === "MEDICAL",
+              );
+              const transportAbilities = abilities.filter(
+                (a) => a.categoryCode === "TRANSPORTATION",
+              );
+              const experienceAbilities = abilities.filter(
+                (a) =>
+                  a.categoryCode === "EXPERIENCE" ||
+                  ![
+                    "RESCUE",
+                    "MEDICAL",
+                    "TRANSPORTATION",
+                    "EXPERIENCE",
+                  ].includes(a.categoryCode),
               );
 
               const totalAbilities = abilities.length;
@@ -772,7 +938,13 @@ const RescuerVerificationPage = () => {
               const categories = [
                 {
                   label: "Kỹ năng cứu hộ",
-                  icon: <Icon icon="fluent-emoji-high-contrast:rescue-workers-helmet" width="22" height="22" />,
+                  icon: (
+                    <Icon
+                      icon="fluent-emoji-high-contrast:rescue-workers-helmet"
+                      width="22"
+                      height="22"
+                    />
+                  ),
                   iconBg: "bg-[#FF5722] text-white",
                   dotColor: "text-[#FF5722]",
                   items: rescueAbilities,
@@ -790,7 +962,13 @@ const RescuerVerificationPage = () => {
                 },
                 {
                   label: "Kỹ năng vận chuyển",
-                  icon: <Icon icon="icon-park-twotone:transporter" width="22" height="22" />,
+                  icon: (
+                    <Icon
+                      icon="icon-park-twotone:transporter"
+                      width="22"
+                      height="22"
+                    />
+                  ),
                   iconBg: "bg-[#FF5722] text-white",
                   dotColor: "text-[#FF5722]",
                   items: transportAbilities,
@@ -826,7 +1004,10 @@ const RescuerVerificationPage = () => {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     {categories.map((cat, catIdx) => (
-                      <div key={catIdx} className="border border-border/50 rounded-2xl p-6 bg-card">
+                      <div
+                        key={catIdx}
+                        className="border border-border/50 rounded-2xl p-6 bg-card"
+                      >
                         {/* Category Header */}
                         <div className="flex items-center gap-3 mb-4">
                           <div className={`p-2.5 rounded-xl ${cat.iconBg}`}>
@@ -856,8 +1037,15 @@ const RescuerVerificationPage = () => {
                         {cat.items.length > 0 ? (
                           <div className="space-y-2.5">
                             {cat.items.map((ability, aIdx) => (
-                              <div key={aIdx} className="flex items-start gap-2">
-                                <span className={`text-sm mt-0.5 ${cat.dotColor} font-bold`}>✦</span>
+                              <div
+                                key={aIdx}
+                                className="flex items-start gap-2"
+                              >
+                                <span
+                                  className={`text-sm mt-0.5 ${cat.dotColor} font-bold`}
+                                >
+                                  ✦
+                                </span>
                                 <p className="text-sm tracking-tighter text-foreground leading-snug">
                                   {ability.description}
                                 </p>
@@ -967,7 +1155,9 @@ const RescuerVerificationPage = () => {
                         <div className="mt-auto">
                           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 pt-2 border-t border-border/40">
                             Tải lên{" "}
-                            {new Date(doc.uploadedAt).toLocaleDateString("vi-VN")}
+                            {new Date(doc.uploadedAt).toLocaleDateString(
+                              "vi-VN",
+                            )}
                           </p>
                         </div>
                       </div>
@@ -997,7 +1187,7 @@ const RescuerVerificationPage = () => {
   const toggleStatus = (value: string) => {
     setPage(1);
     setSelectedStatuses((prev) =>
-      prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value]
+      prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value],
     );
   };
 
@@ -1010,7 +1200,9 @@ const RescuerVerificationPage = () => {
   };
 
   const serverTotalCount = applicationsData?.totalCount ?? 0;
-  const totalPages = applicationsData?.totalPages ?? Math.max(1, Math.ceil(filteredAndSorted.length / pageSize));
+  const totalPages =
+    applicationsData?.totalPages ??
+    Math.max(1, Math.ceil(filteredAndSorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginatedItems = filteredAndSorted;
   const startItem = serverTotalCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
@@ -1027,7 +1219,11 @@ const RescuerVerificationPage = () => {
           {/* Header */}
           <div>
             <div className="flex items-center gap-2.5 mb-1">
-              <ShieldCheck size={20} weight="bold" className="text-foreground" />
+              <ShieldCheck
+                size={20}
+                weight="bold"
+                className="text-foreground"
+              />
               <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                 Quản lý hồ sơ
               </p>
@@ -1107,7 +1303,10 @@ const RescuerVerificationPage = () => {
                   <Input
                     placeholder="Tìm theo tên, email, số điện thoại..."
                     value={searchQuery}
-                    onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setPage(1);
+                    }}
                     className="pl-9 h-9 text-sm"
                     autoComplete="off"
                   />
@@ -1118,16 +1317,26 @@ const RescuerVerificationPage = () => {
                 </div>
 
                 {/* Status filter */}
-                <Popover open={statusFilterOpen} onOpenChange={setStatusFilterOpen}>
+                <Popover
+                  open={statusFilterOpen}
+                  onOpenChange={setStatusFilterOpen}
+                >
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 gap-1.5 font-normal text-sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1.5 font-normal text-sm"
+                    >
                       Trạng thái
                       {selectedStatuses.length > 0 ? (
                         <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
                           {selectedStatuses.length}
                         </Badge>
                       ) : (
-                        <CaretDown size={13} className="text-muted-foreground" />
+                        <CaretDown
+                          size={13}
+                          className="text-muted-foreground"
+                        />
                       )}
                     </Button>
                   </PopoverTrigger>
@@ -1141,20 +1350,26 @@ const RescuerVerificationPage = () => {
                           className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
                         >
                           <span
-                            className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "border-border bg-background"
-                              }`}
+                            className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
+                              checked
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-border bg-background"
+                            }`}
                           >
                             {checked && <Check size={11} weight="bold" />}
                           </span>
-                          <span className={checked ? "font-medium" : ""}>{label}</span>
+                          <span className={checked ? "font-medium" : ""}>
+                            {label}
+                          </span>
                         </button>
                       );
                     })}
                     {selectedStatuses.length > 0 && (
                       <button
-                        onClick={() => { setSelectedStatuses([]); setPage(1); }}
+                        onClick={() => {
+                          setSelectedStatuses([]);
+                          setPage(1);
+                        }}
                         className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground tracking-tighter border-t border-border/40 hover:text-foreground transition-colors"
                       >
                         <X size={11} />
@@ -1188,15 +1403,40 @@ const RescuerVerificationPage = () => {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border/50">
-                      <SortHeader column="name" label="Họ và tên" sort={sort} onSort={handleSort} />
-                      <SortHeader column="email" label="Email" sort={sort} onSort={handleSort} />
+                      <SortHeader
+                        column="name"
+                        label="Họ và tên"
+                        sort={sort}
+                        onSort={handleSort}
+                      />
+                      <SortHeader
+                        column="email"
+                        label="Email"
+                        sort={sort}
+                        onSort={handleSort}
+                      />
                       <th className="text-left tracking-tighter p-3 text-sm font-semibold text-foreground">
                         Số điện thoại
                       </th>
 
-                      <SortHeader column="region" label="Khu vực" sort={sort} onSort={handleSort} />
-                      <SortHeader column="status" label="Trạng thái" sort={sort} onSort={handleSort} />
-                      <SortHeader column="submittedAt" label="Ngày nộp" sort={sort} onSort={handleSort} />
+                      <SortHeader
+                        column="region"
+                        label="Khu vực"
+                        sort={sort}
+                        onSort={handleSort}
+                      />
+                      <SortHeader
+                        column="status"
+                        label="Trạng thái"
+                        sort={sort}
+                        onSort={handleSort}
+                      />
+                      <SortHeader
+                        column="submittedAt"
+                        label="Ngày nộp"
+                        sort={sort}
+                        onSort={handleSort}
+                      />
                     </tr>
                   </thead>
                   <tbody>
@@ -1243,13 +1483,19 @@ const RescuerVerificationPage = () => {
                               {item.province || "Chưa cập nhật"}
                             </td>
                             <td className="p-3">
-                              <Badge className={`${statusConfig.className} border gap-1`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotColor}`} />
+                              <Badge
+                                className={`${statusConfig.className} border gap-1`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotColor}`}
+                                />
                                 {statusConfig.label}
                               </Badge>
                             </td>
                             <td className="p-3 text-sm tracking-tighter text-foreground/60">
-                              {new Date(item.submittedAt).toLocaleDateString("vi-VN")}
+                              {new Date(item.submittedAt).toLocaleDateString(
+                                "vi-VN",
+                              )}
                             </td>
                           </tr>
                         );
@@ -1264,10 +1510,17 @@ const RescuerVerificationPage = () => {
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
                   <div className="flex items-center gap-3">
                     <div className="text-sm tracking-tighter text-muted-foreground">
-                      Hiển thị {startItem}–{endItem} trong {serverTotalCount} hồ sơ
+                      Hiển thị {startItem}–{endItem} trong {serverTotalCount} hồ
+                      sơ
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+                      <Select
+                        value={String(pageSize)}
+                        onValueChange={(v) => {
+                          setPageSize(Number(v));
+                          setPage(1);
+                        }}
+                      >
                         <SelectTrigger className="w-16 h-7 text-sm">
                           <SelectValue />
                         </SelectTrigger>
@@ -1277,7 +1530,9 @@ const RescuerVerificationPage = () => {
                           <SelectItem value="50">50</SelectItem>
                         </SelectContent>
                       </Select>
-                      <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>
+                      <span className="text-sm text-muted-foreground tracking-tighter">
+                        / trang
+                      </span>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -1291,7 +1546,12 @@ const RescuerVerificationPage = () => {
                     </Button>
                     <div className="flex items-center gap-1">
                       {Array.from({ length: totalPages }, (_, i) => i + 1)
-                        .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                        .filter(
+                          (p) =>
+                            p === 1 ||
+                            p === totalPages ||
+                            Math.abs(p - safePage) <= 1,
+                        )
                         .reduce<(number | "...")[]>((acc, p, idx, arr) => {
                           if (
                             idx > 0 &&
@@ -1305,7 +1565,10 @@ const RescuerVerificationPage = () => {
                         }, [])
                         .map((p, i) =>
                           p === "..." ? (
-                            <span key={`ellipsis-${i}`} className="px-1 text-muted-foreground text-sm">
+                            <span
+                              key={`ellipsis-${i}`}
+                              className="px-1 text-muted-foreground text-sm"
+                            >
                               …
                             </span>
                           ) : (
@@ -1318,18 +1581,20 @@ const RescuerVerificationPage = () => {
                             >
                               {p}
                             </Button>
-                          )
+                          ),
                         )}
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages, p + 1))
+                      }
                       disabled={safePage === totalPages}
                     >
                       Sau
                     </Button>
-                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>
