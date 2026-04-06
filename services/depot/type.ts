@@ -165,7 +165,7 @@ export interface DepotClosureMetadata {
   resolutionTypes: DepotClosureResolutionTypeItem[];
 }
 
-// Initiate Depot Closure (POST /logistics/depot/{id}/close/initiate)
+// Initiate Depot Closure (POST /logistics/depot/{id}/close)
 export interface InitiateDepotClosureRequest {
   id: number;
   reason: string;
@@ -174,7 +174,15 @@ export interface InitiateDepotClosureRequest {
 export interface InitiateDepotClosureResponse {
   closureId: number;
   depotId: number;
-  status: string;
+  depotName: string;
+  requiresResolution: boolean;
+  inventorySummary: {
+    consumableItemTypeCount: number;
+    consumableUnitTotal: number;
+    reusableAvailableCount: number;
+    reusableInUseCount: number;
+  } | null;
+  timeoutAt: string | null;
   message: string;
 }
 
@@ -190,8 +198,22 @@ export interface ResolveDepotClosureRequest {
 export interface ResolveDepotClosureResponse {
   closureId: number;
   depotId: number;
-  status: string;
+  depotName: string;
+  resolutionType: string;
+  completedAt: string | null;
   message: string;
+  transferPending: boolean;
+  transferId: number | null;
+  transferSummary: {
+    transferId: number;
+    targetDepotId: number;
+    targetDepotName: string;
+    transferStatus: string;
+    transferDeadlineAt: string | null;
+    snapshotConsumableUnits: number;
+    snapshotReusableUnits: number;
+    reusableItemsSkipped: number;
+  } | null;
 }
 
 // Cancel Depot Closure (POST /logistics/depot/{id}/close/{closureId}/cancel)
@@ -204,7 +226,8 @@ export interface CancelDepotClosureRequest {
 export interface CancelDepotClosureResponse {
   closureId: number;
   depotId: number;
-  status: string;
+  restoredStatus: string;
+  cancelledAt: string;
   message: string;
 }
 
@@ -271,4 +294,20 @@ export interface DepotTransferActionRequest {
   note?: string;
 }
 
-export type DepotTransferActionResponse = DepotClosureTransfer;
+// POST .../prepare  |  .../ship  |  .../complete
+export interface DepotTransferActionResponse {
+  transferId: number;
+  transferStatus: string;
+  message: string;
+}
+
+// POST .../receive — bulk transfer + closure finalisation
+export interface DepotReceiveTransferResponse {
+  transferId: number;
+  closureId: number;
+  transferStatus: string;
+  consumableUnitsMoved: number;
+  reusableItemsMoved: number;
+  completedAt: string;
+  message: string;
+}

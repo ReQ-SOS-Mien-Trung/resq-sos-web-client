@@ -45,6 +45,7 @@ import {
   DepotClosureTransfer,
   DepotTransferActionRequest,
   DepotTransferActionResponse,
+  DepotReceiveTransferResponse,
   DepotClosureRecord,
 } from "./type";
 
@@ -423,7 +424,7 @@ export function useCompleteDepotTransfer() {
 export function useReceiveDepotTransfer() {
   const queryClient = useQueryClient();
   return useMutation<
-    DepotTransferActionResponse,
+    DepotReceiveTransferResponse,
     Error,
     DepotTransferActionRequest
   >({

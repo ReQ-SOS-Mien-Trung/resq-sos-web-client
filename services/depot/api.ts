@@ -22,6 +22,7 @@ import {
   DepotClosureTransfer,
   DepotTransferActionRequest,
   DepotTransferActionResponse,
+  DepotReceiveTransferResponse,
   DepotClosureRecord,
 } from "./type";
 
@@ -182,16 +183,13 @@ export async function getDepotClosureMetadata(): Promise<DepotClosureMetadata> {
 /**
  * [Admin] Initiate depot closure
  * Nếu kho trống → đóng ngay. Nếu còn hàng → chuyển sang Closing, chờ resolve.
- * POST /logistics/depot/{id}/close/initiate
+ * POST /logistics/depot/{id}/close
  */
 export async function initiateDepotClosure(
   request: InitiateDepotClosureRequest,
 ): Promise<InitiateDepotClosureResponse> {
   const { id, ...body } = request;
-  const { data } = await api.post(
-    `/logistics/depot/${id}/close/initiate`,
-    body,
-  );
+  const { data } = await api.post(`/logistics/depot/${id}/close`, body);
   return data;
 }
 
@@ -220,9 +218,9 @@ export async function cancelDepotClosure(
   request: CancelDepotClosureRequest,
 ): Promise<CancelDepotClosureResponse> {
   const { id, closureId, ...body } = request;
-  const { data } = await api.post(
-    `/logistics/depot/${id}/close/${closureId}/cancel`,
-    body,
+  const { data } = await api.delete(
+    `/logistics/depot/${id}/close/${closureId}`,
+    { data: body },
   );
   return data;
 }
@@ -295,7 +293,7 @@ export async function completeDepotTransfer(
  */
 export async function receiveDepotTransfer(
   request: DepotTransferActionRequest,
-): Promise<DepotTransferActionResponse> {
+): Promise<DepotReceiveTransferResponse> {
   const { id, closureId, transferId, ...body } = request;
   const { data } = await api.post(
     `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}/receive`,

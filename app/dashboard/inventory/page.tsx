@@ -40,6 +40,8 @@ import {
   WalletIcon,
   SunIcon,
   MoonIcon,
+  ProhibitInset,
+  LockIcon,
 } from "@phosphor-icons/react";
 import {
   CategoryOverview,
@@ -634,8 +636,7 @@ const InventoryDashboardPage = () => {
             className="hidden md:flex gap-2"
             onClick={() => router.push("/dashboard/inventory/export-report")}
           >
-            <FileArrowDownIcon
-             className="h-4 w-4" />
+            <FileArrowDownIcon className="h-4 w-4" />
             Xuất báo cáo
           </Button>
           <Button
@@ -664,6 +665,15 @@ const InventoryDashboardPage = () => {
           >
             <WalletIcon className="h-4 w-4" />
             Yêu cầu cấp quỹ
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden md:flex gap-2 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
+            onClick={() => router.push("/dashboard/inventory/depot-closure")}
+          >
+            <LockIcon className="h-4 w-4" />
+            Đóng kho
           </Button>
 
           {/* Notifications */}
