@@ -13,6 +13,13 @@ import {
   BroadcastAlertRealtimePayload,
   NotificationRealtimePayload,
 } from "./type";
+import {
+  getBackendCircuitBlockedUntil,
+  isBackendCircuitOpen,
+  isBackendConnectivityError,
+  markBackendConnectionSuccess,
+  openBackendCircuit,
+} from "@/lib/backend-circuit";
 
 type ReceiveNotificationHandler = (
   payload: NotificationRealtimePayload,
@@ -23,13 +30,16 @@ type ReceiveBroadcastAlertHandler = (
 ) => void;
 
 const STOP_DEBOUNCE_MS = 1200;
+const START_RETRY_MIN_DELAY_MS = 1500;
 
 export class NotificationRealtimeClient {
   private connection: HubConnection | null = null;
   private listeners = new Set<ReceiveNotificationHandler>();
   private broadcastListeners = new Set<ReceiveBroadcastAlertHandler>();
   private isReceiveEventBound = false;
+  private isLifecycleEventBound = false;
   private pendingStopTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private startPromise: Promise<void> | null = null;
 
   private clearPendingStop(): void {
@@ -41,13 +51,62 @@ export class NotificationRealtimeClient {
     this.pendingStopTimer = null;
   }
 
+  private clearPendingRetry(): void {
+    if (!this.pendingRetryTimer) {
+      return;
+    }
+
+    clearTimeout(this.pendingRetryTimer);
+    this.pendingRetryTimer = null;
+  }
+
+  private hasActiveSubscribers(): boolean {
+    return this.listeners.size > 0 || this.broadcastListeners.size > 0;
+  }
+
+  private scheduleRetryStart(): void {
+    if (!this.hasActiveSubscribers()) {
+      this.clearPendingRetry();
+      return;
+    }
+
+    if (this.pendingRetryTimer) {
+      return;
+    }
+
+    const blockedUntil = getBackendCircuitBlockedUntil();
+    const delay = blockedUntil
+      ? Math.max(START_RETRY_MIN_DELAY_MS, blockedUntil - Date.now())
+      : START_RETRY_MIN_DELAY_MS;
+
+    this.pendingRetryTimer = setTimeout(() => {
+      this.pendingRetryTimer = null;
+
+      if (!this.hasActiveSubscribers()) {
+        return;
+      }
+
+      void this.start().catch((error) => {
+        if (
+          this.isNegotiationAbortError(error) ||
+          isBackendConnectivityError(error)
+        ) {
+          return;
+        }
+
+        console.error("Failed to reconnect notification hub:", error);
+      });
+    }, delay);
+  }
+
   private scheduleStop(): void {
     this.clearPendingStop();
+    this.clearPendingRetry();
 
     this.pendingStopTimer = setTimeout(() => {
       this.pendingStopTimer = null;
 
-      if (this.listeners.size > 0) {
+      if (this.hasActiveSubscribers()) {
         return;
       }
 
@@ -107,6 +166,24 @@ export class NotificationRealtimeClient {
       this.connection = this.buildConnection();
     }
 
+    if (!this.isLifecycleEventBound) {
+      this.connection.onreconnected(() => {
+        markBackendConnectionSuccess();
+      });
+
+      this.connection.onclose((error) => {
+        if (error && isBackendConnectivityError(error)) {
+          openBackendCircuit(error);
+        }
+
+        if (this.hasActiveSubscribers()) {
+          this.scheduleRetryStart();
+        }
+      });
+
+      this.isLifecycleEventBound = true;
+    }
+
     if (!this.isReceiveEventBound) {
       this.connection.on(
         NOTIFICATION_HUB_CONFIG.events.receive,
@@ -128,8 +205,9 @@ export class NotificationRealtimeClient {
 
   async start(): Promise<void> {
     this.clearPendingStop();
+    this.clearPendingRetry();
 
-    if (this.listeners.size === 0 && this.broadcastListeners.size === 0) {
+    if (!this.hasActiveSubscribers()) {
       return;
     }
 
@@ -151,6 +229,11 @@ export class NotificationRealtimeClient {
       return;
     }
 
+    if (isBackendCircuitOpen()) {
+      this.scheduleRetryStart();
+      return;
+    }
+
     const startTask = async () => {
       if (connection.state === HubConnectionState.Disconnecting) {
         await this.waitForDisconnected(connection);
@@ -165,11 +248,18 @@ export class NotificationRealtimeClient {
       }
 
       await connection.start();
+      markBackendConnectionSuccess();
     };
 
     this.startPromise = startTask()
       .catch((error) => {
         if (this.isNegotiationAbortError(error)) {
+          return;
+        }
+
+        if (isBackendConnectivityError(error)) {
+          openBackendCircuit(error);
+          this.scheduleRetryStart();
           return;
         }
 
@@ -179,10 +269,10 @@ export class NotificationRealtimeClient {
         this.startPromise = null;
 
         if (
-          (this.listeners.size > 0 || this.broadcastListeners.size > 0) &&
+          this.hasActiveSubscribers() &&
           this.connection?.state === HubConnectionState.Disconnected
         ) {
-          void this.start().catch(() => null);
+          this.scheduleRetryStart();
         }
       });
 
@@ -191,18 +281,19 @@ export class NotificationRealtimeClient {
 
   async stop(): Promise<void> {
     this.clearPendingStop();
+    this.clearPendingRetry();
 
     if (!this.connection) {
       return;
     }
 
-    if (this.listeners.size > 0 || this.broadcastListeners.size > 0) {
+    if (this.hasActiveSubscribers()) {
       return;
     }
 
     if (this.startPromise) {
       await this.startPromise.catch(() => null);
-      if (this.listeners.size > 0 || this.broadcastListeners.size > 0) {
+      if (this.hasActiveSubscribers()) {
         return;
       }
     }
@@ -213,7 +304,7 @@ export class NotificationRealtimeClient {
 
     await this.connection.stop();
 
-    if (this.listeners.size > 0 || this.broadcastListeners.size > 0) {
+    if (this.hasActiveSubscribers()) {
       await this.start();
     }
   }
@@ -221,15 +312,23 @@ export class NotificationRealtimeClient {
   subscribe(handler: ReceiveNotificationHandler): () => void {
     this.listeners.add(handler);
     this.clearPendingStop();
+    this.clearPendingRetry();
 
     void this.start().catch((error) => {
+      if (
+        this.isNegotiationAbortError(error) ||
+        isBackendConnectivityError(error)
+      ) {
+        return;
+      }
+
       console.error("Failed to connect notification hub:", error);
     });
 
     return () => {
       this.listeners.delete(handler);
 
-      if (this.listeners.size === 0 && this.broadcastListeners.size === 0) {
+      if (!this.hasActiveSubscribers()) {
         this.scheduleStop();
       }
     };
@@ -238,15 +337,23 @@ export class NotificationRealtimeClient {
   subscribeBroadcast(handler: ReceiveBroadcastAlertHandler): () => void {
     this.broadcastListeners.add(handler);
     this.clearPendingStop();
+    this.clearPendingRetry();
 
     void this.start().catch((error) => {
+      if (
+        this.isNegotiationAbortError(error) ||
+        isBackendConnectivityError(error)
+      ) {
+        return;
+      }
+
       console.error("Failed to connect notification hub:", error);
     });
 
     return () => {
       this.broadcastListeners.delete(handler);
 
-      if (this.listeners.size === 0 && this.broadcastListeners.size === 0) {
+      if (!this.hasActiveSubscribers()) {
         this.scheduleStop();
       }
     };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DepotEntity } from "@/services/depot/type";
 import {
@@ -35,12 +35,6 @@ import {
 } from "@/components/ui/select";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import type { InventoryItemEntity } from "@/services/inventory/type";
-import {
-  formatInventoryTargetGroups,
-  getInventoryAvailable,
-  getInventoryTotal,
-  getInventoryTotalReserved,
-} from "@/services/inventory/utils";
 import { vi } from "date-fns/locale";
 import {
   X,
@@ -60,12 +54,19 @@ import {
   CalendarBlank,
   CaretDown,
   CaretUp,
+  ArrowsClockwise,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { AxiosError } from "axios";
 import { LocationDetailsPanelProps } from "@/type";
 import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
 import { ChartBar } from "lucide-react";
+import {
+  getBackendCircuitBlockedUntil,
+  releaseBackendCircuitForRetry,
+} from "@/lib/backend-circuit";
+import { useBackendConnectionStore } from "@/stores/backend-connection.store";
 
 // Panel width
 const PANEL_WIDTH = 420;
@@ -188,6 +189,20 @@ function getMinimumGatheringDate(now = new Date()): Date {
   // Keep minute precision to match picker values.
   date.setSeconds(0, 0);
   return date;
+}
+
+function formatRetryTime(blockedUntil: number | null): string | null {
+  if (!blockedUntil) return null;
+
+  try {
+    return new Date(blockedUntil).toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return null;
+  }
 }
 
 function extractBackendErrorMessage(error: unknown): string | null {
@@ -360,8 +375,9 @@ function getInventoryQuantities(item: InventoryItemEntity): {
     const total = toFiniteNumber(item.unit, 0);
     const reserved = toFiniteNumber(
       item.reservedUnit ??
-        item.totalReservedQuantity ??
-        item.reservedForMissionQuantity,
+        item.totalReservedUnits ??
+        item.reservedForMissionUnit ??
+        item.reservedForMissionUnits,
       0,
     );
     const available = toFiniteNumber(
@@ -399,36 +415,124 @@ function getDepotManagerDisplayName(manager: DepotEntity["manager"]): string {
   return fullName || manager.email || manager.phone || "Chưa có quản lý";
 }
 
+function BackendConnectionErrorPanel({
+  onClose,
+  onRetry,
+  blockedUntil,
+  message,
+}: {
+  onClose: () => void;
+  onRetry: () => void;
+  blockedUntil: number | null;
+  message: string | null;
+}) {
+  const retryAt = formatRetryTime(blockedUntil);
+
+  return (
+    <div className="h-full bg-background border-r shadow-2xl flex flex-col">
+      <div className="relative h-20 shrink-0 border-b bg-linear-to-br from-[#FF5722]/15 via-background to-background">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-3 right-3 h-8 w-8 rounded-full"
+          onClick={onClose}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="flex-1 px-6 py-7 flex flex-col items-center justify-center text-center">
+        <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full border border-[#FF5722]/30 bg-[#FF5722]/10 text-[#FF5722]">
+          <WarningCircle className="h-7 w-7" weight="fill" />
+        </div>
+
+        <h3 className="text-base font-semibold tracking-tight">
+          Mất kết nối backend API
+        </h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Hệ thống đang tạm dừng gửi request để tránh spam khi backend không
+          phản hồi.
+        </p>
+
+        {retryAt ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Tạm khóa gọi API đến {retryAt}.
+          </p>
+        ) : null}
+
+        {message ? (
+          <p className="mt-2 max-w-[20rem] text-xs text-[#FF5722]">{message}</p>
+        ) : null}
+
+        <Button
+          type="button"
+          className="mt-5 bg-[#FF5722] text-white hover:bg-[#E64A19]"
+          onClick={onRetry}
+        >
+          <ArrowsClockwise className="mr-1.5 h-4 w-4" />
+          Thử kết nối lại
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 const LocationDetailsPanel = ({
   open,
   onOpenChange,
   location,
 }: LocationDetailsPanelProps) => {
+  const backendStatus = useBackendConnectionStore((state) => state.status);
+  const backendBlockedUntil = useBackendConnectionStore(
+    (state) => state.blockedUntil,
+  );
+  const backendErrorMessage = useBackendConnectionStore(
+    (state) => state.lastErrorMessage,
+  );
+
+  const isBackendOffline = backendStatus === "offline";
+  const retryBlockUntil = useMemo(
+    () => backendBlockedUntil ?? getBackendCircuitBlockedUntil(),
+    [backendBlockedUntil],
+  );
+  const handleRetryBackendConnection = useCallback(() => {
+    releaseBackendCircuitForRetry();
+  }, []);
+
   if (!location && !open) return null;
 
   return (
     <div
       className={cn(
-        "absolute top-0 left-0 h-full z-[1000] transition-all duration-300 ease-in-out",
+        "absolute top-0 left-0 h-full z-1000 transition-all duration-300 ease-in-out",
         open
           ? "opacity-100 translate-x-0"
           : "opacity-0 -translate-x-full pointer-events-none",
       )}
       style={{ width: PANEL_WIDTH }}
     >
-      <div className="h-full bg-background border-r shadow-2xl overflow-y-auto">
-        {location?.type === "depot" ? (
-          <DepotDetails
-            depot={location.data}
-            onClose={() => onOpenChange(false)}
-          />
-        ) : location?.type === "assemblyPoint" ? (
-          <AssemblyPointDetails
-            assemblyPoint={location.data}
-            onClose={() => onOpenChange(false)}
-          />
-        ) : null}
-      </div>
+      {isBackendOffline ? (
+        <BackendConnectionErrorPanel
+          onClose={() => onOpenChange(false)}
+          onRetry={handleRetryBackendConnection}
+          blockedUntil={retryBlockUntil}
+          message={backendErrorMessage}
+        />
+      ) : (
+        <div className="h-full bg-background border-r shadow-2xl overflow-y-auto">
+          {location?.type === "depot" ? (
+            <DepotDetails
+              depot={location.data}
+              onClose={() => onOpenChange(false)}
+            />
+          ) : location?.type === "assemblyPoint" ? (
+            <AssemblyPointDetails
+              assemblyPoint={location.data}
+              onClose={() => onOpenChange(false)}
+            />
+          ) : null}
+        </div>
+      )}
     </div>
   );
 };
@@ -1553,7 +1657,7 @@ function AssemblyDateTimePicker({
       </PopoverTrigger>
 
       <PopoverContent
-        className="z-1200 w-[calc(100vw-20px)] max-w-[340px] space-y-2.5 p-2.5"
+        className="z-1200 w-[calc(100vw-20px)] max-w-85 space-y-2.5 p-2.5"
         align="start"
         side="bottom"
         sideOffset={6}

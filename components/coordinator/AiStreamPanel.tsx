@@ -91,6 +91,29 @@ const formatTeamTypeLabel = (teamType?: string | null) => {
   return TEAM_TYPE_LABELS[normalized] ?? teamType;
 };
 
+function normalizeAiErrorText(error: string): string {
+  const message = error.trim();
+  if (!message) {
+    return "AI không thể phân tích cụm này. Vui lòng thử lại.";
+  }
+
+  const lower = message.toLowerCase();
+  if (lower === "lỗi" || lower === "loi" || lower === "error") {
+    return "AI phân tích thất bại. Backend chưa trả chi tiết lỗi.";
+  }
+
+  return message;
+}
+
+function buildAiErrorStatusLabel(error: string): string {
+  const readable = normalizeAiErrorText(error);
+  const compact =
+    readable.split(/[.!?]/).find((segment) => segment.trim().length > 0) ??
+    readable;
+
+  return `LỖI: ${compact.trim()}`;
+}
+
 /* ═══ Main Component ═══ */
 
 export default function AiStreamPanel({
@@ -202,6 +225,14 @@ function TopBar({
   onStop: () => void;
   onClose: () => void;
 }) {
+  const statusLabel = loading
+    ? phaseLabel(phase)
+    : result
+      ? "HOÀN TẤT"
+      : error
+        ? buildAiErrorStatusLabel(error)
+        : "SẴN SÀNG";
+
   return (
     <div className="relative flex items-center justify-between px-5 py-3 border-b bg-background shrink-0">
       <div className="flex items-center gap-3">
@@ -227,14 +258,11 @@ function TopBar({
               </Badge>
             )}
           </h3>
-          <p className="text-xs text-muted-foreground font-mono">
-            {loading
-              ? phaseLabel(phase)
-              : result
-                ? "HOÀN TẤT"
-                : error
-                  ? "LỖI"
-                  : "SẴN SÀNG"}
+          <p
+            className="max-w-xl truncate text-xs text-muted-foreground"
+            title={error ? normalizeAiErrorText(error) : undefined}
+          >
+            {statusLabel}
           </p>
         </div>
       </div>
@@ -1214,6 +1242,8 @@ function WarningsBlock({
 
 function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const readableError = normalizeAiErrorText(error);
+
   useEffect(() => {
     if (!ref.current) return;
     gsap.fromTo(
@@ -1238,7 +1268,7 @@ function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
         <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">
           Phân tích thất bại
         </p>
-        <p className="text-xs text-red-500/60 mb-4">{error}</p>
+        <p className="text-xs text-red-500/60 mb-4">{readableError}</p>
         <Button
           variant="destructive"
           size="sm"
