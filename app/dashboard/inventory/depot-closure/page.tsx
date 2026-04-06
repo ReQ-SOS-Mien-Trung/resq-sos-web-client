@@ -301,27 +301,21 @@ export default function DepotClosurePage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-                <ArrowsLeftRight
-                  className="h-5 w-5 text-red-500"
-                  weight="fill"
-                />
-              </div>
               <div>
-                <h1 className="text-2xl tracking-tighter font-bold leading-tight">
+                <h1 className="text-2xl tracking-tighter font-bold leading-tight mb-1">
                   Đóng kho & Chuyển hàng
                 </h1>
-                <div className="flex items-center gap-2 text-sm tracking-tighter text-muted-foreground">
+                <div className="flex items-center gap-2 text-base tracking-tighter font-medium text-muted-foreground">
                   <span>{depot?.name ?? `Kho #${depotId}`}</span>
                   {depot?.status && (
                     <Badge
                       variant="outline"
                       className={cn(
-                        "text-xs",
+                        "text-sm",
                         depot.status === "Closing"
                           ? "border-red-300 text-red-600 dark:border-red-700 dark:text-red-400"
                           : depot.status === "Closed"
-                            ? "border-zinc-300 text-zinc-500"
+                            ? "border-zinc-300 border bg-zinc-700 text-zinc-100"
                             : "border-emerald-300 text-emerald-600 dark:border-emerald-700 dark:text-emerald-400",
                       )}
                     >
@@ -625,8 +619,8 @@ export default function DepotClosurePage() {
                 weight="fill"
               />
               <span className="text-sm font-semibold text-amber-700 dark:text-amber-400 tracking-tighter">
-                Kho đang trong quy trình đóng — Admin đang xử lý tồn kho bên
-                ngoài hệ thống.
+                Kho đang trong quy trình đóng — Quản trị viên đang xử lý tồn kho
+                bên ngoài hệ thống.
               </span>
             </div>
             {activeInProgressClosure && (
@@ -689,7 +683,7 @@ export default function DepotClosurePage() {
 
         {/* ── Closure History ── */}
         <div className="space-y-4">
-          <h2 className="text-xl font-bold tracking-tighter">
+          <h2 className="text-2xl font-bold tracking-tighter">
             Lịch sử đóng kho
           </h2>
 
@@ -724,7 +718,10 @@ export default function DepotClosurePage() {
                 return (
                   <div
                     key={c.id}
-                    className={cn("rounded-2xl border p-5 space-y-3", scfg.bg)}
+                    className={cn(
+                      "rounded-2xl border px-5 py-3 space-y-3",
+                      scfg.bg,
+                    )}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -735,27 +732,27 @@ export default function DepotClosurePage() {
                         />
                         <span
                           className={cn(
-                            "text-base font-bold tracking-tight",
+                            "text-base font-bold tracking-tighter",
                             scfg.color,
                           )}
                         >
                           {scfg.label}
                         </span>
                       </div>
-                      <span className="text-sm text-muted-foreground font-mono">
-                        #{c.id}
+                      <span className="text-sm tracking-tighter text-muted-foreground font-semibold">
+                        Phiên số {c.id}
                       </span>
                     </div>
 
                     {c.closeReason && (
-                      <p className="text-sm tracking-tight text-foreground/80 leading-relaxed">
-                        <span className="font-semibold">Lý do: </span>
+                      <p className="text-sm tracking-tighter font-bold mb-1">
+                        <span className="font-normal">Lý do đóng kho: </span>
                         {c.closeReason}
                       </p>
                     )}
 
                     {c.resolutionType && (
-                      <div className="flex items-center gap-2 text-sm tracking-tight">
+                      <div className="flex items-center gap-2 text-sm tracking-tighter">
                         <ArrowsLeftRight
                           size={14}
                           className="text-muted-foreground shrink-0"
@@ -779,7 +776,7 @@ export default function DepotClosurePage() {
                           size={13}
                           className="text-muted-foreground shrink-0"
                         />
-                        <span className="text-sm tracking-tight text-muted-foreground">
+                        <span className="text-sm tracking-tighter text-muted-foreground">
                           Transfer #{c.transfer.transferId} —{" "}
                           <span className="font-semibold text-foreground/70">
                             {c.transfer.status}
@@ -788,31 +785,42 @@ export default function DepotClosurePage() {
                       </div>
                     )}
 
+                    {c.cancellationReason && (
+                      <p className="text-sm tracking-tighter font-bold">
+                        <span className="font-normal">Lý do hủy đóng: </span>
+                        {c.cancellationReason}
+                      </p>
+                    )}
+
                     <div className="pt-2 border-t border-current/10 space-y-1">
-                      <p className="text-xs text-muted-foreground tracking-tight">
-                        Khởi tạo:{" "}
-                        <span className="font-semibold text-foreground/70">
+                      <p className="text-sm text-muted-foreground tracking-tighter">
+                        Đóng kho bởi:{" "}
+                        <span className="font-semibold text-black dark:text-white">
+                          {c.initiatedByFullName}
+                        </span>
+                        {" — "} vào lúc{" "}
+                        <span className="font-semibold text-black dark:text-white">
                           {new Date(c.initiatedAt).toLocaleString("vi-VN")}
                         </span>
-                        {" — "}
-                        {c.initiatedByFullName}
                       </p>
                       {c.completedAt && (
-                        <p className="text-xs text-muted-foreground tracking-tight">
+                        <p className="text-sm text-muted-foreground tracking-tighter">
                           Hoàn thành:{" "}
-                          <span className="font-semibold text-foreground/70">
+                          <span className="font-semibold text-black dark:text-white">
                             {new Date(c.completedAt).toLocaleString("vi-VN")}
                           </span>
                         </p>
                       )}
                       {c.cancelledAt && c.cancelledByFullName && (
-                        <p className="text-xs text-muted-foreground tracking-tight">
-                          Hủy bởi:{" "}
-                          <span className="font-semibold text-foreground/70">
+                        <p className="text-sm text-black dark:text-white tracking-tighter">
+                          Hủy đóng kho bởi:{" "}
+                          <span className="font-semibold text-black dark:text-white">
                             {c.cancelledByFullName}
                           </span>
-                          {" — "}
-                          {new Date(c.cancelledAt).toLocaleString("vi-VN")}
+                          {" — "} vào lúc{" "}
+                          <span className="font-semibold text-black dark:text-white">
+                            {new Date(c.cancelledAt).toLocaleString("vi-VN")}
+                          </span>
                         </p>
                       )}
                     </div>
