@@ -6,11 +6,12 @@ import polylineDecode from "@mapbox/polyline";
 import {
   CircleMarker,
   MapContainer,
+  Marker,
   Polyline,
   Tooltip,
   useMap,
 } from "react-leaflet";
-import { tileLayer } from "leaflet";
+import { divIcon, tileLayer } from "leaflet";
 import {
   activityTypeConfig,
   resourceTypeIcons,
@@ -140,11 +141,36 @@ const TEAM_TYPE_LABELS: Record<string, string> = {
 
 const MISSION_TYPE_LABELS: Record<string, string> = {
   RESCUE: "Cứu hộ",
+  RESCUER: "Cứu hộ",
+  RELIEF: "Cứu trợ",
+  EVACUATION: "Sơ tán",
   EVACUATE: "Sơ tán",
   MEDICAL: "Y tế",
   SUPPLY: "Cứu trợ",
   MIXED: "Tổng hợp",
 };
+
+const MISSION_TYPE_BADGE_CLASSNAMES: Record<string, string> = {
+  RESCUE:
+    "border-[#FF5722]/40 bg-[#FF5722]/10 text-[#C2410C] dark:border-[#FF5722]/45 dark:bg-[#FF5722]/20 dark:text-[#FDBA74]",
+  RESCUER:
+    "border-[#FF5722]/40 bg-[#FF5722]/10 text-[#C2410C] dark:border-[#FF5722]/45 dark:bg-[#FF5722]/20 dark:text-[#FDBA74]",
+  RELIEF:
+    "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  SUPPLY:
+    "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  MEDICAL:
+    "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  EVACUATION:
+    "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+  EVACUATE:
+    "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+  MIXED:
+    "border-teal-300 bg-teal-50 text-teal-700 dark:border-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
+};
+
+const normalizeMissionTypeKey = (missionType?: string | null) =>
+  (missionType ?? "").trim().toUpperCase();
 
 const formatTeamTypeLabel = (teamType?: string | null) => {
   if (!teamType) return "Chưa rõ";
@@ -154,8 +180,16 @@ const formatTeamTypeLabel = (teamType?: string | null) => {
 
 const formatMissionTypeLabel = (missionType?: string | null) => {
   if (!missionType) return "Chưa rõ";
-  const normalized = missionType.trim().toUpperCase();
+  const normalized = normalizeMissionTypeKey(missionType);
   return MISSION_TYPE_LABELS[normalized] ?? missionType;
+};
+
+const getMissionTypeBadgeClassName = (missionType?: string | null) => {
+  const normalized = normalizeMissionTypeKey(missionType);
+  return (
+    MISSION_TYPE_BADGE_CLASSNAMES[normalized] ??
+    "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300"
+  );
 };
 
 const normalizeEditMissionType = (value?: string | null): MissionType => {
@@ -166,6 +200,7 @@ const normalizeEditMissionType = (value?: string | null): MissionType => {
     normalized === "SUPPLY" ||
     normalized === "MEDICAL" ||
     normalized === "EVACUATE" ||
+    normalized === "EVACUATION" ||
     normalized === "RELIEF"
   ) {
     return "RELIEF";
@@ -211,6 +246,48 @@ function getRescueTeamOperationalRank(status?: string | null): number {
 
 const buildLeafletMapKey = (points: [number, number][]) =>
   points.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join("|");
+
+const getRouteLabelAnchor = (
+  points: [number, number][],
+): [number, number] | null => {
+  if (points.length === 0) {
+    return null;
+  }
+
+  return points[Math.floor(points.length / 2)] ?? null;
+};
+
+const escapeLeafletLabelHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
+type RouteDurationBadgeVariant = "primary" | "neutral";
+
+const estimateRouteDurationBadgeWidth = (label: string) =>
+  Math.max(72, Math.min(196, Array.from(label).length * 8 + 22));
+
+const buildRouteDurationBadgeIcon = (
+  label: string,
+  variant: RouteDurationBadgeVariant = "primary",
+) => {
+  const safeLabel = escapeLeafletLabelHtml(label);
+  const badgeWidth = estimateRouteDurationBadgeWidth(label);
+  const variantClassName =
+    variant === "primary"
+      ? "route-duration-badge--primary"
+      : "route-duration-badge--neutral";
+
+  return divIcon({
+    className: "route-duration-marker-icon",
+    iconSize: [badgeWidth, 28],
+    iconAnchor: [badgeWidth / 2, 14],
+    html: `<span class="route-duration-badge ${variantClassName}">${safeLabel}</span>`,
+  });
+};
 
 const RoutePreviewFitBounds = ({ points }: { points: [number, number][] }) => {
   const map = useMap();
@@ -2072,19 +2149,39 @@ const MissionRoutePreview = ({
                 <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <RoutePreviewFitBounds points={allPoints} />
                 {/* Render each segment with different color */}
-                {segments.map((seg, idx) => (
-                  <Polyline
-                    key={seg.index}
-                    positions={seg.points}
-                    pathOptions={{
-                      color: segmentColors[idx % segmentColors.length],
-                      weight: 5,
-                      opacity: 0.85,
-                      lineJoin: "round",
-                      lineCap: "round",
-                    }}
-                  />
-                ))}
+                {segments.flatMap((seg, idx) => {
+                  const durationLabel =
+                    (typeof seg.duration === "string" && seg.duration.trim()) ||
+                    formatDuration(seg.durationSeconds);
+                  const routeLabelAnchor = getRouteLabelAnchor(seg.points);
+                  const segmentKey = `mission-route-segment-${seg.index}-${idx}`;
+
+                  return [
+                    <Polyline
+                      key={`${segmentKey}-line`}
+                      positions={seg.points}
+                      pathOptions={{
+                        color: segmentColors[idx % segmentColors.length],
+                        weight: 5,
+                        opacity: 0.85,
+                        lineJoin: "round",
+                        lineCap: "round",
+                      }}
+                    />,
+                    routeLabelAnchor ? (
+                      <Marker
+                        key={`${segmentKey}-eta`}
+                        position={routeLabelAnchor}
+                        icon={buildRouteDurationBadgeIcon(
+                          durationLabel,
+                          seg.isFallback ? "neutral" : "primary",
+                        )}
+                        interactive={false}
+                        keyboard={false}
+                      />
+                    ) : null,
+                  ];
+                })}
                 {/* Origin marker (green) */}
                 <CircleMarker
                   center={[originCoords.lat, originCoords.lng]}
@@ -3024,6 +3121,11 @@ const MissionTeamRoutePreview = ({
     activityRouteSegments.length > 0
       ? activityRouteSegments.length
       : Math.max(routeLegs.length, expectedLegCount);
+  const consolidatedDurationLabel =
+    Number.isFinite(totalDurationSeconds) && totalDurationSeconds > 0
+      ? formatDuration(totalDurationSeconds)
+      : "";
+  const consolidatedRouteLabelAnchor = getRouteLabelAnchor(displayPoints);
 
   return (
     <div className="mt-2 space-y-1.5 rounded-lg border bg-muted/30 p-2">
@@ -3137,12 +3239,6 @@ const MissionTeamRoutePreview = ({
         </p>
       ) : null}
 
-      {!isLoadingRoute && activityRouteSegments.length > 0 ? (
-        <p className="text-sm text-emerald-700 dark:text-emerald-300">
-          Đang hiển thị chỉ đường thật theo từng chặng từ activity-route.
-        </p>
-      ) : null}
-
       {!isLoadingRoute &&
       activityRouteSegments.length > 0 &&
       (activityRouteFallbackSegments > 0 ||
@@ -3198,35 +3294,73 @@ const MissionTeamRoutePreview = ({
             <RoutePreviewFitBounds points={displayPoints} />
 
             {activityRouteSegments.length > 0 ? (
-              activityRouteSegments.map((segment, segmentIndex) => (
+              activityRouteSegments.flatMap((segment, segmentIndex) => {
+                const durationLabel =
+                  (typeof segment.duration === "string" &&
+                    segment.duration.trim()) ||
+                  formatDuration(segment.durationSeconds);
+                const routeLabelAnchor = getRouteLabelAnchor(segment.points);
+                const segmentKey = `mission-team-route-segment-${segment.index}-${segmentIndex}`;
+
+                return [
+                  <Polyline
+                    key={`${segmentKey}-line`}
+                    positions={segment.points}
+                    pathOptions={{
+                      color: "#FF6B35",
+                      weight: segment.isFallback ? 4 : 5,
+                      opacity: segment.isFallback ? 0.75 : 0.88,
+                      lineJoin: "round",
+                      lineCap: "round",
+                      dashArray: segment.isFallback ? "7 7" : undefined,
+                    }}
+                  />,
+                  routeLabelAnchor ? (
+                    <Marker
+                      key={`${segmentKey}-eta`}
+                      position={routeLabelAnchor}
+                      icon={buildRouteDurationBadgeIcon(
+                        durationLabel,
+                        segment.isFallback ? "neutral" : "primary",
+                      )}
+                      interactive={false}
+                      keyboard={false}
+                    />
+                  ) : null,
+                ];
+              })
+            ) : (
+              <>
                 <Polyline
-                  key={`mission-team-route-segment-${segment.index}-${segmentIndex}`}
-                  positions={segment.points}
+                  positions={displayPoints}
                   pathOptions={{
                     color: "#FF6B35",
-                    weight: segment.isFallback ? 4 : 5,
-                    opacity: segment.isFallback ? 0.75 : 0.88,
+                    weight: 5,
+                    opacity: 0.85,
                     lineJoin: "round",
                     lineCap: "round",
-                    dashArray: segment.isFallback ? "7 7" : undefined,
+                    dashArray:
+                      shouldPreferStopoverGuide &&
+                      decodedRoutePoints.length <= 1
+                        ? "7 7"
+                        : undefined,
                   }}
                 />
-              ))
-            ) : (
-              <Polyline
-                positions={displayPoints}
-                pathOptions={{
-                  color: "#FF6B35",
-                  weight: 5,
-                  opacity: 0.85,
-                  lineJoin: "round",
-                  lineCap: "round",
-                  dashArray:
-                    shouldPreferStopoverGuide && decodedRoutePoints.length <= 1
-                      ? "7 7"
-                      : undefined,
-                }}
-              />
+                {consolidatedDurationLabel && consolidatedRouteLabelAnchor ? (
+                  <Marker
+                    position={consolidatedRouteLabelAnchor}
+                    icon={buildRouteDurationBadgeIcon(
+                      consolidatedDurationLabel,
+                      shouldPreferStopoverGuide &&
+                        decodedRoutePoints.length <= 1
+                        ? "neutral"
+                        : "primary",
+                    )}
+                    interactive={false}
+                    keyboard={false}
+                  />
+                ) : null}
+              </>
             )}
 
             {originCoords ? (
@@ -4618,7 +4752,12 @@ const RescuePlanPanel = ({
                       </Badge>
                       <Badge
                         variant="outline"
-                        className="text-sm px-1.5 py-0 h-5"
+                        className={cn(
+                          "text-sm px-1.5 py-0 h-5",
+                          getMissionTypeBadgeClassName(
+                            activeSuggestion.suggestedMissionType,
+                          ),
+                        )}
                       >
                         {formatMissionTypeLabel(
                           activeSuggestion.suggestedMissionType,
@@ -4948,7 +5087,12 @@ const RescuePlanPanel = ({
                                         </span>
                                         <Badge
                                           variant="outline"
-                                          className="text-sm h-5 px-2 shrink-0 font-semibold"
+                                          className={cn(
+                                            "text-sm h-5 px-2 shrink-0 font-semibold",
+                                            getMissionTypeBadgeClassName(
+                                              mission.missionType,
+                                            ),
+                                          )}
                                         >
                                           {formatMissionTypeLabel(
                                             mission.missionType,
@@ -5419,17 +5563,6 @@ const RescuePlanPanel = ({
                                                               {stepStatus.icon}
                                                               {stepStatus.label}
                                                             </Badge>
-                                                            {activity.priority ? (
-                                                              <Badge
-                                                                variant="outline"
-                                                                className="text-sm h-6 px-2 font-semibold"
-                                                              >
-                                                                Ưu tiên:{" "}
-                                                                {
-                                                                  activity.priority
-                                                                }
-                                                              </Badge>
-                                                            ) : null}
                                                             {typeof activity.estimatedTime ===
                                                             "number" ? (
                                                               <Badge
@@ -5539,6 +5672,31 @@ const RescuePlanPanel = ({
                                                                         team.teamStatus,
                                                                         rescueTeamStatusLabelsByKey,
                                                                       );
+                                                                    const normalizedAssignmentStatus =
+                                                                      (
+                                                                        team.status ??
+                                                                        ""
+                                                                      )
+                                                                        .trim()
+                                                                        .toLowerCase()
+                                                                        .replaceAll(
+                                                                          "_",
+                                                                          "",
+                                                                        )
+                                                                        .replaceAll(
+                                                                          " ",
+                                                                          "",
+                                                                        );
+                                                                    const normalizedRescueTeamStatus =
+                                                                      normalizeRescueTeamStatusKey(
+                                                                        team.teamStatus,
+                                                                      );
+                                                                    const shouldShowRescueTeamStatusBadge =
+                                                                      Boolean(
+                                                                        team.teamStatus,
+                                                                      ) &&
+                                                                      normalizedRescueTeamStatus !==
+                                                                        normalizedAssignmentStatus;
 
                                                                     return (
                                                                       <div
@@ -5608,7 +5766,7 @@ const RescuePlanPanel = ({
                                                                               teamStatusMeta.label
                                                                             }
                                                                           </Badge>
-                                                                          {team.teamStatus && (
+                                                                          {shouldShowRescueTeamStatusBadge && (
                                                                             <Badge
                                                                               variant="outline"
                                                                               className={cn(
@@ -6059,58 +6217,23 @@ const RescuePlanPanel = ({
                                     )}
                                   </div>
 
-                                  {/* Time + Priority */}
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <div className="space-y-1">
-                                      <Label className="block min-h-5 text-sm leading-none text-muted-foreground uppercase tracking-wider">
-                                        Thời gian ước tính
-                                      </Label>
-                                      <Input
-                                        value={activity.estimatedTime}
-                                        onChange={(e) =>
-                                          updateEditActivity(
-                                            activity._id,
-                                            "estimatedTime",
-                                            e.target.value,
-                                          )
-                                        }
-                                        placeholder="VD: 30 phút"
-                                        className="h-10 w-full text-sm"
-                                      />
-                                    </div>
-                                    <div className="space-y-1">
-                                      <Label className="block min-h-5 text-sm leading-none text-muted-foreground uppercase tracking-wider">
-                                        Độ ưu tiên
-                                      </Label>
-                                      <Select
-                                        value={activity.priority || "Medium"}
-                                        onValueChange={(v) =>
-                                          updateEditActivity(
-                                            activity._id,
-                                            "priority",
-                                            v,
-                                          )
-                                        }
-                                      >
-                                        <SelectTrigger className="h-10 w-full text-sm">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="z-1200">
-                                          <SelectItem value="Critical">
-                                            Critical
-                                          </SelectItem>
-                                          <SelectItem value="High">
-                                            High
-                                          </SelectItem>
-                                          <SelectItem value="Medium">
-                                            Medium
-                                          </SelectItem>
-                                          <SelectItem value="Low">
-                                            Low
-                                          </SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
+                                  {/* Time estimate */}
+                                  <div className="space-y-1">
+                                    <Label className="block min-h-5 text-sm leading-none text-muted-foreground uppercase tracking-wider">
+                                      Thời gian ước tính
+                                    </Label>
+                                    <Input
+                                      value={activity.estimatedTime}
+                                      onChange={(e) =>
+                                        updateEditActivity(
+                                          activity._id,
+                                          "estimatedTime",
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder="VD: 30 phút"
+                                      className="h-10 w-full text-sm"
+                                    />
                                   </div>
 
                                   {/* Team assignment override (nearby assembly points) */}
@@ -6811,11 +6934,6 @@ const RescuePlanPanel = ({
                                                 <Clock className="h-3 w-3" />
                                                 {activity.estimatedTime}
                                               </span>
-                                              {activity.priority && (
-                                                <span className="text-sm text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-md">
-                                                  {activity.priority}
-                                                </span>
-                                              )}
                                               <Badge
                                                 variant="outline"
                                                 className={cn(
@@ -6830,57 +6948,6 @@ const RescuePlanPanel = ({
                                             <p className="text-sm leading-relaxed text-foreground/80">
                                               {displayDescription}
                                             </p>
-
-                                            {activity.suggestedTeam && (
-                                              <div className="mt-2 p-2.5 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
-                                                <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
-                                                  <ShieldCheck
-                                                    className="h-3 w-3"
-                                                    weight="fill"
-                                                  />
-                                                  Đội đề xuất
-                                                </p>
-                                                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
-                                                  {activity.suggestedTeam
-                                                    .teamName ||
-                                                    (activity.suggestedTeam
-                                                      .teamId
-                                                      ? `Đội #${activity.suggestedTeam.teamId}`
-                                                      : "Đội chưa đặt tên")}
-                                                </p>
-                                                <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
-                                                  {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
-                                                  {activity.suggestedTeam
-                                                    .contactPhone
-                                                    ? ` • SĐT: ${activity.suggestedTeam.contactPhone}`
-                                                    : ""}
-                                                  {activity.suggestedTeam
-                                                    .estimatedEtaMinutes != null
-                                                    ? ` • ETA: ${activity.suggestedTeam.estimatedEtaMinutes} phút`
-                                                    : ""}
-                                                </p>
-                                                {activity.suggestedTeam
-                                                  .reason && (
-                                                  <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
-                                                    Lý do:{" "}
-                                                    {
-                                                      activity.suggestedTeam
-                                                        .reason
-                                                    }
-                                                  </p>
-                                                )}
-                                                {activity.suggestedTeam
-                                                  .assemblyPointName && (
-                                                  <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
-                                                    Điểm tập kết đội:{" "}
-                                                    {
-                                                      activity.suggestedTeam
-                                                        .assemblyPointName
-                                                    }
-                                                  </p>
-                                                )}
-                                              </div>
-                                            )}
 
                                             {(activity.assemblyPointName ||
                                               (activity.assemblyPointLatitude !=

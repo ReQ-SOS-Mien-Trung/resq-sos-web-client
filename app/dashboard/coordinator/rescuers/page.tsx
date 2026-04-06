@@ -1378,7 +1378,7 @@ export default function CoordinatorRescuerManagementPage() {
         }
         onDragEnd={isRowDraggable ? handleDragEnd : undefined}
         className={cn(
-          "rounded-lg border border-border bg-card p-2.5 transition-colors md:p-3",
+          "rounded-lg border border-border bg-card p-3 transition-colors md:p-3.5",
           isRowDraggable && "cursor-grab active:cursor-grabbing",
           isSplitByAssemblyPointView &&
             draggableSide &&
@@ -1389,10 +1389,10 @@ export default function CoordinatorRescuerManagementPage() {
           isRowBeingDragged && "opacity-70",
         )}
       >
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex min-w-0 items-start gap-3">
+        <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-3">
+          <div className="flex min-w-0 items-center gap-2.5 md:gap-3.5">
             {showSelection ? (
-              <div className="flex h-9 items-center">
+              <div className="flex h-10 shrink-0 items-center">
                 <Checkbox
                   checked={isRowSelected}
                   onCheckedChange={(checked) =>
@@ -1405,7 +1405,7 @@ export default function CoordinatorRescuerManagementPage() {
               </div>
             ) : null}
 
-            <Avatar className="h-9 w-9 border border-black/10">
+            <Avatar className="h-10 w-10 shrink-0 border border-black/10">
               <AvatarImage
                 src={rescuer.avatarUrl ?? DEFAULT_RESCUER_AVATAR}
                 alt={fullName}
@@ -1415,21 +1415,21 @@ export default function CoordinatorRescuerManagementPage() {
               </AvatarFallback>
             </Avatar>
 
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold tracking-tight">
+            <div className="min-w-0 space-y-1">
+              <p className="truncate text-[15px] font-semibold leading-5 tracking-tight text-foreground">
                 {fullName}
               </p>
 
-              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] leading-5 text-muted-foreground">
                 {rescuer.phone ? <span>{rescuer.phone}</span> : null}
                 {rescuer.email ? <span>{rescuer.email}</span> : null}
               </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <Badge
                   variant="outline"
                   className={cn(
-                    "border px-2 py-0.5 text-sm",
+                    "border px-2 py-0.5 text-[13px] leading-5",
                     rescuer.hasAssemblyPoint
                       ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                       : "border-amber-300 bg-amber-50 text-amber-700",
@@ -1443,7 +1443,7 @@ export default function CoordinatorRescuerManagementPage() {
                 <Badge
                   variant="outline"
                   className={cn(
-                    "border px-2 py-0.5 text-sm",
+                    "border px-2 py-0.5 text-[13px] leading-5",
                     rescuer.hasTeam
                       ? "border-indigo-300 bg-indigo-50 text-indigo-700"
                       : "border-slate-300 bg-slate-50 text-slate-700",
@@ -1456,7 +1456,7 @@ export default function CoordinatorRescuerManagementPage() {
                   <Badge
                     variant="outline"
                     className={cn(
-                      "border px-2 py-0.5 text-sm font-semibold",
+                      "border px-2 py-0.5 text-[13px] font-semibold leading-5",
                       rescuer.rescuerType === "Core"
                         ? "border-sky-300 bg-sky-50 text-sky-700"
                         : "border-[#FF5722]/40 bg-[#FF5722]/10 text-[#C2410C]",
@@ -1471,7 +1471,7 @@ export default function CoordinatorRescuerManagementPage() {
                 {rawRowSelectedAssemblyPointId ? (
                   <Badge
                     variant="outline"
-                    className="border-[#FF5722]/35 bg-[#FF5722]/10 px-2 py-0.5 text-sm text-[#C2410C]"
+                    className="border-[#FF5722]/35 bg-[#FF5722]/10 px-2 py-0.5 text-[13px] leading-5 text-[#C2410C]"
                   >
                     Chưa lưu
                   </Badge>
@@ -1480,7 +1480,7 @@ export default function CoordinatorRescuerManagementPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 md:justify-end">
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center md:w-auto md:justify-end">
             <Select
               value={rowSelectedAssemblyPointId}
               onValueChange={(value) =>
@@ -1491,7 +1491,7 @@ export default function CoordinatorRescuerManagementPage() {
               }
               disabled={isAssignmentBusy}
             >
-              <SelectTrigger className="h-8 w-55 border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:border-slate-400 data-[state=open]:border-[#FF5722]/55 data-[state=open]:ring-1 data-[state=open]:ring-[#FF5722]/20">
+              <SelectTrigger className="h-8 w-full border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:border-slate-400 data-[state=open]:border-[#FF5722]/55 data-[state=open]:ring-1 data-[state=open]:ring-[#FF5722]/20 sm:w-55">
                 <SelectValue
                   placeholder={
                     isAssemblyPointLoading
@@ -1524,7 +1524,7 @@ export default function CoordinatorRescuerManagementPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 border-[#FF5722]/35 text-[#FF5722] hover:bg-[#FF5722]/10"
+                className="h-8 border-[#FF5722]/35 text-[#FF5722] hover:bg-[#FF5722]/10 sm:min-w-35"
                 onClick={() =>
                   handleSaveAssignment(
                     rescuer.id,
@@ -1946,8 +1946,7 @@ export default function CoordinatorRescuerManagementPage() {
                     </p>
                     <p className="text-sm text-sky-800/80">
                       {assignedCount} người cứu hộ đang thuộc điểm tập kết này.
-                      Kéo từ bên phải qua để thêm tạm, rồi bấm Lưu tất cả thay
-                      đổi.
+                      Kéo từ bên phải qua để thêm tạm. đổi.
                     </p>
                   </div>
 
