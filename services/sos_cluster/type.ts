@@ -82,6 +82,10 @@ export interface ClusterSuggestedActivity {
   description: string;
   priority: string;
   estimatedTime: string;
+  executionMode?: string | null;
+  requiredTeamCount?: number | null;
+  coordinationGroupKey?: string | null;
+  coordinationNotes?: string | null;
   sosRequestId: number | null;
   depotId: number | null;
   depotName: string | null;

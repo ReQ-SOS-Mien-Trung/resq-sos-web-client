@@ -1048,6 +1048,7 @@ const COORD_EPSILON = 0.0005; // ~55m tolerance for "same location"
 const HUE_DEFAULT_ORIGIN = { lat: 16.4637, lng: 107.5909 };
 const SOS_COORD_MATCH_EPSILON = 0.003; // ~330m tolerance for SOS coordinate matching
 const MISSION_TEAM_ROUTE_WAYPOINT_EPSILON = 0.0015; // ~165m tolerance when checking whether route covers a waypoint
+const OVERVIEW_SPLIT_MAX_MATCH_DISTANCE_METERS = 6000;
 const VEHICLE_PRIORITY: RouteVehicle[] = ["bike", "car", "hd"];
 const VEHICLE_LABELS: Record<RouteVehicle, string> = {
   bike: "Xe máy",
@@ -2336,18 +2337,6 @@ const MissionTeamRoutePreview = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [vehicle, setVehicle] = useState<RouteVehicle>("car");
-  const [activityRouteSegments, setActivityRouteSegments] = useState<
-    RouteSegment[]
-  >([]);
-  const [isActivityRouteLoading, setIsActivityRouteLoading] = useState(false);
-  const [activityRouteProgress, setActivityRouteProgress] = useState(0);
-  const [activityRouteFallbackSegments, setActivityRouteFallbackSegments] =
-    useState(0);
-  const [
-    activityRouteAlternativeVehicleSegments,
-    setActivityRouteAlternativeVehicleSegments,
-  ] = useState(0);
-  const activityRouteAbortRef = useRef(false);
 
   const missionRouteTeams = useMemo(() => {
     const teams = mission.teams ?? [];
@@ -2607,261 +2596,6 @@ const MissionTeamRoutePreview = ({
     [waypointGroups, sosRequests],
   );
 
-  useEffect(() => {
-    if (!open) {
-      activityRouteAbortRef.current = true;
-      return;
-    }
-
-    if (
-      selectedMissionTeam?.missionTeamId == null ||
-      waypointGroups.length === 0
-    ) {
-      activityRouteAbortRef.current = true;
-      setActivityRouteSegments((previous) =>
-        previous.length === 0 ? previous : [],
-      );
-      setIsActivityRouteLoading(false);
-      setActivityRouteProgress(0);
-      setActivityRouteFallbackSegments(0);
-      setActivityRouteAlternativeVehicleSegments(0);
-      return;
-    }
-
-    activityRouteAbortRef.current = false;
-    setIsActivityRouteLoading(true);
-    setActivityRouteSegments((previous) =>
-      previous.length === 0 ? previous : [],
-    );
-    setActivityRouteProgress(0);
-    setActivityRouteFallbackSegments(0);
-    setActivityRouteAlternativeVehicleSegments(0);
-
-    let currentOrigin = { lat: originCoords.lat, lng: originCoords.lng };
-
-    void (async () => {
-      const nextSegments: RouteSegment[] = [];
-      let fallbackCount = 0;
-      let alternativeVehicleCount = 0;
-
-      for (let index = 0; index < waypointGroups.length; index += 1) {
-        if (activityRouteAbortRef.current) return;
-
-        const waypoint = waypointGroups[index];
-        const isSameAsOrigin =
-          Math.abs(currentOrigin.lat - waypoint.lat) < COORD_EPSILON &&
-          Math.abs(currentOrigin.lng - waypoint.lng) < COORD_EPSILON;
-
-        if (!isSameAsOrigin) {
-          let segmentAdded = false;
-          const representativeActivity = waypoint.activities[0];
-
-          if (representativeActivity) {
-            const tryVehicles = buildVehicleTryOrder(vehicle);
-
-            for (const tryVehicle of tryVehicles) {
-              try {
-                const resp = await getActivityRoute({
-                  missionId: mission.id,
-                  activityId: representativeActivity.id,
-                  originLat: currentOrigin.lat,
-                  originLng: currentOrigin.lng,
-                  vehicle: tryVehicle,
-                });
-
-                if (!resp.route?.overviewPolyline) {
-                  continue;
-                }
-
-                const decoded = polylineDecode.decode(
-                  resp.route.overviewPolyline,
-                ) as [number, number][];
-
-                if (decoded.length < 2) {
-                  continue;
-                }
-
-                const distanceMeters = Number.isFinite(
-                  resp.route.totalDistanceMeters,
-                )
-                  ? resp.route.totalDistanceMeters
-                  : Math.round(
-                      haversineDistanceMeters(currentOrigin, {
-                        lat: waypoint.lat,
-                        lng: waypoint.lng,
-                      }),
-                    );
-
-                const durationSeconds = Number.isFinite(
-                  resp.route.totalDurationSeconds,
-                )
-                  ? resp.route.totalDurationSeconds
-                  : estimateDurationSeconds(distanceMeters, tryVehicle);
-
-                nextSegments.push({
-                  index,
-                  waypoint,
-                  points: decoded,
-                  steps: resp.route.steps ?? [],
-                  distance:
-                    resp.route.totalDistanceText ||
-                    (distanceMeters < 1000
-                      ? `${distanceMeters}m`
-                      : `${(distanceMeters / 1000).toFixed(1)} km`),
-                  duration:
-                    resp.route.totalDurationText ||
-                    (durationSeconds < 3600
-                      ? `${Math.round(durationSeconds / 60)} phút`
-                      : `${Math.floor(durationSeconds / 3600)}h ${Math.round((durationSeconds % 3600) / 60)}p`),
-                  distanceMeters,
-                  durationSeconds,
-                  isFallback: false,
-                  usedVehicle: tryVehicle,
-                });
-
-                if (tryVehicle !== vehicle) {
-                  alternativeVehicleCount += 1;
-                }
-
-                segmentAdded = true;
-                break;
-              } catch {
-                // Try next vehicle profile for this leg.
-              }
-            }
-          }
-
-          if (!segmentAdded) {
-            const fallbackLegCandidates = [
-              routeLegs[index],
-              index > 0 ? routeLegs[index - 1] : null,
-            ].filter(
-              (leg): leg is NonNullable<(typeof routeLegs)[number]> => !!leg,
-            );
-
-            for (const leg of fallbackLegCandidates) {
-              if (
-                !leg.overviewPolyline ||
-                leg.overviewPolyline.trim().length === 0
-              ) {
-                continue;
-              }
-
-              try {
-                const legPoints = polylineDecode.decode(
-                  leg.overviewPolyline,
-                ) as [number, number][];
-
-                if (legPoints.length < 2) {
-                  continue;
-                }
-
-                const distanceMeters = Number.isFinite(leg.distanceMeters)
-                  ? leg.distanceMeters
-                  : Math.round(
-                      haversineDistanceMeters(currentOrigin, {
-                        lat: waypoint.lat,
-                        lng: waypoint.lng,
-                      }),
-                    );
-                const durationSeconds = Number.isFinite(leg.durationSeconds)
-                  ? leg.durationSeconds
-                  : estimateDurationSeconds(distanceMeters, vehicle);
-
-                nextSegments.push({
-                  index,
-                  waypoint,
-                  points: legPoints,
-                  steps: [],
-                  distance:
-                    leg.distanceText ||
-                    (distanceMeters < 1000
-                      ? `${distanceMeters}m`
-                      : `${(distanceMeters / 1000).toFixed(1)} km`),
-                  duration:
-                    leg.durationText ||
-                    (durationSeconds < 3600
-                      ? `${Math.round(durationSeconds / 60)} phút`
-                      : `${Math.floor(durationSeconds / 3600)}h ${Math.round((durationSeconds % 3600) / 60)}p`),
-                  distanceMeters,
-                  durationSeconds,
-                  isFallback: true,
-                  usedVehicle: vehicle,
-                });
-
-                fallbackCount += 1;
-                segmentAdded = true;
-                break;
-              } catch {
-                // Ignore invalid fallback leg polyline and continue.
-              }
-            }
-          }
-
-          if (!segmentAdded) {
-            const distanceMeters = Math.round(
-              haversineDistanceMeters(currentOrigin, {
-                lat: waypoint.lat,
-                lng: waypoint.lng,
-              }),
-            );
-            const durationSeconds = estimateDurationSeconds(
-              distanceMeters,
-              vehicle,
-            );
-
-            nextSegments.push({
-              index,
-              waypoint,
-              points: [
-                [currentOrigin.lat, currentOrigin.lng],
-                [waypoint.lat, waypoint.lng],
-              ],
-              steps: [],
-              distance:
-                distanceMeters < 1000
-                  ? `${distanceMeters}m`
-                  : `${(distanceMeters / 1000).toFixed(1)} km`,
-              duration:
-                durationSeconds < 3600
-                  ? `${Math.round(durationSeconds / 60)} phút`
-                  : `${Math.floor(durationSeconds / 3600)}h ${Math.round((durationSeconds % 3600) / 60)}p`,
-              distanceMeters,
-              durationSeconds,
-              isFallback: true,
-              usedVehicle: vehicle,
-            });
-
-            fallbackCount += 1;
-          }
-        }
-
-        currentOrigin = { lat: waypoint.lat, lng: waypoint.lng };
-        setActivityRouteProgress(index + 1);
-      }
-
-      if (!activityRouteAbortRef.current) {
-        setActivityRouteSegments(nextSegments);
-        setActivityRouteFallbackSegments(fallbackCount);
-        setActivityRouteAlternativeVehicleSegments(alternativeVehicleCount);
-        setIsActivityRouteLoading(false);
-      }
-    })();
-
-    return () => {
-      activityRouteAbortRef.current = true;
-    };
-  }, [
-    open,
-    selectedMissionTeam?.missionTeamId,
-    waypointGroups,
-    originCoords.lat,
-    originCoords.lng,
-    vehicle,
-    mission.id,
-    routeLegs,
-  ]);
-
   const decodedRoutePoints = useMemo(() => {
     if (!teamRouteData?.overviewPolyline) return [] as [number, number][];
 
@@ -2875,62 +2609,71 @@ const MissionTeamRoutePreview = ({
     }
   }, [teamRouteData?.overviewPolyline]);
 
-  const activityRoutePoints = useMemo(() => {
-    if (activityRouteSegments.length === 0) {
+  const decodedLegRoutePoints = useMemo(() => {
+    if (routeLegs.length === 0) {
       return [] as [number, number][];
     }
 
     const points: [number, number][] = [];
 
-    for (const segment of activityRouteSegments) {
-      for (const point of segment.points) {
-        const last = points[points.length - 1];
-        if (
-          last &&
-          Math.abs(last[0] - point[0]) < COORD_EPSILON &&
-          Math.abs(last[1] - point[1]) < COORD_EPSILON
-        ) {
-          continue;
-        }
+    for (const leg of routeLegs) {
+      if (!leg.overviewPolyline || leg.overviewPolyline.trim().length === 0) {
+        continue;
+      }
 
-        points.push(point);
+      try {
+        const decoded = polylineDecode.decode(leg.overviewPolyline) as [
+          number,
+          number,
+        ][];
+
+        for (const point of decoded) {
+          const last = points[points.length - 1];
+          if (
+            last &&
+            Math.abs(last[0] - point[0]) < COORD_EPSILON &&
+            Math.abs(last[1] - point[1]) < COORD_EPSILON
+          ) {
+            continue;
+          }
+
+          points.push(point);
+        }
+      } catch {
+        // Ignore malformed leg polyline and continue with next leg.
       }
     }
 
     return points;
-  }, [activityRouteSegments]);
+  }, [routeLegs]);
 
-  const activitySegmentByIndex = useMemo(
-    () =>
-      new Map(activityRouteSegments.map((segment) => [segment.index, segment])),
-    [activityRouteSegments],
-  );
+  const routeLegByWaypointIndex = useMemo(() => {
+    const mapping = new Map<number, (typeof routeLegs)[number]>();
 
-  const activityRouteDistanceMeters = useMemo(
-    () =>
-      activityRouteSegments.reduce(
-        (sum, segment) =>
-          sum +
-          (Number.isFinite(segment.distanceMeters)
-            ? segment.distanceMeters
-            : 0),
-        0,
-      ),
-    [activityRouteSegments],
-  );
+    for (let index = 0; index < waypointGroups.length; index += 1) {
+      const apiWaypoint = routeWaypoints[index];
+      const step = apiWaypoint?.step;
+      let matchedLeg: (typeof routeLegs)[number] | undefined;
 
-  const activityRouteDurationSeconds = useMemo(
-    () =>
-      activityRouteSegments.reduce(
-        (sum, segment) =>
-          sum +
-          (Number.isFinite(segment.durationSeconds)
-            ? segment.durationSeconds
-            : 0),
-        0,
-      ),
-    [activityRouteSegments],
-  );
+      if (Number.isFinite(step)) {
+        matchedLeg = routeLegs.find((leg) => leg.toStep === step);
+      }
+
+      if (!matchedLeg && index > 0) {
+        matchedLeg = routeLegs[index - 1];
+      }
+
+      if (!matchedLeg && routeLegs.length === waypointGroups.length) {
+        matchedLeg = routeLegs[index];
+      }
+
+      if (matchedLeg) {
+        mapping.set(index, matchedLeg);
+      }
+    }
+
+    return mapping;
+  }, [routeLegs, routeWaypoints, waypointGroups]);
 
   const stopoverGuidePoints = useMemo(() => {
     const points: [number, number][] = [[originCoords.lat, originCoords.lng]];
@@ -2957,13 +2700,114 @@ const MissionTeamRoutePreview = ({
     [stopoverGuidePoints],
   );
 
+  const splitOverviewSegments = useMemo(() => {
+    if (decodedRoutePoints.length < 2 || stopoverGuidePoints.length < 3) {
+      return [] as [number, number][][];
+    }
+
+    const legCount = stopoverGuidePoints.length - 1;
+    const segments: [number, number][][] = [];
+    let previousIndex = 0;
+
+    for (let legIndex = 0; legIndex < legCount; legIndex += 1) {
+      const remainingLegs = legCount - legIndex - 1;
+      const minEndIndex = previousIndex + 1;
+      const maxEndIndex = decodedRoutePoints.length - 1 - remainingLegs;
+
+      if (minEndIndex > maxEndIndex) {
+        return [] as [number, number][][];
+      }
+
+      let endIndex = maxEndIndex;
+
+      if (legIndex < legCount - 1) {
+        const target = stopoverGuidePoints[legIndex + 1];
+        let bestIndex = minEndIndex;
+        let bestDistance = Number.POSITIVE_INFINITY;
+
+        for (
+          let pointIndex = minEndIndex;
+          pointIndex <= maxEndIndex;
+          pointIndex += 1
+        ) {
+          const point = decodedRoutePoints[pointIndex];
+          const distance = haversineDistanceMeters(
+            { lat: point[0], lng: point[1] },
+            { lat: target[0], lng: target[1] },
+          );
+
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = pointIndex;
+          }
+        }
+
+        if (bestDistance > OVERVIEW_SPLIT_MAX_MATCH_DISTANCE_METERS) {
+          return [] as [number, number][][];
+        }
+
+        endIndex = bestIndex;
+      }
+
+      const segmentPoints = decodedRoutePoints.slice(
+        previousIndex,
+        endIndex + 1,
+      );
+      if (segmentPoints.length < 2) {
+        return [] as [number, number][][];
+      }
+
+      segments.push(segmentPoints);
+      previousIndex = endIndex;
+    }
+
+    return segments;
+  }, [decodedRoutePoints, stopoverGuidePoints]);
+
+  const splitOverviewPoints = useMemo(() => {
+    if (splitOverviewSegments.length === 0) {
+      return [] as [number, number][];
+    }
+
+    const points: [number, number][] = [];
+
+    for (const segment of splitOverviewSegments) {
+      for (const point of segment) {
+        const last = points[points.length - 1];
+        if (
+          last &&
+          Math.abs(last[0] - point[0]) < COORD_EPSILON &&
+          Math.abs(last[1] - point[1]) < COORD_EPSILON
+        ) {
+          continue;
+        }
+
+        points.push(point);
+      }
+    }
+
+    return points;
+  }, [splitOverviewSegments]);
+
+  const apiRoutePoints = useMemo(() => {
+    if (decodedRoutePoints.length > 1) {
+      return decodedRoutePoints;
+    }
+
+    if (decodedLegRoutePoints.length > 1) {
+      return decodedLegRoutePoints;
+    }
+
+    return [] as [number, number][];
+  }, [decodedRoutePoints, decodedLegRoutePoints]);
+
   const missingWaypointCount = useMemo(() => {
-    if (decodedRoutePoints.length <= 1 || waypointGroups.length === 0) {
+    if (apiRoutePoints.length <= 1 || waypointGroups.length === 0) {
       return 0;
     }
 
     return waypointGroups.reduce((missing, waypoint) => {
-      const covered = decodedRoutePoints.some(
+      const covered = apiRoutePoints.some(
         ([lat, lng]) =>
           Math.abs(lat - waypoint.lat) < MISSION_TEAM_ROUTE_WAYPOINT_EPSILON &&
           Math.abs(lng - waypoint.lng) < MISSION_TEAM_ROUTE_WAYPOINT_EPSILON,
@@ -2971,14 +2815,14 @@ const MissionTeamRoutePreview = ({
 
       return covered ? missing : missing + 1;
     }, 0);
-  }, [decodedRoutePoints, waypointGroups]);
+  }, [apiRoutePoints, waypointGroups]);
 
   const shouldPreferStopoverGuide = useMemo(() => {
     if (waypointGroups.length <= 1) {
       return false;
     }
 
-    if (decodedRoutePoints.length <= 1) {
+    if (apiRoutePoints.length <= 1) {
       return true;
     }
 
@@ -2989,30 +2833,46 @@ const MissionTeamRoutePreview = ({
     return missingWaypointCount > 0;
   }, [
     waypointGroups.length,
-    decodedRoutePoints.length,
+    apiRoutePoints.length,
     routeLegs.length,
     expectedLegCount,
     missingWaypointCount,
   ]);
 
+  const shouldUseSplitOverview = useMemo(() => {
+    if (!shouldPreferStopoverGuide) {
+      return false;
+    }
+
+    if (expectedLegCount <= 1) {
+      return false;
+    }
+
+    return splitOverviewSegments.length === expectedLegCount;
+  }, [shouldPreferStopoverGuide, expectedLegCount, splitOverviewSegments]);
+
+  const isUsingStopoverGuideFallback =
+    shouldPreferStopoverGuide && !shouldUseSplitOverview;
+
   const displayPoints = useMemo(() => {
-    if (activityRoutePoints.length > 1) {
-      return activityRoutePoints;
+    if (shouldUseSplitOverview && splitOverviewPoints.length > 1) {
+      return splitOverviewPoints;
     }
 
-    if (decodedRoutePoints.length > 1) {
-      return decodedRoutePoints;
-    }
-
-    if (shouldPreferStopoverGuide && stopoverGuidePoints.length > 1) {
+    if (isUsingStopoverGuideFallback && stopoverGuidePoints.length > 1) {
       return stopoverGuidePoints;
+    }
+
+    if (apiRoutePoints.length > 1) {
+      return apiRoutePoints;
     }
 
     return stopoverGuidePoints;
   }, [
-    activityRoutePoints,
-    decodedRoutePoints,
-    shouldPreferStopoverGuide,
+    apiRoutePoints,
+    isUsingStopoverGuideFallback,
+    shouldUseSplitOverview,
+    splitOverviewPoints,
     stopoverGuidePoints,
   ]);
 
@@ -3026,14 +2886,6 @@ const MissionTeamRoutePreview = ({
 
   const totalDistanceMeters = useMemo(() => {
     if (
-      activityRouteSegments.length > 0 &&
-      Number.isFinite(activityRouteDistanceMeters) &&
-      activityRouteDistanceMeters > 0
-    ) {
-      return activityRouteDistanceMeters;
-    }
-
-    if (
       teamRouteData &&
       Number.isFinite(teamRouteData.totalDistanceMeters) &&
       teamRouteData.totalDistanceMeters > 0
@@ -3046,22 +2898,9 @@ const MissionTeamRoutePreview = ({
         sum + (Number.isFinite(leg.distanceMeters) ? leg.distanceMeters : 0),
       0,
     );
-  }, [
-    activityRouteSegments.length,
-    activityRouteDistanceMeters,
-    teamRouteData,
-    routeLegs,
-  ]);
+  }, [teamRouteData, routeLegs]);
 
   const totalDurationSeconds = useMemo(() => {
-    if (
-      activityRouteSegments.length > 0 &&
-      Number.isFinite(activityRouteDurationSeconds) &&
-      activityRouteDurationSeconds > 0
-    ) {
-      return activityRouteDurationSeconds;
-    }
-
     if (
       teamRouteData &&
       Number.isFinite(teamRouteData.totalDurationSeconds) &&
@@ -3075,11 +2914,94 @@ const MissionTeamRoutePreview = ({
         sum + (Number.isFinite(leg.durationSeconds) ? leg.durationSeconds : 0),
       0,
     );
+  }, [teamRouteData, routeLegs]);
+
+  const splitOverviewLegByWaypointIndex = useMemo(() => {
+    const mapping = new Map<
+      number,
+      {
+        distanceMeters: number;
+        durationSeconds: number;
+      }
+    >();
+
+    if (!shouldUseSplitOverview || splitOverviewSegments.length === 0) {
+      return mapping;
+    }
+
+    const rawDistances = splitOverviewSegments.map((segment) => {
+      let distanceMeters = 0;
+
+      for (let pointIndex = 1; pointIndex < segment.length; pointIndex += 1) {
+        distanceMeters += haversineDistanceMeters(
+          { lat: segment[pointIndex - 1][0], lng: segment[pointIndex - 1][1] },
+          { lat: segment[pointIndex][0], lng: segment[pointIndex][1] },
+        );
+      }
+
+      return distanceMeters;
+    });
+
+    const rawDistanceTotal = rawDistances.reduce(
+      (sum, value) => sum + value,
+      0,
+    );
+
+    const normalizedDistances = rawDistances.map((distanceMeters) => {
+      if (
+        Number.isFinite(totalDistanceMeters) &&
+        totalDistanceMeters > 0 &&
+        rawDistanceTotal > 0
+      ) {
+        return (distanceMeters / rawDistanceTotal) * totalDistanceMeters;
+      }
+
+      return distanceMeters;
+    });
+
+    const normalizedDistanceTotal = normalizedDistances.reduce(
+      (sum, value) => sum + value,
+      0,
+    );
+
+    for (
+      let legIndex = 0;
+      legIndex < normalizedDistances.length;
+      legIndex += 1
+    ) {
+      const distanceMeters = Math.max(
+        0,
+        Math.round(normalizedDistances[legIndex] ?? 0),
+      );
+
+      let durationSeconds = 0;
+
+      if (
+        Number.isFinite(totalDurationSeconds) &&
+        totalDurationSeconds > 0 &&
+        normalizedDistanceTotal > 0
+      ) {
+        durationSeconds = Math.max(
+          60,
+          Math.round(
+            ((normalizedDistances[legIndex] ?? 0) / normalizedDistanceTotal) *
+              totalDurationSeconds,
+          ),
+        );
+      } else {
+        durationSeconds = estimateDurationSeconds(distanceMeters, vehicle);
+      }
+
+      mapping.set(legIndex, { distanceMeters, durationSeconds });
+    }
+
+    return mapping;
   }, [
-    activityRouteSegments.length,
-    activityRouteDurationSeconds,
-    teamRouteData,
-    routeLegs,
+    shouldUseSplitOverview,
+    splitOverviewSegments,
+    totalDistanceMeters,
+    totalDurationSeconds,
+    vehicle,
   ]);
 
   const formatDuration = (seconds: number) => {
@@ -3096,8 +3018,7 @@ const MissionTeamRoutePreview = ({
     return `${(meters / 1000).toFixed(1)} km`;
   };
 
-  const isLoadingRoute =
-    isTeamRouteLoading || isTeamRouteFetching || isActivityRouteLoading;
+  const isLoadingRoute = isTeamRouteLoading || isTeamRouteFetching;
 
   if (missionRouteTeams.length === 0) return null;
 
@@ -3117,10 +3038,11 @@ const MissionTeamRoutePreview = ({
   const selectedTeamLabel =
     selectedMissionTeam?.teamName ||
     (selectedMissionTeam ? `Đội #${selectedMissionTeam.rescueTeamId}` : "-");
-  const displayedLegCount =
-    activityRouteSegments.length > 0
-      ? activityRouteSegments.length
-      : Math.max(routeLegs.length, expectedLegCount);
+  const displayedLegCount = shouldPreferStopoverGuide
+    ? expectedLegCount
+    : routeLegs.length > 0
+      ? routeLegs.length
+      : expectedLegCount;
   const consolidatedDurationLabel =
     Number.isFinite(totalDurationSeconds) && totalDurationSeconds > 0
       ? formatDuration(totalDurationSeconds)
@@ -3221,9 +3143,7 @@ const MissionTeamRoutePreview = ({
         <div className="space-y-1">
           <p className="flex items-center gap-1 text-sm text-muted-foreground animate-pulse">
             <CircleNotch className="h-3 w-3 animate-spin" />
-            {isActivityRouteLoading && waypointGroups.length > 0
-              ? `Đang tải chỉ đường từng chặng (${activityRouteProgress}/${waypointGroups.length})...`
-              : "Đang tải lộ trình đội..."}
+            Đang tải lộ trình đội...
           </p>
           <Skeleton className="h-48 w-full rounded" />
         </div>
@@ -3239,26 +3159,19 @@ const MissionTeamRoutePreview = ({
         </p>
       ) : null}
 
-      {!isLoadingRoute &&
-      activityRouteSegments.length > 0 &&
-      (activityRouteFallbackSegments > 0 ||
-        activityRouteAlternativeVehicleSegments > 0) ? (
-        <p className="text-sm text-amber-700 dark:text-amber-300">
-          {activityRouteAlternativeVehicleSegments > 0
-            ? `${activityRouteAlternativeVehicleSegments} chặng đã tự đổi phương tiện để tìm đường. `
-            : ""}
-          {activityRouteFallbackSegments > 0
-            ? `${activityRouteFallbackSegments} chặng đang dùng fallback vì API chưa trả đủ tuyến.`
-            : ""}
+      {!isLoadingRoute && shouldUseSplitOverview && expectedLegCount > 1 ? (
+        <p className="text-sm text-emerald-700 dark:text-emerald-300">
+          API chỉ trả tuyến tổng, hệ thống đã tách overview polyline theo
+          waypoint để hiển thị đúng từng chặng.
         </p>
       ) : null}
 
       {!isLoadingRoute &&
-      shouldPreferStopoverGuide &&
+      isUsingStopoverGuideFallback &&
       waypointGroups.length > 1 &&
-      activityRouteSegments.length === 0 ? (
+      expectedLegCount > 1 ? (
         <p className="text-sm text-amber-700 dark:text-amber-300">
-          Chưa lấy được chỉ đường từng chặng, đang tạm hiển thị tuyến nối
+          API tuyến đội chưa trả đủ polyline, đang tạm hiển thị tuyến nối
           waypoint để giữ đúng thứ tự điểm dừng.
         </p>
       ) : null}
@@ -3293,75 +3206,44 @@ const MissionTeamRoutePreview = ({
             <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <RoutePreviewFitBounds points={displayPoints} />
 
-            {activityRouteSegments.length > 0 ? (
-              activityRouteSegments.flatMap((segment, segmentIndex) => {
-                const durationLabel =
-                  (typeof segment.duration === "string" &&
-                    segment.duration.trim()) ||
-                  formatDuration(segment.durationSeconds);
-                const routeLabelAnchor = getRouteLabelAnchor(segment.points);
-                const segmentKey = `mission-team-route-segment-${segment.index}-${segmentIndex}`;
-
-                return [
-                  <Polyline
-                    key={`${segmentKey}-line`}
-                    positions={segment.points}
-                    pathOptions={{
-                      color: "#FF6B35",
-                      weight: segment.isFallback ? 4 : 5,
-                      opacity: segment.isFallback ? 0.75 : 0.88,
-                      lineJoin: "round",
-                      lineCap: "round",
-                      dashArray: segment.isFallback ? "7 7" : undefined,
-                    }}
-                  />,
-                  routeLabelAnchor ? (
-                    <Marker
-                      key={`${segmentKey}-eta`}
-                      position={routeLabelAnchor}
-                      icon={buildRouteDurationBadgeIcon(
-                        durationLabel,
-                        segment.isFallback ? "neutral" : "primary",
-                      )}
-                      interactive={false}
-                      keyboard={false}
-                    />
-                  ) : null,
-                ];
-              })
-            ) : (
-              <>
+            {shouldUseSplitOverview ? (
+              splitOverviewSegments.map((segment, segmentIndex) => (
                 <Polyline
-                  positions={displayPoints}
+                  key={`mission-team-overview-segment-${segmentIndex}`}
+                  positions={segment}
                   pathOptions={{
                     color: "#FF6B35",
                     weight: 5,
                     opacity: 0.85,
                     lineJoin: "round",
                     lineCap: "round",
-                    dashArray:
-                      shouldPreferStopoverGuide &&
-                      decodedRoutePoints.length <= 1
-                        ? "7 7"
-                        : undefined,
                   }}
                 />
-                {consolidatedDurationLabel && consolidatedRouteLabelAnchor ? (
-                  <Marker
-                    position={consolidatedRouteLabelAnchor}
-                    icon={buildRouteDurationBadgeIcon(
-                      consolidatedDurationLabel,
-                      shouldPreferStopoverGuide &&
-                        decodedRoutePoints.length <= 1
-                        ? "neutral"
-                        : "primary",
-                    )}
-                    interactive={false}
-                    keyboard={false}
-                  />
-                ) : null}
-              </>
+              ))
+            ) : (
+              <Polyline
+                positions={displayPoints}
+                pathOptions={{
+                  color: "#FF6B35",
+                  weight: 5,
+                  opacity: 0.85,
+                  lineJoin: "round",
+                  lineCap: "round",
+                  dashArray: isUsingStopoverGuideFallback ? "7 7" : undefined,
+                }}
+              />
             )}
+            {consolidatedDurationLabel && consolidatedRouteLabelAnchor ? (
+              <Marker
+                position={consolidatedRouteLabelAnchor}
+                icon={buildRouteDurationBadgeIcon(
+                  consolidatedDurationLabel,
+                  isUsingStopoverGuideFallback ? "neutral" : "primary",
+                )}
+                interactive={false}
+                keyboard={false}
+              />
+            ) : null}
 
             {originCoords ? (
               <CircleMarker
@@ -3427,25 +3309,46 @@ const MissionTeamRoutePreview = ({
       {!isLoadingRoute && waypointGroups.length > 0 && (
         <div className="mt-1 space-y-1.5">
           {waypointGroups.map((waypoint, index) => {
-            const activitySegment = activitySegmentByIndex.get(index);
-            const routeLeg = index > 0 ? routeLegs[index - 1] : null;
-            const legendLeg = activitySegment ?? routeLeg;
+            const routeLeg = shouldUseSplitOverview
+              ? null
+              : routeLegByWaypointIndex.get(index);
+            const splitLeg = splitOverviewLegByWaypointIndex.get(index);
             const meta = waypointMetaList[index];
             const apiWaypoint = routeWaypoints[index];
+            const routeLegStatus = (routeLeg?.status ?? "")
+              .trim()
+              .toUpperCase();
+            const isRouteLegFallback =
+              routeLeg != null
+                ? routeLegStatus === "NO_ROUTE" ||
+                  routeLegStatus === "FALLBACK" ||
+                  !routeLeg?.overviewPolyline
+                : !!splitLeg;
+
+            const legDistanceLabel = routeLeg
+              ? routeLeg.distanceText || formatDistance(routeLeg.distanceMeters)
+              : splitLeg
+                ? formatDistance(splitLeg.distanceMeters)
+                : "";
+
+            const legDurationLabel = routeLeg
+              ? routeLeg.durationText ||
+                formatDuration(routeLeg.durationSeconds)
+              : splitLeg
+                ? formatDuration(splitLeg.durationSeconds)
+                : "";
 
             return (
               <div
                 key={`mission-team-waypoint-legend-${index}`}
                 className="space-y-0.5"
               >
-                {legendLeg ? (
+                {routeLeg || splitLeg ? (
                   <div className="flex items-center gap-2 text-sm">
                     <span
                       className={cn(
                         "h-1 w-4 shrink-0 rounded-full",
-                        activitySegment?.isFallback
-                          ? "bg-[#FF6B35]/70"
-                          : "bg-[#FF6B35]",
+                        isRouteLegFallback ? "bg-[#FF6B35]/70" : "bg-[#FF6B35]",
                       )}
                     />
                     <NavigationArrow
@@ -3453,11 +3356,7 @@ const MissionTeamRoutePreview = ({
                       weight="bold"
                     />
                     <span className="text-muted-foreground">
-                      {activitySegment
-                        ? `${activitySegment.distance || formatDistance(activitySegment.distanceMeters)} · ${activitySegment.duration || formatDuration(activitySegment.durationSeconds)}`
-                        : routeLeg
-                          ? `${routeLeg.distanceText || formatDistance(routeLeg.distanceMeters)} · ${routeLeg.durationText || formatDuration(routeLeg.durationSeconds)}`
-                          : ""}
+                      {`${legDistanceLabel} · ${legDurationLabel}`}
                     </span>
                   </div>
                 ) : null}

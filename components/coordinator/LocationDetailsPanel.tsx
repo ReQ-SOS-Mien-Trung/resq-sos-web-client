@@ -44,10 +44,6 @@ import {
   Phone,
   EnvelopeSimple,
   Package,
-  NavigationArrow,
-  ShareNetwork,
-  BookmarkSimple,
-  DotsThree,
   Users,
   Hash,
   Info,
@@ -557,11 +553,17 @@ function DepotDetails({
     data: inventoryData,
     isLoading: isInventoryLoading,
     isError: isInventoryError,
+    isFetching: isInventoryFetching,
+    refetch: refetchInventory,
   } = useDepotInventory({
     depotId: depot.id,
     pageNumber: inventoryPageNumber,
     pageSize: INVENTORY_PAGE_SIZE,
   });
+
+  const handleRefreshInventory = useCallback(() => {
+    void refetchInventory();
+  }, [refetchInventory]);
 
   const statusConfig = depotStatusConfig[depot.status];
   const StatusIcon = statusConfig.icon;
@@ -681,28 +683,20 @@ function DepotDetails({
         </div>
       </div>
 
-      {/* Quick Actions - Google Maps style */}
+      {/* Quick Actions */}
       <div className="px-5 py-3 border-b shrink-0">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           <ActionButton
-            icon={<NavigationArrow className="h-5 w-5" weight="fill" />}
-            label="Chỉ đường"
-            color="text-blue-600 dark:text-blue-400"
-          />
-          <ActionButton
-            icon={<BookmarkSimple className="h-5 w-5" />}
-            label="Lưu"
-            color="text-blue-600 dark:text-blue-400"
-          />
-          <ActionButton
-            icon={<ShareNetwork className="h-5 w-5" />}
-            label="Chia sẻ"
-            color="text-blue-600 dark:text-blue-400"
-          />
-          <ActionButton
-            icon={<DotsThree className="h-5 w-5" weight="bold" />}
-            label="Thêm"
-            color="text-blue-600 dark:text-blue-400"
+            icon={
+              <ArrowsClockwise
+                className={cn("h-5 w-5", isInventoryFetching && "animate-spin")}
+              />
+            }
+            label="Làm mới tồn kho"
+            color="text-[#FF5722]"
+            active={isInventoryFetching}
+            disabled={isInventoryFetching}
+            onClick={handleRefreshInventory}
           />
         </div>
       </div>
@@ -979,12 +973,14 @@ function AssemblyPointDetails({
     data: assemblyPointDetail,
     isLoading: isAssemblyPointDetailLoading,
     isError: isAssemblyPointDetailError,
+    isFetching: isAssemblyPointDetailFetching,
     refetch: refetchAssemblyPointDetail,
   } = useAssemblyPointById(assemblyPoint.id, { enabled: true });
   const {
     data: assemblyPointEvents,
     isLoading: isAssemblyPointEventsLoading,
     isError: isAssemblyPointEventsError,
+    isFetching: isAssemblyPointEventsFetching,
     refetch: refetchAssemblyPointEvents,
   } = useAssemblyPointEvents(assemblyPoint.id, {
     enabled: true,
@@ -1134,7 +1130,20 @@ function AssemblyPointDetails({
     hasActiveEvent && selectedEvent?.status !== "Gathering";
   const shouldShowCreateTeam =
     hasActiveEvent && selectedEvent?.status === "Gathering";
+  const canToggleSchedule = !hasActiveEvent;
+  const canOpenCheckIn =
+    shouldShowOpenCheckIn && !isStartingGathering && !!selectedEventId;
+  const canCreateTeam = shouldShowCreateTeam;
+  const checkInActionLabel =
+    selectedEvent?.status === "Gathering" ? "Đang check-in" : "Mở check-in";
+  const isRefreshingAssemblyData =
+    isAssemblyPointDetailFetching || isAssemblyPointEventsFetching;
   const assemblyPointImageUrl = displayAssemblyPoint.imageUrl?.trim() || null;
+
+  const handleRefreshAssemblyData = useCallback(() => {
+    void refetchAssemblyPointDetail();
+    void refetchAssemblyPointEvents();
+  }, [refetchAssemblyPointDetail, refetchAssemblyPointEvents]);
 
   const handleCreateTeam = () => {
     const eventId = selectedEvent?.eventId ?? selectedEventId;
@@ -1222,49 +1231,72 @@ function AssemblyPointDetails({
 
       {/* Quick Actions */}
       <div className="px-5 py-3 border-b shrink-0">
-        <div className="flex items-center justify-between">
-          <ActionButton
-            icon={<NavigationArrow className="h-5 w-5" weight="fill" />}
-            label="Chỉ đường"
-            color="text-purple-600 dark:text-purple-400"
-          />
-          <ActionButton
-            icon={<BookmarkSimple className="h-5 w-5" />}
-            label="Lưu"
-            color="text-purple-600 dark:text-purple-400"
-          />
-          <ActionButton
-            icon={<ShareNetwork className="h-5 w-5" />}
-            label="Chia sẻ"
-            color="text-purple-600 dark:text-purple-400"
-          />
-          {hasActiveEvent ? (
-            shouldShowOpenCheckIn ? (
-              <ActionButton
-                icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
-                label="Mở check-in"
-                color="text-[#FF5722]"
-                active={isStartingGathering}
-                disabled={isStartingGathering || !selectedEventId}
-                onClick={handleStartGathering}
-              />
-            ) : shouldShowCreateTeam ? (
-              <ActionButton
-                icon={<Users className="h-5 w-5" />}
-                label="Tạo team"
-                color="text-purple-600 dark:text-purple-400"
-                onClick={handleCreateTeam}
-              />
-            ) : null
-          ) : (
+        <div className="grid grid-cols-4 gap-2">
+          <div className="flex justify-center">
             <ActionButton
               icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
-              label={showScheduleForm ? "Ẩn triệu tập" : "Triệu tập mới"}
-              color="text-[#FF5722]"
-              active={!hasActiveEvent && showScheduleForm}
-              onClick={() => setShowScheduleForm((prev) => !prev)}
+              label={showScheduleForm ? "Ẩn triệu tập" : "Triệu tập"}
+              color={
+                canToggleSchedule
+                  ? "text-[#FF5722]"
+                  : "text-slate-600 dark:text-slate-300"
+              }
+              active={canToggleSchedule && showScheduleForm}
+              disabled={!canToggleSchedule}
+              onClick={
+                canToggleSchedule
+                  ? () => setShowScheduleForm((prev) => !prev)
+                  : undefined
+              }
             />
-          )}
+          </div>
+
+          <div className="flex justify-center">
+            <ActionButton
+              icon={<Hash className="h-5 w-5" weight="bold" />}
+              label={checkInActionLabel}
+              color={
+                canOpenCheckIn
+                  ? "text-[#FF5722]"
+                  : "text-slate-600 dark:text-slate-300"
+              }
+              active={isStartingGathering}
+              disabled={!canOpenCheckIn}
+              onClick={canOpenCheckIn ? handleStartGathering : undefined}
+            />
+          </div>
+
+          <div className="flex justify-center">
+            <ActionButton
+              icon={<Users className="h-5 w-5" />}
+              label="Tạo team"
+              color={
+                canCreateTeam
+                  ? "text-[#FF5722]"
+                  : "text-slate-600 dark:text-slate-300"
+              }
+              disabled={!canCreateTeam}
+              onClick={canCreateTeam ? handleCreateTeam : undefined}
+            />
+          </div>
+
+          <div className="flex justify-center">
+            <ActionButton
+              icon={
+                <ArrowsClockwise
+                  className={cn(
+                    "h-5 w-5",
+                    isRefreshingAssemblyData && "animate-spin",
+                  )}
+                />
+              }
+              label="Làm mới"
+              color="text-slate-600 dark:text-slate-300"
+              active={isRefreshingAssemblyData}
+              disabled={isRefreshingAssemblyData}
+              onClick={handleRefreshAssemblyData}
+            />
+          </div>
         </div>
 
         {!hasActiveEvent && showScheduleForm && (
