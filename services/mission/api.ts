@@ -81,6 +81,7 @@ function normalizeMissionTeamRouteLeg(
 
   return {
     ...leg,
+    segmentIndex: toNumberOrNull(leg?.segmentIndex),
     fromStep: toNumberOrNull(leg?.fromStep),
     toStep: toNumberOrNull(leg?.toStep),
     fromLatitude: toNumberOrNull(leg?.fromLatitude),

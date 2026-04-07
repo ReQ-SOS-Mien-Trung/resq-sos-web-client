@@ -68,11 +68,24 @@ import { useBackendConnectionStore } from "@/stores/backend-connection.store";
 const PANEL_WIDTH = 420;
 const INVENTORY_PAGE_SIZE = 10;
 
-const assemblyTeamTypeLabel: Record<AssemblyPointTeam["teamType"], string> = {
+const assemblyTeamTypeLabel: Record<string, string> = {
   Rescue: "Cứu hộ",
   Medical: "Y tế",
   Transportation: "Vận chuyển",
+  Mixed: "Tổng hợp",
+  MIXED: "Tổng hợp",
 };
+
+function getAssemblyTeamTypeLabel(teamType: unknown): string {
+  const rawType = String(teamType ?? "").trim();
+  if (!rawType) return "Không xác định";
+
+  return (
+    assemblyTeamTypeLabel[rawType] ??
+    assemblyTeamTypeLabel[rawType.toUpperCase()] ??
+    formatStatusText(rawType.replace(/_/g, " "))
+  );
+}
 
 const assemblyTeamStatusLabel: Record<string, string> = {
   AwaitingAcceptance: "Chờ xác nhận",
@@ -1513,7 +1526,7 @@ function AssemblyPointDetails({
                     </div>
 
                     <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{assemblyTeamTypeLabel[team.teamType]}</span>
+                      <span>{getAssemblyTeamTypeLabel(team.teamType)}</span>
                       <span>•</span>
                       <span>
                         {team.members.length}/{team.maxMembers} thành viên

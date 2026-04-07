@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { RescuePlanPanelProps } from "@/type";
 import polylineDecode from "@mapbox/polyline";
 import {
@@ -60,6 +61,8 @@ import { getActivityRoute } from "@/services/mission/api";
 import type {
   MissionActivity,
   MissionEntity,
+  MissionTeamRouteLeg,
+  MissionTeamRouteWaypoint,
   MissionType,
   MissionTeam,
   RouteVehicle,
@@ -221,6 +224,23 @@ const formatDistanceKmLabel = (distanceKm?: number | null) => {
   if (!Number.isFinite(distanceKm)) return "--";
   return `${distanceKm!.toFixed(1)} km`;
 };
+
+function buildFallbackSOSRequest(sosId: string): SOSRequest {
+  return {
+    id: sosId,
+    groupId: sosId,
+    location: { lat: 0, lng: 0 },
+    priority: "P3",
+    needs: {
+      medical: false,
+      food: false,
+      boat: false,
+    },
+    status: "PENDING",
+    message: `Đang chờ đồng bộ thông tin cho SOS #${sosId}.`,
+    createdAt: new Date(0),
+  };
+}
 
 function getRescueTeamOperationalRank(status?: string | null): number {
   const normalizedStatus = (status ?? "").trim().toLowerCase();
@@ -1044,11 +1064,27 @@ interface RouteSegment {
   usedVehicle?: RouteVehicle;
 }
 
+interface MissionTeamRenderableLeg {
+  leg?: MissionTeamRouteLeg;
+  destinationGroupIndex: number | null;
+  points: [number, number][];
+  isFallback: boolean;
+  distanceMeters: number;
+  durationSeconds: number;
+  distanceText: string;
+  durationText: string;
+  source: "team-route" | "activity-route";
+}
+
 const COORD_EPSILON = 0.0005; // ~55m tolerance for "same location"
 const HUE_DEFAULT_ORIGIN = { lat: 16.4637, lng: 107.5909 };
 const SOS_COORD_MATCH_EPSILON = 0.003; // ~330m tolerance for SOS coordinate matching
 const MISSION_TEAM_ROUTE_WAYPOINT_EPSILON = 0.0015; // ~165m tolerance when checking whether route covers a waypoint
 const OVERVIEW_SPLIT_MAX_MATCH_DISTANCE_METERS = 6000;
+const ACTIVITY_ROUTE_DIRECT_FALLBACK_MAX_DISTANCE_METERS = 10000;
+const ACTIVITY_ROUTE_FALLBACK_STALE_TIME_MS = 5 * 60 * 1000;
+const ACTIVITY_ROUTE_FALLBACK_GC_TIME_MS = 15 * 60 * 1000;
+const ACTIVITY_ROUTE_FALLBACK_COOLDOWN_MS = 3 * 60 * 1000;
 const VEHICLE_PRIORITY: RouteVehicle[] = ["bike", "car", "hd"];
 const VEHICLE_LABELS: Record<RouteVehicle, string> = {
   bike: "Xe máy",
@@ -1056,6 +1092,8 @@ const VEHICLE_LABELS: Record<RouteVehicle, string> = {
   taxi: "Taxi",
   hd: "Xe tải",
 };
+
+let activityRouteFallbackBlockedUntil = 0;
 
 function getActivityRouteStatusMeta(status?: string | null): {
   label: string;
@@ -1113,9 +1151,117 @@ function hasRenderableWaypointCoords(
   return Math.abs(lat) > 0.000001 || Math.abs(lng) > 0.000001;
 }
 
+function isMissionTeamRouteLegMoving(leg: MissionTeamRouteLeg): boolean {
+  const fromLat = Number(leg.fromLatitude);
+  const fromLng = Number(leg.fromLongitude);
+  const toLat = Number(leg.toLatitude);
+  const toLng = Number(leg.toLongitude);
+
+  const hasDistinctEndpoints =
+    hasRenderableWaypointCoords(fromLat, fromLng) &&
+    hasRenderableWaypointCoords(toLat, toLng) &&
+    (Math.abs(fromLat - toLat) >= COORD_EPSILON ||
+      Math.abs(fromLng - toLng) >= COORD_EPSILON);
+
+  const hasDistance =
+    Number.isFinite(leg.distanceMeters) && leg.distanceMeters > 1;
+
+  return hasDistinctEndpoints || hasDistance;
+}
+
+function decodeMissionTeamRouteLegPoints(
+  leg: MissionTeamRouteLeg,
+): [number, number][] {
+  if (leg.overviewPolyline && leg.overviewPolyline.trim().length > 0) {
+    try {
+      const decodedPoints = polylineDecode.decode(leg.overviewPolyline) as [
+        number,
+        number,
+      ][];
+
+      if (decodedPoints.length >= 2) {
+        return decodedPoints;
+      }
+    } catch {
+      // Fall through to endpoint connector below.
+    }
+  }
+
+  const fromLat = Number(leg.fromLatitude);
+  const fromLng = Number(leg.fromLongitude);
+  const toLat = Number(leg.toLatitude);
+  const toLng = Number(leg.toLongitude);
+
+  if (
+    hasRenderableWaypointCoords(fromLat, fromLng) &&
+    hasRenderableWaypointCoords(toLat, toLng) &&
+    (Math.abs(fromLat - toLat) >= COORD_EPSILON ||
+      Math.abs(fromLng - toLng) >= COORD_EPSILON)
+  ) {
+    return [
+      [fromLat, fromLng],
+      [toLat, toLng],
+    ];
+  }
+
+  return [];
+}
+
 function buildVehicleTryOrder(preferred: RouteVehicle): RouteVehicle[] {
   const next = [preferred, ...VEHICLE_PRIORITY.filter((v) => v !== preferred)];
   return Array.from(new Set(next));
+}
+
+function formatRouteDistanceText(distanceMeters: number): string {
+  if (distanceMeters < 1000) {
+    return `${distanceMeters}m`;
+  }
+
+  return `${(distanceMeters / 1000).toFixed(1)} km`;
+}
+
+function formatRouteDurationText(durationSeconds: number): string {
+  if (durationSeconds < 60) {
+    return `${durationSeconds}s`;
+  }
+
+  const mins = Math.floor(durationSeconds / 60);
+  if (mins < 60) {
+    return `${mins} phút`;
+  }
+
+  const hrs = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  return remainMins > 0 ? `${hrs}h ${remainMins}p` : `${hrs}h`;
+}
+
+function isRouteRateLimited(errorMessage?: string | null): boolean {
+  const normalized = (errorMessage ?? "").trim().toLowerCase();
+  return (
+    normalized.includes("over_rate_limit") ||
+    normalized.includes("exceeded your rate limit") ||
+    normalized.includes("http 429") ||
+    normalized.includes("rate limit")
+  );
+}
+
+function formatRouteErrorMessage(errorMessage?: string | null): string | null {
+  const trimmed = (errorMessage ?? "").trim();
+  if (!trimmed) return null;
+
+  if (isRouteRateLimited(trimmed)) {
+    return "Dịch vụ chỉ đường đang bị giới hạn lượt gọi (429). Tạm thời chưa thể lấy tuyến bổ sung lúc này.";
+  }
+
+  return trimmed;
+}
+
+function isActivityRouteFallbackCoolingDown(now = Date.now()): boolean {
+  return activityRouteFallbackBlockedUntil > now;
+}
+
+function blockActivityRouteFallback(now = Date.now()): void {
+  activityRouteFallbackBlockedUntil = now + ACTIVITY_ROUTE_FALLBACK_COOLDOWN_MS;
 }
 
 function estimateDurationSeconds(
@@ -1661,6 +1807,67 @@ function getWaypointMeta(
     stepNumbers: uniqueStepNumbers,
     stepRangeLabel,
   };
+}
+
+function extractDepotLabelFromRouteWaypoint(
+  waypoint: MissionTeamRouteWaypoint,
+): string | null {
+  if (waypoint.activityType !== "COLLECT_SUPPLIES") return null;
+
+  const description = String(waypoint.description ?? "").trim();
+  if (!description) return "Kho tiếp tế";
+
+  const match = description.match(/kho\s+(.+?)(?:\s+tại|\s+tai|\.|,|$)/i);
+  if (match?.[1]) {
+    const depotName = match[1].trim();
+    return depotName ? `Kho ${depotName}` : "Kho tiếp tế";
+  }
+
+  return /\bkho\b/i.test(description) ? "Kho tiếp tế" : null;
+}
+
+function extractTargetLabelFromRouteWaypoint(
+  waypoint: MissionTeamRouteWaypoint,
+): string | null {
+  const description = String(waypoint.description ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!description) return null;
+
+  if (waypoint.activityType === "COLLECT_SUPPLIES") {
+    return extractDepotLabelFromRouteWaypoint(waypoint);
+  }
+
+  const startMatch = description.match(/di chuyển đến\s+(.+)/i);
+  if (!startMatch?.[1]) {
+    return null;
+  }
+
+  let label = startMatch[1]
+    .split(/\s+(?:Lấy:|Giao\b|Thực hiện\b)/i)[0]
+    .replace(/\s+\((?:tiện đường|tien duong)[^)]+\)\s*$/i, "")
+    .trim();
+
+  const sosLabel = extractSOSLabelFromRouteWaypoint(waypoint);
+  if (sosLabel && /\(SOS\s*ID\s*\d+\)/i.test(label)) {
+    label = label.replace(/\s*\(SOS\s*ID\s*\d+\)\s*/i, "").trim();
+    return label ? `${sosLabel} • ${label}` : sosLabel;
+  }
+
+  return label || sosLabel;
+}
+
+function extractSOSLabelFromRouteWaypoint(
+  waypoint: MissionTeamRouteWaypoint,
+): string | null {
+  const description = String(waypoint.description ?? "").trim();
+  if (!description) return null;
+
+  const match = description.match(SOS_TARGET_REGEX);
+  if (!match?.[1]) return null;
+
+  return `SOS ${match[1]}`;
 }
 
 const MissionRoutePreview = ({
@@ -2426,11 +2633,14 @@ const MissionTeamRoutePreview = ({
     [teamRouteData?.status],
   );
 
-  const routeErrorMessage =
-    typeof teamRouteData?.errorMessage === "string" &&
-    teamRouteData.errorMessage.trim().length > 0
-      ? teamRouteData.errorMessage.trim()
-      : null;
+  const routeErrorMessage = useMemo(
+    () => formatRouteErrorMessage(teamRouteData?.errorMessage),
+    [teamRouteData?.errorMessage],
+  );
+  const isTeamRouteRateLimited = useMemo(
+    () => isRouteRateLimited(teamRouteData?.errorMessage),
+    [teamRouteData?.errorMessage],
+  );
 
   const routeWaypoints = useMemo(
     () => teamRouteData?.waypoints ?? [],
@@ -2439,6 +2649,10 @@ const MissionTeamRoutePreview = ({
   const routeLegs = useMemo(
     () => teamRouteData?.legs ?? [],
     [teamRouteData?.legs],
+  );
+  const movingRouteLegs = useMemo(
+    () => routeLegs.filter(isMissionTeamRouteLegMoving),
+    [routeLegs],
   );
 
   const waypointGroups = useMemo(() => {
@@ -2463,6 +2677,89 @@ const MissionTeamRoutePreview = ({
     const sortedActivities = routeTeamActivities
       .slice()
       .sort((a, b) => (a.step !== b.step ? a.step - b.step : a.id - b.id));
+
+    const activityById = new Map(
+      selectedTeamActivities.map((activity) => [activity.id, activity]),
+    );
+    const activitiesByStep = new Map<number, MissionActivity[]>();
+
+    for (const activity of sortedActivities) {
+      const existing = activitiesByStep.get(activity.step) ?? [];
+      existing.push(activity);
+      activitiesByStep.set(activity.step, existing);
+    }
+
+    // Prefer backend mission-team waypoints when available because activities may
+    // share fallback coordinates and hide intermediate depot/SOS stopovers.
+    const apiWaypoints = routeWaypoints
+      .map((waypoint) => {
+        const byId = activityById.get(waypoint.activityId);
+        const byStep = activitiesByStep.get(waypoint.step) ?? [];
+        const matchedActivity = byId ?? byStep[0];
+
+        let lat = Number(waypoint.latitude);
+        let lng = Number(waypoint.longitude);
+
+        if (!hasRenderableWaypointCoords(lat, lng) && matchedActivity) {
+          if (
+            hasRenderableWaypointCoords(
+              matchedActivity.targetLatitude,
+              matchedActivity.targetLongitude,
+            )
+          ) {
+            lat = matchedActivity.targetLatitude;
+            lng = matchedActivity.targetLongitude;
+          } else {
+            const parsed = extractCoordsFromDescription(
+              matchedActivity.description,
+            );
+            if (parsed) {
+              lat = parsed.lat;
+              lng = parsed.lng;
+            }
+          }
+        }
+
+        if (!hasRenderableWaypointCoords(lat, lng)) {
+          return null;
+        }
+
+        return {
+          lat,
+          lng,
+          activities: byId ? [byId] : byStep,
+        } as UniqueWaypoint;
+      })
+      .filter((waypoint): waypoint is UniqueWaypoint => !!waypoint);
+
+    if (apiWaypoints.length > 0) {
+      const groupedFromApi: UniqueWaypoint[] = [];
+
+      for (const waypoint of apiWaypoints) {
+        const last = groupedFromApi[groupedFromApi.length - 1];
+
+        if (
+          last &&
+          Math.abs(last.lat - waypoint.lat) < COORD_EPSILON &&
+          Math.abs(last.lng - waypoint.lng) < COORD_EPSILON
+        ) {
+          for (const activity of waypoint.activities) {
+            if (!last.activities.some((item) => item.id === activity.id)) {
+              last.activities.push(activity);
+            }
+          }
+          continue;
+        }
+
+        groupedFromApi.push({
+          lat: waypoint.lat,
+          lng: waypoint.lng,
+          activities: [...waypoint.activities],
+        });
+      }
+
+      return groupedFromApi;
+    }
 
     const enrichedActivities = sortedActivities
       .map((activity) => {
@@ -2512,10 +2809,6 @@ const MissionTeamRoutePreview = ({
     }
 
     if (routeWaypoints.length === 0) return [] as UniqueWaypoint[];
-
-    const activityById = new Map(
-      selectedTeamActivities.map((activity) => [activity.id, activity]),
-    );
 
     const fallbackWaypoints = routeWaypoints
       .map((waypoint) => {
@@ -2590,90 +2883,378 @@ const MissionTeamRoutePreview = ({
     routeWaypoints,
   ]);
 
+  const routeWaypointByGroupIndex = useMemo(() => {
+    const matchedWaypoints = Array<MissionTeamRouteWaypoint | null>(
+      waypointGroups.length,
+    ).fill(null);
+
+    if (waypointGroups.length === 0 || routeWaypoints.length === 0) {
+      return matchedWaypoints;
+    }
+
+    const usedRouteWaypointIndexes = new Set<number>();
+
+    // Pass 1: strongest match by activity step and nearest coordinate.
+    for (let index = 0; index < waypointGroups.length; index += 1) {
+      const waypoint = waypointGroups[index];
+      const stepSet = new Set(
+        waypoint.activities
+          .map((activity) => activity.step)
+          .filter((step): step is number => Number.isFinite(step)),
+      );
+
+      if (stepSet.size === 0) {
+        continue;
+      }
+
+      let bestRouteWaypointIndex = -1;
+      let bestDistance = Number.POSITIVE_INFINITY;
+
+      for (
+        let routeWaypointIndex = 0;
+        routeWaypointIndex < routeWaypoints.length;
+        routeWaypointIndex += 1
+      ) {
+        if (usedRouteWaypointIndexes.has(routeWaypointIndex)) {
+          continue;
+        }
+
+        const routeWaypoint = routeWaypoints[routeWaypointIndex];
+        if (!stepSet.has(routeWaypoint.step)) {
+          continue;
+        }
+
+        const waypointLat = Number(routeWaypoint.latitude);
+        const waypointLng = Number(routeWaypoint.longitude);
+        if (!hasRenderableWaypointCoords(waypointLat, waypointLng)) {
+          continue;
+        }
+
+        const distance = haversineDistanceMeters(
+          { lat: waypoint.lat, lng: waypoint.lng },
+          { lat: waypointLat, lng: waypointLng },
+        );
+
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestRouteWaypointIndex = routeWaypointIndex;
+        }
+      }
+
+      if (bestRouteWaypointIndex >= 0) {
+        matchedWaypoints[index] = routeWaypoints[bestRouteWaypointIndex];
+        usedRouteWaypointIndexes.add(bestRouteWaypointIndex);
+      }
+    }
+
+    // Pass 2: fallback by nearest coordinate among remaining route waypoints.
+    for (let index = 0; index < waypointGroups.length; index += 1) {
+      if (matchedWaypoints[index]) {
+        continue;
+      }
+
+      const waypoint = waypointGroups[index];
+      let bestRouteWaypointIndex = -1;
+      let bestDistance = Number.POSITIVE_INFINITY;
+
+      for (
+        let routeWaypointIndex = 0;
+        routeWaypointIndex < routeWaypoints.length;
+        routeWaypointIndex += 1
+      ) {
+        if (usedRouteWaypointIndexes.has(routeWaypointIndex)) {
+          continue;
+        }
+
+        const routeWaypoint = routeWaypoints[routeWaypointIndex];
+        const waypointLat = Number(routeWaypoint.latitude);
+        const waypointLng = Number(routeWaypoint.longitude);
+        if (!hasRenderableWaypointCoords(waypointLat, waypointLng)) {
+          continue;
+        }
+
+        const distance = haversineDistanceMeters(
+          { lat: waypoint.lat, lng: waypoint.lng },
+          { lat: waypointLat, lng: waypointLng },
+        );
+
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestRouteWaypointIndex = routeWaypointIndex;
+        }
+      }
+
+      if (bestRouteWaypointIndex >= 0) {
+        matchedWaypoints[index] = routeWaypoints[bestRouteWaypointIndex];
+        usedRouteWaypointIndexes.add(bestRouteWaypointIndex);
+      }
+    }
+
+    // Pass 3: final stable fallback by leftover order.
+    let fallbackCursor = 0;
+    for (let index = 0; index < waypointGroups.length; index += 1) {
+      if (matchedWaypoints[index]) {
+        continue;
+      }
+
+      while (
+        fallbackCursor < routeWaypoints.length &&
+        usedRouteWaypointIndexes.has(fallbackCursor)
+      ) {
+        fallbackCursor += 1;
+      }
+
+      if (fallbackCursor >= routeWaypoints.length) {
+        break;
+      }
+
+      matchedWaypoints[index] = routeWaypoints[fallbackCursor];
+      usedRouteWaypointIndexes.add(fallbackCursor);
+      fallbackCursor += 1;
+    }
+
+    return matchedWaypoints;
+  }, [routeWaypoints, waypointGroups]);
+
   const waypointMetaList = useMemo(
     () =>
-      waypointGroups.map((waypoint) => getWaypointMeta(waypoint, sosRequests)),
-    [waypointGroups, sosRequests],
+      waypointGroups.map((waypoint, index) => {
+        const baseMeta = getWaypointMeta(waypoint, sosRequests);
+        const apiWaypoint = routeWaypointByGroupIndex[index];
+
+        if (!apiWaypoint) {
+          return baseMeta;
+        }
+
+        const waypointLabel = extractTargetLabelFromRouteWaypoint(apiWaypoint);
+
+        if (apiWaypoint.activityType === "COLLECT_SUPPLIES") {
+          return {
+            ...baseMeta,
+            labels: waypointLabel
+              ? [waypointLabel]
+              : [`Kho (Bước ${apiWaypoint.step})`],
+            hasDepot: true,
+            hasSOS: false,
+          };
+        }
+
+        const sosLabel = extractSOSLabelFromRouteWaypoint(apiWaypoint);
+        if (sosLabel) {
+          return {
+            ...baseMeta,
+            labels: waypointLabel ? [waypointLabel] : [sosLabel],
+            hasSOS: true,
+          };
+        }
+
+        if (waypointLabel) {
+          return {
+            ...baseMeta,
+            labels: [waypointLabel],
+          };
+        }
+
+        return baseMeta;
+      }),
+    [waypointGroups, sosRequests, routeWaypointByGroupIndex],
   );
 
+  const teamOverviewPolyline = teamRouteData?.overviewPolyline ?? null;
+
   const decodedRoutePoints = useMemo(() => {
-    if (!teamRouteData?.overviewPolyline) return [] as [number, number][];
+    if (!teamOverviewPolyline) return [] as [number, number][];
 
     try {
-      return polylineDecode.decode(teamRouteData.overviewPolyline) as [
-        number,
-        number,
-      ][];
+      return polylineDecode.decode(teamOverviewPolyline) as [number, number][];
     } catch {
       return [] as [number, number][];
     }
-  }, [teamRouteData?.overviewPolyline]);
+  }, [teamOverviewPolyline]);
+
+  const apiRouteLegSegments = useMemo(() => {
+    if (movingRouteLegs.length === 0) {
+      return [] as MissionTeamRenderableLeg[];
+    }
+
+    const provisionalSegments = movingRouteLegs
+      .map((leg, legIndex) => {
+        const routeLegStatus = (leg.status ?? "").trim().toUpperCase();
+        const points = decodeMissionTeamRouteLegPoints(leg);
+
+        let destinationGroupIndex = -1;
+
+        if (Number.isFinite(leg.toStep)) {
+          destinationGroupIndex = waypointGroups.findIndex(
+            (waypoint, index) => {
+              const stepNumbers = new Set<number>();
+
+              for (const activity of waypoint.activities) {
+                if (Number.isFinite(activity.step)) {
+                  stepNumbers.add(activity.step);
+                }
+              }
+
+              const apiWaypointStep = routeWaypointByGroupIndex[index]?.step;
+              if (Number.isFinite(apiWaypointStep)) {
+                stepNumbers.add(apiWaypointStep as number);
+              }
+
+              return stepNumbers.has(leg.toStep as number);
+            },
+          );
+        }
+
+        if (destinationGroupIndex < 0) {
+          const toLat = Number(leg.toLatitude);
+          const toLng = Number(leg.toLongitude);
+
+          if (hasRenderableWaypointCoords(toLat, toLng)) {
+            let bestDistance = Number.POSITIVE_INFINITY;
+
+            for (
+              let waypointIndex = 0;
+              waypointIndex < waypointGroups.length;
+              waypointIndex += 1
+            ) {
+              const waypoint = waypointGroups[waypointIndex];
+              const distance = haversineDistanceMeters(
+                { lat: waypoint.lat, lng: waypoint.lng },
+                { lat: toLat, lng: toLng },
+              );
+
+              if (distance < bestDistance) {
+                bestDistance = distance;
+                destinationGroupIndex = waypointIndex;
+              }
+            }
+          }
+        }
+
+        return {
+          leg,
+          destinationGroupIndex:
+            destinationGroupIndex >= 0 ? destinationGroupIndex : null,
+          points,
+          isFallback:
+            routeLegStatus === "NO_ROUTE" ||
+            routeLegStatus === "FALLBACK" ||
+            !leg.overviewPolyline?.trim(),
+          distanceMeters: leg.distanceMeters,
+          durationSeconds: leg.durationSeconds,
+          distanceText:
+            leg.distanceText || formatRouteDistanceText(leg.distanceMeters),
+          durationText:
+            leg.durationText || formatRouteDurationText(leg.durationSeconds),
+          source: "team-route" as const,
+          sortIndex:
+            Number.isFinite(leg.segmentIndex) && leg.segmentIndex != null
+              ? (leg.segmentIndex as number)
+              : legIndex,
+        };
+      })
+      .sort((a, b) => a.sortIndex - b.sortIndex);
+
+    const usedDestinationGroupIndexes = new Set<number>();
+
+    for (const segment of provisionalSegments) {
+      if (
+        segment.destinationGroupIndex != null &&
+        !usedDestinationGroupIndexes.has(segment.destinationGroupIndex)
+      ) {
+        usedDestinationGroupIndexes.add(segment.destinationGroupIndex);
+        continue;
+      }
+
+      segment.destinationGroupIndex = null;
+    }
+
+    let nextGroupIndex = 0;
+    for (const segment of provisionalSegments) {
+      if (segment.destinationGroupIndex != null) {
+        continue;
+      }
+
+      while (
+        nextGroupIndex < waypointGroups.length &&
+        usedDestinationGroupIndexes.has(nextGroupIndex)
+      ) {
+        nextGroupIndex += 1;
+      }
+
+      if (nextGroupIndex >= waypointGroups.length) {
+        break;
+      }
+
+      segment.destinationGroupIndex = nextGroupIndex;
+      usedDestinationGroupIndexes.add(nextGroupIndex);
+      nextGroupIndex += 1;
+    }
+
+    return provisionalSegments.map((segment) => ({
+      leg: segment.leg,
+      destinationGroupIndex: segment.destinationGroupIndex,
+      points: segment.points,
+      isFallback: segment.isFallback,
+      distanceMeters: segment.distanceMeters,
+      durationSeconds: segment.durationSeconds,
+      distanceText: segment.distanceText,
+      durationText: segment.durationText,
+      source: segment.source,
+    }));
+  }, [movingRouteLegs, routeWaypointByGroupIndex, waypointGroups]);
+
+  const apiPolylineLegSegments = useMemo(
+    () =>
+      apiRouteLegSegments.filter(
+        (segment) => !segment.isFallback && segment.points.length > 1,
+      ),
+    [apiRouteLegSegments],
+  );
+
+  const hasApiRoutePolylineLegSegments = apiPolylineLegSegments.length > 0;
 
   const decodedLegRoutePoints = useMemo(() => {
-    if (routeLegs.length === 0) {
+    if (apiPolylineLegSegments.length === 0) {
       return [] as [number, number][];
     }
 
     const points: [number, number][] = [];
 
-    for (const leg of routeLegs) {
-      if (!leg.overviewPolyline || leg.overviewPolyline.trim().length === 0) {
-        continue;
-      }
-
-      try {
-        const decoded = polylineDecode.decode(leg.overviewPolyline) as [
-          number,
-          number,
-        ][];
-
-        for (const point of decoded) {
-          const last = points[points.length - 1];
-          if (
-            last &&
-            Math.abs(last[0] - point[0]) < COORD_EPSILON &&
-            Math.abs(last[1] - point[1]) < COORD_EPSILON
-          ) {
-            continue;
-          }
-
-          points.push(point);
+    for (const segment of apiPolylineLegSegments) {
+      for (const point of segment.points) {
+        const last = points[points.length - 1];
+        if (
+          last &&
+          Math.abs(last[0] - point[0]) < COORD_EPSILON &&
+          Math.abs(last[1] - point[1]) < COORD_EPSILON
+        ) {
+          continue;
         }
-      } catch {
-        // Ignore malformed leg polyline and continue with next leg.
+
+        points.push(point);
       }
     }
 
     return points;
-  }, [routeLegs]);
+  }, [apiPolylineLegSegments]);
 
-  const routeLegByWaypointIndex = useMemo(() => {
-    const mapping = new Map<number, (typeof routeLegs)[number]>();
+  const apiRouteLegByWaypointIndex = useMemo(() => {
+    const mapping = new Map<number, MissionTeamRenderableLeg>();
 
-    for (let index = 0; index < waypointGroups.length; index += 1) {
-      const apiWaypoint = routeWaypoints[index];
-      const step = apiWaypoint?.step;
-      let matchedLeg: (typeof routeLegs)[number] | undefined;
-
-      if (Number.isFinite(step)) {
-        matchedLeg = routeLegs.find((leg) => leg.toStep === step);
+    for (const segment of apiRouteLegSegments) {
+      if (
+        segment.destinationGroupIndex == null ||
+        mapping.has(segment.destinationGroupIndex)
+      ) {
+        continue;
       }
 
-      if (!matchedLeg && index > 0) {
-        matchedLeg = routeLegs[index - 1];
-      }
-
-      if (!matchedLeg && routeLegs.length === waypointGroups.length) {
-        matchedLeg = routeLegs[index];
-      }
-
-      if (matchedLeg) {
-        mapping.set(index, matchedLeg);
-      }
+      mapping.set(segment.destinationGroupIndex, segment);
     }
 
     return mapping;
-  }, [routeLegs, routeWaypoints, waypointGroups]);
+  }, [apiRouteLegSegments]);
 
   const stopoverGuidePoints = useMemo(() => {
     const points: [number, number][] = [[originCoords.lat, originCoords.lng]];
@@ -2790,12 +3371,12 @@ const MissionTeamRoutePreview = ({
   }, [splitOverviewSegments]);
 
   const apiRoutePoints = useMemo(() => {
-    if (decodedRoutePoints.length > 1) {
-      return decodedRoutePoints;
-    }
-
     if (decodedLegRoutePoints.length > 1) {
       return decodedLegRoutePoints;
+    }
+
+    if (decodedRoutePoints.length > 1) {
+      return decodedRoutePoints;
     }
 
     return [] as [number, number][];
@@ -2822,19 +3403,27 @@ const MissionTeamRoutePreview = ({
       return false;
     }
 
+    if (hasApiRoutePolylineLegSegments) {
+      return false;
+    }
+
     if (apiRoutePoints.length <= 1) {
       return true;
     }
 
-    if (routeLegs.length > 0 && routeLegs.length < expectedLegCount) {
+    if (
+      movingRouteLegs.length > 0 &&
+      movingRouteLegs.length < expectedLegCount
+    ) {
       return true;
     }
 
     return missingWaypointCount > 0;
   }, [
     waypointGroups.length,
+    hasApiRoutePolylineLegSegments,
     apiRoutePoints.length,
-    routeLegs.length,
+    movingRouteLegs.length,
     expectedLegCount,
     missingWaypointCount,
   ]);
@@ -2851,10 +3440,270 @@ const MissionTeamRoutePreview = ({
     return splitOverviewSegments.length === expectedLegCount;
   }, [shouldPreferStopoverGuide, expectedLegCount, splitOverviewSegments]);
 
+  const activityRouteFallbackKey = useMemo(
+    () =>
+      waypointGroups
+        .map((waypoint, index) => {
+          const representativeActivityId = waypoint.activities[0]?.id ?? index;
+          return `${representativeActivityId}:${waypoint.lat.toFixed(5)}:${waypoint.lng.toFixed(5)}`;
+        })
+        .join("|"),
+    [waypointGroups],
+  );
+
+  const shouldFetchActivityRouteFallback =
+    open &&
+    !!selectedMissionTeam &&
+    waypointGroups.length > 0 &&
+    shouldPreferStopoverGuide &&
+    !isTeamRouteRateLimited &&
+    !isActivityRouteFallbackCoolingDown() &&
+    !hasApiRoutePolylineLegSegments &&
+    !shouldUseSplitOverview;
+
+  const {
+    data: activityRouteFallbackLegSegments = [],
+    isFetching: isActivityRouteFallbackFetching,
+  } = useQuery<MissionTeamRenderableLeg[]>({
+    queryKey: [
+      "mission-team-route-activity-fallback",
+      mission.id,
+      selectedMissionTeam?.missionTeamId ?? null,
+      originCoords.lat,
+      originCoords.lng,
+      vehicle,
+      activityRouteFallbackKey,
+    ],
+    enabled: shouldFetchActivityRouteFallback,
+    queryFn: async () => {
+      const segments: MissionTeamRenderableLeg[] = [];
+      let currentOrigin = { lat: originCoords.lat, lng: originCoords.lng };
+
+      for (let index = 0; index < waypointGroups.length; index += 1) {
+        const waypoint = waypointGroups[index];
+        const representativeActivity = waypoint.activities[0];
+
+        if (!representativeActivity) {
+          currentOrigin = { lat: waypoint.lat, lng: waypoint.lng };
+          continue;
+        }
+
+        const isSameAsOrigin =
+          Math.abs(currentOrigin.lat - waypoint.lat) < COORD_EPSILON &&
+          Math.abs(currentOrigin.lng - waypoint.lng) < COORD_EPSILON;
+
+        if (isSameAsOrigin) {
+          currentOrigin = { lat: waypoint.lat, lng: waypoint.lng };
+          continue;
+        }
+
+        let resolvedSegment: MissionTeamRenderableLeg | null = null;
+        const tryVehicles = buildVehicleTryOrder(vehicle);
+
+        for (const tryVehicle of tryVehicles) {
+          try {
+            const response = await getActivityRoute({
+              missionId: mission.id,
+              activityId: representativeActivity.id,
+              originLat: currentOrigin.lat,
+              originLng: currentOrigin.lng,
+              vehicle: tryVehicle,
+            });
+
+            if (!response.route?.overviewPolyline) {
+              continue;
+            }
+
+            const points = polylineDecode.decode(
+              response.route.overviewPolyline,
+            ) as [number, number][];
+
+            if (points.length < 2) {
+              continue;
+            }
+
+            resolvedSegment = {
+              destinationGroupIndex: index,
+              points,
+              isFallback: false,
+              distanceMeters: response.route.totalDistanceMeters,
+              durationSeconds: response.route.totalDurationSeconds,
+              distanceText:
+                response.route.totalDistanceText ||
+                formatRouteDistanceText(response.route.totalDistanceMeters),
+              durationText:
+                response.route.totalDurationText ||
+                formatRouteDurationText(response.route.totalDurationSeconds),
+              source: "activity-route",
+            };
+            break;
+          } catch (error) {
+            const fallbackErrorMessage =
+              error instanceof Error ? error.message : String(error ?? "");
+
+            if (isRouteRateLimited(fallbackErrorMessage)) {
+              blockActivityRouteFallback();
+              return segments;
+            }
+
+            // Try next vehicle profile before falling back to direct line.
+          }
+        }
+
+        if (!resolvedSegment) {
+          const distanceMeters = Math.round(
+            haversineDistanceMeters(currentOrigin, {
+              lat: waypoint.lat,
+              lng: waypoint.lng,
+            }),
+          );
+
+          if (
+            distanceMeters > ACTIVITY_ROUTE_DIRECT_FALLBACK_MAX_DISTANCE_METERS
+          ) {
+            currentOrigin = { lat: waypoint.lat, lng: waypoint.lng };
+            continue;
+          }
+
+          const durationSeconds = estimateDurationSeconds(
+            distanceMeters,
+            vehicle,
+          );
+
+          resolvedSegment = {
+            destinationGroupIndex: index,
+            points: [
+              [currentOrigin.lat, currentOrigin.lng],
+              [waypoint.lat, waypoint.lng],
+            ],
+            isFallback: true,
+            distanceMeters,
+            durationSeconds,
+            distanceText: formatRouteDistanceText(distanceMeters),
+            durationText: formatRouteDurationText(durationSeconds),
+            source: "activity-route",
+          };
+        }
+
+        segments.push(resolvedSegment);
+        currentOrigin = { lat: waypoint.lat, lng: waypoint.lng };
+      }
+
+      return segments;
+    },
+    staleTime: ACTIVITY_ROUTE_FALLBACK_STALE_TIME_MS,
+    gcTime: ACTIVITY_ROUTE_FALLBACK_GC_TIME_MS,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+  });
+
+  const isUsingActivityRouteFallback =
+    shouldFetchActivityRouteFallback &&
+    activityRouteFallbackLegSegments.some(
+      (segment) => segment.points.length > 1,
+    );
+  const isActivityRouteFallbackBlocked =
+    shouldPreferStopoverGuide && isActivityRouteFallbackCoolingDown();
+
   const isUsingStopoverGuideFallback =
-    shouldPreferStopoverGuide && !shouldUseSplitOverview;
+    shouldPreferStopoverGuide &&
+    !isUsingActivityRouteFallback &&
+    !shouldUseSplitOverview &&
+    apiRoutePoints.length <= 1;
+
+  const isUsingPartialApiPolyline =
+    shouldPreferStopoverGuide &&
+    !isUsingActivityRouteFallback &&
+    !shouldUseSplitOverview &&
+    apiRoutePoints.length > 1;
+
+  const effectiveRouteLegSegments = useMemo(
+    () =>
+      isUsingActivityRouteFallback
+        ? activityRouteFallbackLegSegments
+        : apiRouteLegSegments,
+    [
+      activityRouteFallbackLegSegments,
+      apiRouteLegSegments,
+      isUsingActivityRouteFallback,
+    ],
+  );
+
+  const effectiveRouteLegPoints = useMemo(() => {
+    if (effectiveRouteLegSegments.length === 0) {
+      return [] as [number, number][];
+    }
+
+    const points: [number, number][] = [];
+
+    for (const segment of effectiveRouteLegSegments) {
+      for (const point of segment.points) {
+        const last = points[points.length - 1];
+
+        if (
+          last &&
+          Math.abs(last[0] - point[0]) < COORD_EPSILON &&
+          Math.abs(last[1] - point[1]) < COORD_EPSILON
+        ) {
+          continue;
+        }
+
+        points.push(point);
+      }
+    }
+
+    return points;
+  }, [effectiveRouteLegSegments]);
+
+  const shouldRenderEffectiveRouteLegSegments = useMemo(() => {
+    if (isUsingActivityRouteFallback) {
+      return effectiveRouteLegSegments.some(
+        (segment) => segment.points.length > 1,
+      );
+    }
+
+    return (
+      hasApiRoutePolylineLegSegments &&
+      effectiveRouteLegSegments.some((segment) => segment.points.length > 1)
+    );
+  }, [
+    effectiveRouteLegSegments,
+    hasApiRoutePolylineLegSegments,
+    isUsingActivityRouteFallback,
+  ]);
+
+  const routeLegByWaypointIndex = useMemo(() => {
+    if (isUsingActivityRouteFallback) {
+      const mapping = new Map<number, MissionTeamRenderableLeg>();
+
+      for (const segment of activityRouteFallbackLegSegments) {
+        if (
+          segment.destinationGroupIndex == null ||
+          mapping.has(segment.destinationGroupIndex)
+        ) {
+          continue;
+        }
+
+        mapping.set(segment.destinationGroupIndex, segment);
+      }
+
+      return mapping;
+    }
+
+    return apiRouteLegByWaypointIndex;
+  }, [
+    activityRouteFallbackLegSegments,
+    apiRouteLegByWaypointIndex,
+    isUsingActivityRouteFallback,
+  ]);
 
   const displayPoints = useMemo(() => {
+    if (isUsingActivityRouteFallback && effectiveRouteLegPoints.length > 1) {
+      return effectiveRouteLegPoints;
+    }
+
     if (shouldUseSplitOverview && splitOverviewPoints.length > 1) {
       return splitOverviewPoints;
     }
@@ -2870,21 +3719,81 @@ const MissionTeamRoutePreview = ({
     return stopoverGuidePoints;
   }, [
     apiRoutePoints,
+    effectiveRouteLegPoints,
     isUsingStopoverGuideFallback,
+    isUsingActivityRouteFallback,
     shouldUseSplitOverview,
     splitOverviewPoints,
     stopoverGuidePoints,
   ]);
 
+  const hasOriginInDisplayPoints = useMemo(
+    () =>
+      displayPoints.some(
+        ([lat, lng]) =>
+          Math.abs(lat - originCoords.lat) <
+            MISSION_TEAM_ROUTE_WAYPOINT_EPSILON &&
+          Math.abs(lng - originCoords.lng) <
+            MISSION_TEAM_ROUTE_WAYPOINT_EPSILON,
+      ),
+    [displayPoints, originCoords.lat, originCoords.lng],
+  );
+
+  const originConnectorPoints = useMemo<[number, number][]>(() => {
+    if (displayPoints.length === 0 || hasOriginInDisplayPoints) {
+      return [];
+    }
+
+    const firstPoint = displayPoints[0];
+    if (!firstPoint) {
+      return [];
+    }
+
+    const originPoint: [number, number] = [originCoords.lat, originCoords.lng];
+    return [originPoint, firstPoint];
+  }, [
+    displayPoints,
+    hasOriginInDisplayPoints,
+    originCoords.lat,
+    originCoords.lng,
+  ]);
+
+  const mapFitPoints = useMemo<[number, number][]>(() => {
+    if (displayPoints.length === 0) {
+      return [];
+    }
+
+    if (hasOriginInDisplayPoints) {
+      return displayPoints;
+    }
+
+    const originPoint: [number, number] = [originCoords.lat, originCoords.lng];
+    return [originPoint, ...displayPoints];
+  }, [
+    displayPoints,
+    hasOriginInDisplayPoints,
+    originCoords.lat,
+    originCoords.lng,
+  ]);
+
+  const isUsingOriginConnector = originConnectorPoints.length > 1;
+
   const missionRouteMapKey = useMemo(() => {
-    if (displayPoints.length > 0) {
-      return buildLeafletMapKey(displayPoints);
+    if (mapFitPoints.length > 0) {
+      return buildLeafletMapKey(mapFitPoints);
     }
 
     return "mission-team-route-empty";
-  }, [displayPoints]);
+  }, [mapFitPoints]);
 
   const totalDistanceMeters = useMemo(() => {
+    if (isUsingActivityRouteFallback) {
+      return activityRouteFallbackLegSegments.reduce(
+        (sum, segment) => sum + segment.distanceMeters,
+        0,
+      );
+    }
+
     if (
       teamRouteData &&
       Number.isFinite(teamRouteData.totalDistanceMeters) &&
@@ -2898,9 +3807,21 @@ const MissionTeamRoutePreview = ({
         sum + (Number.isFinite(leg.distanceMeters) ? leg.distanceMeters : 0),
       0,
     );
-  }, [teamRouteData, routeLegs]);
+  }, [
+    activityRouteFallbackLegSegments,
+    isUsingActivityRouteFallback,
+    teamRouteData,
+    routeLegs,
+  ]);
 
   const totalDurationSeconds = useMemo(() => {
+    if (isUsingActivityRouteFallback) {
+      return activityRouteFallbackLegSegments.reduce(
+        (sum, segment) => sum + segment.durationSeconds,
+        0,
+      );
+    }
+
     if (
       teamRouteData &&
       Number.isFinite(teamRouteData.totalDurationSeconds) &&
@@ -2914,7 +3835,12 @@ const MissionTeamRoutePreview = ({
         sum + (Number.isFinite(leg.durationSeconds) ? leg.durationSeconds : 0),
       0,
     );
-  }, [teamRouteData, routeLegs]);
+  }, [
+    activityRouteFallbackLegSegments,
+    isUsingActivityRouteFallback,
+    teamRouteData,
+    routeLegs,
+  ]);
 
   const splitOverviewLegByWaypointIndex = useMemo(() => {
     const mapping = new Map<
@@ -3018,7 +3944,10 @@ const MissionTeamRoutePreview = ({
     return `${(meters / 1000).toFixed(1)} km`;
   };
 
-  const isLoadingRoute = isTeamRouteLoading || isTeamRouteFetching;
+  const isLoadingRoute =
+    isTeamRouteLoading ||
+    isTeamRouteFetching ||
+    isActivityRouteFallbackFetching;
 
   if (missionRouteTeams.length === 0) return null;
 
@@ -3038,11 +3967,12 @@ const MissionTeamRoutePreview = ({
   const selectedTeamLabel =
     selectedMissionTeam?.teamName ||
     (selectedMissionTeam ? `Đội #${selectedMissionTeam.rescueTeamId}` : "-");
-  const displayedLegCount = shouldPreferStopoverGuide
-    ? expectedLegCount
-    : routeLegs.length > 0
-      ? routeLegs.length
-      : expectedLegCount;
+  const displayedLegCount =
+    shouldUseSplitOverview || isUsingStopoverGuideFallback
+      ? expectedLegCount
+      : effectiveRouteLegSegments.length > 0
+        ? effectiveRouteLegSegments.length
+        : expectedLegCount;
   const consolidatedDurationLabel =
     Number.isFinite(totalDurationSeconds) && totalDurationSeconds > 0
       ? formatDuration(totalDurationSeconds)
@@ -3167,6 +4097,24 @@ const MissionTeamRoutePreview = ({
       ) : null}
 
       {!isLoadingRoute &&
+      isUsingActivityRouteFallback &&
+      waypointGroups.length > 0 ? (
+        <p className="text-sm text-emerald-700 dark:text-emerald-300">
+          Team route chưa khớp đầy đủ, hệ thống đang dùng activity route theo
+          từng chặng để vẽ đường chính xác hơn.
+        </p>
+      ) : null}
+
+      {!isLoadingRoute &&
+      !isUsingActivityRouteFallback &&
+      isActivityRouteFallbackBlocked ? (
+        <p className="text-sm text-amber-700 dark:text-amber-300">
+          Fallback activity route đang tạm nghỉ vài phút để tránh spam khi dịch
+          vụ chỉ đường báo giới hạn lượt gọi.
+        </p>
+      ) : null}
+
+      {!isLoadingRoute &&
       isUsingStopoverGuideFallback &&
       waypointGroups.length > 1 &&
       expectedLegCount > 1 ? (
@@ -3176,7 +4124,24 @@ const MissionTeamRoutePreview = ({
         </p>
       ) : null}
 
-      {!isLoadingRoute && teamRouteData && (
+      {!isLoadingRoute &&
+      isUsingPartialApiPolyline &&
+      waypointGroups.length > 1 &&
+      expectedLegCount > 1 ? (
+        <p className="text-sm text-amber-700 dark:text-amber-300">
+          API chỉ trả polyline một phần, hệ thống đang ưu tiên vẽ polyline khả
+          dụng thay vì nối thẳng toàn tuyến.
+        </p>
+      ) : null}
+
+      {!isLoadingRoute && isUsingOriginConnector ? (
+        <p className="text-sm text-amber-700 dark:text-amber-300">
+          API tuyến đội chưa chứa đoạn xuất phát từ vị trí đội, hệ thống đang
+          nối tạm từ điểm tập kết vào tuyến để hiển thị đúng điểm khởi hành.
+        </p>
+      ) : null}
+
+      {!isLoadingRoute && (teamRouteData || isUsingActivityRouteFallback) && (
         <div className="flex items-center gap-3 text-sm">
           <span className="font-bold text-primary">
             {formatDistance(totalDistanceMeters)}
@@ -3204,7 +4169,21 @@ const MissionTeamRoutePreview = ({
             className="h-full w-full"
           >
             <SafeTileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <RoutePreviewFitBounds points={displayPoints} />
+            <RoutePreviewFitBounds points={mapFitPoints} />
+
+            {isUsingOriginConnector ? (
+              <Polyline
+                positions={originConnectorPoints}
+                pathOptions={{
+                  color: "#16a34a",
+                  weight: 4,
+                  opacity: 0.75,
+                  lineJoin: "round",
+                  lineCap: "round",
+                  dashArray: "6 6",
+                }}
+              />
+            ) : null}
 
             {shouldUseSplitOverview ? (
               splitOverviewSegments.map((segment, segmentIndex) => (
@@ -3220,6 +4199,23 @@ const MissionTeamRoutePreview = ({
                   }}
                 />
               ))
+            ) : shouldRenderEffectiveRouteLegSegments ? (
+              effectiveRouteLegSegments
+                .filter((segment) => segment.points.length > 1)
+                .map((segment, segmentIndex) => (
+                  <Polyline
+                    key={`mission-team-leg-segment-${segment.leg?.segmentIndex ?? `${segment.source}-${segmentIndex}`}`}
+                    positions={segment.points}
+                    pathOptions={{
+                      color: "#FF6B35",
+                      weight: 5,
+                      opacity: segment.isFallback ? 0.75 : 0.85,
+                      lineJoin: "round",
+                      lineCap: "round",
+                      dashArray: segment.isFallback ? "7 7" : undefined,
+                    }}
+                  />
+                ))
             ) : (
               <Polyline
                 positions={displayPoints}
@@ -3261,7 +4257,7 @@ const MissionTeamRoutePreview = ({
             {waypointGroups.map((waypoint, index) => {
               const isLast = index === waypointGroups.length - 1;
               const meta = waypointMetaList[index];
-              const apiWaypoint = routeWaypoints[index];
+              const apiWaypoint = routeWaypointByGroupIndex[index];
               const tooltipLabel =
                 meta?.labels.length > 0
                   ? meta.labels.join(" • ")
@@ -3293,9 +4289,10 @@ const MissionTeamRoutePreview = ({
                     direction="top"
                     offset={[0, -10]}
                     opacity={1}
-                    permanent
+                    permanent={tooltipLabel.length <= 18}
+                    sticky={tooltipLabel.length > 18}
                   >
-                    <div className="whitespace-nowrap text-sm font-semibold">
+                    <div className="max-w-[220px] whitespace-normal text-sm font-semibold leading-4">
                       {tooltipLabel}
                     </div>
                   </Tooltip>
@@ -3309,31 +4306,25 @@ const MissionTeamRoutePreview = ({
       {!isLoadingRoute && waypointGroups.length > 0 && (
         <div className="mt-1 space-y-1.5">
           {waypointGroups.map((waypoint, index) => {
-            const routeLeg = shouldUseSplitOverview
+            const routeLegSegment = shouldUseSplitOverview
               ? null
               : routeLegByWaypointIndex.get(index);
             const splitLeg = splitOverviewLegByWaypointIndex.get(index);
             const meta = waypointMetaList[index];
-            const apiWaypoint = routeWaypoints[index];
-            const routeLegStatus = (routeLeg?.status ?? "")
-              .trim()
-              .toUpperCase();
+            const apiWaypoint = routeWaypointByGroupIndex[index];
             const isRouteLegFallback =
-              routeLeg != null
-                ? routeLegStatus === "NO_ROUTE" ||
-                  routeLegStatus === "FALLBACK" ||
-                  !routeLeg?.overviewPolyline
-                : !!splitLeg;
+              routeLegSegment != null ? routeLegSegment.isFallback : !!splitLeg;
 
-            const legDistanceLabel = routeLeg
-              ? routeLeg.distanceText || formatDistance(routeLeg.distanceMeters)
+            const legDistanceLabel = routeLegSegment
+              ? routeLegSegment?.distanceText ||
+                formatDistance(routeLegSegment?.distanceMeters ?? 0)
               : splitLeg
                 ? formatDistance(splitLeg.distanceMeters)
                 : "";
 
-            const legDurationLabel = routeLeg
-              ? routeLeg.durationText ||
-                formatDuration(routeLeg.durationSeconds)
+            const legDurationLabel = routeLegSegment
+              ? routeLegSegment?.durationText ||
+                formatDuration(routeLegSegment?.durationSeconds ?? 0)
               : splitLeg
                 ? formatDuration(splitLeg.durationSeconds)
                 : "";
@@ -3343,7 +4334,7 @@ const MissionTeamRoutePreview = ({
                 key={`mission-team-waypoint-legend-${index}`}
                 className="space-y-0.5"
               >
-                {routeLeg || splitLeg ? (
+                {routeLegSegment || splitLeg ? (
                   <div className="flex items-center gap-2 text-sm">
                     <span
                       className={cn(
@@ -4368,6 +5359,36 @@ const RescuePlanPanel = ({
   // Use either the passed prop or the stream result
   const activeSuggestion = rescueSuggestion ?? streamResult;
 
+  const panelSOSRequests = useMemo(() => {
+    const merged = new Map<string, SOSRequest>();
+
+    for (const sos of clusterSOSRequests) {
+      merged.set(String(sos.id), sos);
+    }
+
+    for (const activity of activeSuggestion?.suggestedActivities ?? []) {
+      if (
+        typeof activity.sosRequestId !== "number" ||
+        !Number.isFinite(activity.sosRequestId) ||
+        activity.sosRequestId <= 0
+      ) {
+        continue;
+      }
+
+      const sosId = String(activity.sosRequestId);
+      if (!merged.has(sosId)) {
+        merged.set(sosId, buildFallbackSOSRequest(sosId));
+      }
+    }
+
+    return Array.from(merged.values());
+  }, [clusterSOSRequests, activeSuggestion]);
+
+  const panelSOSCount =
+    (activeSuggestion?.sosRequestCount ?? 0) > 0
+      ? (activeSuggestion?.sosRequestCount ?? 0)
+      : panelSOSRequests.length;
+
   const enterEditMode = useCallback(() => {
     if (activeSuggestion) {
       setEditActivities(
@@ -4410,7 +5431,7 @@ const RescuePlanPanel = ({
         sortedActivities.map((a, i) => {
           const inferredSosRequestId = inferSOSRequestIdFromActivity(
             a,
-            clusterSOSRequests,
+            panelSOSRequests,
           );
           const isDepot = a.activityType === "COLLECT_SUPPLIES";
           const linkedMissionTeam =
@@ -4462,7 +5483,7 @@ const RescuePlanPanel = ({
       setActiveTab("plan");
       setIsEditMode(true);
     },
-    [clusterSOSRequests],
+    [panelSOSRequests],
   );
 
   const hasSidebar = !!activeSuggestion;
@@ -4537,7 +5558,7 @@ const RescuePlanPanel = ({
     if (sourceActivities.length === 0) return [];
 
     const fallbackSosRequestId =
-      clusterSOSRequests.length > 0 ? Number(clusterSOSRequests[0].id) : null;
+      panelSOSRequests.length > 0 ? Number(panelSOSRequests[0].id) : null;
 
     const groups: ActivityGroup[] = [];
     for (const act of sourceActivities) {
@@ -4568,7 +5589,7 @@ const RescuePlanPanel = ({
       }
     }
     return groups;
-  }, [activeSuggestion, clusterSOSRequests]);
+  }, [activeSuggestion, panelSOSRequests]);
 
   // Auto-collapse Quick Stats when user scrolls deep into the main plan content.
   useEffect(() => {
@@ -4641,7 +5662,7 @@ const RescuePlanPanel = ({
                         className="text-sm px-1.5 py-0 h-5 gap-1"
                       >
                         <TreeStructure className="h-3 w-3" weight="fill" />
-                        {clusterSOSRequests.length} SOS
+                        {panelSOSCount} SOS
                       </Badge>
                       <Badge
                         variant={severity!.variant}
@@ -4771,8 +5792,7 @@ const RescuePlanPanel = ({
                 {
                   icon: TreeStructure,
                   value:
-                    activeSuggestion.sosRequestCount ??
-                    clusterSOSRequests.length,
+                    activeSuggestion.sosRequestCount ?? panelSOSRequests.length,
                   label: "Yêu cầu SOS",
                   color: "text-blue-500",
                   bg: "bg-blue-500/5 border-blue-500/15",
@@ -5230,7 +6250,7 @@ const RescuePlanPanel = ({
                                           sosRequestId =
                                             inferSOSRequestIdFromActivity(
                                               act,
-                                              clusterSOSRequests,
+                                              panelSOSRequests,
                                             ) ?? "unknown";
                                         }
 
@@ -5257,7 +6277,7 @@ const RescuePlanPanel = ({
                                         const matchedSOS =
                                           group.type === "sos" &&
                                           group.sosRequestId
-                                            ? clusterSOSRequests.find(
+                                            ? panelSOSRequests.find(
                                                 (s) =>
                                                   s.id ===
                                                   String(group.sosRequestId),
@@ -5757,7 +6777,7 @@ const RescuePlanPanel = ({
                                 {/* Consolidated route for entire mission */}
                                 <MissionTeamRoutePreview
                                   mission={mission}
-                                  sosRequests={clusterSOSRequests}
+                                  sosRequests={panelSOSRequests}
                                 />
                               </CardContent>
                             </Card>
@@ -6479,9 +7499,15 @@ const RescuePlanPanel = ({
                             Thông tin SOS
                           </h3>
                           <div className="space-y-2">
-                            {clusterSOSRequests.map((sos) => (
-                              <SOSRequestSidebarCard key={sos.id} sos={sos} />
-                            ))}
+                            {panelSOSRequests.length > 0 ? (
+                              panelSOSRequests.map((sos) => (
+                                <SOSRequestSidebarCard key={sos.id} sos={sos} />
+                              ))
+                            ) : (
+                              <div className="rounded-lg border border-dashed border-border/70 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+                                Chưa đồng bộ được danh sách SOS của cụm.
+                              </div>
+                            )}
                           </div>
                         </section>
 
@@ -6682,7 +7708,7 @@ const RescuePlanPanel = ({
                           {activityGroups.map((group, gIdx) => {
                             const matchedSOS =
                               group.type === "sos" && group.sosRequestId
-                                ? clusterSOSRequests.find(
+                                ? panelSOSRequests.find(
                                     (s) => s.id === String(group.sosRequestId),
                                   )
                                 : null;

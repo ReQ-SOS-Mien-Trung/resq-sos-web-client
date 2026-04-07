@@ -293,6 +293,7 @@ export interface MissionTeamRouteWaypoint {
 }
 
 export interface MissionTeamRouteLeg {
+  segmentIndex?: number | null;
   fromStep?: number | null;
   toStep?: number | null;
   fromLatitude?: number | null;
