@@ -153,7 +153,7 @@ export default function RescueTeamsPage() {
       <Badge
         variant="outline"
         className={cn(
-          "inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold shadow-none",
+          "inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-semibold shadow-none",
           config.className,
         )}
       >
@@ -191,7 +191,7 @@ export default function RescueTeamsPage() {
       <Badge
         variant="secondary"
         className={cn(
-          "rounded-full px-3 py-1 text-xs font-medium",
+          "rounded-full px-3 py-1 text-sm font-medium",
           config.className,
         )}
       >
@@ -559,7 +559,7 @@ export default function RescueTeamsPage() {
         <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-orange-50/60 to-sky-50/70 p-5 shadow-sm md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FF5722]">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-[#FF5722]">
                 Bảng điều phối đội cứu hộ
               </p>
               <h1 className="text-pretty text-2xl font-bold text-slate-900 md:text-3xl">
@@ -579,15 +579,15 @@ export default function RescueTeamsPage() {
             </Button>
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-2.5 md:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
-                className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm"
+                className="rounded-2xl border border-white/70 bg-white/85 p-3.5 shadow-sm"
               >
-                <Skeleton className="h-10 w-10 rounded-2xl" />
-                <Skeleton className="mt-4 h-4 w-28" />
-                <Skeleton className="mt-3 h-8 w-16" />
+                <Skeleton className="h-9 w-9 rounded-2xl" />
+                <Skeleton className="mt-3 h-4 w-28" />
+                <Skeleton className="mt-2 h-7 w-14" />
                 <Skeleton className="mt-2 h-3 w-full" />
               </div>
             ))}
@@ -615,7 +615,7 @@ export default function RescueTeamsPage() {
                 {Array.from({ length: 3 }).map((_, i) => (
                   <Card
                     key={i}
-                    className="min-w-[320px] max-w-[360px] shrink-0 rounded-2xl border border-slate-200 shadow-none"
+                    className="min-w-[300px] max-w-[330px] shrink-0 rounded-2xl border border-slate-200 shadow-none"
                   >
                     <CardHeader className="space-y-3 pb-3">
                       <div className="flex gap-2">
@@ -669,7 +669,7 @@ export default function RescueTeamsPage() {
       <section className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-orange-50/60 to-sky-50/70 p-5 shadow-sm md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#FF5722]">
+            <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-[#FF5722]">
               Bảng điều phối đội cứu hộ
             </p>
             <h1 className="text-pretty text-2xl font-bold text-slate-900 md:text-3xl">
@@ -692,30 +692,30 @@ export default function RescueTeamsPage() {
           </Button>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-5 grid gap-2.5 md:grid-cols-2 lg:grid-cols-4">
           {overviewCards.map((item) => {
             const Icon = item.icon;
 
             return (
               <div
                 key={item.title}
-                className="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm shadow-slate-200/60"
+                className="h-full rounded-2xl border border-white/80 bg-white/90 p-3.5 shadow-sm shadow-slate-200/60"
               >
                 <div
                   className={cn(
-                    "flex h-11 w-11 items-center justify-center rounded-2xl shadow-sm",
+                    "flex h-10 w-10 items-center justify-center rounded-2xl shadow-sm",
                     item.iconClassName,
                   )}
                 >
-                  <Icon className="h-5 w-5" aria-hidden="true" />
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                 </div>
-                <p className="mt-4 text-sm font-medium text-slate-600">
+                <p className="mt-3 text-sm font-medium text-slate-600">
                   {item.title}
                 </p>
-                <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900 tabular-nums">
+                <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">
                   {item.value}
                 </p>
-                <p className="mt-2 text-sm leading-5 text-slate-500">
+                <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-slate-500">
                   {item.description}
                 </p>
               </div>
@@ -724,16 +724,16 @@ export default function RescueTeamsPage() {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <span className="rounded-full border border-emerald-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-700">
+          <span className="rounded-full border border-emerald-200 bg-white/90 px-3 py-1.5 text-sm font-medium text-slate-700">
             Quân số đủ: xanh lá
           </span>
-          <span className="rounded-full border border-amber-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-700">
+          <span className="rounded-full border border-amber-200 bg-white/90 px-3 py-1.5 text-sm font-medium text-slate-700">
             Cần bổ sung: vàng
           </span>
-          <span className="rounded-full border border-rose-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-700">
+          <span className="rounded-full border border-rose-200 bg-white/90 px-3 py-1.5 text-sm font-medium text-slate-700">
             Thiếu nghiêm trọng: đỏ
           </span>
-          <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-700">
+          <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-sm font-medium text-slate-700">
             Trống quân số: xám
           </span>
         </div>
@@ -865,7 +865,7 @@ export default function RescueTeamsPage() {
               </span>{" "}
               / {numberFormatter.format(teams.length)} đội trong trang hiện tại.
             </p>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
               {hasActiveFilters && (
                 <span className="rounded-full bg-white px-2.5 py-1 font-medium text-slate-600">
                   {activeFilterCount} bộ lọc đang bật
@@ -958,7 +958,7 @@ export default function RescueTeamsPage() {
                     >
                       <SelectTrigger
                         className={cn(
-                          "h-8 min-w-[180px] rounded-full px-3 text-xs font-medium shadow-none",
+                          "h-8 min-w-[180px] rounded-full px-3 text-sm font-medium shadow-none",
                           filterTheme.selectClassName,
                         )}
                       >
@@ -997,7 +997,7 @@ export default function RescueTeamsPage() {
                     >
                       <SelectTrigger
                         className={cn(
-                          "h-8 min-w-[150px] rounded-full px-3 text-xs font-medium shadow-none",
+                          "h-8 min-w-[150px] rounded-full px-3 text-sm font-medium shadow-none",
                           filterTheme.selectClassName,
                         )}
                       >
@@ -1029,7 +1029,7 @@ export default function RescueTeamsPage() {
                     >
                       <SelectTrigger
                         className={cn(
-                          "h-8 min-w-[170px] rounded-full px-3 text-xs font-medium shadow-none",
+                          "h-8 min-w-[170px] rounded-full px-3 text-sm font-medium shadow-none",
                           filterTheme.selectClassName,
                         )}
                       >
@@ -1061,7 +1061,7 @@ export default function RescueTeamsPage() {
                 </span>
               </div>
 
-              <div className="flex gap-4 overflow-x-auto pb-2 pr-1">
+              <div className="flex gap-3 overflow-x-auto pb-2 pr-1">
                 {columnTeams.map((team) => {
                   const occupancy = getOccupancyPercent(
                     team.currentMemberCount,
@@ -1072,11 +1072,11 @@ export default function RescueTeamsPage() {
                   return (
                     <Card
                       key={team.id}
-                      className="min-w-[340px] max-w-[390px] shrink-0 rounded-2xl border border-slate-200 bg-white shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                      className="min-w-[300px] max-w-[330px] shrink-0 rounded-2xl border border-slate-200 bg-white shadow-sm transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
                     >
-                      <CardHeader className="space-y-2.5 pb-2">
+                      <CardHeader className="space-y-2 pb-1.5">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-sm font-medium text-slate-600">
                             {team.code}
                           </span>
                           {getTypeBadge(team.teamType)}
@@ -1084,7 +1084,7 @@ export default function RescueTeamsPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <CardTitle
-                              className="line-clamp-2 text-pretty text-lg leading-tight text-slate-900"
+                              className="line-clamp-2 text-pretty text-base leading-tight text-slate-900"
                               title={team.name}
                             >
                               {team.name}
@@ -1096,8 +1096,8 @@ export default function RescueTeamsPage() {
                         </div>
                       </CardHeader>
 
-                      <CardContent className="space-y-2.5 pb-3 text-sm">
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50/85 p-2.5">
+                      <CardContent className="space-y-2 pb-2.5 text-sm">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/85 p-2">
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <span className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
                               <UsersThree
@@ -1110,7 +1110,7 @@ export default function RescueTeamsPage() {
                             <div className="flex items-center gap-2">
                               <span
                                 className={cn(
-                                  "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                                  "rounded-full px-2.5 py-1 text-sm font-semibold",
                                   occupancyMeta.chipClassName,
                                 )}
                               >
@@ -1156,7 +1156,7 @@ export default function RescueTeamsPage() {
                           </div>
 
                           <div className="mt-2 flex items-end justify-between gap-2">
-                            <p className="text-xs text-slate-500">
+                            <p className="text-sm text-slate-500">
                               <span className="font-semibold text-slate-900 tabular-nums">
                                 {team.currentMemberCount}
                               </span>{" "}
@@ -1165,7 +1165,7 @@ export default function RescueTeamsPage() {
                           </div>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-100 bg-white p-2.5">
+                        <div className="rounded-2xl border border-slate-100 bg-white p-2">
                           <div className="flex items-start gap-2 text-slate-600">
                             <MapPin
                               className="mt-0.5 h-4 w-4 shrink-0 text-slate-400"
@@ -1173,7 +1173,7 @@ export default function RescueTeamsPage() {
                               weight="duotone"
                             />
                             <div className="min-w-0">
-                              <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
+                              <p className="text-sm font-medium uppercase tracking-[0.14em] text-slate-400">
                                 Điểm tập kết
                               </p>
                               <p
@@ -1192,7 +1192,7 @@ export default function RescueTeamsPage() {
                         <Button
                           asChild
                           variant="outline"
-                          className="h-10 w-full gap-1.5 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[#FF5722]/30"
+                          className="h-9 w-full gap-1.5 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-[#FF5722]/30"
                         >
                           <Link
                             href={`/dashboard/coordinator/rescue-teams/${team.id}`}
@@ -1211,7 +1211,7 @@ export default function RescueTeamsPage() {
                 })}
 
                 {columnTeams.length === 0 && (
-                  <div className="min-w-[320px] rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-8 text-center">
+                  <div className="min-w-[300px] rounded-2xl border border-dashed border-slate-300 bg-white/80 px-4 py-6 text-center">
                     <p className="text-sm font-medium text-slate-700">
                       {hasActiveFilters
                         ? "Không có đội phù hợp trong nhóm này"

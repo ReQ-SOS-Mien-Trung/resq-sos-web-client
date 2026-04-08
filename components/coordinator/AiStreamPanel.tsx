@@ -72,6 +72,7 @@ const activityIconMap: Record<
   EVACUATE: Users,
   ASSESS: Eye,
   COORDINATE: TreeStructure,
+  RETURN_SUPPLIES: ArrowsClockwise,
   MIXED: Sparkle,
 };
 
@@ -90,6 +91,29 @@ const formatTeamTypeLabel = (teamType?: string | null) => {
   const normalized = teamType.trim().toUpperCase();
   return TEAM_TYPE_LABELS[normalized] ?? teamType;
 };
+
+function normalizeAiErrorText(error: string): string {
+  const message = error.trim();
+  if (!message) {
+    return "AI không thể phân tích cụm này. Vui lòng thử lại.";
+  }
+
+  const lower = message.toLowerCase();
+  if (lower === "lỗi" || lower === "loi" || lower === "error") {
+    return "AI phân tích thất bại. Backend chưa trả chi tiết lỗi.";
+  }
+
+  return message;
+}
+
+function buildAiErrorStatusLabel(error: string): string {
+  const readable = normalizeAiErrorText(error);
+  const compact =
+    readable.split(/[.!?]/).find((segment) => segment.trim().length > 0) ??
+    readable;
+
+  return `LỖI: ${compact.trim()}`;
+}
 
 /* ═══ Main Component ═══ */
 
@@ -202,6 +226,14 @@ function TopBar({
   onStop: () => void;
   onClose: () => void;
 }) {
+  const statusLabel = loading
+    ? phaseLabel(phase)
+    : result
+      ? "HOÀN TẤT"
+      : error
+        ? buildAiErrorStatusLabel(error)
+        : "SẴN SÀNG";
+
   return (
     <div className="relative flex items-center justify-between px-5 py-3 border-b bg-background shrink-0">
       <div className="flex items-center gap-3">
@@ -227,14 +259,11 @@ function TopBar({
               </Badge>
             )}
           </h3>
-          <p className="text-xs text-muted-foreground font-mono">
-            {loading
-              ? phaseLabel(phase)
-              : result
-                ? "HOÀN TẤT"
-                : error
-                  ? "LỖI"
-                  : "SẴN SÀNG"}
+          <p
+            className="max-w-xl truncate text-xs text-muted-foreground"
+            title={error ? normalizeAiErrorText(error) : undefined}
+          >
+            {statusLabel}
           </p>
         </div>
       </div>
@@ -344,9 +373,10 @@ function SonarRadar({
   const ringRefs = useRef<(SVGCircleElement | null)[]>([]);
   const tickerRef = useRef<HTMLDivElement>(null);
   const thinkingRef = useRef<HTMLDivElement>(null);
-  const statusEntries = statusLog
-    .filter((entry) => entry.type === "status" || entry.type === "result")
-    .slice(-3);
+  const previousStatusCountRef = useRef(0);
+  const statusEntries = statusLog.filter(
+    (entry) => entry.type === "status" || entry.type === "result",
+  );
 
   useEffect(() => {
     const rings = ringRefs.current.filter(Boolean) as SVGCircleElement[];
@@ -369,21 +399,73 @@ function SonarRadar({
   }, []);
 
   useEffect(() => {
-    if (!tickerRef.current || statusEntries.length === 0) return;
-    const items = tickerRef.current.querySelectorAll(".status-ticker-item");
-    gsap.killTweensOf(items);
-    gsap.fromTo(
-      items,
-      { y: 18, opacity: 0 },
-      {
-        y: 0,
-        opacity: 1,
-        duration: 0.38,
-        stagger: 0.05,
-        ease: "power2.out",
-      },
+    if (!tickerRef.current) return;
+
+    const items = Array.from(
+      tickerRef.current.querySelectorAll<HTMLElement>(".status-ticker-item"),
     );
-  }, [statusEntries]);
+
+    if (items.length === 0) {
+      previousStatusCountRef.current = 0;
+      return;
+    }
+
+    const previousCount = previousStatusCountRef.current;
+
+    if (previousCount === 0 || items.length <= previousCount) {
+      gsap.killTweensOf(items);
+      gsap.fromTo(
+        items,
+        { y: 10, opacity: 0 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: 0.28,
+          stagger: 0.04,
+          ease: "power2.out",
+          overwrite: "auto",
+        },
+      );
+    } else {
+      const existingItems = items.slice(0, previousCount);
+      const newItems = items.slice(previousCount);
+
+      if (existingItems.length > 0) {
+        gsap.killTweensOf(existingItems);
+        gsap.fromTo(
+          existingItems,
+          { y: 0 },
+          {
+            y: -8,
+            duration: 0.18,
+            stagger: 0.014,
+            ease: "power1.out",
+            yoyo: true,
+            repeat: 1,
+            overwrite: "auto",
+          },
+        );
+      }
+
+      gsap.killTweensOf(newItems);
+      gsap.fromTo(
+        newItems,
+        { y: 16, x: 10, opacity: 0 },
+        {
+          y: 0,
+          x: 0,
+          opacity: 1,
+          duration: 0.34,
+          stagger: 0.05,
+          ease: "power2.out",
+          overwrite: "auto",
+        },
+      );
+    }
+
+    previousStatusCountRef.current = items.length;
+    tickerRef.current.scrollTop = tickerRef.current.scrollHeight;
+  }, [statusEntries.length]);
 
   useEffect(() => {
     if (thinkingRef.current) {
@@ -392,96 +474,110 @@ function SonarRadar({
   }, [thinkingText]);
 
   return (
-    <div className="w-full px-2 py-6 md:px-4">
-      <div className="flex flex-col items-center justify-center">
-        <div className="relative h-72 w-72">
-          <svg viewBox="0 0 300 300" className="w-full h-full">
-            {[60, 100, 140].map((r) => (
-              <circle
-                key={r}
-                cx="150"
-                cy="150"
-                r={r}
-                fill="none"
-                className="stroke-primary/10"
-                strokeWidth="0.5"
-              />
-            ))}
-            <line
-              x1="150"
-              y1="30"
-              x2="150"
-              y2="270"
-              className="stroke-primary/10"
-              strokeWidth="0.5"
-            />
-            <line
-              x1="30"
-              y1="150"
-              x2="270"
-              y2="150"
-              className="stroke-primary/10"
-              strokeWidth="0.5"
-            />
-            {[0, 1, 2, 3].map((i) => (
-              <circle
-                key={`ring-${i}`}
-                ref={(el) => {
-                  ringRefs.current[i] = el;
-                }}
-                cx="150"
-                cy="150"
-                r="20"
-                fill="none"
-                stroke="url(#sonarGrad)"
-                strokeWidth={2.5 - i * 0.4}
-                opacity="0"
-              />
-            ))}
-            <circle
-              cx="150"
-              cy="150"
-              r="18"
-              className="fill-primary/15 stroke-primary/60"
-              strokeWidth="2"
-            />
-            <circle cx="150" cy="150" r="8" className="fill-primary/50">
-              <animate
-                attributeName="r"
-                values="6;10;6"
-                dur="1.5s"
-                repeatCount="indefinite"
-              />
-              <animate
-                attributeName="opacity"
-                values="0.8;0.4;0.8"
-                dur="1.5s"
-                repeatCount="indefinite"
-              />
-            </circle>
-            <defs>
-              <radialGradient id="sonarGrad">
-                <stop offset="0%" stopColor="rgba(249,115,22,0.8)" />
-                <stop offset="100%" stopColor="rgba(249,115,22,0)" />
-              </radialGradient>
-            </defs>
-          </svg>
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <Brain
-              className="h-6 w-6 text-primary animate-pulse"
-              weight="fill"
-            />
+    <div className="w-full px-2 py-5 md:px-4">
+      <div className="mx-auto grid w-full max-w-5xl gap-5 md:grid-cols-[280px_minmax(0,1fr)] md:items-start">
+        <div className="rounded-2xl border bg-card/40 p-3 md:p-4">
+          <div className="flex flex-col items-center">
+            <div className="relative h-52 w-52 md:h-56 md:w-56">
+              <svg viewBox="0 0 300 300" className="w-full h-full">
+                {[60, 100, 140].map((r) => (
+                  <circle
+                    key={r}
+                    cx="150"
+                    cy="150"
+                    r={r}
+                    fill="none"
+                    className="stroke-primary/10"
+                    strokeWidth="0.5"
+                  />
+                ))}
+                <line
+                  x1="150"
+                  y1="30"
+                  x2="150"
+                  y2="270"
+                  className="stroke-primary/10"
+                  strokeWidth="0.5"
+                />
+                <line
+                  x1="30"
+                  y1="150"
+                  x2="270"
+                  y2="150"
+                  className="stroke-primary/10"
+                  strokeWidth="0.5"
+                />
+                {[0, 1, 2, 3].map((i) => (
+                  <circle
+                    key={`ring-${i}`}
+                    ref={(el) => {
+                      ringRefs.current[i] = el;
+                    }}
+                    cx="150"
+                    cy="150"
+                    r="20"
+                    fill="none"
+                    stroke="url(#sonarGrad)"
+                    strokeWidth={2.5 - i * 0.4}
+                    opacity="0"
+                  />
+                ))}
+                <circle
+                  cx="150"
+                  cy="150"
+                  r="18"
+                  className="fill-primary/15 stroke-primary/60"
+                  strokeWidth="2"
+                />
+                <circle cx="150" cy="150" r="8" className="fill-primary/50">
+                  <animate
+                    attributeName="r"
+                    values="6;10;6"
+                    dur="1.5s"
+                    repeatCount="indefinite"
+                  />
+                  <animate
+                    attributeName="opacity"
+                    values="0.8;0.4;0.8"
+                    dur="1.5s"
+                    repeatCount="indefinite"
+                  />
+                </circle>
+                <defs>
+                  <radialGradient id="sonarGrad">
+                    <stop offset="0%" stopColor="rgba(249,115,22,0.8)" />
+                    <stop offset="100%" stopColor="rgba(249,115,22,0)" />
+                  </radialGradient>
+                </defs>
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <Brain
+                  className="h-6 w-6 text-primary animate-pulse"
+                  weight="fill"
+                />
+              </div>
+            </div>
+
+            <Badge className="mt-1 border-primary/20 bg-primary/10 text-primary hover:bg-primary/10">
+              {phaseLabel(phase)}
+            </Badge>
+            <p className="mt-2 text-center text-xs text-muted-foreground/80">
+              AI đang phân tích
+            </p>
           </div>
         </div>
 
-        <Badge className="mt-1 border-primary/20 bg-primary/10 text-primary hover:bg-primary/10">
-          {phaseLabel(phase)}
-        </Badge>
+        <div className="rounded-2xl border bg-card/40 p-3 md:p-4">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-primary/70 animate-pulse" />
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
+              SUY NGHĨ AI
+            </p>
+          </div>
 
-        <div className="mt-5 w-full max-w-md px-4">
           <div
             ref={tickerRef}
-            className="mx-auto flex min-h-[88px] max-w-sm flex-col justify-end overflow-hidden"
+            className="mt-3 max-h-65 overflow-y-auto space-y-1.5 pr-1"
           >
             {statusEntries.length > 0 ? (
               statusEntries.map((entry, index) => {
@@ -490,20 +586,22 @@ function SonarRadar({
                   <div
                     key={entry.id}
                     className={cn(
-                      "status-ticker-item flex items-center justify-center gap-2 py-1 text-center transition-opacity",
-                      isLatest ? "text-primary/85" : "text-muted-foreground/65",
+                      "status-ticker-item flex items-start gap-2 rounded-lg border border-transparent bg-background/50 px-2.5 py-2 transition-colors",
+                      isLatest
+                        ? "border-primary/25 bg-primary/8"
+                        : "text-muted-foreground/85",
                     )}
                   >
                     <span
                       className={cn(
-                        "h-1.5 w-1.5 shrink-0 rounded-full",
-                        isLatest ? "bg-primary/70" : "bg-primary/25",
+                        "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
+                        isLatest ? "bg-primary/70" : "bg-primary/30",
                       )}
                     />
                     <p
                       className={cn(
-                        "font-mono break-words",
-                        isLatest ? "text-sm" : "text-xs",
+                        "font-mono wrap-break-word leading-relaxed",
+                        isLatest ? "text-[13px] text-primary/90" : "text-xs",
                       )}
                     >
                       {entry.message}
@@ -512,24 +610,24 @@ function SonarRadar({
                 );
               })
             ) : (
-              <div className="status-ticker-item py-1 text-center text-sm font-mono text-primary/80">
+              <div className="status-ticker-item rounded-lg bg-background/50 px-2.5 py-2 text-xs font-mono text-primary/80">
                 {status || "Đang khởi tạo..."}
               </div>
             )}
           </div>
-        </div>
 
-        {thinkingText && (
-          <div
-            ref={thinkingRef}
-            className="mt-4 max-h-28 w-full max-w-xl overflow-y-auto px-3 text-center scrollbar-none"
-          >
-            <p className="text-xs font-mono leading-5 text-primary/55 whitespace-pre-wrap break-words">
-              {thinkingText}
-              <span className="ml-1 inline-block h-3 w-1.5 animate-pulse bg-primary/60 align-middle" />
-            </p>
-          </div>
-        )}
+          {thinkingText && (
+            <div
+              ref={thinkingRef}
+              className="mt-3 max-h-28 overflow-y-auto rounded-lg border border-primary/15 bg-primary/4 p-3 scrollbar-none"
+            >
+              <p className="text-xs font-mono leading-5 text-primary/65 whitespace-pre-wrap wrap-break-word">
+                {thinkingText}
+                <span className="ml-1 inline-block h-3 w-1.5 animate-pulse bg-primary/60 align-middle" />
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1214,6 +1312,8 @@ function WarningsBlock({
 
 function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const readableError = normalizeAiErrorText(error);
+
   useEffect(() => {
     if (!ref.current) return;
     gsap.fromTo(
@@ -1238,7 +1338,7 @@ function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
         <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">
           Phân tích thất bại
         </p>
-        <p className="text-xs text-red-500/60 mb-4">{error}</p>
+        <p className="text-xs text-red-500/60 mb-4">{readableError}</p>
         <Button
           variant="destructive"
           size="sm"

@@ -9,6 +9,155 @@ import {
   SseMissionEvent,
 } from "./type";
 
+const GENERIC_AI_ERROR_MESSAGES = new Set([
+  "lỗi",
+  "loi",
+  "error",
+  "failed",
+  "đã xảy ra lỗi không xác định",
+  "da xay ra loi khong xac dinh",
+  "unknown error",
+  "internal server error",
+]);
+
+const CONNECTIVITY_ERROR_HINTS = [
+  "failed to fetch",
+  "network error",
+  "networkerror",
+  "timeout",
+  "timed out",
+  "connection",
+  "negotiation",
+] as const;
+
+type BackendErrorEnvelope = {
+  message?: unknown;
+  title?: unknown;
+  detail?: unknown;
+  error?: unknown;
+  errorMessage?: unknown;
+  errors?: Record<string, unknown> | null;
+};
+
+function getFirstErrorFromMap(
+  errors: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!errors || typeof errors !== "object") return null;
+
+  for (const value of Object.values(errors)) {
+    if (Array.isArray(value)) {
+      const first = value.find(
+        (item) => typeof item === "string" && item.trim().length > 0,
+      );
+      if (typeof first === "string") return first.trim();
+      continue;
+    }
+
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function tryExtractMessage(raw: unknown): string | null {
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return tryExtractMessage(JSON.parse(trimmed));
+      } catch {
+        return trimmed;
+      }
+    }
+
+    return trimmed;
+  }
+
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const extracted = tryExtractMessage(item);
+      if (extracted) return extracted;
+    }
+    return null;
+  }
+
+  if (raw && typeof raw === "object") {
+    const payload = raw as BackendErrorEnvelope;
+    const firstValidationError = getFirstErrorFromMap(payload.errors ?? null);
+    if (firstValidationError) return firstValidationError;
+
+    const fieldCandidates = [
+      payload.message,
+      payload.title,
+      payload.detail,
+      payload.error,
+      payload.errorMessage,
+    ];
+
+    for (const candidate of fieldCandidates) {
+      const extracted = tryExtractMessage(candidate);
+      if (extracted) return extracted;
+    }
+  }
+
+  return null;
+}
+
+function isConnectivityMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  if (!normalized) return false;
+  return CONNECTIVITY_ERROR_HINTS.some((hint) => normalized.includes(hint));
+}
+
+function isGenericMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  if (!normalized) return true;
+  return GENERIC_AI_ERROR_MESSAGES.has(normalized);
+}
+
+export function formatAiAnalysisErrorMessage(
+  rawError: unknown,
+  statusCode?: number,
+): string {
+  const extractedMessage = tryExtractMessage(rawError);
+
+  if (statusCode === 401 || statusCode === 403) {
+    return "Bạn không có quyền chạy AI phân tích. Vui lòng đăng nhập lại hoặc kiểm tra phân quyền.";
+  }
+
+  if (statusCode === 404) {
+    return "Không tìm thấy cụm SOS để AI phân tích. Vui lòng tải lại dữ liệu cụm.";
+  }
+
+  if (statusCode === 429) {
+    return "AI đang quá tải yêu cầu (HTTP 429). Vui lòng thử lại sau ít phút.";
+  }
+
+  if (typeof statusCode === "number" && statusCode >= 500) {
+    if (extractedMessage && !isGenericMessage(extractedMessage)) {
+      return extractedMessage;
+    }
+
+    return `AI phân tích thất bại do lỗi backend (HTTP ${statusCode}). Vui lòng thử lại sau ít phút.`;
+  }
+
+  if (extractedMessage) {
+    if (isConnectivityMessage(extractedMessage)) {
+      return "Không kết nối được backend AI. Vui lòng kiểm tra server hoặc kết nối mạng rồi thử lại.";
+    }
+
+    if (!isGenericMessage(extractedMessage)) {
+      return extractedMessage;
+    }
+  }
+
+  return "AI không thể phân tích cụm này. Backend chưa trả chi tiết lỗi, vui lòng thử lại sau.";
+}
+
 /**
  * Get all SOS clusters
  * GET /emergency/sos-clusters
@@ -90,7 +239,13 @@ export function streamClusterRescueSuggestion(
       );
 
       if (!response.ok) {
-        callbacks.onError(`HTTP ${response.status}: ${response.statusText}`);
+        const errorBody = await response.text().catch(() => "");
+        callbacks.onError(
+          formatAiAnalysisErrorMessage(
+            errorBody || response.statusText,
+            response.status,
+          ),
+        );
         return;
       }
 
@@ -103,17 +258,17 @@ export function streamClusterRescueSuggestion(
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        
+
         let nlIdx = buffer.indexOf("\n");
         while (nlIdx !== -1) {
           const line = buffer.slice(0, nlIdx).trim();
           buffer = buffer.slice(nlIdx + 1);
-          
+
           if (!line.startsWith("data: ")) {
             nlIdx = buffer.indexOf("\n");
             continue;
           }
-          
+
           const jsonStr = line.slice(6).trim();
           if (!jsonStr) {
             nlIdx = buffer.indexOf("\n");
@@ -145,10 +300,10 @@ export function streamClusterRescueSuggestion(
               }
               break;
             case "error":
-              callbacks.onError(event.data || "Đã xảy ra lỗi không xác định");
+              callbacks.onError(formatAiAnalysisErrorMessage(event.data));
               return;
           }
-          
+
           nlIdx = buffer.indexOf("\n");
         }
       }
@@ -167,9 +322,7 @@ export function streamClusterRescueSuggestion(
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;
-      callbacks.onError(
-        err instanceof Error ? err.message : "Lỗi kết nối không xác định",
-      );
+      callbacks.onError(formatAiAnalysisErrorMessage(err));
     }
   })();
 

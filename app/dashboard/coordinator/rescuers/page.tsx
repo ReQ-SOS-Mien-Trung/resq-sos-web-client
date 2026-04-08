@@ -94,6 +94,7 @@ export default function CoordinatorRescuerManagementPage() {
   const [draggingRescuerId, setDraggingRescuerId] = useState<string | null>(
     null,
   );
+  const [draggingRescuerIds, setDraggingRescuerIds] = useState<string[]>([]);
   const [dragSourcePanel, setDragSourcePanel] = useState<SplitPanelSide | null>(
     null,
   );
@@ -112,10 +113,20 @@ export default function CoordinatorRescuerManagementPage() {
   const leftPanelRef = useRef<HTMLDivElement | null>(null);
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
   const splitRowLayoutsRef = useRef<Record<string, SplitRowLayout>>({});
+  const dragPreviewRef = useRef<HTMLDivElement | null>(null);
   const hasSelectedAssemblyPoint =
     selectedAssemblyPointCode !== ALL_ASSEMBLY_POINT_FILTER_VALUE;
   const isSplitByAssemblyPointView =
     isSplitLayoutEnabled && hasSelectedAssemblyPoint;
+
+  useEffect(() => {
+    return () => {
+      if (dragPreviewRef.current) {
+        dragPreviewRef.current.remove();
+        dragPreviewRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -636,6 +647,7 @@ export default function CoordinatorRescuerManagementPage() {
   useEffect(() => {
     if (!isSplitByAssemblyPointView) {
       setDraggingRescuerId(null);
+      setDraggingRescuerIds([]);
       setDragSourcePanel(null);
       setActiveDropPanel(null);
       setSplitPanelOverrides({});
@@ -908,8 +920,65 @@ export default function CoordinatorRescuerManagementPage() {
     await refetch();
   };
 
+  const clearDragPreview = () => {
+    if (dragPreviewRef.current) {
+      dragPreviewRef.current.remove();
+      dragPreviewRef.current = null;
+    }
+  };
+
+  const createMultiDragPreview = (draggedCount: number) => {
+    if (typeof document === "undefined") {
+      return null;
+    }
+
+    const preview = document.createElement("div");
+    preview.style.position = "fixed";
+    preview.style.top = "-9999px";
+    preview.style.left = "-9999px";
+    preview.style.pointerEvents = "none";
+    preview.style.display = "inline-flex";
+    preview.style.alignItems = "center";
+    preview.style.gap = "8px";
+    preview.style.padding = "8px 11px";
+    preview.style.borderRadius = "999px";
+    preview.style.background = "rgba(15, 23, 42, 0.95)";
+    preview.style.color = "#F8FAFC";
+    preview.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+    preview.style.boxShadow = "0 14px 30px rgba(2, 6, 23, 0.45)";
+    preview.style.font =
+      '600 12px/1.2 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+
+    const stack = document.createElement("span");
+    stack.style.position = "relative";
+    stack.style.display = "inline-block";
+    stack.style.width = "24px";
+    stack.style.height = "17px";
+
+    for (let layerIndex = 0; layerIndex < 3; layerIndex += 1) {
+      const layer = document.createElement("span");
+      layer.style.position = "absolute";
+      layer.style.top = `${layerIndex * 2}px`;
+      layer.style.left = `${layerIndex * 3}px`;
+      layer.style.width = "15px";
+      layer.style.height = "11px";
+      layer.style.borderRadius = "3px";
+      layer.style.border = "1px solid rgba(248, 250, 252, 0.82)";
+      layer.style.background = "rgba(248, 250, 252, 0.18)";
+      stack.appendChild(layer);
+    }
+
+    const label = document.createElement("span");
+    label.textContent = `Kéo ${draggedCount} người cứu hộ`;
+
+    preview.append(stack, label);
+    return preview;
+  };
+
   const resetDragState = () => {
+    clearDragPreview();
     setDraggingRescuerId(null);
+    setDraggingRescuerIds([]);
     setDragSourcePanel(null);
     setActiveDropPanel(null);
   };
@@ -924,11 +993,71 @@ export default function CoordinatorRescuerManagementPage() {
       return;
     }
 
+    const selectedRightPanelRescuerIds = selectableRescuers
+      .map((item) => item.id)
+      .filter((rescuerId) => selectedRescuerIdSet.has(rescuerId));
+    const shouldDragSelectedGroup =
+      sourcePanel === "right" &&
+      selectedRescuerIdSet.has(rescuer.id) &&
+      selectedRightPanelRescuerIds.length > 1;
+    const draggedRescuerIds = shouldDragSelectedGroup
+      ? selectedRightPanelRescuerIds
+      : [rescuer.id];
+
+    clearDragPreview();
     setDraggingRescuerId(rescuer.id);
+    setDraggingRescuerIds(draggedRescuerIds);
     setDragSourcePanel(sourcePanel);
     setActiveDropPanel(sourcePanel === "left" ? "right" : "left");
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", rescuer.id);
+    event.dataTransfer.setData(
+      "application/x-rescuer-ids",
+      JSON.stringify(draggedRescuerIds),
+    );
+
+    if (draggedRescuerIds.length > 1) {
+      const preview = createMultiDragPreview(draggedRescuerIds.length);
+      if (preview) {
+        document.body.appendChild(preview);
+        dragPreviewRef.current = preview;
+        event.dataTransfer.setDragImage(preview, 24, 14);
+      }
+    }
+
+    if (shouldDragSelectedGroup && rightPanelRef.current) {
+      const anchorRect = event.currentTarget.getBoundingClientRect();
+      const selectedRowElements = draggedRescuerIds
+        .filter((rescuerId) => rescuerId !== rescuer.id)
+        .map((rescuerId) =>
+          rightPanelRef.current?.querySelector<HTMLElement>(
+            `[data-split-rescuer-id="${rescuerId}"]`,
+          ),
+        )
+        .filter((rowElement): rowElement is HTMLElement => rowElement !== null);
+
+      selectedRowElements.forEach((rowElement, index) => {
+        const rowRect = rowElement.getBoundingClientRect();
+
+        gsap.fromTo(
+          rowElement,
+          { x: 0, y: 0, scale: 1, opacity: 1 },
+          {
+            x: (anchorRect.left - rowRect.left) * 0.22,
+            y: (anchorRect.top - rowRect.top) * 0.22,
+            scale: 0.985,
+            opacity: 0.82,
+            duration: 0.18,
+            ease: "power2.out",
+            yoyo: true,
+            repeat: 1,
+            delay: index * 0.012,
+            clearProps: "transform,opacity",
+            overwrite: "auto",
+          },
+        );
+      });
+    }
 
     gsap.to(event.currentTarget, {
       scale: 0.98,
@@ -953,7 +1082,7 @@ export default function CoordinatorRescuerManagementPage() {
     targetPanel: SplitPanelSide,
   ) => {
     if (
-      !draggingRescuerId ||
+      (draggingRescuerIds.length === 0 && !draggingRescuerId) ||
       !dragSourcePanel ||
       dragSourcePanel === targetPanel
     ) {
@@ -980,8 +1109,45 @@ export default function CoordinatorRescuerManagementPage() {
   ) => {
     event.preventDefault();
 
+    const fallbackDraggedRescuerIds =
+      draggingRescuerIds.length > 0
+        ? draggingRescuerIds
+        : draggingRescuerId
+          ? [draggingRescuerId]
+          : [];
+    let droppedRescuerIds = fallbackDraggedRescuerIds;
+
+    const serializedDraggedIds = event.dataTransfer.getData(
+      "application/x-rescuer-ids",
+    );
+    if (serializedDraggedIds) {
+      try {
+        const parsedDraggedIds = JSON.parse(serializedDraggedIds) as unknown;
+        if (Array.isArray(parsedDraggedIds)) {
+          const parsedRescuerIds = parsedDraggedIds.filter(
+            (rescuerId): rescuerId is string =>
+              typeof rescuerId === "string" && rescuerId.length > 0,
+          );
+
+          if (parsedRescuerIds.length > 0) {
+            droppedRescuerIds = parsedRescuerIds;
+          }
+        }
+      } catch {
+        // Ignore parse errors and fallback to current dragging state.
+      }
+    }
+
+    const normalizedDroppedRescuerIds = Array.from(
+      new Set(
+        droppedRescuerIds.filter((rescuerId) =>
+          baseSplitRescuerMap.has(rescuerId),
+        ),
+      ),
+    );
+
     if (
-      !draggingRescuerId ||
+      normalizedDroppedRescuerIds.length === 0 ||
       !dragSourcePanel ||
       dragSourcePanel === targetPanel ||
       isAssignmentBusy
@@ -989,11 +1155,6 @@ export default function CoordinatorRescuerManagementPage() {
       resetDragState();
       return;
     }
-
-    const droppedRescuerId = draggingRescuerId;
-    const shouldResetToBasePanel =
-      (targetPanel === "left" && baseLeftRescuerIdSet.has(droppedRescuerId)) ||
-      (targetPanel === "right" && baseRightRescuerIdSet.has(droppedRescuerId));
 
     if (dragSourcePanel === "right" && targetPanel === "left") {
       if (splitTargetAssemblyPointId === null) {
@@ -1003,68 +1164,124 @@ export default function CoordinatorRescuerManagementPage() {
       }
     }
 
+    const droppedRescuerIdSet = new Set(normalizedDroppedRescuerIds);
+    const shouldResetToBasePanelByRescuerId = new Map<string, boolean>();
+
+    for (const droppedRescuerId of normalizedDroppedRescuerIds) {
+      const shouldResetToBasePanel =
+        (targetPanel === "left" &&
+          baseLeftRescuerIdSet.has(droppedRescuerId)) ||
+        (targetPanel === "right" &&
+          baseRightRescuerIdSet.has(droppedRescuerId));
+
+      shouldResetToBasePanelByRescuerId.set(
+        droppedRescuerId,
+        shouldResetToBasePanel,
+      );
+    }
+
     setSplitPanelOverrides((previous) => {
+      let hasChange = false;
       const nextOverrides = { ...previous };
 
-      if (shouldResetToBasePanel) {
-        delete nextOverrides[droppedRescuerId];
-      } else {
-        nextOverrides[droppedRescuerId] = targetPanel;
-      }
+      for (const droppedRescuerId of normalizedDroppedRescuerIds) {
+        const shouldResetToBasePanel =
+          shouldResetToBasePanelByRescuerId.get(droppedRescuerId) ?? false;
 
-      return nextOverrides;
-    });
-
-    if (shouldResetToBasePanel) {
-      setSplitPanelMoveOrderByRescuerId((previous) => {
-        if (previous[droppedRescuerId] == null) {
-          return previous;
+        if (shouldResetToBasePanel) {
+          if (nextOverrides[droppedRescuerId]) {
+            delete nextOverrides[droppedRescuerId];
+            hasChange = true;
+          }
+          continue;
         }
 
-        const nextMoveOrder = { ...previous };
-        delete nextMoveOrder[droppedRescuerId];
-        return nextMoveOrder;
-      });
-      setLatestDroppedRescuerId((previous) =>
-        previous === droppedRescuerId ? null : previous,
-      );
+        if (nextOverrides[droppedRescuerId] !== targetPanel) {
+          nextOverrides[droppedRescuerId] = targetPanel;
+          hasChange = true;
+        }
+      }
+
+      return hasChange ? nextOverrides : previous;
+    });
+
+    const movedRescuerIds = normalizedDroppedRescuerIds.filter(
+      (droppedRescuerId) =>
+        !(shouldResetToBasePanelByRescuerId.get(droppedRescuerId) ?? false),
+    );
+
+    setSplitPanelMoveOrderByRescuerId((previous) => {
+      let hasChange = false;
+      const nextMoveOrder = { ...previous };
+
+      for (const droppedRescuerId of normalizedDroppedRescuerIds) {
+        const shouldResetToBasePanel =
+          shouldResetToBasePanelByRescuerId.get(droppedRescuerId) ?? false;
+
+        if (shouldResetToBasePanel) {
+          if (nextMoveOrder[droppedRescuerId] != null) {
+            delete nextMoveOrder[droppedRescuerId];
+            hasChange = true;
+          }
+          continue;
+        }
+
+        splitDropSequenceRef.current += 1;
+        const nextOrder = splitDropSequenceRef.current;
+
+        if (nextMoveOrder[droppedRescuerId] !== nextOrder) {
+          nextMoveOrder[droppedRescuerId] = nextOrder;
+          hasChange = true;
+        }
+      }
+
+      return hasChange ? nextMoveOrder : previous;
+    });
+
+    if (movedRescuerIds.length > 0) {
+      setLatestDroppedRescuerId(movedRescuerIds[movedRescuerIds.length - 1]);
     } else {
-      splitDropSequenceRef.current += 1;
-      const nextMoveOrder = splitDropSequenceRef.current;
-      setSplitPanelMoveOrderByRescuerId((previous) => ({
-        ...previous,
-        [droppedRescuerId]: nextMoveOrder,
-      }));
-      setLatestDroppedRescuerId(droppedRescuerId);
+      setLatestDroppedRescuerId((previous) =>
+        previous && droppedRescuerIdSet.has(previous) ? null : previous,
+      );
     }
 
     setRowSelectedAssemblyPointIds((previous) => {
+      let hasChange = false;
       const nextSelections = { ...previous };
 
-      if (shouldResetToBasePanel) {
-        nextSelections[droppedRescuerId] = "";
-        return nextSelections;
+      for (const droppedRescuerId of normalizedDroppedRescuerIds) {
+        const shouldResetToBasePanel =
+          shouldResetToBasePanelByRescuerId.get(droppedRescuerId) ?? false;
+        let nextValue = "";
+
+        if (!shouldResetToBasePanel) {
+          const currentAssemblyPointId =
+            splitBaseAssemblyPointByRescuerId.get(droppedRescuerId) ?? null;
+
+          if (targetPanel === "left") {
+            nextValue =
+              splitTargetAssemblyPointId !== null &&
+              currentAssemblyPointId !== splitTargetAssemblyPointId
+                ? String(splitTargetAssemblyPointId)
+                : "";
+          } else {
+            nextValue =
+              currentAssemblyPointId !== null ? UNASSIGN_SELECT_VALUE : "";
+          }
+        }
+
+        if (nextSelections[droppedRescuerId] !== nextValue) {
+          nextSelections[droppedRescuerId] = nextValue;
+          hasChange = true;
+        }
       }
 
-      const currentAssemblyPointId =
-        splitBaseAssemblyPointByRescuerId.get(droppedRescuerId) ?? null;
-
-      if (targetPanel === "left") {
-        nextSelections[droppedRescuerId] =
-          splitTargetAssemblyPointId !== null &&
-          currentAssemblyPointId !== splitTargetAssemblyPointId
-            ? String(splitTargetAssemblyPointId)
-            : "";
-      } else {
-        nextSelections[droppedRescuerId] =
-          currentAssemblyPointId !== null ? UNASSIGN_SELECT_VALUE : "";
-      }
-
-      return nextSelections;
+      return hasChange ? nextSelections : previous;
     });
 
     setSelectedRescuerIds((previous) =>
-      previous.filter((rescuerId) => rescuerId !== droppedRescuerId),
+      previous.filter((rescuerId) => !droppedRescuerIdSet.has(rescuerId)),
     );
 
     const targetPanelElement =
@@ -1341,7 +1558,10 @@ export default function CoordinatorRescuerManagementPage() {
     const isRowDraggable = Boolean(draggableSide) && !isAssignmentBusy;
     const isRowPending = pendingUserId === rescuer.id;
     const isRowSelected = showSelection && selectedRescuerIdSet.has(rescuer.id);
-    const isRowBeingDragged = draggingRescuerId === rescuer.id;
+    const isDragAnchorRow = draggingRescuerId === rescuer.id;
+    const isRowInDragGroup =
+      draggingRescuerIds.length > 1 && draggingRescuerIds.includes(rescuer.id);
+    const isRowBeingDragged = isDragAnchorRow || isRowInDragGroup;
     const fullName = `${rescuer.firstName} ${rescuer.lastName}`;
     const assemblyPointName =
       rescuer.assemblyPointId != null
@@ -1365,6 +1585,11 @@ export default function CoordinatorRescuerManagementPage() {
       Boolean(rawRowSelectedAssemblyPointId) &&
       (splitPanelMoveOrderByRescuerId[rescuer.id] != null ||
         latestDroppedRescuerId === rescuer.id);
+    const shouldHidePendingSelectValue =
+      isSplitByAssemblyPointView && isRecentlyDraggedRow;
+    const displayedRowSelectedAssemblyPointId = shouldHidePendingSelectValue
+      ? ""
+      : rowSelectedAssemblyPointId;
 
     return (
       <div
@@ -1378,7 +1603,7 @@ export default function CoordinatorRescuerManagementPage() {
         }
         onDragEnd={isRowDraggable ? handleDragEnd : undefined}
         className={cn(
-          "rounded-lg border border-border bg-card p-2.5 transition-colors md:p-3",
+          "rounded-lg border border-border bg-card p-3 transition-colors md:p-3.5",
           isRowDraggable && "cursor-grab active:cursor-grabbing",
           isSplitByAssemblyPointView &&
             draggableSide &&
@@ -1386,13 +1611,16 @@ export default function CoordinatorRescuerManagementPage() {
           isRecentlyDraggedRow &&
             "border-[#FF5722]/65 bg-[#FFF7F2] shadow-[0_0_0_2px_rgba(255,87,34,0.2)]",
           isRowSelected && "border-[#FF5722]/35 bg-[#FF5722]/3",
+          isRowInDragGroup &&
+            !isDragAnchorRow &&
+            "border-[#FF5722]/45 bg-[#FFF7F2]/70",
           isRowBeingDragged && "opacity-70",
         )}
       >
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex min-w-0 items-start gap-3">
+        <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-3">
+          <div className="flex min-w-0 items-center gap-2.5 md:gap-3.5">
             {showSelection ? (
-              <div className="flex h-9 items-center">
+              <div className="flex h-10 shrink-0 items-center">
                 <Checkbox
                   checked={isRowSelected}
                   onCheckedChange={(checked) =>
@@ -1405,7 +1633,7 @@ export default function CoordinatorRescuerManagementPage() {
               </div>
             ) : null}
 
-            <Avatar className="h-9 w-9 border border-black/10">
+            <Avatar className="h-10 w-10 shrink-0 border border-black/10">
               <AvatarImage
                 src={rescuer.avatarUrl ?? DEFAULT_RESCUER_AVATAR}
                 alt={fullName}
@@ -1415,21 +1643,21 @@ export default function CoordinatorRescuerManagementPage() {
               </AvatarFallback>
             </Avatar>
 
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold tracking-tight">
+            <div className="min-w-0 space-y-1">
+              <p className="truncate text-[15px] font-semibold leading-5 tracking-tight text-foreground">
                 {fullName}
               </p>
 
-              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] leading-5 text-muted-foreground">
                 {rescuer.phone ? <span>{rescuer.phone}</span> : null}
                 {rescuer.email ? <span>{rescuer.email}</span> : null}
               </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <Badge
                   variant="outline"
                   className={cn(
-                    "border px-2 py-0.5 text-sm",
+                    "border px-2 py-0.5 text-[13px] leading-5",
                     rescuer.hasAssemblyPoint
                       ? "border-emerald-300 bg-emerald-50 text-emerald-700"
                       : "border-amber-300 bg-amber-50 text-amber-700",
@@ -1443,7 +1671,7 @@ export default function CoordinatorRescuerManagementPage() {
                 <Badge
                   variant="outline"
                   className={cn(
-                    "border px-2 py-0.5 text-sm",
+                    "border px-2 py-0.5 text-[13px] leading-5",
                     rescuer.hasTeam
                       ? "border-indigo-300 bg-indigo-50 text-indigo-700"
                       : "border-slate-300 bg-slate-50 text-slate-700",
@@ -1456,7 +1684,7 @@ export default function CoordinatorRescuerManagementPage() {
                   <Badge
                     variant="outline"
                     className={cn(
-                      "border px-2 py-0.5 text-sm font-semibold",
+                      "border px-2 py-0.5 text-[13px] font-semibold leading-5",
                       rescuer.rescuerType === "Core"
                         ? "border-sky-300 bg-sky-50 text-sky-700"
                         : "border-[#FF5722]/40 bg-[#FF5722]/10 text-[#C2410C]",
@@ -1471,7 +1699,7 @@ export default function CoordinatorRescuerManagementPage() {
                 {rawRowSelectedAssemblyPointId ? (
                   <Badge
                     variant="outline"
-                    className="border-[#FF5722]/35 bg-[#FF5722]/10 px-2 py-0.5 text-sm text-[#C2410C]"
+                    className="border-[#FF5722]/35 bg-[#FF5722]/10 px-2 py-0.5 text-[13px] leading-5 text-[#C2410C]"
                   >
                     Chưa lưu
                   </Badge>
@@ -1480,9 +1708,9 @@ export default function CoordinatorRescuerManagementPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 md:justify-end">
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center md:w-auto md:justify-end">
             <Select
-              value={rowSelectedAssemblyPointId}
+              value={displayedRowSelectedAssemblyPointId}
               onValueChange={(value) =>
                 setRowSelectedAssemblyPointIds((previous) => ({
                   ...previous,
@@ -1491,7 +1719,7 @@ export default function CoordinatorRescuerManagementPage() {
               }
               disabled={isAssignmentBusy}
             >
-              <SelectTrigger className="h-8 w-55 border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:border-slate-400 data-[state=open]:border-[#FF5722]/55 data-[state=open]:ring-1 data-[state=open]:ring-[#FF5722]/20">
+              <SelectTrigger className="h-8 w-full border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.08)] hover:border-slate-400 data-[state=open]:border-[#FF5722]/55 data-[state=open]:ring-1 data-[state=open]:ring-[#FF5722]/20 sm:w-55">
                 <SelectValue
                   placeholder={
                     isAssemblyPointLoading
@@ -1524,7 +1752,7 @@ export default function CoordinatorRescuerManagementPage() {
                 type="button"
                 size="sm"
                 variant="outline"
-                className="h-8 border-[#FF5722]/35 text-[#FF5722] hover:bg-[#FF5722]/10"
+                className="h-8 border-[#FF5722]/35 text-[#FF5722] hover:bg-[#FF5722]/10 sm:min-w-35"
                 onClick={() =>
                   handleSaveAssignment(
                     rescuer.id,
@@ -1946,8 +2174,7 @@ export default function CoordinatorRescuerManagementPage() {
                     </p>
                     <p className="text-sm text-sky-800/80">
                       {assignedCount} người cứu hộ đang thuộc điểm tập kết này.
-                      Kéo từ bên phải qua để thêm tạm, rồi bấm Lưu tất cả thay
-                      đổi.
+                      Kéo từ bên phải qua để thêm tạm. đổi.
                     </p>
                   </div>
 

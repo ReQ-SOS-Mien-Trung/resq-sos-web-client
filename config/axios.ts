@@ -1,10 +1,19 @@
 import axios, {
+  AxiosError,
   AxiosInstance,
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from "axios";
 import { useAuthStore } from "@/stores/auth.store";
 import { RefreshTokenResponse } from "@/services/auth/type";
+import {
+  BACKEND_CIRCUIT_OPEN_ERROR_CODE,
+  getBackendCircuitBlockedUntil,
+  isBackendCircuitOpen,
+  isBackendConnectivityError,
+  markBackendConnectionSuccess,
+  openBackendCircuit,
+} from "@/lib/backend-circuit";
 
 const API_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
@@ -44,6 +53,25 @@ function processQueue(error: unknown, token: string | null = null): void {
 // ---- Request Interceptor ----
 axiosInstance.interceptors.request.use(
   (config) => {
+    const requestUrl = config.url ?? "";
+    const isAuthEndpoint =
+      requestUrl.includes("/auth/refresh-token") ||
+      requestUrl.includes("/auth/login");
+
+    if (!isAuthEndpoint && isBackendCircuitOpen()) {
+      const blockedUntil = getBackendCircuitBlockedUntil();
+
+      return Promise.reject(
+        new AxiosError(
+          blockedUntil
+            ? `Backend connection is temporarily unavailable until ${new Date(blockedUntil).toISOString()}.`
+            : "Backend connection is temporarily unavailable.",
+          BACKEND_CIRCUIT_OPEN_ERROR_CODE,
+          config,
+        ),
+      );
+    }
+
     // Lấy token từ Zustand store
     const token = useAuthStore.getState().accessToken;
     if (token && config.headers) {
@@ -56,8 +84,18 @@ axiosInstance.interceptors.request.use(
 
 // ---- Response Interceptor (Auto Refresh Token) ----
 axiosInstance.interceptors.response.use(
-  (response: AxiosResponse) => response,
+  (response: AxiosResponse) => {
+    markBackendConnectionSuccess();
+    return response;
+  },
   async (error) => {
+    if (isBackendConnectivityError(error)) {
+      if (error.code !== BACKEND_CIRCUIT_OPEN_ERROR_CODE) {
+        openBackendCircuit(error);
+      }
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
     };
@@ -127,8 +165,14 @@ axiosInstance.interceptors.response.use(
         }
         return axiosInstance(originalRequest);
       } catch (refreshError) {
-        // Refresh thất bại → logout và redirect
         processQueue(refreshError, null);
+
+        if (isBackendConnectivityError(refreshError)) {
+          openBackendCircuit(refreshError);
+          return Promise.reject(refreshError);
+        }
+
+        // Refresh thất bại → logout và redirect
         logout();
         if (typeof window !== "undefined") {
           window.location.href = "/sign-in";
