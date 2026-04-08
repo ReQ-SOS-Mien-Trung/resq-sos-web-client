@@ -1,0 +1,9 @@
+export { default as HeaderHome } from "./HeaderHome";
+export { default as TestimonialsSection } from "./TestimonialsSection";
+export { default as NetworkMapSection } from "./NetworkMapSection";
+export { default as HeroSection } from "./HeroSection";
+export { default as FeaturesStrip } from "./FeaturesStrip";
+export { default as PartnersSection } from "./PartnersSection";
+export { default as ProductsSection } from "./ProductsSection";
+export { default as SecuritySection } from "./SecuritySection";
+export { default as FooterHome } from "./FooterHome";

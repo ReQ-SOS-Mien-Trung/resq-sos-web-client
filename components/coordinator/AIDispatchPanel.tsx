@@ -1,12 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  AIDispatchDecision,
-  SOSCluster,
-  Rescuer,
-  MissionStep,
-} from "@/types/coordinator";
+import { MissionStep, AIDispatchPanelProps } from "@/type";
 import { getRescuerTypeIcon } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -31,31 +26,21 @@ import {
 } from "@/components/ui/dialog";
 import {
   Brain,
-  CheckCircle2,
-  AlertTriangle,
+  CheckCircle,
+  Warning,
   MapPin,
   Clock,
   Users,
   Package,
   ArrowRight,
-  Sparkles,
-  RefreshCw,
-  GripVertical,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+  Sparkle,
+  ArrowsClockwise,
+  DotsSixVertical,
+  CaretDown,
+  CaretUp,
+} from "@phosphor-icons/react";
 
-interface AIDispatchPanelProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  cluster: SOSCluster | null;
-  aiDecision: AIDispatchDecision | null;
-  availableRescuers: Rescuer[];
-  onApprove: () => void;
-  onOverride: (rescuerId: string) => void;
-}
-
-export default function AIDispatchPanel({
+const AIDispatchPanel = ({
   open,
   onOpenChange,
   cluster,
@@ -63,10 +48,10 @@ export default function AIDispatchPanel({
   availableRescuers,
   onApprove,
   onOverride,
-}: AIDispatchPanelProps) {
+}: AIDispatchPanelProps) => {
   const [showOverride, setShowOverride] = useState(false);
   const [selectedRescuerId, setSelectedRescuerId] = useState<string | null>(
-    null
+    null,
   );
   const [isApproving, setIsApproving] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState(true);
@@ -90,7 +75,7 @@ export default function AIDispatchPanel({
 
   const totalEstimatedTime = aiDecision.proposedPlan.reduce(
     (acc, step) => acc + step.estimatedTime,
-    0
+    0,
   );
 
   return (
@@ -111,7 +96,10 @@ export default function AIDispatchPanel({
                 <div>
                   <SheetTitle className="flex items-center gap-2">
                     AI Dispatch Decision
-                    <Sparkles className="h-4 w-4 text-yellow-500" />
+                    <Sparkle
+                      className="h-4 w-4 text-yellow-500"
+                      weight="fill"
+                    />
                   </SheetTitle>
                   <SheetDescription>
                     Cụm SOS #{cluster.id.split("-")[1]} • {cluster.totalVictims}{" "}
@@ -141,7 +129,7 @@ export default function AIDispatchPanel({
                 <Card className="border-red-200 dark:border-red-900 py-4">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2 text-red-600">
-                      <AlertTriangle className="h-4 w-4" />
+                      <Warning className="h-4 w-4" weight="fill" />
                       Phân Tích Tình Huống
                     </CardTitle>
                   </CardHeader>
@@ -167,7 +155,7 @@ export default function AIDispatchPanel({
                 <Card className="border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-950/20 py-4">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2 text-green-600">
-                      <CheckCircle2 className="h-4 w-4" />
+                      <CheckCircle className="h-4 w-4" weight="fill" />
                       Đội Cứu Hộ Được Đề Xuất
                     </CardTitle>
                   </CardHeader>
@@ -184,7 +172,7 @@ export default function AIDispatchPanel({
                           Tải: {aiDecision.recommendedRescuer.currentLoad}/
                           {aiDecision.recommendedRescuer.capacity} •{" "}
                           {aiDecision.recommendedRescuer.capabilities.join(
-                            ", "
+                            ", ",
                           )}
                         </div>
                       </div>
@@ -207,9 +195,9 @@ export default function AIDispatchPanel({
                         onClick={() => setExpandedSteps(!expandedSteps)}
                       >
                         {expandedSteps ? (
-                          <ChevronUp className="h-4 w-4" />
+                          <CaretUp className="h-4 w-4" weight="bold" />
                         ) : (
-                          <ChevronDown className="h-4 w-4" />
+                          <CaretDown className="h-4 w-4" weight="bold" />
                         )}
                       </Button>
                     </div>
@@ -267,7 +255,7 @@ export default function AIDispatchPanel({
                   className="flex-1"
                   onClick={() => setShowOverride(true)}
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <ArrowsClockwise className="h-4 w-4 mr-2" />
                   Ghi đè thủ công
                 </Button>
                 <Button
@@ -277,12 +265,12 @@ export default function AIDispatchPanel({
                 >
                   {isApproving ? (
                     <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      <ArrowsClockwise className="h-4 w-4 mr-2 animate-spin" />
                       Đang xử lý...
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      <CheckCircle className="h-4 w-4 mr-2" weight="fill" />
                       Phê duyệt nhiệm vụ
                     </>
                   )}
@@ -298,7 +286,7 @@ export default function AIDispatchPanel({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <GripVertical className="h-5 w-5" />
+              <DotsSixVertical className="h-5 w-5" weight="bold" />
               Ghi Đè Thủ Công
             </DialogTitle>
             <DialogDescription>
@@ -314,7 +302,7 @@ export default function AIDispatchPanel({
                   "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
                   selectedRescuerId === rescuer.id
                     ? "border-primary bg-primary/5"
-                    : "hover:bg-muted/50"
+                    : "hover:bg-muted/50",
                 )}
                 onClick={() => setSelectedRescuerId(rescuer.id)}
               >
@@ -329,7 +317,7 @@ export default function AIDispatchPanel({
                   </div>
                 </div>
                 {selectedRescuerId === rescuer.id && (
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                  <CheckCircle className="h-5 w-5 text-primary" weight="fill" />
                 )}
               </div>
             ))}
@@ -350,7 +338,7 @@ export default function AIDispatchPanel({
       </Dialog>
     </>
   );
-}
+};
 
 // Mission Step Item Component
 function MissionStepItem({
@@ -381,7 +369,7 @@ function MissionStepItem({
         <div
           className={cn(
             "w-8 h-8 rounded-full flex items-center justify-center text-white",
-            actionColors[step.action]
+            actionColors[step.action],
           )}
         >
           {actionIcons[step.action]}
@@ -402,3 +390,5 @@ function MissionStepItem({
     </div>
   );
 }
+
+export default AIDispatchPanel;

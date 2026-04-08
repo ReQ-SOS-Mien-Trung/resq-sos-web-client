@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@uiw/react-md-editor/markdown-editor.css";
+@import "@uiw/react-markdown-preview/markdown.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -54,7 +56,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: #ff5722;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -65,7 +67,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: #ff5722;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -88,8 +90,8 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: #ff5722;
+  --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -99,7 +101,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: #ff5722;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -131,13 +133,236 @@
   box-shadow: 0px 4px 40px 0px #00000066;
 }
 
+/* Background grid pattern */
+.bg-grid-pattern {
+  background-image:
+    linear-gradient(to right, currentColor 1px, transparent 1px),
+    linear-gradient(to bottom, currentColor 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Custom scrollbar styling */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: oklch(0.7 0 0 / 30%);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.6 0 0 / 50%);
+}
+
+/* Smooth animations */
+@keyframes bounceX {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(1 0 0 / 10%) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px -12px oklch(0.5 0.15 280 / 20%);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, oklch(0.6 0.2 280), oklch(0.5 0.25 310));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@layer utilities {
+  /*
+   * Dark-mode safeguard for legacy hard-coded palette classes.
+   * This keeps old "text-black / bg-white / border-black" UIs readable
+   * without overriding elements that already declare explicit dark variants.
+   */
+  :where(.dark) [class~="text-black"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-900"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-800"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-700"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-900"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-800"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-700"]:not([class*="dark:text-"]) {
+    color: var(--foreground) !important;
+  }
+
+  :where(.dark) [class~="text-black/80"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/75"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/70"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/65"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/60"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/55"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/50"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/45"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/40"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-black/30"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-600"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-500"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-400"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-slate-700/85"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-600"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-500"]:not([class*="dark:text-"]),
+  :where(.dark) [class~="text-gray-400"]:not([class*="dark:text-"]) {
+    color: var(--muted-foreground) !important;
+  }
+
+  :where(.dark) [class~="bg-white"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/95"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/90"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/85"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/80"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/70"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-white/60"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-slate-50"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-slate-100"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-gray-50"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-gray-100"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-black/4"]:not([class*="dark:bg-"]),
+  :where(.dark) [class~="bg-black/[0.03]"]:not([class*="dark:bg-"]) {
+    background-color: var(--card) !important;
+  }
+
+  :where(.dark) [class~="border-black"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/50"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/40"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/30"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/20"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/15"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-black/10"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-slate-300"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-slate-200"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-slate-200/80"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-slate-100"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-gray-200"]:not([class*="dark:border-"]),
+  :where(.dark) [class~="border-gray-200/60"]:not([class*="dark:border-"]) {
+    border-color: var(--border) !important;
+  }
+}
+
+/* Auth page gradient backgrounds */
+.auth-gradient {
+  background: linear-gradient(
+    135deg,
+    oklch(0.98 0.02 50) 0%,
+    oklch(0.95 0.05 50) 50%,
+    oklch(0.9 0.08 50) 100%
+  );
+}
+
+.auth-gradient-dark {
+  background: linear-gradient(
+    135deg,
+    oklch(0.2 0.05 50) 0%,
+    oklch(0.15 0.08 50) 50%,
+    oklch(0.1 0.1 50) 100%
+  );
 }
 
 @layer components {
@@ -148,7 +373,7 @@
   }
 
   #explore-btn {
-    @apply flex w-fit cursor-pointer  rounded-full border px-8 py-3.5 max-sm:w-full text-center;
+    @apply flex w-fit cursor-pointer rounded-full border px-8 py-3.5 max-sm:w-full text-center;
 
     a {
       @apply flex-center gap-2 text-center w-full;
@@ -212,7 +437,7 @@
       @apply flex w-full flex-col lg:flex-row gap-12 items-start mt-12 max-lg:items-center;
 
       .content {
-        @apply flex flex-[2] flex-col gap-8 max-lg:w-full;
+        @apply flex flex-2 flex-col gap-8 max-lg:w-full;
 
         .banner {
           @apply max-h-[457px] w-full rounded-lg object-cover;
@@ -263,9 +488,42 @@
 /* Leaflet Custom Marker Styles */
 .custom-cluster-marker,
 .custom-rescuer-marker,
-.custom-depot-marker {
+.custom-depot-marker,
+.custom-assembly-point-marker {
   background: transparent !important;
   border: none !important;
+}
+
+.route-duration-marker-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.route-duration-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.24);
+}
+
+.route-duration-badge--primary {
+  color: #ffffff;
+  background: #1d4ed8;
+  border: 1px solid rgba(30, 64, 175, 0.95);
+}
+
+.route-duration-badge--neutral {
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.24);
 }
 
 .leaflet-popup-content-wrapper {
@@ -287,10 +545,12 @@
     transform: scale(0.8);
     opacity: 0.8;
   }
+
   50% {
     transform: scale(1.2);
     opacity: 0.4;
   }
+
   100% {
     transform: scale(0.8);
     opacity: 0.8;
@@ -335,6 +595,7 @@
   from {
     transform: translateX(100%);
   }
+
   to {
     transform: translateX(0);
   }
@@ -344,6 +605,7 @@
   from {
     transform: translateX(-100%);
   }
+
   to {
     transform: translateX(0);
   }
@@ -353,6 +615,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -388,6 +651,7 @@
   from {
     transform: translateY(-100%);
   }
+
   to {
     transform: translateY(0);
   }
@@ -397,6 +661,7 @@
   from {
     transform: translateY(100%);
   }
+
   to {
     transform: translateY(0);
   }
@@ -407,6 +672,7 @@
     transform: translate(-50%, -50%) scale(0.95);
     opacity: 0;
   }
+
   to {
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
@@ -417,10 +683,186 @@
   animation-name: zoom-in-95;
 }
 
+@keyframes zoom-in-95-static {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.zoom-in-95-static {
+  animation-name: zoom-in-95-static;
+}
+
 .slide-in-from-left-1\/2 {
   --tw-translate-x: -50%;
 }
 
 .slide-in-from-top-1\/2 {
   --tw-translate-y: -50%;
+}
+
+/* Auth page specific animations */
+@keyframes slide-in-from-top-1 {
+  from {
+    transform: translateY(-0.25rem);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.slide-in-from-top-1 {
+  animation-name: slide-in-from-top-1;
+}
+
+@keyframes scale-in {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.scale-in {
+  animation-name: scale-in;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 1000px 100%;
+}
+
+/* Smooth transitions for inputs */
+input:focus {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Button hover effects */
+button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 404 Page Animations */
+@keyframes bubbleFloat {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: translateY(-30px) translateX(15px);
+    opacity: 0.7;
+  }
+}
+
+@keyframes lifebuoyFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-5px) rotate(2deg);
+  }
+}
+
+.bubble-float {
+  animation: bubbleFloat 3s ease-in-out infinite;
+}
+
+.lifebuoy-float {
+  animation: lifebuoyFloat 4s ease-in-out infinite;
+}
+
+.number-4-left {
+  color: #1e40af;
+  text-shadow:
+    4px 4px 0px #3b82f6,
+    8px 8px 0px #60a5fa,
+    12px 12px 20px rgba(30, 64, 175, 0.3);
+  transform: perspective(500px) rotateY(-8deg);
+}
+
+.number-4-right {
+  color: #1e40af;
+  text-shadow:
+    4px 4px 0px #3b82f6,
+    8px 8px 0px #60a5fa,
+    12px 12px 20px rgba(30, 64, 175, 0.3);
+  transform: perspective(500px) rotateY(8deg);
+}
+
+/* ── Bell ring animation ── */
+@keyframes bell-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  5% {
+    transform: rotate(18deg);
+  }
+  15% {
+    transform: rotate(-16deg);
+  }
+  25% {
+    transform: rotate(14deg);
+  }
+  35% {
+    transform: rotate(-12deg);
+  }
+  45% {
+    transform: rotate(10deg);
+  }
+  55% {
+    transform: rotate(-8deg);
+  }
+  65% {
+    transform: rotate(6deg);
+  }
+  75% {
+    transform: rotate(-4deg);
+  }
+  85% {
+    transform: rotate(2deg);
+  }
+  95% {
+    transform: rotate(-1deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.bell-ring {
+  transform-origin: top center;
+  animation: bell-ring 0.9s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
 }

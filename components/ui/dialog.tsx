@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -10,7 +11,7 @@ interface DialogContextValue {
 }
 
 const DialogContext = React.createContext<DialogContextValue | undefined>(
-  undefined
+  undefined,
 );
 
 function useDialog() {
@@ -46,7 +47,7 @@ function Dialog({
       }
       onOpenChange?.(newOpen);
     },
-    [isControlled, onOpenChange]
+    [isControlled, onOpenChange],
   );
 
   return (
@@ -81,34 +82,41 @@ function DialogContent({
   ...props
 }: React.ComponentProps<"div">) {
   const { open, onOpenChange } = useDialog();
+  const [mounted, setMounted] = React.useState(false);
 
-  if (!open) return null;
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  return (
-    <>
+  if (!open || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/80 animate-in fade-in-0"
+        className="fixed inset-0 bg-black/80 animate-in fade-in-0"
         onClick={() => onOpenChange(false)}
       />
       {/* Content */}
       <div
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border bg-background p-6 shadow-lg duration-200 animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-1/2 sm:rounded-lg",
-          className
+          "relative z-[1] grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 animate-in fade-in-0 zoom-in-95-static sm:rounded-lg",
+          className,
         )}
+        onClick={(e) => e.stopPropagation()}
         {...props}
       >
         {children}
         <button
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
           onClick={() => onOpenChange(false)}
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </button>
       </div>
-    </>
+    </div>,
+    document.body,
   );
 }
 
@@ -117,7 +125,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       className={cn(
         "flex flex-col space-y-1.5 text-center sm:text-left",
-        className
+        className,
       )}
       {...props}
     />
@@ -129,7 +137,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       className={cn(
         "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
-        className
+        className,
       )}
       {...props}
     />
@@ -141,7 +149,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<"h2">) {
     <h2
       className={cn(
         "text-lg font-semibold leading-none tracking-tight",
-        className
+        className,
       )}
       {...props}
     />
@@ -150,7 +158,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<"h2">) {
 
 function DialogDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
-    <p className={cn("text-sm text-muted-foreground", className)} {...props} />
+    <p className={cn("text-sm tracking-tighter text-muted-foreground", className)} {...props} />
   );
 }
 

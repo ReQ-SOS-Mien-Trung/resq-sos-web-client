@@ -1,0 +1,100 @@
+import type { RescuerRegistration } from "@/types/admin-pages";
+
+export const mockRescuerRegistrations: RescuerRegistration[] = [
+  {
+    id: "1",
+    name: "Nguyễn Văn A",
+    email: "nguyenvana@example.com",
+    phone: "0901234001",
+    region: "Thừa Thiên Huế",
+    experience: "5 năm kinh nghiệm cứu hộ, từng tham gia nhiều chiến dịch cứu hộ thiên tai",
+    skills: ["Bơi lội", "Sơ cấp cứu", "Leo núi", "Lái thuyền"],
+    documents: [
+      {
+        id: "doc1",
+        type: "id",
+        url: "/documents/id-1.pdf",
+        name: "CMND/CCCD",
+      },
+      {
+        id: "doc2",
+        type: "certificate",
+        url: "/documents/cert-1.pdf",
+        name: "Chứng chỉ cứu hộ",
+      },
+    ],
+    status: "pending",
+    submittedAt: "2024-12-19T10:00:00Z",
+  },
+  {
+    id: "2",
+    name: "Trần Thị B",
+    email: "tranthib@example.com",
+    phone: "0901234002",
+    region: "Đà Nẵng",
+    experience: "3 năm kinh nghiệm, chuyên về cứu hộ trên biển",
+    skills: ["Bơi lội", "Lặn", "Sơ cấp cứu", "Lái thuyền"],
+    documents: [
+      {
+        id: "doc3",
+        type: "id",
+        url: "/documents/id-2.pdf",
+        name: "CMND/CCCD",
+      },
+      {
+        id: "doc4",
+        type: "license",
+        url: "/documents/license-1.pdf",
+        name: "Giấy phép lái thuyền",
+      },
+    ],
+    status: "pending",
+    submittedAt: "2024-12-18T14:30:00Z",
+  },
+  {
+    id: "3",
+    name: "Lê Văn C",
+    email: "levanc@example.com",
+    phone: "0901234003",
+    region: "Quảng Nam",
+    experience: "7 năm kinh nghiệm, từng là lính cứu hỏa",
+    skills: ["Cứu hỏa", "Sơ cấp cứu", "Sử dụng thiết bị cứu hộ", "Quản lý khủng hoảng"],
+    documents: [
+      {
+        id: "doc5",
+        type: "id",
+        url: "/documents/id-3.pdf",
+        name: "CMND/CCCD",
+      },
+      {
+        id: "doc6",
+        type: "certificate",
+        url: "/documents/cert-2.pdf",
+        name: "Chứng chỉ cứu hỏa",
+      },
+    ],
+    status: "approved",
+    submittedAt: "2024-12-15T09:00:00Z",
+    notes: "Đã xác minh và phê duyệt",
+  },
+  {
+    id: "4",
+    name: "Phạm Thị D",
+    email: "phamthid@example.com",
+    phone: "0901234004",
+    region: "Quảng Ngãi",
+    experience: "2 năm kinh nghiệm cứu hộ",
+    skills: ["Bơi lội", "Sơ cấp cứu"],
+    documents: [
+      {
+        id: "doc7",
+        type: "id",
+        url: "/documents/id-4.pdf",
+        name: "CMND/CCCD",
+      },
+    ],
+    status: "rejected",
+    submittedAt: "2024-12-17T11:00:00Z",
+    notes: "Thiếu chứng chỉ cứu hộ cần thiết",
+  },
+];

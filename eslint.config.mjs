@@ -13,6 +13,13 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    "rules": {
+      "@typescript-eslint/no-explicit-any": "off", // Tắt lỗi any
+      "react/no-unescaped-entities": "off",        // (Tuỳ chọn) Tắt lỗi ký tự lạ trong JSX
+      "@next/next/no-img-element": "off",
+    }
+  }
 ]);
 
 export default eslintConfig;

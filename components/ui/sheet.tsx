@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import * as ReactDOM from "react-dom";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -77,17 +78,43 @@ function SheetTrigger({
 
 interface SheetContentProps extends React.ComponentProps<"div"> {
   side?: "top" | "right" | "bottom" | "left";
+  showOverlay?: boolean;
 }
 
 function SheetContent({
   className,
   children,
   side = "right",
+  showOverlay = true,
   ...props
 }: SheetContentProps) {
   const { open, onOpenChange } = useSheet();
+  const [mounted, setMounted] = React.useState(false);
+  const [isVisible, setIsVisible] = React.useState(false);
+  const [isEntered, setIsEntered] = React.useState(false);
 
-  if (!open) return null;
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (open) {
+      setIsVisible(true);
+      // Double rAF: wait for DOM paint before starting transition
+      const raf = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsEntered(true);
+        });
+      });
+      return () => cancelAnimationFrame(raf);
+    } else {
+      setIsEntered(false);
+      const timer = setTimeout(() => setIsVisible(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  if (!mounted || !isVisible) return null;
 
   const sideClasses = {
     top: "inset-x-0 top-0 border-b",
@@ -96,36 +123,51 @@ function SheetContent({
     left: "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
   };
 
-  return (
+  const panelTransform: Record<string, string> = {
+    right: isEntered ? "translateX(0)" : "translateX(100%)",
+    left: isEntered ? "translateX(0)" : "translateX(-100%)",
+    top: isEntered ? "translateY(0)" : "translateY(-100%)",
+    bottom: isEntered ? "translateY(0)" : "translateY(100%)",
+  };
+
+  return ReactDOM.createPortal(
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-50 bg-black/80 animate-in fade-in-0"
-        onClick={() => onOpenChange(false)}
-      />
+      {showOverlay && (
+        <div
+          className="fixed inset-0 z-100 bg-black/80"
+          style={{
+            opacity: isEntered ? 1 : 0,
+            transition: "opacity 300ms ease",
+          }}
+          onClick={() => onOpenChange(false)}
+        />
+      )}
       {/* Content */}
       <div
         className={cn(
-          "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out animate-in",
-          side === "right" && "slide-in-from-right",
-          side === "left" && "slide-in-from-left",
-          side === "top" && "slide-in-from-top",
-          side === "bottom" && "slide-in-from-bottom",
+          "fixed z-101 gap-4 bg-background p-6 shadow-lg",
           sideClasses[side],
           className
         )}
+        style={{
+          transform: panelTransform[side],
+          transition: "transform 300ms cubic-bezier(0.32, 0.72, 0, 1)",
+          willChange: isEntered ? "auto" : "transform",
+          contain: "layout style paint",
+        }}
         {...props}
       >
         {children}
         <button
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
           onClick={() => onOpenChange(false)}
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </button>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
