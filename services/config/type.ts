@@ -19,3 +19,15 @@ export interface UpdateSosPriorityRuleConfigRequest {
   situationMultipliersJson: string;
   priorityThresholdsJson: string;
 }
+
+// Rescuer Score Visibility Config Entity
+export interface RescuerScoreVisibilityConfigEntity {
+  minimumEvaluationCount: number;
+  updatedBy: string | null;
+  updatedAt: string;
+}
+
+// Update Rescuer Score Visibility Config Request
+export interface UpdateRescuerScoreVisibilityConfigRequest {
+  minimumEvaluationCount: number;
+}

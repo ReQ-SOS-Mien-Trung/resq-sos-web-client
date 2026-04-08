@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -14,6 +14,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -71,6 +79,7 @@ import { toast } from "sonner";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
   useFundingRequests,
+  useFundingRequestItems,
   useFundingRequestStatuses,
   useApproveFundingRequest,
   useRejectFundingRequest,
@@ -79,10 +88,17 @@ import type {
   FundingRequestEntity,
   FundingRequestStatus,
 } from "@/services/funding_request";
-import { useDepotMetadata, useDepotFunds, useUpdateDepotAdvanceLimit } from "@/services/depot/hooks";
+import {
+  useDepotMetadata,
+  useDepotFunds,
+  useUpdateDepotAdvanceLimit,
+} from "@/services/depot/hooks";
 import type { DepotFund } from "@/services/depot/type";
 import { useInventoryCategories } from "@/services/inventory/hooks";
-import { useCampaigns, useAllocateDisbursement } from "@/services/campaign_disbursement";
+import {
+  useCampaigns,
+  useAllocateDisbursement,
+} from "@/services/campaign_disbursement";
 import {
   useDepotFundTransactions,
   useDepotFundTransactionTypes,
@@ -130,12 +146,26 @@ function formatMoney(value: number) {
 
 /* ── Advance Limit Section ───────────────────────────────── */
 
-function AdvanceLimitSection() {
-  const { data: depotMetadata = [], isLoading: loadingMeta } = useDepotMetadata();
+function AdvanceLimitModal({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (val: boolean) => void;
+}) {
+  const { data: depotMetadata = [], isLoading: loadingMeta } =
+    useDepotMetadata();
   const { data: depotFunds = [], isLoading: loadingFunds } = useDepotFunds();
   const updateLimit = useUpdateDepotAdvanceLimit();
   const [selectedDepotId, setSelectedDepotId] = useState<string>("");
   const [limitInput, setLimitInput] = useState<string>("");
+
+  useEffect(() => {
+    if (open) {
+      setSelectedDepotId("");
+      setLimitInput("");
+    }
+  }, [open]);
 
   const currentFund = useMemo(
     () => depotFunds.find((f) => f.depotId === Number(selectedDepotId)),
@@ -151,8 +181,14 @@ function AdvanceLimitSection() {
   const handleSaveLimit = () => {
     const id = Number(selectedDepotId);
     const limit = Number(limitInput);
-    if (!id) { toast.error("Vui lòng chọn kho"); return; }
-    if (isNaN(limit) || limit < 0) { toast.error("Hạn mức phải là số ≥ 0"); return; }
+    if (!id) {
+      toast.error("Vui lòng chọn kho");
+      return;
+    }
+    if (isNaN(limit) || limit < 0) {
+      toast.error("Hạn mức phải là số ≥ 0");
+      return;
+    }
     const toastId = toast.loading("Đang cập nhật...");
     updateLimit.mutate(
       { depotId: id, maxAdvanceLimit: limit },
@@ -160,6 +196,7 @@ function AdvanceLimitSection() {
         onSuccess: () => {
           toast.dismiss(toastId);
           toast.success("Cập nhật hạn mức thành công");
+          onOpenChange(false);
         },
         onError: () => {
           toast.dismiss(toastId);
@@ -170,19 +207,20 @@ function AdvanceLimitSection() {
   };
 
   return (
-    <div className="max-w-lg">
-      <Card className="border-border/60">
-        <CardHeader>
-          <CardTitle className="text-[16px] tracking-tighter flex items-center gap-1.5">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md gap-3">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-1.5 mb-0 text-base tracking-tighter">
             <Warehouse size={16} />
             Cấu hình hạn mức ứng trước
-          </CardTitle>
-          <CardDescription className="tracking-tighter text-[14px]">
-            Hạn mức ứng trước là số tiền tối đa kho được phép âm (chi trước khi chưa có quỹ)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
+          </DialogTitle>
+          <DialogDescription className="text-sm">
+            Hạn mức ứng trước là số tiền tối đa kho được phép âm (chi trước khi
+            chưa có quỹ)
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5 pb-0">
             <Label className="text-sm tracking-tighter">Kho</Label>
             <Select
               value={selectedDepotId}
@@ -206,14 +244,26 @@ function AdvanceLimitSection() {
             <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-sm tracking-tighter space-y-0.5">
               <p className="text-muted-foreground">
                 Số dư hiện tại:{" "}
-                <span className={currentFund.balance < 0 ? "font-semibold text-red-600" : "font-semibold text-emerald-600"}>
-                  {currentFund.balance.toLocaleString("vi-VN", { style: "currency", currency: "VND" })}
+                <span
+                  className={
+                    currentFund.balance < 0
+                      ? "font-semibold text-red-600"
+                      : "font-semibold text-emerald-600"
+                  }
+                >
+                  {currentFund.balance.toLocaleString("vi-VN", {
+                    style: "currency",
+                    currency: "VND",
+                  })}
                 </span>
               </p>
               <p className="text-muted-foreground">
                 Hạn mức hiện tại:{" "}
                 <span className="font-semibold">
-                  {currentFund.maxAdvanceLimit.toLocaleString("vi-VN", { style: "currency", currency: "VND" })}
+                  {currentFund.maxAdvanceLimit.toLocaleString("vi-VN", {
+                    style: "currency",
+                    currency: "VND",
+                  })}
                 </span>
               </p>
             </div>
@@ -231,11 +281,9 @@ function AdvanceLimitSection() {
               onChange={(e) => setLimitInput(e.target.value)}
               className="text-sm"
             />
-            <p className="text-xs text-muted-foreground tracking-tighter">
-              Kho sẽ được phép nhập mua khi số dư quỹ ≥ −{Number(limitInput || 0).toLocaleString("vi-VN")} VNĐ
-            </p>
           </div>
-
+        </div>
+        <DialogFooter>
           <Button
             size="sm"
             onClick={handleSaveLimit}
@@ -245,9 +293,9 @@ function AdvanceLimitSection() {
             <FloppyDisk size={14} className="mr-1.5" />
             Lưu hạn mức
           </Button>
-        </CardContent>
-      </Card>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -267,12 +315,15 @@ export default function FundingRequestsPage() {
   const [pageSize, setPageSize] = useState(10);
 
   // Detail panel
-  const [selectedItem, setSelectedItem] =
-    useState<FundingRequestEntity | null>(null);
+  const [selectedItem, setSelectedItem] = useState<FundingRequestEntity | null>(
+    null,
+  );
   const [panelOpen, setPanelOpen] = useState(false);
 
   // Depot fund transaction panel
-  const [selectedDepotFund, setSelectedDepotFund] = useState<DepotFund | null>(null);
+  const [selectedDepotFund, setSelectedDepotFund] = useState<DepotFund | null>(
+    null,
+  );
   const [depotTxPanelOpen, setDepotTxPanelOpen] = useState(false);
   const [depotTxPage, setDepotTxPage] = useState(1);
   const [depotTxPageSize, setDepotTxPageSize] = useState(10);
@@ -295,7 +346,8 @@ export default function FundingRequestsPage() {
   const [allocateDepotId, setAllocateDepotId] = useState("");
   const [allocateAmount, setAllocateAmount] = useState("");
   const [allocatePurpose, setAllocatePurpose] = useState("");
-  const [activeTab, setActiveTab] = useState<"requests" | "advance-limit">("requests");
+
+  const [advanceLimitOpen, setAdvanceLimitOpen] = useState(false);
 
   // API
   const { data, isLoading } = useFundingRequests({
@@ -310,9 +362,12 @@ export default function FundingRequestsPage() {
     [campaignsData],
   );
   const { data: categoriesData } = useInventoryCategories();
-  const { data: depotTxData, isLoading: loadingDepotTx } = useDepotFundTransactions(
-    { depotId: selectedDepotFund?.depotId ?? 0, pageNumber: depotTxPage, pageSize: depotTxPageSize },
-  );
+  const { data: depotTxData, isLoading: loadingDepotTx } =
+    useDepotFundTransactions({
+      depotId: selectedDepotFund?.depotId ?? 0,
+      pageNumber: depotTxPage,
+      pageSize: depotTxPageSize,
+    });
   const { data: txTypesMeta = [] } = useDepotFundTransactionTypes();
   const { data: refTypesMeta = [] } = useDepotFundReferenceTypes();
   const txTypeMap = useMemo(
@@ -332,26 +387,31 @@ export default function FundingRequestsPage() {
   );
   const { mutate: approve, isPending: isApproving } =
     useApproveFundingRequest();
-  const { mutate: reject, isPending: isRejecting } =
-    useRejectFundingRequest();
+  const { mutate: reject, isPending: isRejecting } = useRejectFundingRequest();
   const { mutate: allocate, isPending: isAllocating } =
     useAllocateDisbursement();
 
+  const { data: selectedItemsData, isLoading: loadingSelectedItems } =
+    useFundingRequestItems({
+      fundingRequestId: selectedItem?.id,
+      params: { pageNumber: 1, pageSize: 200 },
+      enabled: panelOpen && !!selectedItem?.id,
+    });
+
   const items = useMemo(() => data?.items ?? [], [data]);
+  const selectedRequestItems = useMemo(
+    () => selectedItemsData?.items ?? selectedItem?.items ?? [],
+    [selectedItemsData, selectedItem],
+  );
 
   // Push content when panel opens
-  const handlePanelChange = useCallback(
-    (open: boolean) => {
-      if (contentRef.current) {
-        contentRef.current.style.marginRight = open
-          ? `${PANEL_WIDTH}px`
-          : "0px";
-        contentRef.current.style.transition =
-          "margin-right 300ms cubic-bezier(0.32,0.72,0,1)";
-      }
-    },
-    [],
-  );
+  const handlePanelChange = useCallback((open: boolean) => {
+    if (contentRef.current) {
+      contentRef.current.style.marginRight = open ? `${PANEL_WIDTH}px` : "0px";
+      contentRef.current.style.transition =
+        "margin-right 300ms cubic-bezier(0.32,0.72,0,1)";
+    }
+  }, []);
 
   // Stats
   const stats = useMemo(
@@ -387,12 +447,8 @@ export default function FundingRequestsPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const paged = filtered.slice(
-    (safePage - 1) * pageSize,
-    safePage * pageSize,
-  );
-  const startItem =
-    filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const startItem = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const endItem = Math.min(safePage * pageSize, filtered.length);
 
   const toggleStatus = (val: string) => {
@@ -458,7 +514,9 @@ export default function FundingRequestsPage() {
   const openDetail = (item: FundingRequestEntity) => {
     setSelectedItem(item);
     setPanelOpen(true);
-    if (depotTxPanelOpen) { setDepotTxPanelOpen(false); }
+    if (depotTxPanelOpen) {
+      setDepotTxPanelOpen(false);
+    }
     handlePanelChange(true);
   };
 
@@ -466,7 +524,11 @@ export default function FundingRequestsPage() {
   const openDepotFundPanel = (fund: DepotFund) => {
     setSelectedDepotFund(fund);
     setDepotTxPage(1);
-    if (panelOpen) { setPanelOpen(false); setSelectedItem(null); handlePanelChange(false); }
+    if (panelOpen) {
+      setPanelOpen(false);
+      setSelectedItem(null);
+      handlePanelChange(false);
+    }
     setDepotTxPanelOpen(true);
   };
 
@@ -545,17 +607,11 @@ export default function FundingRequestsPage() {
           </div>
           <div className="flex items-center gap-2">
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setIsRefreshing(true);
-                queryClient.invalidateQueries().finally(() => setIsRefreshing(false));
-              }}
-              disabled={isRefreshing}
-              className="gap-1.5 text-muted-foreground"
+              onClick={() => setAdvanceLimitOpen(true)}
+              className="gap-2 tracking-tight bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25"
             >
-              <ArrowClockwise size={15} className={isRefreshing ? "animate-spin" : ""} />
-              Làm mới
+              <Warehouse size={16} />
+              Cấu hình hạn mức
             </Button>
             <Button
               onClick={() => setAllocateOpen(true)}
@@ -564,34 +620,26 @@ export default function FundingRequestsPage() {
               <Money size={16} weight="bold" />
               Cấp quỹ cho kho
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setIsRefreshing(true);
+                queryClient
+                  .invalidateQueries()
+                  .finally(() => setIsRefreshing(false));
+              }}
+              disabled={isRefreshing}
+              className="gap-1.5 text-muted-foreground"
+            >
+              <ArrowClockwise
+                size={15}
+                className={isRefreshing ? "animate-spin" : ""}
+              />
+              Làm mới
+            </Button>
           </div>
         </div>
-
-        {/* ── Tabs ──────────────────────────────────────── */}
-        <div className="flex gap-1 border-b border-border/50">
-          <button
-            onClick={() => setActiveTab("requests")}
-            className={`px-4 py-2.5 text-sm font-medium tracking-tighter transition-colors border-b-2 -mb-px ${
-              activeTab === "requests"
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Yêu cầu cấp quỹ
-          </button>
-          <button
-            onClick={() => setActiveTab("advance-limit")}
-            className={`px-4 py-2.5 text-sm font-medium tracking-tighter transition-colors border-b-2 -mb-px ${
-              activeTab === "advance-limit"
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Cấu hình hạn mức ứng trước
-          </button>
-        </div>
-
-        {activeTab === "requests" && (<>
         {/* ── Stats ──────────────────────────────────────── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
@@ -651,7 +699,7 @@ export default function FundingRequestsPage() {
 
         {/* ── Depot Funds ──────────────────────────────── */}
         <Card className="border border-border/50">
-          <CardContent className="p-5">
+          <CardContent className="px-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold tracking-tighter flex items-center gap-1.5">
                 <Storefront size={15} className="text-primary" />
@@ -665,7 +713,7 @@ export default function FundingRequestsPage() {
               </p>
             </div>
             {loadingFunds ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
                 {Array.from({ length: 4 }).map((_, i) => (
                   <Skeleton key={i} className="h-20 w-full rounded-xl" />
                 ))}
@@ -675,13 +723,14 @@ export default function FundingRequestsPage() {
                 Chưa có dữ liệu quỹ
               </p>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
                 {depotFunds.map((fund) => (
                   <div
                     key={fund.depotId}
                     onClick={() => openDepotFundPanel(fund)}
                     className={`rounded-xl border bg-background p-3.5 cursor-pointer transition-all active:scale-[0.97] ${
-                      selectedDepotFund?.depotId === fund.depotId && depotTxPanelOpen
+                      selectedDepotFund?.depotId === fund.depotId &&
+                      depotTxPanelOpen
                         ? "border-primary ring-1 ring-primary/30 shadow-sm"
                         : "border-border/60 hover:bg-muted/30 hover:border-border"
                     }`}
@@ -689,11 +738,13 @@ export default function FundingRequestsPage() {
                     <p className="text-sm font-semibold tracking-tighter text-muted-foreground truncate mb-1.5">
                       {fund.depotName}
                     </p>
-                    <p className={`text-lg font-bold tracking-tighter ${
-                      fund.balance < 0
-                        ? "text-red-600 dark:text-red-400"
-                        : "text-emerald-600 dark:text-emerald-400"
-                    }`}>
+                    <p
+                      className={`text-lg font-bold tracking-tighter ${
+                        fund.balance < 0
+                          ? "text-red-600 dark:text-red-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                      }`}
+                    >
                       {formatMoney(fund.balance)}
                     </p>
                     {fund.balance < 0 && (
@@ -707,7 +758,8 @@ export default function FundingRequestsPage() {
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground tracking-tight mt-1">
-                      Cập nhật: {new Date(fund.lastUpdatedAt).toLocaleDateString("vi-VN")}
+                      Cập nhật:{" "}
+                      {new Date(fund.lastUpdatedAt).toLocaleDateString("vi-VN")}
                     </p>
                   </div>
                 ))}
@@ -755,10 +807,7 @@ export default function FundingRequestsPage() {
                         {selectedStatuses.length}
                       </Badge>
                     ) : (
-                      <CaretDown
-                        size={13}
-                        className="text-muted-foreground"
-                      />
+                      <CaretDown size={13} className="text-muted-foreground" />
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -802,10 +851,7 @@ export default function FundingRequestsPage() {
               </Popover>
 
               {/* Depot filter */}
-              <Popover
-                open={depotFilterOpen}
-                onOpenChange={setDepotFilterOpen}
-              >
+              <Popover open={depotFilterOpen} onOpenChange={setDepotFilterOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
@@ -819,14 +865,14 @@ export default function FundingRequestsPage() {
                         {selectedDepots.length}
                       </Badge>
                     ) : (
-                      <CaretDown
-                        size={13}
-                        className="text-muted-foreground"
-                      />
+                      <CaretDown size={13} className="text-muted-foreground" />
                     )}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-56 p-1.5 max-h-64 overflow-y-auto" align="start">
+                <PopoverContent
+                  className="w-56 p-1.5 max-h-64 overflow-y-auto"
+                  align="start"
+                >
                   {depotOptions.map((depot) => {
                     const checked = selectedDepots.includes(depot.key);
                     return (
@@ -844,7 +890,9 @@ export default function FundingRequestsPage() {
                         >
                           {checked && <Check size={11} weight="bold" />}
                         </span>
-                        <span className={`truncate ${checked ? "font-medium" : ""}`}>
+                        <span
+                          className={`truncate ${checked ? "font-medium" : ""}`}
+                        >
                           {depot.value}
                         </span>
                       </button>
@@ -950,9 +998,7 @@ export default function FundingRequestsPage() {
                             {formatMoney(item.totalAmount)}
                           </td>
                           <td className="p-3">
-                            <Badge
-                              className={`${st.className} border gap-1`}
-                            >
+                            <Badge className={`${st.className} border gap-1`}>
                               <span
                                 className={`w-1.5 h-1.5 rounded-full ${st.dotColor}`}
                               />
@@ -990,10 +1036,17 @@ export default function FundingRequestsPage() {
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/50">
                 <div className="flex items-center gap-3">
                   <div className="text-sm tracking-tighter text-muted-foreground">
-                    Hiển thị {startItem}–{endItem} trong {filtered.length} yêu cầu
+                    Hiển thị {startItem}–{endItem} trong {filtered.length} yêu
+                    cầu
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+                    <Select
+                      value={String(pageSize)}
+                      onValueChange={(v) => {
+                        setPageSize(Number(v));
+                        setPage(1);
+                      }}
+                    >
                       <SelectTrigger className="w-16 h-7 text-sm">
                         <SelectValue />
                       </SelectTrigger>
@@ -1003,7 +1056,9 @@ export default function FundingRequestsPage() {
                         <SelectItem value="50">50</SelectItem>
                       </SelectContent>
                     </Select>
-                    <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>
+                    <span className="text-sm text-muted-foreground tracking-tighter">
+                      / trang
+                    </span>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -1018,9 +1073,7 @@ export default function FundingRequestsPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() =>
-                      setPage((p) => Math.min(totalPages, p + 1))
-                    }
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={safePage === totalPages}
                   >
                     Sau
@@ -1030,9 +1083,10 @@ export default function FundingRequestsPage() {
             )}
           </CardContent>
         </Card>
-        </>)}
-
-        {activeTab === "advance-limit" && <AdvanceLimitSection />}
+        <AdvanceLimitModal
+          open={advanceLimitOpen}
+          onOpenChange={setAdvanceLimitOpen}
+        />
       </div>
 
       {/* ── Detail Panel ─────────────────────────────────── */}
@@ -1095,9 +1149,7 @@ export default function FundingRequestsPage() {
                       Ngày gửi
                     </p>
                     <p className="text-base tracking-tight">
-                      {new Date(selectedItem.createdAt).toLocaleString(
-                        "vi-VN",
-                      )}
+                      {new Date(selectedItem.createdAt).toLocaleString("vi-VN")}
                     </p>
                   </div>
                 </div>
@@ -1140,9 +1192,9 @@ export default function FundingRequestsPage() {
                         <p className="text-xs text-emerald-600/70 tracking-tight mt-1">
                           Duyệt bởi: {selectedItem.reviewedByUserName} ·{" "}
                           {selectedItem.reviewedAt
-                            ? new Date(
-                                selectedItem.reviewedAt,
-                              ).toLocaleString("vi-VN")
+                            ? new Date(selectedItem.reviewedAt).toLocaleString(
+                                "vi-VN",
+                              )
                             : ""}
                         </p>
                       )}
@@ -1172,9 +1224,15 @@ export default function FundingRequestsPage() {
               <div>
                 <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
                   <Package size={15} className="text-primary" />
-                  Danh sách vật tư ({selectedItem.items.length})
+                  Danh sách vật tư ({selectedRequestItems.length})
                 </h4>
-                {selectedItem.items.length === 0 ? (
+                {loadingSelectedItems ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <Skeleton key={idx} className="h-18 w-full rounded-xl" />
+                    ))}
+                  </div>
+                ) : selectedRequestItems.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
                     <Package
                       size={28}
@@ -1186,7 +1244,7 @@ export default function FundingRequestsPage() {
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-75 overflow-y-auto pr-1">
-                    {selectedItem.items.map((item, idx) => (
+                    {selectedRequestItems.map((item, idx) => (
                       <div
                         key={item.id || idx}
                         className="rounded-xl border border-border/60 bg-background p-3"
@@ -1196,18 +1254,26 @@ export default function FundingRequestsPage() {
                             {item.itemName}
                           </p>
                           <span className="text-base tracking-tighter font-bold text-emerald-600 shrink-0">
-                            {formatMoney(item.totalPrice)}
+                            {formatMoney(
+                              item.totalPrice ?? item.quantity * item.unitPrice,
+                            )}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground tracking-tighter">
                           <span>
                             SL: {item.quantity} {item.unit}
                           </span>
+                          <span>Đơn giá: {formatMoney(item.unitPrice)}</span>
                           <span>
-                            Đơn giá: {formatMoney(item.unitPrice)}
+                            Danh mục:{" "}
+                            {categoryMap[item.categoryCode] ??
+                              item.categoryCode}
                           </span>
-                          <span>Danh mục: {categoryMap[item.categoryCode] ?? item.categoryCode}</span>
-                          {item.notes && <span>Ghi chú: {item.notes}</span>}
+                          {(item.notes || item.description) && (
+                            <span>
+                              Ghi chú: {item.notes ?? item.description}
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1224,7 +1290,6 @@ export default function FundingRequestsPage() {
                       setApproveDialog({ open: true, item: selectedItem })
                     }
                   >
-                    
                     Phê duyệt
                   </Button>
                   <Button
@@ -1234,7 +1299,6 @@ export default function FundingRequestsPage() {
                       setRejectDialog({ open: true, item: selectedItem })
                     }
                   >
-                    
                     Từ chối
                   </Button>
                 </div>
@@ -1271,15 +1335,23 @@ export default function FundingRequestsPage() {
               {/* Fund summary */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                  <p className="text-xs text-muted-foreground tracking-tight mb-1">Số dư hiện tại</p>
-                  <p className={`text-sm font-bold tracking-tight ${
-                    selectedDepotFund.balance < 0 ? "text-red-600" : "text-emerald-600"
-                  }`}>
+                  <p className="text-xs text-muted-foreground tracking-tight mb-1">
+                    Số dư hiện tại
+                  </p>
+                  <p
+                    className={`text-sm font-bold tracking-tight ${
+                      selectedDepotFund.balance < 0
+                        ? "text-red-600"
+                        : "text-emerald-600"
+                    }`}
+                  >
                     {formatMoney(selectedDepotFund.balance)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                  <p className="text-xs text-muted-foreground tracking-tight mb-1">Hạn mức ứng</p>
+                  <p className="text-xs text-muted-foreground tracking-tight mb-1">
+                    Hạn mức ứng
+                  </p>
                   <p className="text-sm font-bold tracking-tight">
                     {formatMoney(selectedDepotFund.maxAdvanceLimit)}
                   </p>
@@ -1296,7 +1368,10 @@ export default function FundingRequestsPage() {
                 {loadingDepotTx ? (
                   <div className="space-y-2">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="rounded-xl border border-border/40 p-3">
+                      <div
+                        key={i}
+                        className="rounded-xl border border-border/40 p-3"
+                      >
                         <div className="flex items-center gap-3">
                           <div className="w-7 h-7 rounded-full bg-muted animate-pulse shrink-0" />
                           <div className="flex-1 space-y-1.5">
@@ -1310,95 +1385,133 @@ export default function FundingRequestsPage() {
                   </div>
                 ) : (depotTxData?.items ?? []).length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border/60 p-8 text-center">
-                    <Receipt size={28} className="mx-auto text-muted-foreground/40 mb-2" />
-                    <p className="text-sm text-muted-foreground tracking-tight">Chưa có giao dịch</p>
+                    <Receipt
+                      size={28}
+                      className="mx-auto text-muted-foreground/40 mb-2"
+                    />
+                    <p className="text-sm text-muted-foreground tracking-tight">
+                      Chưa có giao dịch
+                    </p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {(depotTxData?.items ?? []).map((tx) => {
-                      const isIn = tx.amount >= 0;
-                      return (
-                        <div
-                          key={tx.id}
-                          className="rounded-xl border border-border/50 bg-background p-3"
-                        >
-                          <div className="flex items-start gap-2.5">
-                            <div className={`mt-0.5 w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-                              isIn ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-rose-50 dark:bg-rose-950/30"
-                            }`}>
-                              {isIn
-                                ? <ArrowUp size={13} weight="bold" className="text-emerald-600" />
-                                : <ArrowDown size={13} weight="bold" className="text-rose-600" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-sm font-semibold tracking-tighter truncate">
-                                  {txTypeMap[tx.transactionType] ?? tx.transactionType}
-                                </p>
-                                <p className={`text-sm font-bold tracking-tight shrink-0 ${
+                  <div className="rounded-lg border border-border/60 overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableHead className="w-10 text-center text-sm">
+                            #
+                          </TableHead>
+                          <TableHead className="text-sm">
+                            Loại giao dịch
+                          </TableHead>
+                          <TableHead className="text-sm">
+                            Nguồn tham chiếu
+                          </TableHead>
+                          <TableHead className="text-sm min-w-36">
+                            Ghi chú
+                          </TableHead>
+                          <TableHead className="text-sm text-right">
+                            Số tiền
+                          </TableHead>
+                          <TableHead className="text-sm text-right">
+                            Thời gian
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(depotTxData?.items ?? []).map((tx, idx) => {
+                          const isIn = tx.amount >= 0;
+                          return (
+                            <TableRow key={tx.id}>
+                              <TableCell className="text-center text-sm text-muted-foreground">
+                                {(depotTxPage - 1) * depotTxPageSize + idx + 1}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium">
+                                <span
+                                  className={`inline-flex items-center gap-1 ${
+                                    isIn ? "text-emerald-600" : "text-rose-600"
+                                  }`}
+                                >
+                                  {isIn ? (
+                                    <ArrowUp size={12} weight="bold" />
+                                  ) : (
+                                    <ArrowDown size={12} weight="bold" />
+                                  )}
+                                  {txTypeMap[tx.transactionType] ??
+                                    tx.transactionType}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {tx.referenceType
+                                  ? `${refTypeMap[tx.referenceType] ?? tx.referenceType}${tx.referenceId ? ` #${tx.referenceId}` : ""}`
+                                  : "—"}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-48 truncate">
+                                {tx.note || "—"}
+                              </TableCell>
+                              <TableCell
+                                className={`text-sm font-bold text-right ${
                                   isIn ? "text-emerald-600" : "text-rose-600"
-                                }`}>
-                                  {isIn ? "+" : ""}{tx.amount.toLocaleString("vi-VN")}đ
-                                </p>
-                              </div>
-                              {tx.referenceType && (
-                                <p className="text-xs text-muted-foreground tracking-tight truncate">
-                                  {refTypeMap[tx.referenceType] ?? tx.referenceType}{tx.referenceId ? ` #${tx.referenceId}` : ""}
-                                </p>
-                              )}
-                              {tx.note && (
-                                <p className="text-xs text-muted-foreground/70 tracking-tight truncate mt-0.5">
-                                  {tx.note}
-                                </p>
-                              )}
-                              <p className="text-xs text-muted-foreground/60 tracking-tight mt-1">
+                                }`}
+                              >
+                                {isIn ? "+" : ""}
+                                {tx.amount.toLocaleString("vi-VN")}đ
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground text-right whitespace-nowrap">
                                 {new Date(tx.createdAt).toLocaleString("vi-VN")}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
 
                 {/* Pagination */}
-                {(depotTxData?.totalPages ?? 0) > 1 && (
-                  <div className="flex items-center justify-between pt-3 border-t border-border/40 mt-3">
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-muted-foreground tracking-tight">
-                        Trang {depotTxPage}/{depotTxData?.totalPages}
-                      </p>
-                      <Select value={String(depotTxPageSize)} onValueChange={(v) => { setDepotTxPageSize(Number(v)); setDepotTxPage(1); }}>
-                        <SelectTrigger className="w-14 h-6 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <span className="text-xs text-muted-foreground tracking-tight">/ trang</span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => setDepotTxPage((p) => Math.max(1, p - 1))}
-                        disabled={!depotTxData?.hasPreviousPage}
-                        className="px-2.5 py-1 text-xs rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
-                      >
-                        Trước
-                      </button>
-                      <button
-                        onClick={() => setDepotTxPage((p) => p + 1)}
-                        disabled={!depotTxData?.hasNextPage}
-                        className="px-2.5 py-1 text-xs rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
-                      >
-                        Sau
-                      </button>
-                    </div>
+                <div className="flex items-center justify-between pt-3 border-t border-border/40 mt-3">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground tracking-tight">
+                      Trang {depotTxPage}/{depotTxData?.totalPages ?? 1}
+                    </p>
+                    <Select
+                      value={String(depotTxPageSize)}
+                      onValueChange={(v) => {
+                        setDepotTxPageSize(Number(v));
+                        setDepotTxPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="w-16 h-7 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-muted-foreground tracking-tight">
+                      / trang
+                    </span>
                   </div>
-                )}
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => setDepotTxPage((p) => Math.max(1, p - 1))}
+                      disabled={!depotTxData?.hasPreviousPage}
+                      className="px-2.5 py-1 text-sm rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
+                    >
+                      Trước
+                    </button>
+                    <button
+                      onClick={() => setDepotTxPage((p) => p + 1)}
+                      disabled={!depotTxData?.hasNextPage}
+                      className="px-2.5 py-1 text-sm rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
+                    >
+                      Sau
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1446,14 +1559,20 @@ export default function FundingRequestsPage() {
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Chọn chiến dịch quỹ..." />
                 </SelectTrigger>
-                <SelectContent disablePortal position="popper" className="w-[--radix-select-trigger-width]">
+                <SelectContent
+                  disablePortal
+                  position="popper"
+                  className="w-[--radix-select-trigger-width]"
+                >
                   {activeCampaigns.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       <div className="flex items-center justify-between w-full gap-3">
                         <span className="truncate">{c.name}</span>
                         <div className="flex items-center gap-2 shrink-0">
                           {c.status !== "Active" && (
-                            <span className="text-xs text-muted-foreground">[{c.status}]</span>
+                            <span className="text-xs text-muted-foreground">
+                              [{c.status}]
+                            </span>
                           )}
                           <span className="text-sm font-semibold text-emerald-600">
                             {c.totalAmount.toLocaleString("vi-VN")}đ
@@ -1593,7 +1712,9 @@ export default function FundingRequestsPage() {
                 <Money size={22} weight="bold" />
               </div>
               <div>
-                <DialogTitle className="tracking-tighter">Cấp quỹ cho kho</DialogTitle>
+                <DialogTitle className="tracking-tighter">
+                  Cấp quỹ cho kho
+                </DialogTitle>
                 <DialogDescription className="tracking-tight">
                   Phân bổ ngân sách từ chiến dịch quỹ cho các kho
                 </DialogDescription>
@@ -1614,14 +1735,20 @@ export default function FundingRequestsPage() {
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Chọn chiến dịch quỹ..." />
                 </SelectTrigger>
-                <SelectContent disablePortal position="popper" className="w-[--radix-select-trigger-width] z-200">
+                <SelectContent
+                  disablePortal
+                  position="popper"
+                  className="w-[--radix-select-trigger-width] z-200"
+                >
                   {activeCampaigns.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       <div className="flex items-center justify-between w-full gap-3">
                         <span className="truncate">{c.name}</span>
                         <div className="flex items-center gap-2 shrink-0">
                           {c.status !== "Active" && (
-                            <span className="text-xs text-muted-foreground">[{c.status}]</span>
+                            <span className="text-xs text-muted-foreground">
+                              [{c.status}]
+                            </span>
                           )}
                           <span className="text-sm font-semibold text-emerald-600">
                             {c.totalAmount.toLocaleString("vi-VN")}đ
@@ -1652,7 +1779,11 @@ export default function FundingRequestsPage() {
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Chọn kho..." />
                 </SelectTrigger>
-                <SelectContent disablePortal position="popper" className="w-[--radix-select-trigger-width] z-200">
+                <SelectContent
+                  disablePortal
+                  position="popper"
+                  className="w-[--radix-select-trigger-width] z-200"
+                >
                   {depotOptions.map((d) => (
                     <SelectItem key={d.key} value={String(d.key)}>
                       {d.value}

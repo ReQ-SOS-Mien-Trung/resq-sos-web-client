@@ -51,6 +51,7 @@ import {
 } from '@/services/inventory';
 import { type StockMovementEntity } from '@/services/inventory/type';
 import { StockMovementDetailSheet } from './StockMovementDetailSheet';
+import { motion } from 'framer-motion';
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
@@ -217,8 +218,18 @@ const StockMovementTable: React.FC = () => {
   const displayStockMovements = filteredStockMovements || stockMovements;
 
   return (
-    <div className="flex flex-col pb-6">
+    <motion.div
+      className="flex flex-col pb-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+    >
       {/* Filters Section */}
+      <motion.div
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
+      >
       <Card className="mx-6 mt-4 mb-4">
         <CardHeader className="pb-0.5">
           <CardTitle className="text-lg flex items-center gap-2">
@@ -405,9 +416,15 @@ const StockMovementTable: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+      </motion.div>
 
       {/* Table */}
-      <div className="mx-6">
+      <motion.div
+        className="mx-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
+      >
         <Card>
           <CardHeader className="pb-1">
             <div className="flex items-center justify-between">
@@ -481,14 +498,17 @@ const StockMovementTable: React.FC = () => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      displayStockMovements.content.map((movement) => (
-                        <TableRow
+                      displayStockMovements.content.map((movement, idx) => (
+                        <motion.tr
                           key={movement.id}
-                          className="hover:bg-muted/50 cursor-pointer"
+                          className="hover:bg-muted/50 cursor-pointer border-b border-border/50"
                           onClick={() => {
                             setSelectedMovement(movement.rawMovement as StockMovementEntity);
                             setSheetOpen(true);
                           }}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.25, delay: idx * 0.04, ease: "easeOut" }}
                         >
                           <TableCell className="font-regular text-sm pl-6">
                             {movement.transactionId}
@@ -526,7 +546,7 @@ const StockMovementTable: React.FC = () => {
                           <TableCell className="text-sm">
                             {formatDate(movement.createdAt)}
                           </TableCell>
-                        </TableRow>
+                        </motion.tr>
                       ))
                     )}
                   </TableBody>
@@ -588,13 +608,13 @@ const StockMovementTable: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
       <StockMovementDetailSheet
         movement={selectedMovement}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
       />
-    </div>
+    </motion.div>
   );
 };
 

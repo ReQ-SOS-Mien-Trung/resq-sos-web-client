@@ -4,6 +4,11 @@ import {
   getCampaignSpending,
   getCampaigns,
   getCampaignStatuses,
+  createCampaign,
+  updateCampaignInfo,
+  extendCampaign,
+  updateCampaignTarget,
+  updateCampaignStatus,
 } from "./api";
 import type {
   AllocateDisbursementRequest,
@@ -12,6 +17,11 @@ import type {
   GetCampaignSpendingResponse,
   GetCampaignsParams,
   GetCampaignsResponse,
+  CreateCampaignRequest,
+  UpdateCampaignInfoRequest,
+  ExtendCampaignRequest,
+  UpdateCampaignTargetRequest,
+  UpdateCampaignStatusRequest,
 } from "./type";
 
 export const CAMPAIGN_SPENDING_QUERY_KEY = ["campaign-spending"] as const;
@@ -80,5 +90,70 @@ export function useCampaignStatuses() {
     queryKey: CAMPAIGN_STATUSES_QUERY_KEY,
     queryFn: getCampaignStatuses,
     staleTime: Infinity,
+  });
+}
+
+/* ── POST create campaign ── */
+
+export function useCreateCampaign() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, CreateCampaignRequest>({
+    mutationFn: createCampaign,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CAMPAIGNS_QUERY_KEY });
+    },
+  });
+}
+
+/* ── PUT update campaign info ── */
+
+export function useUpdateCampaignInfo() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, { id: number; payload: UpdateCampaignInfoRequest }>({
+    mutationFn: ({ id, payload }) => updateCampaignInfo(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CAMPAIGNS_QUERY_KEY });
+    },
+  });
+}
+
+/* ── PUT extend campaign ── */
+
+export function useExtendCampaign() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, { id: number; payload: ExtendCampaignRequest }>({
+    mutationFn: ({ id, payload }) => extendCampaign(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CAMPAIGNS_QUERY_KEY });
+    },
+  });
+}
+
+/* ── PUT update campaign target ── */
+
+export function useUpdateCampaignTarget() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, { id: number; payload: UpdateCampaignTargetRequest }>({
+    mutationFn: ({ id, payload }) => updateCampaignTarget(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CAMPAIGNS_QUERY_KEY });
+    },
+  });
+}
+
+/* ── PATCH update campaign status ── */
+
+export function useUpdateCampaignStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, { id: number; payload: UpdateCampaignStatusRequest }>({
+    mutationFn: ({ id, payload }) => updateCampaignStatus(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CAMPAIGNS_QUERY_KEY });
+    },
   });
 }

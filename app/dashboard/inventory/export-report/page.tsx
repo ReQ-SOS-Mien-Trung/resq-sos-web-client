@@ -462,11 +462,11 @@ export default function ExportReportPage() {
                 </span>
                 <ChevronRight className="h-3 w-3" />
                 <span className="text-foreground tracking-tighter font-medium">
-                  Xuất báo cáo
+                  Xuất báo cáo biến động kho
                 </span>
               </div>
               <h1 className="text-3xl font-bold tracking-tighter">
-                Xuất báo cáo
+                Xuất báo cáo biến động kho
               </h1>
               <p className="text-muted-foreground tracking-tighter">
                 Tạo báo cáo theo khoảng thời gian hoặc theo tháng

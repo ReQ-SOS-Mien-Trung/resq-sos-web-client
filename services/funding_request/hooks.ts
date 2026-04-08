@@ -3,6 +3,7 @@ import {
   getFundingRequests,
   getFundingRequestStatuses,
   createFundingRequest,
+  getFundingRequestItems,
   downloadFundingRequestTemplate,
   approveFundingRequest,
   rejectFundingRequest,
@@ -10,6 +11,8 @@ import {
 import type {
   GetFundingRequestsParams,
   GetFundingRequestsResponse,
+  GetFundingRequestItemsParams,
+  GetFundingRequestItemsResponse,
   CreateFundingRequestPayload,
   ApproveFundingRequestPayload,
   RejectFundingRequestPayload,
@@ -18,6 +21,9 @@ import type {
 export const FUNDING_REQUESTS_QUERY_KEY = ["funding-requests"] as const;
 export const FUNDING_REQUEST_STATUSES_QUERY_KEY = [
   "funding-request-statuses",
+] as const;
+export const FUNDING_REQUEST_ITEMS_QUERY_KEY = [
+  "funding-request-items",
 ] as const;
 
 /* ── GET funding requests ── */
@@ -48,6 +54,33 @@ export function useFundingRequestStatuses(options?: { enabled?: boolean }) {
     queryKey: FUNDING_REQUEST_STATUSES_QUERY_KEY,
     queryFn: getFundingRequestStatuses,
     enabled: options?.enabled ?? true,
+  });
+}
+
+/* ── GET funding request items ── */
+
+export interface UseFundingRequestItemsOptions {
+  fundingRequestId?: number;
+  params?: GetFundingRequestItemsParams;
+  enabled?: boolean;
+}
+
+export function useFundingRequestItems(
+  options?: UseFundingRequestItemsOptions,
+) {
+  return useQuery<GetFundingRequestItemsResponse>({
+    queryKey: [
+      ...FUNDING_REQUEST_ITEMS_QUERY_KEY,
+      options?.fundingRequestId,
+      options?.params,
+    ],
+    queryFn: () =>
+      getFundingRequestItems(
+        options?.fundingRequestId as number,
+        options?.params,
+      ),
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(options?.fundingRequestId),
   });
 }
 

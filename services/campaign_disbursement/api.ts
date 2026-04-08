@@ -6,6 +6,11 @@ import type {
   GetCampaignSpendingResponse,
   GetCampaignsParams,
   GetCampaignsResponse,
+  CreateCampaignRequest,
+  UpdateCampaignInfoRequest,
+  ExtendCampaignRequest,
+  UpdateCampaignTargetRequest,
+  UpdateCampaignStatusRequest,
 } from "./type";
 
 /**
@@ -63,4 +68,58 @@ export async function getCampaigns(
 export async function getCampaignStatuses(): Promise<CampaignStatusMetadata[]> {
   const { data } = await api.get("/finance/campaigns/metadata/statuses");
   return data;
+}
+
+/**
+ * Tạo chiến dịch gây quỹ mới.
+ * POST /finance/campaigns
+ */
+export async function createCampaign(
+  payload: CreateCampaignRequest,
+): Promise<void> {
+  await api.post("/finance/campaigns", payload);
+}
+
+/**
+ * Cập nhật thông tin cơ bản (tên, khu vực) của chiến dịch.
+ * PUT /finance/campaigns/{id}/info
+ */
+export async function updateCampaignInfo(
+  id: number,
+  payload: UpdateCampaignInfoRequest,
+): Promise<void> {
+  await api.put(`/finance/campaigns/${id}/info`, payload);
+}
+
+/**
+ * Gia hạn ngày kết thúc chiến dịch.
+ * PUT /finance/campaigns/{id}/extension
+ */
+export async function extendCampaign(
+  id: number,
+  payload: ExtendCampaignRequest,
+): Promise<void> {
+  await api.put(`/finance/campaigns/${id}/extension`, payload);
+}
+
+/**
+ * Tăng mục tiêu số tiền cần gây quỹ.
+ * PUT /finance/campaigns/{id}/target
+ */
+export async function updateCampaignTarget(
+  id: number,
+  payload: UpdateCampaignTargetRequest,
+): Promise<void> {
+  await api.put(`/finance/campaigns/${id}/target`, payload);
+}
+
+/**
+ * Thay đổi trạng thái chiến dịch.
+ * PATCH /finance/campaigns/{id}/status
+ */
+export async function updateCampaignStatus(
+  id: number,
+  payload: UpdateCampaignStatusRequest,
+): Promise<void> {
+  await api.patch(`/finance/campaigns/${id}/status`, payload);
 }

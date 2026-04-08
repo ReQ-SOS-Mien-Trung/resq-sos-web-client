@@ -5,17 +5,20 @@ export type FundingRequestStatus = "Pending" | "Approved" | "Rejected";
 /* ── Item inside a funding request ── */
 
 export interface FundingRequestItem {
-  id: number;
+  id?: number;
   row: number;
   itemName: string;
   categoryCode: string;
   unit: string;
   quantity: number;
   unitPrice: number;
-  totalPrice: number;
+  totalPrice?: number;
   itemType: string;
   targetGroup: string;
-  notes: string;
+  receivedDate?: string | null;
+  expiredDate?: string | null;
+  notes?: string;
+  description?: string;
 }
 
 /* ── Funding Request Entity ── */
@@ -26,7 +29,7 @@ export interface FundingRequestEntity {
   depotName: string;
   totalAmount: number;
   description: string;
-  attachmentUrl: string;
+  attachmentUrl?: string;
   status: FundingRequestStatus;
   approvedCampaignId: number | null;
   approvedCampaignName: string | null;
@@ -35,7 +38,7 @@ export interface FundingRequestEntity {
   rejectionReason: string | null;
   createdAt: string;
   reviewedAt: string | null;
-  items: FundingRequestItem[];
+  items?: FundingRequestItem[];
 }
 
 /* ── GET /finance/funding-requests ── */
@@ -57,6 +60,23 @@ export interface GetFundingRequestsResponse {
   hasNextPage: boolean;
 }
 
+/* ── GET /finance/funding-requests/{id}/items ── */
+
+export interface GetFundingRequestItemsParams {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetFundingRequestItemsResponse {
+  items: FundingRequestItem[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
 /* ── POST /finance/funding-requests ── */
 
 export interface CreateFundingRequestItem {
@@ -66,14 +86,16 @@ export interface CreateFundingRequestItem {
   unit: string;
   quantity: number;
   unitPrice: number;
-  totalPrice: number;
+  totalPrice?: number;
   itemType: string;
   targetGroup: string;
-  notes: string;
+  notes?: string;
+  description?: string;
 }
 
 export interface CreateFundingRequestPayload {
   description: string;
+  attachmentUrl?: string;
   items: CreateFundingRequestItem[];
 }
 

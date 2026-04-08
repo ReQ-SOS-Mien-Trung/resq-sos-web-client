@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,12 @@ export default function SupplyRequestManagement() {
   return (
     <div className="space-y-5">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <motion.div
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"
+      >
         <div className="min-w-0">
           <h2 className="text-2xl font-semibold tracking-tighter">
             Quản lý yêu cầu tiếp tế
@@ -81,14 +87,32 @@ export default function SupplyRequestManagement() {
             Đơn đã gửi
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {/* ── Content ── */}
-      {subTab === "incoming" ? (
-        <IncomingRequestsSection />
-      ) : (
-        <OutgoingRequestsPanel />
-      )}
+      <AnimatePresence mode="wait">
+        {subTab === "incoming" ? (
+          <motion.div
+            key="incoming"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            <IncomingRequestsSection />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="outgoing"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            <OutgoingRequestsPanel />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -169,7 +193,12 @@ function OutgoingRequestsPanel() {
   return (
     <div className="space-y-4">
       {/* ── Stats strip ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3"
+      >
         <OutgoingStatCard
           label="Đang chờ duyệt"
           value={pendingCount}
@@ -202,10 +231,15 @@ function OutgoingRequestsPanel() {
           active={filter === "rejected"}
           onClick={() => setFilter(filter === "rejected" ? "all" : "rejected")}
         />
-      </div>
+      </motion.div>
 
       {/* ── Filter chips + refresh ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+        className="flex items-center justify-between gap-3 flex-wrap"
+      >
         <div className="flex items-center gap-2 flex-wrap">
           {(
             [
@@ -240,7 +274,7 @@ function OutgoingRequestsPanel() {
           <ArrowsClockwise className={cn("h-4 w-4", isFetching && "animate-spin")} />
           Làm mới
         </Button>
-      </div>
+      </motion.div>
 
       {/* ── Table ── */}
       {isLoading ? (
@@ -255,7 +289,12 @@ function OutgoingRequestsPanel() {
           <p className="text-sm tracking-tighter">Không có đơn nào</p>
         </div>
       ) : (
-        <Card className="border-border/60">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
+        >
+          <Card className="border-border/60">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full min-w-200 text-sm tracking-tighter">
@@ -270,9 +309,12 @@ function OutgoingRequestsPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((request) => (
-                    <tr
+                  {filteredItems.map((request, idx) => (
+                    <motion.tr
                       key={request.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, ease: "easeOut", delay: 0.2 + idx * 0.05 }}
                       className="border-b border-border/50 align-top cursor-pointer hover:bg-muted/40 transition-colors"
                       onClick={() => {
                         setTrackerRequestId(request.id);
@@ -314,17 +356,23 @@ function OutgoingRequestsPanel() {
                       <td className="px-4 py-3 text-muted-foreground w-44 max-w-44 whitespace-normal wrap-break-word leading-snug">
                         {request.note || "—"}
                       </td>
-                    </tr>
+                    </motion.tr>
                   ))}
                 </tbody>
               </table>
             </div>
           </CardContent>
-        </Card>
+          </Card>
+        </motion.div>
       )}
 
       {/* ── Pagination ── */}
-      <div className="flex items-center justify-between">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.25 }}
+        className="flex items-center justify-between"
+      >
         <p className="text-xs text-muted-foreground tracking-tighter">
           Trang {pageNumber}
           {data?.totalPages ? ` / ${data.totalPages}` : ""}
@@ -348,7 +396,7 @@ function OutgoingRequestsPanel() {
             Sau
           </Button>
         </div>
-      </div>
+      </motion.div>
 
       {/* ── Tracker Sheet ── */}
       <SupplyRequestTracker

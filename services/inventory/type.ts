@@ -409,6 +409,108 @@ export interface RejectSupplyRequestPayload {
 }
 export type GetDepotInventoryResponse = GetMyDepotInventoryResponse;
 
+// ─── Upcoming Pickups (My Depot) ───
+
+export interface UpcomingPickupItem {
+  itemId: number;
+  itemName: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface UpcomingPickupEntity {
+  depotId: number;
+  depotName: string;
+  missionId: number;
+  missionType: string;
+  missionStatus: string;
+  missionStartTime: string;
+  missionExpectedEndTime: string;
+  activityId: number;
+  step: number;
+  activityCode: string;
+  activityType: string;
+  description: string;
+  priority: string;
+  estimatedTime: number;
+  status: string;
+  assignedAt: string;
+  missionTeamId: number;
+  rescueTeamId: number;
+  rescueTeamName: string;
+  teamType: string;
+  items: UpcomingPickupItem[];
+}
+
+export interface GetUpcomingPickupsParams {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetUpcomingPickupsResponse {
+  items: UpcomingPickupEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+// ─── Pickup History (My Depot) ───
+
+export interface PickupHistoryItem {
+  itemId: number;
+  itemName: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface PickupHistoryEntity {
+  depotId: number;
+  depotName: string;
+  depotAddress: string;
+  missionId: number;
+  missionType: string;
+  missionStatus: string;
+  missionStartTime: string;
+  missionExpectedEndTime: string;
+  activityId: number;
+  step: number;
+  activityCode: string;
+  activityType: string;
+  description: string;
+  priority: string;
+  estimatedTime: number;
+  status: string;
+  assignedAt: string;
+  completedAt: string;
+  completedBy: string;
+  completedByName: string;
+  missionTeamId: number;
+  rescueTeamId: number;
+  rescueTeamName: string;
+  teamType: string;
+  items: PickupHistoryItem[];
+}
+
+export interface GetPickupHistoryParams {
+  fromDate?: string;
+  toDate?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetPickupHistoryResponse {
+  items: PickupHistoryEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
 // ─── Thresholds ───
 
 export type ThresholdScopeType =

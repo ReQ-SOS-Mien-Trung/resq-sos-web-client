@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -202,6 +202,20 @@ export default function IncomingRequestsSection() {
     setTrackerOpen(true);
   };
 
+  // ── Card pagination ──
+  const CARDS_PER_PAGE = 6;
+  const [cardPage, setCardPage] = useState(1);
+  const totalCardPages = Math.ceil(filteredItems.length / CARDS_PER_PAGE);
+  const pagedItems = filteredItems.slice(
+    (cardPage - 1) * CARDS_PER_PAGE,
+    cardPage * CARDS_PER_PAGE,
+  );
+
+  // Reset về trang 1 khi đổi filter
+  useEffect(() => {
+    setCardPage(1);
+  }, [filter]);
+
   // ── Render ──
   return (
     <div className="space-y-5">
@@ -341,7 +355,7 @@ export default function IncomingRequestsSection() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredItems.map((request) => (
+          {pagedItems.map((request) => (
             <RequestCard
               key={request.id}
               request={request}
@@ -349,6 +363,84 @@ export default function IncomingRequestsSection() {
               onActionSuccess={() => refetch()}
             />
           ))}
+        </div>
+      )}
+
+      {/* ── Cards Pagination ── */}
+      {totalCardPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground tracking-tighter order-2 sm:order-1">
+            {filteredItems.length} yêu cầu • Trang {cardPage} / {totalCardPages}
+          </p>
+          <div className="flex items-center gap-1 order-1 sm:order-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={cardPage === 1}
+              onClick={() => setCardPage(1)}
+            >
+              «
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3"
+              disabled={cardPage === 1}
+              onClick={() => setCardPage((p) => Math.max(1, p - 1))}
+            >
+              ‹ Trước
+            </Button>
+            {(() => {
+              const pages: (number | "...")[] = [];
+              if (totalCardPages <= 7) {
+                for (let i = 1; i <= totalCardPages; i++) pages.push(i);
+              } else {
+                pages.push(1);
+                if (cardPage > 3) pages.push("...");
+                for (let i = Math.max(2, cardPage - 1); i <= Math.min(totalCardPages - 1, cardPage + 1); i++) {
+                  pages.push(i);
+                }
+                if (cardPage < totalCardPages - 2) pages.push("...");
+                pages.push(totalCardPages);
+              }
+              return pages.map((p, i) =>
+                p === "..." ? (
+                  <span key={`ellipsis-${i}`} className="px-1 text-xs text-muted-foreground select-none">
+                    ···
+                  </span>
+                ) : (
+                  <Button
+                    key={p}
+                    variant={cardPage === p ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 w-8 p-0 text-xs"
+                    onClick={() => setCardPage(p as number)}
+                  >
+                    {p}
+                  </Button>
+                ),
+              );
+            })()}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-3"
+              disabled={cardPage === totalCardPages}
+              onClick={() => setCardPage((p) => Math.min(totalCardPages, p + 1))}
+            >
+              Sau ›
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              disabled={cardPage === totalCardPages}
+              onClick={() => setCardPage(totalCardPages)}
+            >
+              »
+            </Button>
+          </div>
         </div>
       )}
 

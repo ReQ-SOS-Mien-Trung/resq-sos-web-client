@@ -1,12 +1,186 @@
 import api from "@/config/axios";
 import { useAuthStore } from "@/stores/auth.store";
 import type {
+  FundingRequestEntity,
+  FundingRequestItem,
+  FundingRequestStatus,
   GetFundingRequestsParams,
   GetFundingRequestsResponse,
+  GetFundingRequestItemsParams,
+  GetFundingRequestItemsResponse,
   CreateFundingRequestPayload,
   ApproveFundingRequestPayload,
   RejectFundingRequestPayload,
 } from "./type";
+
+type FundingRequestRawResponse = {
+  data?: FundingRequestRawResponsePayload;
+} & FundingRequestRawResponsePayload;
+
+type FundingRequestRawResponsePayload = {
+  items?: FundingRequestRawEntity[];
+  fundingRequests?: FundingRequestRawEntity[];
+  pageNumber?: number;
+  currentPage?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalItems?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasPrevious?: boolean;
+  hasNextPage?: boolean;
+  hasNext?: boolean;
+};
+
+type FundingRequestRawEntity = Partial<FundingRequestEntity> & {
+  requestId?: number;
+  requestDescription?: string;
+  requestedByName?: string;
+  reviewedByName?: string | null;
+  requestItems?: FundingRequestRawItem[];
+  fundingRequestItems?: FundingRequestRawItem[];
+};
+
+type FundingRequestRawItem = Partial<FundingRequestItem> & {
+  note?: string;
+};
+
+type FundingRequestItemsRawResponse = {
+  data?: FundingRequestItemsRawResponsePayload;
+} & FundingRequestItemsRawResponsePayload;
+
+type FundingRequestItemsRawResponsePayload = {
+  items?: FundingRequestRawItem[];
+  fundingRequestItems?: FundingRequestRawItem[];
+  pageNumber?: number;
+  currentPage?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalItems?: number;
+  totalPages?: number;
+  pageCount?: number;
+  hasPreviousPage?: boolean;
+  hasPrevious?: boolean;
+  hasNextPage?: boolean;
+  hasNext?: boolean;
+};
+
+function normalizeFundingRequestItem(
+  item: FundingRequestRawItem,
+): FundingRequestItem {
+  return {
+    id: item.id,
+    row: item.row ?? 0,
+    itemName: item.itemName ?? "",
+    categoryCode: item.categoryCode ?? "",
+    unit: item.unit ?? "",
+    quantity: item.quantity ?? 0,
+    unitPrice: item.unitPrice ?? 0,
+    totalPrice: item.totalPrice,
+    itemType: item.itemType ?? "",
+    targetGroup: item.targetGroup ?? "",
+    receivedDate: item.receivedDate ?? null,
+    expiredDate: item.expiredDate ?? null,
+    notes: item.notes ?? item.note,
+    description: item.description,
+  };
+}
+
+function normalizeFundingRequestEntity(
+  entity: FundingRequestRawEntity,
+): FundingRequestEntity {
+  const rawItems =
+    entity.items ?? entity.requestItems ?? entity.fundingRequestItems;
+
+  return {
+    id: entity.id ?? entity.requestId ?? 0,
+    depotId: entity.depotId ?? 0,
+    depotName: entity.depotName ?? "",
+    totalAmount: entity.totalAmount ?? 0,
+    description: entity.description ?? entity.requestDescription ?? "",
+    attachmentUrl: entity.attachmentUrl,
+    status: (entity.status as FundingRequestStatus | undefined) ?? "Pending",
+    approvedCampaignId: entity.approvedCampaignId ?? null,
+    approvedCampaignName: entity.approvedCampaignName ?? null,
+    requestedByUserName:
+      entity.requestedByUserName ?? entity.requestedByName ?? "",
+    reviewedByUserName:
+      entity.reviewedByUserName ?? entity.reviewedByName ?? null,
+    rejectionReason: entity.rejectionReason ?? null,
+    createdAt: entity.createdAt ?? new Date(0).toISOString(),
+    reviewedAt: entity.reviewedAt ?? null,
+    items: rawItems?.map(normalizeFundingRequestItem),
+  };
+}
+
+function normalizeFundingRequestsResponse(
+  raw: FundingRequestRawResponse,
+  fallbackPageNumber: number,
+  fallbackPageSize: number,
+): GetFundingRequestsResponse {
+  const payload = raw.data ?? raw;
+  const rawItems = payload.items ?? payload.fundingRequests ?? [];
+  const items = rawItems.map(normalizeFundingRequestEntity);
+
+  const pageNumber =
+    payload.pageNumber ?? payload.currentPage ?? fallbackPageNumber;
+  const pageSize = payload.pageSize ?? fallbackPageSize;
+  const totalCount = payload.totalCount ?? payload.totalItems ?? items.length;
+  const totalPages =
+    payload.totalPages ??
+    payload.pageCount ??
+    Math.max(1, Math.ceil(totalCount / Math.max(pageSize, 1)));
+
+  const hasPreviousPage =
+    payload.hasPreviousPage ?? payload.hasPrevious ?? pageNumber > 1;
+  const hasNextPage =
+    payload.hasNextPage ?? payload.hasNext ?? pageNumber < totalPages;
+
+  return {
+    items,
+    pageNumber,
+    pageSize,
+    totalCount,
+    totalPages,
+    hasPreviousPage,
+    hasNextPage,
+  };
+}
+
+function normalizeFundingRequestItemsResponse(
+  raw: FundingRequestItemsRawResponse,
+  fallbackPageNumber: number,
+  fallbackPageSize: number,
+): GetFundingRequestItemsResponse {
+  const payload = raw.data ?? raw;
+  const rawItems = payload.items ?? payload.fundingRequestItems ?? [];
+  const items = rawItems.map(normalizeFundingRequestItem);
+
+  const pageNumber =
+    payload.pageNumber ?? payload.currentPage ?? fallbackPageNumber;
+  const pageSize = payload.pageSize ?? fallbackPageSize;
+  const totalCount = payload.totalCount ?? payload.totalItems ?? items.length;
+  const totalPages =
+    payload.totalPages ??
+    payload.pageCount ??
+    Math.max(1, Math.ceil(totalCount / Math.max(pageSize, 1)));
+
+  const hasPreviousPage =
+    payload.hasPreviousPage ?? payload.hasPrevious ?? pageNumber > 1;
+  const hasNextPage =
+    payload.hasNextPage ?? payload.hasNext ?? pageNumber < totalPages;
+
+  return {
+    items,
+    pageNumber,
+    pageSize,
+    totalCount,
+    totalPages,
+    hasPreviousPage,
+    hasNextPage,
+  };
+}
 
 /**
  * Lấy danh sách yêu cầu cấp quỹ (filter theo nhiều depot, nhiều status)
@@ -15,18 +189,25 @@ import type {
 export async function getFundingRequests(
   params?: GetFundingRequestsParams,
 ): Promise<GetFundingRequestsResponse> {
-  const { data } = await api.get("/finance/funding-requests", {
-    params: {
-      pageNumber: params?.pageNumber ?? 1,
-      pageSize: params?.pageSize ?? 10,
-      depotIds: params?.depotIds,
-      statuses: params?.statuses,
+  const pageNumber = params?.pageNumber ?? 1;
+  const pageSize = params?.pageSize ?? 10;
+
+  const { data } = await api.get<FundingRequestRawResponse>(
+    "/finance/funding-requests",
+    {
+      params: {
+        pageNumber,
+        pageSize,
+        depotIds: params?.depotIds,
+        statuses: params?.statuses,
+      },
+      paramsSerializer: {
+        indexes: null, // depotIds=1&depotIds=2 (no brackets)
+      },
     },
-    paramsSerializer: {
-      indexes: null, // depotIds=1&depotIds=2 (no brackets)
-    },
-  });
-  return data;
+  );
+
+  return normalizeFundingRequestsResponse(data, pageNumber, pageSize);
 }
 
 /**
@@ -46,6 +227,27 @@ export async function createFundingRequest(
   payload: CreateFundingRequestPayload,
 ): Promise<void> {
   await api.post("/finance/funding-requests", payload);
+}
+
+/**
+ * Lấy danh sách vật tư theo funding request
+ * GET /finance/funding-requests/{id}/items
+ */
+export async function getFundingRequestItems(
+  id: number,
+  params?: GetFundingRequestItemsParams,
+): Promise<GetFundingRequestItemsResponse> {
+  const pageNumber = params?.pageNumber ?? 1;
+  const pageSize = params?.pageSize ?? 20;
+
+  const { data } = await api.get<FundingRequestItemsRawResponse>(
+    `/finance/funding-requests/${id}/items`,
+    {
+      params: { pageNumber, pageSize },
+    },
+  );
+
+  return normalizeFundingRequestItemsResponse(data, pageNumber, pageSize);
 }
 
 /**

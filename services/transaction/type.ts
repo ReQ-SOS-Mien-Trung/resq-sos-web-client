@@ -41,6 +41,9 @@ export interface GetCampaignTransactionsParams {
   id: number;
   pageNumber?: number;
   pageSize?: number;
+  types?: string[];
+  directions?: string[];
+  referenceTypes?: string[];
 }
 
 export interface CampaignTransactionItem {
