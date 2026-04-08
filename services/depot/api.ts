@@ -1,6 +1,7 @@
 import api from "@/config/axios";
 import {
   GetDepotsResponse,
+  GetDepotsByClusterResponse,
   GetDepotsParams,
   CreateDepotRequest,
   DepotEntity,
@@ -47,6 +48,17 @@ export async function getDepots(
     // axios needs paramsSerializer to send array as repeated keys
     paramsSerializer: { indexes: null },
   });
+  return data;
+}
+
+/**
+ * Get nearby depots for a cluster.
+ * GET /logistics/depot/by-cluster/{clusterId}
+ */
+export async function getDepotsByCluster(
+  clusterId: number,
+): Promise<GetDepotsByClusterResponse> {
+  const { data } = await api.get(`/logistics/depot/by-cluster/${clusterId}`);
   return data;
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect } from "react";
+import type { AxiosError } from "axios";
 import {
   DndContext,
   DragOverlay,
@@ -11,7 +12,6 @@ import {
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
-  type DragOverEvent,
   useDroppable,
 } from "@dnd-kit/core";
 import {
@@ -25,15 +25,16 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { activityTypeConfig } from "@/lib/constants";
+import { activityTypeConfig, depotStatusConfig } from "@/lib/constants";
 import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -53,13 +54,17 @@ import {
   Package,
   Storefront,
   UsersThree,
-  Clock,
   Lightning,
   CircleNotch,
   Warning,
   PencilSimpleLine,
   CopySimple,
   CheckCircle,
+  CaretLeft,
+  CaretRight,
+  Buildings,
+  Compass,
+  Info,
 } from "@phosphor-icons/react";
 import type { SOSRequest } from "@/type";
 import type { SOSClusterEntity } from "@/services/sos_cluster/type";
@@ -73,6 +78,9 @@ import {
   useCreateActivity,
 } from "@/services/mission/hooks";
 import { useRescueTeamsByCluster } from "@/services/rescue_teams/hooks";
+import { useDepotInventory } from "@/services/inventory/hooks";
+import { useDepotsByCluster } from "@/services/depot";
+import type { DepotByClusterEntity, DepotStatus } from "@/services/depot";
 import type { MissionActivity, MissionType } from "@/services/mission/type";
 
 // ── Types ──
@@ -110,7 +118,6 @@ interface ManualTeamOption {
   assemblyPointName: string | null;
   status: string | null;
   distanceKm?: number | null;
-  source: "live" | "mock";
 }
 
 interface ManualInventoryDragPayload {
@@ -121,18 +128,6 @@ interface ManualInventoryDragPayload {
   sourceDepotName: string;
   sourceDepotAddress: string | null;
   availableQuantity: number;
-}
-
-interface ManualDepotCatalog {
-  depotId: number;
-  depotName: string;
-  depotAddress: string | null;
-  items: Array<{
-    itemId: number;
-    itemName: string;
-    unit: string;
-    availableQuantity: number;
-  }>;
 }
 
 interface ManualMissionBuilderProps {
@@ -178,89 +173,6 @@ const AUTO_RETURN_TRIGGER_TYPES = new Set<ClusterActivityType>([
 const AUTO_RETURN_STEP_DESCRIPTION =
   "Trả vật tư còn lại về kho sau khi hoàn tất nhiệm vụ.";
 const AUTO_RETURN_TARGET_FALLBACK = "Kho tiếp nhận vật tư";
-
-const MOCK_DEPOT_CATALOG: ManualDepotCatalog[] = [
-  {
-    depotId: -101,
-    depotName: "Kho Trung tâm An Cựu",
-    depotAddress: "17 Nguyễn Huệ, TP Huế",
-    items: [
-      {
-        itemId: 9001,
-        itemName: "Áo phao cứu sinh",
-        unit: "cái",
-        availableQuantity: 120,
-      },
-      {
-        itemId: 9002,
-        itemName: "Đèn pin chống nước",
-        unit: "cái",
-        availableQuantity: 65,
-      },
-      {
-        itemId: 9003,
-        itemName: "Bộ sơ cứu y tế",
-        unit: "bộ",
-        availableQuantity: 48,
-      },
-    ],
-  },
-  {
-    depotId: -102,
-    depotName: "Kho Dã chiến Hương Trà",
-    depotAddress: "QL1A, Hương Trà, Thừa Thiên Huế",
-    items: [
-      {
-        itemId: 9101,
-        itemName: "Thùng lương khô",
-        unit: "thùng",
-        availableQuantity: 36,
-      },
-      {
-        itemId: 9102,
-        itemName: "Can nước 20L",
-        unit: "can",
-        availableQuantity: 54,
-      },
-      {
-        itemId: 9103,
-        itemName: "Cáng khiêng thương",
-        unit: "cái",
-        availableQuantity: 15,
-      },
-    ],
-  },
-];
-
-const MOCK_TEAM_OPTIONS: ManualTeamOption[] = [
-  {
-    id: -1,
-    name: "Đội phản ứng nhanh A",
-    teamType: "RESCUE",
-    assemblyPointName: "Điểm tập kết Cầu Dã Viên",
-    status: "Ready",
-    distanceKm: 1.8,
-    source: "mock",
-  },
-  {
-    id: -2,
-    name: "Đội y tế lưu động B",
-    teamType: "MEDICAL",
-    assemblyPointName: "Điểm tập kết Bệnh viện Trung ương Huế",
-    status: "Gathering",
-    distanceKm: 2.6,
-    source: "mock",
-  },
-  {
-    id: -3,
-    name: "Đội vận chuyển C",
-    teamType: "LOGISTICS",
-    assemblyPointName: "Điểm tập kết Ga Huế",
-    status: "Available",
-    distanceKm: 3.2,
-    source: "mock",
-  },
-];
 
 function isSupplyActivityType(activityType: string): boolean {
   return SUPPLY_ACTIVITY_TYPES.has(activityType as ClusterActivityType);
@@ -330,6 +242,129 @@ function toValidRescueTeamId(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? value
     : null;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  const axiosError = error as AxiosError<{ message?: string }>;
+  const apiMessage = axiosError?.response?.data?.message;
+  if (typeof apiMessage === "string" && apiMessage.trim()) {
+    return apiMessage.trim();
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  return fallback;
+}
+
+function formatDistanceKmLabel(distanceKm?: number | null): string {
+  if (!Number.isFinite(distanceKm)) {
+    return "Chưa có khoảng cách";
+  }
+
+  return `${distanceKm!.toFixed(1)} km`;
+}
+
+function formatManualTeamType(teamType?: string | null): string {
+  switch ((teamType ?? "").trim().toUpperCase()) {
+    case "RESCUE":
+      return "Cứu hộ";
+    case "MEDICAL":
+      return "Y tế";
+    case "TRANSPORTATION":
+    case "LOGISTICS":
+      return "Hậu cần";
+    case "MIXED":
+      return "Hỗn hợp";
+    default:
+      return teamType?.trim() || "Chưa rõ";
+  }
+}
+
+function getTeamStatusMeta(status?: string | null) {
+  switch ((status ?? "").trim()) {
+    case "AwaitingAcceptance":
+      return {
+        label: "Chờ xác nhận",
+        className: "border-amber-200 bg-amber-50 text-amber-800",
+      };
+    case "Ready":
+    case "Available":
+      return {
+        label: "Sẵn sàng",
+        className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+      };
+    case "Gathering":
+      return {
+        label: "Đang tập hợp",
+        className: "border-sky-200 bg-sky-50 text-sky-800",
+      };
+    case "Assigned":
+    case "OnMission":
+      return {
+        label: "Đang triển khai",
+        className: "border-indigo-200 bg-indigo-50 text-indigo-800",
+      };
+    default:
+      return {
+        label: status?.trim() || "Chưa rõ",
+        className: "border-slate-200 bg-slate-100 text-slate-700",
+      };
+  }
+}
+
+function getDepotStatusMeta(status?: string | null) {
+  const normalizedStatus = (status ?? "").trim() as DepotStatus;
+
+  if (normalizedStatus in depotStatusConfig) {
+    const config =
+      depotStatusConfig[normalizedStatus as keyof typeof depotStatusConfig];
+
+    return {
+      label: config.label,
+      className: `${config.bgColor} ${config.textColor} border-transparent`,
+    };
+  }
+
+  switch (normalizedStatus) {
+    case "Closing":
+      return {
+        label: "Đang đóng",
+        className:
+          "border-transparent bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+      };
+    case "UnderMaintenance":
+      return {
+        label: "Bảo trì",
+        className:
+          "border-transparent bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+      };
+    default:
+      return {
+        label: status?.trim() || "Chưa rõ",
+        className:
+          "border-transparent bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300",
+      };
+  }
+}
+
+function getDepotUtilizationPercent(
+  currentUtilization?: number | null,
+  capacity?: number | null,
+) {
+  if (!Number.isFinite(currentUtilization) || !Number.isFinite(capacity)) {
+    return 0;
+  }
+
+  if ((capacity ?? 0) <= 0) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.min(100, Math.round(((currentUtilization ?? 0) / (capacity ?? 1)) * 100)),
+  );
 }
 
 // ── Preset templates ──
@@ -486,6 +521,7 @@ function SortableActivityCard({
           {...attributes}
           {...listeners}
           className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+          aria-label={`Kéo để sắp xếp bước ${index + 1}`}
         >
           <DotsSixVertical className="h-4 w-4" weight="bold" />
         </div>
@@ -523,6 +559,7 @@ function SortableActivityCard({
           className="h-6 w-6 text-muted-foreground hover:text-red-500"
           disabled={isAutoReturnStep}
           onClick={() => onRemove(activity.id)}
+          aria-label={`Xóa bước ${index + 1}`}
         >
           <Trash className="h-3 w-3" />
         </Button>
@@ -541,7 +578,9 @@ function SortableActivityCard({
         <textarea
           value={activity.description || ""}
           onChange={(e) => onUpdate(activity.id, "description", e.target.value)}
-          placeholder="Mô tả hoạt động..."
+          placeholder="Mô tả hoạt động…"
+          name={`activity-${activity.id}-description`}
+          autoComplete="off"
           rows={2}
           className="w-full mt-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm leading-relaxed ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
         />
@@ -553,9 +592,11 @@ function SortableActivityCard({
             Mục tiêu
           </Label>
           <Input
-            placeholder="Tên địa điểm / mục tiêu..."
+            placeholder="Tên địa điểm / mục tiêu…"
             value={activity.target || ""}
             onChange={(e) => onUpdate(activity.id, "target", e.target.value)}
+            name={`activity-${activity.id}-target`}
+            autoComplete="off"
             className="h-9 text-sm mt-1"
           />
         </div>
@@ -576,7 +617,7 @@ function SortableActivityCard({
               }}
             >
               <SelectTrigger className="h-9 text-sm mt-1">
-                <SelectValue placeholder="Chọn một yêu cầu SOS để gán tọa độ..." />
+                <SelectValue placeholder="Chọn một yêu cầu SOS để gán tọa độ…" />
               </SelectTrigger>
               <SelectContent className="z-1200">
                 {clusterSOSRequests.map((sos) => (
@@ -610,6 +651,7 @@ function SortableActivityCard({
               ? String(activity.rescueTeamId)
               : undefined
           }
+          disabled={teamOptions.length === 0}
           onValueChange={(value) => {
             if (value === CLEAR_ACTIVITY_TEAM_VALUE) {
               onUpdate(activity.id, "rescueTeamId", null);
@@ -625,7 +667,13 @@ function SortableActivityCard({
           }}
         >
           <SelectTrigger className="h-9 text-sm mt-2 bg-white/90 dark:bg-emerald-950/25">
-            <SelectValue placeholder="Chọn đội phụ trách bước này" />
+            <SelectValue
+              placeholder={
+                teamOptions.length > 0
+                  ? "Chọn đội phụ trách bước này"
+                  : "Chưa có đội gần cụm để chọn"
+              }
+            />
           </SelectTrigger>
           <SelectContent className="z-1200">
             {teamOptions.map((team) => (
@@ -635,7 +683,6 @@ function SortableActivityCard({
                 className="text-sm"
               >
                 {team.name}
-                {team.source === "mock" ? " (demo)" : ""}
                 {team.distanceKm != null
                   ? ` • ${team.distanceKm.toFixed(1)} km`
                   : ""}
@@ -656,9 +703,15 @@ function SortableActivityCard({
           </p>
         ) : null}
 
-        {selectedTeam?.source === "mock" ? (
+        {selectedTeam?.distanceKm != null ? (
           <p className="mt-1 text-xs text-emerald-700/65 dark:text-emerald-300/65">
-            Đội demo giao diện, sẽ được thay bằng dữ liệu thật khi API sẵn sàng.
+            Khoảng cách đến cụm: {formatDistanceKmLabel(selectedTeam.distanceKm)}
+          </p>
+        ) : null}
+
+        {teamOptions.length === 0 ? (
+          <p className="mt-2 rounded-md border border-dashed border-amber-300/80 bg-amber-100/60 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-300">
+            Chưa có đội cứu hộ gần cụm. Cần có đội hợp lệ để xác nhận nhiệm vụ.
           </p>
         ) : null}
       </div>
@@ -746,6 +799,8 @@ function SortableActivityCard({
                         parseInt(event.target.value, 10) || 1,
                       )
                     }
+                    name={`activity-${activity.id}-supply-${supplyIndex}-quantity`}
+                    autoComplete="off"
                     className="h-6 w-full text-sm text-center px-1"
                   />
                   <span className="text-right text-sm text-muted-foreground">
@@ -756,6 +811,7 @@ function SortableActivityCard({
                     size="icon"
                     className="h-5 w-5 text-muted-foreground hover:text-red-500"
                     onClick={() => onRemoveSupply(activity.id, supplyIndex)}
+                    aria-label={`Xóa vật tư ${supply.itemName}`}
                   >
                     <X className="h-3 w-3" />
                   </Button>
@@ -774,9 +830,11 @@ function SortableActivityCard({
             Vật tư / Thiết bị
           </Label>
           <Input
-            placeholder="VD: Áo phao x5, Lương khô x10..."
+            placeholder="VD: Áo phao x5, Lương khô x10…"
             value={activity.items || ""}
             onChange={(e) => onUpdate(activity.id, "items", e.target.value)}
+            name={`activity-${activity.id}-items`}
+            autoComplete="off"
             className="h-9 text-sm mt-1"
           />
         </div>
@@ -856,6 +914,202 @@ function TimelineDropZone({
   );
 }
 
+function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
+  const [page, setPage] = useState(1);
+  const { data, isLoading, isError, error } = useDepotInventory({
+    depotId: depot.id,
+    pageNumber: page,
+    pageSize: 6,
+  });
+
+  const availableItems =
+    data?.items.filter((item) =>
+      item.itemType === "Reusable"
+        ? item.availableUnit > 0
+        : item.availableQuantity > 0,
+    ) ?? [];
+  const utilizationPercent = getDepotUtilizationPercent(
+    depot.currentUtilization,
+    depot.capacity,
+  );
+  const statusMeta = getDepotStatusMeta(depot.status);
+
+  return (
+    <div className="rounded-2xl border border-amber-200/70 bg-[linear-gradient(180deg,rgba(255,247,237,0.98)_0%,rgba(255,255,255,0.98)_100%)] shadow-sm dark:border-amber-800/40 dark:bg-[linear-gradient(180deg,rgba(120,53,15,0.22)_0%,rgba(15,23,42,0.88)_100%)]">
+      <div className="border-b border-amber-200/70 px-3 py-3 dark:border-amber-800/40">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Storefront
+                className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300"
+                weight="fill"
+              />
+              <p className="truncate text-sm font-bold text-foreground">
+                {depot.name}
+              </p>
+            </div>
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+              {depot.address}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Badge
+              variant="outline"
+              className={cn("h-5 rounded-full px-2 text-xs font-semibold", statusMeta.className)}
+            >
+              {statusMeta.label}
+            </Badge>
+            <Badge
+              variant="secondary"
+              className="h-5 rounded-full bg-sky-100 px-2 text-xs font-semibold text-sky-800 dark:bg-sky-950/40 dark:text-sky-300"
+            >
+              <Compass className="mr-1 h-3 w-3" weight="fill" />
+              {formatDistanceKmLabel(depot.distanceKm)}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-border/60 bg-background/80 p-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Công suất
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">
+              {depot.currentUtilization.toLocaleString("vi-VN")} /{" "}
+              {depot.capacity.toLocaleString("vi-VN")}
+            </p>
+            <Progress value={utilizationPercent} className="mt-2 h-1.5" />
+          </div>
+          <div className="rounded-xl border border-border/60 bg-background/80 p-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Tồn kho
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">
+              {data?.totalCount?.toLocaleString("vi-VN") ?? "—"} vật tư
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Trang {data?.pageNumber ?? 1}/{data?.totalPages ?? 1}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2 px-3 py-3">
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={`${depot.id}-inventory-skeleton-${index}`} className="h-12 rounded-xl" />
+          ))
+        ) : isError ? (
+          <div className="rounded-xl border border-dashed border-rose-200 bg-rose-50/80 px-3 py-3 text-xs text-rose-700 dark:border-rose-800/50 dark:bg-rose-950/20 dark:text-rose-300">
+            {getErrorMessage(error, "Không thể tải vật tư của kho này.")}
+          </div>
+        ) : availableItems.length > 0 ? (
+          availableItems.map((item, index) => {
+            const availableQuantity =
+              item.itemType === "Reusable"
+                ? item.availableUnit
+                : item.availableQuantity;
+            const itemWithUnit = item as typeof item & {
+              unit?: string;
+              unitName?: string;
+            };
+            const rawUnit =
+              (typeof itemWithUnit.unit === "string"
+                ? itemWithUnit.unit.trim()
+                : "") ||
+              (typeof itemWithUnit.unitName === "string"
+                ? itemWithUnit.unitName.trim()
+                : "");
+
+            return (
+              <div
+                key={`${depot.id}-${item.itemModelId}-${item.itemType}-${index}`}
+                draggable
+                onDragStart={(event) => {
+                  const payload: ManualInventoryDragPayload = {
+                    itemId: item.itemModelId,
+                    itemName: item.itemModelName,
+                    unit: rawUnit || "đơn vị",
+                    availableQuantity,
+                    sourceDepotId: depot.id,
+                    sourceDepotName: depot.name,
+                    sourceDepotAddress: depot.address,
+                  };
+
+                  event.dataTransfer.effectAllowed = "copy";
+                  event.dataTransfer.setData(
+                    MANUAL_INVENTORY_MIME,
+                    JSON.stringify(payload),
+                  );
+                }}
+                className="flex cursor-grab items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-2.5 py-2 transition-colors hover:bg-accent/40 active:cursor-grabbing"
+              >
+                <Package
+                  className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300"
+                  weight="fill"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-foreground">
+                    {item.itemModelName}
+                  </p>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {item.categoryName}
+                  </p>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="h-6 shrink-0 rounded-full px-2 text-xs font-bold"
+                >
+                  {availableQuantity.toLocaleString("vi-VN")}
+                </Badge>
+              </div>
+            );
+          })
+        ) : (
+          <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-3 py-4 text-center">
+            <p className="text-sm font-medium text-foreground">
+              Không còn vật tư khả dụng
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Chuyển trang hoặc chọn kho khác để tiếp tục kéo-thả vật tư.
+            </p>
+          </div>
+        )}
+
+        {data && data.totalPages > 1 ? (
+          <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/70 px-2 py-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs font-semibold"
+              disabled={!data.hasPreviousPage}
+              onClick={() => setPage((previous) => Math.max(1, previous - 1))}
+            >
+              <CaretLeft className="h-3 w-3" />
+              Trước
+            </Button>
+            <p className="text-center text-[11px] text-muted-foreground">
+              {data.pageSize} vật tư / trang
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs font-semibold"
+              disabled={!data.hasNextPage}
+              onClick={() => setPage((previous) => previous + 1)}
+            >
+              Sau
+              <CaretRight className="h-3 w-3" />
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ──
 
 const ManualMissionBuilder = ({
@@ -900,98 +1154,134 @@ const ManualMissionBuilder = ({
       enabled: !!existingMissionId && open,
     },
   );
-  const { data: rescueTeamsByClusterData } = useRescueTeamsByCluster(
+  const {
+    data: rescueTeamsByClusterData,
+    isLoading: isNearbyTeamsLoading,
+    isError: isNearbyTeamsError,
+    error: nearbyTeamsError,
+  } = useRescueTeamsByCluster(
     clusterId ?? 0,
     {
-      enabled: open && !!clusterId,
+      enabled: open && !!clusterId && clusterId > 0,
     },
   );
+  const {
+    data: nearbyDepotsData,
+    isLoading: isNearbyDepotsLoading,
+    isError: isNearbyDepotsError,
+    error: nearbyDepotsError,
+  } = useDepotsByCluster(clusterId ?? 0, {
+    enabled: open && !!clusterId && clusterId > 0,
+  });
 
   const teamOptions = useMemo<ManualTeamOption[]>(() => {
-    if (rescueTeamsByClusterData && rescueTeamsByClusterData.length > 0) {
-      return rescueTeamsByClusterData.map((team) => ({
+    return (rescueTeamsByClusterData ?? [])
+      .map((team) => ({
         id: team.id,
         name: team.name,
         teamType: team.teamType,
         assemblyPointName: team.assemblyPointName,
         status: team.status,
         distanceKm: team.distanceKm,
-        source: "live",
-      }));
-    }
+      }))
+      .sort((teamA, teamB) => {
+        const distanceA = Number.isFinite(teamA.distanceKm)
+          ? teamA.distanceKm!
+          : Number.POSITIVE_INFINITY;
+        const distanceB = Number.isFinite(teamB.distanceKm)
+          ? teamB.distanceKm!
+          : Number.POSITIVE_INFINITY;
 
-    return MOCK_TEAM_OPTIONS;
+        if (distanceA !== distanceB) {
+          return distanceA - distanceB;
+        }
+
+        return teamA.name.localeCompare(teamB.name, "vi");
+      });
   }, [rescueTeamsByClusterData]);
+  const nearbyDepots = nearbyDepotsData ?? [];
+  const hasNearbyTeams = teamOptions.length > 0;
+  const hasNearbyDepots = nearbyDepots.length > 0;
 
   const isEditingExisting = !!existingMissionId;
 
   // ── Pre-fill from existing mission ──
   useEffect(() => {
     if (!existingMission || !open || hasLoadedExisting) return;
-    const normalizedMissionType = normalizeManualMissionType(
-      existingMission.missionType,
-    );
-    setMissionType(normalizedMissionType);
-    setPriorityScore(existingMission.priorityScore || 5);
-    setStartTime(existingMission.startTime?.slice(0, 16) || "");
-    setExpectedEndTime(existingMission.expectedEndTime?.slice(0, 16) || "");
-
-    const rescueTeamIdByMissionTeamId = new Map(
-      (existingMission.teams ?? []).map((team) => [
-        team.missionTeamId,
-        team.rescueTeamId,
-      ]),
-    );
-
-    const acts = existingMission.activities ?? existingActivities ?? [];
-    if (acts.length > 0) {
-      setActivities(
-        acts.map((a: MissionActivity) => ({
-          id: `${TIMELINE_PREFIX}existing-${a.id}-${Date.now()}`,
-          activityType: (a.activityType || "ASSESS") as ClusterActivityType,
-          description: a.description || "",
-          target: a.target || "",
-          items:
-            typeof a.items === "string"
-              ? a.items
-              : buildSupplySummary(
-                  (a.suppliesToCollect ?? []).map((supply) => ({
-                    itemId: supply.itemId ?? -1,
-                    itemName: supply.itemName ?? "Vật tư chưa rõ tên",
-                    quantity: supply.quantity,
-                    unit: supply.unit,
-                    sourceDepotId: a.depotId,
-                    sourceDepotName: a.depotName,
-                    sourceDepotAddress: a.depotAddress,
-                  })),
-                ),
-          targetLatitude: a.targetLatitude || 0,
-          targetLongitude: a.targetLongitude || 0,
-          rescueTeamId:
-            typeof a.missionTeamId === "number"
-              ? (rescueTeamIdByMissionTeamId.get(a.missionTeamId) ?? null)
-              : null,
-          depotId: a.depotId ?? null,
-          depotName: a.depotName ?? null,
-          depotAddress: a.depotAddress ?? null,
-          suppliesToCollect: (a.suppliesToCollect ?? []).map((supply) => ({
-            itemId: supply.itemId ?? -1,
-            itemName: supply.itemName ?? "Vật tư chưa rõ tên",
-            quantity: supply.quantity,
-            unit: supply.unit,
-            sourceDepotId: a.depotId,
-            sourceDepotName: a.depotName,
-            sourceDepotAddress: a.depotAddress,
-          })),
-        })),
+    const timeoutId = window.setTimeout(() => {
+      const normalizedMissionType = normalizeManualMissionType(
+        existingMission.missionType,
       );
-    }
-    setHasLoadedExisting(true);
+      setMissionType(normalizedMissionType);
+      setPriorityScore(existingMission.priorityScore || 5);
+      setStartTime(existingMission.startTime?.slice(0, 16) || "");
+      setExpectedEndTime(existingMission.expectedEndTime?.slice(0, 16) || "");
+
+      const rescueTeamIdByMissionTeamId = new Map(
+        (existingMission.teams ?? []).map((team) => [
+          team.missionTeamId,
+          team.rescueTeamId,
+        ]),
+      );
+
+      const acts = existingMission.activities ?? existingActivities ?? [];
+      if (acts.length > 0) {
+        setActivities(
+          acts.map((a: MissionActivity) => ({
+            id: `${TIMELINE_PREFIX}existing-${a.id}-${Date.now()}`,
+            activityType: (a.activityType || "ASSESS") as ClusterActivityType,
+            description: a.description || "",
+            target: a.target || "",
+            items:
+              typeof a.items === "string"
+                ? a.items
+                : buildSupplySummary(
+                    (a.suppliesToCollect ?? []).map((supply) => ({
+                      itemId: supply.itemId ?? -1,
+                      itemName: supply.itemName ?? "Vật tư chưa rõ tên",
+                      quantity: supply.quantity,
+                      unit: supply.unit,
+                      sourceDepotId: a.depotId,
+                      sourceDepotName: a.depotName,
+                      sourceDepotAddress: a.depotAddress,
+                    })),
+                  ),
+            targetLatitude: a.targetLatitude || 0,
+            targetLongitude: a.targetLongitude || 0,
+            rescueTeamId:
+              typeof a.missionTeamId === "number"
+                ? (rescueTeamIdByMissionTeamId.get(a.missionTeamId) ?? null)
+                : null,
+            depotId: a.depotId ?? null,
+            depotName: a.depotName ?? null,
+            depotAddress: a.depotAddress ?? null,
+            suppliesToCollect: (a.suppliesToCollect ?? []).map((supply) => ({
+              itemId: supply.itemId ?? -1,
+              itemName: supply.itemName ?? "Vật tư chưa rõ tên",
+              quantity: supply.quantity,
+              unit: supply.unit,
+              sourceDepotId: a.depotId,
+              sourceDepotName: a.depotName,
+              sourceDepotAddress: a.depotAddress,
+            })),
+          })),
+        );
+      }
+      setHasLoadedExisting(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [existingMission, existingActivities, open, hasLoadedExisting]);
 
   // Reset loaded flag when closing or changing mission
   useEffect(() => {
-    if (!open) setHasLoadedExisting(false);
+    if (open) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setHasLoadedExisting(false);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [open]);
 
   // ── DnD sensors ──
@@ -1260,108 +1550,112 @@ const ManualMissionBuilder = ({
 
   // ── Auto append final RETURN_SUPPLIES when supply collection exists ──
   useEffect(() => {
-    setActivities((previous) => {
-      if (previous.length === 0) {
-        return previous;
-      }
-
-      const triggerActivities = previous.filter((activity) =>
-        AUTO_RETURN_TRIGGER_TYPES.has(activity.activityType),
-      );
-      const hasSupplyCollectionStep = triggerActivities.length > 0;
-      const autoReturnIndexes: number[] = [];
-
-      for (let index = 0; index < previous.length; index += 1) {
-        if (previous[index].isAutoReturnStep) {
-          autoReturnIndexes.push(index);
-        }
-      }
-
-      if (!hasSupplyCollectionStep) {
-        if (autoReturnIndexes.length === 0) {
+    const timeoutId = window.setTimeout(() => {
+      setActivities((previous) => {
+        if (previous.length === 0) {
           return previous;
         }
 
-        return previous.filter((activity) => !activity.isAutoReturnStep);
-      }
+        const triggerActivities = previous.filter((activity) =>
+          AUTO_RETURN_TRIGGER_TYPES.has(activity.activityType),
+        );
+        const hasSupplyCollectionStep = triggerActivities.length > 0;
+        const autoReturnIndexes: number[] = [];
 
-      let managedReturnIndex =
-        autoReturnIndexes.length > 0
-          ? autoReturnIndexes[autoReturnIndexes.length - 1]
-          : -1;
-
-      if (managedReturnIndex < 0) {
-        for (let index = previous.length - 1; index >= 0; index -= 1) {
-          if (previous[index].activityType === "RETURN_SUPPLIES") {
-            managedReturnIndex = index;
-            break;
+        for (let index = 0; index < previous.length; index += 1) {
+          if (previous[index].isAutoReturnStep) {
+            autoReturnIndexes.push(index);
           }
         }
-      }
 
-      const lastCollectStep = triggerActivities[triggerActivities.length - 1];
-      const mergedSupplies =
-        mergeCollectedSuppliesForAutoReturn(triggerActivities);
-      const baseManagedStep =
-        managedReturnIndex >= 0
-          ? previous[managedReturnIndex]
-          : createActivity("RETURN_SUPPLIES");
+        if (!hasSupplyCollectionStep) {
+          if (autoReturnIndexes.length === 0) {
+            return previous;
+          }
 
-      const nextSupplies =
-        mergedSupplies.length > 0
-          ? mergedSupplies
-          : baseManagedStep.suppliesToCollect;
-
-      const autoReturnStep: ManualActivity = {
-        ...baseManagedStep,
-        activityType: "RETURN_SUPPLIES",
-        description:
-          baseManagedStep.description.trim() || AUTO_RETURN_STEP_DESCRIPTION,
-        target:
-          baseManagedStep.target.trim() ||
-          lastCollectStep.depotName ||
-          lastCollectStep.target ||
-          AUTO_RETURN_TARGET_FALLBACK,
-        targetLatitude: hasRenderableCoordinates(
-          lastCollectStep.targetLatitude,
-          lastCollectStep.targetLongitude,
-        )
-          ? lastCollectStep.targetLatitude
-          : baseManagedStep.targetLatitude,
-        targetLongitude: hasRenderableCoordinates(
-          lastCollectStep.targetLatitude,
-          lastCollectStep.targetLongitude,
-        )
-          ? lastCollectStep.targetLongitude
-          : baseManagedStep.targetLongitude,
-        rescueTeamId:
-          lastCollectStep.rescueTeamId ?? baseManagedStep.rescueTeamId ?? null,
-        depotId: lastCollectStep.depotId ?? baseManagedStep.depotId ?? null,
-        depotName:
-          lastCollectStep.depotName ?? baseManagedStep.depotName ?? null,
-        depotAddress:
-          lastCollectStep.depotAddress ?? baseManagedStep.depotAddress ?? null,
-        suppliesToCollect: nextSupplies,
-        items: buildSupplySummary(nextSupplies),
-        isAutoReturnStep: true,
-      };
-
-      const normalizedActivities = previous.filter((activity, index) => {
-        if (index === managedReturnIndex) {
-          return false;
+          return previous.filter((activity) => !activity.isAutoReturnStep);
         }
 
-        return !activity.isAutoReturnStep;
+        let managedReturnIndex =
+          autoReturnIndexes.length > 0
+            ? autoReturnIndexes[autoReturnIndexes.length - 1]
+            : -1;
+
+        if (managedReturnIndex < 0) {
+          for (let index = previous.length - 1; index >= 0; index -= 1) {
+            if (previous[index].activityType === "RETURN_SUPPLIES") {
+              managedReturnIndex = index;
+              break;
+            }
+          }
+        }
+
+        const lastCollectStep = triggerActivities[triggerActivities.length - 1];
+        const mergedSupplies =
+          mergeCollectedSuppliesForAutoReturn(triggerActivities);
+        const baseManagedStep =
+          managedReturnIndex >= 0
+            ? previous[managedReturnIndex]
+            : createActivity("RETURN_SUPPLIES");
+
+        const nextSupplies =
+          mergedSupplies.length > 0
+            ? mergedSupplies
+            : baseManagedStep.suppliesToCollect;
+
+        const autoReturnStep: ManualActivity = {
+          ...baseManagedStep,
+          activityType: "RETURN_SUPPLIES",
+          description:
+            baseManagedStep.description.trim() || AUTO_RETURN_STEP_DESCRIPTION,
+          target:
+            baseManagedStep.target.trim() ||
+            lastCollectStep.depotName ||
+            lastCollectStep.target ||
+            AUTO_RETURN_TARGET_FALLBACK,
+          targetLatitude: hasRenderableCoordinates(
+            lastCollectStep.targetLatitude,
+            lastCollectStep.targetLongitude,
+          )
+            ? lastCollectStep.targetLatitude
+            : baseManagedStep.targetLatitude,
+          targetLongitude: hasRenderableCoordinates(
+            lastCollectStep.targetLatitude,
+            lastCollectStep.targetLongitude,
+          )
+            ? lastCollectStep.targetLongitude
+            : baseManagedStep.targetLongitude,
+          rescueTeamId:
+            lastCollectStep.rescueTeamId ?? baseManagedStep.rescueTeamId ?? null,
+          depotId: lastCollectStep.depotId ?? baseManagedStep.depotId ?? null,
+          depotName:
+            lastCollectStep.depotName ?? baseManagedStep.depotName ?? null,
+          depotAddress:
+            lastCollectStep.depotAddress ?? baseManagedStep.depotAddress ?? null,
+          suppliesToCollect: nextSupplies,
+          items: buildSupplySummary(nextSupplies),
+          isAutoReturnStep: true,
+        };
+
+        const normalizedActivities = previous.filter((activity, index) => {
+          if (index === managedReturnIndex) {
+            return false;
+          }
+
+          return !activity.isAutoReturnStep;
+        });
+
+        normalizedActivities.push(autoReturnStep);
+
+        if (JSON.stringify(normalizedActivities) === JSON.stringify(previous)) {
+          return previous;
+        }
+
+        return normalizedActivities;
       });
+    }, 0);
 
-      normalizedActivities.push(autoReturnStep);
-
-      if (JSON.stringify(normalizedActivities) === JSON.stringify(previous)) {
-        return previous;
-      }
-
-      return normalizedActivities;
-    });
+    return () => window.clearTimeout(timeoutId);
   }, [activities, createActivity]);
 
   // ── Fill location from SOS ──
@@ -1406,7 +1700,7 @@ const ManualMissionBuilder = ({
         return false;
       }
 
-      if (a.rescueTeamId == null) {
+      if (!toValidRescueTeamId(a.rescueTeamId)) {
         toast.error(`Bước ${i + 1}: Vui lòng chọn đội phụ trách`);
         return false;
       }
@@ -1596,12 +1890,18 @@ const ManualMissionBuilder = ({
     startTime,
     expectedEndTime,
     activities,
+    clusterSOSRequests,
     onOpenChange,
     onCreated,
   ]);
 
   // ── Sortable IDs ──
   const sortableIds = useMemo(() => activities.map((a) => a.id), [activities]);
+  const hasAssignedTeamsForAllSteps =
+    activities.length > 0 &&
+    activities.every((activity) => toValidRescueTeamId(activity.rescueTeamId));
+  const canSubmitMission =
+    activities.length > 0 && hasNearbyTeams && hasAssignedTeamsForAllSteps;
 
   if (!clusterId) return null;
 
@@ -1662,6 +1962,7 @@ const ManualMissionBuilder = ({
               size="icon"
               className="h-8 w-8"
               onClick={() => onOpenChange(false)}
+              aria-label="Đóng trình tạo nhiệm vụ thủ công"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -1676,7 +1977,7 @@ const ManualMissionBuilder = ({
           onDragEnd={handleDragEnd}
         >
           <div className="flex-1 flex overflow-hidden min-h-0">
-            {/* ── Left Panel: Palette + SOS + Templates ── */}
+            {/* ── Left Panel: Palette + Reference Data ── */}
             <div className="w-62.5 shrink-0 border-r flex flex-col overflow-hidden">
               <ScrollArea className="flex-1">
                 <div className="p-3 space-y-4">
@@ -1725,83 +2026,155 @@ const ManualMissionBuilder = ({
 
                   <Separator />
 
-                  {/* Mock depot inventory for drag/drop supply planning */}
+                  {/* Nearby rescue teams */}
                   <section>
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                      <Storefront className="h-3 w-3" weight="fill" />
-                      Kho vật tư (giao diện sẵn)
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
-                      Kéo vật tư từ kho vào các bước lấy/giao/trả vật tư ở bên
-                      phải.
-                    </p>
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <UsersThree className="h-3 w-3" weight="fill" />
+                          Đội gần cụm SOS
+                        </h3>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                          Chỉ dùng đội thật từ backend. Chọn đội phụ trách cho
+                          từng bước ở cột bên phải.
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {teamOptions.length}
+                      </Badge>
+                    </div>
 
                     <div className="space-y-2">
-                      {MOCK_DEPOT_CATALOG.map((depot) => (
-                        <div
-                          key={depot.depotId}
-                          className="rounded-lg border border-amber-200/70 bg-amber-50/40 p-2 dark:border-amber-700/40 dark:bg-amber-900/10"
-                        >
-                          <div className="mb-1.5 flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 truncate">
-                                {depot.depotName}
-                              </p>
-                              {depot.depotAddress ? (
-                                <p className="text-xs text-amber-700/75 dark:text-amber-300/75 line-clamp-2">
-                                  {depot.depotAddress}
+                      {isNearbyTeamsLoading ? (
+                        Array.from({ length: 3 }).map((_, index) => (
+                          <Skeleton
+                            key={`nearby-team-skeleton-${index}`}
+                            className="h-20 rounded-xl"
+                          />
+                        ))
+                      ) : isNearbyTeamsError ? (
+                        <div className="rounded-xl border border-dashed border-rose-200 bg-rose-50/80 px-3 py-3 text-xs text-rose-700 dark:border-rose-800/50 dark:bg-rose-950/20 dark:text-rose-300">
+                          {getErrorMessage(
+                            nearbyTeamsError,
+                            "Không thể tải danh sách đội gần cụm.",
+                          )}
+                        </div>
+                      ) : hasNearbyTeams ? (
+                        teamOptions.map((team) => {
+                          const statusMeta = getTeamStatusMeta(team.status);
+
+                          return (
+                            <div
+                              key={team.id}
+                              className="rounded-2xl border border-emerald-200/80 bg-[linear-gradient(180deg,rgba(236,253,245,0.95)_0%,rgba(255,255,255,0.98)_100%)] p-3 shadow-sm dark:border-emerald-800/40 dark:bg-[linear-gradient(180deg,rgba(6,95,70,0.22)_0%,rgba(15,23,42,0.88)_100%)]"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-foreground">
+                                    {team.name}
+                                  </p>
+                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                    <Badge
+                                      variant="outline"
+                                      className="h-5 rounded-full px-2 text-[11px]"
+                                    >
+                                      {formatManualTeamType(team.teamType)}
+                                    </Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "h-5 rounded-full px-2 text-[11px] font-semibold",
+                                        statusMeta.className,
+                                      )}
+                                    >
+                                      {statusMeta.label}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <Badge
+                                  variant="secondary"
+                                  className="h-5 shrink-0 rounded-full bg-sky-100 px-2 text-[11px] font-semibold text-sky-800 dark:bg-sky-950/40 dark:text-sky-300"
+                                >
+                                  {formatDistanceKmLabel(team.distanceKm)}
+                                </Badge>
+                              </div>
+
+                              {team.assemblyPointName ? (
+                                <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+                                  <Buildings className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                  <span className="line-clamp-2">
+                                    {team.assemblyPointName}
+                                  </span>
                                 </p>
                               ) : null}
                             </div>
-                            <Badge
-                              variant="outline"
-                              className="h-5 px-1.5 text-xs border-amber-300/70 text-amber-700 dark:border-amber-700 dark:text-amber-300"
-                            >
-                              {depot.items.length} vật tư
-                            </Badge>
-                          </div>
-
-                          <div className="space-y-1.5">
-                            {depot.items.map((item) => (
-                              <div
-                                key={`${depot.depotId}-${item.itemId}`}
-                                draggable
-                                onDragStart={(event) => {
-                                  const payload: ManualInventoryDragPayload = {
-                                    itemId: item.itemId,
-                                    itemName: item.itemName,
-                                    unit: item.unit,
-                                    availableQuantity: item.availableQuantity,
-                                    sourceDepotId: depot.depotId,
-                                    sourceDepotName: depot.depotName,
-                                    sourceDepotAddress: depot.depotAddress,
-                                  };
-
-                                  event.dataTransfer.effectAllowed = "copy";
-                                  event.dataTransfer.setData(
-                                    MANUAL_INVENTORY_MIME,
-                                    JSON.stringify(payload),
-                                  );
-                                }}
-                                className="flex cursor-grab active:cursor-grabbing items-center justify-between gap-2 rounded-md border border-blue-200/60 bg-white px-2 py-1.5 transition-colors hover:bg-blue-50 dark:border-blue-800/50 dark:bg-blue-950/20"
-                              >
-                                <div className="min-w-0 flex items-center gap-1.5">
-                                  <Package
-                                    className="h-3.5 w-3.5 shrink-0 text-blue-600"
-                                    weight="fill"
-                                  />
-                                  <span className="text-xs font-medium text-blue-900 dark:text-blue-200 truncate">
-                                    {item.itemName}
-                                  </span>
-                                </div>
-                                <span className="shrink-0 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                                  {item.availableQuantity} {item.unit}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                          );
+                        })
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-amber-300/80 bg-amber-50/80 px-3 py-4 text-center dark:border-amber-700/60 dark:bg-amber-900/15">
+                          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                            Chưa có đội gần cụm
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-amber-700/80 dark:text-amber-300/80">
+                            Hệ thống chưa trả về đội cứu hộ phù hợp trong bán
+                            kính điều phối. Bạn vẫn có thể dựng kế hoạch, nhưng
+                            chưa thể xác nhận nhiệm vụ.
+                          </p>
                         </div>
-                      ))}
+                      )}
+                    </div>
+                  </section>
+
+                  <Separator />
+
+                  {/* Nearby depots for drag/drop supply planning */}
+                  <section>
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Storefront className="h-3 w-3" weight="fill" />
+                          Kho gần cụm SOS
+                        </h3>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                          Kéo vật tư từ kho khả dụng vào các bước lấy, giao hoặc
+                          trả vật tư ở bên phải.
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {nearbyDepots.length}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      {isNearbyDepotsLoading ? (
+                        Array.from({ length: 2 }).map((_, index) => (
+                          <Skeleton
+                            key={`nearby-depot-skeleton-${index}`}
+                            className="h-56 rounded-2xl"
+                          />
+                        ))
+                      ) : isNearbyDepotsError ? (
+                        <div className="rounded-xl border border-dashed border-rose-200 bg-rose-50/80 px-3 py-3 text-xs text-rose-700 dark:border-rose-800/50 dark:bg-rose-950/20 dark:text-rose-300">
+                          {getErrorMessage(
+                            nearbyDepotsError,
+                            "Không thể tải danh sách kho gần cụm.",
+                          )}
+                        </div>
+                      ) : hasNearbyDepots ? (
+                        nearbyDepots.map((depot) => (
+                          <NearbyDepotInventoryCard key={depot.id} depot={depot} />
+                        ))
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-3 py-4 text-center">
+                          <p className="text-sm font-semibold text-foreground">
+                            Chưa có kho khả dụng gần cụm
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                            Backend không trả về kho `Available` còn hàng trong
+                            bán kính điều phối cho cụm này.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </section>
 
@@ -1870,30 +2243,92 @@ const ManualMissionBuilder = ({
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
               <ScrollArea className="flex-1">
                 <div className="p-4 space-y-4">
-                  <div className="rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-900/10 p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <PencilSimpleLine
-                        className="h-4 w-4 text-amber-600"
-                        weight="fill"
-                      />
-                      <span className="text-sm font-bold text-amber-800 dark:text-amber-300">
-                        Tạo kế hoạch cứu hộ thủ công
-                      </span>
+                  <div className="rounded-2xl border border-amber-300/80 bg-[linear-gradient(135deg,rgba(255,247,237,0.95)_0%,rgba(255,255,255,0.98)_100%)] p-4 shadow-sm dark:border-amber-700/60 dark:bg-[linear-gradient(135deg,rgba(120,53,15,0.25)_0%,rgba(15,23,42,0.95)_100%)]">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="mb-1 flex items-center gap-2">
+                          <PencilSimpleLine
+                            className="h-4 w-4 text-amber-600"
+                            weight="fill"
+                          />
+                          <span className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                            Tạo kế hoạch cứu hộ thủ công
+                          </span>
+                        </div>
+                        <p className="text-sm text-amber-700/80 dark:text-amber-400/80">
+                          Sắp xếp trình tự triển khai, gán đội phụ trách và kéo
+                          vật tư thực tế từ các kho gần cụm để tạo nhiệm vụ.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="h-6 rounded-full px-2">
+                          {activities.length} bước
+                        </Badge>
+                        <Badge variant="outline" className="h-6 rounded-full px-2">
+                          {teamOptions.length} đội gần cụm
+                        </Badge>
+                        <Badge variant="outline" className="h-6 rounded-full px-2">
+                          {nearbyDepots.length} kho gần cụm
+                        </Badge>
+                      </div>
                     </div>
-                    <p className="text-sm text-amber-700/70 dark:text-amber-400/70">
-                      Thêm các bước thực hiện theo thứ tự, sau đó xác nhận để
-                      tạo nhiệm vụ cho cụm SOS.
-                    </p>
+
+                    {(!hasNearbyTeams || !hasNearbyDepots) && (
+                      <div className="mt-3 rounded-xl border border-dashed border-amber-300/80 bg-amber-100/70 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-300">
+                        <p className="flex items-start gap-1.5 leading-relaxed">
+                          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <span>
+                            {!hasNearbyTeams
+                              ? "Chưa có đội gần cụm nên nhiệm vụ chưa thể xác nhận cho đến khi mỗi bước được gán một đội hợp lệ."
+                              : "Cụm này hiện chưa có kho khả dụng gần đó. Bạn vẫn có thể cấu hình bước, nhưng không thể kéo vật tư từ danh sách kho."}
+                          </span>
+                        </p>
+                      </div>
+                    )}
                   </div>
 
-                  <section className="rounded-xl border bg-card p-4 space-y-3">
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                      <Rocket className="h-3.5 w-3.5" weight="fill" />
-                      Cấu hình nhiệm vụ
-                    </h3>
-
-                    <div className="grid grid-cols-2 gap-3">
+                  <section className="rounded-2xl border border-border/70 bg-card/95 p-4 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                          <Rocket className="h-3.5 w-3.5" weight="fill" />
+                          Cấu hình nhiệm vụ
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Thiết lập loại nhiệm vụ, mức ưu tiên và khung thời gian
+                          triển khai trước khi xác nhận.
+                        </p>
+                      </div>
+                      <div className="grid min-w-[220px] grid-cols-3 gap-2 text-xs">
+                        <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2">
+                          <p className="uppercase tracking-[0.14em] text-muted-foreground">
+                            Loại
+                          </p>
+                          <p className="mt-1 font-semibold text-foreground">
+                            {missionType}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2">
+                          <p className="uppercase tracking-[0.14em] text-muted-foreground">
+                            Ưu tiên
+                          </p>
+                          <p className="mt-1 font-semibold text-foreground">
+                            {priorityScore.toFixed(1)}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2">
+                          <p className="uppercase tracking-[0.14em] text-muted-foreground">
+                            Tiến độ
+                          </p>
+                          <p className="mt-1 font-semibold text-foreground">
+                            {activities.length} bước
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-xl border border-border/70 bg-background/80 p-3">
                         <Label className="text-sm text-muted-foreground uppercase tracking-wider">
                           Loại nhiệm vụ
                         </Label>
@@ -1903,7 +2338,7 @@ const ManualMissionBuilder = ({
                             setMissionType(value as MissionType)
                           }
                         >
-                          <SelectTrigger className="h-8 text-sm mt-1">
+                          <SelectTrigger className="mt-2 h-10 text-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="z-1200">
@@ -1913,9 +2348,13 @@ const ManualMissionBuilder = ({
                             <SelectItem value="RESCUER">Cứu hộ viên</SelectItem>
                           </SelectContent>
                         </Select>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Loại nhiệm vụ sẽ định hướng cách đặt hoạt động và vật
+                          tư trong timeline.
+                        </p>
                       </div>
 
-                      <div>
+                      <div className="rounded-xl border border-border/70 bg-background/80 p-3">
                         <Label className="text-sm text-muted-foreground uppercase tracking-wider">
                           Điểm ưu tiên
                         </Label>
@@ -1932,11 +2371,16 @@ const ManualMissionBuilder = ({
                               Math.max(1, Math.min(10, nextPriority)),
                             );
                           }}
-                          className="h-8 text-sm mt-1"
+                          name="mission-priority-score"
+                          autoComplete="off"
+                          className="mt-2 h-10 text-sm"
                         />
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Dùng thang điểm từ 1 đến 10 để phản ánh mức khẩn cấp.
+                        </p>
                       </div>
 
-                      <div>
+                      <div className="rounded-xl border border-border/70 bg-background/80 p-3">
                         <Label className="text-sm text-muted-foreground uppercase tracking-wider">
                           Bắt đầu
                         </Label>
@@ -1944,11 +2388,16 @@ const ManualMissionBuilder = ({
                           type="datetime-local"
                           value={startTime}
                           onChange={(e) => setStartTime(e.target.value)}
-                          className="h-8 text-sm mt-1"
+                          name="mission-start-time"
+                          autoComplete="off"
+                          className="mt-2 h-10 text-sm"
                         />
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Chọn thời điểm đội bắt đầu di chuyển hoặc tập kết.
+                        </p>
                       </div>
 
-                      <div>
+                      <div className="rounded-xl border border-border/70 bg-background/80 p-3">
                         <Label className="text-sm text-muted-foreground uppercase tracking-wider">
                           Kết thúc dự kiến
                         </Label>
@@ -1956,8 +2405,14 @@ const ManualMissionBuilder = ({
                           type="datetime-local"
                           value={expectedEndTime}
                           onChange={(e) => setExpectedEndTime(e.target.value)}
-                          className="h-8 text-sm mt-1"
+                          name="mission-expected-end-time"
+                          autoComplete="off"
+                          className="mt-2 h-10 text-sm"
                         />
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Hệ thống dùng mốc này để theo dõi tiến độ và cảnh báo
+                          trễ hạn.
+                        </p>
                       </div>
                     </div>
                   </section>
@@ -2013,7 +2468,7 @@ const ManualMissionBuilder = ({
               </ScrollArea>
 
               {/* ── Footer Actions ── */}
-              <div className="p-4 border-t bg-background shrink-0 flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-3 border-t bg-background p-4 shrink-0">
                 <Button
                   variant="outline"
                   size="sm"
@@ -2022,20 +2477,25 @@ const ManualMissionBuilder = ({
                 >
                   Hủy bỏ
                 </Button>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col items-end gap-2">
                   <span className="text-sm text-muted-foreground">
                     {activities.length} hoạt động
+                    {!hasNearbyTeams
+                      ? " • cần đội gần cụm"
+                      : !hasAssignedTeamsForAllSteps
+                        ? " • chưa gán đủ đội"
+                        : ""}
                   </span>
                   <Button
                     size="sm"
                     className="h-9 gap-1.5 bg-linear-to-r from-[#FF5722] to-orange-600 hover:from-[#E64A19] hover:to-orange-700 text-white shadow-sm"
                     onClick={handleSubmit}
-                    disabled={isSubmitting || activities.length === 0}
+                    disabled={isSubmitting || !canSubmitMission}
                   >
                     {isSubmitting ? (
                       <>
                         <CircleNotch className="h-4 w-4 animate-spin" />
-                        {isEditingExisting ? "Đang cập nhật..." : "Đang tạo..."}
+                        {isEditingExisting ? "Đang cập nhật…" : "Đang tạo…"}
                       </>
                     ) : (
                       <>
@@ -2046,6 +2506,11 @@ const ManualMissionBuilder = ({
                       </>
                     )}
                   </Button>
+                  {!canSubmitMission ? (
+                    <p className="text-xs text-muted-foreground">
+                      Cần ít nhất 1 bước và mỗi bước phải có đội cứu hộ hợp lệ.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
