@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
 import { RescuePlanPanelProps } from "@/type";
 import polylineDecode from "@mapbox/polyline";
 import {
@@ -1256,6 +1257,44 @@ function formatRouteErrorMessage(errorMessage?: string | null): string | null {
   return trimmed;
 }
 
+function extractBackendErrorMessage(error: unknown): string | null {
+  const err = error as AxiosError<{
+    message?: string;
+    title?: string;
+    errors?: Record<string, string[] | string | undefined>;
+  }>;
+
+  const errors = err.response?.data?.errors;
+  if (errors && typeof errors === "object") {
+    const firstError = Object.values(errors).find((messages) => {
+      if (Array.isArray(messages)) {
+        return messages.length > 0;
+      }
+
+      return typeof messages === "string" && messages.trim().length > 0;
+    });
+
+    if (Array.isArray(firstError) && firstError[0]) {
+      return firstError[0].replace(/\s*\n+\s*/g, " ").trim();
+    }
+
+    if (typeof firstError === "string" && firstError.trim()) {
+      return firstError.replace(/\s*\n+\s*/g, " ").trim();
+    }
+  }
+
+  const fallbackMessage =
+    err.response?.data?.message ||
+    err.response?.data?.title ||
+    (error instanceof Error ? error.message : null);
+
+  if (!fallbackMessage || fallbackMessage === "[object Object]") {
+    return null;
+  }
+
+  return fallbackMessage.replace(/\s*\n+\s*/g, " ").trim();
+}
+
 function isActivityRouteFallbackCoolingDown(now = Date.now()): boolean {
   return activityRouteFallbackBlockedUntil > now;
 }
@@ -1303,6 +1342,7 @@ function haversineDistanceMeters(
 const RESCUE_ROUTE_ACTIVITY_TYPES = new Set([
   "COLLECT_SUPPLIES",
   "DELIVER_SUPPLIES",
+  "RETURN_SUPPLIES",
   "RESCUE",
   "MEDICAL_AID",
   "EVACUATE",
@@ -1373,9 +1413,15 @@ function extractSOSLabel(activity: MissionActivity): string | null {
   return null;
 }
 
+function isDepotSupplyStep(activityType: string): boolean {
+  return (
+    activityType === "COLLECT_SUPPLIES" || activityType === "RETURN_SUPPLIES"
+  );
+}
+
 function extractDepotLabel(activity: MissionActivity): string | null {
-  // Only pickup steps should be labeled as depot points on the consolidated route.
-  if (activity.activityType !== "COLLECT_SUPPLIES") {
+  // Supply pickup/return steps should be labeled as depot points on the route.
+  if (!isDepotSupplyStep(activity.activityType)) {
     return null;
   }
 
@@ -1429,16 +1475,161 @@ function inferSOSRequestIdFromActivity(
 }
 
 function isSupplyStep(activityType: string): boolean {
-  return (
-    activityType === "COLLECT_SUPPLIES" || activityType === "DELIVER_SUPPLIES"
-  );
+  return isDepotSupplyStep(activityType) || activityType === "DELIVER_SUPPLIES";
+}
+
+function getSupplyStepTitle(activityType: string): string {
+  if (activityType === "DELIVER_SUPPLIES") {
+    return "Danh sách giao hàng";
+  }
+
+  if (activityType === "RETURN_SUPPLIES") {
+    return "Danh sách trả đồ";
+  }
+
+  return "Yêu cầu lấy vật tư";
+}
+
+function toValidTeamId(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function getSupplyItemIdSet(activity: {
+  suppliesToCollect?:
+    | ClusterSupplyCollection[]
+    | Array<{ itemId: number | null }>
+    | null;
+}) {
+  const ids = new Set<number>();
+
+  for (const supply of activity.suppliesToCollect ?? []) {
+    const itemId = Number(supply?.itemId);
+    if (Number.isFinite(itemId) && itemId > 0) {
+      ids.add(itemId);
+    }
+  }
+
+  return ids;
+}
+
+function normalizeDepotName(value?: string | null): string {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function findCollectorActivityForReturn(
+  returnActivity: Pick<
+    ClusterSuggestedActivity,
+    "activityType" | "step" | "depotId" | "depotName" | "suppliesToCollect"
+  >,
+  activities: Array<
+    Pick<
+      ClusterSuggestedActivity,
+      | "activityType"
+      | "step"
+      | "depotId"
+      | "depotName"
+      | "suppliesToCollect"
+      | "suggestedTeam"
+    >
+  >,
+) {
+  if (returnActivity.activityType !== "RETURN_SUPPLIES") {
+    return null;
+  }
+
+  const returnStep = Number(returnActivity.step);
+  const returnDepotId =
+    typeof returnActivity.depotId === "number" && returnActivity.depotId > 0
+      ? returnActivity.depotId
+      : null;
+  const returnDepotName = normalizeDepotName(returnActivity.depotName);
+  const returnSupplyItemIds = getSupplyItemIdSet(returnActivity);
+
+  let bestCandidate: {
+    activity: (typeof activities)[number];
+    score: number;
+    step: number;
+  } | null = null;
+
+  for (const activity of activities) {
+    if (activity.activityType !== "COLLECT_SUPPLIES") {
+      continue;
+    }
+
+    const collectorTeamId = toValidTeamId(activity.suggestedTeam?.teamId);
+    if (collectorTeamId == null) {
+      continue;
+    }
+
+    const collectorStep = Number(activity.step);
+    const collectorDepotId =
+      typeof activity.depotId === "number" && activity.depotId > 0
+        ? activity.depotId
+        : null;
+    const collectorDepotName = normalizeDepotName(activity.depotName);
+    const collectorSupplyItemIds = getSupplyItemIdSet(activity);
+
+    let score = 0;
+
+    if (returnDepotId != null && collectorDepotId != null) {
+      if (returnDepotId === collectorDepotId) {
+        score += 120;
+      }
+    }
+
+    if (
+      returnDepotName &&
+      collectorDepotName &&
+      returnDepotName === collectorDepotName
+    ) {
+      score += 80;
+    }
+
+    let overlapCount = 0;
+    if (returnSupplyItemIds.size > 0 && collectorSupplyItemIds.size > 0) {
+      for (const itemId of returnSupplyItemIds) {
+        if (collectorSupplyItemIds.has(itemId)) {
+          overlapCount += 1;
+        }
+      }
+      score += overlapCount * 35;
+    }
+
+    if (Number.isFinite(returnStep) && Number.isFinite(collectorStep)) {
+      if (collectorStep <= returnStep) {
+        score += 12;
+      } else {
+        score -= 8;
+      }
+      score += Math.max(0, 6 - Math.abs(returnStep - collectorStep));
+    }
+
+    if (overlapCount === 0 && !returnDepotName && returnDepotId == null) {
+      score += 1;
+    }
+
+    if (
+      !bestCandidate ||
+      score > bestCandidate.score ||
+      (score === bestCandidate.score && collectorStep > bestCandidate.step)
+    ) {
+      bestCandidate = {
+        activity,
+        score,
+        step: Number.isFinite(collectorStep) ? collectorStep : -1,
+      };
+    }
+  }
+
+  return bestCandidate?.activity ?? null;
 }
 
 function parseSupplyItemsFromDescription(
   description: string,
 ): SupplyDisplayItem[] {
   const markerMatch = description.match(
-    /(?:Lấy|Lay|Giao vật tư|Tiếp tế|Tiep te|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?)[^:]*:\s*(.+)$/i,
+    /(?:Lấy|Lay|Giao vật tư|Tiếp tế|Tiep te|Trả|Tra|Hoàn trả|Hoan tra|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?|Return(?: supplies)?)[^:]*:\s*(.+)$/i,
   );
   if (!markerMatch?.[1]) return [];
 
@@ -1812,7 +2003,7 @@ function getWaypointMeta(
 function extractDepotLabelFromRouteWaypoint(
   waypoint: MissionTeamRouteWaypoint,
 ): string | null {
-  if (waypoint.activityType !== "COLLECT_SUPPLIES") return null;
+  if (!isDepotSupplyStep(waypoint.activityType)) return null;
 
   const description = String(waypoint.description ?? "").trim();
   if (!description) return "Kho tiếp tế";
@@ -1835,7 +2026,7 @@ function extractTargetLabelFromRouteWaypoint(
 
   if (!description) return null;
 
-  if (waypoint.activityType === "COLLECT_SUPPLIES") {
+  if (isDepotSupplyStep(waypoint.activityType)) {
     return extractDepotLabelFromRouteWaypoint(waypoint);
   }
 
@@ -3028,7 +3219,7 @@ const MissionTeamRoutePreview = ({
 
         const waypointLabel = extractTargetLabelFromRouteWaypoint(apiWaypoint);
 
-        if (apiWaypoint.activityType === "COLLECT_SUPPLIES") {
+        if (isDepotSupplyStep(apiWaypoint.activityType)) {
           return {
             ...baseMeta,
             labels: waypointLabel
@@ -4812,19 +5003,19 @@ const RescuePlanPanel = ({
           }
 
           const nextDepotId =
-            a.activityType === "COLLECT_SUPPLIES" &&
+            isDepotSupplyStep(a.activityType) &&
             typeof item.sourceDepotId === "number" &&
             item.sourceDepotId > 0
               ? item.sourceDepotId
               : a.depotId;
           const nextDepotName =
-            a.activityType === "COLLECT_SUPPLIES" &&
+            isDepotSupplyStep(a.activityType) &&
             typeof item.sourceDepotName === "string" &&
             item.sourceDepotName.trim()
               ? item.sourceDepotName.trim()
               : a.depotName;
           const nextDepotAddress =
-            a.activityType === "COLLECT_SUPPLIES" &&
+            isDepotSupplyStep(a.activityType) &&
             typeof item.sourceDepotAddress === "string" &&
             item.sourceDepotAddress.trim()
               ? item.sourceDepotAddress.trim()
@@ -4874,6 +5065,59 @@ const RescuePlanPanel = ({
     },
     [],
   );
+
+  useEffect(() => {
+    setEditActivities((previous) => {
+      let hasChange = false;
+
+      const next = previous.map((activity) => {
+        if (activity.activityType !== "RETURN_SUPPLIES") {
+          return activity;
+        }
+
+        const collectorActivity = findCollectorActivityForReturn(
+          activity,
+          previous,
+        );
+        const collectorTeamId = toValidTeamId(
+          collectorActivity?.suggestedTeam?.teamId,
+        );
+        const currentTeamId = toValidTeamId(activity.suggestedTeam?.teamId);
+
+        if (!collectorActivity || collectorTeamId == null) {
+          if (activity.suggestedTeam == null) {
+            return activity;
+          }
+
+          hasChange = true;
+          return {
+            ...activity,
+            suggestedTeam: null,
+          };
+        }
+
+        const expectedReason = `Tự động gán theo đội lấy vật tư ở Bước ${collectorActivity.step}.`;
+
+        if (
+          currentTeamId === collectorTeamId &&
+          activity.suggestedTeam?.reason === expectedReason
+        ) {
+          return activity;
+        }
+
+        hasChange = true;
+        return {
+          ...activity,
+          suggestedTeam: {
+            ...collectorActivity.suggestedTeam,
+            reason: expectedReason,
+          },
+        };
+      });
+
+      return hasChange ? next : previous;
+    });
+  }, [editActivities]);
 
   const handleRemoveSupply = useCallback(
     (activityId: string, supplyIndex: number) => {
@@ -4965,6 +5209,33 @@ const RescuePlanPanel = ({
         toast.error(`Bước ${i + 1}: Vui lòng nhập mô tả`);
         return false;
       }
+
+      if (editActivities[i].activityType === "RETURN_SUPPLIES") {
+        const collectorActivity = findCollectorActivityForReturn(
+          editActivities[i],
+          editActivities,
+        );
+        const collectorTeamId = toValidTeamId(
+          collectorActivity?.suggestedTeam?.teamId,
+        );
+        const returnTeamId = toValidTeamId(
+          editActivities[i].suggestedTeam?.teamId,
+        );
+
+        if (collectorTeamId == null || !collectorActivity) {
+          toast.error(
+            `Bước ${i + 1}: Chưa xác định được đội đã lấy vật tư để gán cho bước Trả đồ.`,
+          );
+          return false;
+        }
+
+        if (returnTeamId !== collectorTeamId) {
+          toast.error(
+            `Bước ${i + 1}: Đội Trả đồ phải trùng với đội lấy vật tư ở Bước ${collectorActivity.step}.`,
+          );
+          return false;
+        }
+      }
     }
     if (!editStartTime || !editExpectedEndTime) {
       toast.error("Vui lòng chọn thời gian bắt đầu và kết thúc");
@@ -5052,11 +5323,14 @@ const RescuePlanPanel = ({
                 )
               : null;
 
-          const rawRescueTeamId = Number(a.suggestedTeam?.teamId);
-          const rescueTeamId =
-            Number.isFinite(rawRescueTeamId) && rawRescueTeamId > 0
-              ? rawRescueTeamId
+          const forcedCollectorActivity =
+            a.activityType === "RETURN_SUPPLIES"
+              ? findCollectorActivityForReturn(a, editActivities)
               : null;
+          const rescueTeamId =
+            a.activityType === "RETURN_SUPPLIES"
+              ? toValidTeamId(forcedCollectorActivity?.suggestedTeam?.teamId)
+              : toValidTeamId(a.suggestedTeam?.teamId);
 
           return {
             step: i + 1,
@@ -5103,8 +5377,11 @@ const RescuePlanPanel = ({
           onApprove();
         },
         onError: (error) => {
+          const backendMessage = extractBackendErrorMessage(error);
           console.error("Failed to create mission:", error);
-          toast.error("Không thể tạo nhiệm vụ. Vui lòng thử lại.");
+          toast.error(
+            backendMessage ?? "Không thể tạo nhiệm vụ. Vui lòng thử lại.",
+          );
         },
       },
     );
@@ -5217,6 +5494,10 @@ const RescuePlanPanel = ({
             return activity;
           }
 
+          if (activity.activityType === "RETURN_SUPPLIES") {
+            return activity;
+          }
+
           if (!team) {
             return {
               ...activity,
@@ -5242,6 +5523,14 @@ const RescuePlanPanel = ({
 
   const handleSelectNearbyTeamForActivity = useCallback(
     (activityId: string, value: string) => {
+      const targetActivity = editActivities.find((a) => a._id === activityId);
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+        toast.info(
+          "Bước Trả đồ được tự động gán theo đội đã lấy vật tư và không thể thay đổi thủ công.",
+        );
+        return;
+      }
+
       if (value === CLEAR_ACTIVITY_TEAM_VALUE) {
         updateEditActivitySuggestedTeam(activityId, null);
         return;
@@ -5259,7 +5548,7 @@ const RescuePlanPanel = ({
 
       updateEditActivitySuggestedTeam(activityId, team);
     },
-    [nearbyRescueTeamById, updateEditActivitySuggestedTeam],
+    [editActivities, nearbyRescueTeamById, updateEditActivitySuggestedTeam],
   );
 
   const getNearbyTeamsForActivity = useCallback(
@@ -5433,7 +5722,7 @@ const RescuePlanPanel = ({
             a,
             panelSOSRequests,
           );
-          const isDepot = a.activityType === "COLLECT_SUPPLIES";
+          const isDepot = isDepotSupplyStep(a.activityType);
           const linkedMissionTeam =
             typeof a.missionTeamId === "number"
               ? missionTeamsByMissionTeamId.get(a.missionTeamId)
@@ -5562,7 +5851,7 @@ const RescuePlanPanel = ({
 
     const groups: ActivityGroup[] = [];
     for (const act of sourceActivities) {
-      const isDepot = act.activityType === "COLLECT_SUPPLIES" && act.depotId;
+      const isDepot = isDepotSupplyStep(act.activityType) && act.depotId;
       const resolvedSosRequestId = isDepot
         ? null
         : (act.sosRequestId ?? fallbackSosRequestId);
@@ -6232,11 +6521,11 @@ const RescuePlanPanel = ({
                                       });
 
                                       for (const act of sortedActivities) {
-                                        // Only pickup steps belong to depot groups.
-                                        // Delivery steps should stay in SOS groups even if they contain depot info.
-                                        const isDepot =
-                                          act.activityType ===
-                                          "COLLECT_SUPPLIES";
+                                        // Supply pickup/return steps belong to depot groups.
+                                        // Delivery steps stay in SOS groups even if they contain depot info.
+                                        const isDepot = isDepotSupplyStep(
+                                          act.activityType,
+                                        );
                                         let targetType = "sos";
                                         let sosRequestId = undefined;
                                         let depotName = undefined;
@@ -6728,10 +7017,9 @@ const RescuePlanPanel = ({
                                                                   className="h-3 w-3"
                                                                   weight="fill"
                                                                 />
-                                                                {activity.activityType ===
-                                                                "DELIVER_SUPPLIES"
-                                                                  ? "Danh sách giao hàng"
-                                                                  : "Yêu cầu lấy vật tư"}
+                                                                {getSupplyStepTitle(
+                                                                  activity.activityType,
+                                                                )}
                                                               </p>
                                                               <div className="space-y-1">
                                                                 {supplyItems.map(
@@ -6989,11 +7277,15 @@ const RescuePlanPanel = ({
                                 activityNearbyTeams.some(
                                   (team) => team.id === parsedSuggestedTeamId,
                                 );
+                              const isReturnSuppliesActivity =
+                                activity.activityType === "RETURN_SUPPLIES";
                               const selectedTeamDisplayName =
                                 activity.suggestedTeam?.teamName ||
                                 (hasValidSuggestedTeamId
                                   ? `Đội #${parsedSuggestedTeamId}`
-                                  : "Chưa chọn đội");
+                                  : isReturnSuppliesActivity
+                                    ? "Chưa xác định đội lấy vật tư"
+                                    : "Chưa chọn đội");
                               return (
                                 <div
                                   key={activity._id}
@@ -7188,8 +7480,15 @@ const RescuePlanPanel = ({
                                             value,
                                           )
                                         }
+                                        disabled={isReturnSuppliesActivity}
                                       >
-                                        <SelectTrigger className="h-9 text-sm bg-white/90 dark:bg-emerald-950/25">
+                                        <SelectTrigger
+                                          className={cn(
+                                            "h-9 text-sm bg-white/90 dark:bg-emerald-950/25",
+                                            isReturnSuppliesActivity &&
+                                              "cursor-not-allowed opacity-80",
+                                          )}
+                                        >
                                           <SelectValue
                                             placeholder={
                                               isNearbyTeamsByClusterLoading
@@ -7223,12 +7522,14 @@ const RescuePlanPanel = ({
                                             </SelectItem>
                                           ))}
 
-                                          <SelectItem
-                                            value={CLEAR_ACTIVITY_TEAM_VALUE}
-                                            className="text-sm text-rose-700"
-                                          >
-                                            Bỏ gán đội cho bước này
-                                          </SelectItem>
+                                          {!isReturnSuppliesActivity && (
+                                            <SelectItem
+                                              value={CLEAR_ACTIVITY_TEAM_VALUE}
+                                              className="text-sm text-rose-700"
+                                            >
+                                              Bỏ gán đội cho bước này
+                                            </SelectItem>
+                                          )}
                                         </SelectContent>
                                       </Select>
 
@@ -7243,7 +7544,10 @@ const RescuePlanPanel = ({
                                             null,
                                           )
                                         }
-                                        disabled={!activity.suggestedTeam}
+                                        disabled={
+                                          !activity.suggestedTeam ||
+                                          isReturnSuppliesActivity
+                                        }
                                       >
                                         Bỏ đội
                                       </Button>
@@ -7275,6 +7579,9 @@ const RescuePlanPanel = ({
                                                     activity._id,
                                                     team,
                                                   )
+                                                }
+                                                disabled={
+                                                  isReturnSuppliesActivity
                                                 }
                                               >
                                                 <span className="max-w-30 truncate">
@@ -7317,6 +7624,14 @@ const RescuePlanPanel = ({
                                         {activity.suggestedTeam.reason}
                                       </p>
                                     ) : null}
+
+                                    {isReturnSuppliesActivity && (
+                                      <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
+                                        Bước Trả đồ được tự động gán cùng đội đã
+                                        lấy vật tư và không thể thay đổi thủ
+                                        công.
+                                      </p>
+                                    )}
                                   </div>
 
                                   {/* Supply drop zone (for supply activities) */}
@@ -7910,10 +8225,9 @@ const RescuePlanPanel = ({
                                             {supplyItems.length > 0 && (
                                               <div className="mt-2 p-2 rounded-md bg-muted/50 border border-dashed">
                                                 <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
-                                                  {activity.activityType ===
-                                                  "DELIVER_SUPPLIES"
-                                                    ? "Danh sách giao hàng"
-                                                    : "Yêu cầu lấy vật tư"}
+                                                  {getSupplyStepTitle(
+                                                    activity.activityType,
+                                                  )}
                                                 </p>
                                                 <div className="space-y-1">
                                                   {supplyItems.map(

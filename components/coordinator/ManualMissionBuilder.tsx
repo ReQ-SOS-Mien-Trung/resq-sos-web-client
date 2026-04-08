@@ -102,6 +102,7 @@ const ACTIVITY_TYPES: ClusterActivityType[] = [
   "MEDICAL_AID",
   "EVACUATE",
   "DELIVER_SUPPLIES",
+  "RETURN_SUPPLIES",
   "MIXED",
 ];
 

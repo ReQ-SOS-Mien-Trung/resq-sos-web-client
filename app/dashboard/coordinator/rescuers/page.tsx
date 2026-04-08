@@ -94,6 +94,7 @@ export default function CoordinatorRescuerManagementPage() {
   const [draggingRescuerId, setDraggingRescuerId] = useState<string | null>(
     null,
   );
+  const [draggingRescuerIds, setDraggingRescuerIds] = useState<string[]>([]);
   const [dragSourcePanel, setDragSourcePanel] = useState<SplitPanelSide | null>(
     null,
   );
@@ -112,10 +113,20 @@ export default function CoordinatorRescuerManagementPage() {
   const leftPanelRef = useRef<HTMLDivElement | null>(null);
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
   const splitRowLayoutsRef = useRef<Record<string, SplitRowLayout>>({});
+  const dragPreviewRef = useRef<HTMLDivElement | null>(null);
   const hasSelectedAssemblyPoint =
     selectedAssemblyPointCode !== ALL_ASSEMBLY_POINT_FILTER_VALUE;
   const isSplitByAssemblyPointView =
     isSplitLayoutEnabled && hasSelectedAssemblyPoint;
+
+  useEffect(() => {
+    return () => {
+      if (dragPreviewRef.current) {
+        dragPreviewRef.current.remove();
+        dragPreviewRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -636,6 +647,7 @@ export default function CoordinatorRescuerManagementPage() {
   useEffect(() => {
     if (!isSplitByAssemblyPointView) {
       setDraggingRescuerId(null);
+      setDraggingRescuerIds([]);
       setDragSourcePanel(null);
       setActiveDropPanel(null);
       setSplitPanelOverrides({});
@@ -908,8 +920,65 @@ export default function CoordinatorRescuerManagementPage() {
     await refetch();
   };
 
+  const clearDragPreview = () => {
+    if (dragPreviewRef.current) {
+      dragPreviewRef.current.remove();
+      dragPreviewRef.current = null;
+    }
+  };
+
+  const createMultiDragPreview = (draggedCount: number) => {
+    if (typeof document === "undefined") {
+      return null;
+    }
+
+    const preview = document.createElement("div");
+    preview.style.position = "fixed";
+    preview.style.top = "-9999px";
+    preview.style.left = "-9999px";
+    preview.style.pointerEvents = "none";
+    preview.style.display = "inline-flex";
+    preview.style.alignItems = "center";
+    preview.style.gap = "8px";
+    preview.style.padding = "8px 11px";
+    preview.style.borderRadius = "999px";
+    preview.style.background = "rgba(15, 23, 42, 0.95)";
+    preview.style.color = "#F8FAFC";
+    preview.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+    preview.style.boxShadow = "0 14px 30px rgba(2, 6, 23, 0.45)";
+    preview.style.font =
+      '600 12px/1.2 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+
+    const stack = document.createElement("span");
+    stack.style.position = "relative";
+    stack.style.display = "inline-block";
+    stack.style.width = "24px";
+    stack.style.height = "17px";
+
+    for (let layerIndex = 0; layerIndex < 3; layerIndex += 1) {
+      const layer = document.createElement("span");
+      layer.style.position = "absolute";
+      layer.style.top = `${layerIndex * 2}px`;
+      layer.style.left = `${layerIndex * 3}px`;
+      layer.style.width = "15px";
+      layer.style.height = "11px";
+      layer.style.borderRadius = "3px";
+      layer.style.border = "1px solid rgba(248, 250, 252, 0.82)";
+      layer.style.background = "rgba(248, 250, 252, 0.18)";
+      stack.appendChild(layer);
+    }
+
+    const label = document.createElement("span");
+    label.textContent = `Kéo ${draggedCount} người cứu hộ`;
+
+    preview.append(stack, label);
+    return preview;
+  };
+
   const resetDragState = () => {
+    clearDragPreview();
     setDraggingRescuerId(null);
+    setDraggingRescuerIds([]);
     setDragSourcePanel(null);
     setActiveDropPanel(null);
   };
@@ -924,11 +993,71 @@ export default function CoordinatorRescuerManagementPage() {
       return;
     }
 
+    const selectedRightPanelRescuerIds = selectableRescuers
+      .map((item) => item.id)
+      .filter((rescuerId) => selectedRescuerIdSet.has(rescuerId));
+    const shouldDragSelectedGroup =
+      sourcePanel === "right" &&
+      selectedRescuerIdSet.has(rescuer.id) &&
+      selectedRightPanelRescuerIds.length > 1;
+    const draggedRescuerIds = shouldDragSelectedGroup
+      ? selectedRightPanelRescuerIds
+      : [rescuer.id];
+
+    clearDragPreview();
     setDraggingRescuerId(rescuer.id);
+    setDraggingRescuerIds(draggedRescuerIds);
     setDragSourcePanel(sourcePanel);
     setActiveDropPanel(sourcePanel === "left" ? "right" : "left");
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", rescuer.id);
+    event.dataTransfer.setData(
+      "application/x-rescuer-ids",
+      JSON.stringify(draggedRescuerIds),
+    );
+
+    if (draggedRescuerIds.length > 1) {
+      const preview = createMultiDragPreview(draggedRescuerIds.length);
+      if (preview) {
+        document.body.appendChild(preview);
+        dragPreviewRef.current = preview;
+        event.dataTransfer.setDragImage(preview, 24, 14);
+      }
+    }
+
+    if (shouldDragSelectedGroup && rightPanelRef.current) {
+      const anchorRect = event.currentTarget.getBoundingClientRect();
+      const selectedRowElements = draggedRescuerIds
+        .filter((rescuerId) => rescuerId !== rescuer.id)
+        .map((rescuerId) =>
+          rightPanelRef.current?.querySelector<HTMLElement>(
+            `[data-split-rescuer-id="${rescuerId}"]`,
+          ),
+        )
+        .filter((rowElement): rowElement is HTMLElement => rowElement !== null);
+
+      selectedRowElements.forEach((rowElement, index) => {
+        const rowRect = rowElement.getBoundingClientRect();
+
+        gsap.fromTo(
+          rowElement,
+          { x: 0, y: 0, scale: 1, opacity: 1 },
+          {
+            x: (anchorRect.left - rowRect.left) * 0.22,
+            y: (anchorRect.top - rowRect.top) * 0.22,
+            scale: 0.985,
+            opacity: 0.82,
+            duration: 0.18,
+            ease: "power2.out",
+            yoyo: true,
+            repeat: 1,
+            delay: index * 0.012,
+            clearProps: "transform,opacity",
+            overwrite: "auto",
+          },
+        );
+      });
+    }
 
     gsap.to(event.currentTarget, {
       scale: 0.98,
@@ -953,7 +1082,7 @@ export default function CoordinatorRescuerManagementPage() {
     targetPanel: SplitPanelSide,
   ) => {
     if (
-      !draggingRescuerId ||
+      (draggingRescuerIds.length === 0 && !draggingRescuerId) ||
       !dragSourcePanel ||
       dragSourcePanel === targetPanel
     ) {
@@ -980,8 +1109,45 @@ export default function CoordinatorRescuerManagementPage() {
   ) => {
     event.preventDefault();
 
+    const fallbackDraggedRescuerIds =
+      draggingRescuerIds.length > 0
+        ? draggingRescuerIds
+        : draggingRescuerId
+          ? [draggingRescuerId]
+          : [];
+    let droppedRescuerIds = fallbackDraggedRescuerIds;
+
+    const serializedDraggedIds = event.dataTransfer.getData(
+      "application/x-rescuer-ids",
+    );
+    if (serializedDraggedIds) {
+      try {
+        const parsedDraggedIds = JSON.parse(serializedDraggedIds) as unknown;
+        if (Array.isArray(parsedDraggedIds)) {
+          const parsedRescuerIds = parsedDraggedIds.filter(
+            (rescuerId): rescuerId is string =>
+              typeof rescuerId === "string" && rescuerId.length > 0,
+          );
+
+          if (parsedRescuerIds.length > 0) {
+            droppedRescuerIds = parsedRescuerIds;
+          }
+        }
+      } catch {
+        // Ignore parse errors and fallback to current dragging state.
+      }
+    }
+
+    const normalizedDroppedRescuerIds = Array.from(
+      new Set(
+        droppedRescuerIds.filter((rescuerId) =>
+          baseSplitRescuerMap.has(rescuerId),
+        ),
+      ),
+    );
+
     if (
-      !draggingRescuerId ||
+      normalizedDroppedRescuerIds.length === 0 ||
       !dragSourcePanel ||
       dragSourcePanel === targetPanel ||
       isAssignmentBusy
@@ -989,11 +1155,6 @@ export default function CoordinatorRescuerManagementPage() {
       resetDragState();
       return;
     }
-
-    const droppedRescuerId = draggingRescuerId;
-    const shouldResetToBasePanel =
-      (targetPanel === "left" && baseLeftRescuerIdSet.has(droppedRescuerId)) ||
-      (targetPanel === "right" && baseRightRescuerIdSet.has(droppedRescuerId));
 
     if (dragSourcePanel === "right" && targetPanel === "left") {
       if (splitTargetAssemblyPointId === null) {
@@ -1003,68 +1164,124 @@ export default function CoordinatorRescuerManagementPage() {
       }
     }
 
+    const droppedRescuerIdSet = new Set(normalizedDroppedRescuerIds);
+    const shouldResetToBasePanelByRescuerId = new Map<string, boolean>();
+
+    for (const droppedRescuerId of normalizedDroppedRescuerIds) {
+      const shouldResetToBasePanel =
+        (targetPanel === "left" &&
+          baseLeftRescuerIdSet.has(droppedRescuerId)) ||
+        (targetPanel === "right" &&
+          baseRightRescuerIdSet.has(droppedRescuerId));
+
+      shouldResetToBasePanelByRescuerId.set(
+        droppedRescuerId,
+        shouldResetToBasePanel,
+      );
+    }
+
     setSplitPanelOverrides((previous) => {
+      let hasChange = false;
       const nextOverrides = { ...previous };
 
-      if (shouldResetToBasePanel) {
-        delete nextOverrides[droppedRescuerId];
-      } else {
-        nextOverrides[droppedRescuerId] = targetPanel;
-      }
+      for (const droppedRescuerId of normalizedDroppedRescuerIds) {
+        const shouldResetToBasePanel =
+          shouldResetToBasePanelByRescuerId.get(droppedRescuerId) ?? false;
 
-      return nextOverrides;
-    });
-
-    if (shouldResetToBasePanel) {
-      setSplitPanelMoveOrderByRescuerId((previous) => {
-        if (previous[droppedRescuerId] == null) {
-          return previous;
+        if (shouldResetToBasePanel) {
+          if (nextOverrides[droppedRescuerId]) {
+            delete nextOverrides[droppedRescuerId];
+            hasChange = true;
+          }
+          continue;
         }
 
-        const nextMoveOrder = { ...previous };
-        delete nextMoveOrder[droppedRescuerId];
-        return nextMoveOrder;
-      });
-      setLatestDroppedRescuerId((previous) =>
-        previous === droppedRescuerId ? null : previous,
-      );
+        if (nextOverrides[droppedRescuerId] !== targetPanel) {
+          nextOverrides[droppedRescuerId] = targetPanel;
+          hasChange = true;
+        }
+      }
+
+      return hasChange ? nextOverrides : previous;
+    });
+
+    const movedRescuerIds = normalizedDroppedRescuerIds.filter(
+      (droppedRescuerId) =>
+        !(shouldResetToBasePanelByRescuerId.get(droppedRescuerId) ?? false),
+    );
+
+    setSplitPanelMoveOrderByRescuerId((previous) => {
+      let hasChange = false;
+      const nextMoveOrder = { ...previous };
+
+      for (const droppedRescuerId of normalizedDroppedRescuerIds) {
+        const shouldResetToBasePanel =
+          shouldResetToBasePanelByRescuerId.get(droppedRescuerId) ?? false;
+
+        if (shouldResetToBasePanel) {
+          if (nextMoveOrder[droppedRescuerId] != null) {
+            delete nextMoveOrder[droppedRescuerId];
+            hasChange = true;
+          }
+          continue;
+        }
+
+        splitDropSequenceRef.current += 1;
+        const nextOrder = splitDropSequenceRef.current;
+
+        if (nextMoveOrder[droppedRescuerId] !== nextOrder) {
+          nextMoveOrder[droppedRescuerId] = nextOrder;
+          hasChange = true;
+        }
+      }
+
+      return hasChange ? nextMoveOrder : previous;
+    });
+
+    if (movedRescuerIds.length > 0) {
+      setLatestDroppedRescuerId(movedRescuerIds[movedRescuerIds.length - 1]);
     } else {
-      splitDropSequenceRef.current += 1;
-      const nextMoveOrder = splitDropSequenceRef.current;
-      setSplitPanelMoveOrderByRescuerId((previous) => ({
-        ...previous,
-        [droppedRescuerId]: nextMoveOrder,
-      }));
-      setLatestDroppedRescuerId(droppedRescuerId);
+      setLatestDroppedRescuerId((previous) =>
+        previous && droppedRescuerIdSet.has(previous) ? null : previous,
+      );
     }
 
     setRowSelectedAssemblyPointIds((previous) => {
+      let hasChange = false;
       const nextSelections = { ...previous };
 
-      if (shouldResetToBasePanel) {
-        nextSelections[droppedRescuerId] = "";
-        return nextSelections;
+      for (const droppedRescuerId of normalizedDroppedRescuerIds) {
+        const shouldResetToBasePanel =
+          shouldResetToBasePanelByRescuerId.get(droppedRescuerId) ?? false;
+        let nextValue = "";
+
+        if (!shouldResetToBasePanel) {
+          const currentAssemblyPointId =
+            splitBaseAssemblyPointByRescuerId.get(droppedRescuerId) ?? null;
+
+          if (targetPanel === "left") {
+            nextValue =
+              splitTargetAssemblyPointId !== null &&
+              currentAssemblyPointId !== splitTargetAssemblyPointId
+                ? String(splitTargetAssemblyPointId)
+                : "";
+          } else {
+            nextValue =
+              currentAssemblyPointId !== null ? UNASSIGN_SELECT_VALUE : "";
+          }
+        }
+
+        if (nextSelections[droppedRescuerId] !== nextValue) {
+          nextSelections[droppedRescuerId] = nextValue;
+          hasChange = true;
+        }
       }
 
-      const currentAssemblyPointId =
-        splitBaseAssemblyPointByRescuerId.get(droppedRescuerId) ?? null;
-
-      if (targetPanel === "left") {
-        nextSelections[droppedRescuerId] =
-          splitTargetAssemblyPointId !== null &&
-          currentAssemblyPointId !== splitTargetAssemblyPointId
-            ? String(splitTargetAssemblyPointId)
-            : "";
-      } else {
-        nextSelections[droppedRescuerId] =
-          currentAssemblyPointId !== null ? UNASSIGN_SELECT_VALUE : "";
-      }
-
-      return nextSelections;
+      return hasChange ? nextSelections : previous;
     });
 
     setSelectedRescuerIds((previous) =>
-      previous.filter((rescuerId) => rescuerId !== droppedRescuerId),
+      previous.filter((rescuerId) => !droppedRescuerIdSet.has(rescuerId)),
     );
 
     const targetPanelElement =
@@ -1341,7 +1558,10 @@ export default function CoordinatorRescuerManagementPage() {
     const isRowDraggable = Boolean(draggableSide) && !isAssignmentBusy;
     const isRowPending = pendingUserId === rescuer.id;
     const isRowSelected = showSelection && selectedRescuerIdSet.has(rescuer.id);
-    const isRowBeingDragged = draggingRescuerId === rescuer.id;
+    const isDragAnchorRow = draggingRescuerId === rescuer.id;
+    const isRowInDragGroup =
+      draggingRescuerIds.length > 1 && draggingRescuerIds.includes(rescuer.id);
+    const isRowBeingDragged = isDragAnchorRow || isRowInDragGroup;
     const fullName = `${rescuer.firstName} ${rescuer.lastName}`;
     const assemblyPointName =
       rescuer.assemblyPointId != null
@@ -1365,6 +1585,11 @@ export default function CoordinatorRescuerManagementPage() {
       Boolean(rawRowSelectedAssemblyPointId) &&
       (splitPanelMoveOrderByRescuerId[rescuer.id] != null ||
         latestDroppedRescuerId === rescuer.id);
+    const shouldHidePendingSelectValue =
+      isSplitByAssemblyPointView && isRecentlyDraggedRow;
+    const displayedRowSelectedAssemblyPointId = shouldHidePendingSelectValue
+      ? ""
+      : rowSelectedAssemblyPointId;
 
     return (
       <div
@@ -1386,6 +1611,9 @@ export default function CoordinatorRescuerManagementPage() {
           isRecentlyDraggedRow &&
             "border-[#FF5722]/65 bg-[#FFF7F2] shadow-[0_0_0_2px_rgba(255,87,34,0.2)]",
           isRowSelected && "border-[#FF5722]/35 bg-[#FF5722]/3",
+          isRowInDragGroup &&
+            !isDragAnchorRow &&
+            "border-[#FF5722]/45 bg-[#FFF7F2]/70",
           isRowBeingDragged && "opacity-70",
         )}
       >
@@ -1482,7 +1710,7 @@ export default function CoordinatorRescuerManagementPage() {
 
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center md:w-auto md:justify-end">
             <Select
-              value={rowSelectedAssemblyPointId}
+              value={displayedRowSelectedAssemblyPointId}
               onValueChange={(value) =>
                 setRowSelectedAssemblyPointIds((previous) => ({
                   ...previous,

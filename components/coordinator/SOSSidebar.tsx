@@ -156,7 +156,6 @@ const SOSSidebar = ({
   sosRequests,
   rescuers,
   teamIncidents = [],
-  missions,
   onSOSSelect,
   onRescuerSelect,
   onTeamIncidentSelect,
@@ -274,18 +273,12 @@ const SOSSidebar = ({
         onValueChange={setActiveTab}
         className="flex-1 flex flex-col overflow-hidden"
       >
-        <TabsList className="mx-3 mt-3 grid h-auto w-auto grid-cols-4 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-inner dark:border-white/10 dark:bg-white/5">
+        <TabsList className="mx-3 mt-3 grid h-auto w-auto grid-cols-3 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-inner dark:border-white/10 dark:bg-white/5">
           <TabsTrigger
             value="incoming"
             className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
           >
             SOS Mới
-          </TabsTrigger>
-          <TabsTrigger
-            value="missions"
-            className="h-9 rounded-xl px-3 text-[12px] font-semibold tracking-tight data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
-          >
-            Nhiệm vụ
           </TabsTrigger>
           <TabsTrigger
             value="rescuers"
@@ -485,34 +478,38 @@ const SOSSidebar = ({
                                     onClick={() => onSOSSelect(sos)}
                                   >
                                     <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                      <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                                        <Badge
-                                          variant={
-                                            PRIORITY_BADGE_VARIANT[sos.priority]
-                                          }
-                                          className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
-                                        >
-                                          {PRIORITY_LABELS[sos.priority]}
-                                        </Badge>
-                                        <span className="text-xs font-mono text-muted-foreground">
+                                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                        <span className="text-xs font-mono font-semibold text-foreground/90 whitespace-nowrap">
                                           SOS {sos.id}
                                         </span>
-                                        <Badge
-                                          variant={
-                                            sos.status === "PENDING"
-                                              ? "warning"
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <Badge
+                                            variant={
+                                              PRIORITY_BADGE_VARIANT[
+                                                sos.priority
+                                              ]
+                                            }
+                                            className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
+                                          >
+                                            {PRIORITY_LABELS[sos.priority]}
+                                          </Badge>
+                                          <Badge
+                                            variant={
+                                              sos.status === "PENDING"
+                                                ? "warning"
+                                                : sos.status === "ASSIGNED"
+                                                  ? "info"
+                                                  : "success"
+                                            }
+                                            className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
+                                          >
+                                            {sos.status === "PENDING"
+                                              ? "Chờ"
                                               : sos.status === "ASSIGNED"
-                                                ? "info"
-                                                : "success"
-                                          }
-                                          className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
-                                        >
-                                          {sos.status === "PENDING"
-                                            ? "Chờ"
-                                            : sos.status === "ASSIGNED"
-                                              ? "Đang cứu"
-                                              : "Đã cứu"}
-                                        </Badge>
+                                                ? "Đang cứu"
+                                                : "Đã cứu"}
+                                          </Badge>
+                                        </div>
                                       </div>
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground self-end sm:self-auto whitespace-nowrap">
                                         <Clock className="h-3 w-3" />
@@ -589,7 +586,7 @@ const SOSSidebar = ({
                           <Button
                             variant="default"
                             size="sm"
-                            className="h-7 text-xs px-2.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+                            className="h-7 text-xs px-2.5 bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
                             onClick={() =>
                               onCreateCluster(cluster.map((s) => s.id))
                             }
@@ -678,22 +675,24 @@ const SOSSidebar = ({
                         onClick={() => onSOSSelect(sos)}
                       >
                         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                            <Badge
-                              variant={PRIORITY_BADGE_VARIANT[sos.priority]}
-                              className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
-                            >
-                              {PRIORITY_LABELS[sos.priority]}
-                            </Badge>
-                            <span className="text-xs font-mono text-muted-foreground">
+                          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                            <span className="text-xs font-mono font-semibold text-foreground/90 whitespace-nowrap">
                               SOS {sos.id}
                             </span>
-                            <Badge
-                              variant="warning"
-                              className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
-                            >
-                              Chờ
-                            </Badge>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Badge
+                                variant={PRIORITY_BADGE_VARIANT[sos.priority]}
+                                className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
+                              >
+                                {PRIORITY_LABELS[sos.priority]}
+                              </Badge>
+                              <Badge
+                                variant="warning"
+                                className="text-xs h-5 px-1.5 leading-none whitespace-nowrap shrink-0"
+                              >
+                                Chờ
+                              </Badge>
+                            </div>
                           </div>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground self-end sm:self-auto whitespace-nowrap">
                             <Clock className="h-3 w-3" />
@@ -708,7 +707,7 @@ const SOSSidebar = ({
                         <Button
                           variant="default"
                           size="sm"
-                          className="w-full h-7 text-xs bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+                          className="w-full h-7 text-xs bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             onCreateCluster([sos.id]);
@@ -779,29 +778,6 @@ const SOSSidebar = ({
                     <p className="text-sm">Không có yêu cầu SOS nào</p>
                   </div>
                 )}
-            </div>
-          </ScrollArea>
-        </TabsContent>
-
-        {/* Active Missions Tab */}
-        <TabsContent
-          value="missions"
-          className="flex-1 overflow-hidden m-0 mt-3"
-        >
-          <ScrollArea className="h-full">
-            <div className="p-3 space-y-3">
-              {backendClusters.some((c) => c.isMissionCreated) ? (
-                backendClusters
-                  .filter((c) => c.isMissionCreated)
-                  .map((cluster) => (
-                    <ClusterMissionsGroup key={cluster.id} cluster={cluster} />
-                  ))
-              ) : (
-                <div className="text-center text-muted-foreground py-8">
-                  <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Chưa có cụm SOS nào</p>
-                </div>
-              )}
             </div>
           </ScrollArea>
         </TabsContent>
@@ -1296,7 +1272,7 @@ function ClusterActionButtons({
         <Button
           variant="default"
           size="sm"
-          className="w-full h-7 text-xs bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+          className="w-full h-7 text-xs bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
           onClick={(e) => {
             e.stopPropagation();
             onAnalyzeCluster(clusterId);

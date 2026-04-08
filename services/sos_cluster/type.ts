@@ -51,6 +51,7 @@ export type ClusterActivityType =
   | "EVACUATE"
   | "DELIVER_SUPPLIES"
   | "COLLECT_SUPPLIES"
+  | "RETURN_SUPPLIES"
   | "MIXED";
 
 // Supply collection details
