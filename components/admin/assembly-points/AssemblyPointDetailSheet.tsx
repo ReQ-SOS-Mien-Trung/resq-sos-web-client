@@ -161,9 +161,7 @@ function MemberFloatingTooltip({
             <div key={m.userId} className="flex items-center gap-2">
               <Avatar className="h-6 w-6 text-xs">
                 <AvatarFallback
-                  className={cn(
-                    m.isLeader && "bg-amber-100 text-amber-800",
-                  )}
+                  className={cn(m.isLeader && "bg-amber-100 text-amber-800")}
                 >
                   {m.lastName?.[0]}
                   {m.firstName?.[0]}
@@ -245,10 +243,7 @@ function TeamCard({ team }: { team: AssemblyPointTeam }) {
           </div>
           <Badge
             variant="outline"
-            className={cn(
-              "text-xs shrink-0",
-              teamStatusColors[team.status],
-            )}
+            className={cn("text-xs shrink-0", teamStatusColors[team.status])}
           >
             {teamStatusLabels[team.status] ?? team.status}
           </Badge>
@@ -347,7 +342,7 @@ export function AssemblyPointDetailSheet({
         className="w-full sm:max-w-md h-dvh overflow-y-auto p-6"
       >
         <SheetHeader className="pb-4 border-b mb-4">
-          <SheetTitle className="tracking-tighter text-xl">
+          <SheetTitle className="tracking-tighter font-bold mb-0 text-xl">
             Chi tiết điểm tập kết
           </SheetTitle>
           <SheetDescription className="tracking-tight text-sm">

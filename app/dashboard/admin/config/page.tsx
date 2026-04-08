@@ -24,21 +24,18 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
+  useRescuerScoreVisibilityConfig,
+  useUpdateRescuerScoreVisibilityConfig,
   useSosPriorityRuleConfig,
   useUpdateSosPriorityRuleConfig,
 } from "@/services/config";
 import {
   SosPriorityRuleConfigEntity,
+  UpdateRescuerScoreVisibilityConfigRequest,
   UpdateSosPriorityRuleConfigRequest,
 } from "@/services/config/type";
 import { WarningBandConfigCard } from "@/components/admin/inventory/WarningBandConfigCard";
 import { SupplyRequestPriorityConfigCard } from "@/components/admin/inventory/SupplyRequestPriorityConfigCard";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -521,6 +518,122 @@ function PriorityThresholdsEditor({
   );
 }
 
+function RescuerScoreVisibilityConfigCard() {
+  const {
+    data,
+    isLoading,
+    isFetching,
+    refetch,
+  } = useRescuerScoreVisibilityConfig();
+  const updateMutation = useUpdateRescuerScoreVisibilityConfig();
+
+  const [draft, setDraft] = useState<string | null>(null);
+  const currentValue = draft ?? String(data?.minimumEvaluationCount ?? 0);
+
+  const parsedValue = Number(currentValue);
+  const isInvalid =
+    !Number.isFinite(parsedValue) ||
+    !Number.isInteger(parsedValue) ||
+    parsedValue < 0;
+
+  const handleSave = () => {
+    if (isInvalid) {
+      toast.error("Ngưỡng phải là số nguyên không âm");
+      return;
+    }
+
+    const payload: UpdateRescuerScoreVisibilityConfigRequest = {
+      minimumEvaluationCount: parsedValue,
+    };
+
+    const toastId = toast.loading("Đang cập nhật ngưỡng hiển thị...");
+    updateMutation.mutate(payload, {
+      onSuccess: async () => {
+        toast.dismiss(toastId);
+        toast.success("Cập nhật ngưỡng hiển thị thành công");
+        setDraft(null);
+        await refetch();
+      },
+      onError: () => {
+        toast.dismiss(toastId);
+        toast.error("Không thể cập nhật ngưỡng hiển thị");
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm tracking-tighter text-muted-foreground">
+          Thiết lập ngưỡng hiển thị điểm cứu hộ viên.
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setDraft(null);
+              refetch();
+            }}
+            disabled={isLoading || isFetching || updateMutation.isPending}
+          >
+            <ArrowCounterClockwise
+              size={14}
+              className={`mr-1.5 ${isFetching ? "animate-spin" : ""}`}
+            />
+            Làm mới
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={isLoading || isInvalid || updateMutation.isPending}
+          >
+            <FloppyDisk size={14} className="mr-1.5" />
+            Lưu cấu hình
+          </Button>
+        </div>
+      </div>
+
+      <Card className="max-w-xl border-border/60 border-l-4 border-l-violet-400">
+        <CardHeader className="">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <CardTitle className="text-base tracking-tighter">
+              Ngưỡng hiển thị điểm
+            </CardTitle>
+            <CardDescription className="tracking-tighter text-base">
+              (Chỉ hiển thị điểm khi số lượt đánh giá đạt ngưỡng)
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <label className="mb-1.5 block text-sm tracking-tighter text-muted-foreground">
+              Số lượt đánh giá tối thiểu
+            </label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={currentValue}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={isLoading || updateMutation.isPending}
+              className="h-9 w-full max-w-65 rounded-md border border-border/60 bg-background px-3 text-sm tracking-tighter outline-none focus:border-foreground/40"
+            />
+            {isInvalid && (
+              <p className="mt-1 text-xs text-red-500 tracking-tighter">
+                Giá trị không hợp lệ. Vui lòng nhập số nguyên không âm.
+              </p>
+            )}
+            <p className="text-xs tracking-tighter text-muted-foreground">
+              Cập nhật: {data?.updatedAt ? new Date(data.updatedAt).toLocaleString("vi-VN") : "—"}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const AdminConfigPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -625,8 +738,9 @@ const AdminConfigPage = () => {
           <TabsList className="rounded-none border-b border-border/60 bg-transparent p-0 h-auto w-full justify-start gap-0">
             <TabsTrigger
               value="sos-priority"
-              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm tracking-tighter font-medium data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm tracking-tighter font-medium data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none flex items-center gap-1.5"
             >
+              <WarningCircle size={14} className="text-red-500" />
               Ưu tiên SOS
             </TabsTrigger>
             <TabsTrigger
@@ -642,6 +756,13 @@ const AdminConfigPage = () => {
             >
               <Info size={14} className="text-sky-500" />
               Thời gian tiếp tế
+            </TabsTrigger>
+            <TabsTrigger
+              value="rescuer-score-visibility"
+              className="rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm tracking-tighter font-medium data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none flex items-center gap-1.5"
+            >
+              <Info size={14} className="text-violet-500" />
+              Ngưỡng điểm cứu hộ viên
             </TabsTrigger>
           </TabsList>
 
@@ -737,6 +858,11 @@ const AdminConfigPage = () => {
           {/* ── Tab: Supply Request Priority ── */}
           <TabsContent value="supply-priority" className="mt-5 space-y-4">
             <SupplyRequestPriorityConfigCard />
+          </TabsContent>
+
+          {/* ── Tab: Rescuer Score Visibility ── */}
+          <TabsContent value="rescuer-score-visibility" className="mt-5 space-y-4">
+            <RescuerScoreVisibilityConfigCard />
           </TabsContent>
         </Tabs>
       </div>

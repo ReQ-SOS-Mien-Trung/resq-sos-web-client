@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef } from "react";
+import { motion } from "framer-motion";
 import {
   mockInventoryItems,
   mockSupplyRequests,
@@ -29,15 +30,18 @@ import {
   ArrowsClockwise,
   WifiHigh,
   WifiSlash,
-  Sun,
-  Moon,
   Plus,
-  FileArrowDown,
   SignOut,
-  Buildings,
   CaretDown,
-  Package,
-  Wallet,
+  FileArrowDownIcon,
+  PackageIcon,
+  BuildingsIcon,
+  TruckIcon,
+  WalletIcon,
+  SunIcon,
+  MoonIcon,
+  ProhibitInset,
+  LockIcon,
 } from "@phosphor-icons/react";
 import {
   CategoryOverview,
@@ -252,6 +256,8 @@ const InventoryDashboardPage = () => {
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
   const mainRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
   const panelWidthRef = useRef(480);
 
   const router = useRouter();
@@ -553,7 +559,13 @@ const InventoryDashboardPage = () => {
       )}
     >
       {/* Top Header Bar */}
-      <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0 z-20">
+      <motion.header
+        ref={headerRef}
+        initial={{ y: -56, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0 z-20"
+      >
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -604,7 +616,7 @@ const InventoryDashboardPage = () => {
                 className="gap-2 cursor-pointer tracking-tighter"
                 onClick={() => router.push("/dashboard/inventory/import")}
               >
-                <Buildings className="h-4 w-4" />
+                <BuildingsIcon className="h-4 w-4" />
                 Nhập kho từ thiện
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -613,7 +625,7 @@ const InventoryDashboardPage = () => {
                   router.push("/dashboard/inventory/import-regular")
                 }
               >
-                <Package className="h-4 w-4" />
+                <PackageIcon className="h-4 w-4" />
                 Nhập kho thường
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -624,7 +636,7 @@ const InventoryDashboardPage = () => {
             className="hidden md:flex gap-2"
             onClick={() => router.push("/dashboard/inventory/export-report")}
           >
-            <FileArrowDown className="h-4 w-4" />
+            <FileArrowDownIcon className="h-4 w-4" />
             Xuất báo cáo
           </Button>
           <Button
@@ -639,11 +651,29 @@ const InventoryDashboardPage = () => {
           <Button
             variant="outline"
             size="sm"
+            className="hidden md:flex gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
+            onClick={() => router.push("/dashboard/inventory/pickups")}
+          >
+            <TruckIcon className="h-4 w-4" />
+            Quản lý lấy hàng
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             className="hidden md:flex gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
             onClick={() => router.push("/dashboard/inventory/funding-request")}
           >
-            <Wallet className="h-4 w-4" />
+            <WalletIcon className="h-4 w-4" />
             Yêu cầu cấp quỹ
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden md:flex gap-2 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
+            onClick={() => router.push("/dashboard/inventory/depot-closure")}
+          >
+            <LockIcon className="h-4 w-4" />
+            Đóng kho
           </Button>
 
           {/* Notifications */}
@@ -652,9 +682,9 @@ const InventoryDashboardPage = () => {
           {/* Dark Mode Toggle */}
           <Button variant="ghost" size="icon" onClick={toggleDarkMode}>
             {isDarkMode ? (
-              <Sun className="h-5 w-5" weight="fill" />
+              <SunIcon className="h-5 w-5" weight="fill" />
             ) : (
-              <Moon className="h-5 w-5" weight="fill" />
+              <MoonIcon className="h-5 w-5" weight="fill" />
             )}
           </Button>
 
@@ -711,12 +741,16 @@ const InventoryDashboardPage = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </header>
+      </motion.header>
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <aside
+        <motion.aside
+          ref={sidebarRef}
+          initial={{ x: -60, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.45, ease: "easeOut", delay: 0.2 }}
           className={cn(
             "w-80 shrink-0 transition-all duration-300 ease-in-out overflow-hidden",
             sidebarOpen ? "w-80" : "w-0",
@@ -740,11 +774,16 @@ const InventoryDashboardPage = () => {
               onActiveTabChange={handleActiveTabChange}
             />
           )}
-        </aside>
+        </motion.aside>
 
         {/* Main Content */}
         <main ref={mainRef} className="flex-1 overflow-auto bg-muted/30">
-          <div className="p-6 space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0.3 }}
+            className="p-6 space-y-6"
+          >
             {/* Page Title — hidden on supply-management tab (it has its own header) */}
             {activeTab !== "supply-management" && (
               <div className="flex items-center justify-between">
@@ -979,7 +1018,7 @@ const InventoryDashboardPage = () => {
                 </div>
               </>
             )}
-          </div>
+          </motion.div>
         </main>
       </div>
 

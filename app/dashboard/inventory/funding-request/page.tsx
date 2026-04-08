@@ -63,9 +63,11 @@ import {
   useInventoryTargetGroups,
 } from "@/services/inventory/hooks";
 import { useMyDepotFund, MY_DEPOT_FUND_QUERY_KEY, useMyDepotFundTransactions } from "@/services/depot/hooks";
+import { useDepotFundTransactionTypes, useDepotFundReferenceTypes } from "@/services/transaction/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useFundingRequests,
+  useFundingRequestItems,
   useCreateFundingRequest,
   useDownloadFundingRequestTemplate,
 } from "@/services/funding_request";
@@ -74,6 +76,7 @@ import type {
   FundingRequestStatus,
   CreateFundingRequestItem,
 } from "@/services/funding_request";
+import { motion, AnimatePresence } from "framer-motion";
 
 /* ── Excel column mapping ─────────────────────────────────── */
 
@@ -403,9 +406,20 @@ export default function FundingRequestPage() {
   const { data: myFund, isLoading: loadingFund } = useMyDepotFund();
   const queryClient = useQueryClient();
   const [txPage, setTxPage] = useState(1);
+  const [txPageSize, setTxPageSize] = useState(10);
   const { data: txData, isLoading: loadingTx } = useMyDepotFundTransactions(
-    { pageNumber: txPage, pageSize: 20 },
+    { pageNumber: txPage, pageSize: txPageSize },
     { enabled: true },
+  );
+  const { data: txTypesMeta = [] } = useDepotFundTransactionTypes();
+  const { data: refTypesMeta = [] } = useDepotFundReferenceTypes();
+  const txTypeMap = useMemo(
+    () => Object.fromEntries(txTypesMeta.map((m) => [m.key, m.value])),
+    [txTypesMeta],
+  );
+  const refTypeMap = useMemo(
+    () => Object.fromEntries(refTypesMeta.map((m) => [m.key, m.value])),
+    [refTypesMeta],
   );
 
   const [activeTab, setActiveTab] = useState<TabType>("create");
@@ -422,11 +436,13 @@ export default function FundingRequestPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── History ──
+  const [histPage, setHistPage] = useState(1);
+  const [histPageSize, setHistPageSize] = useState(10);
   const { data: requestsData, isLoading: loadingRequests } =
     useFundingRequests({
       params: {
-        pageNumber: 1,
-        pageSize: 200,
+        pageNumber: histPage,
+        pageSize: histPageSize,
         depotIds: depotId ? [depotId] : undefined,
       },
     });
@@ -438,6 +454,13 @@ export default function FundingRequestPage() {
   // Detail dialog
   const [detailItem, setDetailItem] =
     useState<FundingRequestEntity | null>(null);
+
+  const { data: detailItemsData, isLoading: loadingDetailItems } =
+    useFundingRequestItems({
+      fundingRequestId: detailItem?.id,
+      params: { pageNumber: 1, pageSize: 200 },
+      enabled: !!detailItem?.id,
+    });
 
   const { mutate: createRequest, isPending } = useCreateFundingRequest();
   const {
@@ -666,6 +689,7 @@ export default function FundingRequestPage() {
       itemType: r.itemType,
       targetGroup: r.targetGroup,
       notes: r.notes,
+      description: r.notes,
     }));
     createRequest(
       { description: description.trim(), items },
@@ -804,7 +828,12 @@ export default function FundingRequestPage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-full mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <motion.div
+          className="flex items-start justify-between"
+          initial={{ opacity: 0, y: -18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+        >
           <div>
             <Button
               variant="ghost"
@@ -853,10 +882,15 @@ export default function FundingRequestPage() {
                 : "Tải file mẫu Excel"}
             </Button>
           )}
-        </div>
+        </motion.div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-muted/40 rounded-lg p-1 w-fit">
+        <motion.div
+          className="flex gap-1 bg-muted/40 rounded-lg p-1 w-fit"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+        >
           <button
             onClick={() => setActiveTab("create")}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${activeTab === "create"
@@ -875,9 +909,9 @@ export default function FundingRequestPage() {
               }`}
           >
             <ListBullets size={14} />
-            Lịch sử
+            Lịch sử yêu cầu cấp quỹ
             {requests.length > 0 && (
-              <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground ml-1">
+              <Badge className="h-4.5 px-1.5 text-sm rounded-full bg-primary text-primary-foreground ml-1">
                 {requests.length}
               </Badge>
             )}
@@ -890,18 +924,31 @@ export default function FundingRequestPage() {
               }`}
           >
             <ClockCounterClockwise size={14} />
-            GD kho
+            Biến động quỹ kho
           </button>
-        </div>
+        </motion.div>
 
         {/* ─── CREATE TAB ────────────────────────────────── */}
+        <AnimatePresence mode="wait">
         {activeTab === "create" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <motion.div
+            key="create"
+            className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+          >
             {/* ── Right column: Info + Summary ── */}
-            <div className="lg:col-span-3 lg:order-2 space-y-4 lg:sticky lg:top-6">
+            <motion.div
+              className="lg:col-span-3 lg:order-2 space-y-4 lg:sticky lg:top-6"
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
+            >
               {/* Fund balance */}
               <Card className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
-                <CardContent className="py-4">
+                <CardContent className="">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <Wallet
@@ -932,16 +979,16 @@ export default function FundingRequestPage() {
                         {formatMoney(myFund.balance)}
                       </p>
                       {myFund.balance < 0 && (
-                        <p className="text-xs font-medium text-red-500 tracking-tighter mt-1">
+                        <p className="text-sm font-medium text-red-500 tracking-tighter mt-1">
                           ⚠️ Kho đang ứng trước — hạn mức: {formatMoney(myFund.maxAdvanceLimit)}
                         </p>
                       )}
                       {myFund.balance >= 0 && (
-                        <p className="text-xs text-muted-foreground tracking-tighter mt-1">
+                        <p className="text-sm text-muted-foreground tracking-tighter mt-1">
                           Hạn mức ứng trước: {formatMoney(myFund.maxAdvanceLimit)}
                         </p>
                       )}
-                      <p className="text-xs tracking-tighter mt-2">
+                      <p className="text-xs tracking-tighter mt-1">
                         Cập nhật:{" "}
                         {new Date(
                           myFund.lastUpdatedAt,
@@ -957,27 +1004,18 @@ export default function FundingRequestPage() {
               </Card>
 
               {/* Description */}
-              <Card className="border border-border/50">
-                <CardContent className="p-4 space-y-3">
-                  <h3 className="text-sm font-semibold tracking-tighter flex items-center gap-1.5">
-                    <FileText
-                      size={15}
-                      className="text-primary"
-                    />
-                    Mô tả lý do cấp quỹ
-                  </h3>
-                  <div className="space-y-1.5">
-                    <Textarea
-                      placeholder="Mô tả lý do cần cấp quỹ mua vật tư..."
-                      value={description}
-                      onChange={(
-                        e: React.ChangeEvent<HTMLTextAreaElement>,
-                      ) => setDescription(e.target.value)}
-                      className="min-h-24 resize-none text-sm"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold tracking-tighter flex items-center gap-1.5">
+                  <FileText size={15} className="text-primary" />
+                  Mô tả lý do cấp quỹ
+                </h3>
+                <Textarea
+                  placeholder="Mô tả lý do cần cấp quỹ mua vật tư..."
+                  value={description}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
+                  className="min-h-24 resize-none text-sm"
+                />
+              </div>
 
               {/* Summary */}
               <Card className="border border-border/50">
@@ -1066,23 +1104,28 @@ export default function FundingRequestPage() {
                   </Button>
                   {!canSubmit &&
                     description.trim() === "" && (
-                      <p className="text-xs text-amber-600 flex items-center gap-1 tracking-tight">
+                      <p className="text-sm text-amber-600 flex items-center gap-1 tracking-tight">
                         <WarningCircle size={11} />
                         Vui lòng nhập mô tả
                       </p>
                     )}
                   {!canSubmit && totalErrors > 0 && (
-                    <p className="text-xs text-red-500 flex items-center gap-1 tracking-tight">
+                    <p className="text-sm text-red-500 flex items-center gap-1 tracking-tight">
                       <WarningCircle size={11} />
                       Sửa {totalErrors} dòng lỗi trước khi gửi
                     </p>
                   )}
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
 
             {/* ── Left column: Excel / Manual toggle ── */}
-            <div className="lg:col-span-9 lg:order-1">
+            <motion.div
+              className="lg:col-span-9 lg:order-1"
+              initial={{ opacity: 0, x: -24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
+            >
               <Card className="border border-border/50 overflow-hidden p-0">
                 {/* ── Header with mode toggle ── */}
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
@@ -1097,7 +1140,7 @@ export default function FundingRequestPage() {
                         ` (${rows.length})`}
                     </span>
                     {inputMode === "manual" && excelFileName && (
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         · {excelFileName}
                       </span>
                     )}
@@ -1108,7 +1151,7 @@ export default function FundingRequestPage() {
                       <button
                         onClick={() => setInputMode("excel")}
                         className={cn(
-                          "flex items-center gap-1 px-2.5 py-1 text-xs font-medium tracking-tighter rounded-md transition-colors",
+                          "flex items-center gap-1 px-2.5 py-1 text-sm font-medium tracking-tighter rounded-md transition-colors",
                           inputMode === "excel"
                             ? "bg-background text-foreground shadow-sm"
                             : "text-muted-foreground hover:text-foreground",
@@ -1120,7 +1163,7 @@ export default function FundingRequestPage() {
                       <button
                         onClick={() => setInputMode("manual")}
                         className={cn(
-                          "flex items-center gap-1 px-2.5 py-1 text-xs font-medium tracking-tighter rounded-md transition-colors",
+                          "flex items-center gap-1 px-2.5 py-1 text-sm font-medium tracking-tighter rounded-md transition-colors",
                           inputMode === "manual"
                             ? "bg-background text-foreground shadow-sm"
                             : "text-muted-foreground hover:text-foreground",
@@ -1137,7 +1180,7 @@ export default function FundingRequestPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="gap-1 text-xs h-7 px-2 text-muted-foreground tracking-tighter"
+                          className="gap-1 text-sm h-7 px-2 text-muted-foreground tracking-tighter"
                           onClick={addRow}
                         >
                           <Plus size={13} />
@@ -1147,7 +1190,7 @@ export default function FundingRequestPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="gap-1 text-xs h-7 px-2 text-muted-foreground hover:text-red-500 tracking-tighter"
+                            className="gap-1 text-sm h-7 px-2 text-muted-foreground hover:text-red-500 tracking-tighter"
                             onClick={handleReset}
                           >
                             <Trash size={13} />
@@ -1159,9 +1202,17 @@ export default function FundingRequestPage() {
                   </div>
                 </div>
 
-                {/* ── Excel upload area (default) ── */}
+                {/* ── Excel / Manual animated panels ── */}
+                <AnimatePresence mode="wait">
                 {inputMode === "excel" && (
-                  <div className="p-6">
+                  <motion.div
+                    key="excel-panel"
+                    className="p-6"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                  >
                     <div
                       onDrop={(e) => {
                         e.preventDefault();
@@ -1207,7 +1258,7 @@ export default function FundingRequestPage() {
                             nhấp để chọn file
                           </span>
                         </p>
-                        <p className="text-xs text-muted-foreground/70 mt-2">
+                        <p className="text-sm text-muted-foreground/70 mt-2">
                           Hỗ trợ .xlsx, .xls
                         </p>
                       </div>
@@ -1216,14 +1267,14 @@ export default function FundingRequestPage() {
                     {/* Column hint + template download */}
                     <div className="mt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div>
-                        <p className="text-xs text-muted-foreground tracking-tighter mb-1.5">
+                        <p className="text-sm text-muted-foreground tracking-tighter mb-1.5">
                           Các cột trong file:
                         </p>
                         <div className="flex flex-wrap gap-1">
                           {Object.values(COL).map((col) => (
                             <span
                               key={col}
-                              className="px-2 py-1 rounded bg-muted border text-xs font-normal tracking-tighter text-muted-foreground"
+                              className="px-2 py-1 rounded bg-muted border text-sm font-normal tracking-tighter text-muted-foreground"
                             >
                               {col}
                             </span>
@@ -1250,7 +1301,7 @@ export default function FundingRequestPage() {
                     </div>
 
                     {/* Quick switch hint */}
-                    <p className="text-xs text-muted-foreground text-center mt-5 tracking-tighter">
+                    <p className="text-sm text-muted-foreground text-center mt-5 tracking-tighter">
                       Hoặc chuyển sang{" "}
                       <button
                         className="text-primary font-medium underline underline-offset-2 hover:text-primary/80"
@@ -1259,43 +1310,50 @@ export default function FundingRequestPage() {
                         nhập thủ công từng dòng
                       </button>
                     </p>
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* ── Manual table (when toggled) ── */}
                 {inputMode === "manual" && (
-                  <div className="overflow-auto">
+                  <motion.div
+                    key="manual-panel"
+                    className="overflow-auto"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                  >
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/40">
-                          <TableHead className="w-10 text-center text-xs">
+                          <TableHead className="w-10 text-center text-sm">
                             STT
                           </TableHead>
-                          <TableHead className="min-w-44 text-xs">
+                          <TableHead className="min-w-44 text-sm">
                             Tên vật phẩm *
                           </TableHead>
-                          <TableHead className="min-w-36 text-xs">
+                          <TableHead className="min-w-36 text-sm">
                             Danh mục *
                           </TableHead>
-                          <TableHead className="min-w-24 text-xs">
+                          <TableHead className="min-w-24 text-sm">
                             Đơn vị *
                           </TableHead>
-                          <TableHead className="min-w-24 text-xs">
+                          <TableHead className="min-w-24 text-sm">
                             Số lượng *
                           </TableHead>
-                          <TableHead className="min-w-28 text-xs">
+                          <TableHead className="min-w-28 text-sm">
                             Đơn giá *
                           </TableHead>
-                          <TableHead className="min-w-28 text-xs">
+                          <TableHead className="min-w-28 text-sm">
                             Thành tiền
                           </TableHead>
-                          <TableHead className="min-w-32 text-xs">
+                          <TableHead className="min-w-32 text-sm">
                             Loại vật phẩm
                           </TableHead>
-                          <TableHead className="min-w-32 text-xs">
+                          <TableHead className="min-w-32 text-sm">
                             Đối tượng
                           </TableHead>
-                          <TableHead className="min-w-32 text-xs">
+                          <TableHead className="min-w-32 text-sm">
                             Ghi chú
                           </TableHead>
                           <TableHead className="w-10" />
@@ -1313,7 +1371,7 @@ export default function FundingRequestPage() {
                                 "bg-red-50/50 dark:bg-red-950/10",
                               )}
                             >
-                              <TableCell className="text-center text-xs text-muted-foreground font-mono">
+                              <TableCell className="text-center text-sm text-muted-foreground font-mono">
                                 {row.row}
                               </TableCell>
                               <TableCell>
@@ -1432,7 +1490,7 @@ export default function FundingRequestPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="gap-1.5 text-xs"
+                                  className="gap-1.5 text-sm"
                                   onClick={addRow}
                                 >
                                   <Plus size={12} /> Thêm dòng
@@ -1443,8 +1501,9 @@ export default function FundingRequestPage() {
                         )}
                       </TableBody>
                     </Table>
-                  </div>
+                  </motion.div>
                 )}
+                </AnimatePresence>
 
                 {/* Hidden file input (shared) */}
                 <input
@@ -1459,186 +1518,323 @@ export default function FundingRequestPage() {
                   className="hidden"
                 />
               </Card>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         {/* ─── HISTORY TAB ───────────────────────────────── */}
         {activeTab === "history" && (
+          <motion.div
+            key="history"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+          >
           <Card className="border border-border/50">
-            <CardContent className="p-5">
-              <h3 className="text-base font-semibold tracking-tighter mb-4 flex items-center gap-1.5">
-                <ListBullets
-                  size={16}
-                  className="text-primary"
-                />
-                Lịch sử yêu cầu cấp quỹ
-              </h3>
+            <CardContent className="px-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold tracking-tighter flex items-center gap-1.5">
+                  <ListBullets size={16} className="text-primary" />
+                  Lịch sử yêu cầu cấp quỹ
+                  {requestsData && (
+                    <Badge variant="secondary" className="ml-1 px-1.5 py-0 font-medium text-sm">
+                      {requestsData.totalCount}
+                    </Badge>
+                  )}
+                </h3>
+              </div>
 
               {loadingRequests ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <Skeleton
-                      key={i}
-                      className="h-16 w-full rounded-xl"
-                    />
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
                   ))}
                 </div>
               ) : requests.length === 0 ? (
                 <div className="p-10 text-center">
-                  <Wallet
-                    size={40}
-                    className="mx-auto text-muted-foreground/30 mb-3"
-                  />
+                  <Wallet size={40} className="mx-auto text-muted-foreground/30 mb-3" />
                   <p className="text-sm text-muted-foreground tracking-tight">
                     Chưa có yêu cầu cấp quỹ nào
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {requests.map((req) => {
-                    const st = statusConfig[req.status];
-                    return (
-                      <div
-                        key={req.id}
-                        onClick={() => setDetailItem(req)}
-                        className="flex items-center gap-3 p-3 rounded-xl border border-border/90 hover:bg-muted/30 cursor-pointer transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3">
-                            <p className="text-base font-semibold tracking-tighter truncate">
-                              {"Yêu cầu số " + req.id}
-                            </p>
-                            <Badge
-                              className={`${st.className} border gap-1.5 shrink-0 px-2 py-0.5`}
+                <>
+                  <div className="rounded-lg border border-border/60 overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableHead className="w-12 text-center text-sm tracking-tighter">#</TableHead>
+                          <TableHead className="text-sm tracking-tighter min-w-36">Mô tả</TableHead>
+                          <TableHead className="text-sm tracking-tighter">Trạng thái</TableHead>
+                          <TableHead className="text-sm tracking-tighter text-right">Tổng tiền</TableHead>
+                          <TableHead className="text-sm tracking-tighter text-right">Ngày tạo</TableHead>
+                          <TableHead className="w-12" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {requests.map((req, idx) => {
+                          const st = statusConfig[req.status];
+                          return (
+                            <motion.tr
+                              key={req.id}
+                              className="hover:bg-muted/30 cursor-pointer transition-colors border-b border-border/40"
+                              onClick={() => setDetailItem(req)}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.28, delay: idx * 0.05, ease: "easeOut" }}
                             >
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${st.dotColor}`}
-                              />
-                              {st.label}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end shrink-0">
-                          <span className="font-bold text-base text-emerald-600 tracking-tighter">
-                            {formatMoney(req.totalAmount)}
-                          </span>
-                          <span className="text-sm text-muted-foreground tracking-tighter">
-                            {new Date(
-                              req.createdAt,
-                            ).toLocaleDateString("vi-VN")}
-                          </span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0 shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDetailItem(req);
-                          }}
-                        >
-                          <Eye size={15} />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
+                              <TableCell className="text-center text-sm text-muted-foreground">
+                                {(histPage - 1) * histPageSize + idx + 1}
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="text-sm font-medium tracking-tighter">Yêu cầu #{req.id}</p>
+                                  {req.description && (
+                                    <p className="text-sm text-muted-foreground tracking-tighter truncate max-w-64">{req.description}</p>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={`${st.className} border gap-1.5 px-2 py-0.5 text-sm`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full ${st.dotColor}`} />
+                                  {st.label}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="text-sm font-bold text-emerald-600 tracking-tighter">
+                                  {formatMoney(req.totalAmount)}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="text-sm text-muted-foreground tracking-tighter">
+                                  {new Date(req.createdAt).toLocaleDateString("vi-VN")}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={(e) => { e.stopPropagation(); setDetailItem(req); }}
+                                >
+                                  <Eye size={14} />
+                                </Button>
+                              </TableCell>
+                            </motion.tr>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Pagination */}
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-muted-foreground tracking-tight">
+                        Trang {requestsData?.pageNumber}/{requestsData?.totalPages} · {requestsData?.totalCount} yêu cầu
+                      </p>
+                      <Select
+                        value={String(histPageSize)}
+                        onValueChange={(v) => { setHistPageSize(Number(v)); setHistPage(1); }}
+                      >
+                        <SelectTrigger className="w-16 h-7 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[5, 10, 20, 50].map((s) => (
+                            <SelectItem key={s} value={String(s)}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!requestsData?.hasPreviousPage}
+                        onClick={() => setHistPage((p) => Math.max(1, p - 1))}
+                        className="h-7 px-3 text-sm"
+                      >
+                        Trước
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!requestsData?.hasNextPage}
+                        onClick={() => setHistPage((p) => p + 1)}
+                        className="h-7 px-3 text-sm"
+                      >
+                        Tiếp
+                      </Button>
+                    </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
+          </motion.div>
         )}
 
         {/* ─── TRANSACTIONS TAB ──────────────────────────────── */}
         {activeTab === "transactions" && (
+          <motion.div
+            key="transactions"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+          >
           <Card className="border border-border/50">
-            <CardContent className="p-5">
-              <h3 className="text-base font-semibold tracking-tighter mb-4 flex items-center gap-1.5">
-                <ClockCounterClockwise size={16} className="text-primary" />
-                Lịch sử giao dịch kho
-              </h3>
+            <CardContent className="px-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold tracking-tighter flex items-center gap-1.5">
+                  <ClockCounterClockwise size={16} className="text-primary" />
+                  Lịch sử giao dịch kho
+                  {txData && (
+                    <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0 font-medium">
+                      {txData.totalCount}
+                    </Badge>
+                  )}
+                </h3>
+              </div>
 
               {loadingTx ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} className="h-14 w-full rounded-xl" />
+                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
                   ))}
                 </div>
               ) : !txData?.items?.length ? (
                 <div className="p-10 text-center">
                   <ClockCounterClockwise size={40} className="mx-auto text-muted-foreground/30 mb-3" />
-                  <p className="text-sm text-muted-foreground tracking-tight">
+                  <p className="text-sm text-muted-foreground tracking-tighter">
                     Chưa có giao dịch nào
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="space-y-2">
-                    {txData.items.map((tx) => {
-                      const isCredit = tx.amount >= 0;
-                      return (
-                        <div
-                          key={tx.id}
-                          className="flex items-center gap-3 p-3 rounded-xl border border-border/50 hover:bg-muted/20 transition-colors"
-                        >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isCredit ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
-                            }`}>
-                            {isCredit ? <ArrowDown size={15} weight="bold" /> : <ArrowUp size={15} weight="bold" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold tracking-tighter truncate">
-                                {tx.transactionType}
-                              </p>
-                              <span className={`text-sm font-bold shrink-0 ${isCredit ? "text-emerald-600" : "text-rose-600"
-                                }`}>
-                                {isCredit ? "+" : ""}{tx.amount.toLocaleString("vi-VN")}đ
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground tracking-tight mt-0.5">
-                              {tx.note && <span className="truncate">{tx.note}</span>}
-                              {tx.note && <span>·</span>}
-                              <span>{new Date(tx.createdAt).toLocaleDateString("vi-VN")}</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="rounded-lg border border-border/60 overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableHead className="w-12 text-center text-sm tracking-tighter">#</TableHead>
+                          <TableHead className="text-sm tracking-tighter">Loại giao dịch</TableHead>
+                          <TableHead className="text-sm tracking-tighter">Nguồn tham chiếu</TableHead>
+                          <TableHead className="text-sm tracking-tighter min-w-50">Ghi chú</TableHead>
+                          <TableHead className="text-sm tracking-tighter text-right">Số tiền</TableHead>
+                          <TableHead className="text-sm tracking-tighter text-right">Thời gian</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {txData.items.map((tx, idx) => {
+                          const isCredit = tx.amount >= 0;
+                          const displayType = txTypeMap[tx.transactionType] ?? tx.transactionType;
+                          const displayRef = refTypeMap[tx.referenceType] ?? tx.referenceType;
+                          return (
+                            <motion.tr
+                              key={tx.id}
+                              className="hover:bg-muted/30 transition-colors border-b border-border/40"
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.25, delay: idx * 0.04, ease: "easeOut" }}
+                            >
+                              <TableCell className="text-center text-sm text-muted-foreground">
+                                {(txPage - 1) * txPageSize + idx + 1}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className={cn(
+                                    "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
+                                    isCredit ? "bg-emerald-100 dark:bg-emerald-950/40" : "bg-rose-100 dark:bg-rose-950/40",
+                                  )}>
+                                    {isCredit
+                                      ? <ArrowDown size={12} weight="bold" className="text-emerald-600" />
+                                      : <ArrowUp size={12} weight="bold" className="text-rose-600" />}
+                                  </div>
+                                  <span className="text-sm font-medium tracking-tighter">{displayType}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-sm tracking-tighter text-muted-foreground">
+                                  {displayRef}{tx.referenceId != null ? ` #${tx.referenceId}` : ""}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-sm tracking-tighter text-muted-foreground line-clamp-1">
+                                  {tx.note || "—"}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={cn(
+                                  "text-sm font-bold tracking-tighter",
+                                  isCredit ? "text-emerald-600" : "text-rose-600",
+                                )}>
+                                  {isCredit ? "+" : ""}{tx.amount.toLocaleString("vi-VN")}đ
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="text-sm text-muted-foreground tracking-tighter">
+                                  {new Date(tx.createdAt).toLocaleString("vi-VN")}
+                                </span>
+                              </TableCell>
+                            </motion.tr>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
 
                   {/* Pagination */}
-                  {txData.totalPages > 1 && (
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-border/30">
-                      <p className="text-xs text-muted-foreground tracking-tight">
-                        Trang {txData.pageNumber} / {txData.totalPages} &middot; {txData.totalCount} giao dịch
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-muted-foreground tracking-tighter">
+                        Trang {txData.pageNumber}/{txData.totalPages} · {txData.totalCount} giao dịch
                       </p>
-                      <div className="flex gap-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={!txData.hasPreviousPage}
-                          onClick={() => setTxPage((p) => p - 1)}
-                          className="h-7 px-2 text-xs"
-                        >
-                          Trước
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={!txData.hasNextPage}
-                          onClick={() => setTxPage((p) => p + 1)}
-                          className="h-7 px-2 text-xs"
-                        >
-                          Tiếp
-                        </Button>
-                      </div>
+                      <Select
+                        value={String(txPageSize)}
+                        onValueChange={(v) => { setTxPageSize(Number(v)); setTxPage(1); }}
+                      >
+                        <SelectTrigger className="w-16 h-7 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[5, 10, 20, 50].map((s) => (
+                            <SelectItem key={s} value={String(s)}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>
                     </div>
-                  )}
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!txData.hasPreviousPage}
+                        onClick={() => setTxPage((p) => Math.max(1, p - 1))}
+                        className="h-7 px-3 text-sm"
+                      >
+                        Trước
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!txData.hasNextPage}
+                        onClick={() => setTxPage((p) => p + 1)}
+                        className="h-7 px-3 text-sm"
+                      >
+                        Tiếp
+                      </Button>
+                    </div>
+                  </div>
                 </>
               )}
             </CardContent>
           </Card>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
 
       {/* ── Detail Dialog ─────────────────────────────────── */}
@@ -1651,13 +1847,18 @@ export default function FundingRequestPage() {
             <DialogTitle className="tracking-tighter">
               Chi tiết yêu cầu cấp quỹ
             </DialogTitle>
-            <DialogDescription className="tracking-tight">
+            <DialogDescription className="tracking-tighter">
               Yêu cầu số {detailItem?.id}
             </DialogDescription>
           </DialogHeader>
 
           {detailItem && (
             <div className="space-y-4">
+              {(() => {
+                const detailItems = detailItemsData?.items ?? detailItem.items ?? [];
+
+                return (
+                  <>
               {/* Status + amount */}
               <div className="flex items-center justify-between">
                 <Badge
@@ -1673,20 +1874,20 @@ export default function FundingRequestPage() {
               {/* Meta */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                  <p className="text-xs text-muted-foreground tracking-tight mb-0.5">
+                  <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
                     Ngày gửi
                   </p>
-                  <p className="text-sm tracking-tight">
+                  <p className="text-sm tracking-tighter">
                     {new Date(
                       detailItem.createdAt,
                     ).toLocaleString("vi-VN")}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                  <p className="text-xs text-muted-foreground tracking-tight mb-0.5">
+                  <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
                     Người gửi
                   </p>
-                  <p className="text-sm tracking-tight">
+                  <p className="text-sm tracking-tighter">
                     {detailItem.requestedByUserName}
                   </p>
                 </div>
@@ -1694,10 +1895,10 @@ export default function FundingRequestPage() {
 
               {/* Description */}
               <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                <p className="text-xs text-muted-foreground tracking-tight mb-0.5">
+                <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
                   Mô tả
                 </p>
-                <p className="text-sm tracking-tight">
+                <p className="text-sm tracking-tighter">
                   {detailItem.description}
                 </p>
               </div>
@@ -1706,14 +1907,14 @@ export default function FundingRequestPage() {
               {detailItem.status === "Approved" &&
                 detailItem.approvedCampaignName && (
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800 p-2.5">
-                    <p className="text-xs text-emerald-600 font-medium tracking-tight mb-0.5">
+                    <p className="text-sm text-emerald-600 font-medium tracking-tighter mb-0.5">
                       Duyệt từ quỹ
                     </p>
-                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 tracking-tight">
+                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 tracking-tighter">
                       {detailItem.approvedCampaignName}
                     </p>
                     {detailItem.reviewedByUserName && (
-                      <p className="text-xs text-emerald-600/70 mt-1 tracking-tight">
+                      <p className="text-sm text-emerald-600/70 mt-1 tracking-tighter">
                         Bởi: {detailItem.reviewedByUserName}
                       </p>
                     )}
@@ -1724,10 +1925,10 @@ export default function FundingRequestPage() {
               {detailItem.status === "Rejected" &&
                 detailItem.rejectionReason && (
                   <div className="rounded-lg border border-rose-200 bg-rose-50/50 dark:bg-rose-950/20 dark:border-rose-800 p-2.5">
-                    <p className="text-xs text-rose-600 font-medium tracking-tight mb-0.5">
+                    <p className="text-sm text-rose-600 font-medium tracking-tighter mb-0.5">
                       Lý do từ chối
                     </p>
-                    <p className="text-sm text-rose-700 dark:text-rose-400 tracking-tight">
+                    <p className="text-sm text-rose-700 dark:text-rose-400 tracking-tighter">
                       {detailItem.rejectionReason}
                     </p>
                   </div>
@@ -1740,39 +1941,62 @@ export default function FundingRequestPage() {
                     size={14}
                     className="text-primary"
                   />
-                  Vật tư ({detailItem.items.length})
+                  Vật tư ({detailItems.length})
                 </h4>
-                <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                  {detailItem.items.map((item, idx) => (
-                    <div
-                      key={item.id || idx}
-                      className="rounded-lg border border-border/60 bg-background p-2.5"
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <p className="text-sm font-semibold tracking-tighter">
-                          {item.itemName}
-                        </p>
-                        <span className="text-sm font-bold text-emerald-600 shrink-0">
-                          {formatMoney(item.totalPrice)}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground tracking-tight">
-                        <span>
-                          SL: {item.quantity} {item.unit}
-                        </span>
-                        <span>
-                          Đơn giá: {formatMoney(item.unitPrice)}
-                        </span>
-                        <span>
-                          Danh mục:{" "}
-                          {categoryMap[item.categoryCode] ??
-                            item.categoryCode}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {loadingDetailItems ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <Skeleton key={idx} className="h-16 w-full rounded-xl" />
+                    ))}
+                  </div>
+                ) : detailItems.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border/60 p-4 text-center">
+                    <p className="text-sm text-muted-foreground tracking-tighter">
+                      Không có danh sách vật tư chi tiết
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                    {detailItems.map((item, idx) => (
+                      <motion.div
+                        key={item.id || idx}
+                        className="rounded-lg border border-border/60 bg-background p-2.5"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.22, delay: idx * 0.04, ease: "easeOut" }}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-sm font-semibold tracking-tighter">
+                            {item.itemName}
+                          </p>
+                          <span className="text-sm font-bold text-emerald-600 shrink-0">
+                            {formatMoney(item.totalPrice ?? item.quantity * item.unitPrice)}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-muted-foreground tracking-tighter">
+                          <span>
+                            SL: {item.quantity} {item.unit}
+                          </span>
+                          <span>
+                            Đơn giá: {formatMoney(item.unitPrice)}
+                          </span>
+                          <span>
+                            Danh mục:{" "}
+                            {categoryMap[item.categoryCode] ??
+                              item.categoryCode}
+                          </span>
+                          {(item.notes || item.description) && (
+                            <span>Ghi chú: {item.notes ?? item.description}</span>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
               </div>
+                  </>
+                );
+              })()}
             </div>
           )}
 

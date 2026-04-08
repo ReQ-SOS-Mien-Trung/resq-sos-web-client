@@ -36,6 +36,7 @@ import {
   useBroadcastNotification,
 } from "@/services/noti_alert";
 import { WeatherApiCurrentPoint } from "@/type";
+import { Icon } from "@iconify/react";
 import { geocodeCity, reverseGeocodeCoordinates } from "./geocode";
 
 const LocationPickerMap = dynamic(() => import("./LocationPickerMap"), {
@@ -63,16 +64,16 @@ const ALERT_TYPE_META: Record<
   }
 > = {
   FLOOD_WARNING: {
-    label: "Cảnh báo lũ",
-    icon: <WaveSine size={16} weight="duotone" />,
+    label: "Cảnh báo lũ lụt",
+    icon: <Icon icon="line-md:alert" width="22" height="22" />,
     activeClassName:
       "border-amber-500 bg-amber-50 text-amber-700 shadow-sm ring-2 ring-amber-300",
     inactiveClassName:
       "border-amber-200 bg-amber-50/50 text-amber-600 hover:bg-amber-50 hover:border-amber-300",
   },
   FLOOD_EMERGENCY: {
-    label: "Khẩn cấp lũ",
-    icon: <Lightning size={16} weight="fill" />,
+    label: "Khẩn cấp lũ lụt",
+    icon: <Icon icon="carbon:flood-warning" width="24" height="24" />,
     activeClassName:
       "border-red-500 bg-red-50 text-red-700 shadow-sm ring-2 ring-red-300",
     inactiveClassName:
@@ -80,7 +81,7 @@ const ALERT_TYPE_META: Record<
   },
   EVACUATION: {
     label: "Sơ tán",
-    icon: <BellRinging size={16} weight="fill" />,
+    icon: <Icon icon="tabler:run" width="24" height="24" />,
     activeClassName:
       "border-orange-500 bg-orange-50 text-orange-700 shadow-sm ring-2 ring-orange-300",
     inactiveClassName:
@@ -99,7 +100,7 @@ const MANUAL_PRESETS: Array<{
     type: "FLOOD_WARNING",
   },
   {
-    title: "KHẨN CẤP: LŨ LỚN",
+    title: "KHẨN CẤP LŨ LỚN",
     body: "Lũ lớn bất thường đang xảy ra. Toàn bộ cư dân khu vực thấp trũng cần sơ tán khẩn cấp. Liên hệ 114 nếu cần hỗ trợ.",
     type: "FLOOD_EMERGENCY",
   },

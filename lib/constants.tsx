@@ -10,11 +10,9 @@ import {
 } from "@/type";
 import {
   ArrowsCounterClockwise,
-  IdentificationCardIcon,
   Bell,
   Boat,
   ChartBar,
-  ChatCircle,
   CheckCircle,
   Clock,
   Cloud,
@@ -29,7 +27,6 @@ import {
   Package,
   Pulse,
   Radio,
-  Robot,
   Shield,
   Spinner,
   SquaresFour,
@@ -39,7 +36,6 @@ import {
   Thermometer,
   TShirt,
   Truck,
-  UserCheck,
   Users,
   Warning,
   WarningCircle,
@@ -47,11 +43,12 @@ import {
   Wind,
   Wrench,
   XCircle,
-  FadersIcon,
   SlidersIcon,
   UserIcon,
-  Folder,
+  PiggyBankIcon,
+  UsersIcon
 } from "@phosphor-icons/react";
+import { Icon as IconifyIcon } from "@iconify/react";
 
 export const navLinks = [
   { href: "#features", label: "Tính năng" },
@@ -371,59 +368,47 @@ export const navigationItems = [
     icon: UserIcon,
     label: "Quản lý người dùng",
     children: [
-      {
-        icon: UserIcon,
-        label: "Quản lý người dùng",
-        href: "/dashboard/admin/users",
-      },
-      {
-        icon: UserCheck,
-        label: "Quản lý cứu hộ viên",
-        href: "/dashboard/admin/rescuers",
-      },
-      {
-        icon: IdentificationCardIcon,
-        label: "Quản lý hồ sơ cứu hộ viên",
-        href: "/dashboard/admin/rescuer-verification",
-      },
+      { icon: UsersIcon, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
+      { icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="fluent-emoji-high-contrast:rescue-workers-helmet" width={20} height={20} className={className} />
+    ), label: "Quản lý cứu hộ viên", href: "/dashboard/admin/rescuers" },
+      { icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="vaadin:user-card" width={18} height={18} className={className} />
+    ), label: "Quản lý hồ sơ cứu hộ viên", href: "/dashboard/admin/rescuer-verification" },
     ],
   },
   {
     icon: SlidersIcon,
     label: "Cấu hình hệ thống",
     children: [
-      {
-        icon: FadersIcon,
-        label: "Tham số hệ thống",
-        href: "/dashboard/admin/config",
-      },
-      {
-        icon: Robot,
-        label: "Cấu hình AI Prompt",
-        href: "/dashboard/admin/ai-prompt",
-      },
-      {
-        icon: ChatCircle,
-        label: "Cấu hình phòng chat",
-        href: "/dashboard/admin/chat-config",
-      },
+      { icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="mynaui:config-vertical" width={20} height={20} className={className} />
+    ), label: "Tham số hệ thống", href: "/dashboard/admin/config" },
+      { icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="streamline:ai-prompt-spark" width={18} height={18} className={className} />
+    ), label: "Cấu hình AI Prompt", href: "/dashboard/admin/ai-prompt" },
+      { icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="proicons:chat" width={20} height={20} className={className} />
+    ), label: "Cấu hình phòng chat", href: "/dashboard/admin/chat-config" },
     ],
   },
   {
-    icon: IdentificationCardIcon,
+    icon: ({ size, className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="fa7-solid:people-roof" width={size} height={size} className={className} />
+    ),
     label: "Quản lý điểm tập kết",
     href: "/dashboard/admin/assembly-points",
   },
   {
-    icon: ChartBar,
-    label: "Phân bổ quỹ từ thiện",
-    href: "/dashboard/admin/reports",
+    icon: Warehouse,
+    label: "Quản lý kho",
+    href: "/dashboard/admin/depots",
   },
-  {
-    icon: Folder,
-    label: "Quản lý quỹ chiến dịch",
-    href: "/dashboard/admin/campaigns",
-  },
+  { icon: ({ size, className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="solar:hand-money-outline" width={size} height={size} className={className} />
+    )
+    , label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
+  { icon: PiggyBankIcon, label: "Quản lý quỹ chiến dịch", href: "/dashboard/admin/campaigns" },
   {
     icon: LockKey,
     label: "Phân quyền người dùng",
@@ -438,16 +423,13 @@ export const navigationItems = [
     icon: CloudSun,
     label: "Thời tiết",
     children: [
-      {
-        icon: CloudSun,
-        label: "Bài đăng thời tiết",
-        href: "/dashboard/admin/weather-posts",
-      },
-      {
-        icon: Drop,
-        label: "Thời tiết & Lũ lụt",
-        href: "/dashboard/admin/weather-flood",
-      },
+      { icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="fluent-mdl2:news"  width={18} height={18} className={className} />
+    ), 
+    label: "Bài đăng thời tiết", href: "/dashboard/admin/weather-posts" },
+      { icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon icon="wi:forecast-io-hail" width={24} height={24} className={className} />
+    ), label: "Thời tiết & Lũ lụt", href: "/dashboard/admin/weather-flood" },
     ],
   },
 ];

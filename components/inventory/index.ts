@@ -7,3 +7,4 @@ export { default as LowStockAlerts } from "./LowStockAlerts";
 export { default as SupplyRequestSection } from "./SupplyRequestSection";
 export { SupplyRequestTracker } from "./SupplyRequestTracker";
 export { default as IncomingRequestsSection } from "./IncomingRequestsSection";
+export { PickupActivitiesPanel } from "./PickupActivitiesPanel";

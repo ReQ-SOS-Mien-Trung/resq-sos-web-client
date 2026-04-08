@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
@@ -1086,7 +1087,12 @@ export default function ExcelImportFromOrg() {
   return (
     <div className="flex flex-col h-full">
       {/* Page Header */}
-      <div className="shrink-0 border-b bg-background px-6 py-4">
+      <motion.div
+        className="shrink-0 border-b bg-background px-6 py-4"
+        initial={{ opacity: 0, y: -18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
@@ -1124,15 +1130,28 @@ export default function ExcelImportFromOrg() {
             </Button>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto bg-muted/30 p-6">
+        <AnimatePresence mode="wait">
         {step === "upload" && (
-          <div className="max-w-7xl mx-auto">
+          <motion.div
+            key="upload"
+            className="max-w-7xl mx-auto"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.32, ease: "easeOut" }}
+          >
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column - Info */}
-              <div className="space-y-6">
+              <motion.div
+                className="space-y-6"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.38, ease: "easeOut", delay: 0.1 }}
+              >
                 {/* Organization Combobox */}
                 <div className="rounded-xl border bg-card p-6 space-y-3">
                   <div className="flex items-center justify-between">
@@ -1225,10 +1244,15 @@ export default function ExcelImportFromOrg() {
                     ))}
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Right Column - Two options */}
-              <div className="flex flex-col gap-4">
+              <motion.div
+                className="flex flex-col gap-4"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.38, ease: "easeOut", delay: 0.15 }}
+              >
                 {/* Option 1: Excel upload */}
                 <div
                   onDrop={handleDrop}
@@ -1298,13 +1322,20 @@ export default function ExcelImportFromOrg() {
                     <p className="text-sm tracking-tighter mt-0.5">Thêm từng dòng vật phẩm bằng tay</p>
                   </div>
                 </button>
-              </div>
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {step === "review" && (
-          <div className="space-y-4 flex flex-col h-full">
+          <motion.div
+            key="review"
+            className="space-y-4 flex flex-col h-full"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.32, ease: "easeOut" }}
+          >
             {/* Top bar */}
             <div className="flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
@@ -1646,8 +1677,9 @@ export default function ExcelImportFromOrg() {
                 )}
               </Button>
             </div>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
       <Dialog
         open={!!previewImage}

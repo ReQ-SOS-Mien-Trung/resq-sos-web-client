@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { useMyDepotInventory, useInventoryCategories, useInventoryItemTypes, useInventoryTargetGroups } from "@/services/inventory/hooks";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
   const [page, setPage] = useState(1);
   const [selectedCategoryCodes, setSelectedCategoryCodes] = useState<string[]>([]);
   const [selectedItemTypes, setSelectedItemTypes] = useState<string[]>([]);
-  const [selectedTargetGroups, setSelectedTargetGroups] = useState<string[]>([]);
+  const [selectedTargetGroups, setSelectedTargetGroups] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<string>("name_asc");
 
@@ -28,7 +29,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
     categoryCode:
       selectedCategoryCodes.length > 0 ? selectedCategoryCodes : undefined,
     itemTypes: selectedItemTypes.length > 0 ? selectedItemTypes : undefined,
-    targetGroups: selectedTargetGroups.length > 0 ? selectedTargetGroups : undefined,
+    targetGroups: selectedTargetGroups ? [selectedTargetGroups] : undefined,
   });
 
   const toggleCategory = (code: string) => {
@@ -46,16 +47,24 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
   };
 
   const toggleTargetGroup = (group: string) => {
-    setSelectedTargetGroups(prev =>
-      prev.includes(group) ? prev.filter(x => x !== group) : [...prev, group]
-    );
+    setSelectedTargetGroups(prev => prev === group ? null : group);
     setPage(1);
   };
 
   return (
-    <div className="flex flex-col bg-background/50 border border-border/40 animate-in fade-in duration-300 mt-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="flex flex-col bg-background/50 border border-border/40 mt-6"
+    >
       {/* Filter Header - Minimalist Editorial Style */}
-      <div className="p-4 border-b border-border/40 space-y-4">
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
+        className="p-4 border-b border-border/40 space-y-4"
+      >
         {/* Search */}
         <div className="relative">
           <MagnifyingGlass className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -113,7 +122,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
           <div className="flex flex-wrap gap-0">
             <span className="text-[14px] text-primary tracking-tighter font-semibold mr-2 self-center">Đối tượng:</span>
             {targetGroupsData?.map((group) => {
-              const isActive = selectedTargetGroups.includes(group.key);
+              const isActive = selectedTargetGroups === group.key;
               return (
                 <button
                   key={group.key}
@@ -159,9 +168,13 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
             </Button>
           </div>
         </div>
-      </div>
+        </motion.div>
 
-      <div>
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
+      >
         <div className="p-4 space-y-4">
           {isLoading ? (
             <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -192,15 +205,18 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                   if (sortBy === "name_desc") return nameB.localeCompare(nameA);
                   return 0;
                 })
-                .map((item) => {
+                .map((item, idx) => {
                   // Determine stock status for border/color accents
                   const availQty = item.itemType === "Reusable" ? item.availableUnit : item.availableQuantity;
                   const isOutOfStock = availQty <= 0;
                   const isLowStock = availQty > 0 && availQty < 50; // Mock threshold
 
                   return (
-                    <div
+                    <motion.div
                       key={item.itemModelId}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, ease: "easeOut", delay: 0.15 + idx * 0.04 }}
                       onClick={() => onItemSelect?.(item)}
                       className="group relative flex aspect-4/5 cursor-pointer flex-col justify-between border border-black/10 bg-card px-3 pt-3 shadow-sm transition-all hover:-translate-y-1 hover:border-[#FF5722] hover:shadow-md dark:border-white/10"
                     >
@@ -283,7 +299,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
                       {/* Editorial Accent */}
                       <div className="absolute left-0 bottom-0 h-0.5 w-0 bg-[#FF5722] group-hover:w-full transition-all duration-300" />
-                    </div>
+                    </motion.div>
                   );
                 })}
             </div>
@@ -291,7 +307,12 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
           {/* Pagination Controls */}
           {inventoryData && inventoryData.totalPages > 1 && (
-            <div className="flex justify-between items-center mt-6 pt-4 border-t border-border/40">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+              className="flex justify-between items-center mt-6 pt-4 border-t border-border/40"
+            >
               <Button
                 variant="outline"
                 size="sm"
@@ -319,10 +340,10 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
               >
                 SAU
               </Button>
-            </div>
+            </motion.div>
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

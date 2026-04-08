@@ -125,6 +125,19 @@ export class NotificationRealtimeClient {
     );
   }
 
+  private isAuthorizationError(error: unknown): boolean {
+    const message =
+      error instanceof Error ? error.message : String(error ?? "");
+    const normalized = message.toLowerCase();
+
+    return (
+      normalized.includes("status code '401'") ||
+      normalized.includes("status code '403'") ||
+      normalized.includes("unauthorized") ||
+      normalized.includes("forbidden")
+    );
+  }
+
   private async waitForDisconnected(
     connection: HubConnection,
     timeoutMs = 2500,
@@ -251,9 +264,17 @@ export class NotificationRealtimeClient {
       markBackendConnectionSuccess();
     };
 
+    let canRetry = true;
+
     this.startPromise = startTask()
       .catch((error) => {
         if (this.isNegotiationAbortError(error)) {
+          canRetry = false;
+          return;
+        }
+
+        if (this.isAuthorizationError(error)) {
+          canRetry = false;
           return;
         }
 
@@ -269,7 +290,8 @@ export class NotificationRealtimeClient {
         this.startPromise = null;
 
         if (
-          this.hasActiveSubscribers() &&
+          canRetry &&
+          (this.listeners.size > 0 || this.broadcastListeners.size > 0) &&
           this.connection?.state === HubConnectionState.Disconnected
         ) {
           this.scheduleRetryStart();
