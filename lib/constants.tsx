@@ -239,21 +239,49 @@ export const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 export { CENTRAL_VN_LOCATIONS } from "./locations";
 
 //Admin Prompt
-export const PROMPT_VARIABLES = [
-  { label: "Tên nạn nhân", value: "victim_name" },
-  { label: "Tọa độ", value: "coordinates" },
-  { label: "Mức độ khẩn cấp", value: "urgency_level" },
-  { label: "Mô tả tình huống", value: "situation_description" },
-  { label: "Số người bị nạn", value: "victim_count" },
-  { label: "Loại thiên tai", value: "disaster_type" },
-  { label: "Khu vực", value: "region" },
-  { label: "Thời gian", value: "timestamp" },
-  { label: "Tài nguyên", value: "resources" },
-  { label: "Yêu cầu", value: "request" },
+export const PROMPT_TYPE_OPTIONS = [
+  {
+    label: "Phân tích SOS",
+    value: "SosPriorityAnalysis",
+    description: "Dùng để phân tích mức độ ưu tiên và dữ liệu SOS.",
+  },
+  {
+    label: "Lập kế hoạch mission",
+    value: "MissionPlanning",
+    description: "Dùng cho AI gợi ý mission và rescue plan.",
+  },
 ] as const;
+
+export const AI_PROVIDER_OPTIONS = [
+  {
+    label: "Gemini",
+    value: "Gemini",
+    description: "Dùng Google AI Studio API key hoặc default Gemini config của server.",
+  },
+  {
+    label: "OpenRouter",
+    value: "OpenRouter",
+    description: "Dùng endpoint OpenRouter theo chuẩn OpenAI-compatible chat completions.",
+  },
+] as const;
+
+export const PROMPT_VARIABLES_BY_TYPE = {
+  SosPriorityAnalysis: [
+    { label: "Dữ liệu đã trích xuất", value: "structured_data" },
+    { label: "Tin nhắn gốc", value: "raw_message" },
+    { label: "Loại SOS", value: "sos_type" },
+  ],
+  MissionPlanning: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Tổng số SOS", value: "total_count" },
+    { label: "Ghi chú kho", value: "depots_data" },
+  ],
+} as const;
 
 export const INITIAL_FORM_DATA: PromptFormData = {
   name: "",
+  prompt_type: "MissionPlanning",
+  provider: "Gemini",
   purpose: "",
   system_prompt: "",
   user_prompt_template: "",
@@ -262,6 +290,7 @@ export const INITIAL_FORM_DATA: PromptFormData = {
   max_tokens: 0,
   version: "",
   api_url: "",
+  api_key: "",
   is_active: true,
 };
 

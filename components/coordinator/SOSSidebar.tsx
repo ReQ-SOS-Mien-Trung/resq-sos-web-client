@@ -1242,6 +1242,20 @@ function ClusterActionButtons({
               Xem kế hoạch
             </Button>
           )}
+          {onManualMission && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-7 text-xs border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                onManualMission(clusterId);
+              }}
+            >
+              <PencilSimpleLine className="h-3 w-3 mr-1" weight="fill" />
+              Tạo nhiệm vụ thủ công
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -1268,31 +1282,48 @@ function ClusterActionButtons({
           </Button>
         </>
       ) : (
-        // No mission yet — show AI analyze only
-        <Button
-          variant="default"
-          size="sm"
-          className="w-full h-7 text-xs bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAnalyzeCluster(clusterId);
-          }}
-          disabled={isAnalyzingCluster}
-        >
-          {isAnalyzing ? (
-            <div className="flex items-center w-full justify-center overflow-hidden">
-              <Spinner className="h-3 w-3 mr-1 shrink-0 animate-spin" />
-              <span className="truncate">
-                {analyzingStatus || "AI đang phân tích..."}
-              </span>
-            </div>
-          ) : (
-            <>
-              <Lightning className="h-3 w-3 mr-1" weight="fill" />
-              AI Phân tích Rescue Plan
-            </>
+        // No mission yet — allow either manual creation or AI analysis
+        <>
+          {onManualMission && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-7 text-xs border-orange-300/60 dark:border-orange-700/60 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                onManualMission(clusterId);
+              }}
+              disabled={isAnalyzingCluster}
+            >
+              <PencilSimpleLine className="h-3 w-3 mr-1" weight="fill" />
+              Tạo nhiệm vụ thủ công
+            </Button>
           )}
-        </Button>
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full h-7 text-xs bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAnalyzeCluster(clusterId);
+            }}
+            disabled={isAnalyzingCluster}
+          >
+            {isAnalyzing ? (
+              <div className="flex items-center w-full justify-center overflow-hidden">
+                <Spinner className="h-3 w-3 mr-1 shrink-0 animate-spin" />
+                <span className="truncate">
+                  {analyzingStatus || "AI đang phân tích..."}
+                </span>
+              </div>
+            ) : (
+              <>
+                <Lightning className="h-3 w-3 mr-1" weight="fill" />
+                AI Phân tích Rescue Plan
+              </>
+            )}
+          </Button>
+        </>
       )}
     </div>
   );

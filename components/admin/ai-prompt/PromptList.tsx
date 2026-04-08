@@ -11,8 +11,19 @@ import {
   Robot,
   ThermometerHot,
   Hash,
+  Key,
 } from "@phosphor-icons/react";
 import type { PromptListProps } from "@/type";
+
+const PROMPT_TYPE_LABELS = {
+  SosPriorityAnalysis: "Phân tích SOS",
+  MissionPlanning: "Mission planning",
+} as const;
+
+const PROVIDER_BADGE_CLASSNAMES = {
+  Gemini: "border-sky-200 bg-sky-50 text-sky-700",
+  OpenRouter: "border-amber-200 bg-amber-50 text-amber-700",
+} as const;
 
 const PromptList = ({
   prompts,
@@ -88,28 +99,44 @@ const PromptList = ({
                   >
                     {prompt.isActive ? "Hoạt động" : "Tắt"}
                   </Badge>
+                  <Badge
+                    variant="outline"
+                    className={PROVIDER_BADGE_CLASSNAMES[prompt.provider]}
+                  >
+                    {prompt.provider}
+                  </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                   {prompt.purpose}
                 </p>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <Badge variant="outline">
+                    {PROMPT_TYPE_LABELS[prompt.promptType]}
+                  </Badge>
+                  <Badge variant="outline">
+                    <Key size={12} className="mr-1" />
+                    {prompt.hasApiKey ? "Có key riêng" : "Dùng key mặc định"}
+                  </Badge>
+                </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground/80">
                   <span className="flex items-center gap-1">
                     <Robot size={14} />
-                    {prompt.model}
+                    {prompt.model || "Default"}
                   </span>
                   <span className="text-border">•</span>
                   <span className="flex items-center gap-1">
                     <ThermometerHot size={14} />
-                    {prompt.temperature}
+                    {prompt.temperature ?? "—"}
                   </span>
                   <span className="text-border">•</span>
                   <span className="flex items-center gap-1">
                     <Lightning size={14} />
-                    {prompt.maxTokens} tokens
+                    {prompt.maxTokens?.toLocaleString() ?? "—"} tokens
                   </span>
                   <span className="text-border">•</span>
                   <span className="flex items-center gap-1">
-                    <Hash size={14} />v{prompt.version}
+                    <Hash size={14} />
+                    {prompt.version || "—"}
                   </span>
                 </div>
               </div>

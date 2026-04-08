@@ -555,6 +555,7 @@ const CoordinatorDashboardContent = () => {
     if (!urlState.selected) return;
 
     const sel = urlState.selected;
+    const shouldOpenClusterPlan = searchParams.get("openPlan") === "1";
 
     if (sel.type === "sos" && sosRequests.length > 0) {
       const sos = sosRequests.find((s) => s.id === sel.id);
@@ -574,6 +575,19 @@ const CoordinatorDashboardContent = () => {
           lat: cluster.centerLatitude,
           lng: cluster.centerLongitude,
         });
+
+        if (shouldOpenClusterPlan) {
+          setActiveClusterId(cluster.id);
+          const cachedSuggestion = suggestionCacheRef.current.get(cluster.id);
+          setRescueSuggestion(cachedSuggestion ?? null);
+          setRescuePlanDefaultTab("missions");
+          setRescuePlanOpen(true);
+          setSOSDetailOpen(false);
+          setLocationPanelOpen(false);
+          setTeamIncidentDetailOpen(false);
+          setSelectedTeamIncident(null);
+        }
+
         initialSelectionAppliedRef.current = true;
       }
     } else if (sel.type === "depot" && depots.length > 0) {
@@ -604,6 +618,7 @@ const CoordinatorDashboardContent = () => {
     depots,
     assemblyPoints,
     hasInitialView,
+    searchParams,
   ]);
 
   // ─── URL → State: Set initial map view from URL ───

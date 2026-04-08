@@ -12,8 +12,14 @@ import {
   Clock,
   Globe,
   Eye,
+  Key,
 } from "@phosphor-icons/react";
 import type { PromptDetailPanelProps } from "@/type";
+
+const PROMPT_TYPE_LABELS = {
+  SosPriorityAnalysis: "Phân tích SOS",
+  MissionPlanning: "Mission planning",
+} as const;
 
 const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
   if (isLoading) {
@@ -70,8 +76,20 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
           <div>
             <CardTitle className="text-xl">{prompt.name}</CardTitle>
             <p className="text-base text-muted-foreground mt-1">
-              {prompt.purpose}
+              {prompt.purpose || "—"}
             </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge variant="outline">
+                {PROMPT_TYPE_LABELS[prompt.promptType]}
+              </Badge>
+              <Badge variant="outline">{prompt.provider}</Badge>
+              <Badge variant="outline">
+                <Key size={12} className="mr-1" />
+                {prompt.hasApiKey
+                  ? prompt.apiKeyMasked || "Có key riêng"
+                  : "Dùng key mặc định của server"}
+              </Badge>
+            </div>
           </div>
           <Badge
             variant={prompt.isActive ? "success" : "secondary"}
@@ -88,14 +106,14 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
             <Robot size={18} className="text-blue-500 shrink-0" />
             <div>
               <p className="text-xs text-muted-foreground">Model</p>
-              <p className="text-sm font-medium">{prompt.model}</p>
+              <p className="text-sm font-medium">{prompt.model || "Default"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
             <ThermometerHot size={18} className="text-orange-500 shrink-0" />
             <div>
               <p className="text-xs text-muted-foreground">Temperature</p>
-              <p className="text-sm font-medium">{prompt.temperature}</p>
+              <p className="text-sm font-medium">{prompt.temperature ?? "—"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
@@ -103,7 +121,7 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
             <div>
               <p className="text-xs text-muted-foreground">Max Tokens</p>
               <p className="text-sm font-medium">
-                {prompt.maxTokens.toLocaleString()}
+                {prompt.maxTokens?.toLocaleString() ?? "—"}
               </p>
             </div>
           </div>
@@ -111,7 +129,7 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
             <Hash size={18} className="text-purple-500 shrink-0" />
             <div>
               <p className="text-xs text-muted-foreground">Version</p>
-              <p className="text-sm font-medium">{prompt.version}</p>
+              <p className="text-sm font-medium">{prompt.version || "—"}</p>
             </div>
           </div>
         </div>
@@ -121,7 +139,9 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
           <Globe size={18} className="text-emerald-500 shrink-0" />
           <div className="min-w-0">
             <p className="text-xs text-muted-foreground">API URL</p>
-            <p className="text-sm font-mono truncate">{prompt.apiUrl}</p>
+            <p className="text-sm font-mono truncate">
+              {prompt.apiUrl || "Dùng API URL mặc định của provider"}
+            </p>
           </div>
         </div>
 
@@ -135,7 +155,7 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
           </h4>
           <div className="relative">
             <pre className="text-sm font-mono bg-muted/70 p-3 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap wrap-break-word leading-relaxed border border-border/30">
-              {prompt.systemPrompt}
+              {prompt.systemPrompt || "—"}
             </pre>
           </div>
         </div>
