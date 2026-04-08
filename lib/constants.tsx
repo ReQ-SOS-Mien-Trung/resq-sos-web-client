@@ -522,15 +522,15 @@ export const WINDY_LAYERS: {
   label: string;
   icon: React.ReactNode;
 }[] = [
-    { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
-    { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
-    {
-      id: "rain",
-      label: "Mưa",
-      icon: <Drop className="h-4 w-4" weight="fill" />,
-    },
-    { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
-  ];
+  { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
+  { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
+  {
+    id: "rain",
+    label: "Mưa",
+    icon: <Drop className="h-4 w-4" weight="fill" />,
+  },
+  { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
+];
 
 // ════════════════════════════════
 // Location Details Panel - Status Configs
@@ -631,6 +631,11 @@ export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
     label: "Tiếp tế",
     color: "text-purple-700 dark:text-purple-400",
     bgColor: "bg-purple-100 dark:bg-purple-900/30",
+  },
+  RETURN_SUPPLIES: {
+    label: "Trả đồ",
+    color: "text-cyan-700 dark:text-cyan-400",
+    bgColor: "bg-cyan-100 dark:bg-cyan-900/30",
   },
   COLLECT_SUPPLIES: {
     label: "Lấy vật tư",

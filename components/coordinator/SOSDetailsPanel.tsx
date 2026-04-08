@@ -196,7 +196,7 @@ function ParsedMessage({
             <div key={index} className="mb-1">
               <Badge
                 variant="destructive"
-                className="font-bold text-[10px] px-2 py-0 uppercase tracking-wider rounded"
+                className="font-bold text-xs px-2 py-0 uppercase tracking-wider rounded"
               >
                 {part.replace(/[\[\]]/g, "")}
               </Badge>
@@ -401,7 +401,7 @@ function FormulaTooltip({
         open &&
         createPortal(
           <div
-            className="fixed z-[9999] w-80 max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-3 text-[11px] leading-relaxed shadow-md"
+            className="fixed z-[9999] w-80 max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-3 text-xs leading-relaxed shadow-md"
             style={{ top: pos.top, left: pos.left }}
             onMouseEnter={() => setOpen(true)}
             onMouseLeave={() => setOpen(false)}
@@ -687,13 +687,40 @@ const SOSDetailsPanel = ({
       )
     : scoreRows;
 
-  const reporterDisplayName =
-    sosRequest.reporterName?.trim() ||
-    sosRequest.createdByCoordinatorName?.trim() ||
-    (sosRequest.createdByCoordinatorId &&
-    currentUser?.userId === sosRequest.createdByCoordinatorId
-      ? currentUser.fullName
-      : null);
+  const normalizeContactText = (value?: string | null) => {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : null;
+  };
+
+  const victimDisplayName = normalizeContactText(sosRequest.victimName);
+  const victimDisplayPhone = normalizeContactText(sosRequest.victimPhone);
+  const victimPrimaryContact = victimDisplayName || victimDisplayPhone;
+  const victimSecondaryContact =
+    victimDisplayName &&
+    victimDisplayPhone &&
+    victimDisplayName !== victimDisplayPhone
+      ? victimDisplayPhone
+      : null;
+
+  const reporterDisplayName = normalizeContactText(
+    sosRequest.reporterName ||
+      sosRequest.createdByCoordinatorName ||
+      (sosRequest.createdByCoordinatorId &&
+      currentUser?.userId === sosRequest.createdByCoordinatorId
+        ? currentUser.fullName
+        : null),
+  );
+  const reporterDisplayPhone = normalizeContactText(sosRequest.reporterPhone);
+  const reporterPrimaryContact = reporterDisplayName || reporterDisplayPhone;
+  const reporterSecondaryContact =
+    reporterDisplayName &&
+    reporterDisplayPhone &&
+    reporterDisplayName !== reporterDisplayPhone
+      ? reporterDisplayPhone
+      : null;
+  const reporterRoleLabel = sosRequest.isSentOnBehalf
+    ? "Người gửi hộ"
+    : "Người gửi SOS";
 
   return (
     <div
@@ -769,40 +796,63 @@ const SOSDetailsPanel = ({
         <ScrollArea className="flex-1">
           <div className="p-5 space-y-5">
             {/* Victim / Reporter Info */}
-            {(sosRequest.victimPhone ||
-              sosRequest.victimName ||
+            {(victimPrimaryContact ||
               sosRequest.address ||
-              reporterDisplayName ||
-              sosRequest.reporterPhone ||
+              reporterPrimaryContact ||
               sosRequest.isSentOnBehalf ||
               sosRequest.reporterIsOnline !== undefined) && (
               <div className="bg-muted/50 rounded-lg p-4">
                 <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
                   <Phone className="h-4 w-4" />
-                  Nạn nhân
+                  Thông tin liên hệ
                 </h4>
                 <div className="flex items-center justify-between">
                   <div className="text-sm space-y-1">
-                    {sosRequest.victimName && (
-                      <div className="font-medium">{sosRequest.victimName}</div>
+                    {victimPrimaryContact && (
+                      <div>
+                        <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                          Nạn nhân
+                        </span>
+                        <div className="font-medium">
+                          {victimPrimaryContact}
+                        </div>
+                        {victimSecondaryContact && (
+                          <div className="text-xs text-muted-foreground">
+                            {victimSecondaryContact}
+                          </div>
+                        )}
+                      </div>
                     )}
-                    {sosRequest.victimPhone && (
-                      <div className="text-muted-foreground">
-                        {sosRequest.victimPhone}
+                    {reporterPrimaryContact && (
+                      <div>
+                        <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                          {reporterRoleLabel}
+                        </span>
+                        <div className="font-medium">
+                          {reporterPrimaryContact}
+                        </div>
+                        {reporterSecondaryContact && (
+                          <div className="text-xs text-muted-foreground">
+                            {reporterSecondaryContact}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {!victimPrimaryContact &&
+                      !sosRequest.isSentOnBehalf &&
+                      reporterPrimaryContact && (
+                        <div className="text-xs text-muted-foreground">
+                          Người gửi đang là đầu mối liên hệ cho yêu cầu này.
+                        </div>
+                      )}
+                    {!victimPrimaryContact && !reporterPrimaryContact && (
+                      <div className="text-xs text-muted-foreground">
+                        Chưa có thông tin liên hệ của người gửi/nạn nhân.
                       </div>
                     )}
                     {sosRequest.address && (
                       <div className="text-xs text-muted-foreground">
                         Địa chỉ nhập tay: {sosRequest.address}
-                      </div>
-                    )}
-                    {(reporterDisplayName || sosRequest.reporterPhone) && (
-                      <div className="text-xs text-muted-foreground">
-                        Người tạo yêu cầu:{" "}
-                        {reporterDisplayName || "Người gửi SOS"}
-                        {sosRequest.reporterPhone
-                          ? ` • ${sosRequest.reporterPhone}`
-                          : ""}
                       </div>
                     )}
                   </div>
@@ -1103,7 +1153,7 @@ const SOSDetailsPanel = ({
                         <Badge
                           key={supply}
                           variant="outline"
-                          className="text-[11px] px-2 py-1"
+                          className="text-xs px-2 py-1"
                         >
                           {getSupplyLabel(supply)}
                         </Badge>
@@ -1228,10 +1278,7 @@ const SOSDetailsPanel = ({
                               )}
                             </div>
                             {person.gender && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10.5px]"
-                              >
+                              <Badge variant="outline" className="text-xs">
                                 {getClothingGenderLabel(person.gender)}
                               </Badge>
                             )}
@@ -1571,7 +1618,7 @@ const SOSDetailsPanel = ({
                           <div className="flex items-center gap-2">
                             <Badge
                               variant={PRIORITY_BADGE_VARIANT[sos.priority]}
-                              className="text-[10px] px-1.5 py-0 h-5"
+                              className="text-xs px-1.5 py-0 h-5"
                             >
                               {PRIORITY_LABELS[sos.priority]}
                             </Badge>

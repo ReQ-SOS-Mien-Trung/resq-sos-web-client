@@ -36,8 +36,8 @@ import {
   useBroadcastNotification,
 } from "@/services/noti_alert";
 import { WeatherApiCurrentPoint } from "@/type";
-import { geocodeCity } from "./geocode";
 import { Icon } from "@iconify/react";
+import { geocodeCity, reverseGeocodeCoordinates } from "./geocode";
 
 const LocationPickerMap = dynamic(() => import("./LocationPickerMap"), {
   ssr: false,
@@ -66,21 +66,24 @@ const ALERT_TYPE_META: Record<
   FLOOD_WARNING: {
     label: "Cảnh báo lũ lụt",
     icon: <Icon icon="line-md:alert" width="22" height="22" />,
-    activeClassName: "border-amber-500 bg-amber-50 text-amber-700 shadow-sm ring-2 ring-amber-300",
+    activeClassName:
+      "border-amber-500 bg-amber-50 text-amber-700 shadow-sm ring-2 ring-amber-300",
     inactiveClassName:
       "border-amber-200 bg-amber-50/50 text-amber-600 hover:bg-amber-50 hover:border-amber-300",
   },
   FLOOD_EMERGENCY: {
     label: "Khẩn cấp lũ lụt",
     icon: <Icon icon="carbon:flood-warning" width="24" height="24" />,
-    activeClassName: "border-red-500 bg-red-50 text-red-700 shadow-sm ring-2 ring-red-300",
+    activeClassName:
+      "border-red-500 bg-red-50 text-red-700 shadow-sm ring-2 ring-red-300",
     inactiveClassName:
       "border-red-200 bg-red-50/50 text-red-600 hover:bg-red-50 hover:border-red-300",
   },
   EVACUATION: {
     label: "Sơ tán",
     icon: <Icon icon="tabler:run" width="24" height="24" />,
-    activeClassName: "border-orange-500 bg-orange-50 text-orange-700 shadow-sm ring-2 ring-orange-300",
+    activeClassName:
+      "border-orange-500 bg-orange-50 text-orange-700 shadow-sm ring-2 ring-orange-300",
     inactiveClassName:
       "border-orange-200 bg-orange-50/50 text-orange-600 hover:bg-orange-50 hover:border-orange-300",
   },
@@ -344,6 +347,32 @@ export default function FloodAlertComposer({
     }
   };
 
+  const handlePickLocation = async (lat: number, lon: number) => {
+    const picked = {
+      lat: Number(lat.toFixed(6)),
+      lon: Number(lon.toFixed(6)),
+    };
+
+    setManualLocation(picked);
+
+    // Keep weather mode location label aligned with the selected WeatherAPI station.
+    if (effectiveMode !== "manual") {
+      return;
+    }
+
+    try {
+      const reverseResult = await reverseGeocodeCoordinates(
+        picked.lat,
+        picked.lon,
+      );
+      if (reverseResult?.displayName) {
+        setCity(reverseResult.displayName);
+      }
+    } catch {
+      // Keep existing city input when reverse geocoding is unavailable.
+    }
+  };
+
   const handleSend = () => {
     if (!title.trim() || !body.trim() || !city.trim()) {
       toast.error("Vui lòng điền đầy đủ tiêu đề và nội dung");
@@ -452,9 +481,7 @@ export default function FloodAlertComposer({
                 onClick={() => setType(item)}
                 className={cn(
                   "flex items-center gap-1.5 rounded-lg tracking-tighter border px-3 py-1.5 text-sm font-semibold transition-all",
-                  type === item
-                    ? meta.activeClassName
-                    : meta.inactiveClassName,
+                  type === item ? meta.activeClassName : meta.inactiveClassName,
                 )}
               >
                 {meta.icon}
@@ -520,14 +547,33 @@ export default function FloodAlertComposer({
                   </div>
                   <div className="mt-2 grid grid-cols-4 gap-1.5">
                     {[
-                      { icon: <Thermometer size={12} />, val: `${selectedWeatherPoint.temp_c}°C` },
-                      { icon: <Droplets className="h-3 w-3" />, val: `${selectedWeatherPoint.humidity}%` },
-                      { icon: <CloudRain size={12} />, val: `${selectedWeatherPoint.precip_mm}mm` },
-                      { icon: <Wind size={12} />, val: `${selectedWeatherPoint.wind_kph}km/h` },
+                      {
+                        icon: <Thermometer size={12} />,
+                        val: `${selectedWeatherPoint.temp_c}°C`,
+                      },
+                      {
+                        icon: <Droplets className="h-3 w-3" />,
+                        val: `${selectedWeatherPoint.humidity}%`,
+                      },
+                      {
+                        icon: <CloudRain size={12} />,
+                        val: `${selectedWeatherPoint.precip_mm}mm`,
+                      },
+                      {
+                        icon: <Wind size={12} />,
+                        val: `${selectedWeatherPoint.wind_kph}km/h`,
+                      },
                     ].map((s, i) => (
-                      <div key={i} className="rounded-md bg-white/80 px-2 py-1.5 text-center">
-                        <div className="flex justify-center text-muted-foreground">{s.icon}</div>
-                        <p className="mt-0.5 text-xs font-semibold text-foreground">{s.val}</p>
+                      <div
+                        key={i}
+                        className="rounded-md bg-white/80 px-2 py-1.5 text-center"
+                      >
+                        <div className="flex justify-center text-muted-foreground">
+                          {s.icon}
+                        </div>
+                        <p className="mt-0.5 text-xs font-semibold text-foreground">
+                          {s.val}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -536,7 +582,10 @@ export default function FloodAlertComposer({
                     <div className="mt-2 rounded-md border border-amber-200/70 bg-amber-50/60 p-2">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-muted-foreground">
-                          Gợi ý: <strong className="text-foreground">{suggestedDraft.severityLabel}</strong>
+                          Gợi ý:{" "}
+                          <strong className="text-foreground">
+                            {suggestedDraft.severityLabel}
+                          </strong>
                         </span>
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
                           {ALERT_TYPE_META[suggestedDraft.type].label}
@@ -580,15 +629,18 @@ export default function FloodAlertComposer({
               <div className="space-y-1.5">
                 {MANUAL_PRESETS.map((preset) => {
                   const meta = ALERT_TYPE_META[preset.type];
-                  const isActive = title === preset.title && type === preset.type;
+                  const isActive =
+                    title === preset.title && type === preset.type;
                   return (
                     <button
                       key={preset.type}
                       type="button"
                       onClick={() => applyManualPreset(preset)}
                       className={cn(
-                        "flex w-full items-center gap-2 tracking-tighter mt-1 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all hover:shadow-sm",
-                        isActive ? meta.activeClassName : meta.inactiveClassName,
+                        "flex w-full items-center gap-2 tracking-tighter mt-1 rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-all hover:shadow-sm",
+                        isActive
+                          ? meta.activeClassName
+                          : meta.inactiveClassName,
                       )}
                     >
                       {meta.icon}
@@ -626,22 +678,40 @@ export default function FloodAlertComposer({
                 onClick={() => void handleSearchCity()}
                 disabled={isPending || isGeocoding}
               >
-                {isGeocoding ? <Spinner size={14} className="animate-spin" /> : <MapPin size={14} />}
+                {isGeocoding ? (
+                  <Spinner size={14} className="animate-spin" />
+                ) : (
+                  <MapPin size={14} />
+                )}
               </Button>
             </div>
-            <div className="overflow-hidden rounded-lg border border-border/60">
+
+            <div className="relative overflow-hidden rounded-lg border border-border/60">
+              <div className="pointer-events-none absolute left-2 top-2 z-450 rounded-md border border-border/70 bg-background/95 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                  Tọa độ đã chọn
+                </p>
+                {manualLocation ? (
+                  <p className="mt-0.5 font-mono text-sm font-semibold text-foreground">
+                    {manualLocation.lat.toFixed(6)},{" "}
+                    {manualLocation.lon.toFixed(6)}
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Chưa chọn điểm trên bản đồ
+                  </p>
+                )}
+              </div>
+
               <LocationPickerMap
                 lat={manualLocation?.lat}
                 lon={manualLocation?.lon}
-                onPick={(lat, lon) => setManualLocation({ lat, lon })}
+                heightClassName="h-[280px]"
+                onPick={(pickedLat, pickedLon) => {
+                  void handlePickLocation(pickedLat, pickedLon);
+                }}
               />
             </div>
-            {manualLocation && (
-              <p className="flex items-center gap-1 text-xs tracking-tighter text-emerald-600">
-                <MapPin size={10} weight="fill" />
-                Đã chọn vị trí ({manualLocation.lat.toFixed(4)}, {manualLocation.lon.toFixed(4)})
-              </p>
-            )}
           </div>
         </div>
 
@@ -649,7 +719,10 @@ export default function FloodAlertComposer({
         <div className="space-y-1">
           {/* Title */}
           <div>
-            <Label htmlFor="flood-alert-title" className="mb-2 block text-sm tracking-tighter font-medium text-muted-foreground">
+            <Label
+              htmlFor="flood-alert-title"
+              className="mb-2 block text-sm tracking-tighter font-medium text-muted-foreground"
+            >
               Tiêu đề <span className="text-red-500">*</span>
             </Label>
             <Input
@@ -667,7 +740,10 @@ export default function FloodAlertComposer({
 
           {/* Body */}
           <div>
-            <Label htmlFor="flood-alert-body" className="mb-2 block text-sm tracking-tighter font-medium text-muted-foreground">
+            <Label
+              htmlFor="flood-alert-body"
+              className="mb-2 block text-sm tracking-tighter font-medium text-muted-foreground"
+            >
               Nội dung <span className="text-red-500">*</span>
             </Label>
             <Textarea
@@ -692,14 +768,17 @@ export default function FloodAlertComposer({
               className="mt-1 h-4 w-4 rounded border-border accent-red-600"
             />
             <span className="text-sm tracking-tighter leading-relaxed text-amber-900">
-              Tôi xác nhận phát cảnh báo này đến <strong>toàn bộ người dùng</strong>. Thông báo sẽ gửi ngay và không thể hoàn tác.
+              Tôi xác nhận phát cảnh báo này đến{" "}
+              <strong>toàn bộ người dùng</strong>. Thông báo sẽ gửi ngay và
+              không thể hoàn tác.
             </span>
           </label>
 
           <div className="flex items-start gap-2 rounded-lg border border-red-200/60 bg-red-50/50 px-3 py-2 text-sm text-red-700">
             <Warning size={18} weight="fill" className="mt-0.5 shrink-0" />
             <p>
-              Nội dung gợi ý từ WeatherAPI chưa phải cảnh báo chính thức từ cơ quan chuyên trách.
+              Nội dung gợi ý từ WeatherAPI chưa phải cảnh báo chính thức từ cơ
+              quan chuyên trách.
             </p>
           </div>
 

@@ -60,6 +60,37 @@ export class DepotRealtimeClient {
     }
   }
 
+  private async waitForConnected(
+    connection: HubConnection,
+    timeoutMs = 8000,
+  ): Promise<void> {
+    const startedAt = Date.now();
+
+    while (
+      connection.state === HubConnectionState.Connecting ||
+      connection.state === HubConnectionState.Reconnecting
+    ) {
+      if (Date.now() - startedAt >= timeoutMs) {
+        throw new Error(
+          "Depot realtime connection did not reach the connected state in time.",
+        );
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+
+    if (connection.state !== HubConnectionState.Connected) {
+      throw new Error(
+        `Depot realtime connection is not connected (state=${connection.state}).`,
+      );
+    }
+  }
+
+  private isNotConnectedInvokeError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    return /not in the 'Connected' State/i.test(message);
+  }
+
   private buildConnection(): HubConnection {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, "") || "";
 
@@ -133,23 +164,19 @@ export class DepotRealtimeClient {
   async start(): Promise<void> {
     const connection = this.getOrCreateConnection();
 
-    if (
-      connection.state === HubConnectionState.Connected ||
-      connection.state === HubConnectionState.Connecting ||
-      connection.state === HubConnectionState.Reconnecting
-    ) {
+    if (connection.state === HubConnectionState.Connected) {
       return;
     }
 
     if (connection.state === HubConnectionState.Disconnecting) {
       await this.waitForDisconnected(connection);
-      const currentState = connection.state;
-      if (currentState !== HubConnectionState.Disconnected) {
-        return;
-      }
     }
 
-    await connection.start();
+    if (connection.state === HubConnectionState.Disconnected) {
+      await connection.start();
+    }
+
+    await this.waitForConnected(connection);
   }
 
   async stop(): Promise<void> {
@@ -176,14 +203,26 @@ export class DepotRealtimeClient {
       return;
     }
 
-    await this.start();
-    const connection = this.getOrCreateConnection();
-    await connection.invoke(
-      DEPOT_REALTIME_METHODS.JoinDepotGroup,
-      missionId,
-      depotId,
-    );
-    this.joinedGroups.set(streamKey, { missionId, depotId, refCount: 1 });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await this.start();
+      const connection = this.getOrCreateConnection();
+
+      try {
+        await connection.invoke(
+          DEPOT_REALTIME_METHODS.JoinDepotGroup,
+          missionId,
+          depotId,
+        );
+        this.joinedGroups.set(streamKey, { missionId, depotId, refCount: 1 });
+        return;
+      } catch (error) {
+        if (attempt === 0 && this.isNotConnectedInvokeError(error)) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
   }
 
   async leaveDepotGroup(

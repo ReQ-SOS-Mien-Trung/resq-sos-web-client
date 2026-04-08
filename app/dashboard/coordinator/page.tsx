@@ -133,8 +133,9 @@ function toStatus(status: string): "PENDING" | "ASSIGNED" | "RESCUED" {
 /** Convert SOSRequestEntity from API to SOSRequest used by UI */
 function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
   const sd = entity.structuredData;
-  const victimInfo = entity.victimInfo ?? entity.senderInfo ?? null;
-  const reporterInfo = entity.reporterInfo ?? null;
+  const victimInfo = entity.victimInfo ?? null;
+  // Prefer explicit reporter info. Keep senderInfo as backward-compatible fallback.
+  const reporterInfo = entity.reporterInfo ?? entity.senderInfo ?? null;
   const nm = entity.networkMetadata;
   const supplies = sd?.supplies ?? [];
   const supplyDetails = sd?.supply_details;
@@ -957,37 +958,44 @@ const CoordinatorDashboardContent = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Coordinator Chat Navigation */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push("/dashboard/coordinator/chat")}
-            className="flex items-center gap-2"
-          >
-            <ChatCircleDots className="h-4 w-4" />
-            <span>Chat với Victim</span>
-          </Button>
+          {/* Compact coordinator navigation group */}
+          <div className="flex items-center gap-1 rounded-xl border bg-muted/40 p-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/dashboard/coordinator/chat")}
+              className="h-8 gap-1.5 rounded-lg px-2.5 text-xs font-semibold"
+              title="Chat với Victim"
+              aria-label="Chat với Victim"
+            >
+              <ChatCircleDots className="h-4 w-4" />
+              <span>Chat</span>
+            </Button>
 
-          {/* Rescue Teams Navigation */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push("/dashboard/coordinator/rescue-teams")}
-            className="flex items-center gap-2"
-          >
-            <UsersThree className="h-4 w-4" />
-            <span>Quản lý Đội cứu hộ</span>
-          </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/dashboard/coordinator/rescue-teams")}
+              className="h-8 gap-1.5 rounded-lg px-2.5 text-xs font-semibold"
+              title="Quản lý Đội cứu hộ"
+              aria-label="Quản lý Đội cứu hộ"
+            >
+              <UsersThree className="h-4 w-4" />
+              <span>Đội</span>
+            </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push("/dashboard/coordinator/rescuers")}
-            className="flex items-center gap-2"
-          >
-            <User className="h-4 w-4" />
-            <span>Quản lý Rescuer</span>
-          </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/dashboard/coordinator/rescuers")}
+              className="h-8 gap-1.5 rounded-lg px-2.5 text-xs font-semibold"
+              title="Quản lý Rescuer"
+              aria-label="Quản lý Rescuer"
+            >
+              <User className="h-4 w-4" />
+              <span>Rescuer</span>
+            </Button>
+          </div>
 
           {/* Connection Status */}
           <div
@@ -1194,43 +1202,6 @@ const CoordinatorDashboardContent = () => {
                   <span className="tracking-wide">TẠO YÊU CẦU SOS</span>
                 </Button>
               </div>
-
-              {/* Floating Stats Panel */}
-              {!sosDetailOpen && (
-                <div className="absolute top-4 right-4 z-[40]">
-                  <div className="bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-4">
-                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                      Thống kê thời gian thực
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                      <div>
-                        <div className="text-2xl font-bold text-red-500">
-                          {
-                            sosRequests.filter(
-                              (s) =>
-                                s.priority === "P1" && s.status === "PENDING",
-                            ).length
-                          }
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          P1 Rất nghiêm trọng
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-green-500">
-                          {
-                            rescuers.filter((r) => r.status === "AVAILABLE")
-                              .length
-                          }
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Đội sẵn sàng
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* SOS Details Panel */}
               <SOSDetailsPanel

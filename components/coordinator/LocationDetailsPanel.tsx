@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DepotEntity } from "@/services/depot/type";
 import {
@@ -35,12 +35,6 @@ import {
 } from "@/components/ui/select";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import type { InventoryItemEntity } from "@/services/inventory/type";
-import {
-  formatInventoryTargetGroups,
-  getInventoryAvailable,
-  getInventoryTotal,
-  getInventoryTotalReserved,
-} from "@/services/inventory/utils";
 import { vi } from "date-fns/locale";
 import {
   X,
@@ -50,32 +44,48 @@ import {
   Phone,
   EnvelopeSimple,
   Package,
-  NavigationArrow,
-  ShareNetwork,
-  BookmarkSimple,
-  DotsThree,
   Users,
   Hash,
   Info,
   CalendarBlank,
   CaretDown,
   CaretUp,
+  ArrowsClockwise,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { AxiosError } from "axios";
 import { LocationDetailsPanelProps } from "@/type";
 import { depotStatusConfig, assemblyPointStatusConfig } from "@/lib/constants";
 import { ChartBar } from "lucide-react";
+import {
+  getBackendCircuitBlockedUntil,
+  releaseBackendCircuitForRetry,
+} from "@/lib/backend-circuit";
+import { useBackendConnectionStore } from "@/stores/backend-connection.store";
 
 // Panel width
 const PANEL_WIDTH = 420;
 const INVENTORY_PAGE_SIZE = 10;
 
-const assemblyTeamTypeLabel: Record<AssemblyPointTeam["teamType"], string> = {
+const assemblyTeamTypeLabel: Record<string, string> = {
   Rescue: "Cứu hộ",
   Medical: "Y tế",
   Transportation: "Vận chuyển",
+  Mixed: "Tổng hợp",
+  MIXED: "Tổng hợp",
 };
+
+function getAssemblyTeamTypeLabel(teamType: unknown): string {
+  const rawType = String(teamType ?? "").trim();
+  if (!rawType) return "Không xác định";
+
+  return (
+    assemblyTeamTypeLabel[rawType] ??
+    assemblyTeamTypeLabel[rawType.toUpperCase()] ??
+    formatStatusText(rawType.replace(/_/g, " "))
+  );
+}
 
 const assemblyTeamStatusLabel: Record<string, string> = {
   AwaitingAcceptance: "Chờ xác nhận",
@@ -188,6 +198,20 @@ function getMinimumGatheringDate(now = new Date()): Date {
   // Keep minute precision to match picker values.
   date.setSeconds(0, 0);
   return date;
+}
+
+function formatRetryTime(blockedUntil: number | null): string | null {
+  if (!blockedUntil) return null;
+
+  try {
+    return new Date(blockedUntil).toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return null;
+  }
 }
 
 function extractBackendErrorMessage(error: unknown): string | null {
@@ -360,8 +384,9 @@ function getInventoryQuantities(item: InventoryItemEntity): {
     const total = toFiniteNumber(item.unit, 0);
     const reserved = toFiniteNumber(
       item.reservedUnit ??
-        item.totalReservedQuantity ??
-        item.reservedForMissionQuantity,
+        item.totalReservedUnits ??
+        item.reservedForMissionUnit ??
+        item.reservedForMissionUnits,
       0,
     );
     const available = toFiniteNumber(
@@ -399,36 +424,124 @@ function getDepotManagerDisplayName(manager: DepotEntity["manager"]): string {
   return fullName || manager.email || manager.phone || "Chưa có quản lý";
 }
 
+function BackendConnectionErrorPanel({
+  onClose,
+  onRetry,
+  blockedUntil,
+  message,
+}: {
+  onClose: () => void;
+  onRetry: () => void;
+  blockedUntil: number | null;
+  message: string | null;
+}) {
+  const retryAt = formatRetryTime(blockedUntil);
+
+  return (
+    <div className="h-full bg-background border-r shadow-2xl flex flex-col">
+      <div className="relative h-20 shrink-0 border-b bg-linear-to-br from-[#FF5722]/15 via-background to-background">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-3 right-3 h-8 w-8 rounded-full"
+          onClick={onClose}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="flex-1 px-6 py-7 flex flex-col items-center justify-center text-center">
+        <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full border border-[#FF5722]/30 bg-[#FF5722]/10 text-[#FF5722]">
+          <WarningCircle className="h-7 w-7" weight="fill" />
+        </div>
+
+        <h3 className="text-base font-semibold tracking-tight">
+          Mất kết nối backend API
+        </h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Hệ thống đang tạm dừng gửi request để tránh spam khi backend không
+          phản hồi.
+        </p>
+
+        {retryAt ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Tạm khóa gọi API đến {retryAt}.
+          </p>
+        ) : null}
+
+        {message ? (
+          <p className="mt-2 max-w-[20rem] text-xs text-[#FF5722]">{message}</p>
+        ) : null}
+
+        <Button
+          type="button"
+          className="mt-5 bg-[#FF5722] text-white hover:bg-[#E64A19]"
+          onClick={onRetry}
+        >
+          <ArrowsClockwise className="mr-1.5 h-4 w-4" />
+          Thử kết nối lại
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 const LocationDetailsPanel = ({
   open,
   onOpenChange,
   location,
 }: LocationDetailsPanelProps) => {
+  const backendStatus = useBackendConnectionStore((state) => state.status);
+  const backendBlockedUntil = useBackendConnectionStore(
+    (state) => state.blockedUntil,
+  );
+  const backendErrorMessage = useBackendConnectionStore(
+    (state) => state.lastErrorMessage,
+  );
+
+  const isBackendOffline = backendStatus === "offline";
+  const retryBlockUntil = useMemo(
+    () => backendBlockedUntil ?? getBackendCircuitBlockedUntil(),
+    [backendBlockedUntil],
+  );
+  const handleRetryBackendConnection = useCallback(() => {
+    releaseBackendCircuitForRetry();
+  }, []);
+
   if (!location && !open) return null;
 
   return (
     <div
       className={cn(
-        "absolute top-0 left-0 h-full z-[1000] transition-all duration-300 ease-in-out",
+        "absolute top-0 left-0 h-full z-1000 transition-all duration-300 ease-in-out",
         open
           ? "opacity-100 translate-x-0"
           : "opacity-0 -translate-x-full pointer-events-none",
       )}
       style={{ width: PANEL_WIDTH }}
     >
-      <div className="h-full bg-background border-r shadow-2xl overflow-y-auto">
-        {location?.type === "depot" ? (
-          <DepotDetails
-            depot={location.data}
-            onClose={() => onOpenChange(false)}
-          />
-        ) : location?.type === "assemblyPoint" ? (
-          <AssemblyPointDetails
-            assemblyPoint={location.data}
-            onClose={() => onOpenChange(false)}
-          />
-        ) : null}
-      </div>
+      {isBackendOffline ? (
+        <BackendConnectionErrorPanel
+          onClose={() => onOpenChange(false)}
+          onRetry={handleRetryBackendConnection}
+          blockedUntil={retryBlockUntil}
+          message={backendErrorMessage}
+        />
+      ) : (
+        <div className="h-full bg-background border-r shadow-2xl overflow-y-auto">
+          {location?.type === "depot" ? (
+            <DepotDetails
+              depot={location.data}
+              onClose={() => onOpenChange(false)}
+            />
+          ) : location?.type === "assemblyPoint" ? (
+            <AssemblyPointDetails
+              assemblyPoint={location.data}
+              onClose={() => onOpenChange(false)}
+            />
+          ) : null}
+        </div>
+      )}
     </div>
   );
 };
@@ -453,11 +566,17 @@ function DepotDetails({
     data: inventoryData,
     isLoading: isInventoryLoading,
     isError: isInventoryError,
+    isFetching: isInventoryFetching,
+    refetch: refetchInventory,
   } = useDepotInventory({
     depotId: depot.id,
     pageNumber: inventoryPageNumber,
     pageSize: INVENTORY_PAGE_SIZE,
   });
+
+  const handleRefreshInventory = useCallback(() => {
+    void refetchInventory();
+  }, [refetchInventory]);
 
   const statusConfig = depotStatusConfig[depot.status];
   const StatusIcon = statusConfig.icon;
@@ -577,28 +696,20 @@ function DepotDetails({
         </div>
       </div>
 
-      {/* Quick Actions - Google Maps style */}
+      {/* Quick Actions */}
       <div className="px-5 py-3 border-b shrink-0">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           <ActionButton
-            icon={<NavigationArrow className="h-5 w-5" weight="fill" />}
-            label="Chỉ đường"
-            color="text-blue-600 dark:text-blue-400"
-          />
-          <ActionButton
-            icon={<BookmarkSimple className="h-5 w-5" />}
-            label="Lưu"
-            color="text-blue-600 dark:text-blue-400"
-          />
-          <ActionButton
-            icon={<ShareNetwork className="h-5 w-5" />}
-            label="Chia sẻ"
-            color="text-blue-600 dark:text-blue-400"
-          />
-          <ActionButton
-            icon={<DotsThree className="h-5 w-5" weight="bold" />}
-            label="Thêm"
-            color="text-blue-600 dark:text-blue-400"
+            icon={
+              <ArrowsClockwise
+                className={cn("h-5 w-5", isInventoryFetching && "animate-spin")}
+              />
+            }
+            label="Làm mới tồn kho"
+            color="text-[#FF5722]"
+            active={isInventoryFetching}
+            disabled={isInventoryFetching}
+            onClick={handleRefreshInventory}
           />
         </div>
       </div>
@@ -875,12 +986,14 @@ function AssemblyPointDetails({
     data: assemblyPointDetail,
     isLoading: isAssemblyPointDetailLoading,
     isError: isAssemblyPointDetailError,
+    isFetching: isAssemblyPointDetailFetching,
     refetch: refetchAssemblyPointDetail,
   } = useAssemblyPointById(assemblyPoint.id, { enabled: true });
   const {
     data: assemblyPointEvents,
     isLoading: isAssemblyPointEventsLoading,
     isError: isAssemblyPointEventsError,
+    isFetching: isAssemblyPointEventsFetching,
     refetch: refetchAssemblyPointEvents,
   } = useAssemblyPointEvents(assemblyPoint.id, {
     enabled: true,
@@ -1030,7 +1143,20 @@ function AssemblyPointDetails({
     hasActiveEvent && selectedEvent?.status !== "Gathering";
   const shouldShowCreateTeam =
     hasActiveEvent && selectedEvent?.status === "Gathering";
+  const canToggleSchedule = !hasActiveEvent;
+  const canOpenCheckIn =
+    shouldShowOpenCheckIn && !isStartingGathering && !!selectedEventId;
+  const canCreateTeam = shouldShowCreateTeam;
+  const checkInActionLabel =
+    selectedEvent?.status === "Gathering" ? "Đang check-in" : "Mở check-in";
+  const isRefreshingAssemblyData =
+    isAssemblyPointDetailFetching || isAssemblyPointEventsFetching;
   const assemblyPointImageUrl = displayAssemblyPoint.imageUrl?.trim() || null;
+
+  const handleRefreshAssemblyData = useCallback(() => {
+    void refetchAssemblyPointDetail();
+    void refetchAssemblyPointEvents();
+  }, [refetchAssemblyPointDetail, refetchAssemblyPointEvents]);
 
   const handleCreateTeam = () => {
     const eventId = selectedEvent?.eventId ?? selectedEventId;
@@ -1118,49 +1244,72 @@ function AssemblyPointDetails({
 
       {/* Quick Actions */}
       <div className="px-5 py-3 border-b shrink-0">
-        <div className="flex items-center justify-between">
-          <ActionButton
-            icon={<NavigationArrow className="h-5 w-5" weight="fill" />}
-            label="Chỉ đường"
-            color="text-purple-600 dark:text-purple-400"
-          />
-          <ActionButton
-            icon={<BookmarkSimple className="h-5 w-5" />}
-            label="Lưu"
-            color="text-purple-600 dark:text-purple-400"
-          />
-          <ActionButton
-            icon={<ShareNetwork className="h-5 w-5" />}
-            label="Chia sẻ"
-            color="text-purple-600 dark:text-purple-400"
-          />
-          {hasActiveEvent ? (
-            shouldShowOpenCheckIn ? (
-              <ActionButton
-                icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
-                label="Mở check-in"
-                color="text-[#FF5722]"
-                active={isStartingGathering}
-                disabled={isStartingGathering || !selectedEventId}
-                onClick={handleStartGathering}
-              />
-            ) : shouldShowCreateTeam ? (
-              <ActionButton
-                icon={<Users className="h-5 w-5" />}
-                label="Tạo team"
-                color="text-purple-600 dark:text-purple-400"
-                onClick={handleCreateTeam}
-              />
-            ) : null
-          ) : (
+        <div className="grid grid-cols-4 gap-2">
+          <div className="flex justify-center">
             <ActionButton
               icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
-              label={showScheduleForm ? "Ẩn triệu tập" : "Triệu tập mới"}
-              color="text-[#FF5722]"
-              active={!hasActiveEvent && showScheduleForm}
-              onClick={() => setShowScheduleForm((prev) => !prev)}
+              label={showScheduleForm ? "Ẩn triệu tập" : "Triệu tập"}
+              color={
+                canToggleSchedule
+                  ? "text-[#FF5722]"
+                  : "text-slate-600 dark:text-slate-300"
+              }
+              active={canToggleSchedule && showScheduleForm}
+              disabled={!canToggleSchedule}
+              onClick={
+                canToggleSchedule
+                  ? () => setShowScheduleForm((prev) => !prev)
+                  : undefined
+              }
             />
-          )}
+          </div>
+
+          <div className="flex justify-center">
+            <ActionButton
+              icon={<Hash className="h-5 w-5" weight="bold" />}
+              label={checkInActionLabel}
+              color={
+                canOpenCheckIn
+                  ? "text-[#FF5722]"
+                  : "text-slate-600 dark:text-slate-300"
+              }
+              active={isStartingGathering}
+              disabled={!canOpenCheckIn}
+              onClick={canOpenCheckIn ? handleStartGathering : undefined}
+            />
+          </div>
+
+          <div className="flex justify-center">
+            <ActionButton
+              icon={<Users className="h-5 w-5" />}
+              label="Tạo team"
+              color={
+                canCreateTeam
+                  ? "text-[#FF5722]"
+                  : "text-slate-600 dark:text-slate-300"
+              }
+              disabled={!canCreateTeam}
+              onClick={canCreateTeam ? handleCreateTeam : undefined}
+            />
+          </div>
+
+          <div className="flex justify-center">
+            <ActionButton
+              icon={
+                <ArrowsClockwise
+                  className={cn(
+                    "h-5 w-5",
+                    isRefreshingAssemblyData && "animate-spin",
+                  )}
+                />
+              }
+              label="Làm mới"
+              color="text-slate-600 dark:text-slate-300"
+              active={isRefreshingAssemblyData}
+              disabled={isRefreshingAssemblyData}
+              onClick={handleRefreshAssemblyData}
+            />
+          </div>
         </div>
 
         {!hasActiveEvent && showScheduleForm && (
@@ -1377,7 +1526,7 @@ function AssemblyPointDetails({
                     </div>
 
                     <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{assemblyTeamTypeLabel[team.teamType]}</span>
+                      <span>{getAssemblyTeamTypeLabel(team.teamType)}</span>
                       <span>•</span>
                       <span>
                         {team.members.length}/{team.maxMembers} thành viên
@@ -1553,7 +1702,7 @@ function AssemblyDateTimePicker({
       </PopoverTrigger>
 
       <PopoverContent
-        className="z-1200 w-[calc(100vw-20px)] max-w-[340px] space-y-2.5 p-2.5"
+        className="z-1200 w-[calc(100vw-20px)] max-w-85 space-y-2.5 p-2.5"
         align="start"
         side="bottom"
         sideOffset={6}

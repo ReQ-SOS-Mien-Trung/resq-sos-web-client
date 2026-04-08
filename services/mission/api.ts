@@ -19,6 +19,7 @@ import {
   ActivityRouteResponse,
   GetActivityRouteParams,
   GetMissionTeamRouteParams,
+  MissionTeamRouteLeg,
   MissionTeamRouteResponse,
 } from "./type";
 
@@ -30,6 +31,78 @@ function toNumberOrZero(value: unknown): number {
         ? Number(value)
         : Number.NaN;
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toTrimmedStringOrNull(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function formatRouteDistanceText(distanceMeters: number): string {
+  if (distanceMeters < 1000) {
+    return `${distanceMeters}m`;
+  }
+
+  return `${(distanceMeters / 1000).toFixed(1)} km`;
+}
+
+function formatRouteDurationText(durationSeconds: number): string {
+  if (durationSeconds < 60) {
+    return `${durationSeconds}s`;
+  }
+
+  const mins = Math.floor(durationSeconds / 60);
+  if (mins < 60) {
+    return `${mins} phút`;
+  }
+
+  const hrs = Math.floor(mins / 60);
+  const remainMins = mins % 60;
+  return remainMins > 0 ? `${hrs}h ${remainMins}p` : `${hrs}h`;
+}
+
+function normalizeMissionTeamRouteLeg(
+  leg: MissionTeamRouteLeg,
+): MissionTeamRouteLeg {
+  const distanceMeters = toNumberOrZero(leg?.distanceMeters);
+  const durationSeconds = toNumberOrZero(leg?.durationSeconds);
+  const overviewPolyline = toTrimmedStringOrNull(leg?.overviewPolyline);
+
+  return {
+    ...leg,
+    segmentIndex: toNumberOrNull(leg?.segmentIndex),
+    fromStep: toNumberOrNull(leg?.fromStep),
+    toStep: toNumberOrNull(leg?.toStep),
+    fromLatitude: toNumberOrNull(leg?.fromLatitude),
+    fromLongitude: toNumberOrNull(leg?.fromLongitude),
+    toLatitude: toNumberOrNull(leg?.toLatitude),
+    toLongitude: toNumberOrNull(leg?.toLongitude),
+    distanceMeters,
+    distanceText:
+      toTrimmedStringOrNull(leg?.distanceText) ??
+      formatRouteDistanceText(distanceMeters),
+    durationSeconds,
+    durationText:
+      toTrimmedStringOrNull(leg?.durationText) ??
+      formatRouteDurationText(durationSeconds),
+    overviewPolyline,
+    vehicleUsed: toTrimmedStringOrNull(leg?.vehicleUsed),
+    status:
+      toTrimmedStringOrNull(leg?.status) ??
+      (overviewPolyline ? "OK" : "NO_ROUTE"),
+    errorMessage: toTrimmedStringOrNull(leg?.errorMessage),
+  };
 }
 
 function normalizeActivityRouteResponse(
@@ -59,10 +132,34 @@ function normalizeActivityRouteResponse(
 function normalizeMissionTeamRouteResponse(
   response: MissionTeamRouteResponse,
 ): MissionTeamRouteResponse {
+  const normalizedLegs = Array.isArray(response?.legs)
+    ? response.legs.map(normalizeMissionTeamRouteLeg)
+    : [];
+
+  const legDistanceMeters = normalizedLegs.reduce(
+    (sum, leg) => sum + toNumberOrZero(leg.distanceMeters),
+    0,
+  );
+  const legDurationSeconds = normalizedLegs.reduce(
+    (sum, leg) => sum + toNumberOrZero(leg.durationSeconds),
+    0,
+  );
+
+  const hasLegPolyline = normalizedLegs.some(
+    (leg) =>
+      typeof leg.overviewPolyline === "string" &&
+      leg.overviewPolyline.trim().length > 0,
+  );
+
+  const normalizedOverviewPolyline =
+    typeof response?.overviewPolyline === "string"
+      ? response.overviewPolyline
+      : null;
+
   const normalizedStatus =
     typeof response?.status === "string" && response.status.trim()
       ? response.status.trim()
-      : response?.overviewPolyline
+      : normalizedOverviewPolyline || hasLegPolyline
         ? "OK"
         : "NO_ROUTE";
 
@@ -76,14 +173,13 @@ function normalizeMissionTeamRouteResponse(
     ...response,
     status: normalizedStatus,
     errorMessage: normalizedErrorMessage,
-    totalDistanceMeters: toNumberOrZero(response?.totalDistanceMeters),
-    totalDurationSeconds: toNumberOrZero(response?.totalDurationSeconds),
-    overviewPolyline:
-      typeof response?.overviewPolyline === "string"
-        ? response.overviewPolyline
-        : null,
+    totalDistanceMeters:
+      toNumberOrZero(response?.totalDistanceMeters) || legDistanceMeters,
+    totalDurationSeconds:
+      toNumberOrZero(response?.totalDurationSeconds) || legDurationSeconds,
+    overviewPolyline: normalizedOverviewPolyline,
     waypoints: Array.isArray(response?.waypoints) ? response.waypoints : [],
-    legs: Array.isArray(response?.legs) ? response.legs : [],
+    legs: normalizedLegs,
   };
 }
 

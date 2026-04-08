@@ -51,6 +51,7 @@ export type ClusterActivityType =
   | "EVACUATE"
   | "DELIVER_SUPPLIES"
   | "COLLECT_SUPPLIES"
+  | "RETURN_SUPPLIES"
   | "MIXED";
 
 // Supply collection details
@@ -82,6 +83,10 @@ export interface ClusterSuggestedActivity {
   description: string;
   priority: string;
   estimatedTime: string;
+  executionMode?: string | null;
+  requiredTeamCount?: number | null;
+  coordinationGroupKey?: string | null;
+  coordinationNotes?: string | null;
   sosRequestId: number | null;
   depotId: number | null;
   depotName: string | null;

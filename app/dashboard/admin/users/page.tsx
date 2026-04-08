@@ -2,13 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
-import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import { UserStats, UserTable, UserDetailSheet } from "@/components/admin/users";
-import { useAdminUsers, useBanUser, useUnbanUser, ADMIN_USERS_QUERY_KEY } from "@/services/user/hooks";
+import {
+  UserStats,
+  UserTable,
+  UserDetailSheet,
+} from "@/components/admin/users";
+import {
+  useAdminUsers,
+  useBanUser,
+  useUnbanUser,
+  ADMIN_USERS_QUERY_KEY,
+} from "@/services/user/hooks";
 import { UserEntity } from "@/services/user/type";
 import { User } from "@/type";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient } from "@tanstack/react-query";
@@ -51,7 +66,9 @@ const UsersPage = () => {
   const [banReason, setBanReason] = useState("");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
-  const [detailSheetMode, setDetailSheetMode] = useState<"view" | "edit">("view");
+  const [detailSheetMode, setDetailSheetMode] = useState<"view" | "edit">(
+    "view",
+  );
 
   // Load sidebar layout data
   useEffect(() => {
@@ -69,7 +86,7 @@ const UsersPage = () => {
 
   const dynamicStats = {
     total: usersData?.totalCount ?? 0,
-    active: (usersData?.items?.filter((u) => !u.isBanned).length) ?? 0,
+    active: usersData?.items?.filter((u) => !u.isBanned).length ?? 0,
     pending: 0,
     banned: usersData?.items?.filter((u) => u.isBanned).length ?? 0,
   };
@@ -102,7 +119,7 @@ const UsersPage = () => {
           toast.dismiss();
           toast.error("Có lỗi xảy ra khi cấm người dùng");
         },
-      }
+      },
     );
   };
 
@@ -125,7 +142,14 @@ const UsersPage = () => {
     <DashboardLayout
       favorites={dashboardData?.favorites ?? []}
       projects={dashboardData?.projects ?? []}
-      cloudStorage={dashboardData?.cloudStorage ?? { used: 0, total: 0, percentage: 0, unit: "GB" }}
+      cloudStorage={
+        dashboardData?.cloudStorage ?? {
+          used: 0,
+          total: 0,
+          percentage: 0,
+          unit: "GB",
+        }
+      }
     >
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
@@ -144,7 +168,9 @@ const UsersPage = () => {
             </p>
           </div>
           <button
-            onClick={() => window.location.href = "/dashboard/admin/users/create"}
+            onClick={() =>
+              (window.location.href = "/dashboard/admin/users/create")
+            }
             className="px-2 sm:px-4 py-4 bg-black text-white text-[12px] sm:text-[14px] font-bold uppercase tracking-tighter hover:bg-[#FF5722] transition-colors flex items-center justify-center gap-2 group"
           >
             Tạo tài khoản
@@ -174,7 +200,10 @@ const UsersPage = () => {
             hasPreviousPage: usersData?.hasPreviousPage ?? false,
             hasNextPage: usersData?.hasNextPage ?? false,
             onPageChange: setPage,
-            onPageSizeChange: (size) => { setPageSize(size); setPage(1); },
+            onPageSizeChange: (size) => {
+              setPageSize(size);
+              setPage(1);
+            },
           }}
         />
       </div>
@@ -191,7 +220,9 @@ const UsersPage = () => {
           <DialogHeader>
             <DialogTitle>Cấm người dùng</DialogTitle>
             <DialogDescription>
-              Bạn đang thực hiện cấm người dùng <strong>{userToBan?.name}</strong>. Vui lòng nhập lý do (tuỳ chọn).
+              Bạn đang thực hiện cấm người dùng{" "}
+              <strong>{userToBan?.name}</strong>. Vui lòng nhập lý do (tuỳ
+              chọn).
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
@@ -203,10 +234,7 @@ const UsersPage = () => {
             />
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setBanModalOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setBanModalOpen(false)}>
               Hủy
             </Button>
             <Button
@@ -224,4 +252,3 @@ const UsersPage = () => {
 };
 
 export default UsersPage;
-
