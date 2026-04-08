@@ -158,7 +158,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<"h2">) {
 
 function DialogDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
-    <p className={cn("text-sm text-muted-foreground", className)} {...props} />
+    <p className={cn("text-sm tracking-tighter text-muted-foreground", className)} {...props} />
   );
 }
 

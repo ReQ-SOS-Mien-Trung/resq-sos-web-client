@@ -93,3 +93,39 @@ export interface CampaignStatusMetadata {
   key: CampaignStatus;
   value: string;
 }
+
+/* ── POST /finance/campaigns ── */
+
+export interface CreateCampaignRequest {
+  name: string;
+  region: string;
+  campaignStartDate: string;
+  campaignEndDate: string;
+  targetAmount: number;
+}
+
+/* ── PUT /finance/campaigns/{id}/info ── */
+
+export interface UpdateCampaignInfoRequest {
+  name: string;
+  region: string;
+}
+
+/* ── PUT /finance/campaigns/{id}/extension ── */
+
+export interface ExtendCampaignRequest {
+  newEndDate: string;
+}
+
+/* ── PUT /finance/campaigns/{id}/target ── */
+
+export interface UpdateCampaignTargetRequest {
+  newTarget: number;
+}
+
+/* ── PATCH /finance/campaigns/{id}/status ── */
+
+export interface UpdateCampaignStatusRequest {
+  newStatus: CampaignStatus;
+  reason?: string;
+}

@@ -34,7 +34,6 @@ import {
   Package,
   ArrowClockwise,
   UserCircle,
-  ProhibitInset,
   ArrowsLeftRight,
   Phone,
   EnvelopeSimple,
@@ -55,8 +54,11 @@ import { toast } from "sonner";
 import {
   useDepotById,
   useDepots,
+  useDepotAvailableManagers,
   useDepotMetadata,
   useDepotStatuses,
+  useAssignDepotManager,
+  useUnassignDepotManager,
   useInitiateDepotClosure,
   useResolveDepotClosure,
   useCancelDepotClosure,
@@ -207,6 +209,31 @@ function getClosureStatusCfg(status: string) {
   );
 }
 
+/* ── Transfer status normalizer ────────────────────────────────
+ * Backend GET transfer returns Vietnamese strings ("Chờ chuẩn bị")
+ * while closure summary returns enum keys ("AwaitingPreparation").
+ * Normalise everything to enum keys so lookups work.
+ */
+const TRANSFER_STATUS_MAP: Record<string, string> = {
+  "Chờ chuẩn bị": "AwaitingPreparation",
+  "Đang chuẩn bị": "Preparing",
+  "Đang vận chuyển": "Shipping",
+  "Đã giao": "Completed",
+  "Đã hoàn thành": "Completed",
+  "Đã nhận": "Received",
+  "Đã hủy": "Cancelled",
+  AwaitingPreparation: "AwaitingPreparation",
+  Preparing: "Preparing",
+  Shipping: "Shipping",
+  Completed: "Completed",
+  Received: "Received",
+  Cancelled: "Cancelled",
+};
+function normalizeTransferStatus(raw: string | undefined | null): string {
+  if (!raw) return "AwaitingPreparation";
+  return TRANSFER_STATUS_MAP[raw] ?? raw;
+}
+
 /* ── Page ─────────────────────────────────────────────────────── */
 export default function DepotDetailPage() {
   const { id: rawId } = useParams<{ id: string }>();
@@ -221,12 +248,13 @@ export default function DepotDetailPage() {
     refetch: refetchClosures,
   } = useDepotClosures(depotId);
   /* requests only comes from the list endpoint, not GET /depot/{id} */
-  const { data: allDepotsData } = useDepots({
+  const { data: allDepotsData, refetch: refetchAllDepots } = useDepots({
     params: { pageNumber: 1, pageSize: 200 },
   });
   const { data: depotOptions = [] } = useDepotMetadata();
   const { data: statusMetadata } = useDepotStatuses();
   const { data: closureMeta } = useDepotClosureMetadata();
+  const { data: availableManagers = [] } = useDepotAvailableManagers();
 
   const statusCfg = buildStatusCfg(statusMetadata);
   const listDepot = allDepotsData?.items.find((d) => d.id === depotId);
@@ -267,9 +295,14 @@ export default function DepotDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelClosureId, setCancelClosureId] = useState("");
   const [cancelReason, setCancelReason] = useState("");
+  const [managerDialogOpen, setManagerDialogOpen] = useState(false);
+  const [selectedManagerId, setSelectedManagerId] = useState("");
+  const [isSwitchingManager, setIsSwitchingManager] = useState(false);
   const initiateMutation = useInitiateDepotClosure();
   const resolveMutation = useResolveDepotClosure();
   const cancelMutation = useCancelDepotClosure();
+  const assignManagerMutation = useAssignDepotManager();
+  const unassignManagerMutation = useUnassignDepotManager();
 
   const initiateTimeoutCountdown = useCountdown(
     initiateResult?.timeoutAt ?? activeInProgressClosure?.closingTimeoutAt,
@@ -287,10 +320,9 @@ export default function DepotDetailPage() {
       activeTransferId ?? 0,
       { enabled: !!(activeClosureId && activeTransferId) },
     );
-  const currentTransferStatus =
-    activeTransfer?.status ??
-    activeInProgressClosure?.transfer?.status ??
-    "Pending";
+  const currentTransferStatus = normalizeTransferStatus(
+    activeTransfer?.status ?? activeInProgressClosure?.transfer?.status,
+  );
 
   const resolutionTypes = closureMeta?.resolutionTypes ?? [
     { key: "TransferToDepot", value: "Chuyển toàn bộ hàng sang kho khác" },
@@ -304,9 +336,55 @@ export default function DepotDetailPage() {
     setIsRefreshing(true);
     Promise.all([
       refetch(),
+      refetchAllDepots(),
       refetchClosures(),
       ...(activeTransferId ? [refetchTransfer()] : []),
     ]).finally(() => setIsRefreshing(false));
+  }
+
+  async function handleSwitchManager() {
+    if (!depot || !selectedManagerId) {
+      toast.error("Vui lòng chọn quản kho.");
+      return;
+    }
+
+    try {
+      setIsSwitchingManager(true);
+
+      const sourceDepot = (allDepotsData?.items ?? []).find(
+        (d) => d.manager?.id === selectedManagerId && d.id !== depot.id,
+      );
+
+      if (sourceDepot) {
+        await unassignManagerMutation.mutateAsync({ id: sourceDepot.id });
+      }
+
+      await assignManagerMutation.mutateAsync({
+        id: depot.id,
+        managerId: selectedManagerId,
+      });
+
+      toast.success("Đã cập nhật quản kho thành công.");
+      setManagerDialogOpen(false);
+      setSelectedManagerId("");
+      handleRefresh();
+    } catch (err) {
+      toast.error(getApiError(err, "Cập nhật quản kho thất bại."));
+    } finally {
+      setIsSwitchingManager(false);
+    }
+  }
+
+  async function handleUnassignCurrentManager() {
+    if (!depot) return;
+
+    try {
+      await unassignManagerMutation.mutateAsync({ id: depot.id });
+      toast.success("Đã gỡ quản kho khỏi kho này.");
+      handleRefresh();
+    } catch (err) {
+      toast.error(getApiError(err, "Gỡ quản kho thất bại."));
+    }
   }
 
   function handleInitiate() {
@@ -537,27 +615,30 @@ export default function DepotDetailPage() {
                 )}
                 {depot.status === "Closing" && (
                   <>
-                    <Button
-                      size="sm"
-                      className="gap-1.5 font-semibold"
-                      onClick={() => {
-                        const cid =
-                          knownClosureIds[depot.id] ??
-                          activeInProgressClosure?.id;
-                        setResolveClosureId(String(cid ?? ""));
-                        setResolutionType("TransferToDepot");
-                        setTargetDepotId("");
-                        setExternalNote("");
-                        setResolveOpen(true);
-                      }}
-                    >
-                      <Icon
-                        icon="lsicon:goods-outline"
-                        width="16"
-                        height="16"
-                      />
-                      Giải quyết
-                    </Button>
+                    {/* Chỉ hiện nút Giải quyết khi chưa resolve (chưa chọn cách xử lý) */}
+                    {!activeInProgressClosure?.resolutionType && (
+                      <Button
+                        size="sm"
+                        className="gap-1.5 font-semibold"
+                        onClick={() => {
+                          const cid =
+                            knownClosureIds[depot.id] ??
+                            activeInProgressClosure?.id;
+                          setResolveClosureId(String(cid ?? ""));
+                          setResolutionType("TransferToDepot");
+                          setTargetDepotId("");
+                          setExternalNote("");
+                          setResolveOpen(true);
+                        }}
+                      >
+                        <Icon
+                          icon="lsicon:goods-outline"
+                          width="16"
+                          height="16"
+                        />
+                        Giải quyết
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
@@ -595,21 +676,72 @@ export default function DepotDetailPage() {
         </div>
 
         {/* ══ Hero image ══ */}
-        {depot.imageUrl ? (
-          <div className="relative h-80 sm:h-88 w-full overflow-hidden rounded-2xl">
-            <Image
-              src={depot.imageUrl}
-              alt={depot.name}
-              fill
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-linear-to-t from-black/40 via-black/5 to-transparent rounded-2xl" />
-          </div>
-        ) : (
-          <div className="h-48 w-full rounded-2xl bg-muted/50 border border-border/50 flex items-center justify-center">
-            <Warehouse size={48} className="text-muted-foreground/20" />
-          </div>
-        )}
+        <div className="relative w-full rounded-2xl overflow-hidden">
+          {depot.imageUrl ? (
+            <div className="relative h-80 sm:h-88 w-full">
+              <Image
+                src={depot.imageUrl}
+                alt={depot.name}
+                fill
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-black/40 via-black/5 to-transparent" />
+            </div>
+          ) : (
+            <div className="h-48 w-full bg-muted/50 border border-border/50 flex items-center justify-center">
+              <Warehouse size={48} className="text-muted-foreground/20" />
+            </div>
+          )}
+
+          {/* Closing warning banner */}
+          {depot.status === "Closing" && (
+            <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 rounded-xl bg-red-700/95 backdrop-blur-sm border border-red-600 shadow-xl text-white">
+              <div className="flex items-center gap-2">
+                <WarningCircle
+                  size={15}
+                  className="text-white shrink-0"
+                  weight="fill"
+                />
+                <span className="text-sm font-bold text-white tracking-tighter">
+                  Chờ xử lý tồn kho
+                </span>
+                {(knownClosureIds[depot.id] || activeInProgressClosure) && (
+                  <span className="text-sm text-red-100 font-medium tracking-tighter opacity-80">
+                    · Closure #
+                    {knownClosureIds[depot.id] ?? activeInProgressClosure?.id}
+                  </span>
+                )}
+              </div>
+              {activeInProgressClosure && (
+                <>
+                  <div className="flex items-center gap-4">
+                    {activeInProgressClosure.closingTimeoutAt && (
+                      <>
+                        <div className="w-px h-3 bg-red-500 opacity-50 hidden sm:block" />
+                        <div className="flex items-center gap-1.5 text-xs text-red-50 tracking-tighter">
+                          <HourglassHigh size={13} className="shrink-0" />
+                          <span>
+                            Hết hạn:{" "}
+                            <strong>
+                              {new Date(
+                                activeInProgressClosure.closingTimeoutAt,
+                              ).toLocaleString("vi-VN")}
+                            </strong>
+                            {closingTimeoutCountdown && (
+                              <span className="ml-1.5 font-mono opacity-80">
+                                ({closingTimeoutCountdown})
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* ══ Info cards — 3 columns ══ */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -738,66 +870,36 @@ export default function DepotDetailPage() {
                   </p>
                 </div>
               )}
+
+              <div className="pt-2 border-t border-border/50 flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 tracking-tight"
+                  onClick={() => {
+                    setSelectedManagerId(depot.manager?.id ?? "");
+                    setManagerDialogOpen(true);
+                  }}
+                >
+                  <ArrowsLeftRight size={14} />
+                  Thay quản kho
+                </Button>
+                {depot.manager && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 tracking-tight text-amber-700 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                    disabled={unassignManagerMutation.isPending}
+                    onClick={handleUnassignCurrentManager}
+                  >
+                    <X size={14} />
+                    Gỡ quản kho
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
-
-        {/* Closing warning banner */}
-        {depot.status === "Closing" && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900">
-            <div className="flex items-center gap-2">
-              <WarningCircle
-                size={15}
-                className="text-red-500 shrink-0"
-                weight="fill"
-              />
-              <span className="text-sm font-semibold text-red-700 dark:text-red-400 tracking-tighter">
-                Chờ xử lý tồn kho
-              </span>
-              {(knownClosureIds[depot.id] || activeInProgressClosure) && (
-                <span className="text-xs text-red-400 font-mono tracking-tighter">
-                  · Closure #
-                  {knownClosureIds[depot.id] ?? activeInProgressClosure?.id}
-                </span>
-              )}
-            </div>
-            {activeInProgressClosure && (
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 tracking-tighter">
-                  <Package size={13} className="shrink-0" />
-                  <span>
-                    Tồn kho:{" "}
-                    <strong>
-                      {(
-                        activeInProgressClosure.snapshotConsumableUnits +
-                        activeInProgressClosure.snapshotReusableUnits
-                      ).toLocaleString("vi-VN")}{" "}
-                      mục
-                    </strong>
-                  </span>
-                </div>
-                {activeInProgressClosure.closingTimeoutAt && (
-                  <div className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 tracking-tighter">
-                    <HourglassHigh size={13} className="shrink-0" />
-                    <span>
-                      Hết hạn:{" "}
-                      <strong>
-                        {new Date(
-                          activeInProgressClosure.closingTimeoutAt,
-                        ).toLocaleString("vi-VN")}
-                      </strong>
-                      {closingTimeoutCountdown && (
-                        <span className="ml-1.5 font-mono font-semibold">
-                          ({closingTimeoutCountdown})
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* ══ Transfer Panel ══ */}
         {depot.status === "Closing" &&
@@ -812,13 +914,13 @@ export default function DepotDetailPage() {
                     weight="fill"
                     className="text-blue-500 shrink-0"
                   />
-                  <span className="text-sm font-bold tracking-tighter text-blue-800 dark:text-blue-300">
+                  <span className="text-base font-bold tracking-tighter text-blue-800 dark:text-blue-300">
                     Transfer #{activeInProgressClosure.transfer.transferId}
                   </span>
                   {(() => {
                     const s = currentTransferStatus;
                     const cls =
-                      s === "Pending"
+                      s === "AwaitingPreparation"
                         ? "bg-zinc-100 border-zinc-300 text-zinc-600 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400"
                         : s === "Preparing"
                           ? "bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-700 dark:text-amber-300"
@@ -828,7 +930,7 @@ export default function DepotDetailPage() {
                               ? "bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-300"
                               : "bg-muted border-border text-muted-foreground";
                     const lbl: Record<string, string> = {
-                      Pending: "Chờ chuẩn bị",
+                      AwaitingPreparation: "Chờ chuẩn bị",
                       Preparing: "Đang chuẩn bị",
                       Shipping: "Đang vận chuyển",
                       Completed: "Chờ xác nhận nhận",
@@ -836,7 +938,7 @@ export default function DepotDetailPage() {
                     return (
                       <span
                         className={cn(
-                          "text-xs font-semibold tracking-tighter px-2 py-0.5 rounded-md border",
+                          "text-sm font-semibold tracking-tighter px-2 py-1 rounded-md border",
                           cls,
                         )}
                       >
@@ -847,10 +949,16 @@ export default function DepotDetailPage() {
                 </div>
                 {activeInProgressClosure.targetDepotName && (
                   <div className="flex items-center gap-1.5 text-sm font-semibold tracking-tighter text-blue-700 dark:text-blue-400">
-                    <Truck size={13} className="shrink-0" />
+                    <Icon
+                      icon="fluent:vehicle-truck-cube-20-regular"
+                      width="24"
+                      height="24"
+                    />
                     <span>
                       →{" "}
-                      <strong>{activeInProgressClosure.targetDepotName}</strong>
+                      <span className="font-semibold">
+                        {activeInProgressClosure.targetDepotName}
+                      </span>
                     </span>
                   </div>
                 )}
@@ -860,14 +968,14 @@ export default function DepotDetailPage() {
                 {/* Step Progress */}
                 <div className="flex items-start">
                   {[
-                    { key: "Pending", label: "Chờ xử lý" },
+                    { key: "AwaitingPreparation", label: "Chờ xử lý" },
                     { key: "Preparing", label: "Chuẩn bị" },
-                    { key: "Shipping", label: "Vận chuyển" },
-                    { key: "Completed", label: "Xuất xong" },
+                    { key: "Shipping", label: "Đang vận chuyển" },
+                    { key: "Completed", label: "Đã giao" },
                     { key: "Received", label: "Đã nhận" },
                   ].map((step, i) => {
                     const order = [
-                      "Pending",
+                      "AwaitingPreparation",
                       "Preparing",
                       "Shipping",
                       "Completed",
@@ -889,7 +997,7 @@ export default function DepotDetailPage() {
                             )}
                           />
                         )}
-                        <div className="flex flex-col items-center gap-1.5 shrink-0 w-14">
+                        <div className="flex flex-col items-center gap-1.5 shrink-0 w-24">
                           <div
                             className={cn(
                               "h-7 w-7 rounded-full border-2 flex items-center justify-center transition-all",
@@ -903,14 +1011,14 @@ export default function DepotDetailPage() {
                             {done ? (
                               <CheckFat size={11} weight="fill" />
                             ) : (
-                              <span className="text-xs font-bold leading-none">
+                              <span className="text-sm font-bold leading-none">
                                 {i + 1}
                               </span>
                             )}
                           </div>
                           <span
                             className={cn(
-                              "text-xs text-center leading-tight tracking-tighter",
+                              "text-xs text-center font-medium leading-tight tracking-tighter whitespace-nowrap",
                               done
                                 ? "text-blue-500 dark:text-blue-400 font-medium"
                                 : active
@@ -927,10 +1035,10 @@ export default function DepotDetailPage() {
                 </div>
 
                 {/* Transfer stats */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
                     {
-                      label: "Vật tư tiêu hao",
+                      label: "Vật tư tiêu thụ",
                       value: (
                         activeTransfer?.snapshotConsumableUnits ??
                         activeInProgressClosure.snapshotConsumableUnits
@@ -942,14 +1050,6 @@ export default function DepotDetailPage() {
                         activeTransfer?.snapshotReusableUnits ??
                         activeInProgressClosure.snapshotReusableUnits
                       ).toLocaleString("vi-VN"),
-                    },
-                    {
-                      label: "Hạn giao nhận",
-                      value: activeTransfer?.transferDeadlineAt
-                        ? new Date(
-                            activeTransfer.transferDeadlineAt,
-                          ).toLocaleDateString("vi-VN")
-                        : "—",
                     },
                     {
                       label: "Kho nhận",
@@ -964,10 +1064,10 @@ export default function DepotDetailPage() {
                       key={item.label}
                       className="flex flex-col gap-0.5 p-2.5 rounded-lg bg-blue-100/60 dark:bg-blue-900/20 border border-blue-200/60 dark:border-blue-800/60"
                     >
-                      <span className="text-xs text-blue-600 dark:text-blue-400 font-medium tracking-tighter">
+                      <span className="text-sm text-blue-600 dark:text-blue-400 font-medium tracking-tighter">
                         {item.label}
                       </span>
-                      <span className="text-sm font-bold text-blue-900 dark:text-blue-200 tracking-tighter tabular-nums">
+                      <span className="text-base font-bold text-blue-900 dark:text-blue-200 tracking-tighter tabular-nums">
                         {item.value}
                       </span>
                     </div>
@@ -1201,7 +1301,7 @@ export default function DepotDetailPage() {
                     </div>
 
                     {c.closeReason && (
-                      <p className="text-sm tracking-tighter font-bold mb-1">
+                      <p className="text-sm tracking-tighter font-semibold mb-1">
                         <span className="font-normal">Lý do đóng kho: </span>
                         {c.closeReason}
                       </p>
@@ -1870,6 +1970,96 @@ export default function DepotDetailPage() {
                 <Spinner size={13} className="animate-spin" />
               )}
               Xác nhận hủy đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={managerDialogOpen}
+        onOpenChange={(open) => {
+          setManagerDialogOpen(open);
+          if (!open) setSelectedManagerId("");
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="tracking-tighter">
+              Thay quản kho
+            </DialogTitle>
+            <DialogDescription className="tracking-tight">
+              Nếu quản kho đã thuộc kho khác, hệ thống sẽ gỡ khỏi kho cũ trước,
+              rồi gán vào kho này.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-1">
+            <div className="space-y-1.5">
+              <Label className="tracking-tight">Kho hiện tại</Label>
+              <div className="text-sm tracking-tight rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5">
+                {depot.name}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="tracking-tight">Chọn quản kho</Label>
+              <Select
+                value={selectedManagerId || "__none"}
+                onValueChange={(value) =>
+                  setSelectedManagerId(value === "__none" ? "" : value)
+                }
+              >
+                <SelectTrigger className="tracking-tight">
+                  <SelectValue placeholder="Chọn quản kho" />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  sideOffset={4}
+                  avoidCollisions={false}
+                  className="z-10000 w-(--radix-select-trigger-width)"
+                >
+                  <SelectItem value="__none">Chọn quản kho</SelectItem>
+                  {Array.from(
+                    new Map(
+                      [
+                        ...availableManagers.map((m) => ({
+                          id: m.id,
+                          label: `${m.fullName} (${m.phone})`,
+                        })),
+                        ...(allDepotsData?.items ?? [])
+                          .filter((d) => !!d.manager)
+                          .map((d) => ({
+                            id: d.manager!.id,
+                            label: `${d.manager!.fullName ?? `${d.manager!.lastName} ${d.manager!.firstName}`} (${d.manager!.phone ?? "—"})`,
+                          })),
+                      ].map((x) => [x.id, x] as const),
+                    ).values(),
+                  ).map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="tracking-tight"
+              onClick={() => setManagerDialogOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              className="tracking-tight"
+              disabled={!selectedManagerId || isSwitchingManager}
+              onClick={handleSwitchManager}
+            >
+              {isSwitchingManager ? "Đang cập nhật..." : "Xác nhận"}
             </Button>
           </DialogFooter>
         </DialogContent>

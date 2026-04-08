@@ -8,6 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -30,6 +35,8 @@ import {
   XCircle,
   CaretLeft,
   CaretRight,
+  CaretDown,
+  Check,
   Spinner,
   ArrowClockwise,
   GarageIcon,
@@ -114,9 +121,8 @@ export default function AssemblyPointsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<AssemblyPointStatus | "all">(
-    "all",
-  );
+  const [selectedStatuses, setSelectedStatuses] = useState<AssemblyPointStatus[]>([]);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   // Dialogs / sheets
   const [formOpen, setFormOpen] = useState(false);
@@ -160,11 +166,11 @@ export default function AssemblyPointsPage() {
           it.code.toLowerCase().includes(q),
       );
     }
-    if (statusFilter !== "all") {
-      result = result.filter((it) => it.status === statusFilter);
+    if (selectedStatuses.length > 0) {
+      result = result.filter((it) => selectedStatuses.includes(it.status as AssemblyPointStatus));
     }
     return result;
-  }, [items, search, statusFilter]);
+  }, [items, search, selectedStatuses]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice(
@@ -332,8 +338,9 @@ export default function AssemblyPointsPage() {
         </div>
 
         {/* Search & filter */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Search input */}
+          <div className="relative flex-1 min-w-48">
             <Input
               placeholder="Tìm theo tên hoặc mã..."
               value={search}
@@ -341,38 +348,103 @@ export default function AssemblyPointsPage() {
                 setSearch(e.target.value);
                 setPage(1);
               }}
-              className="pl-10 h-8 tracking-tighter"
+              className="pl-9 pr-9 h-8 tracking-tighter"
             />
             <MagnifyingGlass
               size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
             />
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {(
-              [
-                { key: "all", label: "Tất cả" },
-                { key: "Created", label: "Mới tạo" },
-                { key: "Active", label: "Hoạt động" },
-                { key: "Overloaded", label: "Quá tải" },
-                { key: "UnderMaintenance", label: "Bảo trì" },
-                { key: "Closed", label: "Đã đóng" },
-              ] as const
-            ).map((opt) => (
+
+          {/* Status dropdown */}
+          <Popover open={statusOpen} onOpenChange={setStatusOpen}>
+            <PopoverTrigger asChild>
               <Button
-                key={opt.key}
-                variant={statusFilter === opt.key ? "default" : "outline"}
+                variant="outline"
                 size="sm"
-                className="h-9 text-sm tracking-tight"
-                onClick={() => {
-                  setStatusFilter(opt.key);
-                  setPage(1);
-                }}
+                className="gap-1.5 font-normal h-8"
               >
-                {opt.label}
+                Trạng thái
+                {selectedStatuses.length > 0 ? (
+                  <Badge className="h-5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
+                    {selectedStatuses.length}
+                  </Badge>
+                ) : (
+                  <CaretDown size={13} className="text-muted-foreground" />
+                )}
               </Button>
-            ))}
-          </div>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-48 p-1"
+              align="start"
+              sideOffset={4}
+              avoidCollisions
+              collisionPadding={16}
+            >
+              {(
+                [
+                  "Created",
+                  "Active",
+                  "Overloaded",
+                  "UnderMaintenance",
+                  "Closed",
+                ] as AssemblyPointStatus[]
+              ).map((s) => {
+                const checked = selectedStatuses.includes(s);
+                return (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      setPage(1);
+                      setSelectedStatuses((prev) =>
+                        prev.includes(s)
+                          ? prev.filter((x) => x !== s)
+                          : [...prev, s],
+                      );
+                    }}
+                    className="flex items-center gap-2 w-full px-2.5 py-1.5 text-sm rounded-md hover:bg-muted/60 transition-colors"
+                  >
+                    <div
+                      className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center transition-colors ${checked ? "bg-primary border-primary" : "border-border"}`}
+                    >
+                      {checked && (
+                        <Check
+                          size={10}
+                          weight="bold"
+                          className="text-primary-foreground"
+                        />
+                      )}
+                    </div>
+                    <span
+                      className={cn(
+                        "text-left leading-tight tracking-tighter text-black dark:text-white",
+                        checked ? "font-medium" : "text-muted-foreground",
+                      )}
+                    >
+                      {statusConfig[s]?.label ?? s}
+                    </span>
+                  </button>
+                );
+              })}
+            </PopoverContent>
+          </Popover>
+
+          {/* Clear filters */}
+          {(search || selectedStatuses.length > 0) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch("");
+                setSelectedStatuses([]);
+                setPage(1);
+              }}
+              className="text-muted-foreground gap-1 h-8"
+            >
+              <XCircle size={14} />
+              Xóa bộ lọc
+            </Button>
+          )}
         </div>
 
         {/* Card grid */}
@@ -397,7 +469,7 @@ export default function AssemblyPointsPage() {
                 className="mx-auto text-muted-foreground/30 mb-3"
               />
               <p className="text-base text-muted-foreground tracking-tight">
-                {search || statusFilter !== "all"
+                {search || selectedStatuses.length > 0
                   ? "Không tìm thấy điểm tập kết nào phù hợp"
                   : "Chưa có điểm tập kết nào. Hãy tạo mới!"}
               </p>

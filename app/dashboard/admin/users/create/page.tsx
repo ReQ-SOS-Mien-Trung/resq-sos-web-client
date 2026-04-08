@@ -79,7 +79,7 @@ export default function CreateUserPage() {
     fetch("https://provinces.open-api.vn/api/v2/")
       .then((r) => r.json())
       .then((data) => setProvinces(data))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Fetch wards when province changes
@@ -93,7 +93,7 @@ export default function CreateUserPage() {
     )
       .then((r) => r.json())
       .then((data) => setWards(data.wards || []))
-      .catch(() => {});
+      .catch(() => { });
   }, [selectedProvinceCode]);
 
   // Close dropdowns on outside click
@@ -260,13 +260,23 @@ export default function CreateUserPage() {
     }
   };
 
+  const isFormValid =
+    formData.firstName.trim().length > 0 &&
+    formData.lastName.trim().length > 0 &&
+    formData.username.trim().length > 0 &&
+    formData.email.trim().length > 0 &&
+    formData.phone.trim().length > 0 &&
+    formData.password.trim().length > 0 &&
+    !phoneError &&
+    !emailError;
+
   return (
     <DashboardLayout
       favorites={[]}
       projects={[]}
       cloudStorage={{ used: 0, total: 0, percentage: 0, unit: "GB" }}
     >
-      <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
+      <div className="w-full space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
         {/* Header & Back Action */}
         <div>
           <Button
@@ -278,30 +288,50 @@ export default function CreateUserPage() {
             <CaretLeft className="w-4 h-4" />
             Quay lại
           </Button>
-          <div className="pb-1 mb-2">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter text-foreground leading-tight flex items-center gap-3">
-              <UserPlus size={32} weight="bold" />
-              Tạo người dùng mới
-            </h1>
-            <p className="text-sm font-medium text-muted-foreground mt-2 leading-relaxed tracking-tighter">
-              Điền thông tin bên dưới để cấp phát tài khoản truy cập hệ thống
-              quản trị ResQ.
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-2">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter text-foreground leading-tight flex items-center gap-3">
+                <UserPlus size={32} weight="bold" />
+                Tạo người dùng mới
+              </h1>
+              <p className="text-base font-medium text-muted-foreground mt-1 leading-relaxed tracking-tighter">
+                Điền thông tin bên dưới để cấp phát tài khoản truy cập hệ thống.
+              </p>
+            </div>
+
+            <Button
+              type="submit"
+              form="create-user-form"
+              disabled={!isFormValid || createUserMutation.isPending || isUploading}
+              className="gap-2 tracking-tighter shrink-0"
+            >
+              {createUserMutation.isPending || isUploading ? (
+                <>
+                  <Spinner className="h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
+              ) : (
+                <>
+                  Xác nhận khởi tạo
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-10">
+        <form id="create-user-form" onSubmit={handleSubmit} className="space-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-5">
             {/* THÔNG TIN CÁ NHÂN */}
             <div className="col-span-1 md:col-span-4 border-t border-black/10 dark:border-white/10 pt-4">
-              <p className="text-sm font-semibold text-primary mb-1 tracking-tighter">
+              <p className="text-sm font-semibold text-primary mb-0.5 tracking-tighter">
                 Mục I
               </p>
-              <h2 className="text-lg font-bold text-foreground tracking-tighter">
+              <h2 className="text-2xl font-bold text-foreground tracking-tighter">
                 Thông tin cá nhân
               </h2>
-              <p className="text-sm text-muted-foreground mt-1 leading-relaxed tracking-tighter">
+              <p className="text-base text-muted-foreground mt-1 leading-relaxed tracking-tighter">
                 Họ tên và thông tin cơ bản liên lạc của người dùng mới.
               </p>
             </div>
@@ -311,76 +341,271 @@ export default function CreateUserPage() {
                 {/* Left Column: Info Fields */}
                 <div className="flex-1 max-w-lg space-y-5">
                   <div className="flex flex-col gap-5">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-foreground tracking-tighter">
-                        Họ <span className="text-primary">*</span>
-                      </label>
-                      <Input
-                        name="lastName"
-                        value={formData.lastName}
-                        onChange={handleChange}
-                        placeholder="Nguyễn Văn"
-                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground tracking-tighter"
-                      />
+                    <div className="grid grid-cols-2 gap-5">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-semibold text-foreground tracking-tighter">
+                          Họ <span className="text-primary">*</span>
+                        </label>
+                        <Input
+                          name="lastName"
+                          value={formData.lastName}
+                          onChange={handleChange}
+                          placeholder="Nguyễn Văn"
+                          className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground tracking-tighter"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-semibold text-foreground tracking-tighter">
+                          Tên <span className="text-primary">*</span>
+                        </label>
+                        <Input
+                          name="firstName"
+                          value={formData.firstName}
+                          onChange={handleChange}
+                          placeholder="A"
+                          className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground tracking-tighter"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-foreground tracking-tighter">
-                        Tên <span className="text-primary">*</span>
-                      </label>
-                      <Input
-                        name="firstName"
-                        value={formData.firstName}
-                        onChange={handleChange}
-                        placeholder="A"
-                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus-visible:ring-0 focus-visible:border-foreground tracking-tighter"
-                      />
+                    <div className="grid grid-cols-2 gap-5">
+                      <div className="space-y-1.5 flex flex-col justify-start">
+                        <label className="text-sm font-semibold text-foreground tracking-tighter">
+                          Số điện thoại <span className="text-primary">*</span>
+                        </label>
+                        <Input
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleChange}
+                          placeholder="0912345678"
+                          className={`h-11 rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 tracking-tighter focus-visible:ring-0 ${phoneError ? "border-red-500 focus-visible:border-red-500 text-red-500" : "border-border/60 focus-visible:border-foreground"}`}
+                        />
+                        {phoneError && (
+                          <span className="text-sm text-red-500 font-medium leading-none mt-1 tracking-tighter">
+                            {phoneError}
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1.5 flex flex-col justify-start">
+                        <label className="text-sm font-semibold text-foreground tracking-tighter">
+                          Email <span className="text-primary">*</span>
+                        </label>
+                        <Input
+                          name="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          placeholder="example@resq.com"
+                          className={`h-11 rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 tracking-tighter focus-visible:ring-0 ${emailError ? "border-red-500 focus-visible:border-red-500 text-red-500" : "border-border/60 focus-visible:border-foreground"}`}
+                        />
+                        {emailError && (
+                          <span className="text-sm text-red-500 font-medium leading-none mt-1 tracking-tighter">
+                            {emailError}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-1.5 flex flex-col justify-start">
+                  </div>
+                  {/* Address Layout */}
+                  <div className="space-y-4 max-w-lg">
+                    <div className="flex items-center justify-between mb-1">
                       <label className="text-sm font-semibold text-foreground tracking-tighter">
-                        Số điện thoại <span className="text-primary">*</span>
+                        Địa chỉ
                       </label>
-                      <Input
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        placeholder="0912345678"
-                        className={`h-11 rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 tracking-tighter focus-visible:ring-0 ${phoneError ? "border-red-500 focus-visible:border-red-500 text-red-500" : "border-border/60 focus-visible:border-foreground"}`}
-                      />
-                      {phoneError && (
-                        <span className="text-sm text-red-500 font-medium leading-none mt-1 tracking-tighter">
-                          {phoneError}
-                        </span>
+                      {(formData.address || formData.city) && (
+                        <button
+                          type="button"
+                          onClick={handleClearLocation}
+                          className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors tracking-tighter"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          Xóa toàn bộ
+                        </button>
                       )}
                     </div>
-                    <div className="space-y-1.5 flex flex-col justify-start">
-                      <label className="text-sm font-semibold text-foreground tracking-tighter">
-                        Email <span className="text-primary">*</span>
-                      </label>
+
+                    {/* Address (Street) */}
+                    <div className="relative">
+                      <MapPin className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                       <Input
-                        name="email"
-                        type="email"
-                        value={formData.email}
+                        type="text"
+                        name="address"
+                        value={formData.address}
                         onChange={handleChange}
-                        placeholder="example@resq.com"
-                        className={`h-11 rounded-none border-x-0 border-t-0 border-b bg-transparent px-0 tracking-tighter focus-visible:ring-0 ${emailError ? "border-red-500 focus-visible:border-red-500 text-red-500" : "border-border/60 focus-visible:border-foreground"}`}
+                        placeholder="Số nhà, tên đường"
+                        className="h-11 pl-8 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent tracking-tighter focus-visible:ring-0 focus-visible:border-foreground"
                       />
-                      {emailError && (
-                        <span className="text-sm text-red-500 font-medium leading-none mt-1 tracking-tighter">
-                          {emailError}
-                        </span>
-                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      {/* City/Province */}
+                      <div className="relative space-y-1.5" ref={cityDropdownRef}>
+                        <label className="text-sm font-semibold text-foreground tracking-tighter">
+                          Tỉnh/Thành phố
+                        </label>
+                        <div className="relative">
+                          <Input
+                            type="text"
+                            value={citySearch || formData.city}
+                            onChange={(e) => {
+                              setCitySearch(e.target.value);
+                              setCityOpen(true);
+                              setFormData((prev) => ({
+                                ...prev,
+                                city: "",
+                                ward: "",
+                              }));
+                              setSelectedProvinceCode(null);
+                              setWards([]);
+                            }}
+                            onFocus={() => {
+                              setCityOpen(true);
+                              setCitySearch("");
+                            }}
+                            placeholder="Chọn tỉnh/thành phố"
+                            readOnly={!!formData.city && !cityOpen}
+                            className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 pr-8 tracking-tighter focus-visible:ring-0 focus-visible:border-foreground cursor-pointer"
+                          />
+                          <CaretDown
+                            className={`absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-transform pointer-events-none ${cityOpen ? "rotate-180" : ""}`}
+                          />
+                        </div>
+                        {cityOpen && (
+                          <div
+                            className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border border-border/60 shadow-xl overflow-y-auto"
+                            style={{ maxHeight: "220px" }}
+                          >
+                            {provinces.length === 0 && (
+                              <p className="text-sm text-muted-foreground px-4 py-3 text-center tracking-tighter">
+                                Đang tải...
+                              </p>
+                            )}
+                            {provinces
+                              .filter((p) =>
+                                p.name
+                                  .toLowerCase()
+                                  .includes((citySearch || "").toLowerCase()),
+                              )
+                              .map((p) => (
+                                <button
+                                  key={p.code}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      city: p.name,
+                                      ward: "",
+                                    }));
+                                    setSelectedProvinceCode(p.code);
+                                    setWards([]);
+                                    setCityOpen(false);
+                                    setCitySearch("");
+                                  }}
+                                  className={`w-full text-left px-4 py-2.5 text-sm tracking-tighter hover:bg-muted/50 transition-colors ${formData.city === p.name
+                                    ? "bg-primary/5 text-primary font-bold"
+                                    : ""
+                                    }`}
+                                >
+                                  {p.name}
+                                </button>
+                              ))}
+                            {provinces.length > 0 &&
+                              provinces.filter((p) =>
+                                p.name
+                                  .toLowerCase()
+                                  .includes((citySearch || "").toLowerCase()),
+                              ).length === 0 && (
+                                <p className="text-sm text-muted-foreground px-4 py-3 text-center tracking-tighter">
+                                  Không tìm thấy
+                                </p>
+                              )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Ward */}
+                      <div className="relative space-y-1.5" ref={wardDropdownRef}>
+                        <label className="text-sm font-semibold text-foreground tracking-tighter">
+                          Phường/Xã
+                        </label>
+                        <div className="relative">
+                          <Input
+                            type="text"
+                            value={wardSearch || formData.ward}
+                            disabled={!selectedProvinceCode}
+                            onChange={(e) => {
+                              setWardSearch(e.target.value);
+                              setWardOpen(true);
+                              setFormData((prev) => ({ ...prev, ward: "" }));
+                            }}
+                            onFocus={() => {
+                              setWardOpen(true);
+                              setWardSearch("");
+                            }}
+                            placeholder="Chọn phường/xã"
+                            readOnly={!!formData.ward && !wardOpen}
+                            className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 pr-8 tracking-tighter focus-visible:ring-0 focus-visible:border-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          />
+                          <CaretDown
+                            className={`absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-transform pointer-events-none ${wardOpen ? "rotate-180" : ""}`}
+                          />
+                        </div>
+                        {wardOpen && (
+                          <div
+                            className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border border-border/60 shadow-xl overflow-y-auto"
+                            style={{ maxHeight: "220px" }}
+                          >
+                            {wards
+                              .filter((w) =>
+                                w.name
+                                  .toLowerCase()
+                                  .includes((wardSearch || "").toLowerCase()),
+                              )
+                              .map((w) => (
+                                <button
+                                  key={w.code}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      ward: w.name,
+                                    }));
+                                    setWardOpen(false);
+                                    setWardSearch("");
+                                  }}
+                                  className={`w-full text-left px-4 py-2.5 text-sm tracking-tighter hover:bg-muted/50 transition-colors ${formData.ward === w.name
+                                    ? "bg-primary/5 text-primary font-bold"
+                                    : ""
+                                    }`}
+                                >
+                                  {w.name}
+                                </button>
+                              ))}
+                            {wards.filter((w) =>
+                              w.name
+                                .toLowerCase()
+                                .includes((wardSearch || "").toLowerCase()),
+                            ).length === 0 && (
+                                <p className="text-sm text-muted-foreground px-4 py-3 text-center tracking-tighter">
+                                  Không tìm thấy
+                                </p>
+                              )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Right Column: Avatar */}
-                <div className="shrink-0 space-y-2 w-full max-w-40 sm:max-w-50">
+                <div className="shrink-0 space-y-2 w-full max-w-36 sm:max-w-48">
                   <label className="text-sm font-semibold text-foreground tracking-tighter">
-                    Ảnh đại diện (Avatar)
+                    Ảnh đại diện
                   </label>
                   <div className="flex flex-col gap-3">
                     {/* Preview Block 3:4 */}
-                    <div className="w-full aspect-3/4 max-w-40 border border-border/60 bg-muted overflow-hidden flex items-center justify-center relative group sm:max-w-50">
+                    <div className="w-full aspect-3/4 border border-border/60 bg-muted overflow-hidden flex items-center justify-center relative group">
                       {avatarPreview ? (
                         <img
                           src={avatarPreview}
@@ -393,7 +618,7 @@ export default function CreateUserPage() {
                             className="w-8 h-8 text-muted-foreground/30 mb-2"
                             weight="duotone"
                           />
-                          <span className="text-sm text-muted-foreground/60 font-medium uppercase tracking-tighter">
+                          <span className="text-sm text-muted-foreground/60 font-medium tracking-tighter">
                             Trống
                           </span>
                         </div>
@@ -435,234 +660,24 @@ export default function CreateUserPage() {
               </div>
             </div>
 
-            {/* HO KHẨU & ĐỊA CHỈ */}
+            {/* THÔNG TIN TÀI KHOẢN */}
             <div className="col-span-1 md:col-span-4 border-t border-black/10 dark:border-white/10 pt-4">
               <p className="text-sm font-semibold text-primary mb-1 tracking-tighter">
                 Mục II
               </p>
-              <h2 className="text-lg font-bold text-foreground tracking-tighter">
-                Vị trí & Địa chỉ
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1 leading-relaxed tracking-tighter">
-                Thông tin nơi cư trú và địa chỉ liên lạc của người dùng.
-              </p>
-            </div>
-
-            <div className="col-span-1 md:col-span-8 border-t border-black/10 dark:border-white/10 pt-4 space-y-5">
-              {/* Address Layout */}
-              <div className="space-y-4 max-w-lg">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-semibold text-foreground tracking-tighter">
-                    Địa chỉ
-                  </label>
-                  {(formData.address || formData.city) && (
-                    <button
-                      type="button"
-                      onClick={handleClearLocation}
-                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors tracking-tighter"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      Xóa toàn bộ
-                    </button>
-                  )}
-                </div>
-
-                {/* Address (Street) */}
-                <div className="relative">
-                  <MapPin className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    placeholder="Số nhà, tên đường"
-                    className="h-11 pl-8 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent tracking-tighter focus-visible:ring-0 focus-visible:border-foreground"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  {/* City/Province */}
-                  <div className="relative space-y-1.5" ref={cityDropdownRef}>
-                    <label className="text-sm font-semibold text-foreground tracking-tighter">
-                      Tỉnh/Thành phố
-                    </label>
-                    <div className="relative">
-                      <Input
-                        type="text"
-                        value={citySearch || formData.city}
-                        onChange={(e) => {
-                          setCitySearch(e.target.value);
-                          setCityOpen(true);
-                          setFormData((prev) => ({
-                            ...prev,
-                            city: "",
-                            ward: "",
-                          }));
-                          setSelectedProvinceCode(null);
-                          setWards([]);
-                        }}
-                        onFocus={() => {
-                          setCityOpen(true);
-                          setCitySearch("");
-                        }}
-                        placeholder="Chọn tỉnh/thành phố"
-                        readOnly={!!formData.city && !cityOpen}
-                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 pr-8 tracking-tighter focus-visible:ring-0 focus-visible:border-foreground cursor-pointer"
-                      />
-                      <CaretDown
-                        className={`absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-transform pointer-events-none ${cityOpen ? "rotate-180" : ""}`}
-                      />
-                    </div>
-                    {cityOpen && (
-                      <div
-                        className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border border-border/60 shadow-xl overflow-y-auto"
-                        style={{ maxHeight: "220px" }}
-                      >
-                        {provinces.length === 0 && (
-                          <p className="text-sm text-muted-foreground px-4 py-3 text-center tracking-tighter">
-                            Đang tải...
-                          </p>
-                        )}
-                        {provinces
-                          .filter((p) =>
-                            p.name
-                              .toLowerCase()
-                              .includes((citySearch || "").toLowerCase()),
-                          )
-                          .map((p) => (
-                            <button
-                              key={p.code}
-                              type="button"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  city: p.name,
-                                  ward: "",
-                                }));
-                                setSelectedProvinceCode(p.code);
-                                setWards([]);
-                                setCityOpen(false);
-                                setCitySearch("");
-                              }}
-                              className={`w-full text-left px-4 py-2.5 text-sm tracking-tighter hover:bg-muted/50 transition-colors ${
-                                formData.city === p.name
-                                  ? "bg-primary/5 text-primary font-bold"
-                                  : ""
-                              }`}
-                            >
-                              {p.name}
-                            </button>
-                          ))}
-                        {provinces.length > 0 &&
-                          provinces.filter((p) =>
-                            p.name
-                              .toLowerCase()
-                              .includes((citySearch || "").toLowerCase()),
-                          ).length === 0 && (
-                            <p className="text-sm text-muted-foreground px-4 py-3 text-center tracking-tighter">
-                              Không tìm thấy
-                            </p>
-                          )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ward */}
-                  <div className="relative space-y-1.5" ref={wardDropdownRef}>
-                    <label className="text-sm font-semibold text-foreground tracking-tighter">
-                      Phường/Xã
-                    </label>
-                    <div className="relative">
-                      <Input
-                        type="text"
-                        value={wardSearch || formData.ward}
-                        disabled={!selectedProvinceCode}
-                        onChange={(e) => {
-                          setWardSearch(e.target.value);
-                          setWardOpen(true);
-                          setFormData((prev) => ({ ...prev, ward: "" }));
-                        }}
-                        onFocus={() => {
-                          setWardOpen(true);
-                          setWardSearch("");
-                        }}
-                        placeholder="Chọn phường/xã"
-                        readOnly={!!formData.ward && !wardOpen}
-                        className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 pr-8 tracking-tighter focus-visible:ring-0 focus-visible:border-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      />
-                      <CaretDown
-                        className={`absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-transform pointer-events-none ${wardOpen ? "rotate-180" : ""}`}
-                      />
-                    </div>
-                    {wardOpen && (
-                      <div
-                        className="absolute z-50 top-full left-0 right-0 mt-1 bg-background border border-border/60 shadow-xl overflow-y-auto"
-                        style={{ maxHeight: "220px" }}
-                      >
-                        {wards
-                          .filter((w) =>
-                            w.name
-                              .toLowerCase()
-                              .includes((wardSearch || "").toLowerCase()),
-                          )
-                          .map((w) => (
-                            <button
-                              key={w.code}
-                              type="button"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  ward: w.name,
-                                }));
-                                setWardOpen(false);
-                                setWardSearch("");
-                              }}
-                              className={`w-full text-left px-4 py-2.5 text-sm tracking-tighter hover:bg-muted/50 transition-colors ${
-                                formData.ward === w.name
-                                  ? "bg-primary/5 text-primary font-bold"
-                                  : ""
-                              }`}
-                            >
-                              {w.name}
-                            </button>
-                          ))}
-                        {wards.filter((w) =>
-                          w.name
-                            .toLowerCase()
-                            .includes((wardSearch || "").toLowerCase()),
-                        ).length === 0 && (
-                          <p className="text-sm text-muted-foreground px-4 py-3 text-center tracking-tighter">
-                            Không tìm thấy
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* THÔNG TIN TÀI KHOẢN */}
-            <div className="col-span-1 md:col-span-4 border-t border-black/10 dark:border-white/10 pt-4">
-              <p className="text-sm font-semibold text-primary mb-1 tracking-tighter">
-                Mục III
-              </p>
-              <h2 className="text-lg font-bold text-foreground tracking-tighter">
+              <h2 className="text-2xl font-bold text-foreground tracking-tighter">
                 Tài khoản & Phân quyền
               </h2>
-              <p className="text-sm text-muted-foreground mt-1 leading-relaxed tracking-tighter">
-                Tài khoản đăng nhập và cấp quyền hạn sử dụng trong hệ thống
-                ResQ.
+              <p className="text-base text-muted-foreground mt-1 leading-relaxed tracking-tighter">
+                Tài khoản đăng nhập và cấp quyền hạn sử dụng trong hệ thống.
               </p>
             </div>
 
-            <div className="col-span-1 md:col-span-8 border-t border-black/10 dark:border-white/10 pt-4">
-              <div className="space-y-5 max-w-lg">
+            <div className="col-span-1 md:col-span-8 border-t border-black/10 dark:border-white/10 pt-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-foreground tracking-tighter">
-                    Tên đăng nhập (Username){" "}
+                    Tên đăng nhập {" "}
                     <span className="text-primary">*</span>
                   </label>
                   <Input
@@ -702,7 +717,7 @@ export default function CreateUserPage() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5 pt-2">
+                <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground tracking-tighter">
                     Vai trò (Role) <span className="text-primary">*</span>
                   </label>
@@ -713,7 +728,7 @@ export default function CreateUserPage() {
                     <SelectTrigger className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus:ring-0 focus:border-foreground text-sm font-medium tracking-tighter">
                       <SelectValue placeholder="Chọn vai trò..." />
                     </SelectTrigger>
-                    <SelectContent className="rounded-none border border-border/60">
+                    <SelectContent position="popper" sideOffset={4} className="rounded-none border border-border/60 shadow-lg">
                       <SelectItem
                         value="1"
                         className="cursor-pointer font-medium text-sm tracking-tighter focus:bg-black/5 focus:text-foreground"
@@ -739,25 +754,6 @@ export default function CreateUserPage() {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-border/60 flex justify-end">
-            <Button
-              type="submit"
-              disabled={createUserMutation.isPending || isUploading}
-              className="gap-2 tracking-tighter"
-            >
-              {createUserMutation.isPending || isUploading ? (
-                <>
-                  <Spinner className="h-4 w-4 animate-spin" />
-                  Đang xử lý...
-                </>
-              ) : (
-                <>
-                  Xác nhận khởi tạo
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </Button>
-          </div>
         </form>
       </div>
     </DashboardLayout>

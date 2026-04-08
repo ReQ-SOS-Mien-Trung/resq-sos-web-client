@@ -43,6 +43,7 @@ import {
 } from "@/services/depot/hooks";
 import type { DepotClosureRecord } from "@/services/depot/type";
 import { AxiosError } from "axios";
+import { Icon } from "@iconify/react";
 
 /* ── helpers ──────────────────────────────────────────────────── */
 function getApiError(err: unknown, fallback: string): string {
@@ -119,12 +120,39 @@ function getClosureStatusCfg(status: string) {
   );
 }
 
+/* ── Transfer status normalizer ────────────────────────────────
+ * Backend GET transfer returns Vietnamese strings ("Chờ chuẩn bị")
+ * while closure summary returns enum keys ("AwaitingPreparation").
+ * Normalise everything to enum keys so action-button lookups work.
+ */
+const TRANSFER_STATUS_MAP: Record<string, string> = {
+  // Vietnamese → enum key
+  "Chờ chuẩn bị": "AwaitingPreparation",
+  "Đang chuẩn bị": "Preparing",
+  "Đang vận chuyển": "Shipping",
+  "Đã giao": "Completed",
+  "Đã hoàn thành": "Completed",
+  "Đã nhận": "Received",
+  "Đã hủy": "Cancelled",
+  // enum key → itself (passthrough)
+  AwaitingPreparation: "AwaitingPreparation",
+  Preparing: "Preparing",
+  Shipping: "Shipping",
+  Completed: "Completed",
+  Received: "Received",
+  Cancelled: "Cancelled",
+};
+function normalizeTransferStatus(raw: string | undefined | null): string {
+  if (!raw) return "AwaitingPreparation";
+  return TRANSFER_STATUS_MAP[raw] ?? raw;
+}
+
 /* ── Transfer step config ─────────────────────────────────────── */
 const TRANSFER_STEPS = [
-  { key: "Pending", label: "Chờ xử lý" },
+  { key: "AwaitingPreparation", label: "Chờ xử lý" },
   { key: "Preparing", label: "Chuẩn bị" },
-  { key: "Shipping", label: "Vận chuyển" },
-  { key: "Completed", label: "Xuất xong" },
+  { key: "Shipping", label: "Đang vận chuyển" },
+  { key: "Completed", label: "Đã giao" },
   { key: "Received", label: "Đã nhận" },
 ] as const;
 
@@ -162,10 +190,17 @@ export default function DepotClosurePage() {
       { enabled: !!(depotId && activeClosureId && activeTransferId) },
     );
 
-  const currentTransferStatus =
-    activeTransfer?.status ??
-    activeInProgressClosure?.transfer?.status ??
-    "Pending";
+  const currentTransferStatus = normalizeTransferStatus(
+    activeTransfer?.status ?? activeInProgressClosure?.transfer?.status,
+  );
+
+  /* ── Role detection: source vs target depot manager ── */
+  // Closures are queried for depotId, so if targetDepotId matches our depot
+  // we're the receiving depot; otherwise we're the source depot.
+  const isTargetManager =
+    !!activeInProgressClosure &&
+    activeInProgressClosure.targetDepotId === depotId;
+  const isSourceManager = !!activeInProgressClosure && !isTargetManager;
 
   /* ── State ── */
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -185,9 +220,6 @@ export default function DepotClosurePage() {
     completeMutation.isPending ||
     receiveMutation.isPending;
 
-  const transferDeadlineCountdown = useCountdown(
-    activeTransfer?.transferDeadlineAt,
-  );
   const closingTimeoutCountdown = useCountdown(
     activeInProgressClosure?.closingTimeoutAt,
   );
@@ -326,6 +358,14 @@ export default function DepotClosurePage() {
                           : depot.status}
                     </Badge>
                   )}
+                  {isTargetManager && (
+                    <Badge
+                      variant="outline"
+                      className="text-sm border-blue-300 text-blue-600 dark:border-blue-700 dark:text-blue-400"
+                    >
+                      Kho nhận hàng
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -359,13 +399,13 @@ export default function DepotClosurePage() {
                   weight="fill"
                   className="text-blue-500 shrink-0"
                 />
-                <span className="text-sm font-bold tracking-tighter text-blue-800 dark:text-blue-300">
+                <span className="text-base font-bold tracking-tighter text-blue-800 dark:text-blue-300">
                   Transfer #{activeInProgressClosure.transfer.transferId}
                 </span>
                 {(() => {
                   const s = currentTransferStatus;
                   const cls =
-                    s === "Pending"
+                    s === "AwaitingPreparation"
                       ? "bg-zinc-100 border-zinc-300 text-zinc-600 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400"
                       : s === "Preparing"
                         ? "bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-700 dark:text-amber-300"
@@ -377,7 +417,7 @@ export default function DepotClosurePage() {
                               ? "bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-300"
                               : "bg-muted border-border text-muted-foreground";
                   const lbl: Record<string, string> = {
-                    Pending: "Chờ chuẩn bị",
+                    AwaitingPreparation: "Chờ chuẩn bị",
                     Preparing: "Đang chuẩn bị",
                     Shipping: "Đang vận chuyển",
                     Completed: "Chờ xác nhận nhận",
@@ -386,7 +426,7 @@ export default function DepotClosurePage() {
                   return (
                     <span
                       className={cn(
-                        "text-xs font-semibold tracking-tighter px-2 py-0.5 rounded-md border",
+                        "text-sm font-semibold tracking-tighter px-2 py-1 rounded-md border",
                         cls,
                       )}
                     >
@@ -395,11 +435,34 @@ export default function DepotClosurePage() {
                   );
                 })()}
               </div>
-              {activeInProgressClosure.targetDepotName && (
+              {isSourceManager && activeInProgressClosure.targetDepotName && (
                 <div className="flex items-center gap-1.5 text-sm font-semibold tracking-tighter text-blue-700 dark:text-blue-400">
-                  <Truck size={13} className="shrink-0" />
+                  <Icon
+                    icon="fluent:vehicle-truck-cube-20-regular"
+                    width="24"
+                    height="24"
+                  />
                   <span>
-                    → <strong>{activeInProgressClosure.targetDepotName}</strong>
+                    →{" "}
+                    <span className="font-semibold">
+                      {activeInProgressClosure.targetDepotName}
+                    </span>
+                  </span>
+                </div>
+              )}
+              {isTargetManager && (
+                <div className="flex items-center gap-1.5 text-sm font-semibold tracking-tighter text-emerald-700 dark:text-emerald-400">
+                  <Icon
+                    icon="fluent:vehicle-truck-cube-20-regular"
+                    width="24"
+                    height="24"
+                  />
+                  <span>
+                    ←{" "}
+                    <span className="font-semibold">
+                      {activeInProgressClosure.sourceDepotName ??
+                        `Kho #${activeInProgressClosure.depotId}`}
+                    </span>
                   </span>
                 </div>
               )}
@@ -425,7 +488,7 @@ export default function DepotClosurePage() {
                           )}
                         />
                       )}
-                      <div className="flex flex-col items-center gap-1.5 shrink-0 w-14">
+                      <div className="flex flex-col items-center gap-1.5 shrink-0 w-24">
                         <div
                           className={cn(
                             "h-7 w-7 rounded-full border-2 flex items-center justify-center transition-all",
@@ -446,7 +509,7 @@ export default function DepotClosurePage() {
                         </div>
                         <span
                           className={cn(
-                            "text-xs text-center leading-tight tracking-tighter",
+                            "text-sm font-medium text-center leading-tight tracking-tighter whitespace-nowrap",
                             done
                               ? "text-blue-500 dark:text-blue-400 font-medium"
                               : active
@@ -463,10 +526,10 @@ export default function DepotClosurePage() {
               </div>
 
               {/* Transfer stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {[
                   {
-                    label: "Vật tư tiêu hao",
+                    label: "Vật tư tiêu thụ",
                     value: (
                       activeTransfer?.snapshotConsumableUnits ??
                       activeInProgressClosure.snapshotConsumableUnits
@@ -480,44 +543,28 @@ export default function DepotClosurePage() {
                     ).toLocaleString("vi-VN"),
                   },
                   {
-                    label: "Kho nhận",
-                    value:
-                      activeInProgressClosure.targetDepotName ??
-                      (activeInProgressClosure.targetDepotId
-                        ? `#${activeInProgressClosure.targetDepotId}`
-                        : "—"),
+                    label: isTargetManager ? "Kho nguồn" : "Kho nhận",
+                    value: isTargetManager
+                      ? (activeInProgressClosure.sourceDepotName ??
+                        `Kho #${activeInProgressClosure.depotId}`)
+                      : (activeInProgressClosure.targetDepotName ??
+                        (activeInProgressClosure.targetDepotId
+                          ? `#${activeInProgressClosure.targetDepotId}`
+                          : "—")),
                   },
                 ].map((item) => (
                   <div
                     key={item.label}
                     className="flex flex-col gap-0.5 p-2.5 rounded-lg bg-blue-100/60 dark:bg-blue-900/20 border border-blue-200/60 dark:border-blue-800/60"
                   >
-                    <span className="text-xs text-blue-600 dark:text-blue-400 font-medium tracking-tighter">
+                    <span className="text-sm text-blue-600 dark:text-blue-400 font-medium tracking-tighter">
                       {item.label}
                     </span>
-                    <span className="text-sm font-bold text-blue-900 dark:text-blue-200 tracking-tighter tabular-nums">
+                    <span className="text-base font-bold text-blue-900 dark:text-blue-200 tracking-tighter tabular-nums">
                       {item.value}
                     </span>
                   </div>
                 ))}
-                {/* Deadline countdown card */}
-                <div className="flex flex-col gap-0.5 p-2.5 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
-                  <span className="text-xs text-red-500 dark:text-red-400 font-semibold tracking-tighter uppercase">
-                    Hết hạn xử lý
-                  </span>
-                  <span className="text-sm font-bold text-red-900 dark:text-red-200 tracking-tighter tabular-nums">
-                    {activeTransfer?.transferDeadlineAt
-                      ? new Date(
-                          activeTransfer.transferDeadlineAt,
-                        ).toLocaleString("vi-VN")
-                      : "—"}
-                  </span>
-                  {transferDeadlineCountdown && (
-                    <span className="text-xs font-mono font-semibold text-red-600 dark:text-red-400 tabular-nums">
-                      {transferDeadlineCountdown}
-                    </span>
-                  )}
-                </div>
               </div>
 
               {/* Transfer detail info */}
@@ -558,15 +605,15 @@ export default function DepotClosurePage() {
 
               {/* Action button */}
               {(() => {
-                const cfgMap: Record<
+                /* Source manager actions: Pending→prepare, Preparing→ship, Shipping→complete */
+                const sourceCfgMap: Record<
                   string,
                   {
                     label: string;
-                    action: "prepare" | "ship" | "complete" | "receive";
-                    emerald?: boolean;
+                    action: "prepare" | "ship" | "complete";
                   }
                 > = {
-                  Pending: {
+                  AwaitingPreparation: {
                     label: "Bắt đầu chuẩn bị hàng",
                     action: "prepare",
                   },
@@ -578,23 +625,58 @@ export default function DepotClosurePage() {
                     label: "Hoàn tất xuất hàng",
                     action: "complete",
                   },
+                };
+                /* Target manager action: Completed→receive */
+                const targetCfgMap: Record<
+                  string,
+                  {
+                    label: string;
+                    action: "receive";
+                    emerald: boolean;
+                  }
+                > = {
                   Completed: {
-                    label: "Xác nhận đã nhận hàng (kho đích)",
+                    label: "Xác nhận đã nhận hàng",
                     action: "receive",
                     emerald: true,
                   },
                 };
-                const cfg = cfgMap[currentTransferStatus];
-                if (!cfg) return null;
+
+                const cfg = isSourceManager
+                  ? sourceCfgMap[currentTransferStatus]
+                  : isTargetManager
+                    ? targetCfgMap[currentTransferStatus]
+                    : undefined;
+                if (!cfg) {
+                  /* Show waiting message for target manager when transfer is not yet Completed */
+                  if (isTargetManager && currentTransferStatus !== "Received") {
+                    const waitLabel: Record<string, string> = {
+                      AwaitingPreparation: "Đang chờ kho nguồn chuẩn bị hàng…",
+                      Preparing: "Kho nguồn đang chuẩn bị hàng…",
+                      Shipping: "Hàng đang được vận chuyển đến kho bạn…",
+                    };
+                    const msg = waitLabel[currentTransferStatus];
+                    if (msg) {
+                      return (
+                        <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground tracking-tighter">
+                          <HourglassHigh size={14} className="animate-pulse" />
+                          <span className="font-medium">{msg}</span>
+                        </div>
+                      );
+                    }
+                  }
+                  return null;
+                }
+                const isEmerald = "emerald" in cfg && cfg.emerald;
                 return (
                   <div className="flex justify-end">
                     <Button
                       size="sm"
                       className={cn(
-                        "gap-1.5 font-semibold tracking-tighter",
-                        cfg.emerald
-                          ? "bg-emerald-600 hover:bg-emerald-700"
-                          : "",
+                        "gap-1.5 py-2 font-semibold tracking-tighter",
+                        isEmerald
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20",
                       )}
                       onClick={() => {
                         setTransferNote("");
@@ -745,7 +827,7 @@ export default function DepotClosurePage() {
                     </div>
 
                     {c.closeReason && (
-                      <p className="text-sm tracking-tighter font-bold mb-1">
+                      <p className="text-sm tracking-tighter font-semibold mb-1">
                         <span className="font-normal">Lý do đóng kho: </span>
                         {c.closeReason}
                       </p>
@@ -759,10 +841,22 @@ export default function DepotClosurePage() {
                         />
                         {c.resolutionType === "TransferToDepot" ? (
                           <span>
-                            Chuyển sang{" "}
-                            <span className="font-semibold">
-                              {c.targetDepotName ?? `Kho #${c.targetDepotId}`}
-                            </span>
+                            {c.depotId === depotId ? (
+                              <>
+                                Chuyển sang{" "}
+                                <span className="font-semibold">
+                                  {c.targetDepotName ??
+                                    `Kho #${c.targetDepotId}`}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                Nhận hàng từ{" "}
+                                <span className="font-semibold">
+                                  {c.sourceDepotName ?? `Kho #${c.depotId}`}
+                                </span>
+                              </>
+                            )}
                           </span>
                         ) : (
                           <span>{c.externalNote ?? "Tự xử lý bên ngoài"}</span>

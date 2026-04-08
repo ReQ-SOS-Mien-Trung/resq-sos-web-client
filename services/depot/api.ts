@@ -6,10 +6,14 @@ import {
   DepotEntity,
   DepotStatusMetadata,
   DepotMetadataItem,
+  AvailableDepotManager,
   DepotFund,
   UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
+  AssignDepotManagerRequest,
+  UnassignDepotManagerRequest,
+  DepotManagerAssignmentResponse,
   GetDepotFundTransactionsResponse,
   GetDepotFundTransactionsParams,
   DepotClosureMetadata,
@@ -74,6 +78,19 @@ export async function getDepotMetadata(): Promise<DepotMetadataItem[]> {
 }
 
 /**
+ * Get available managers for depot assignment
+ * GET /logistics/depot/metadata/available-managers
+ */
+export async function getAvailableDepotManagers(): Promise<
+  AvailableDepotManager[]
+> {
+  const { data } = await api.get(
+    "/logistics/depot/metadata/available-managers",
+  );
+  return data;
+}
+
+/**
  * Create a new depot
  * POST /logistics/depot
  */
@@ -110,6 +127,31 @@ export async function updateDepotStatus(
       params: { Status: request.status },
     },
   );
+  return data;
+}
+
+/**
+ * Assign or replace manager for a depot
+ * PATCH /logistics/depot/{id}/manager
+ */
+export async function assignDepotManager(
+  request: AssignDepotManagerRequest,
+): Promise<DepotManagerAssignmentResponse> {
+  const { id, managerId } = request;
+  const { data } = await api.patch(`/logistics/depot/${id}/manager`, {
+    managerId,
+  });
+  return data;
+}
+
+/**
+ * Unassign manager from a depot
+ * DELETE /logistics/depot/{id}/manager
+ */
+export async function unassignDepotManager(
+  request: UnassignDepotManagerRequest,
+): Promise<DepotManagerAssignmentResponse> {
+  const { data } = await api.delete(`/logistics/depot/${request.id}/manager`);
   return data;
 }
 

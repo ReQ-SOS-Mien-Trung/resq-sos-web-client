@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -16,6 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
@@ -36,13 +45,42 @@ import {
   Eye,
   MagnifyingGlass,
   Check,
+  Plus,
+  MapPin,
+  Users,
+  ImageSquare,
 } from "@phosphor-icons/react";
-import { useDepots, useDepotStatuses } from "@/services/depot/hooks";
+import { toast } from "sonner";
+import { AxiosError } from "axios";
+import {
+  useCreateDepot,
+  useDepotAvailableManagers,
+  useDepots,
+  useDepotStatuses,
+} from "@/services/depot/hooks";
+import { uploadImageToCloudinary } from "@/utils/uploadFile";
 import type {
+  CreateDepotRequest,
   DepotEntity,
   DepotStatus,
   DepotStatusMetadata,
 } from "@/services/depot/type";
+
+const LocationPickerMap = dynamic(
+  () => import("@/components/admin/assembly-points/LocationPickerMap"),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="w-full h-64 rounded-lg" />,
+  },
+);
+
+function getApiError(err: unknown, fallback: string): string {
+  if (err instanceof AxiosError) {
+    const msg = err.response?.data?.message;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+  }
+  return fallback;
+}
 
 /* ── Status config ───────────────────────────────────────────── */
 
@@ -106,6 +144,12 @@ function buildStatusCfg(apiStatuses?: DepotStatusMetadata[]): StatusCfgMap {
 }
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
+const CAPACITY_PRESETS = [1000000, 2000000, 5000000];
+
+function formatAmountWithDot(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
 
 /* ── Small util bar (used in table only) ─────────────────────── */
 
@@ -355,8 +399,23 @@ export default function DepotsPage() {
   }, [search]);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [isResolvingAddress, setIsResolvingAddress] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [newDepot, setNewDepot] = useState({
+    name: "",
+    address: "",
+    capacity: "",
+    latitude: "",
+    longitude: "",
+    managerId: "",
+    imagePreviewUrl: "",
+  });
 
   /* ── Data ── */
+  const createDepotMutation = useCreateDepot();
   const { data: allData, refetch: refetchAll } = useDepots({
     params: { pageNumber: 1, pageSize: 200 },
   });
@@ -371,6 +430,9 @@ export default function DepotsPage() {
       search: debouncedSearch || undefined,
       statuses: selectedStatuses.length ? selectedStatuses : undefined,
     },
+  });
+  const { data: availableManagers = [] } = useDepotAvailableManagers({
+    enabled: createOpen,
   });
 
   const allDepots = allData?.items ?? [];
@@ -466,6 +528,142 @@ export default function DepotsPage() {
 
   const hasFilters = debouncedSearch || selectedStatuses.length > 0;
 
+  async function resolveAddressFromPickedPoint(lat: number, lng: number) {
+    setIsResolvingAddress(true);
+    try {
+      const res = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+      if (!res.ok) throw new Error("reverse geocode failed");
+      const json = (await res.json()) as {
+        result?: { display_name?: string };
+      };
+      const displayName = json.result?.display_name?.trim();
+      setNewDepot((prev) => ({
+        ...prev,
+        address: displayName || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      }));
+    } catch {
+      setNewDepot((prev) => ({
+        ...prev,
+        address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      }));
+      toast.error("Không đọc được địa chỉ từ OpenStreetMap.");
+    } finally {
+      setIsResolvingAddress(false);
+    }
+  }
+
+  function handleMapPick(lat: number, lng: number) {
+    setNewDepot((prev) => ({
+      ...prev,
+      latitude: lat.toFixed(6),
+      longitude: lng.toFixed(6),
+    }));
+    void resolveAddressFromPickedPoint(lat, lng);
+  }
+
+  function handleImageFileChange(file?: File) {
+    if (newDepot.imagePreviewUrl) {
+      URL.revokeObjectURL(newDepot.imagePreviewUrl);
+    }
+    setShowImagePreview(false);
+    if (!file) {
+      setSelectedImageFile(null);
+      setNewDepot((prev) => ({ ...prev, imagePreviewUrl: "" }));
+      return;
+    }
+    setSelectedImageFile(file);
+    setNewDepot((prev) => ({
+      ...prev,
+      imagePreviewUrl: URL.createObjectURL(file),
+    }));
+  }
+
+  function resetCreateForm() {
+    if (newDepot.imagePreviewUrl) {
+      URL.revokeObjectURL(newDepot.imagePreviewUrl);
+    }
+    setNewDepot({
+      name: "",
+      address: "",
+      capacity: "",
+      latitude: "",
+      longitude: "",
+      managerId: "",
+      imagePreviewUrl: "",
+    });
+    setSelectedImageFile(null);
+    setIsResolvingAddress(false);
+    setIsUploadingImage(false);
+    setShowImagePreview(false);
+  }
+
+  async function handleCreateDepot() {
+    const name = newDepot.name.trim();
+    const address = newDepot.address.trim();
+    const capacity = Number(newDepot.capacity.replaceAll(".", ""));
+    const latitude = Number(newDepot.latitude);
+    const longitude = Number(newDepot.longitude);
+
+    if (!name || !address) {
+      toast.error("Vui lòng nhập đầy đủ tên kho và địa chỉ.");
+      return;
+    }
+    if (!Number.isFinite(capacity) || capacity <= 0) {
+      toast.error("Sức chứa phải lớn hơn 0.");
+      return;
+    }
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+      toast.error("Vĩ độ không hợp lệ.");
+      return;
+    }
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      toast.error("Kinh độ không hợp lệ.");
+      return;
+    }
+
+    let imageUrl: string | undefined;
+    if (selectedImageFile) {
+      try {
+        setIsUploadingImage(true);
+        imageUrl = await uploadImageToCloudinary(
+          selectedImageFile,
+          "depot_img",
+          "depot_img",
+        );
+      } catch {
+        toast.error("Upload ảnh Cloudinary thất bại.");
+        setIsUploadingImage(false);
+        return;
+      } finally {
+        setIsUploadingImage(false);
+      }
+    }
+
+    const basePayload: CreateDepotRequest = {
+      name,
+      address,
+      capacity,
+      latitude,
+      longitude,
+      ...(newDepot.managerId ? { managerId: newDepot.managerId } : {}),
+      ...(imageUrl ? { imageUrl } : {}),
+    };
+
+    const payload = basePayload;
+
+    createDepotMutation.mutate(payload, {
+      onSuccess: () => {
+        toast.success("Tạo kho mới thành công.");
+        setCreateOpen(false);
+        resetCreateForm();
+        handleRefresh();
+      },
+      onError: (err) => {
+        toast.error(getApiError(err, "Tạo kho thất bại."));
+      },
+    });
+  }
+
   /* ── Render ── */
   return (
     <DashboardLayout
@@ -490,19 +688,30 @@ export default function DepotsPage() {
               Tìm kiếm và lọc theo trạng thái kho
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="gap-1.5 text-muted-foreground self-start sm:self-auto"
-          >
-            <ArrowClockwise
-              size={15}
-              className={isRefreshing ? "animate-spin" : ""}
-            />
-            Làm mới
-          </Button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <Button
+              className="gap-2 tracking-tight bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25"
+              onClick={() => {
+                setCreateOpen(true);
+              }}
+            >
+              <Plus size={16} />
+              Tạo kho mới
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="gap-1.5 text-muted-foreground"
+            >
+              <ArrowClockwise
+                size={15}
+                className={isRefreshing ? "animate-spin" : ""}
+              />
+              Làm mới
+            </Button>
+          </div>
         </div>
 
         {/* ── Stats ── */}
@@ -704,6 +913,226 @@ export default function DepotsPage() {
           </div>
         </Card>
       </div>
+
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (!open) resetCreateForm();
+        }}
+      >
+        <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="tracking-tighter text-2xl">
+              Tạo kho mới
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 py-1">
+            <div className="space-y-3 lg:col-span-2">
+              <Label className="tracking-tighter flex items-center gap-1.5">
+                <MapPin size={14} className="text-red-500" />
+                Vui lòng chọn vị trí trên map
+              </Label>
+              <LocationPickerMap
+                lat={newDepot.latitude ? Number(newDepot.latitude) : undefined}
+                lng={
+                  newDepot.longitude ? Number(newDepot.longitude) : undefined
+                }
+                onPick={handleMapPick}
+                height={310}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="tracking-tighter">Vĩ độ</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={newDepot.latitude}
+                    onChange={(e) =>
+                      setNewDepot((p) => ({ ...p, latitude: e.target.value }))
+                    }
+                    placeholder="16.047079"
+                    className="tracking-tighter font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="tracking-tighter">Kinh độ</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={newDepot.longitude}
+                    onChange={(e) =>
+                      setNewDepot((p) => ({ ...p, longitude: e.target.value }))
+                    }
+                    placeholder="108.20623"
+                    className="tracking-tighter font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="tracking-tighter">Tên kho</Label>
+                <Input
+                  value={newDepot.name}
+                  onChange={(e) =>
+                    setNewDepot((p) => ({ ...p, name: e.target.value }))
+                  }
+                  placeholder="Nhập tên kho"
+                  className="tracking-tighter"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="tracking-tighter">Địa chỉ</Label>
+                <Input
+                  value={newDepot.address}
+                  onChange={(e) =>
+                    setNewDepot((p) => ({ ...p, address: e.target.value }))
+                  }
+                  placeholder="Chọn điểm trên bản đồ để lấy địa chỉ"
+                  className="tracking-tighter"
+                />
+                {isResolvingAddress && (
+                  <p className="text-xs text-muted-foreground tracking-tight">
+                    Đang đọc địa chỉ từ map...
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="tracking-tighter flex items-center gap-1.5">
+                  <Users size={14} className="text-blue-500" />
+                  Mức tồn kho tối đa
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {CAPACITY_PRESETS.map((preset) => (
+                    <Button
+                      key={preset}
+                      type="button"
+                      variant={
+                        newDepot.capacity.replaceAll(".", "") === String(preset)
+                          ? "default"
+                          : "outline"
+                      }
+                      size="sm"
+                      className="h-8 text-sm tracking-tight"
+                      onClick={() =>
+                        setNewDepot((p) => ({
+                          ...p,
+                          capacity: formatAmountWithDot(String(preset)),
+                        }))
+                      }
+                    >
+                      {formatAmountWithDot(String(preset))}
+                    </Button>
+                  ))}
+                </div>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={newDepot.capacity}
+                  onChange={(e) =>
+                    setNewDepot((p) => ({
+                      ...p,
+                      capacity: formatAmountWithDot(e.target.value),
+                    }))
+                  }
+                  placeholder="Ví dụ: 1.000.000"
+                  className="tracking-tighter"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="tracking-tighter">Quản kho</Label>
+                <Select
+                  value={newDepot.managerId || "__none"}
+                  onValueChange={(value) =>
+                    setNewDepot((p) => ({
+                      ...p,
+                      managerId: value === "__none" ? "" : value,
+                    }))
+                  }
+                >
+                  <SelectTrigger className="tracking-tighter">
+                    <SelectValue placeholder="Chọn manager từ metadata" />
+                  </SelectTrigger>
+                  <SelectContent
+                    position="popper"
+                    className="z-10010 w-[--radix-select-trigger-width]"
+                  >
+                    <SelectItem value="__none">Chọn quản kho</SelectItem>
+                    {availableManagers.map((manager) => (
+                      <SelectItem key={manager.id} value={manager.id}>
+                        {manager.fullName} - {manager.phone}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="tracking-tighter flex items-center gap-1.5">
+                  <ImageSquare size={14} className="text-violet-500" />
+                  Hình ảnh kho
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleImageFileChange(e.target.files?.[0])}
+                    className="tracking-tighter"
+                  />
+                  {newDepot.imagePreviewUrl ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10 shrink-0"
+                      onClick={() => setShowImagePreview((prev) => !prev)}
+                    >
+                      <Eye size={16} />
+                    </Button>
+                  ) : null}
+                </div>
+                {newDepot.imagePreviewUrl && showImagePreview ? (
+                  <div
+                    className="h-32 rounded-md border border-border/60 bg-center bg-cover"
+                    style={{
+                      backgroundImage: `url(${newDepot.imagePreviewUrl})`,
+                    }}
+                  />
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreateOpen(false);
+                resetCreateForm();
+              }}
+              className="tracking-tighter"
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleCreateDepot}
+              disabled={createDepotMutation.isPending || isUploadingImage}
+              className="tracking-tighter"
+            >
+              {createDepotMutation.isPending || isUploadingImage
+                ? "Đang tạo..."
+                : "Tạo kho"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

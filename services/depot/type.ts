@@ -19,6 +19,13 @@ export interface DepotMetadataItem {
   value: string;
 }
 
+export interface AvailableDepotManager {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+}
+
 // Depot Manager
 export interface DepotManager {
   id: string;
@@ -86,6 +93,8 @@ export interface CreateDepotRequest {
   latitude: number;
   longitude: number;
   capacity: number;
+  managerId?: string;
+  imageUrl?: string;
 }
 
 // Update Depot Request
@@ -109,6 +118,23 @@ export interface UpdateDepotStatusResponse {
   id: number;
   status: DepotStatus;
   message: string;
+}
+
+export interface AssignDepotManagerRequest {
+  id: number;
+  managerId: string;
+}
+
+export interface UnassignDepotManagerRequest {
+  id: number;
+}
+
+export interface DepotManagerAssignmentResponse {
+  depotId: number;
+  depotName: string;
+  status: DepotStatus | string;
+  assignedAt?: string;
+  unassignedAt?: string;
 }
 
 // Depot Fund (from /logistics/depot/funds & /logistics/depot/my-fund)
@@ -209,7 +235,6 @@ export interface ResolveDepotClosureResponse {
     targetDepotId: number;
     targetDepotName: string;
     transferStatus: string;
-    transferDeadlineAt: string | null;
     snapshotConsumableUnits: number;
     snapshotReusableUnits: number;
     reusableItemsSkipped: number;
@@ -241,7 +266,6 @@ export interface DepotClosureTransfer {
   targetDepotId: number;
   status: string;
   createdAt: string;
-  transferDeadlineAt: string | null;
   snapshotConsumableUnits: number;
   snapshotReusableUnits: number;
   shippedAt: string | null;
@@ -265,6 +289,7 @@ export interface DepotClosureTransferSummary {
 export interface DepotClosureRecord {
   id: number;
   depotId: number;
+  sourceDepotName?: string | null;
   status: string;
   previousStatus: string;
   closeReason: string;

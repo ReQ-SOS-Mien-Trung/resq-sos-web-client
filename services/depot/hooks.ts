@@ -4,11 +4,14 @@ import {
   getDepotById,
   getDepotStatuses,
   getDepotMetadata,
+  getAvailableDepotManagers,
   getDepotFunds,
   getMyDepotFund,
   createDepot,
   updateDepot,
   updateDepotStatus,
+  assignDepotManager,
+  unassignDepotManager,
   updateDepotAdvanceLimit,
   getMyDepotFundTransactions,
   getDepotClosureMetadata,
@@ -29,10 +32,14 @@ import {
   DepotEntity,
   DepotStatusMetadata,
   DepotMetadataItem,
+  AvailableDepotManager,
   DepotFund,
   UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
+  AssignDepotManagerRequest,
+  UnassignDepotManagerRequest,
+  DepotManagerAssignmentResponse,
   GetDepotFundTransactionsResponse,
   GetDepotFundTransactionsParams,
   DepotClosureMetadata,
@@ -52,6 +59,9 @@ import {
 export const DEPOTS_QUERY_KEY = ["depots"] as const;
 export const DEPOT_STATUSES_QUERY_KEY = ["depot-statuses"] as const;
 export const DEPOT_METADATA_QUERY_KEY = ["depot-metadata"] as const;
+export const DEPOT_AVAILABLE_MANAGERS_QUERY_KEY = [
+  "depot-available-managers",
+] as const;
 export const DEPOT_FUNDS_QUERY_KEY = ["depot-funds"] as const;
 export const MY_DEPOT_FUND_QUERY_KEY = ["my-depot-fund"] as const;
 
@@ -69,6 +79,10 @@ export interface UseDepotStatusesOptions {
 }
 
 export interface UseDepotMetadataOptions {
+  enabled?: boolean;
+}
+
+export interface UseDepotAvailableManagersOptions {
   enabled?: boolean;
 }
 
@@ -112,6 +126,19 @@ export function useDepotMetadata(options?: UseDepotMetadataOptions) {
   return useQuery<DepotMetadataItem[]>({
     queryKey: DEPOT_METADATA_QUERY_KEY,
     queryFn: getDepotMetadata,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Hook to fetch available managers for depot assignment
+ */
+export function useDepotAvailableManagers(
+  options?: UseDepotAvailableManagersOptions,
+) {
+  return useQuery<AvailableDepotManager[]>({
+    queryKey: DEPOT_AVAILABLE_MANAGERS_QUERY_KEY,
+    queryFn: getAvailableDepotManagers,
     enabled: options?.enabled ?? true,
   });
 }
@@ -222,6 +249,54 @@ export function useUpdateDepotStatus() {
       queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
       queryClient.invalidateQueries({
         queryKey: [...DEPOTS_QUERY_KEY, variables.id],
+      });
+    },
+  });
+}
+
+/**
+ * Hook to assign/replace manager for a depot
+ */
+export function useAssignDepotManager() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    DepotManagerAssignmentResponse,
+    Error,
+    AssignDepotManagerRequest
+  >({
+    mutationFn: assignDepotManager,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOTS_QUERY_KEY, variables.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: DEPOT_AVAILABLE_MANAGERS_QUERY_KEY,
+      });
+    },
+  });
+}
+
+/**
+ * Hook to unassign manager from a depot
+ */
+export function useUnassignDepotManager() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    DepotManagerAssignmentResponse,
+    Error,
+    UnassignDepotManagerRequest
+  >({
+    mutationFn: unassignDepotManager,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOTS_QUERY_KEY, variables.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: DEPOT_AVAILABLE_MANAGERS_QUERY_KEY,
       });
     },
   });
