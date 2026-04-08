@@ -107,6 +107,36 @@ const CLOSURE_STATUS_STYLE: Record<
     bg: "bg-red-50    dark:bg-red-950/30    border-red-200    dark:border-red-800",
     Icon: XCircle,
   },
+  TransferPending: {
+    label: "Đang chuyển kho",
+    color: "text-blue-700 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
+    Icon: ArrowsLeftRight,
+  },
+  AwaitingPreparation: {
+    label: "Chờ chuẩn bị",
+    color: "text-zinc-700 dark:text-zinc-300",
+    bg: "bg-zinc-50 dark:bg-zinc-900/30 border-zinc-200 dark:border-zinc-700",
+    Icon: HourglassHigh,
+  },
+  Preparing: {
+    label: "Đang chuẩn bị",
+    color: "text-amber-700 dark:text-amber-400",
+    bg: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",
+    Icon: Package,
+  },
+  Shipping: {
+    label: "Đang vận chuyển",
+    color: "text-blue-700 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
+    Icon: Truck,
+  },
+  Received: {
+    label: "Đã nhận",
+    color: "text-emerald-700 dark:text-emerald-400",
+    bg: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800",
+    Icon: CheckFat,
+  },
 };
 
 function getClosureStatusCfg(status: string) {
@@ -121,12 +151,18 @@ function getClosureStatusCfg(status: string) {
 }
 
 /* ── Transfer status normalizer ────────────────────────────────
- * Backend GET transfer returns Vietnamese strings ("Chờ chuẩn bị")
- * while closure summary returns enum keys ("AwaitingPreparation").
- * Normalise everything to enum keys so action-button lookups work.
+ * API mới trả enum key tiếng Anh; vẫn giữ map tiếng Việt để tương thích.
  */
-const TRANSFER_STATUS_MAP: Record<string, string> = {
-  // Vietnamese → enum key
+const TRANSFER_STATUS_KEYS = new Set([
+  "AwaitingPreparation",
+  "Preparing",
+  "Shipping",
+  "Completed",
+  "Received",
+  "Cancelled",
+]);
+
+const LEGACY_TRANSFER_STATUS_MAP: Record<string, string> = {
   "Chờ chuẩn bị": "AwaitingPreparation",
   "Đang chuẩn bị": "Preparing",
   "Đang vận chuyển": "Shipping",
@@ -134,17 +170,12 @@ const TRANSFER_STATUS_MAP: Record<string, string> = {
   "Đã hoàn thành": "Completed",
   "Đã nhận": "Received",
   "Đã hủy": "Cancelled",
-  // enum key → itself (passthrough)
-  AwaitingPreparation: "AwaitingPreparation",
-  Preparing: "Preparing",
-  Shipping: "Shipping",
-  Completed: "Completed",
-  Received: "Received",
-  Cancelled: "Cancelled",
 };
+
 function normalizeTransferStatus(raw: string | undefined | null): string {
   if (!raw) return "AwaitingPreparation";
-  return TRANSFER_STATUS_MAP[raw] ?? raw;
+  if (TRANSFER_STATUS_KEYS.has(raw)) return raw;
+  return LEGACY_TRANSFER_STATUS_MAP[raw] ?? raw;
 }
 
 /* ── Transfer step config ─────────────────────────────────────── */
@@ -177,7 +208,9 @@ export default function DepotClosurePage() {
   } = useDepotClosures(depotId);
 
   const activeInProgressClosure =
-    closures.find((c) => c.status === "InProgress") ?? null;
+    closures.find((c) =>
+      ["InProgress", "TransferPending"].includes(c.status),
+    ) ?? null;
   const activeClosureId = activeInProgressClosure?.id ?? null;
   const activeTransferId =
     activeInProgressClosure?.transfer?.transferId ?? null;
@@ -795,7 +828,8 @@ export default function DepotClosurePage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {closures.map((c: DepotClosureRecord) => {
-                const scfg = getClosureStatusCfg(c.status);
+                const displayStatus = c.transfer?.status ?? c.status;
+                const scfg = getClosureStatusCfg(displayStatus);
                 const StatusIcon = scfg.Icon;
                 return (
                   <div

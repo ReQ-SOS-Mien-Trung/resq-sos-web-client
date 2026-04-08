@@ -15,11 +15,15 @@ import {
   getInventoryActionTypes,
   getInventorySourceTypes,
   getInventoryReliefItemsByCategory,
+  getReusableItemConditions,
   searchDepotsByReliefItems,
   createSupplyRequests,
   getSupplyRequests,
   getMyDepotUpcomingPickups,
   getMyDepotPickupHistory,
+  getMyDepotUpcomingReturns,
+  getMyDepotUpcomingReturnsByStatuses,
+  getMyDepotReturnHistory,
   acceptSupplyRequest,
   prepareSupplyRequest,
   shipSupplyRequest,
@@ -61,6 +65,7 @@ import {
   InventoryActionType,
   InventorySourceType,
   InventoryReliefItem,
+  ReusableItemCondition,
   SearchDepotsParams,
   SearchDepotsResponse,
   CreateSupplyRequestsPayload,
@@ -90,6 +95,11 @@ import {
   GetUpcomingPickupsResponse,
   GetPickupHistoryParams,
   GetPickupHistoryResponse,
+  GetUpcomingReturnsParams,
+  GetUpcomingReturnsResponse,
+  UpcomingReturnEntity,
+  GetReturnHistoryParams,
+  GetReturnHistoryResponse,
 } from "./type";
 
 export const INVENTORY_KEYS = {
@@ -107,6 +117,8 @@ export const INVENTORY_KEYS = {
   sourceTypes: () => [...INVENTORY_KEYS.all, "sourceTypes"] as const,
   reliefItemsByCategory: (categoryCode: string) =>
     [...INVENTORY_KEYS.all, "reliefItemsByCategory", categoryCode] as const,
+  reusableItemConditions: () =>
+    [...INVENTORY_KEYS.all, "reusableItemConditions"] as const,
   searchDepots: (params: SearchDepotsParams) =>
     [...INVENTORY_KEYS.all, "searchDepots", params] as const,
   supplyRequests: (params: GetSupplyRequestsParams) =>
@@ -115,6 +127,12 @@ export const INVENTORY_KEYS = {
     [...INVENTORY_KEYS.all, "upcomingPickups", params] as const,
   pickupHistory: (params: GetPickupHistoryParams) =>
     [...INVENTORY_KEYS.all, "pickupHistory", params] as const,
+  upcomingReturns: (params: GetUpcomingReturnsParams) =>
+    [...INVENTORY_KEYS.all, "upcomingReturns", params] as const,
+  upcomingReturnsByStatuses: (statuses: string[]) =>
+    [...INVENTORY_KEYS.all, "upcomingReturnsByStatuses", ...statuses] as const,
+  returnHistory: (params: GetReturnHistoryParams) =>
+    [...INVENTORY_KEYS.all, "returnHistory", params] as const,
   organizations: () => [...INVENTORY_KEYS.all, "organizations"] as const,
   stockMovements: (params: GetDepotStockMovementsParams) =>
     [...INVENTORY_KEYS.all, "transactions", params] as const,
@@ -263,6 +281,20 @@ export function useInventoryReliefItemsByCategory(
   });
 }
 
+export function useReusableItemConditions(
+  options?: Omit<
+    UseQueryOptions<ReusableItemCondition[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.reusableItemConditions(),
+    queryFn: getReusableItemConditions,
+    staleTime: Infinity,
+    ...options,
+  });
+}
+
 export function useSearchDepotsByReliefItems(
   params: SearchDepotsParams,
   options?: Omit<
@@ -326,6 +358,53 @@ export function useMyDepotPickupHistory(
   return useQuery({
     queryKey: INVENTORY_KEYS.pickupHistory(params),
     queryFn: () => getMyDepotPickupHistory(params),
+    ...options,
+  });
+}
+
+export function useMyDepotUpcomingReturns(
+  params: GetUpcomingReturnsParams,
+  options?: Omit<
+    UseQueryOptions<GetUpcomingReturnsResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.upcomingReturns(params),
+    queryFn: () => getMyDepotUpcomingReturns(params),
+    ...options,
+  });
+}
+
+export function useMyDepotUpcomingReturnsByStatuses(
+  statuses: string[],
+  options?: Omit<
+    UseQueryOptions<UpcomingReturnEntity[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  const normalizedStatuses = Array.from(
+    new Set(statuses.map((status) => status.trim()).filter(Boolean)),
+  );
+
+  return useQuery({
+    queryKey: INVENTORY_KEYS.upcomingReturnsByStatuses(normalizedStatuses),
+    queryFn: () => getMyDepotUpcomingReturnsByStatuses(normalizedStatuses),
+    enabled: normalizedStatuses.length > 0,
+    ...options,
+  });
+}
+
+export function useMyDepotReturnHistory(
+  params: GetReturnHistoryParams,
+  options?: Omit<
+    UseQueryOptions<GetReturnHistoryResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.returnHistory(params),
+    queryFn: () => getMyDepotReturnHistory(params),
     ...options,
   });
 }

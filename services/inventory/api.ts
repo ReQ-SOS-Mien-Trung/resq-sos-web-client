@@ -16,6 +16,7 @@ import {
   InventoryActionType,
   InventorySourceType,
   InventoryReliefItem,
+  ReusableItemCondition,
   SearchDepotsParams,
   SearchDepotsResponse,
   CreateSupplyRequestsPayload,
@@ -45,6 +46,11 @@ import {
   GetUpcomingPickupsResponse,
   GetPickupHistoryParams,
   GetPickupHistoryResponse,
+  GetUpcomingReturnsParams,
+  GetUpcomingReturnsResponse,
+  GetReturnHistoryParams,
+  GetReturnHistoryResponse,
+  UpcomingReturnEntity,
 } from "./type";
 
 type InventoryItemLike = Partial<InventoryItemEntity> & {
@@ -262,6 +268,19 @@ export async function getInventoryReliefItemsByCategory(
 }
 
 /**
+ * Get reusable item conditions metadata
+ * GET /logistics/inventory/metadata/reusable-item-conditions
+ */
+export async function getReusableItemConditions(): Promise<
+  ReusableItemCondition[]
+> {
+  const { data } = await api.get(
+    "/logistics/inventory/metadata/reusable-item-conditions",
+  );
+  return data;
+}
+
+/**
  * Search depots by requested relief items and quantities
  * GET /logistics/inventory/search-depots
  */
@@ -326,6 +345,85 @@ export async function getMyDepotPickupHistory(
 ): Promise<GetPickupHistoryResponse> {
   const { data } = await api.get(
     "/logistics/inventory/my-depot/pickup-history",
+    {
+      params,
+    },
+  );
+  return data;
+}
+
+/**
+ * Get upcoming return activities for current depot manager
+ * GET /logistics/inventory/my-depot/upcoming-returns
+ */
+export async function getMyDepotUpcomingReturns(
+  params: GetUpcomingReturnsParams,
+): Promise<GetUpcomingReturnsResponse> {
+  const { data } = await api.get(
+    "/logistics/inventory/my-depot/upcoming-returns",
+    {
+      params,
+      paramsSerializer: {
+        indexes: null,
+      },
+    },
+  );
+  return data;
+}
+
+const UPCOMING_RETURNS_BATCH_SIZE = 100;
+
+export async function getMyDepotUpcomingReturnsByStatuses(
+  statuses: string[],
+): Promise<UpcomingReturnEntity[]> {
+  const uniqueStatuses = Array.from(
+    new Set(statuses.map((status) => status.trim()).filter(Boolean)),
+  );
+
+  if (uniqueStatuses.length === 0) {
+    return [];
+  }
+
+  const groups = await Promise.all(
+    uniqueStatuses.map(async (status) => {
+      const firstPage = await getMyDepotUpcomingReturns({
+        status,
+        pageNumber: 1,
+        pageSize: UPCOMING_RETURNS_BATCH_SIZE,
+      });
+
+      const totalPages = Math.max(firstPage.totalPages ?? 1, 1);
+
+      if (totalPages === 1) {
+        return firstPage.items ?? [];
+      }
+
+      const remainingPages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          getMyDepotUpcomingReturns({
+            status,
+            pageNumber: index + 2,
+            pageSize: UPCOMING_RETURNS_BATCH_SIZE,
+          }).then((page) => page.items ?? []),
+        ),
+      );
+
+      return [...(firstPage.items ?? []), ...remainingPages.flat()];
+    }),
+  );
+
+  return groups.flat();
+}
+
+/**
+ * Get historical return activities for current depot manager
+ * GET /logistics/inventory/my-depot/return-history
+ */
+export async function getMyDepotReturnHistory(
+  params: GetReturnHistoryParams,
+): Promise<GetReturnHistoryResponse> {
+  const { data } = await api.get(
+    "/logistics/inventory/my-depot/return-history",
     {
       params,
     },

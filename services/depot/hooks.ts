@@ -348,6 +348,9 @@ export function useInitiateDepotClosure() {
       queryClient.invalidateQueries({
         queryKey: [...DEPOTS_QUERY_KEY, variables.id],
       });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_CLOSURES_QUERY_KEY, variables.id],
+      });
     },
   });
 }
@@ -369,6 +372,9 @@ export function useResolveDepotClosure() {
       queryClient.invalidateQueries({
         queryKey: [...DEPOTS_QUERY_KEY, variables.id],
       });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_CLOSURES_QUERY_KEY, variables.id],
+      });
     },
   });
 }
@@ -389,6 +395,9 @@ export function useCancelDepotClosure() {
       queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
       queryClient.invalidateQueries({
         queryKey: [...DEPOTS_QUERY_KEY, variables.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_CLOSURES_QUERY_KEY, variables.id],
       });
     },
   });
@@ -436,6 +445,9 @@ export function usePrepareDepotTransfer() {
         ],
       });
       queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_CLOSURES_QUERY_KEY, v.id],
+      });
     },
   });
 }
@@ -462,6 +474,9 @@ export function useShipDepotTransfer() {
         ],
       });
       queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_CLOSURES_QUERY_KEY, v.id],
+      });
     },
   });
 }
@@ -488,6 +503,9 @@ export function useCompleteDepotTransfer() {
         ],
       });
       queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_CLOSURES_QUERY_KEY, v.id],
+      });
     },
   });
 }
@@ -514,6 +532,9 @@ export function useReceiveDepotTransfer() {
         ],
       });
       queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_CLOSURES_QUERY_KEY, v.id],
+      });
     },
   });
 }

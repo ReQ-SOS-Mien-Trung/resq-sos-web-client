@@ -21,6 +21,7 @@ import {
   GetMissionTeamRouteParams,
   MissionTeamRouteLeg,
   MissionTeamRouteResponse,
+  ConfirmReturnSuppliesRequest,
 } from "./type";
 
 function toNumberOrZero(value: unknown): number {
@@ -364,4 +365,15 @@ export async function getMissionTeamRoute(
   );
 
   return normalizeMissionTeamRouteResponse(data as MissionTeamRouteResponse);
+}
+
+export async function confirmReturnSupplies(
+  missionId: number,
+  activityId: number,
+  request: ConfirmReturnSuppliesRequest,
+): Promise<void> {
+  await api.post(
+    `/operations/missions/${missionId}/activities/${activityId}/confirm-return`,
+    request,
+  );
 }

@@ -210,11 +210,20 @@ function getClosureStatusCfg(status: string) {
 }
 
 /* ── Transfer status normalizer ────────────────────────────────
- * Backend GET transfer returns Vietnamese strings ("Chờ chuẩn bị")
- * while closure summary returns enum keys ("AwaitingPreparation").
- * Normalise everything to enum keys so lookups work.
+ * API mới đã trả enum key tiếng Anh ở field `status`
+ * (ví dụ: AwaitingPreparation, Preparing, Shipping...).
+ * Giữ map legacy để tương thích dữ liệu cũ nếu còn.
  */
-const TRANSFER_STATUS_MAP: Record<string, string> = {
+const TRANSFER_STATUS_KEYS = new Set([
+  "AwaitingPreparation",
+  "Preparing",
+  "Shipping",
+  "Completed",
+  "Received",
+  "Cancelled",
+]);
+
+const LEGACY_TRANSFER_STATUS_MAP: Record<string, string> = {
   "Chờ chuẩn bị": "AwaitingPreparation",
   "Đang chuẩn bị": "Preparing",
   "Đang vận chuyển": "Shipping",
@@ -222,16 +231,12 @@ const TRANSFER_STATUS_MAP: Record<string, string> = {
   "Đã hoàn thành": "Completed",
   "Đã nhận": "Received",
   "Đã hủy": "Cancelled",
-  AwaitingPreparation: "AwaitingPreparation",
-  Preparing: "Preparing",
-  Shipping: "Shipping",
-  Completed: "Completed",
-  Received: "Received",
-  Cancelled: "Cancelled",
 };
+
 function normalizeTransferStatus(raw: string | undefined | null): string {
   if (!raw) return "AwaitingPreparation";
-  return TRANSFER_STATUS_MAP[raw] ?? raw;
+  if (TRANSFER_STATUS_KEYS.has(raw)) return raw;
+  return LEGACY_TRANSFER_STATUS_MAP[raw] ?? raw;
 }
 
 /* ── Page ─────────────────────────────────────────────────────── */
@@ -260,7 +265,9 @@ export default function DepotDetailPage() {
   const listDepot = allDepotsData?.items.find((d) => d.id === depotId);
   const requests = listDepot?.requests ?? depot?.requests ?? [];
   const activeInProgressClosure =
-    closures.find((c) => c.status === "InProgress") ?? null;
+    closures.find((c) =>
+      ["InProgress", "TransferPending"].includes(c.status),
+    ) ?? null;
   const activeTransferId =
     activeInProgressClosure?.transfer?.transferId ?? null;
 
@@ -295,6 +302,9 @@ export default function DepotDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelClosureId, setCancelClosureId] = useState("");
   const [cancelReason, setCancelReason] = useState("");
+  const [locallyResolvedClosureIds, setLocallyResolvedClosureIds] = useState<
+    Record<number, true>
+  >({});
   const [managerDialogOpen, setManagerDialogOpen] = useState(false);
   const [selectedManagerId, setSelectedManagerId] = useState("");
   const [isSwitchingManager, setIsSwitchingManager] = useState(false);
@@ -323,6 +333,19 @@ export default function DepotDetailPage() {
   const currentTransferStatus = normalizeTransferStatus(
     activeTransfer?.status ?? activeInProgressClosure?.transfer?.status,
   );
+  const isLocallyResolved = Boolean(
+    activeClosureId && locallyResolvedClosureIds[activeClosureId],
+  );
+  const hasSelectedResolutionOption = Boolean(
+    activeInProgressClosure?.resolutionType ||
+    activeInProgressClosure?.targetDepotId ||
+    activeInProgressClosure?.externalNote ||
+    activeInProgressClosure?.transfer ||
+    isLocallyResolved,
+  );
+  const canCancelClosure =
+    !activeInProgressClosure?.transfer ||
+    currentTransferStatus === "AwaitingPreparation";
 
   const resolutionTypes = closureMeta?.resolutionTypes ?? [
     { key: "TransferToDepot", value: "Chuyển toàn bộ hàng sang kho khác" },
@@ -442,6 +465,10 @@ export default function DepotDetailPage() {
       },
       {
         onSuccess: () => {
+          setLocallyResolvedClosureIds((prev) => ({
+            ...prev,
+            [closureId]: true,
+          }));
           toast.success("Đã xử lý tồn kho — kho sẽ được đóng chính thức.");
           setResolveOpen(false);
           handleRefresh();
@@ -471,6 +498,10 @@ export default function DepotDetailPage() {
       },
       {
         onSuccess: (res) => {
+          setLocallyResolvedClosureIds((prev) => ({
+            ...prev,
+            [closureId]: true,
+          }));
           if (res.transferPending && res.transferSummary) {
             toast.success(
               `Đã tạo Transfer #${res.transferSummary.transferId} → ${res.transferSummary.targetDepotName}. Chờ xác nhận giao nhận.`,
@@ -616,7 +647,7 @@ export default function DepotDetailPage() {
                 {depot.status === "Closing" && (
                   <>
                     {/* Chỉ hiện nút Giải quyết khi chưa resolve (chưa chọn cách xử lý) */}
-                    {!activeInProgressClosure?.resolutionType && (
+                    {!hasSelectedResolutionOption && (
                       <Button
                         size="sm"
                         className="gap-1.5 font-semibold"
@@ -639,22 +670,24 @@ export default function DepotDetailPage() {
                         Giải quyết
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5 font-semibold"
-                      onClick={() => {
-                        const cid =
-                          knownClosureIds[depot.id] ??
-                          activeInProgressClosure?.id;
-                        setCancelClosureId(String(cid ?? ""));
-                        setCancelReason("");
-                        setCancelOpen(true);
-                      }}
-                    >
-                      <X size={15} />
-                      Hủy đóng
-                    </Button>
+                    {canCancelClosure && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 font-semibold"
+                        onClick={() => {
+                          const cid =
+                            knownClosureIds[depot.id] ??
+                            activeInProgressClosure?.id;
+                          setCancelClosureId(String(cid ?? ""));
+                          setCancelReason("");
+                          setCancelOpen(true);
+                        }}
+                      >
+                        <X size={15} />
+                        Hủy đóng
+                      </Button>
+                    )}
                   </>
                 )}
               </>
