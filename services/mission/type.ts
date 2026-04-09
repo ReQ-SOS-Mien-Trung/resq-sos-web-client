@@ -233,6 +233,30 @@ export interface UpdateActivityResponse {
   status: ActivityStatus;
 }
 
+export interface ConfirmReturnConsumableItemRequest {
+  itemModelId: number;
+  quantity: number;
+}
+
+export interface ConfirmReturnReusableUnitRequest {
+  reusableItemId: number;
+  serialNumber: string;
+  condition: string;
+  note?: string | null;
+}
+
+export interface ConfirmReturnReusableItemRequest {
+  itemModelId: number;
+  quantity: number;
+  units: ConfirmReturnReusableUnitRequest[];
+}
+
+export interface ConfirmReturnSuppliesRequest {
+  discrepancyNote?: string | null;
+  consumableItems: ConfirmReturnConsumableItemRequest[];
+  reusableItems: ConfirmReturnReusableItemRequest[];
+}
+
 // ── Route types ──
 
 export type RouteVehicle = "car" | "bike" | "taxi" | "hd";

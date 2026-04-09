@@ -24,7 +24,6 @@ import {
   ArrowCounterClockwise,
   SlidersHorizontal,
   Package,
-  User,
   Calendar,
   Hash,
   Tag,
@@ -87,6 +86,22 @@ function formatDateShort(dateString: string | null | undefined) {
   } catch {
     return dateString;
   }
+}
+
+function getStockMovementItemRowKey(
+  transactionId: string,
+  item: StockMovementEntity["items"][number],
+  index: number,
+) {
+  return [
+    transactionId,
+    item.itemId,
+    item.supplyInventoryLotId ?? "no-lot",
+    item.receivedDate ?? "no-received",
+    item.expiredDate ?? "no-expired",
+    item.quantityChange,
+    index,
+  ].join("-");
 }
 
 export function StockMovementDetailSheet({
@@ -218,7 +233,7 @@ export function StockMovementDetailSheet({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {movement.items.map((item) => {
+                  {movement.items.map((item, index) => {
                     const expired = item.expiredDate ? new Date(item.expiredDate) < new Date(movement.createdAt) : false;
                     const thirtyDaysLater = new Date(movement.createdAt);
                     thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
@@ -228,7 +243,13 @@ export function StockMovementDetailSheet({
                       new Date(item.expiredDate) < thirtyDaysLater;
 
                     return (
-                      <TableRow key={`${item.itemId}-${item.supplyInventoryLotId ?? "no-lot"}`}>
+                      <TableRow
+                        key={getStockMovementItemRowKey(
+                          movement.transactionId,
+                          item,
+                          index,
+                        )}
+                      >
                         <TableCell className="py-2.5">
                           <p className="font-medium text-sm tracking-tighter">{item.itemName}</p>
                           <p className="text-xs text-muted-foreground tracking-tighter">{item.categoryName}</p>

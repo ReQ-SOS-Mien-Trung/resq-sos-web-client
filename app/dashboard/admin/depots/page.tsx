@@ -91,28 +91,28 @@ type StatusCfgMap = Record<
 
 const STATUS_STYLE: Record<DepotStatus, { color: string; bg: string }> = {
   Available: {
-    color: "text-white",
-    bg: "bg-emerald-600 border-emerald-400 dark:bg-emerald-700 dark:border-emerald-700",
+    color: "text-emerald-700 dark:text-emerald-300",
+    bg: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800",
   },
   Full: {
-    color: "text-white",
-    bg: "bg-amber-500  border-amber-400  dark:bg-amber-600  dark:border-amber-600",
+    color: "text-amber-700 dark:text-amber-300",
+    bg: "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800",
   },
   PendingAssignment: {
-    color: "text-white",
-    bg: "bg-blue-600   border-blue-400   dark:bg-blue-700   dark:border-blue-700",
+    color: "text-blue-700 dark:text-blue-300",
+    bg: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
   },
   Closed: {
-    color: "text-white",
-    bg: "bg-zinc-500   border-zinc-400   dark:bg-zinc-600   dark:border-zinc-600",
+    color: "text-zinc-700 dark:text-zinc-300",
+    bg: "bg-zinc-100 border-zinc-300 dark:bg-zinc-900/40 dark:border-zinc-700",
   },
   Closing: {
-    color: "text-white",
-    bg: "bg-red-600    border-red-400    dark:bg-red-700    dark:border-red-700",
+    color: "text-red-700 dark:text-red-300",
+    bg: "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800",
   },
   UnderMaintenance: {
-    color: "text-white",
-    bg: "bg-purple-600 border-purple-400 dark:bg-purple-700 dark:border-purple-700",
+    color: "text-purple-700 dark:text-purple-300",
+    bg: "bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-800",
   },
 };
 
@@ -338,7 +338,7 @@ function DepotTable({
                     <Badge
                       variant="outline"
                       className={cn(
-                        "text-sm font-medium tracking-tight shrink-0",
+                        "text-sm font-semibold tracking-tight shrink-0",
                         cfg.bg,
                         cfg.color,
                       )}
