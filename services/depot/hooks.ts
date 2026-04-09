@@ -24,6 +24,7 @@ import {
   completeDepotTransfer,
   receiveDepotTransfer,
   getDepotClosures,
+  getMyIncomingDepotClosureTransfer,
 } from "./api";
 import {
   GetDepotsResponse,
@@ -54,6 +55,7 @@ import {
   DepotTransferActionResponse,
   DepotReceiveTransferResponse,
   DepotClosureRecord,
+  DepotIncomingClosureTransfer,
 } from "./type";
 
 export const DEPOTS_QUERY_KEY = ["depots"] as const;
@@ -405,6 +407,9 @@ export function useCancelDepotClosure() {
 // ── Depot Closure Transfer ─────────────────────────────────────────
 
 export const DEPOT_TRANSFER_QUERY_KEY = ["depot-closure-transfer"] as const;
+export const MY_INCOMING_DEPOT_CLOSURE_TRANSFER_QUERY_KEY = [
+  "my-incoming-depot-closure-transfer",
+] as const;
 
 /**
  * Hook to fetch a transfer record
@@ -420,6 +425,19 @@ export function useDepotClosureTransfer(
     queryKey: [...DEPOT_TRANSFER_QUERY_KEY, id, closureId, transferId],
     queryFn: () => getDepotClosureTransfer(id, closureId, transferId),
     enabled: options?.enabled ?? (!!id && !!closureId && !!transferId),
+  });
+}
+
+/**
+ * [Manager kho đích] Tìm phiên nhận hàng đang chờ xác nhận của kho hiện tại.
+ */
+export function useMyIncomingDepotClosureTransfer(options?: {
+  enabled?: boolean;
+}) {
+  return useQuery<DepotIncomingClosureTransfer | null>({
+    queryKey: MY_INCOMING_DEPOT_CLOSURE_TRANSFER_QUERY_KEY,
+    queryFn: getMyIncomingDepotClosureTransfer,
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -447,6 +465,9 @@ export function usePrepareDepotTransfer() {
       queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
       queryClient.invalidateQueries({
         queryKey: [...DEPOT_CLOSURES_QUERY_KEY, v.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: MY_INCOMING_DEPOT_CLOSURE_TRANSFER_QUERY_KEY,
       });
     },
   });
@@ -477,6 +498,9 @@ export function useShipDepotTransfer() {
       queryClient.invalidateQueries({
         queryKey: [...DEPOT_CLOSURES_QUERY_KEY, v.id],
       });
+      queryClient.invalidateQueries({
+        queryKey: MY_INCOMING_DEPOT_CLOSURE_TRANSFER_QUERY_KEY,
+      });
     },
   });
 }
@@ -506,6 +530,9 @@ export function useCompleteDepotTransfer() {
       queryClient.invalidateQueries({
         queryKey: [...DEPOT_CLOSURES_QUERY_KEY, v.id],
       });
+      queryClient.invalidateQueries({
+        queryKey: MY_INCOMING_DEPOT_CLOSURE_TRANSFER_QUERY_KEY,
+      });
     },
   });
 }
@@ -534,6 +561,9 @@ export function useReceiveDepotTransfer() {
       queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
       queryClient.invalidateQueries({
         queryKey: [...DEPOT_CLOSURES_QUERY_KEY, v.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: MY_INCOMING_DEPOT_CLOSURE_TRANSFER_QUERY_KEY,
       });
     },
   });

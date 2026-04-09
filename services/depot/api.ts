@@ -28,6 +28,7 @@ import {
   DepotTransferActionResponse,
   DepotReceiveTransferResponse,
   DepotClosureRecord,
+  DepotIncomingClosureTransfer,
 } from "./type";
 
 /**
@@ -282,6 +283,23 @@ export async function getDepotClosureTransfer(
     `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}`,
   );
   return data;
+}
+
+/**
+ * [Manager kho đích] Tìm phiên nhận hàng đang chờ xác nhận của kho hiện tại
+ * GET /logistics/depot/my-incoming-closure-transfer
+ * Trả về 204 nếu hiện không có phiên nào đang chờ.
+ */
+export async function getMyIncomingDepotClosureTransfer(): Promise<DepotIncomingClosureTransfer | null> {
+  const response = await api.get("/logistics/depot/my-incoming-closure-transfer", {
+    validateStatus: (status) => status === 200 || status === 204,
+  });
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.data;
 }
 
 /**

@@ -12,6 +12,8 @@ import {
   GetAdminUserByIdResponse,
   GetUsersForPermissionParams,
   GetUsersForPermissionResponse,
+  RoleMetadataOption,
+  AdminCreateUserResponse,
 } from "./type";
 
 export async function getUserMe(): Promise<UserMeResponse> {
@@ -63,7 +65,7 @@ export async function getAdminUserById(
 
 export async function adminCreateUser(
   data: AdminCreateUserRequest,
-): Promise<any> {
+): Promise<AdminCreateUserResponse> {
   const response = await api.post("/identity/admin/users", data);
   return response.data;
 }
@@ -82,5 +84,10 @@ export async function getUsersForPermission(
   const { data } = await api.get("/identity/admin/users/for-permission", {
     params,
   });
+  return data;
+}
+
+export async function getRoleMetadata(): Promise<RoleMetadataOption[]> {
+  const { data } = await api.get("/identity/roles/metadata");
   return data;
 }

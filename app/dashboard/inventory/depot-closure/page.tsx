@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ import {
   useShipDepotTransfer,
   useCompleteDepotTransfer,
   useReceiveDepotTransfer,
+  useMyIncomingDepotClosureTransfer,
 } from "@/services/depot/hooks";
 import type { DepotClosureRecord } from "@/services/depot/type";
 import { AxiosError } from "axios";
@@ -52,6 +53,12 @@ function getApiError(err: unknown, fallback: string): string {
     if (typeof msg === "string" && msg.trim()) return msg.trim();
   }
   return fallback;
+}
+
+function parsePositiveInt(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function computeCountdown(deadline: string | null | undefined): string {
@@ -67,15 +74,17 @@ function computeCountdown(deadline: string | null | undefined): string {
 }
 
 function useCountdown(deadline: string | null | undefined): string {
-  const [remaining, setRemaining] = useState(() => computeCountdown(deadline));
+  const [, setTick] = useState(0);
   useEffect(() => {
+    if (!deadline) return;
+
     const id = setInterval(
-      () => setRemaining(computeCountdown(deadline)),
+      () => setTick((tick) => tick + 1),
       1_000,
     );
     return () => clearInterval(id);
   }, [deadline]);
-  return remaining;
+  return computeCountdown(deadline);
 }
 
 /* ── Closure status style ─────────────────────────────────────── */
@@ -88,6 +97,12 @@ const CLOSURE_STATUS_STYLE: Record<
     color: "text-amber-700 dark:text-amber-400",
     bg: "bg-amber-50  dark:bg-amber-950/30  border-amber-200  dark:border-amber-800",
     Icon: HourglassHigh,
+  },
+  Processing: {
+    label: "Đang xử lý",
+    color: "text-blue-700 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
+    Icon: Spinner,
   },
   Completed: {
     label: "Hoàn thành",
@@ -188,10 +203,16 @@ const TRANSFER_STEPS = [
 ] as const;
 
 const STEP_ORDER: string[] = TRANSFER_STEPS.map((s) => s.key);
+const ACTIVE_CLOSURE_STATUSES = [
+  "InProgress",
+  "Processing",
+  "TransferPending",
+] as const;
 
 /* ── Page ─────────────────────────────────────────────────────── */
 export default function DepotClosurePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const depotId = user?.depotId ?? 0;
 
@@ -206,34 +227,126 @@ export default function DepotClosurePage() {
     isLoading: closuresLoading,
     refetch: refetchClosures,
   } = useDepotClosures(depotId);
+  const routeSourceDepotId = parsePositiveInt(searchParams.get("sourceDepotId"));
+  const routeClosureId = parsePositiveInt(searchParams.get("closureId"));
+  const routeTransferId = parsePositiveInt(searchParams.get("transferId"));
+  const hasRouteTransferContext = Boolean(
+    routeSourceDepotId && routeClosureId && routeTransferId,
+  );
 
   const activeInProgressClosure =
     closures.find((c) =>
-      ["InProgress", "TransferPending"].includes(c.status),
+      ACTIVE_CLOSURE_STATUSES.includes(
+        c.status as (typeof ACTIVE_CLOSURE_STATUSES)[number],
+      ),
     ) ?? null;
-  const activeClosureId = activeInProgressClosure?.id ?? null;
-  const activeTransferId =
-    activeInProgressClosure?.transfer?.transferId ?? null;
+  const activeClosureStatus = activeInProgressClosure?.status ?? null;
+  const shouldLookupIncomingTransfer =
+    !!depotId &&
+    !hasRouteTransferContext &&
+    !activeInProgressClosure?.transfer;
+  const {
+    data: incomingTransferContext,
+    isLoading: incomingTransferLoading,
+    refetch: refetchIncomingTransfer,
+  } = useMyIncomingDepotClosureTransfer({
+    enabled: shouldLookupIncomingTransfer,
+  });
+
+  const transferContext = useMemo(() => {
+    if (routeSourceDepotId && routeClosureId && routeTransferId) {
+      return {
+        sourceDepotId: routeSourceDepotId,
+        closureId: routeClosureId,
+        transferId: routeTransferId,
+      };
+    }
+
+    if (
+      incomingTransferContext?.sourceDepotId &&
+      incomingTransferContext?.closureId &&
+      incomingTransferContext?.transferId
+    ) {
+      return {
+        sourceDepotId: incomingTransferContext.sourceDepotId,
+        closureId: incomingTransferContext.closureId,
+        transferId: incomingTransferContext.transferId,
+      };
+    }
+
+    if (
+      activeInProgressClosure?.depotId &&
+      activeInProgressClosure?.id &&
+      activeInProgressClosure.transfer?.transferId
+    ) {
+      return {
+        sourceDepotId: activeInProgressClosure.depotId,
+        closureId: activeInProgressClosure.id,
+        transferId: activeInProgressClosure.transfer.transferId,
+      };
+    }
+
+    return null;
+  }, [
+    activeInProgressClosure,
+    incomingTransferContext,
+    routeClosureId,
+    routeSourceDepotId,
+    routeTransferId,
+  ]);
+  const activeClosureId =
+    transferContext?.closureId ?? activeInProgressClosure?.id ?? null;
+  const activeTransferId = transferContext?.transferId ?? null;
+  const transferRequestDepotId = transferContext?.sourceDepotId ?? null;
 
   const { data: activeTransfer, refetch: refetchTransfer } =
     useDepotClosureTransfer(
-      depotId,
+      transferRequestDepotId ?? 0,
       activeClosureId ?? 0,
       activeTransferId ?? 0,
-      { enabled: !!(depotId && activeClosureId && activeTransferId) },
+      {
+        enabled: !!(
+          transferRequestDepotId &&
+          activeClosureId &&
+          activeTransferId
+        ),
+      },
     );
+  const effectiveClosingTimeoutAt =
+    activeInProgressClosure?.closingTimeoutAt ??
+    incomingTransferContext?.closingTimeoutAt ??
+    null;
 
   const currentTransferStatus = normalizeTransferStatus(
-    activeTransfer?.status ?? activeInProgressClosure?.transfer?.status,
+    activeTransfer?.status ??
+      incomingTransferContext?.transferStatus ??
+      activeInProgressClosure?.transfer?.status,
   );
+  const sourceDepotName =
+    activeInProgressClosure?.sourceDepotName ??
+    incomingTransferContext?.sourceDepotName ??
+    (transferRequestDepotId ? `Kho #${transferRequestDepotId}` : null);
+  const targetDepotName =
+    activeInProgressClosure?.targetDepotName ??
+    incomingTransferContext?.targetDepotName ??
+    depot?.name ??
+    (incomingTransferContext?.targetDepotId
+      ? `Kho #${incomingTransferContext.targetDepotId}`
+      : null);
+  const snapshotConsumableUnits =
+    activeTransfer?.snapshotConsumableUnits ??
+    activeInProgressClosure?.snapshotConsumableUnits ??
+    incomingTransferContext?.snapshotConsumableUnits ??
+    0;
+  const snapshotReusableUnits =
+    activeTransfer?.snapshotReusableUnits ??
+    activeInProgressClosure?.snapshotReusableUnits ??
+    incomingTransferContext?.snapshotReusableUnits ??
+    0;
 
   /* ── Role detection: source vs target depot manager ── */
-  // Closures are queried for depotId, so if targetDepotId matches our depot
-  // we're the receiving depot; otherwise we're the source depot.
-  const isTargetManager =
-    !!activeInProgressClosure &&
-    activeInProgressClosure.targetDepotId === depotId;
-  const isSourceManager = !!activeInProgressClosure && !isTargetManager;
+  const isSourceManager = !!transferRequestDepotId && transferRequestDepotId === depotId;
+  const isTargetManager = !!transferRequestDepotId && transferRequestDepotId !== depotId;
 
   /* ── State ── */
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -253,9 +366,7 @@ export default function DepotClosurePage() {
     completeMutation.isPending ||
     receiveMutation.isPending;
 
-  const closingTimeoutCountdown = useCountdown(
-    activeInProgressClosure?.closingTimeoutAt,
-  );
+  const closingTimeoutCountdown = useCountdown(effectiveClosingTimeoutAt);
 
   /* ── Handlers ── */
   function handleRefresh() {
@@ -264,15 +375,21 @@ export default function DepotClosurePage() {
       refetchDepot(),
       refetchClosures(),
       ...(activeTransferId ? [refetchTransfer()] : []),
+      ...(shouldLookupIncomingTransfer ? [refetchIncomingTransfer()] : []),
     ]).finally(() => setIsRefreshing(false));
   }
 
   function handleTransferAction() {
-    if (!depotId || !activeClosureId || !activeTransferId || !transferAction)
+    if (
+      !transferRequestDepotId ||
+      !activeClosureId ||
+      !activeTransferId ||
+      !transferAction
+    )
       return;
     const action = transferAction;
     const payload = {
-      id: depotId,
+      id: transferRequestDepotId,
       closureId: activeClosureId,
       transferId: activeTransferId,
       ...(transferNote.trim() ? { note: transferNote.trim() } : {}),
@@ -331,7 +448,11 @@ export default function DepotClosurePage() {
   }
 
   /* ── Loading ── */
-  if (depotLoading || closuresLoading) {
+  if (
+    depotLoading ||
+    closuresLoading ||
+    (shouldLookupIncomingTransfer && incomingTransferLoading)
+  ) {
     return (
       <div className="flex flex-col bg-background min-h-screen">
         <header className="border-b bg-background px-6 py-4 shrink-0">
@@ -350,6 +471,12 @@ export default function DepotClosurePage() {
       </div>
     );
   }
+
+  const hasActiveTransferPanel = Boolean(
+    transferRequestDepotId && activeClosureId && activeTransferId,
+  );
+  const effectiveClosureStatus =
+    activeClosureStatus ?? incomingTransferContext?.closureStatus ?? null;
 
   return (
     <div className="flex flex-col bg-background min-h-screen">
@@ -422,7 +549,7 @@ export default function DepotClosurePage() {
       {/* ══ Main ══ */}
       <main className="px-6 py-6 space-y-6 flex-1">
         {/* ── Active Transfer Panel ── */}
-        {activeInProgressClosure?.transfer && activeClosureId ? (
+        {hasActiveTransferPanel ? (
           <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/20 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-blue-200 dark:border-blue-800 bg-blue-100/40 dark:bg-blue-900/20 flex-wrap">
@@ -433,7 +560,7 @@ export default function DepotClosurePage() {
                   className="text-blue-500 shrink-0"
                 />
                 <span className="text-base font-bold tracking-tighter text-blue-800 dark:text-blue-300">
-                  Transfer #{activeInProgressClosure.transfer.transferId}
+                  Transfer #{activeTransferId}
                 </span>
                 {(() => {
                   const s = currentTransferStatus;
@@ -468,7 +595,7 @@ export default function DepotClosurePage() {
                   );
                 })()}
               </div>
-              {isSourceManager && activeInProgressClosure.targetDepotName && (
+              {isSourceManager && targetDepotName && (
                 <div className="flex items-center gap-1.5 text-sm font-semibold tracking-tighter text-blue-700 dark:text-blue-400">
                   <Icon
                     icon="fluent:vehicle-truck-cube-20-regular"
@@ -477,9 +604,7 @@ export default function DepotClosurePage() {
                   />
                   <span>
                     →{" "}
-                    <span className="font-semibold">
-                      {activeInProgressClosure.targetDepotName}
-                    </span>
+                    <span className="font-semibold">{targetDepotName}</span>
                   </span>
                 </div>
               )}
@@ -493,8 +618,7 @@ export default function DepotClosurePage() {
                   <span>
                     ←{" "}
                     <span className="font-semibold">
-                      {activeInProgressClosure.sourceDepotName ??
-                        `Kho #${activeInProgressClosure.depotId}`}
+                      {sourceDepotName ?? "Kho nguồn"}
                     </span>
                   </span>
                 </div>
@@ -563,27 +687,17 @@ export default function DepotClosurePage() {
                 {[
                   {
                     label: "Vật tư tiêu thụ",
-                    value: (
-                      activeTransfer?.snapshotConsumableUnits ??
-                      activeInProgressClosure.snapshotConsumableUnits
-                    ).toLocaleString("vi-VN"),
+                    value: snapshotConsumableUnits.toLocaleString("vi-VN"),
                   },
                   {
                     label: "Thiết bị tái sử dụng",
-                    value: (
-                      activeTransfer?.snapshotReusableUnits ??
-                      activeInProgressClosure.snapshotReusableUnits
-                    ).toLocaleString("vi-VN"),
+                    value: snapshotReusableUnits.toLocaleString("vi-VN"),
                   },
                   {
                     label: isTargetManager ? "Kho nguồn" : "Kho nhận",
                     value: isTargetManager
-                      ? (activeInProgressClosure.sourceDepotName ??
-                        `Kho #${activeInProgressClosure.depotId}`)
-                      : (activeInProgressClosure.targetDepotName ??
-                        (activeInProgressClosure.targetDepotId
-                          ? `#${activeInProgressClosure.targetDepotId}`
-                          : "—")),
+                      ? (sourceDepotName ?? "—")
+                      : (targetDepotName ?? "—"),
                   },
                 ].map((item) => (
                   <div
@@ -724,6 +838,37 @@ export default function DepotClosurePage() {
               })()}
             </div>
           </div>
+        ) : effectiveClosureStatus === "Processing" ? (
+          <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/20 p-5">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                <Spinner size={18} className="animate-spin text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-base font-bold tracking-tighter text-blue-900 dark:text-blue-200">
+                  Hệ thống đang xử lý phiên đóng kho
+                </p>
+                <p className="text-sm text-blue-700 dark:text-blue-300 tracking-tighter">
+                  Đang chờ server hoàn tất xử lý. Màn hình sẽ tự cập nhật khi chuyển sang bước tiếp theo.
+                </p>
+                {effectiveClosingTimeoutAt && (
+                  <p className="text-xs text-blue-700 dark:text-blue-300 tracking-tighter">
+                    Hết hạn:{" "}
+                    <strong>
+                      {new Date(effectiveClosingTimeoutAt).toLocaleString(
+                        "vi-VN",
+                      )}
+                    </strong>
+                    {closingTimeoutCountdown && (
+                      <span className="ml-1.5 font-mono font-semibold">
+                        ({closingTimeoutCountdown})
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
         ) : depot?.status === "Closing" ? (
           /* Closing but no transfer — e.g. ExternalResolution */
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900">
@@ -746,22 +891,21 @@ export default function DepotClosurePage() {
                     Tồn kho:{" "}
                     <strong>
                       {(
-                        activeInProgressClosure.snapshotConsumableUnits +
-                        activeInProgressClosure.snapshotReusableUnits
+                        snapshotConsumableUnits + snapshotReusableUnits
                       ).toLocaleString("vi-VN")}{" "}
                       mục
                     </strong>
                   </span>
                 </div>
-                {activeInProgressClosure.closingTimeoutAt && (
+                {effectiveClosingTimeoutAt && (
                   <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 tracking-tighter">
                     <HourglassHigh size={13} className="shrink-0" />
                     <span>
                       Hết hạn:{" "}
                       <strong>
-                        {new Date(
-                          activeInProgressClosure.closingTimeoutAt,
-                        ).toLocaleString("vi-VN")}
+                        {new Date(effectiveClosingTimeoutAt).toLocaleString(
+                          "vi-VN",
+                        )}
                       </strong>
                       {closingTimeoutCountdown && (
                         <span className="ml-1.5 font-mono font-semibold text-amber-700 dark:text-amber-300">

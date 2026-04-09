@@ -191,6 +191,14 @@ export interface DepotClosureMetadata {
   resolutionTypes: DepotClosureResolutionTypeItem[];
 }
 
+export type DepotClosureStatus =
+  | "InProgress"
+  | "Processing"
+  | "TransferPending"
+  | "Completed"
+  | "Cancelled"
+  | "TimedOut";
+
 // Initiate Depot Closure (POST /logistics/depot/{id}/close)
 export interface InitiateDepotClosureRequest {
   id: number;
@@ -201,6 +209,7 @@ export interface InitiateDepotClosureResponse {
   closureId: number;
   depotId: number;
   depotName: string;
+  closureStatus: DepotClosureStatus;
   requiresResolution: boolean;
   inventorySummary: {
     consumableItemTypeCount: number;
@@ -208,6 +217,7 @@ export interface InitiateDepotClosureResponse {
     reusableAvailableCount: number;
     reusableInUseCount: number;
   } | null;
+  closingTimeoutAt?: string | null;
   timeoutAt: string | null;
   message: string;
 }
@@ -277,6 +287,22 @@ export interface DepotClosureTransfer {
   cancelledAt: string | null;
   cancelledBy: string | null;
   cancellationReason: string | null;
+}
+
+// GET /logistics/depot/my-incoming-closure-transfer
+export interface DepotIncomingClosureTransfer {
+  sourceDepotId: number;
+  closureId: number;
+  transferId: number;
+  targetDepotId: number | null;
+  sourceDepotName: string | null;
+  targetDepotName: string | null;
+  closureStatus: string | null;
+  transferStatus: string | null;
+  snapshotConsumableUnits: number | null;
+  snapshotReusableUnits: number | null;
+  closingTimeoutAt: string | null;
+  createdAt: string | null;
 }
 
 // GET /logistics/depot/{id}/closures — summary of a transfer inside a closure

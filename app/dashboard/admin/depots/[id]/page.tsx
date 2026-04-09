@@ -96,15 +96,17 @@ function computeCountdown(deadline: string | null | undefined): string {
 }
 
 function useCountdown(deadline: string | null | undefined): string {
-  const [remaining, setRemaining] = useState(() => computeCountdown(deadline));
+  const [, setTick] = useState(0);
   useEffect(() => {
+    if (!deadline) return;
+
     const id = setInterval(
-      () => setRemaining(computeCountdown(deadline)),
+      () => setTick((tick) => tick + 1),
       1_000,
     );
     return () => clearInterval(id);
   }, [deadline]);
-  return remaining;
+  return computeCountdown(deadline);
 }
 
 /* ── Status config ────────────────────────────────────────────── */
@@ -178,6 +180,12 @@ const CLOSURE_STATUS_STYLE: Record<
     bg: "bg-amber-50  dark:bg-amber-950/30  border-amber-200  dark:border-amber-800",
     Icon: HourglassHigh,
   },
+  Processing: {
+    label: "Đang xử lý",
+    color: "text-blue-700 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
+    Icon: Spinner,
+  },
   Completed: {
     label: "Hoàn thành",
     color: "text-emerald-700 dark:text-emerald-400",
@@ -195,6 +203,12 @@ const CLOSURE_STATUS_STYLE: Record<
     color: "text-red-700 dark:text-red-400",
     bg: "bg-red-50    dark:bg-red-950/30    border-red-200    dark:border-red-800",
     Icon: XCircle,
+  },
+  TransferPending: {
+    label: "Đang chuyển kho",
+    color: "text-blue-700 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
+    Icon: ArrowsLeftRight,
   },
 };
 
@@ -239,6 +253,12 @@ function normalizeTransferStatus(raw: string | undefined | null): string {
   return LEGACY_TRANSFER_STATUS_MAP[raw] ?? raw;
 }
 
+const ACTIVE_CLOSURE_STATUSES = [
+  "InProgress",
+  "Processing",
+  "TransferPending",
+] as const;
+
 /* ── Page ─────────────────────────────────────────────────────── */
 export default function DepotDetailPage() {
   const { id: rawId } = useParams<{ id: string }>();
@@ -266,8 +286,11 @@ export default function DepotDetailPage() {
   const requests = listDepot?.requests ?? depot?.requests ?? [];
   const activeInProgressClosure =
     closures.find((c) =>
-      ["InProgress", "TransferPending"].includes(c.status),
+      ACTIVE_CLOSURE_STATUSES.includes(
+        c.status as (typeof ACTIVE_CLOSURE_STATUSES)[number],
+      ),
     ) ?? null;
+  const activeClosureStatus = activeInProgressClosure?.status ?? null;
   const activeTransferId =
     activeInProgressClosure?.transfer?.transferId ?? null;
 
@@ -282,6 +305,8 @@ export default function DepotDetailPage() {
   const [initiateReason, setInitiateReason] = useState("");
   const [initiateResult, setInitiateResult] = useState<{
     closureId: number;
+    closureStatus: string;
+    closingTimeoutAt: string | null;
     timeoutAt: string | null;
     inventorySummary: {
       consumableItemTypeCount: number;
@@ -315,7 +340,9 @@ export default function DepotDetailPage() {
   const unassignManagerMutation = useUnassignDepotManager();
 
   const initiateTimeoutCountdown = useCountdown(
-    initiateResult?.timeoutAt ?? activeInProgressClosure?.closingTimeoutAt,
+    initiateResult?.closingTimeoutAt ??
+      initiateResult?.timeoutAt ??
+      activeInProgressClosure?.closingTimeoutAt,
   );
   const closingTimeoutCountdown = useCountdown(
     activeInProgressClosure?.closingTimeoutAt,
@@ -336,16 +363,15 @@ export default function DepotDetailPage() {
   const isLocallyResolved = Boolean(
     activeClosureId && locallyResolvedClosureIds[activeClosureId],
   );
-  const hasSelectedResolutionOption = Boolean(
-    activeInProgressClosure?.resolutionType ||
-    activeInProgressClosure?.targetDepotId ||
-    activeInProgressClosure?.externalNote ||
-    activeInProgressClosure?.transfer ||
-    isLocallyResolved,
+  const shouldShowResolveButton = Boolean(
+    activeInProgressClosure &&
+      activeClosureStatus === "InProgress" &&
+      !isLocallyResolved,
   );
   const canCancelClosure =
-    !activeInProgressClosure?.transfer ||
-    currentTransferStatus === "AwaitingPreparation";
+    activeClosureStatus !== "Processing" &&
+    (!activeInProgressClosure?.transfer ||
+      currentTransferStatus === "AwaitingPreparation");
 
   const resolutionTypes = closureMeta?.resolutionTypes ?? [
     { key: "TransferToDepot", value: "Chuyển toàn bộ hàng sang kho khác" },
@@ -416,14 +442,22 @@ export default function DepotDetailPage() {
       { id: depot.id, reason: initiateReason.trim() },
       {
         onSuccess: (res) => {
-          const needsResolution = res.requiresResolution ?? !!res.closureId;
-          if (needsResolution && res.closureId) {
+          const closureStatus =
+            res.closureStatus ?? (res.requiresResolution ? "InProgress" : "Completed");
+          const closingTimeoutAt = res.closingTimeoutAt ?? res.timeoutAt ?? null;
+
+          if (res.closureId) {
             setKnownClosureIds((prev) => ({
               ...prev,
               [depot.id]: res.closureId,
             }));
+          }
+
+          if (closureStatus === "InProgress" && res.closureId) {
             setInitiateResult({
               closureId: res.closureId,
+              closureStatus,
+              closingTimeoutAt,
               timeoutAt: res.timeoutAt ?? null,
               inventorySummary: res.inventorySummary ?? null,
             });
@@ -434,8 +468,28 @@ export default function DepotDetailPage() {
             setInitiateStep(2);
             handleRefresh();
           } else {
-            toast.success("Kho trống — đã đóng thành công!");
             setInitiateOpen(false);
+            setInitiateStep(1);
+            setInitiateResult(null);
+
+            if (closureStatus === "Processing") {
+              toast.info(
+                "Hệ thống đang xử lý phiên đóng kho. Màn hình sẽ cập nhật ngay khi sẵn sàng.",
+              );
+            } else if (closureStatus === "TransferPending") {
+              toast.success(
+                "Đã chọn chuyển kho. Đang chờ hai bên quản lý kho xác nhận giao nhận.",
+              );
+            } else if (closureStatus === "Completed") {
+              toast.success("Kho trống — đã đóng thành công!");
+            } else if (closureStatus === "Cancelled") {
+              toast.error("Phiên đóng kho hiện tại đã bị hủy.");
+            } else if (closureStatus === "TimedOut") {
+              toast.error("Phiên đóng kho đã hết thời hạn và kho đã tự khôi phục.");
+            } else {
+              toast.success(res.message || "Đã cập nhật trạng thái đóng kho.");
+            }
+
             handleRefresh();
           }
         },
@@ -583,6 +637,25 @@ export default function DepotDetailPage() {
       : pct > 50
         ? "text-amber-600 dark:text-amber-400"
         : "text-emerald-600 dark:text-emerald-400";
+  const closingBannerTheme =
+    activeClosureStatus === "Processing" ||
+    activeClosureStatus === "TransferPending"
+      ? {
+          wrapper: "bg-blue-700/95 border-blue-600",
+          divider: "bg-blue-500",
+          muted: "text-blue-100",
+        }
+      : {
+          wrapper: "bg-red-700/95 border-red-600",
+          divider: "bg-red-500",
+          muted: "text-red-100",
+        };
+  const closingBannerLabel =
+    activeClosureStatus === "Processing"
+      ? "Hệ thống đang xử lý phiên đóng kho"
+      : activeClosureStatus === "TransferPending"
+        ? "Đã chọn chuyển kho"
+        : "Chờ xử lý tồn kho";
 
   return (
     <DashboardLayout
@@ -647,7 +720,7 @@ export default function DepotDetailPage() {
                 {depot.status === "Closing" && (
                   <>
                     {/* Chỉ hiện nút Giải quyết khi chưa resolve (chưa chọn cách xử lý) */}
-                    {!hasSelectedResolutionOption && (
+                    {shouldShowResolveButton && (
                       <Button
                         size="sm"
                         className="gap-1.5 font-semibold"
@@ -728,30 +801,65 @@ export default function DepotDetailPage() {
 
           {/* Closing warning banner */}
           {depot.status === "Closing" && (
-            <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 rounded-xl bg-red-700/95 backdrop-blur-sm border border-red-600 shadow-xl text-white">
+            <div
+              className={cn(
+                "absolute top-4 left-4 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 rounded-xl backdrop-blur-sm border shadow-xl text-white",
+                closingBannerTheme.wrapper,
+              )}
+            >
               <div className="flex items-center gap-2">
-                <WarningCircle
-                  size={15}
-                  className="text-white shrink-0"
-                  weight="fill"
-                />
+                {activeClosureStatus === "Processing" ? (
+                  <Spinner size={15} className="text-white shrink-0 animate-spin" />
+                ) : activeClosureStatus === "TransferPending" ? (
+                  <ArrowsLeftRight
+                    size={15}
+                    className="text-white shrink-0"
+                    weight="fill"
+                  />
+                ) : (
+                  <WarningCircle
+                    size={15}
+                    className="text-white shrink-0"
+                    weight="fill"
+                  />
+                )}
                 <span className="text-sm font-bold text-white tracking-tighter">
-                  Chờ xử lý tồn kho
+                  {closingBannerLabel}
                 </span>
                 {(knownClosureIds[depot.id] || activeInProgressClosure) && (
-                  <span className="text-sm text-red-100 font-medium tracking-tighter opacity-80">
+                  <span
+                    className={cn(
+                      "text-sm font-medium tracking-tighter opacity-80",
+                      closingBannerTheme.muted,
+                    )}
+                  >
                     · Closure #
                     {knownClosureIds[depot.id] ?? activeInProgressClosure?.id}
                   </span>
                 )}
               </div>
+              {activeClosureStatus === "TransferPending" && (
+                <span
+                  className={cn(
+                    "text-xs font-medium tracking-tighter",
+                    closingBannerTheme.muted,
+                  )}
+                >
+                  Đang chờ hai bên quản lý kho xác nhận giao nhận.
+                </span>
+              )}
               {activeInProgressClosure && (
                 <>
                   <div className="flex items-center gap-4">
                     {activeInProgressClosure.closingTimeoutAt && (
                       <>
-                        <div className="w-px h-3 bg-red-500 opacity-50 hidden sm:block" />
-                        <div className="flex items-center gap-1.5 text-xs text-red-50 tracking-tighter">
+                        <div
+                          className={cn(
+                            "w-px h-3 opacity-50 hidden sm:block",
+                            closingBannerTheme.divider,
+                          )}
+                        />
+                        <div className="flex items-center gap-1.5 text-xs text-white tracking-tighter">
                           <HourglassHigh size={13} className="shrink-0" />
                           <span>
                             Hết hạn:{" "}
@@ -1105,6 +1213,26 @@ export default function DepotDetailPage() {
                       </span>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+        {depot.status === "Closing" &&
+          activeClosureStatus === "Processing" &&
+          !activeInProgressClosure?.transfer && (
+            <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/20 p-5">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                  <Spinner size={18} className="animate-spin text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-base font-bold tracking-tighter text-blue-900 dark:text-blue-200">
+                    Hệ thống đang xử lý phiên đóng kho
+                  </p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300 tracking-tighter">
+                    Server đang hoàn tất bước chuẩn bị dữ liệu. Màn hình sẽ cập nhật ngay khi có thể tiếp tục.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1580,12 +1708,15 @@ export default function DepotDetailPage() {
                     <span className="text-base text-red-600 dark:text-red-400 font-semibold tracking-tighter uppercase">
                       Hết hạn xử lý
                     </span>
-                    {initiateResult?.timeoutAt ? (
+                    {initiateResult?.closingTimeoutAt ||
+                    initiateResult?.timeoutAt ? (
                       <>
                         <span className="text-base font-semibold tracking-tighter text-black dark:text-white">
-                          {new Date(initiateResult.timeoutAt).toLocaleString(
-                            "vi-VN",
-                          )}
+                          {new Date(
+                            initiateResult.closingTimeoutAt ??
+                              initiateResult.timeoutAt ??
+                              Date.now(),
+                          ).toLocaleString("vi-VN")}
                         </span>
 
                         {initiateTimeoutCountdown && (

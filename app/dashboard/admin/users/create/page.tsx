@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select";
 import {
   UserPlus,
-  CheckCircle,
   CaretLeft,
   CaretDown,
   MapPin,
@@ -28,13 +27,49 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { uploadImageToCloudinary } from "@/utils/uploadFile";
-import { useAdminCreateUser } from "@/services/user/hooks";
+import {
+  useAdminCreateUser,
+  useRoleMetadata,
+  useUpdateUserAvatar,
+} from "@/services/user/hooks";
+import type {
+  AdminCreateUserRequest,
+  AdminCreateUserResponse,
+  RoleMetadataOption,
+} from "@/services/user/type";
 import { ArrowRight } from "@phosphor-icons/react";
 import { useAuthStore } from "@/stores/auth.store";
+
+function normalizeRoleLabel(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function isVictimRole(role: RoleMetadataOption) {
+  return normalizeRoleLabel(role.value) === "victim";
+}
+
+function isRescuerRole(role?: RoleMetadataOption) {
+  return role ? normalizeRoleLabel(role.value) === "rescuer" : false;
+}
+
+function extractCreatedUserId(response: AdminCreateUserResponse): string | null {
+  if (typeof response.userId === "string" && response.userId.length > 0) {
+    return response.userId;
+  }
+
+  if (typeof response.id === "string" && response.id.length > 0) {
+    return response.id;
+  }
+
+  return null;
+}
 
 export default function CreateUserPage() {
   const router = useRouter();
   const createUserMutation = useAdminCreateUser();
+  const updateUserAvatarMutation = useUpdateUserAvatar();
+  const { data: roleMetadata = [], isLoading: isRoleMetadataLoading } =
+    useRoleMetadata();
   const { user } = useAuthStore();
 
   const [formData, setFormData] = useState({
@@ -74,6 +109,28 @@ export default function CreateUserPage() {
   const cityDropdownRef = useRef<HTMLDivElement>(null);
   const wardDropdownRef = useRef<HTMLDivElement>(null);
 
+  const availableRoles = useMemo(
+    () => roleMetadata.filter((role) => !isVictimRole(role)),
+    [roleMetadata],
+  );
+
+  const activeRoleId = useMemo(() => {
+    const matchedRole = availableRoles.find((role) => role.key === formData.roleId);
+
+    if (matchedRole) return matchedRole.key;
+
+    return (
+      availableRoles.find((role) => isRescuerRole(role))?.key ??
+      availableRoles[0]?.key ??
+      ""
+    );
+  }, [availableRoles, formData.roleId]);
+
+  const selectedRole = useMemo(
+    () => availableRoles.find((role) => role.key === activeRoleId),
+    [activeRoleId, availableRoles],
+  );
+
   // Fetch provinces on mount
   useEffect(() => {
     fetch("https://provinces.open-api.vn/api/v2/")
@@ -85,7 +142,6 @@ export default function CreateUserPage() {
   // Fetch wards when province changes
   useEffect(() => {
     if (!selectedProvinceCode) {
-      setWards([]);
       return;
     }
     fetch(
@@ -172,7 +228,7 @@ export default function CreateUserPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Basic validation
@@ -199,64 +255,100 @@ export default function CreateUserPage() {
       return;
     }
 
-    const proceedWithCreation = (uploadedUrl?: string) => {
-      toast.loading("Đang tạo tài khoản...");
+    if (!selectedRole) {
+      toast.error("Vui lòng chọn vai trò hợp lệ");
+      return;
+    }
 
-      const payload: any = {
-        ...formData,
-        roleId: parseInt(formData.roleId, 10),
-        province: formData.city,
-        avatarUrl: uploadedUrl || undefined,
-      };
+    const selectedRoleId = Number(selectedRole.key);
 
-      // If Rescuer, append specific values
-      if (formData.roleId === "3") {
-        payload.rescuerType = "core";
-        payload.latitude = 0;
-        payload.longitude = 0;
-        payload.isEmailVerified = true;
-        payload.isOnboarded = true;
-        payload.isEligibleRescuer = true;
+    if (!Number.isInteger(selectedRoleId)) {
+      toast.error("Vai trò không hợp lệ");
+      return;
+    }
 
-        if (user?.userId) {
-          payload.approvedBy = user.userId;
-          payload.approvedAt = new Date().toISOString();
-        }
-      }
+    toast.loading("Đang tạo tài khoản...");
 
-      createUserMutation.mutate(payload, {
-        onSuccess: () => {
-          toast.dismiss();
-          toast.success("Tạo tài khoản thành công!");
-          router.push("/dashboard/admin/users");
-        },
-        onError: (err: any) => {
-          toast.dismiss();
-          const msg =
-            err?.response?.data?.message || err.message || "Đã xảy ra lỗi!";
-          toast.error("Không thể tạo tài khoản: " + msg);
-        },
-      });
+    const payload: AdminCreateUserRequest = {
+      firstName: formData.firstName.trim(),
+      lastName: formData.lastName.trim(),
+      username: formData.username.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      password: formData.password,
+      roleId: selectedRoleId,
+      address: formData.address.trim() || undefined,
+      ward: formData.ward.trim() || undefined,
+      province: formData.city.trim() || undefined,
     };
 
-    if (avatarFile) {
+    if (isRescuerRole(selectedRole)) {
+      payload.rescuerType = "Core";
+      payload.latitude = 0;
+      payload.longitude = 0;
+      payload.isEmailVerified = true;
+      payload.isOnboarded = true;
+      payload.isEligibleRescuer = true;
+
+      if (user?.userId) {
+        payload.approvedBy = user.userId;
+        payload.approvedAt = new Date().toISOString();
+      }
+    }
+
+    try {
+      const createdUser = await createUserMutation.mutateAsync(payload);
+
+      if (!avatarFile) {
+        toast.dismiss();
+        toast.success("Tạo tài khoản thành công!");
+        router.push("/dashboard/admin/users");
+        return;
+      }
+
+      const createdUserId = extractCreatedUserId(createdUser);
+
+      if (!createdUserId) {
+        toast.dismiss();
+        toast.warning(
+          "Tạo tài khoản thành công nhưng chưa cập nhật được ảnh đại diện.",
+        );
+        router.push("/dashboard/admin/users");
+        return;
+      }
+
+      toast.dismiss();
+      toast.loading("Đang tải ảnh đại diện...");
       setIsUploading(true);
-      toast.loading("Đang tải ảnh lên hệ thống...");
-      uploadImageToCloudinary(avatarFile)
-        .then((url) => {
-          toast.dismiss();
-          setIsUploading(false);
-          proceedWithCreation(url);
-        })
-        .catch(() => {
-          toast.dismiss();
-          setIsUploading(false);
-          toast.error(
-            "Tải ảnh thất bại, vui lòng kiểm tra lại ảnh hoặc kết nối mạng!",
-          );
+
+      try {
+        const avatarUrl = await uploadImageToCloudinary(
+          avatarFile,
+          "avatar",
+          "avatar",
+        );
+
+        await updateUserAvatarMutation.mutateAsync({
+          userId: createdUserId,
+          avatarUrl,
         });
-    } else {
-      proceedWithCreation();
+
+        toast.dismiss();
+        toast.success("Tạo tài khoản thành công!");
+      } catch {
+        toast.dismiss();
+        toast.warning(
+          "Tạo tài khoản thành công nhưng cập nhật ảnh đại diện thất bại.",
+        );
+      } finally {
+        setIsUploading(false);
+        router.push("/dashboard/admin/users");
+      }
+    } catch (err: any) {
+      toast.dismiss();
+      const msg =
+        err?.response?.data?.message || err.message || "Đã xảy ra lỗi!";
+      toast.error("Không thể tạo tài khoản: " + msg);
     }
   };
 
@@ -267,6 +359,7 @@ export default function CreateUserPage() {
     formData.email.trim().length > 0 &&
     formData.phone.trim().length > 0 &&
     formData.password.trim().length > 0 &&
+    !!selectedRole &&
     !phoneError &&
     !emailError;
 
@@ -722,31 +815,35 @@ export default function CreateUserPage() {
                     Vai trò (Role) <span className="text-primary">*</span>
                   </label>
                   <Select
-                    value={formData.roleId}
+                    value={activeRoleId || undefined}
                     onValueChange={handleRoleChange}
+                    disabled={isRoleMetadataLoading || availableRoles.length === 0}
                   >
                     <SelectTrigger className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus:ring-0 focus:border-foreground text-sm font-medium tracking-tighter">
-                      <SelectValue placeholder="Chọn vai trò..." />
+                      <SelectValue
+                        placeholder={
+                          isRoleMetadataLoading
+                            ? "Đang tải vai trò..."
+                            : "Chọn vai trò..."
+                        }
+                      />
                     </SelectTrigger>
-                    <SelectContent position="popper" sideOffset={4} className="rounded-none border border-border/60 shadow-lg">
-                      <SelectItem
-                        value="1"
-                        className="cursor-pointer font-medium text-sm tracking-tighter focus:bg-black/5 focus:text-foreground"
-                      >
-                        Quản trị viên (Admin)
-                      </SelectItem>
-                      <SelectItem
-                        value="2"
-                        className="cursor-pointer font-medium text-sm tracking-tighter focus:bg-black/5 focus:text-foreground"
-                      >
-                        Điều phối viên (Coordinator)
-                      </SelectItem>
-                      <SelectItem
-                        value="3"
-                        className="cursor-pointer font-medium text-sm tracking-tighter focus:bg-black/5 focus:text-foreground"
-                      >
-                        Cứu hộ viên (Rescuer)
-                      </SelectItem>
+                    <SelectContent
+                      position="popper"
+                      side="bottom"
+                      sideOffset={4}
+                      avoidCollisions={false}
+                      className="rounded-none border border-border/60 shadow-lg"
+                    >
+                      {availableRoles.map((role) => (
+                        <SelectItem
+                          key={role.key}
+                          value={role.key}
+                          className="cursor-pointer font-medium text-sm tracking-tighter focus:bg-black/5 focus:text-foreground"
+                        >
+                          {role.value}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

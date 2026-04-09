@@ -1,9 +1,41 @@
 import { getDashboardPathByRole, ROLES } from "@/lib/roles";
+import type { NotificationRouteData } from "./type";
 
 function normalizeType(type: string): string {
   return String(type ?? "")
     .trim()
     .toLowerCase();
+}
+
+function toPositiveInt(value: unknown): number | null {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : Number.NaN;
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+export function buildDepotClosureTransferRoute(
+  data?: NotificationRouteData | null,
+): string | null {
+  const sourceDepotId = toPositiveInt(data?.sourceDepotId);
+  const closureId = toPositiveInt(data?.closureId);
+  const transferId = toPositiveInt(data?.transferId);
+
+  if (!sourceDepotId || !closureId || !transferId) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    sourceDepotId: String(sourceDepotId),
+    closureId: String(closureId),
+    transferId: String(transferId),
+  });
+
+  return `/dashboard/inventory/depot-closure?${params.toString()}`;
 }
 
 function resolveFloodRouteByRole(roleId?: number): string {
@@ -21,7 +53,18 @@ function resolveFloodRouteByRole(roleId?: number): string {
 export function resolveNotificationRoute(
   type: string,
   roleId?: number,
+  data?: NotificationRouteData | null,
 ): string {
+  const explicitUrl = typeof data?.url === "string" ? data.url.trim() : "";
+  if (explicitUrl) {
+    return explicitUrl;
+  }
+
+  const depotClosureRoute = buildDepotClosureTransferRoute(data);
+  if (depotClosureRoute) {
+    return depotClosureRoute;
+  }
+
   const normalizedType = normalizeType(type);
 
   if (normalizedType === "chat_message") {
