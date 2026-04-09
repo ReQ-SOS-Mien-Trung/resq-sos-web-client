@@ -934,12 +934,21 @@ const CoordinatorDashboardContent = () => {
     [manualMissionClusterId, clusters],
   );
 
+  useEffect(() => {
+    document.body.classList.add("coordinator-dashboard-readable");
+
+    return () => {
+      document.body.classList.remove("coordinator-dashboard-readable");
+    };
+  }, []);
+
   // ── Render ──
 
   return (
     <div
+      data-coordinator-dashboard-root
       className={cn(
-        "h-screen flex flex-col overflow-hidden",
+        "coordinator-dashboard h-screen flex flex-col overflow-hidden",
         isDarkMode && "dark",
       )}
     >

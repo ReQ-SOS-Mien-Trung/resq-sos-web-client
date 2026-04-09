@@ -1513,6 +1513,151 @@ function getSupplyItemIdSet(activity: {
   return ids;
 }
 
+function cloneSupplyCollections(
+  supplies: ClusterSupplyCollection[] | null | undefined,
+): ClusterSupplyCollection[] | null {
+  if (!supplies || supplies.length === 0) {
+    return null;
+  }
+
+  return supplies.map((supply) => ({
+    itemId: Number.isFinite(supply.itemId) ? supply.itemId : 0,
+    itemName:
+      typeof supply.itemName === "string" ? supply.itemName.trim() : "",
+    quantity: Math.max(1, Number(supply.quantity) || 1),
+    unit: typeof supply.unit === "string" && supply.unit.trim()
+      ? supply.unit.trim()
+      : "đơn vị",
+  }));
+}
+
+function buildSupplyComparisonKey(
+  supply: Pick<ClusterSupplyCollection, "itemId" | "itemName" | "unit">,
+): string {
+  const itemId = Number(supply.itemId);
+  if (Number.isFinite(itemId) && itemId > 0) {
+    return `id:${itemId}`;
+  }
+
+  const itemName =
+    typeof supply.itemName === "string" ? supply.itemName.trim().toLowerCase() : "";
+  const unit = typeof supply.unit === "string" ? supply.unit.trim().toLowerCase() : "";
+  return `name:${itemName}|unit:${unit}`;
+}
+
+function haveMatchingSupplyCollections(
+  left: ClusterSupplyCollection[] | null | undefined,
+  right: ClusterSupplyCollection[] | null | undefined,
+): boolean {
+  const normalizedLeft = (cloneSupplyCollections(left) ?? [])
+    .map((supply) => ({
+      key: buildSupplyComparisonKey(supply),
+      quantity: supply.quantity,
+      unit: supply.unit.trim().toLowerCase(),
+    }))
+    .sort((a, b) =>
+      a.key.localeCompare(b.key, "vi") ||
+      a.unit.localeCompare(b.unit, "vi") ||
+      a.quantity - b.quantity,
+    );
+  const normalizedRight = (cloneSupplyCollections(right) ?? [])
+    .map((supply) => ({
+      key: buildSupplyComparisonKey(supply),
+      quantity: supply.quantity,
+      unit: supply.unit.trim().toLowerCase(),
+    }))
+    .sort((a, b) =>
+      a.key.localeCompare(b.key, "vi") ||
+      a.unit.localeCompare(b.unit, "vi") ||
+      a.quantity - b.quantity,
+    );
+
+  if (normalizedLeft.length !== normalizedRight.length) {
+    return false;
+  }
+
+  return normalizedLeft.every((supply, index) => {
+    const peer = normalizedRight[index];
+    return (
+      supply.key === peer?.key &&
+      supply.unit === peer.unit &&
+      supply.quantity === peer.quantity
+    );
+  });
+}
+
+function findMatchingSupplyInCollection(
+  target: Pick<ClusterSupplyCollection, "itemId" | "itemName" | "unit">,
+  supplies: ClusterSupplyCollection[] | null | undefined,
+): ClusterSupplyCollection | null {
+  const targetItemId = Number(target.itemId);
+  if (Number.isFinite(targetItemId) && targetItemId > 0) {
+    const matchedById = (supplies ?? []).find(
+      (supply) => Number(supply.itemId) === targetItemId,
+    );
+    if (matchedById) {
+      return matchedById;
+    }
+  }
+
+  const targetKey = buildSupplyComparisonKey(target);
+  return (
+    (supplies ?? []).find(
+      (supply) => buildSupplyComparisonKey(supply) === targetKey,
+    ) ?? null
+  );
+}
+
+function syncExplicitReturnSuppliesWithCollector(
+  returnSupplies: ClusterSupplyCollection[] | null | undefined,
+  collectorSupplies: ClusterSupplyCollection[] | null | undefined,
+): ClusterSupplyCollection[] | null {
+  const normalizedReturnSupplies = cloneSupplyCollections(returnSupplies);
+  if (!normalizedReturnSupplies || normalizedReturnSupplies.length === 0) {
+    return null;
+  }
+
+  return normalizedReturnSupplies.map((returnSupply) => {
+    const matchedCollectorSupply = findMatchingSupplyInCollection(
+      returnSupply,
+      collectorSupplies,
+    );
+
+    if (!matchedCollectorSupply) {
+      return returnSupply;
+    }
+
+    return {
+      itemId: matchedCollectorSupply.itemId,
+      itemName: matchedCollectorSupply.itemName,
+      quantity: matchedCollectorSupply.quantity,
+      unit: matchedCollectorSupply.unit,
+    };
+  });
+}
+
+function hasValidReturnSupplySelections(
+  returnSupplies: ClusterSupplyCollection[] | null | undefined,
+  collectorSupplies: ClusterSupplyCollection[] | null | undefined,
+): boolean {
+  const normalizedReturnSupplies = cloneSupplyCollections(returnSupplies);
+  if (!normalizedReturnSupplies || normalizedReturnSupplies.length === 0) {
+    return true;
+  }
+
+  return normalizedReturnSupplies.every((returnSupply) => {
+    const matchedCollectorSupply = findMatchingSupplyInCollection(
+      returnSupply,
+      collectorSupplies,
+    );
+
+    return (
+      !!matchedCollectorSupply &&
+      matchedCollectorSupply.quantity === returnSupply.quantity
+    );
+  });
+}
+
 function normalizeDepotName(value?: string | null): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
@@ -4953,6 +5098,73 @@ const RescuePlanPanel = ({
   const { mutate: createMission, isPending: isCreatingMission } =
     useCreateMission();
 
+  const syncReturnActivitiesWithCollectors = useCallback(
+    (activities: EditableActivity[]): EditableActivity[] =>
+      activities.map((activity) => {
+        if (activity.activityType !== "RETURN_SUPPLIES") {
+          return activity;
+        }
+
+        const collectorActivity = findCollectorActivityForReturn(
+          activity,
+          activities,
+        );
+        const collectorTeamId = toValidTeamId(
+          collectorActivity?.suggestedTeam?.teamId,
+        );
+        const currentTeamId = toValidTeamId(activity.suggestedTeam?.teamId);
+        const collectorSupplies = cloneSupplyCollections(
+          collectorActivity?.suppliesToCollect ?? null,
+        );
+        const currentSupplies = cloneSupplyCollections(
+          activity.suppliesToCollect ?? null,
+        );
+        const syncedReturnSupplies = syncExplicitReturnSuppliesWithCollector(
+          currentSupplies,
+          collectorSupplies,
+        );
+
+        if (!collectorActivity || collectorTeamId == null) {
+          if (
+            activity.suggestedTeam == null &&
+            haveMatchingSupplyCollections(currentSupplies, null)
+          ) {
+            return activity;
+          }
+
+          return {
+            ...activity,
+            suggestedTeam: null,
+            suppliesToCollect: null,
+          };
+        }
+
+        const expectedReason = `Tự động gán theo đội thu gom Vật phẩm ở Bước ${collectorActivity.step}.`;
+        const hasMatchingSupplies = haveMatchingSupplyCollections(
+          currentSupplies,
+          syncedReturnSupplies,
+        );
+
+        if (
+          currentTeamId === collectorTeamId &&
+          activity.suggestedTeam?.reason === expectedReason &&
+          hasMatchingSupplies
+        ) {
+          return activity;
+        }
+
+        return {
+          ...activity,
+          suggestedTeam: {
+            ...collectorActivity.suggestedTeam,
+            reason: expectedReason,
+          },
+          suppliesToCollect: syncedReturnSupplies,
+        };
+      }),
+    [],
+  );
+
   const exitEditMode = useCallback(() => {
     setIsEditMode(false);
     setEditActivities([]);
@@ -4962,32 +5174,36 @@ const RescuePlanPanel = ({
   const updateEditActivity = useCallback(
     (id: string, field: string, value: string | number | null) => {
       setEditActivities((prev) =>
-        prev.map((a) => {
-          if (a._id !== id) return a;
+        syncReturnActivitiesWithCollectors(
+          prev.map((a) => {
+            if (a._id !== id) return a;
 
-          // Only supply-related activities should keep the supply list.
-          if (field === "activityType") {
-            const nextType = value as ClusterActivityType;
-            if (!isSupplyStep(nextType)) {
-              return {
-                ...a,
-                activityType: nextType,
-                suppliesToCollect: null,
-              };
+            // Only supply-related activities should keep the supply list.
+            if (field === "activityType") {
+              const nextType = value as ClusterActivityType;
+              if (!isSupplyStep(nextType)) {
+                return {
+                  ...a,
+                  activityType: nextType,
+                  suppliesToCollect: null,
+                };
+              }
+              return { ...a, activityType: nextType };
             }
-            return { ...a, activityType: nextType };
-          }
 
-          return { ...a, [field]: value } as EditableActivity;
-        }),
+            return { ...a, [field]: value } as EditableActivity;
+          }),
+        ),
       );
     },
-    [],
+    [syncReturnActivitiesWithCollectors],
   );
 
   const removeEditActivity = useCallback((id: string) => {
-    setEditActivities((prev) => prev.filter((a) => a._id !== id));
-  }, []);
+    setEditActivities((prev) =>
+      syncReturnActivitiesWithCollectors(prev.filter((a) => a._id !== id)),
+    );
+  }, [syncReturnActivitiesWithCollectors]);
 
   const addEditActivity = useCallback(() => {
     const newAct: EditableActivity = {
@@ -5003,8 +5219,10 @@ const RescuePlanPanel = ({
       depotAddress: null,
       suppliesToCollect: null,
     };
-    setEditActivities((prev) => [...prev, newAct]);
-  }, [editActivities.length]);
+    setEditActivities((prev) =>
+      syncReturnActivitiesWithCollectors([...prev, newAct]),
+    );
+  }, [editActivities.length, syncReturnActivitiesWithCollectors]);
 
   const moveEditActivity = useCallback((idx: number, dir: -1 | 1) => {
     setEditActivities((prev) => {
@@ -5012,9 +5230,9 @@ const RescuePlanPanel = ({
       const target = idx + dir;
       if (target < 0 || target >= next.length) return prev;
       [next[idx], next[target]] = [next[target], next[idx]];
-      return next;
+      return syncReturnActivitiesWithCollectors(next);
     });
-  }, []);
+  }, [syncReturnActivitiesWithCollectors]);
 
   useEffect(() => {
     const next = { ...supplyUnitByItemIdRef.current };
@@ -5046,167 +5264,144 @@ const RescuePlanPanel = ({
         sourceDepotAddress?: string | null;
       },
     ) => {
+      const targetActivity = editActivities.find((a) => a._id === activityId);
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+        toast.info(
+          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật tư nên không thể thêm thủ công.",
+        );
+        return;
+      }
+
       setEditActivities((prev) =>
-        prev.map((a) => {
-          if (a._id !== activityId) return a;
+        syncReturnActivitiesWithCollectors(
+          prev.map((a) => {
+            if (a._id !== activityId) return a;
 
-          const dragUnit =
-            typeof item.unit === "string" ? item.unit.trim() : "";
-          const cachedUnit =
-            supplyUnitByItemIdRef.current[item.itemId]?.trim() ?? "";
-          const resolvedUnit = dragUnit || cachedUnit || "đơn vị";
-          if (resolvedUnit) {
-            supplyUnitByItemIdRef.current[item.itemId] = resolvedUnit;
-          }
+            const dragUnit =
+              typeof item.unit === "string" ? item.unit.trim() : "";
+            const cachedUnit =
+              supplyUnitByItemIdRef.current[item.itemId]?.trim() ?? "";
+            const resolvedUnit = dragUnit || cachedUnit || "đơn vị";
+            if (resolvedUnit) {
+              supplyUnitByItemIdRef.current[item.itemId] = resolvedUnit;
+            }
 
-          const nextDepotId =
-            isDepotSupplyStep(a.activityType) &&
-            typeof item.sourceDepotId === "number" &&
-            item.sourceDepotId > 0
-              ? item.sourceDepotId
-              : a.depotId;
-          const nextDepotName =
-            isDepotSupplyStep(a.activityType) &&
-            typeof item.sourceDepotName === "string" &&
-            item.sourceDepotName.trim()
-              ? item.sourceDepotName.trim()
-              : a.depotName;
-          const nextDepotAddress =
-            isDepotSupplyStep(a.activityType) &&
-            typeof item.sourceDepotAddress === "string" &&
-            item.sourceDepotAddress.trim()
-              ? item.sourceDepotAddress.trim()
-              : a.depotAddress;
+            const nextDepotId =
+              isDepotSupplyStep(a.activityType) &&
+              typeof item.sourceDepotId === "number" &&
+              item.sourceDepotId > 0
+                ? item.sourceDepotId
+                : a.depotId;
+            const nextDepotName =
+              isDepotSupplyStep(a.activityType) &&
+              typeof item.sourceDepotName === "string" &&
+              item.sourceDepotName.trim()
+                ? item.sourceDepotName.trim()
+                : a.depotName;
+            const nextDepotAddress =
+              isDepotSupplyStep(a.activityType) &&
+              typeof item.sourceDepotAddress === "string" &&
+              item.sourceDepotAddress.trim()
+                ? item.sourceDepotAddress.trim()
+                : a.depotAddress;
 
-          const existing = a.suppliesToCollect ?? [];
-          const foundIdx = existing.findIndex((s) => s.itemId === item.itemId);
-          if (foundIdx >= 0) {
-            const next = [...existing];
-            const currentUnit =
-              typeof next[foundIdx].unit === "string"
-                ? next[foundIdx].unit.trim()
-                : "";
-            const shouldUpgradeUnit =
-              (!currentUnit || currentUnit === "đơn vị") &&
-              resolvedUnit !== "đơn vị";
-            next[foundIdx] = {
-              ...next[foundIdx],
-              quantity: next[foundIdx].quantity + 1,
-              unit: shouldUpgradeUnit ? resolvedUnit : next[foundIdx].unit,
-            };
+            const existing = a.suppliesToCollect ?? [];
+            const foundIdx = existing.findIndex((s) => s.itemId === item.itemId);
+            if (foundIdx >= 0) {
+              const next = [...existing];
+              const currentUnit =
+                typeof next[foundIdx].unit === "string"
+                  ? next[foundIdx].unit.trim()
+                  : "";
+              const shouldUpgradeUnit =
+                (!currentUnit || currentUnit === "đơn vị") &&
+                resolvedUnit !== "đơn vị";
+              next[foundIdx] = {
+                ...next[foundIdx],
+                quantity: next[foundIdx].quantity + 1,
+                unit: shouldUpgradeUnit ? resolvedUnit : next[foundIdx].unit,
+              };
+              return {
+                ...a,
+                depotId: nextDepotId,
+                depotName: nextDepotName,
+                depotAddress: nextDepotAddress,
+                suppliesToCollect: next,
+              };
+            }
             return {
               ...a,
               depotId: nextDepotId,
               depotName: nextDepotName,
               depotAddress: nextDepotAddress,
-              suppliesToCollect: next,
+              suppliesToCollect: [
+                ...existing,
+                {
+                  itemId: item.itemId,
+                  itemName: item.itemName,
+                  quantity: 1,
+                  unit: resolvedUnit,
+                },
+              ],
             };
-          }
-          return {
-            ...a,
-            depotId: nextDepotId,
-            depotName: nextDepotName,
-            depotAddress: nextDepotAddress,
-            suppliesToCollect: [
-              ...existing,
-              {
-                itemId: item.itemId,
-                itemName: item.itemName,
-                quantity: 1,
-                unit: resolvedUnit,
-              },
-            ],
-          };
-        }),
+          }),
+        ),
       );
     },
-    [],
+    [editActivities, syncReturnActivitiesWithCollectors],
   );
-
-  useEffect(() => {
-    setEditActivities((previous) => {
-      let hasChange = false;
-
-      const next = previous.map((activity) => {
-        if (activity.activityType !== "RETURN_SUPPLIES") {
-          return activity;
-        }
-
-        const collectorActivity = findCollectorActivityForReturn(
-          activity,
-          previous,
-        );
-        const collectorTeamId = toValidTeamId(
-          collectorActivity?.suggestedTeam?.teamId,
-        );
-        const currentTeamId = toValidTeamId(activity.suggestedTeam?.teamId);
-
-        if (!collectorActivity || collectorTeamId == null) {
-          if (activity.suggestedTeam == null) {
-            return activity;
-          }
-
-          hasChange = true;
-          return {
-            ...activity,
-            suggestedTeam: null,
-          };
-        }
-
-        const expectedReason = `Tự động gán theo đội thu gom Vật phẩm ở Bước ${collectorActivity.step}.`;
-
-        if (
-          currentTeamId === collectorTeamId &&
-          activity.suggestedTeam?.reason === expectedReason
-        ) {
-          return activity;
-        }
-
-        hasChange = true;
-        return {
-          ...activity,
-          suggestedTeam: {
-            ...collectorActivity.suggestedTeam,
-            reason: expectedReason,
-          },
-        };
-      });
-
-      return hasChange ? next : previous;
-    });
-  }, [editActivities]);
 
   const handleRemoveSupply = useCallback(
     (activityId: string, supplyIndex: number) => {
+      const targetActivity = editActivities.find((a) => a._id === activityId);
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+        toast.info(
+          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật tư nên không thể xóa thủ công.",
+        );
+        return;
+      }
+
       setEditActivities((prev) =>
-        prev.map((a) => {
-          if (a._id !== activityId) return a;
-          const next = [...(a.suppliesToCollect ?? [])];
-          next.splice(supplyIndex, 1);
-          return { ...a, suppliesToCollect: next.length > 0 ? next : null };
-        }),
+        syncReturnActivitiesWithCollectors(
+          prev.map((a) => {
+            if (a._id !== activityId) return a;
+            const next = [...(a.suppliesToCollect ?? [])];
+            next.splice(supplyIndex, 1);
+            return { ...a, suppliesToCollect: next.length > 0 ? next : null };
+          }),
+        ),
       );
     },
-    [],
+    [editActivities, syncReturnActivitiesWithCollectors],
   );
 
   const handleUpdateSupplyQuantity = useCallback(
     (activityId: string, supplyIndex: number, quantity: number) => {
+      const targetActivity = editActivities.find((a) => a._id === activityId);
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+        toast.info(
+          "Số lượng ở bước Hoàn trả được tự động đồng bộ theo số lượng đã thu gom nên không thể sửa thủ công.",
+        );
+        return;
+      }
+
       setEditActivities((prev) =>
-        prev.map((a) => {
-          if (a._id !== activityId) return a;
-          const next = [...(a.suppliesToCollect ?? [])];
-          if (next[supplyIndex]) {
-            next[supplyIndex] = {
-              ...next[supplyIndex],
-              quantity: Math.max(1, quantity),
-            };
-          }
-          return { ...a, suppliesToCollect: next };
-        }),
+        syncReturnActivitiesWithCollectors(
+          prev.map((a) => {
+            if (a._id !== activityId) return a;
+            const next = [...(a.suppliesToCollect ?? [])];
+            if (next[supplyIndex]) {
+              next[supplyIndex] = {
+                ...next[supplyIndex],
+                quantity: Math.max(1, quantity),
+              };
+            }
+            return { ...a, suppliesToCollect: next };
+          }),
+        ),
       );
     },
-    [],
+    [editActivities, syncReturnActivitiesWithCollectors],
   );
 
   const handleRemoveActivityWithConfirm = useCallback(
@@ -5289,6 +5484,18 @@ const RescuePlanPanel = ({
         if (returnTeamId !== collectorTeamId) {
           toast.error(
             `Bước ${i + 1}: Đội Hoàn trả Vật phẩm phải trùng với đội thu gom Vật phẩm ở Bước ${collectorActivity.step}.`,
+          );
+          return false;
+        }
+
+        if (
+          !hasValidReturnSupplySelections(
+            editActivities[i].suppliesToCollect,
+            collectorActivity.suppliesToCollect,
+          )
+        ) {
+          toast.error(
+            `Bước ${i + 1}: Những vật tư được chọn để hoàn trả phải khớp số lượng đã thu gom ở Bước ${collectorActivity.step}.`,
           );
           return false;
         }
@@ -5546,36 +5753,38 @@ const RescuePlanPanel = ({
   const updateEditActivitySuggestedTeam = useCallback(
     (activityId: string, team: RescueTeamByClusterEntity | null) => {
       setEditActivities((previous) =>
-        previous.map((activity) => {
-          if (activity._id !== activityId) {
-            return activity;
-          }
+        syncReturnActivitiesWithCollectors(
+          previous.map((activity) => {
+            if (activity._id !== activityId) {
+              return activity;
+            }
 
-          if (activity.activityType === "RETURN_SUPPLIES") {
-            return activity;
-          }
+            if (activity.activityType === "RETURN_SUPPLIES") {
+              return activity;
+            }
 
-          if (!team) {
+            if (!team) {
+              return {
+                ...activity,
+                suggestedTeam: null,
+              };
+            }
+
             return {
               ...activity,
-              suggestedTeam: null,
+              suggestedTeam: {
+                teamId: team.id,
+                teamName: team.name,
+                teamType: team.teamType,
+                assemblyPointName: team.assemblyPointName,
+                reason: `Điều phối viên cập nhật từ danh sách đội gần cụm SOS (${formatDistanceKmLabel(team.distanceKm)}).`,
+              },
             };
-          }
-
-          return {
-            ...activity,
-            suggestedTeam: {
-              teamId: team.id,
-              teamName: team.name,
-              teamType: team.teamType,
-              assemblyPointName: team.assemblyPointName,
-              reason: `Điều phối viên cập nhật từ danh sách đội gần cụm SOS (${formatDistanceKmLabel(team.distanceKm)}).`,
-            },
-          };
-        }),
+          }),
+        ),
       );
     },
-    [],
+    [syncReturnActivitiesWithCollectors],
   );
 
   const handleSelectNearbyTeamForActivity = useCallback(
@@ -5680,12 +5889,12 @@ const RescuePlanPanel = ({
         const next = [...prev];
         const [removed] = next.splice(dragIdx, 1);
         next.splice(idx, 0, removed);
-        return next;
+        return syncReturnActivitiesWithCollectors(next);
       });
       setDragIdx(null);
       setDragOverIdx(null);
     },
-    [dragIdx],
+    [dragIdx, syncReturnActivitiesWithCollectors],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -5738,10 +5947,12 @@ const RescuePlanPanel = ({
   const enterEditMode = useCallback(() => {
     if (activeSuggestion) {
       setEditActivities(
-        activeSuggestion.suggestedActivities.map((a, i) => ({
-          ...a,
-          _id: `edit-${i}-${Date.now()}`,
-        })),
+        syncReturnActivitiesWithCollectors(
+          activeSuggestion.suggestedActivities.map((a, i) => ({
+            ...a,
+            _id: `edit-${i}-${Date.now()}`,
+          })),
+        ),
       );
       setEditPriorityScore(activeSuggestion.suggestedPriorityScore || 5);
     } else {
@@ -5757,7 +5968,7 @@ const RescuePlanPanel = ({
     setEditExpectedEndTime(end.toISOString().slice(0, 16));
     setEditingMissionId(null);
     setIsEditMode(true);
-  }, [activeSuggestion]);
+  }, [activeSuggestion, syncReturnActivitiesWithCollectors]);
 
   // Enter edit from an existing mission (missions tab -> edit)
   const enterEditFromMission = useCallback(
@@ -5774,50 +5985,52 @@ const RescuePlanPanel = ({
       );
 
       setEditActivities(
-        sortedActivities.map((a, i) => {
-          const inferredSosRequestId = inferSOSRequestIdFromActivity(
-            a,
-            panelSOSRequests,
-          );
-          const isDepot = isDepotSupplyStep(a.activityType);
-          const linkedMissionTeam =
-            typeof a.missionTeamId === "number"
-              ? missionTeamsByMissionTeamId.get(a.missionTeamId)
-              : null;
+        syncReturnActivitiesWithCollectors(
+          sortedActivities.map((a, i) => {
+            const inferredSosRequestId = inferSOSRequestIdFromActivity(
+              a,
+              panelSOSRequests,
+            );
+            const isDepot = isDepotSupplyStep(a.activityType);
+            const linkedMissionTeam =
+              typeof a.missionTeamId === "number"
+                ? missionTeamsByMissionTeamId.get(a.missionTeamId)
+                : null;
 
-          return {
-            _id: `edit-m-${i}-${Date.now()}`,
-            step: a.step,
-            activityType: a.activityType as ClusterActivityType,
-            description: a.description,
-            priority: "Medium",
-            estimatedTime: "",
-            sosRequestId: isDepot
-              ? null
-              : inferredSosRequestId
-                ? Number(inferredSosRequestId)
+            return {
+              _id: `edit-m-${i}-${Date.now()}`,
+              step: a.step,
+              activityType: a.activityType as ClusterActivityType,
+              description: a.description,
+              priority: "Medium",
+              estimatedTime: "",
+              sosRequestId: isDepot
+                ? null
+                : inferredSosRequestId
+                  ? Number(inferredSosRequestId)
+                  : null,
+              depotId: isDepot ? (a.depotId ?? null) : null,
+              depotName: isDepot ? (a.depotName ?? a.target ?? null) : null,
+              depotAddress: isDepot ? (a.depotAddress ?? null) : null,
+              assemblyPointId: a.assemblyPointId ?? null,
+              assemblyPointName: a.assemblyPointName ?? null,
+              assemblyPointLatitude: a.assemblyPointLatitude ?? null,
+              assemblyPointLongitude: a.assemblyPointLongitude ?? null,
+              suppliesToCollect: a.suppliesToCollect,
+              suggestedTeam: linkedMissionTeam
+                ? {
+                    teamId: linkedMissionTeam.rescueTeamId,
+                    teamName: linkedMissionTeam.teamName,
+                    teamType: linkedMissionTeam.teamType,
+                    assemblyPointName: linkedMissionTeam.assemblyPointName,
+                    latitude: linkedMissionTeam.latitude,
+                    longitude: linkedMissionTeam.longitude,
+                    reason: "Đồng bộ từ nhiệm vụ hiện tại.",
+                  }
                 : null,
-            depotId: isDepot ? (a.depotId ?? null) : null,
-            depotName: isDepot ? (a.depotName ?? a.target ?? null) : null,
-            depotAddress: isDepot ? (a.depotAddress ?? null) : null,
-            assemblyPointId: a.assemblyPointId ?? null,
-            assemblyPointName: a.assemblyPointName ?? null,
-            assemblyPointLatitude: a.assemblyPointLatitude ?? null,
-            assemblyPointLongitude: a.assemblyPointLongitude ?? null,
-            suppliesToCollect: a.suppliesToCollect,
-            suggestedTeam: linkedMissionTeam
-              ? {
-                  teamId: linkedMissionTeam.rescueTeamId,
-                  teamName: linkedMissionTeam.teamName,
-                  teamType: linkedMissionTeam.teamType,
-                  assemblyPointName: linkedMissionTeam.assemblyPointName,
-                  latitude: linkedMissionTeam.latitude,
-                  longitude: linkedMissionTeam.longitude,
-                  reason: "Đồng bộ từ nhiệm vụ hiện tại.",
-                }
-              : null,
-          };
-        }),
+            };
+          }),
+        ),
       );
       setEditMissionType(normalizeEditMissionType(mission.missionType));
       setEditPriorityScore(mission.priorityScore);
@@ -5829,7 +6042,7 @@ const RescuePlanPanel = ({
       setActiveTab("plan");
       setIsEditMode(true);
     },
-    [panelSOSRequests],
+    [panelSOSRequests, syncReturnActivitiesWithCollectors],
   );
 
   const hasSidebar = !!activeSuggestion;
@@ -7684,8 +7897,13 @@ const RescuePlanPanel = ({
                                       className={cn(
                                         "mt-1 p-2 rounded-lg border-2 border-dashed transition-colors",
                                         "border-blue-200 dark:border-blue-800/40 bg-blue-50/30 dark:bg-blue-900/10",
+                                        isReturnSuppliesActivity &&
+                                          "border-blue-300/70 bg-blue-100/40 dark:bg-blue-900/15",
                                       )}
                                       onDragOver={(e) => {
+                                        if (isReturnSuppliesActivity) {
+                                          return;
+                                        }
                                         if (
                                           e.dataTransfer.types.includes(
                                             "application/inventory-item",
@@ -7712,6 +7930,12 @@ const RescuePlanPanel = ({
                                           "border-blue-400",
                                           "bg-blue-100/50",
                                         );
+                                        if (isReturnSuppliesActivity) {
+                                          toast.info(
+                                            "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật tư nên không thể kéo thả thủ công.",
+                                          );
+                                          return;
+                                        }
                                         const data = e.dataTransfer.getData(
                                           "application/inventory-item",
                                         );
@@ -7729,6 +7953,14 @@ const RescuePlanPanel = ({
                                         <Package className="h-3 w-3" />
                                         Vật phẩm
                                       </p>
+                                      {isReturnSuppliesActivity && (
+                                        <p className="mb-1.5 text-sm leading-relaxed text-blue-700/80 dark:text-blue-300/80">
+                                          Hệ thống chỉ đồng bộ số lượng cho
+                                          những vật phẩm AI đã chọn hoàn trả ở
+                                          bước này, không tự thêm toàn bộ vật
+                                          phẩm đã thu gom.
+                                        </p>
+                                      )}
                                       {activity.suppliesToCollect &&
                                       activity.suppliesToCollect.length > 0 ? (
                                         <div className="space-y-1">
@@ -7767,6 +7999,9 @@ const RescuePlanPanel = ({
                                                       ) || 1,
                                                     )
                                                   }
+                                                  disabled={
+                                                    isReturnSuppliesActivity
+                                                  }
                                                   className="h-6 w-full text-sm text-center px-1"
                                                 />
                                                 <span className="text-right text-sm text-muted-foreground">
@@ -7784,6 +8019,9 @@ const RescuePlanPanel = ({
                                                         supply,
                                                       ),
                                                     )
+                                                  }
+                                                  disabled={
+                                                    isReturnSuppliesActivity
                                                   }
                                                 >
                                                   <X className="h-3 w-3" />
@@ -7954,10 +8192,12 @@ const RescuePlanPanel = ({
                                         (ag) => ag.suggestedActivities,
                                       );
                                     setEditActivities(
-                                      allActivities.map((a, i) => ({
-                                        ...a,
-                                        _id: `edit-sug-${i}-${Date.now()}`,
-                                      })),
+                                      syncReturnActivitiesWithCollectors(
+                                        allActivities.map((a, i) => ({
+                                          ...a,
+                                          _id: `edit-sug-${i}-${Date.now()}`,
+                                        })),
+                                      ),
                                     );
                                     setEditPriorityScore(
                                       suggestion.suggestedPriorityScore || 5,
