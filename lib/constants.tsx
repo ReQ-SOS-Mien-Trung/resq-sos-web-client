@@ -657,17 +657,17 @@ export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
     bgColor: "bg-orange-100 dark:bg-orange-900/30",
   },
   DELIVER_SUPPLIES: {
-    label: "Tiếp tế",
+    label: "Bàn giao vật tư",
     color: "text-purple-700 dark:text-purple-400",
     bgColor: "bg-purple-100 dark:bg-purple-900/30",
   },
   RETURN_SUPPLIES: {
-    label: "Trả đồ",
+    label: "Hoàn trả vật tư",
     color: "text-cyan-700 dark:text-cyan-400",
     bgColor: "bg-cyan-100 dark:bg-cyan-900/30",
   },
   COLLECT_SUPPLIES: {
-    label: "Lấy vật tư",
+    label: "Thu gom vật tư",
     color: "text-amber-700 dark:text-amber-400",
     bgColor: "bg-amber-100 dark:bg-amber-900/30",
   },

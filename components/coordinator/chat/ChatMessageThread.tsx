@@ -259,10 +259,55 @@ function getPriorityBadgeClass(priority?: string) {
   return "border-slate-300 bg-slate-100 text-slate-700";
 }
 
-function getSourceLabel(source: SosCardData["source"]) {
-  if (source === "quick-dispatch") return "Realtime";
-  if (source === "sos-selected") return "Đã chọn";
-  return "Danh sách";
+function getStatusLabel(status?: string) {
+  const normalized = (status ?? "").trim().toLowerCase();
+
+  switch (normalized) {
+    case "pending":
+      return "Chờ xử lý";
+    case "inprogress":
+      return "Đang xử lý";
+    case "assigned":
+      return "Đã phân công";
+    case "completed":
+      return "Hoàn thành";
+    case "cancelled":
+      return "Đã hủy";
+    default:
+      return status ?? "";
+  }
+}
+
+function getPriorityLabel(priority?: string) {
+  const normalized = (priority ?? "").trim().toLowerCase();
+
+  switch (normalized) {
+    case "critical":
+      return "Rất nghiêm trọng";
+    case "high":
+      return "Nghiêm trọng";
+    case "medium":
+      return "Trung bình";
+    case "low":
+      return "Thấp";
+    default:
+      return priority ?? "";
+  }
+}
+
+function getSosTypeLabel(sosType?: string) {
+  const normalized = (sosType ?? "").trim().toUpperCase();
+
+  switch (normalized) {
+    case "RESCUE":
+      return "Cứu hộ";
+    case "RELIEF":
+      return "Cứu trợ";
+    case "BOTH":
+      return "Cứu hộ + cứu trợ";
+    default:
+      return sosType ?? "";
+  }
 }
 
 function SosRequestCommerceCard({
@@ -274,18 +319,13 @@ function SosRequestCommerceCard({
 }) {
   return (
     <div className="rounded-xl border border-[#FF5722]/35 bg-linear-to-br from-[#fff7ed] via-white to-[#fff1e8] p-3 shadow-[0_6px_18px_rgba(255,87,34,0.1)]">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-extrabold uppercase tracking-tight text-black">
-            SOS #{card.sosRequestId}
-          </p>
-          <p className="mt-0.5 text-sm text-black/70 line-clamp-2">
-            {card.summary || "Yêu cầu hỗ trợ từ hiện trường"}
-          </p>
-        </div>
-        <span className="shrink-0 rounded-md bg-[#FF5722] px-2 py-1 text-xs font-semibold text-white">
-          {getSourceLabel(card.source)}
-        </span>
+      <div className="min-w-0">
+        <p className="text-sm font-extrabold uppercase tracking-tight text-black">
+          SOS #{card.sosRequestId}
+        </p>
+        <p className="mt-0.5 text-sm text-black/70 line-clamp-2">
+          {card.summary || "Yêu cầu hỗ trợ từ hiện trường"}
+        </p>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -296,7 +336,7 @@ function SosRequestCommerceCard({
               getStatusBadgeClass(card.status),
             )}
           >
-            {card.status}
+            {getStatusLabel(card.status)}
           </span>
         ) : null}
 
@@ -307,13 +347,13 @@ function SosRequestCommerceCard({
               getPriorityBadgeClass(card.priority),
             )}
           >
-            Ưu tiên {card.priority}
+            Ưu tiên {getPriorityLabel(card.priority)}
           </span>
         ) : null}
 
         {card.sosType ? (
           <span className="rounded-md border border-blue-300 bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
-            {card.sosType}
+            {getSosTypeLabel(card.sosType)}
           </span>
         ) : null}
       </div>

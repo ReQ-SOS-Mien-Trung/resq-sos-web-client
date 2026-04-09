@@ -177,7 +177,7 @@ export default function AiStreamPanel({
       />
       <div
         ref={panelRef}
-        className="relative w-full max-w-5xl max-h-[92vh] mx-4 rounded-2xl overflow-hidden flex flex-col bg-background border shadow-2xl"
+        className="relative w-full max-w-5xl max-h-[92vh] mx-4 rounded-2xl overflow-hidden flex flex-col bg-background border text-[14px] shadow-2xl"
         style={{ opacity: 0 }}
       >
         <TopBar
@@ -254,13 +254,13 @@ function TopBar({
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
             AI Mission Suggestion
             {clusterId && (
-              <Badge variant="outline" className="text-xs font-mono px-1.5">
+              <Badge variant="outline" className="text-sm font-mono px-1.5">
                 Cụm #{clusterId}
               </Badge>
             )}
           </h3>
           <p
-            className="max-w-xl truncate text-xs text-muted-foreground"
+            className="max-w-xl truncate text-sm text-muted-foreground"
             title={error ? normalizeAiErrorText(error) : undefined}
           >
             {statusLabel}
@@ -272,7 +272,7 @@ function TopBar({
           <Button
             variant="destructive"
             size="sm"
-            className="h-7 text-xs"
+            className="h-7 text-sm"
             onClick={onStop}
           >
             <Stop className="h-3 w-3 mr-1" weight="fill" />
@@ -540,7 +540,7 @@ function SonarRadar({
                 <Badge
                   variant="outline"
                   className={cn(
-                    "rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]",
+                    "rounded-full px-2.5 py-1 text-sm font-semibold uppercase tracking-[0.18em]",
                     phaseTone.pill,
                   )}
                 >
@@ -572,7 +572,7 @@ function SonarRadar({
                   style={{ width: `${progressValue}%` }}
                 />
               </div>
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 {progressValue}%
               </span>
             </div>
@@ -695,7 +695,7 @@ function SonarRadar({
               <p className="mt-3 text-center text-sm font-medium tracking-tight text-foreground">
                 {status || phaseDescription(phase)}
               </p>
-              <p className="mt-1 text-center text-xs text-muted-foreground">
+              <p className="mt-1 text-center text-sm text-muted-foreground">
                 AI đang phân tích
               </p>
             </div>
@@ -709,12 +709,12 @@ function SonarRadar({
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/35" />
                     <span className="relative inline-flex h-3 w-3 rounded-full bg-primary" />
                   </span>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary/80">
                     Suy nghĩ AI
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 rounded-full border border-primary/10 bg-primary/5 px-3 py-1.5 text-xs text-primary/80">
+                <div className="flex items-center gap-2 rounded-full border border-primary/10 bg-primary/5 px-3 py-1.5 text-sm text-primary/80">
                   <ArrowsClockwise className="h-3.5 w-3.5 animate-spin" />
                   {statusEntries.length}
                 </div>
@@ -781,7 +781,7 @@ function SonarRadar({
                   ref={thinkingRef}
                   className="mt-3 rounded-2xl border border-primary/10 bg-primary/[0.04] px-3 py-2.5"
                 >
-                  <p className="line-clamp-2 text-xs font-mono leading-5 text-primary/70 whitespace-pre-wrap wrap-break-word">
+                  <p className="line-clamp-2 text-sm font-mono leading-5 text-primary/70 whitespace-pre-wrap wrap-break-word">
                     {thinkingText}
                     <span className="ml-1 inline-block h-3 w-1 animate-pulse rounded-full bg-primary/60 align-middle" />
                   </p>
@@ -859,7 +859,7 @@ function ActionFlowTimeline({
       </div>
       {revealedCount < activities.length && (
         <div className="ml-12 border-l-2 border-dashed border-primary/20 py-3 pl-4">
-          <div className="flex items-center gap-2 text-xs font-mono text-primary/40">
+          <div className="flex items-center gap-2 text-sm font-mono text-primary/40">
             <span className="h-2 w-2 rounded-full bg-primary/30 animate-pulse" />
             Đang tải bước {revealedCount + 1}/{activities.length}...
           </div>
@@ -908,11 +908,11 @@ function MissionBanner({
             {result.suggestedMissionTitle}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge className="text-xs bg-primary text-white border-primary hover:bg-primary/90">
+            <Badge className="text-sm bg-primary text-white border-primary hover:bg-primary/90">
               {severityConfig[result.suggestedSeverityLevel]?.label ||
                 result.suggestedSeverityLevel}
             </Badge>
-            <span className="text-xs font-mono text-muted-foreground">
+            <span className="text-sm font-mono text-muted-foreground">
               {result.modelName} • {result.responseTimeMs}ms
             </span>
           </div>
@@ -986,7 +986,7 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
             <span className={cn("text-sm font-bold font-mono", s.color)}>
               {s.value}
             </span>
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">
+            <span className="text-sm text-muted-foreground uppercase tracking-wider">
               {s.label}
             </span>
           </div>
@@ -1015,8 +1015,8 @@ function AiOriginNode() {
         <Brain className="h-4 w-4 text-primary" weight="fill" />
       </div>
       <div>
-        <span className="text-xs font-bold text-primary">AI Engine</span>
-        <p className="text-xs text-muted-foreground font-mono">
+        <span className="text-sm font-bold text-primary">AI Engine</span>
+        <p className="text-sm text-muted-foreground font-mono">
           Bắt đầu thực thi kế hoạch
         </p>
       </div>
@@ -1150,13 +1150,13 @@ function ActivityFlowNode({
                 strokeWidth="1"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-primary">
+            <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-primary">
               {activity.step}
             </span>
           </div>
           <Badge
             className={cn(
-              "text-xs px-1.5 h-5 border",
+              "text-sm px-1.5 h-5 border",
               config.bgColor,
               config.color,
               "border-current/20",
@@ -1165,33 +1165,33 @@ function ActivityFlowNode({
             <Icon className="h-3 w-3 mr-0.5" weight="fill" />
             {config.label}
           </Badge>
-          <Badge className="text-xs px-1.5 h-5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+          <Badge className="text-sm px-1.5 h-5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
             {severityConfig[activity.priority]?.label || activity.priority}
           </Badge>
           {activity.estimatedTime && (
-            <span className="text-xs font-mono text-muted-foreground flex items-center gap-0.5 ml-auto">
+            <span className="text-sm font-mono text-muted-foreground flex items-center gap-0.5 ml-auto">
               <Clock className="h-3 w-3" />
               {activity.estimatedTime}
             </span>
           )}
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground mb-2 pl-9">
+        <p className="text-sm leading-relaxed text-muted-foreground mb-2 pl-9">
           {activity.description}
         </p>
 
         {activity.suggestedTeam && (
           <div className="ml-9 mb-2 rounded-lg border border-emerald-300/40 bg-emerald-50/50 dark:bg-emerald-900/15 dark:border-emerald-700/40 p-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+            <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
               <ShieldCheck className="h-3 w-3" weight="fill" />
               Đội đề xuất
             </p>
-            <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
+            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
               {activity.suggestedTeam.teamName ||
                 (activity.suggestedTeam.teamId
                   ? `Đội #${activity.suggestedTeam.teamId}`
                   : "Đội chưa đặt tên")}
             </p>
-            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+            <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
               {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
               {activity.suggestedTeam.contactPhone
                 ? ` • SĐT: ${activity.suggestedTeam.contactPhone}`
@@ -1201,12 +1201,12 @@ function ActivityFlowNode({
                 : ""}
             </p>
             {activity.suggestedTeam.reason && (
-              <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
+              <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
                 Lý do: {activity.suggestedTeam.reason}
               </p>
             )}
             {activity.suggestedTeam.assemblyPointName && (
-              <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
+              <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
                 Điểm tập kết đội: {activity.suggestedTeam.assemblyPointName}
               </p>
             )}
@@ -1217,18 +1217,18 @@ function ActivityFlowNode({
           (activity.assemblyPointLatitude != null &&
             activity.assemblyPointLongitude != null)) && (
           <div className="ml-9 mb-2 rounded-lg border border-blue-300/40 bg-blue-50/50 dark:bg-blue-900/15 dark:border-blue-700/40 p-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
+            <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
               <MapPin className="h-3 w-3" weight="fill" />
               Điểm tập kết hoạt động
             </p>
             {activity.assemblyPointName && (
-              <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
+              <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
                 {activity.assemblyPointName}
               </p>
             )}
             {activity.assemblyPointLatitude != null &&
               activity.assemblyPointLongitude != null && (
-                <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
                   Tọa độ: {activity.assemblyPointLatitude.toFixed(4)},{" "}
                   {activity.assemblyPointLongitude.toFixed(4)}
                 </p>
@@ -1252,11 +1252,11 @@ function ActivityFlowNode({
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold text-amber-600 dark:text-amber-400 truncate">
+              <p className="text-sm font-bold text-amber-600 dark:text-amber-400 truncate">
                 {activity.depotName}
               </p>
               {activity.depotAddress && (
-                <p className="text-xs text-amber-600/50 dark:text-amber-500/50 truncate">
+                <p className="text-sm text-amber-600/50 dark:text-amber-500/50 truncate">
                   {activity.depotAddress}
                 </p>
               )}
@@ -1279,7 +1279,7 @@ function ActivityFlowNode({
               className="h-3.5 w-3.5 text-red-500 shrink-0"
               weight="fill"
             />
-            <span className="text-xs font-mono text-red-500/70">
+            <span className="text-sm font-mono text-red-500/70">
               SOS #{activity.sosRequestId}
             </span>
           </div>
@@ -1291,7 +1291,7 @@ function ActivityFlowNode({
               {activity.suppliesToCollect.map((supply) => (
                 <div
                   key={supply.itemId}
-                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-xs"
+                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-sm"
                 >
                   <Package className="h-2.5 w-2.5 text-primary" weight="fill" />
                   <span className="text-primary">{supply.itemName}</span>
@@ -1331,12 +1331,12 @@ function AssessmentBlock({ text }: { text: string }) {
           className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400"
           weight="fill"
         />
-        <span className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+        <span className="text-sm font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
           Đánh giá tổng thể
         </span>
       </div>
       <div className="p-3">
-        <p className="text-xs leading-relaxed text-muted-foreground">{text}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{text}</p>
       </div>
     </div>
   );
@@ -1379,7 +1379,7 @@ function ResourcesBlock({
           className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400"
           weight="fill"
         />
-        <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+        <span className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
           Tài nguyên cần thiết
         </span>
       </div>
@@ -1395,14 +1395,14 @@ function ResourcesBlock({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-foreground truncate">
+              <p className="text-sm font-semibold text-foreground truncate">
                 {res.description}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-xs font-mono text-blue-500 dark:text-blue-400">
+                <span className="text-sm font-mono text-blue-500 dark:text-blue-400">
                   SL: {res.quantity}
                 </span>
-                <Badge variant="outline" className="h-5 px-1.5 text-xs">
+                <Badge variant="outline" className="h-5 px-1.5 text-sm">
                   {res.priority}
                 </Badge>
               </div>
@@ -1433,7 +1433,7 @@ function WarningsBlock({
       {result.needsManualReview && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/[0.06] border border-yellow-500/15">
           <Warning className="h-4 w-4 text-yellow-500 shrink-0" weight="fill" />
-          <p className="text-xs text-yellow-600 dark:text-yellow-400/80">
+          <p className="text-sm text-yellow-600 dark:text-yellow-400/80">
             {result.lowConfidenceWarning ||
               "Cần kiểm tra thủ công trước khi phê duyệt."}
           </p>
@@ -1445,7 +1445,7 @@ function WarningsBlock({
             className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0"
             weight="fill"
           />
-          <p className="text-xs text-blue-600 dark:text-blue-400/80">
+          <p className="text-sm text-blue-600 dark:text-blue-400/80">
             Kế hoạch yêu cầu phối hợp nhiều kho tiếp tế.
           </p>
         </div>
@@ -1457,10 +1457,10 @@ function WarningsBlock({
             weight="fill"
           />
           <div>
-            <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
+            <p className="text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
               Lưu ý đặc biệt
             </p>
-            <p className="text-xs text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
+            <p className="text-sm text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
               {result.specialNotes}
             </p>
           </div>
@@ -1500,11 +1500,11 @@ function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
         <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">
           Phân tích thất bại
         </p>
-        <p className="text-xs text-red-500/60 mb-4">{readableError}</p>
+        <p className="text-sm text-red-500/60 mb-4">{readableError}</p>
         <Button
           variant="destructive"
           size="sm"
-          className="h-8 text-xs"
+          className="h-8 text-sm"
           onClick={onRetry}
         >
           <ArrowsClockwise className="h-3.5 w-3.5 mr-1.5" />
@@ -1542,7 +1542,7 @@ function FooterBar({
       <Button
         variant="outline"
         size="sm"
-        className="h-9 text-xs"
+        className="h-9 text-sm"
         onClick={onRetry}
       >
         <ArrowsClockwise className="h-3.5 w-3.5 mr-1.5" />
@@ -1551,7 +1551,7 @@ function FooterBar({
       <div className="flex-1" />
       <Button
         size="sm"
-        className="h-9 text-xs bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
+        className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
         onClick={onViewPlan}
       >
         <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />

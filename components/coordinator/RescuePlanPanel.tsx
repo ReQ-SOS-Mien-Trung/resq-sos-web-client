@@ -626,7 +626,7 @@ const DepotInventoryCard = ({
             variant="secondary"
             className="h-5 shrink-0 rounded-full px-2 text-sm font-semibold"
           >
-            {data.totalCount} vật tư
+            {data.totalCount} Vật phẩm
           </Badge>
         ) : null}
       </div>
@@ -737,7 +737,7 @@ const DepotInventoryCard = ({
                 Trang {data.pageNumber}/{data.totalPages}
               </p>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                6 vật tư mỗi trang
+                6 Vật phẩm mỗi trang
               </p>
             </div>
 
@@ -1369,8 +1369,8 @@ function getSupplyDisplayName(supply: {
   const name =
     typeof supply.itemName === "string" ? supply.itemName.trim() : "";
   if (name) return name;
-  if (typeof supply.itemId === "number") return `Vật tư #${supply.itemId}`;
-  return "Vật tư chưa rõ tên";
+  if (typeof supply.itemId === "number") return `Vật phẩm #${supply.itemId}`;
+  return "Vật phẩm chưa rõ tên";
 }
 
 function escapeRegExp(value: string): string {
@@ -1386,9 +1386,9 @@ function syncDescriptionWithSupplies(
   let next = description;
   for (const supply of supplies) {
     const name = getSupplyDisplayName(supply);
-    if (!name || name === "Vật tư chưa rõ tên") continue;
+    if (!name || name === "Vật phẩm chưa rõ tên") continue;
 
-    // Match patterns like "Tên vật tư x20", "Tên vật tư x 20", "Tên vật tư ×20".
+    // Match patterns like "Tên Vật phẩm x20", "Tên Vật phẩm x 20", "Tên Vật phẩm ×20".
     const qtyPattern = new RegExp(
       `(${escapeRegExp(name)}\\s*[xX×]\\s*)\\d+`,
       "g",
@@ -1480,14 +1480,14 @@ function isSupplyStep(activityType: string): boolean {
 
 function getSupplyStepTitle(activityType: string): string {
   if (activityType === "DELIVER_SUPPLIES") {
-    return "Danh sách giao hàng";
+    return "Vật phẩm cần bàn giao ở bước này";
   }
 
   if (activityType === "RETURN_SUPPLIES") {
-    return "Danh sách trả đồ";
+    return "Vật phẩm cần hoàn trả ở bước này";
   }
 
-  return "Yêu cầu lấy vật tư";
+  return "Vật phẩm cần thu gom ở bước này";
 }
 
 function toValidTeamId(value: unknown): number | null {
@@ -1629,7 +1629,7 @@ function parseSupplyItemsFromDescription(
   description: string,
 ): SupplyDisplayItem[] {
   const markerMatch = description.match(
-    /(?:Lấy|Lay|Giao vật tư|Tiếp tế|Tiep te|Trả|Tra|Hoàn trả|Hoan tra|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?|Return(?: supplies)?)[^:]*:\s*(.+)$/i,
+    /(?:Lấy|Lay|Thu gom|Thu gom Vật phẩm|Thu gom vat tu|Giao Vật phẩm|Ban giao|Bàn giao|Tiếp tế|Tiep te|Trả|Tra|Hoàn trả|Hoan tra|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?|Return(?: supplies)?)[^:]*:\s*(.+)$/i,
   );
   if (!markerMatch?.[1]) return [];
 
@@ -1689,7 +1689,7 @@ function getSupplyDisplayItems(activity: {
 function stripSupplyDetailsFromDescription(description: string): string {
   return description
     .replace(
-      /\s*(?:Lấy|Lay|Giao vật tư|Tiếp tế|Tiep te|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?)[^:]*:\s*.*$/i,
+      /\s*(?:Lấy|Lay|Thu gom|Thu gom Vật phẩm|Thu gom vat tu|Giao Vật phẩm|Ban giao|Bàn giao|Tiếp tế|Tiep te|Hoàn trả|Hoan tra|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?|Return(?: supplies)?)[^:]*:\s*.*$/i,
       "",
     )
     .replace(/[\s,;:.]+$/, "")
@@ -1769,6 +1769,63 @@ function getActivityStatusMeta(status: string | null | undefined): {
     className:
       "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
     icon: <Clock className="h-3.5 w-3.5" />,
+  };
+}
+
+function getMissionStatusMeta(status: string | null | undefined): {
+  label: string;
+  className: string;
+} {
+  const normalizedStatus = (status ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "")
+    .replaceAll(" ", "");
+
+  if (normalizedStatus === "completed") {
+    return {
+      label: "Hoàn thành",
+      className:
+        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+    };
+  }
+
+  if (normalizedStatus === "ongoing" || normalizedStatus === "inprogress") {
+    return {
+      label: "Đang thực hiện",
+      className:
+        "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
+    };
+  }
+
+  if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+    return {
+      label: "Đã hủy",
+      className:
+        "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700",
+    };
+  }
+
+  if (normalizedStatus === "pending") {
+    return {
+      label: "Chờ xử lý",
+      className:
+        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+    };
+  }
+
+  if (normalizedStatus === "planned") {
+    return {
+      label: "Đã lập kế hoạch",
+      className:
+        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+    };
+  }
+
+  return {
+    label: status || "Chưa rõ",
+    className:
+      "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
   };
 }
 
@@ -5096,7 +5153,7 @@ const RescuePlanPanel = ({
           };
         }
 
-        const expectedReason = `Tự động gán theo đội lấy vật tư ở Bước ${collectorActivity.step}.`;
+        const expectedReason = `Tự động gán theo đội thu gom Vật phẩm ở Bước ${collectorActivity.step}.`;
 
         if (
           currentTeamId === collectorTeamId &&
@@ -5224,14 +5281,14 @@ const RescuePlanPanel = ({
 
         if (collectorTeamId == null || !collectorActivity) {
           toast.error(
-            `Bước ${i + 1}: Chưa xác định được đội đã lấy vật tư để gán cho bước Trả đồ.`,
+            `Bước ${i + 1}: Chưa xác định được đội đã thu gom Vật phẩm để gán cho bước Hoàn trả Vật phẩm.`,
           );
           return false;
         }
 
         if (returnTeamId !== collectorTeamId) {
           toast.error(
-            `Bước ${i + 1}: Đội Trả đồ phải trùng với đội lấy vật tư ở Bước ${collectorActivity.step}.`,
+            `Bước ${i + 1}: Đội Hoàn trả Vật phẩm phải trùng với đội thu gom Vật phẩm ở Bước ${collectorActivity.step}.`,
           );
           return false;
         }
@@ -5526,7 +5583,7 @@ const RescuePlanPanel = ({
       const targetActivity = editActivities.find((a) => a._id === activityId);
       if (targetActivity?.activityType === "RETURN_SUPPLIES") {
         toast.info(
-          "Bước Trả đồ được tự động gán theo đội đã lấy vật tư và không thể thay đổi thủ công.",
+          "Bước Hoàn trả vật phẩm được tự động gán theo đội đã thu gom vật phẩm và không thể thay đổi thủ công.",
         );
         return;
       }
@@ -5906,15 +5963,15 @@ const RescuePlanPanel = ({
   const removeDialogTitle =
     pendingRemoval?.type === "activity"
       ? "Xác nhận xóa bước trong kế hoạch"
-      : "Xác nhận xóa vật tư khỏi gợi ý AI";
+      : "Xác nhận xóa vật phẩm khỏi gợi ý AI";
 
   const removeDialogDescription =
     pendingRemoval?.type === "activity"
       ? pendingRemoval.hasSupplyItems
-        ? `Bạn sắp xóa Bước ${pendingRemoval.displayStep} trong kế hoạch AI. Toàn bộ vật tư và nội dung thuộc bước này sẽ bị loại khỏi kế hoạch khi xác nhận nhiệm vụ.`
+        ? `Bạn sắp xóa Bước ${pendingRemoval.displayStep} trong kế hoạch AI. Toàn bộ vật phẩm và nội dung thuộc bước này sẽ bị loại khỏi kế hoạch khi xác nhận nhiệm vụ.`
         : `Bạn sắp xóa Bước ${pendingRemoval.displayStep} trong kế hoạch AI. Bước này sẽ không còn trong nhiệm vụ khi bạn xác nhận.`
       : pendingRemoval?.type === "supply"
-        ? `Bạn có chắc chắn muốn xóa vật tư \"${pendingRemoval.supplyName}\" khỏi gợi ý AI này không? Vật tư này sẽ bị loại khỏi kế hoạch khi bạn xác nhận nhiệm vụ.`
+        ? `Bạn có chắc chắn muốn xóa vật phẩm \"${pendingRemoval.supplyName}\" khỏi gợi ý AI này không? vật phẩm này sẽ bị loại khỏi kế hoạch khi bạn xác nhận nhiệm vụ.`
         : "";
 
   return (
@@ -6249,38 +6306,9 @@ const RescuePlanPanel = ({
                             >
                               <CardContent className="p-3 space-y-2">
                                 {(() => {
-                                  const normalizedStatus = mission.status
-                                    .trim()
-                                    .toLowerCase();
-                                  const statusText =
-                                    normalizedStatus === "completed"
-                                      ? "Hoàn thành"
-                                      : normalizedStatus === "inprogress" ||
-                                          normalizedStatus === "in_progress" ||
-                                          normalizedStatus === "in progress"
-                                        ? "Đang thực hiện"
-                                        : normalizedStatus === "cancelled" ||
-                                            normalizedStatus === "canceled"
-                                          ? "Đã hủy"
-                                          : normalizedStatus === "pending"
-                                            ? "Chờ xử lý"
-                                            : normalizedStatus === "planned"
-                                              ? "Đã lập kế hoạch"
-                                              : mission.status;
-                                  const statusClass =
-                                    normalizedStatus === "completed"
-                                      ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
-                                      : normalizedStatus === "inprogress" ||
-                                          normalizedStatus === "in_progress" ||
-                                          normalizedStatus === "in progress"
-                                        ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700"
-                                        : normalizedStatus === "cancelled" ||
-                                            normalizedStatus === "canceled"
-                                          ? "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700"
-                                          : normalizedStatus === "pending" ||
-                                              normalizedStatus === "planned"
-                                            ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
-                                            : "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600";
+                                  const missionStatus = getMissionStatusMeta(
+                                    mission.status,
+                                  );
 
                                   return (
                                     <div className="flex items-center justify-between">
@@ -6323,10 +6351,10 @@ const RescuePlanPanel = ({
                                           variant="outline"
                                           className={cn(
                                             "text-sm h-7 px-3 font-extrabold uppercase tracking-wide border-2",
-                                            statusClass,
+                                            missionStatus.className,
                                           )}
                                         >
-                                          {statusText}
+                                          {missionStatus.label}
                                         </Badge>
                                       </div>
                                     </div>
@@ -6663,9 +6691,10 @@ const RescuePlanPanel = ({
                                               )}
                                             </div>
 
-                                            <div className="p-3 space-y-2.5 bg-card">
-                                              {group.activities.map(
-                                                (activity) => {
+                                            <div className="bg-card p-3">
+                                              <div className="grid gap-3 lg:grid-cols-2 lg:[grid-auto-rows:1fr]">
+                                                {group.activities.map(
+                                                  (activity) => {
                                                   const assignedMissionTeams = (
                                                     mission.teams ?? []
                                                   ).filter((team) => {
@@ -6736,58 +6765,72 @@ const RescuePlanPanel = ({
                                                   return (
                                                     <div
                                                       key={activity.id}
-                                                      className="rounded-lg border bg-background p-3 hover:bg-accent/20 transition-colors shadow-sm"
+                                                      className="flex h-full flex-col rounded-2xl border border-border/70 bg-gradient-to-b from-background via-background to-muted/20 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md"
                                                     >
-                                                      <div className="flex items-start gap-3">
+                                                      <div className="flex h-full items-start gap-3">
                                                         <div
                                                           className={cn(
-                                                            "w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5",
+                                                            "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-base font-extrabold shadow-sm ring-1 ring-black/5",
                                                             config.bgColor,
                                                             config.color,
                                                           )}
                                                         >
                                                           {activity.step}
                                                         </div>
-                                                        <div className="flex-1 min-w-0 space-y-1.5">
-                                                          <div className="flex items-center gap-1.5 flex-wrap">
-                                                            <Badge
-                                                              variant="outline"
-                                                              className={cn(
-                                                                "text-sm font-semibold px-2 py-0 h-5",
-                                                                config.color,
-                                                                config.bgColor,
-                                                                "border-transparent",
-                                                              )}
-                                                            >
-                                                              {config.label}
-                                                            </Badge>
-                                                            <Badge
-                                                              variant="outline"
-                                                              className={cn(
-                                                                "text-sm h-6 px-2 font-bold border flex items-center gap-1",
-                                                                stepStatus.className,
-                                                              )}
-                                                            >
-                                                              {stepStatus.icon}
-                                                              {stepStatus.label}
-                                                            </Badge>
+                                                        <div className="flex min-h-full min-w-0 flex-1 flex-col gap-3">
+                                                          <div className="flex items-start justify-between gap-3">
+                                                            <div className="min-w-0 space-y-2">
+                                                              <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="text-sm font-bold text-foreground">
+                                                                  Bước{" "}
+                                                                  {activity.step}
+                                                                </span>
+                                                                <Badge
+                                                                  variant="outline"
+                                                                  className={cn(
+                                                                    "h-6 border-transparent px-2 text-sm font-semibold",
+                                                                    config.color,
+                                                                    config.bgColor,
+                                                                  )}
+                                                                >
+                                                                  {config.label}
+                                                                </Badge>
+                                                                <Badge
+                                                                  variant="outline"
+                                                                  className={cn(
+                                                                    "flex h-6 items-center gap-1 border px-2 text-sm font-bold",
+                                                                    stepStatus.className,
+                                                                  )}
+                                                                >
+                                                                  {
+                                                                    stepStatus.icon
+                                                                  }
+                                                                  {
+                                                                    stepStatus.label
+                                                                  }
+                                                                </Badge>
+                                                              </div>
+                                                              <p className="text-sm font-medium leading-relaxed text-foreground/80">
+                                                                {
+                                                                  displayDescription
+                                                                }
+                                                              </p>
+                                                            </div>
                                                             {typeof activity.estimatedTime ===
                                                             "number" ? (
-                                                              <Badge
-                                                                variant="outline"
-                                                                className="text-sm h-6 px-2 font-semibold"
-                                                              >
-                                                                ETA:{" "}
-                                                                {
-                                                                  activity.estimatedTime
-                                                                }{" "}
-                                                                phút
-                                                              </Badge>
+                                                              <div className="shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm">
+                                                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                                                  ETA
+                                                                </p>
+                                                                <p className="text-sm font-bold text-foreground">
+                                                                  {
+                                                                    activity.estimatedTime
+                                                                  }{" "}
+                                                                  phút
+                                                                </p>
+                                                              </div>
                                                             ) : null}
                                                           </div>
-                                                          <p className="text-sm text-foreground/80 leading-relaxed font-medium">
-                                                            {displayDescription}
-                                                          </p>
 
                                                           {(activity.assemblyPointName ||
                                                             (activity.assemblyPointLatitude !=
@@ -7053,8 +7096,9 @@ const RescuePlanPanel = ({
                                                       </div>
                                                     </div>
                                                   );
-                                                },
-                                              )}
+                                                  },
+                                                )}
+                                              </div>
                                             </div>
                                           </div>
                                         );
@@ -7122,7 +7166,7 @@ const RescuePlanPanel = ({
                                   className="h-3.5 w-3.5 mt-0.5 shrink-0"
                                   weight="fill"
                                 />
-                                Khi xóa vật tư hoặc xóa bước trong phần chỉnh
+                                Khi xóa vật phẩm hoặc xóa bước trong phần chỉnh
                                 sửa, dữ liệu đó sẽ bị loại khỏi nhiệm vụ lúc xác
                                 nhận.
                               </p>
@@ -7284,7 +7328,7 @@ const RescuePlanPanel = ({
                                 (hasValidSuggestedTeamId
                                   ? `Đội #${parsedSuggestedTeamId}`
                                   : isReturnSuppliesActivity
-                                    ? "Chưa xác định đội lấy vật tư"
+                                    ? "Chưa xác định đội thu gom vật phẩm"
                                     : "Chưa chọn đội");
                               return (
                                 <div
@@ -7627,9 +7671,9 @@ const RescuePlanPanel = ({
 
                                     {isReturnSuppliesActivity && (
                                       <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
-                                        Bước Trả đồ được tự động gán cùng đội đã
-                                        lấy vật tư và không thể thay đổi thủ
-                                        công.
+                                        Bước Hoàn trả vật phẩm được tự động gán
+                                        cùng đội đã thu gom vật phẩm và không
+                                        thể thay đổi thủ công.
                                       </p>
                                     )}
                                   </div>
@@ -7683,7 +7727,7 @@ const RescuePlanPanel = ({
                                     >
                                       <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
                                         <Package className="h-3 w-3" />
-                                        Vật tư
+                                        Vật phẩm
                                       </p>
                                       {activity.suppliesToCollect &&
                                       activity.suppliesToCollect.length > 0 ? (
@@ -7701,12 +7745,13 @@ const RescuePlanPanel = ({
                                                     title={
                                                       getSupplyDisplayName(
                                                         supply,
-                                                      ) || "Vật tư chưa rõ tên"
+                                                      ) ||
+                                                      "Vật phẩm chưa rõ tên"
                                                     }
                                                   >
                                                     {getSupplyDisplayName(
                                                       supply,
-                                                    ) || "Vật tư chưa rõ tên"}
+                                                    ) || "Vật phẩm chưa rõ tên"}
                                                   </span>
                                                 </div>
                                                 <Input
@@ -7749,7 +7794,7 @@ const RescuePlanPanel = ({
                                         </div>
                                       ) : (
                                         <p className="text-sm text-muted-foreground/60 text-center py-1">
-                                          Kéo vật tư từ kho bên phải vào đây
+                                          Kéo vật phẩm từ kho bên phải vào đây
                                         </p>
                                       )}
                                     </div>
@@ -7994,7 +8039,7 @@ const RescuePlanPanel = ({
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                             <ListChecks className="h-3.5 w-3.5" weight="bold" />
-                            Kế hoạch thực hiện
+                            Các bước thực hiện
                           </h3>
                           <div className="flex items-center gap-2">
                             <Button
@@ -8341,7 +8386,7 @@ const RescuePlanPanel = ({
                               <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30 rounded-lg p-2.5">
                                 <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
                                   Kế hoạch đề xuất phối hợp nhiều kho để đáp ứng
-                                  đủ vật tư.
+                                  đủ vật phẩm.
                                 </p>
                               </div>
                             )}
@@ -8453,12 +8498,12 @@ const RescuePlanPanel = ({
                             className="h-3.5 w-3.5 text-amber-500"
                             weight="fill"
                           />
-                          Kho vật tư
+                          Kho vật phẩm
                         </h4>
                         <p className="text-sm text-muted-foreground mb-2">
                           {isEditMode
-                            ? "Kéo vật tư vào bước thực hiện bên trái"
-                            : "Vào chế độ chỉnh sửa để kéo vật tư vào bước"}
+                            ? "Kéo vật phẩm vào bước thực hiện bên trái"
+                            : "Vào chế độ chỉnh sửa để kéo vật phẩm vào bước"}
                         </p>
                         <div className="space-y-2">
                           {sidebarDepots.map((depot) => (

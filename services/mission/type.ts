@@ -22,6 +22,8 @@ export type MissionActivityStatus =
 
 export type ActivityStatus = MissionActivityStatus;
 
+export type ActivityStatusInput = ActivityStatus | string;
+
 export interface MissionTeam {
   missionTeamId: number;
   rescueTeamId: number;
@@ -203,7 +205,7 @@ export interface CreateMissionResponse {
 }
 
 export interface UpdateActivityStatusRequest {
-  status: ActivityStatus;
+  status: ActivityStatusInput;
 }
 
 export interface UpdateActivityStatusResponse {

@@ -87,7 +87,7 @@ export const SOS_TYPE_OPTIONS: Array<
   },
   {
     value: "BOTH",
-    label: "Cả hai",
+    label: "Cứu hộ + cứu trợ",
     description: "Vừa cần cứu hộ, vừa cần cứu trợ",
   },
 ];

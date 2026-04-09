@@ -180,14 +180,14 @@ function isSupplyActivityType(activityType: string): boolean {
 
 function getSupplyStepTitle(activityType: string): string {
   if (activityType === "DELIVER_SUPPLIES") {
-    return "Danh sách giao vật tư";
+    return "Vật tư cần bàn giao ở bước này";
   }
 
   if (activityType === "RETURN_SUPPLIES") {
-    return "Danh sách trả vật tư";
+    return "Vật tư cần hoàn trả ở bước này";
   }
 
-  return "Danh sách lấy vật tư";
+  return "Vật tư cần thu gom ở bước này";
 }
 
 function buildSupplySummary(supplies: ManualSupplyItem[]): string {
@@ -376,7 +376,7 @@ const TEMPLATES: { label: string; types: ClusterActivityType[] }[] = [
     types: ["ASSESS", "MEDICAL_AID", "EVACUATE"],
   },
   {
-    label: "Tiếp tế vật tư",
+    label: "Bàn giao vật tư",
     types: ["ASSESS", "DELIVER_SUPPLIES", "EVACUATE"],
   },
 ];
@@ -567,7 +567,7 @@ function SortableActivityCard({
 
       {isAutoReturnStep ? (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:border-blue-800/60 dark:bg-blue-900/20 dark:text-blue-300">
-          Bước này được tự động tạo khi có bước lấy vật tư và luôn nằm ở cuối.
+          Bước này được tự động tạo khi có bước thu gom vật tư và luôn nằm ở cuối.
         </div>
       ) : null}
 
