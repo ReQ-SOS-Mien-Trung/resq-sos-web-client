@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AxiosError } from "axios";
 import dynamic from "next/dynamic";
 import {
   Dialog,
@@ -41,6 +42,15 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** If provided, the dialog is in edit mode */
   editItem?: AssemblyPointEntity | null;
+}
+
+function getApiError(err: unknown, fallback: string): string {
+  if (err instanceof AxiosError) {
+    const msg = err.response?.data?.message;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+  }
+
+  return fallback;
 }
 
 export function AssemblyPointFormDialog({
@@ -89,6 +99,18 @@ export function AssemblyPointFormDialog({
   };
 
   const handleSubmit = () => {
+    if (isEdit && editItem?.status === "UnderMaintenance") {
+      toast.error(
+        "Điểm tập kết đang bảo trì hoặc chưa kích hoạt và không thể thực hiện thao tác này.",
+      );
+      return;
+    }
+
+    if (isEdit && editItem?.status === "Closed") {
+      toast.error("Điểm tập kết đã đóng không thể chỉnh sửa.");
+      return;
+    }
+
     if (!name.trim()) {
       toast.error("Vui lòng nhập tên điểm tập kết");
       return;
@@ -134,16 +156,24 @@ export function AssemblyPointFormDialog({
             toast.success("Cập nhật điểm tập kết thành công!");
             handleClose(false);
           },
-          onError: () => toast.error("Cập nhật thất bại. Vui lòng thử lại."),
+          onError: (err) =>
+            toast.error(
+              getApiError(err, "Cập nhật thất bại. Vui lòng thử lại."),
+            ),
         },
       );
     } else {
       create(payload, {
         onSuccess: () => {
-          toast.success("Tạo điểm tập kết thành công!");
+          toast.success(
+            "Tạo điểm tập kết thành công! Trạng thái hiện tại là Mới tạo.",
+          );
           handleClose(false);
         },
-        onError: () => toast.error("Tạo điểm tập kết thất bại. Vui lòng thử lại."),
+        onError: (err) =>
+          toast.error(
+            getApiError(err, "Tạo điểm tập kết thất bại. Vui lòng thử lại."),
+          ),
       });
     }
   };

@@ -5,14 +5,16 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BASE_URL;
 export async function GET(request: NextRequest) {
   const authorization = request.headers.get("authorization");
 
-  const backendRes = await fetch(
-    `${BACKEND_URL}/logistics/inventory/template/purchase-import`,
-    {
-      headers: {
-        ...(authorization ? { Authorization: authorization } : {}),
-      },
-    },
+  const backendUrl = new URL(
+    "/logistics/inventory/template/purchase-import",
+    BACKEND_URL,
   );
+
+  const backendRes = await fetch(backendUrl.toString(), {
+    headers: {
+      ...(authorization ? { Authorization: authorization } : {}),
+    },
+  });
 
   if (!backendRes.ok) {
     return NextResponse.json(
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
   return new NextResponse(arrayBuffer, {
-    status: 200,
+    status: backendRes.status,
     headers: {
       "Content-Type": contentType,
       "Content-Disposition": disposition,

@@ -157,8 +157,9 @@ const statusConfig: Record<
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
-function formatMoney(value: number) {
-  return value.toLocaleString("vi-VN") + "đ";
+function formatMoney(value: number | null | undefined) {
+  const amount = typeof value === "number" && Number.isFinite(value) ? value : 0;
+  return amount.toLocaleString("vi-VN") + "đ";
 }
 
 function formatMoneyInput(value: string | number): string {

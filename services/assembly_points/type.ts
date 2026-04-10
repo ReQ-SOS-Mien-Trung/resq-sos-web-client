@@ -128,19 +128,6 @@ export interface UpdateAssemblyPointResponse {
   lastUpdatedAt: string | null;
 }
 
-// Update Assembly Point Status Request
-export interface UpdateAssemblyPointStatusRequest {
-  id: number;
-  status: AssemblyPointStatus;
-}
-
-// Update Assembly Point Status Response
-export interface UpdateAssemblyPointStatusResponse {
-  id: number;
-  status: AssemblyPointStatus;
-  message: string;
-}
-
 // Assign or unassign one or many rescuers to an assembly point request
 export interface UpdateRescuerAssemblyPointAssignmentRequest {
   userIds: string[];

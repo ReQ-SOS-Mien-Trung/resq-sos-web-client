@@ -141,13 +141,13 @@ export default function ExportReportPage() {
     () =>
       userMe
         ? getUserDisplayName(
-            {
-              firstName: userMe.firstName,
-              lastName: userMe.lastName,
-              username: userMe.username,
-            },
-            getUserDisplayName(user),
-          )
+          {
+            firstName: userMe.firstName,
+            lastName: userMe.lastName,
+            username: userMe.username,
+          },
+          getUserDisplayName(user),
+        )
         : getUserDisplayName(user),
     [userMe, user],
   );
@@ -155,13 +155,13 @@ export default function ExportReportPage() {
     () =>
       userMe
         ? getUserAvatarInitials(
-            {
-              firstName: userMe.firstName,
-              lastName: userMe.lastName,
-              username: userMe.username,
-            },
-            getUserAvatarInitials(user),
-          )
+          {
+            firstName: userMe.firstName,
+            lastName: userMe.lastName,
+            username: userMe.username,
+          },
+          getUserAvatarInitials(user),
+        )
         : getUserAvatarInitials(user),
     [userMe, user],
   );
@@ -191,18 +191,29 @@ export default function ExportReportPage() {
     useExportInventoryMovements();
 
   const handleExport = (panel: "range" | "month") => {
+    if (panel === "range") {
+      if (!leftFromDate || !leftToDate) {
+        toast.error("Vui lòng chọn đủ ngày bắt đầu và ngày kết thúc.");
+        return;
+      }
+      if (leftFromDate > leftToDate) {
+        toast.error("Ngày bắt đầu không được lớn hơn ngày kết thúc.");
+        return;
+      }
+    }
+
     const params =
       panel === "range"
         ? {
-            periodType: "ByDateRange" as const,
-            fromDate: leftFromDate,
-            toDate: leftToDate,
-          }
+          periodType: "ByDateRange" as const,
+          fromDate: leftFromDate,
+          toDate: leftToDate,
+        }
         : {
-            periodType: "ByMonth" as const,
-            month: Number(rightMonth),
-            year: Number(rightYear),
-          };
+          periodType: "ByMonth" as const,
+          month: Number(rightMonth),
+          year: Number(rightYear),
+        };
 
     exportMovements(params, {
       onSuccess: ({ blob, filename }) => {
@@ -420,13 +431,13 @@ export default function ExportReportPage() {
               inventoryItems={mockInventoryItems}
               supplyRequests={mockSupplyRequests}
               shipments={mockShipments}
-              onItemSelect={() => {}}
-              onRequestSelect={() => {}}
-              onShipmentSelect={() => {}}
+              onItemSelect={() => { }}
+              onRequestSelect={() => { }}
+              onShipmentSelect={() => { }}
               selectedItem={null}
               selectedRequest={null}
               selectedCategory={null}
-              onCategorySelect={() => {}}
+              onCategorySelect={() => { }}
               apiCategories={categoriesData?.items}
               activeTab={activeTab}
               onActiveTabChange={setActiveTab}
@@ -505,7 +516,14 @@ export default function ExportReportPage() {
                         </Label>
                         <DatePickerInput
                           value={leftFromDate}
-                          onChange={setLeftFromDate}
+                          onChange={(val) => {
+                            setLeftFromDate(val);
+                            // If fromDate > toDate, reset toDate
+                            if (val && leftToDate && val > leftToDate) {
+                              setLeftToDate(val);
+                            }
+                          }}
+                          maxDate={leftToDate || undefined}
                           placeholder="Chọn ngày..."
                           className="h-10 mt-1"
                         />
@@ -516,7 +534,14 @@ export default function ExportReportPage() {
                         </Label>
                         <DatePickerInput
                           value={leftToDate}
-                          onChange={setLeftToDate}
+                          onChange={(val) => {
+                            setLeftToDate(val);
+                            // If toDate < fromDate, reset fromDate
+                            if (val && leftFromDate && val < leftFromDate) {
+                              setLeftFromDate(val);
+                            }
+                          }}
+                          minDate={leftFromDate || undefined}
                           placeholder="Chọn ngày..."
                           className="h-10 mt-1"
                         />
