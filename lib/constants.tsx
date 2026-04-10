@@ -46,7 +46,7 @@ import {
   SlidersIcon,
   UserIcon,
   PiggyBankIcon,
-  UsersIcon
+  UsersIcon,
 } from "@phosphor-icons/react";
 import { Icon as IconifyIcon } from "@iconify/react";
 
@@ -236,21 +236,51 @@ export const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 export { CENTRAL_VN_LOCATIONS } from "./locations";
 
 //Admin Prompt
-export const PROMPT_VARIABLES = [
-  { label: "Tên nạn nhân", value: "victim_name" },
-  { label: "Tọa độ", value: "coordinates" },
-  { label: "Mức độ khẩn cấp", value: "urgency_level" },
-  { label: "Mô tả tình huống", value: "situation_description" },
-  { label: "Số người bị nạn", value: "victim_count" },
-  { label: "Loại thiên tai", value: "disaster_type" },
-  { label: "Khu vực", value: "region" },
-  { label: "Thời gian", value: "timestamp" },
-  { label: "Tài nguyên", value: "resources" },
-  { label: "Yêu cầu", value: "request" },
+export const PROMPT_TYPE_OPTIONS = [
+  {
+    label: "Phân tích SOS",
+    value: "SosPriorityAnalysis",
+    description: "Dùng để phân tích mức độ ưu tiên và dữ liệu SOS.",
+  },
+  {
+    label: "Lập kế hoạch mission",
+    value: "MissionPlanning",
+    description: "Dùng cho AI gợi ý mission và rescue plan.",
+  },
 ] as const;
+
+export const AI_PROVIDER_OPTIONS = [
+  {
+    label: "Gemini",
+    value: "Gemini",
+    description:
+      "Dùng Google AI Studio API key hoặc default Gemini config của server.",
+  },
+  {
+    label: "OpenRouter",
+    value: "OpenRouter",
+    description:
+      "Dùng endpoint OpenRouter theo chuẩn OpenAI-compatible chat completions.",
+  },
+] as const;
+
+export const PROMPT_VARIABLES_BY_TYPE = {
+  SosPriorityAnalysis: [
+    { label: "Dữ liệu đã trích xuất", value: "structured_data" },
+    { label: "Tin nhắn gốc", value: "raw_message" },
+    { label: "Loại SOS", value: "sos_type" },
+  ],
+  MissionPlanning: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Tổng số SOS", value: "total_count" },
+    { label: "Ghi chú kho", value: "depots_data" },
+  ],
+} as const;
 
 export const INITIAL_FORM_DATA: PromptFormData = {
   name: "",
+  prompt_type: "MissionPlanning",
+  provider: "Gemini",
   purpose: "",
   system_prompt: "",
   user_prompt_template: "",
@@ -259,6 +289,7 @@ export const INITIAL_FORM_DATA: PromptFormData = {
   max_tokens: 0,
   version: "",
   api_url: "",
+  api_key: "",
   is_active: true,
 };
 
@@ -339,33 +370,87 @@ export const navigationItems = [
     icon: UserIcon,
     label: "Quản lý người dùng",
     children: [
-      { icon: UsersIcon, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="fluent-emoji-high-contrast:rescue-workers-helmet" width={20} height={20} className={className} />
-    ), label: "Quản lý cứu hộ viên", href: "/dashboard/admin/rescuers" },
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="vaadin:user-card" width={18} height={18} className={className} />
-    ), label: "Quản lý hồ sơ cứu hộ viên", href: "/dashboard/admin/rescuer-verification" },
+      {
+        icon: UsersIcon,
+        label: "Quản lý người dùng",
+        href: "/dashboard/admin/users",
+      },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="fluent-emoji-high-contrast:rescue-workers-helmet"
+            width={20}
+            height={20}
+            className={className}
+          />
+        ),
+        label: "Quản lý cứu hộ viên",
+        href: "/dashboard/admin/rescuers",
+      },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="vaadin:user-card"
+            width={18}
+            height={18}
+            className={className}
+          />
+        ),
+        label: "Quản lý hồ sơ cứu hộ viên",
+        href: "/dashboard/admin/rescuer-verification",
+      },
     ],
   },
   {
     icon: SlidersIcon,
     label: "Cấu hình hệ thống",
     children: [
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="mynaui:config-vertical" width={20} height={20} className={className} />
-    ), label: "Tham số hệ thống", href: "/dashboard/admin/config" },
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="streamline:ai-prompt-spark" width={18} height={18} className={className} />
-    ), label: "Cấu hình AI Prompt", href: "/dashboard/admin/ai-prompt" },
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="proicons:chat" width={20} height={20} className={className} />
-    ), label: "Cấu hình phòng chat", href: "/dashboard/admin/chat-config" },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="mynaui:config-vertical"
+            width={20}
+            height={20}
+            className={className}
+          />
+        ),
+        label: "Tham số hệ thống",
+        href: "/dashboard/admin/config",
+      },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="streamline:ai-prompt-spark"
+            width={18}
+            height={18}
+            className={className}
+          />
+        ),
+        label: "Cấu hình AI Prompt",
+        href: "/dashboard/admin/ai-prompt",
+      },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="proicons:chat"
+            width={20}
+            height={20}
+            className={className}
+          />
+        ),
+        label: "Cấu hình phòng chat",
+        href: "/dashboard/admin/chat-config",
+      },
     ],
   },
   {
     icon: ({ size, className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="fa7-solid:people-roof" width={size} height={size} className={className} />
+      <IconifyIcon
+        icon="fa7-solid:people-roof"
+        width={size}
+        height={size}
+        className={className}
+      />
     ),
     label: "Quản lý điểm tập kết",
     href: "/dashboard/admin/assembly-points",
@@ -375,11 +460,23 @@ export const navigationItems = [
     label: "Quản lý kho",
     href: "/dashboard/admin/depots",
   },
-  { icon: ({ size, className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="solar:hand-money-outline" width={size} height={size} className={className} />
-    )
-    , label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
-  { icon: PiggyBankIcon, label: "Quản lý quỹ chiến dịch", href: "/dashboard/admin/campaigns" },
+  {
+    icon: ({ size, className }: { size?: number; className?: string }) => (
+      <IconifyIcon
+        icon="solar:hand-money-outline"
+        width={size}
+        height={size}
+        className={className}
+      />
+    ),
+    label: "Phân bổ quỹ từ thiện",
+    href: "/dashboard/admin/reports",
+  },
+  {
+    icon: PiggyBankIcon,
+    label: "Quản lý quỹ chiến dịch",
+    href: "/dashboard/admin/campaigns",
+  },
   {
     icon: LockKey,
     label: "Phân quyền người dùng",
@@ -394,13 +491,30 @@ export const navigationItems = [
     icon: CloudSun,
     label: "Thời tiết",
     children: [
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="fluent-mdl2:news"  width={18} height={18} className={className} />
-    ), 
-    label: "Bài đăng thời tiết", href: "/dashboard/admin/weather-posts" },
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="wi:forecast-io-hail" width={24} height={24} className={className} />
-    ), label: "Thời tiết & Lũ lụt", href: "/dashboard/admin/weather-flood" },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="fluent-mdl2:news"
+            width={18}
+            height={18}
+            className={className}
+          />
+        ),
+        label: "Bài đăng thời tiết",
+        href: "/dashboard/admin/weather-posts",
+      },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="wi:forecast-io-hail"
+            width={24}
+            height={24}
+            className={className}
+          />
+        ),
+        label: "Thời tiết & Lũ lụt",
+        href: "/dashboard/admin/weather-flood",
+      },
     ],
   },
 ];
@@ -628,17 +742,17 @@ export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
     bgColor: "bg-orange-100 dark:bg-orange-900/30",
   },
   DELIVER_SUPPLIES: {
-    label: "Tiếp tế",
+    label: "Phân phát vật phẩm",
     color: "text-purple-700 dark:text-purple-400",
     bgColor: "bg-purple-100 dark:bg-purple-900/30",
   },
   RETURN_SUPPLIES: {
-    label: "Trả đồ",
+    label: "Hoàn trả vật phẩm",
     color: "text-cyan-700 dark:text-cyan-400",
     bgColor: "bg-cyan-100 dark:bg-cyan-900/30",
   },
   COLLECT_SUPPLIES: {
-    label: "Lấy vật tư",
+    label: "Tiếp nhận vật phẩm",
     color: "text-amber-700 dark:text-amber-400",
     bgColor: "bg-amber-100 dark:bg-amber-900/30",
   },

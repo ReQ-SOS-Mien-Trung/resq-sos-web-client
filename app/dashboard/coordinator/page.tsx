@@ -226,9 +226,20 @@ function haversine(
 }
 
 /** Group nearby PENDING SOS requests within 10km using Union-Find */
-function buildAutoClusters(sosRequests: SOSRequest[]): SOSRequest[][] {
+function buildAutoClusters(
+  sosRequests: SOSRequest[],
+  backendClusters: SOSClusterEntity[],
+): SOSRequest[][] {
+  const backendClusteredIds = new Set(
+    backendClusters.flatMap((cluster) =>
+      cluster.sosRequestIds.map((id) => String(id)),
+    ),
+  );
   const pending = sosRequests.filter(
-    (s) => s.status === "PENDING" && s.groupId === s.id,
+    (s) =>
+      s.status === "PENDING" &&
+      s.groupId === s.id &&
+      !backendClusteredIds.has(String(s.id)),
   );
   const n = pending.length;
   if (n < 2) return [];
@@ -406,7 +417,7 @@ const CoordinatorDashboardContent = () => {
 
   // ─── Refs ───
   const sidebarBeforeRescuePlanRef = useRef(true);
-  const initialSelectionAppliedRef = useRef(false);
+  const lastAppliedSelectionSignatureRef = useRef<string | null>(null);
 
   // ─── Data Fetching ───
   const { data: sosData } = useSOSRequests({
@@ -456,8 +467,8 @@ const CoordinatorDashboardContent = () => {
   );
 
   const autoClusters = useMemo(
-    () => buildAutoClusters(sosRequests),
-    [sosRequests],
+    () => buildAutoClusters(sosRequests, clusters),
+    [sosRequests, clusters],
   );
 
   // ─── Auth ───
@@ -551,50 +562,87 @@ const CoordinatorDashboardContent = () => {
 
   // ─── URL → State: Restore selection from URL on initial load ───
   useEffect(() => {
-    if (initialSelectionAppliedRef.current) return;
     if (!urlState.selected) return;
 
     const sel = urlState.selected;
+    const shouldOpenClusterPlan = searchParams.get("openPlan") === "1";
+    const focusSosId = searchParams.get("focusSosId") ?? "";
+    const openAt = searchParams.get("openAt") ?? "";
+    const selectionSignature = JSON.stringify({
+      selected: sel,
+      shouldOpenClusterPlan,
+      focusSosId,
+      openAt,
+    });
 
     if (sel.type === "sos" && sosRequests.length > 0) {
       const sos = sosRequests.find((s) => s.id === sel.id);
       if (sos) {
+        if (lastAppliedSelectionSignatureRef.current === selectionSignature) {
+          return;
+        }
         setSelectedSOS(sos);
         setSOSDetailOpen(true);
+        setRescuePlanOpen(false);
+        setLocationPanelOpen(false);
+        setTeamIncidentDetailOpen(false);
+        setSelectedTeamIncident(null);
         if (!hasInitialView) {
           setFlyToLocation(sos.location);
         }
-        initialSelectionAppliedRef.current = true;
+        lastAppliedSelectionSignatureRef.current = selectionSignature;
       }
     } else if (sel.type === "cluster" && clusters.length > 0) {
       const cluster = clusters.find((c) => c.id === sel.id);
       if (cluster) {
+        if (lastAppliedSelectionSignatureRef.current === selectionSignature) {
+          return;
+        }
         setFlyToZoom(13);
         setFlyToLocation({
           lat: cluster.centerLatitude,
           lng: cluster.centerLongitude,
         });
-        initialSelectionAppliedRef.current = true;
+
+        if (shouldOpenClusterPlan) {
+          setActiveClusterId(cluster.id);
+          const cachedSuggestion = suggestionCacheRef.current.get(cluster.id);
+          setRescueSuggestion(cachedSuggestion ?? null);
+          setRescuePlanDefaultTab("missions");
+          setRescuePlanOpen(true);
+          setSOSDetailOpen(false);
+          setLocationPanelOpen(false);
+          setTeamIncidentDetailOpen(false);
+          setSelectedTeamIncident(null);
+        }
+
+        lastAppliedSelectionSignatureRef.current = selectionSignature;
       }
     } else if (sel.type === "depot" && depots.length > 0) {
       const depot = depots.find((d) => d.id === sel.id);
       if (depot) {
+        if (lastAppliedSelectionSignatureRef.current === selectionSignature) {
+          return;
+        }
         setLocationPanelData({ type: "depot", data: depot });
         setLocationPanelOpen(true);
         if (!hasInitialView) {
           setFlyToLocation({ lat: depot.latitude, lng: depot.longitude });
         }
-        initialSelectionAppliedRef.current = true;
+        lastAppliedSelectionSignatureRef.current = selectionSignature;
       }
     } else if (sel.type === "assemblyPoint" && assemblyPoints.length > 0) {
       const point = assemblyPoints.find((p) => p.id === sel.id);
       if (point) {
+        if (lastAppliedSelectionSignatureRef.current === selectionSignature) {
+          return;
+        }
         setLocationPanelData({ type: "assemblyPoint", data: point });
         setLocationPanelOpen(true);
         if (!hasInitialView) {
           setFlyToLocation({ lat: point.latitude, lng: point.longitude });
         }
-        initialSelectionAppliedRef.current = true;
+        lastAppliedSelectionSignatureRef.current = selectionSignature;
       }
     }
   }, [
@@ -604,6 +652,7 @@ const CoordinatorDashboardContent = () => {
     depots,
     assemblyPoints,
     hasInitialView,
+    searchParams,
   ]);
 
   // ─── URL → State: Set initial map view from URL ───
@@ -919,12 +968,21 @@ const CoordinatorDashboardContent = () => {
     [manualMissionClusterId, clusters],
   );
 
+  useEffect(() => {
+    document.body.classList.add("coordinator-dashboard-readable");
+
+    return () => {
+      document.body.classList.remove("coordinator-dashboard-readable");
+    };
+  }, []);
+
   // ── Render ──
 
   return (
     <div
+      data-coordinator-dashboard-root
       className={cn(
-        "h-screen flex flex-col overflow-hidden",
+        "coordinator-dashboard h-screen flex flex-col overflow-hidden",
         isDarkMode && "dark",
       )}
     >
@@ -1183,6 +1241,7 @@ const CoordinatorDashboardContent = () => {
                 flyToLocation={flyToLocation}
                 flyToZoom={flyToZoom}
                 userLocation={userLocation}
+                panelOpen={aiStreamOpen}
                 onViewChange={handleMapViewChange}
                 routeOverlay={routeOverlay}
               />

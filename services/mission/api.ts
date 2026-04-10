@@ -1,6 +1,7 @@
 import api from "@/config/axios";
 import {
   CreateActivityResponse,
+  ActivityStatus,
   CreateMissionActivityRequest,
   CreateMissionRequest,
   CreateMissionResponse,
@@ -245,6 +246,62 @@ function normalizeCreateMissionRequest(
   };
 }
 
+function normalizeActivityStatusInput(status: string): ActivityStatus | string {
+  const normalizedStatus = status
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "")
+    .replaceAll(" ", "");
+
+  if (
+    normalizedStatus === "succeed" ||
+    normalizedStatus === "success" ||
+    normalizedStatus === "succeeded" ||
+    normalizedStatus === "completed" ||
+    normalizedStatus === "complete" ||
+    normalizedStatus === "done"
+  ) {
+    return "Succeed";
+  }
+
+  if (
+    normalizedStatus === "ongoing" ||
+    normalizedStatus === "inprogress" ||
+    normalizedStatus === "progressing"
+  ) {
+    return "OnGoing";
+  }
+
+  if (
+    normalizedStatus === "pendingconfirmation" ||
+    normalizedStatus === "pending"
+  ) {
+    return "PendingConfirmation";
+  }
+
+  if (
+    normalizedStatus === "failed" ||
+    normalizedStatus === "fail" ||
+    normalizedStatus === "failure"
+  ) {
+    return "Failed";
+  }
+
+  if (
+    normalizedStatus === "cancelled" ||
+    normalizedStatus === "canceled" ||
+    normalizedStatus === "cancel"
+  ) {
+    return "Cancelled";
+  }
+
+  if (normalizedStatus === "planned" || normalizedStatus === "plan") {
+    return "Planned";
+  }
+
+  return status;
+}
+
 export async function getMissions(
   params: GetMissionsParams,
 ): Promise<GetMissionsResponse> {
@@ -313,9 +370,14 @@ export async function updateActivityStatus(
   activityId: number,
   request: UpdateActivityStatusRequest,
 ): Promise<UpdateActivityStatusResponse> {
+  const payload = {
+    ...request,
+    // Accept status aliases from different UIs before sending to backend.
+    status: normalizeActivityStatusInput(String(request.status ?? "")),
+  };
   const { data } = await api.patch(
     `/operations/missions/${missionId}/activities/${activityId}/status`,
-    request,
+    payload,
   );
   return data;
 }

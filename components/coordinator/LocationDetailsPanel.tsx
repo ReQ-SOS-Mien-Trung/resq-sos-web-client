@@ -692,7 +692,7 @@ function DepotDetails({
             {statusConfig.label}
           </Badge>
           <span className="text-xs text-muted-foreground">•</span>
-          <span className="text-xs text-muted-foreground">Kho vật tư</span>
+          <span className="text-xs text-muted-foreground">Kho vật phẩm</span>
         </div>
       </div>
 
@@ -955,7 +955,7 @@ function DepotDetails({
             </div>
           ) : (
             <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              Kho chưa có dữ liệu vật tư.
+              Kho chưa có dữ liệu vật phẩm.
             </div>
           )}
         </div>
@@ -1432,7 +1432,7 @@ function AssemblyPointDetails({
                       icon={<Users className="h-3.5 w-3.5" />}
                     />
                     <StatCard
-                      label="Đã check-in"
+                      label="Đã có mặt"
                       value={String(selectedEvent.checkedInCount)}
                       icon={<ChartBar className="h-3.5 w-3.5" />}
                     />

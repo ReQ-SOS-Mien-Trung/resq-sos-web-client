@@ -74,6 +74,7 @@ const CoordinatorMap = ({
   onViewChange,
   isPickingLocation,
   onMapClick,
+  panelOpen,
   routeOverlay,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
@@ -563,7 +564,11 @@ const CoordinatorMap = ({
       {/* Map Search Box - positioned top-left */}
       <div
         ref={searchContainerRef}
-        className="absolute top-4 left-3 z-[1000] w-80"
+        className={cn(
+          "absolute top-3 left-3 z-[1000] transition-all duration-200",
+          "w-[min(17rem,calc(100vw-1.5rem))] sm:w-72",
+          panelOpen && "pointer-events-none opacity-0 -translate-y-1",
+        )}
       >
         <div
           className={cn(
@@ -591,7 +596,7 @@ const CoordinatorMap = ({
                     searchInputRef.current?.select();
                   }, 0);
                 }}
-                className="pl-10 pr-20 h-11 w-full text-left text-sm truncate text-foreground"
+                className="pl-10 pr-20 h-10 w-full text-left text-sm truncate text-foreground"
               >
                 {selectedSearchName}
               </button>
@@ -612,7 +617,7 @@ const CoordinatorMap = ({
                   setIsSearchOpen(true);
                   setIsSearchFocused(true);
                 }}
-                className="pl-10 pr-20 h-11 bg-transparent border-0 shadow-none focus-visible:ring-0 rounded-2xl text-sm"
+                className="pl-10 pr-20 h-10 bg-transparent border-0 shadow-none focus-visible:ring-0 rounded-2xl text-sm"
               />
             )}
 
@@ -1017,6 +1022,8 @@ function SOSRequestMarker({
 
   const color = priorityColors[sos.priority];
   const size = isSelected ? 38 : 28;
+  const badgeSize = size - 6;
+  const labelFontSize = isSelected ? 11 : 9;
 
   // Create custom icon using divIcon with useMemo
   const icon = useMemo(() => {
@@ -1027,13 +1034,12 @@ function SOSRequestMarker({
     return L.divIcon({
       className: "custom-sos-marker",
       html: `
-        <div class="relative flex items-center justify-center" style="width: ${size}px; height: ${size}px;">
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;">
           ${sos.status === "PENDING" ? `<div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>` : ""}
-          <div class="relative rounded-full flex items-center justify-center text-white font-bold text-[10px]" 
-               style="width: ${size - 6}px; height: ${
-                 size - 6
-               }px; background-color: ${color}; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
-            SOS
+          <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${badgeSize}px;height:${badgeSize}px;border-radius:9999px;overflow:hidden;background-color:${color};border:2px solid #ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+            <span style="display:block;color:#ffffff;font-family:Arial,'Helvetica Neue',sans-serif;font-size:${labelFontSize}px;font-weight:800;line-height:1;letter-spacing:-0.04em;text-transform:uppercase;white-space:nowrap;transform:translateY(-0.5px);">
+              SOS
+            </span>
           </div>
         </div>
       `,
@@ -1041,7 +1047,15 @@ function SOSRequestMarker({
       iconAnchor: [size / 2, size / 2],
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sos.priority, sos.status, isSelected]);
+  }, [
+    badgeSize,
+    color,
+    labelFontSize,
+    size,
+    sos.priority,
+    sos.status,
+    isSelected,
+  ]);
 
   if (!icon) return null;
 
@@ -1485,7 +1499,7 @@ function MapLegend() {
         <div className="border-t pt-1.5 mt-1.5">
           <div className="flex items-center gap-2">
             <span>📦</span>
-            <span>Kho vật tư (Depot)</span>
+            <span>Kho vật phẩm (Depot)</span>
           </div>
           <div className="flex items-center gap-2">
             <span>📍</span>

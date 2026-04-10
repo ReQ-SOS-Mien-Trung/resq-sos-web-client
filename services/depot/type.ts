@@ -19,6 +19,20 @@ export interface DepotMetadataItem {
   value: string;
 }
 
+export interface DepotByClusterEntity {
+  id: number;
+  name: string;
+  address: string;
+  status: DepotStatus | string;
+  capacity: number;
+  currentUtilization: number;
+  latitude: number;
+  longitude: number;
+  distanceKm: number;
+}
+
+export type GetDepotsByClusterResponse = DepotByClusterEntity[];
+
 export interface AvailableDepotManager {
   id: string;
   fullName: string;
