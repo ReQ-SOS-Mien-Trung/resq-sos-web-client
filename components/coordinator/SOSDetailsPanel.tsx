@@ -1439,7 +1439,7 @@ const SOSDetailsPanel = ({
                                 icon: "ph:first-aid-kit",
                               },
                               MEDICAL_SUPPLIES: {
-                                label: "Vật tư y tế",
+                                label: "Vật phẩm y tế",
                                 icon: "ph:pill",
                               },
                               BANDAGES: {

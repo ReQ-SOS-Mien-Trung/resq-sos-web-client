@@ -1522,12 +1522,12 @@ function cloneSupplyCollections(
 
   return supplies.map((supply) => ({
     itemId: Number.isFinite(supply.itemId) ? supply.itemId : 0,
-    itemName:
-      typeof supply.itemName === "string" ? supply.itemName.trim() : "",
+    itemName: typeof supply.itemName === "string" ? supply.itemName.trim() : "",
     quantity: Math.max(1, Number(supply.quantity) || 1),
-    unit: typeof supply.unit === "string" && supply.unit.trim()
-      ? supply.unit.trim()
-      : "đơn vị",
+    unit:
+      typeof supply.unit === "string" && supply.unit.trim()
+        ? supply.unit.trim()
+        : "đơn vị",
   }));
 }
 
@@ -1540,8 +1540,11 @@ function buildSupplyComparisonKey(
   }
 
   const itemName =
-    typeof supply.itemName === "string" ? supply.itemName.trim().toLowerCase() : "";
-  const unit = typeof supply.unit === "string" ? supply.unit.trim().toLowerCase() : "";
+    typeof supply.itemName === "string"
+      ? supply.itemName.trim().toLowerCase()
+      : "";
+  const unit =
+    typeof supply.unit === "string" ? supply.unit.trim().toLowerCase() : "";
   return `name:${itemName}|unit:${unit}`;
 }
 
@@ -1555,10 +1558,11 @@ function haveMatchingSupplyCollections(
       quantity: supply.quantity,
       unit: supply.unit.trim().toLowerCase(),
     }))
-    .sort((a, b) =>
-      a.key.localeCompare(b.key, "vi") ||
-      a.unit.localeCompare(b.unit, "vi") ||
-      a.quantity - b.quantity,
+    .sort(
+      (a, b) =>
+        a.key.localeCompare(b.key, "vi") ||
+        a.unit.localeCompare(b.unit, "vi") ||
+        a.quantity - b.quantity,
     );
   const normalizedRight = (cloneSupplyCollections(right) ?? [])
     .map((supply) => ({
@@ -1566,10 +1570,11 @@ function haveMatchingSupplyCollections(
       quantity: supply.quantity,
       unit: supply.unit.trim().toLowerCase(),
     }))
-    .sort((a, b) =>
-      a.key.localeCompare(b.key, "vi") ||
-      a.unit.localeCompare(b.unit, "vi") ||
-      a.quantity - b.quantity,
+    .sort(
+      (a, b) =>
+        a.key.localeCompare(b.key, "vi") ||
+        a.unit.localeCompare(b.unit, "vi") ||
+        a.quantity - b.quantity,
     );
 
   if (normalizedLeft.length !== normalizedRight.length) {
@@ -5199,11 +5204,14 @@ const RescuePlanPanel = ({
     [syncReturnActivitiesWithCollectors],
   );
 
-  const removeEditActivity = useCallback((id: string) => {
-    setEditActivities((prev) =>
-      syncReturnActivitiesWithCollectors(prev.filter((a) => a._id !== id)),
-    );
-  }, [syncReturnActivitiesWithCollectors]);
+  const removeEditActivity = useCallback(
+    (id: string) => {
+      setEditActivities((prev) =>
+        syncReturnActivitiesWithCollectors(prev.filter((a) => a._id !== id)),
+      );
+    },
+    [syncReturnActivitiesWithCollectors],
+  );
 
   const addEditActivity = useCallback(() => {
     const newAct: EditableActivity = {
@@ -5224,15 +5232,18 @@ const RescuePlanPanel = ({
     );
   }, [editActivities.length, syncReturnActivitiesWithCollectors]);
 
-  const moveEditActivity = useCallback((idx: number, dir: -1 | 1) => {
-    setEditActivities((prev) => {
-      const next = [...prev];
-      const target = idx + dir;
-      if (target < 0 || target >= next.length) return prev;
-      [next[idx], next[target]] = [next[target], next[idx]];
-      return syncReturnActivitiesWithCollectors(next);
-    });
-  }, [syncReturnActivitiesWithCollectors]);
+  const moveEditActivity = useCallback(
+    (idx: number, dir: -1 | 1) => {
+      setEditActivities((prev) => {
+        const next = [...prev];
+        const target = idx + dir;
+        if (target < 0 || target >= next.length) return prev;
+        [next[idx], next[target]] = [next[target], next[idx]];
+        return syncReturnActivitiesWithCollectors(next);
+      });
+    },
+    [syncReturnActivitiesWithCollectors],
+  );
 
   useEffect(() => {
     const next = { ...supplyUnitByItemIdRef.current };
@@ -5267,7 +5278,7 @@ const RescuePlanPanel = ({
       const targetActivity = editActivities.find((a) => a._id === activityId);
       if (targetActivity?.activityType === "RETURN_SUPPLIES") {
         toast.info(
-          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật tư nên không thể thêm thủ công.",
+          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể thêm thủ công.",
         );
         return;
       }
@@ -5306,7 +5317,9 @@ const RescuePlanPanel = ({
                 : a.depotAddress;
 
             const existing = a.suppliesToCollect ?? [];
-            const foundIdx = existing.findIndex((s) => s.itemId === item.itemId);
+            const foundIdx = existing.findIndex(
+              (s) => s.itemId === item.itemId,
+            );
             if (foundIdx >= 0) {
               const next = [...existing];
               const currentUnit =
@@ -5356,7 +5369,7 @@ const RescuePlanPanel = ({
       const targetActivity = editActivities.find((a) => a._id === activityId);
       if (targetActivity?.activityType === "RETURN_SUPPLIES") {
         toast.info(
-          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật tư nên không thể xóa thủ công.",
+          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể xóa thủ công.",
         );
         return;
       }
@@ -5495,7 +5508,7 @@ const RescuePlanPanel = ({
           )
         ) {
           toast.error(
-            `Bước ${i + 1}: Những vật tư được chọn để hoàn trả phải khớp số lượng đã thu gom ở Bước ${collectorActivity.step}.`,
+            `Bước ${i + 1}: Những vật phẩm được chọn để hoàn trả phải khớp số lượng đã thu gom ở Bước ${collectorActivity.step}.`,
           );
           return false;
         }
@@ -6908,407 +6921,414 @@ const RescuePlanPanel = ({
                                               <div className="grid gap-3 lg:grid-cols-2 lg:[grid-auto-rows:1fr]">
                                                 {group.activities.map(
                                                   (activity) => {
-                                                  const assignedMissionTeams = (
-                                                    mission.teams ?? []
-                                                  ).filter((team) => {
-                                                    const normalizedStatus = (
-                                                      team.status ?? ""
-                                                    )
-                                                      .trim()
-                                                      .toLowerCase();
+                                                    const assignedMissionTeams =
+                                                      (
+                                                        mission.teams ?? []
+                                                      ).filter((team) => {
+                                                        const normalizedStatus =
+                                                          (team.status ?? "")
+                                                            .trim()
+                                                            .toLowerCase();
+                                                        return (
+                                                          team.unassignedAt ==
+                                                            null &&
+                                                          (normalizedStatus ===
+                                                            "assigned" ||
+                                                            normalizedStatus ===
+                                                              "inprogress" ||
+                                                            normalizedStatus ===
+                                                              "in_progress" ||
+                                                            normalizedStatus ===
+                                                              "in progress")
+                                                        );
+                                                      });
+                                                    const teamsForStep =
+                                                      typeof activity.missionTeamId ===
+                                                      "number"
+                                                        ? (
+                                                            mission.teams ?? []
+                                                          ).filter(
+                                                            (team) =>
+                                                              team.missionTeamId ===
+                                                              activity.missionTeamId,
+                                                          )
+                                                        : assignedMissionTeams.length >
+                                                            0
+                                                          ? assignedMissionTeams
+                                                          : (mission.teams ??
+                                                            []);
+                                                    const config =
+                                                      activityTypeConfig[
+                                                        activity.activityType
+                                                      ] ||
+                                                      activityTypeConfig[
+                                                        "ASSESS"
+                                                      ];
+                                                    const cleanDescription =
+                                                      activity.description
+                                                        .replace(
+                                                          /\b\d{1,2}\.\d+,\s*\d{1,2}\.\d+\b\s*(\([^\)]*\))?/g,
+                                                          "",
+                                                        )
+                                                        .replace(/\s+/g, " ")
+                                                        .replace(/\(\s*\)/g, "")
+                                                        .replace(/: \./g, ":")
+                                                        .trim();
+                                                    const supplyItems =
+                                                      getSupplyDisplayItems(
+                                                        activity,
+                                                      );
+                                                    const displayDescription =
+                                                      supplyItems.length > 0
+                                                        ? stripSupplyDetailsFromDescription(
+                                                            cleanDescription,
+                                                          )
+                                                        : cleanDescription;
+                                                    const stepStatus =
+                                                      getActivityStatusMeta(
+                                                        activity.status,
+                                                      );
+
                                                     return (
-                                                      team.unassignedAt ==
-                                                        null &&
-                                                      (normalizedStatus ===
-                                                        "assigned" ||
-                                                        normalizedStatus ===
-                                                          "inprogress" ||
-                                                        normalizedStatus ===
-                                                          "in_progress" ||
-                                                        normalizedStatus ===
-                                                          "in progress")
-                                                    );
-                                                  });
-                                                  const teamsForStep =
-                                                    typeof activity.missionTeamId ===
-                                                    "number"
-                                                      ? (
-                                                          mission.teams ?? []
-                                                        ).filter(
-                                                          (team) =>
-                                                            team.missionTeamId ===
-                                                            activity.missionTeamId,
-                                                        )
-                                                      : assignedMissionTeams.length >
-                                                          0
-                                                        ? assignedMissionTeams
-                                                        : (mission.teams ?? []);
-                                                  const config =
-                                                    activityTypeConfig[
-                                                      activity.activityType
-                                                    ] ||
-                                                    activityTypeConfig[
-                                                      "ASSESS"
-                                                    ];
-                                                  const cleanDescription =
-                                                    activity.description
-                                                      .replace(
-                                                        /\b\d{1,2}\.\d+,\s*\d{1,2}\.\d+\b\s*(\([^\)]*\))?/g,
-                                                        "",
-                                                      )
-                                                      .replace(/\s+/g, " ")
-                                                      .replace(/\(\s*\)/g, "")
-                                                      .replace(/: \./g, ":")
-                                                      .trim();
-                                                  const supplyItems =
-                                                    getSupplyDisplayItems(
-                                                      activity,
-                                                    );
-                                                  const displayDescription =
-                                                    supplyItems.length > 0
-                                                      ? stripSupplyDetailsFromDescription(
-                                                          cleanDescription,
-                                                        )
-                                                      : cleanDescription;
-                                                  const stepStatus =
-                                                    getActivityStatusMeta(
-                                                      activity.status,
-                                                    );
-
-                                                  return (
-                                                    <div
-                                                      key={activity.id}
-                                                      className="flex h-full flex-col rounded-2xl border border-border/70 bg-gradient-to-b from-background via-background to-muted/20 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md"
-                                                    >
-                                                      <div className="flex h-full items-start gap-3">
-                                                        <div
-                                                          className={cn(
-                                                            "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-base font-extrabold shadow-sm ring-1 ring-black/5",
-                                                            config.bgColor,
-                                                            config.color,
-                                                          )}
-                                                        >
-                                                          {activity.step}
-                                                        </div>
-                                                        <div className="flex min-h-full min-w-0 flex-1 flex-col gap-3">
-                                                          <div className="flex items-start justify-between gap-3">
-                                                            <div className="min-w-0 space-y-2">
-                                                              <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="text-sm font-bold text-foreground">
-                                                                  Bước{" "}
-                                                                  {activity.step}
-                                                                </span>
-                                                                <Badge
-                                                                  variant="outline"
-                                                                  className={cn(
-                                                                    "h-6 border-transparent px-2 text-sm font-semibold",
-                                                                    config.color,
-                                                                    config.bgColor,
-                                                                  )}
-                                                                >
-                                                                  {config.label}
-                                                                </Badge>
-                                                                <Badge
-                                                                  variant="outline"
-                                                                  className={cn(
-                                                                    "flex h-6 items-center gap-1 border px-2 text-sm font-bold",
-                                                                    stepStatus.className,
-                                                                  )}
-                                                                >
-                                                                  {
-                                                                    stepStatus.icon
-                                                                  }
-                                                                  {
-                                                                    stepStatus.label
-                                                                  }
-                                                                </Badge>
-                                                              </div>
-                                                              <p className="text-sm font-medium leading-relaxed text-foreground/80">
-                                                                {
-                                                                  displayDescription
-                                                                }
-                                                              </p>
-                                                            </div>
-                                                            {typeof activity.estimatedTime ===
-                                                            "number" ? (
-                                                              <div className="shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm">
-                                                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                                                  ETA
-                                                                </p>
-                                                                <p className="text-sm font-bold text-foreground">
-                                                                  {
-                                                                    activity.estimatedTime
-                                                                  }{" "}
-                                                                  phút
-                                                                </p>
-                                                              </div>
-                                                            ) : null}
+                                                      <div
+                                                        key={activity.id}
+                                                        className="flex h-full flex-col rounded-2xl border border-border/70 bg-gradient-to-b from-background via-background to-muted/20 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md"
+                                                      >
+                                                        <div className="flex h-full items-start gap-3">
+                                                          <div
+                                                            className={cn(
+                                                              "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-base font-extrabold shadow-sm ring-1 ring-black/5",
+                                                              config.bgColor,
+                                                              config.color,
+                                                            )}
+                                                          >
+                                                            {activity.step}
                                                           </div>
-
-                                                          {(activity.assemblyPointName ||
-                                                            (activity.assemblyPointLatitude !=
-                                                              null &&
-                                                              activity.assemblyPointLongitude !=
-                                                                null)) && (
-                                                            <div className="mt-2 p-2 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15">
-                                                              <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
-                                                                <MapPin
-                                                                  className="h-3 w-3"
-                                                                  weight="fill"
-                                                                />
-                                                                Điểm tập kết
-                                                                hoạt động
-                                                              </p>
-                                                              {activity.assemblyPointName && (
-                                                                <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
+                                                          <div className="flex min-h-full min-w-0 flex-1 flex-col gap-3">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                              <div className="min-w-0 space-y-2">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                  <span className="text-sm font-bold text-foreground">
+                                                                    Bước{" "}
+                                                                    {
+                                                                      activity.step
+                                                                    }
+                                                                  </span>
+                                                                  <Badge
+                                                                    variant="outline"
+                                                                    className={cn(
+                                                                      "h-6 border-transparent px-2 text-sm font-semibold",
+                                                                      config.color,
+                                                                      config.bgColor,
+                                                                    )}
+                                                                  >
+                                                                    {
+                                                                      config.label
+                                                                    }
+                                                                  </Badge>
+                                                                  <Badge
+                                                                    variant="outline"
+                                                                    className={cn(
+                                                                      "flex h-6 items-center gap-1 border px-2 text-sm font-bold",
+                                                                      stepStatus.className,
+                                                                    )}
+                                                                  >
+                                                                    {
+                                                                      stepStatus.icon
+                                                                    }
+                                                                    {
+                                                                      stepStatus.label
+                                                                    }
+                                                                  </Badge>
+                                                                </div>
+                                                                <p className="text-sm font-medium leading-relaxed text-foreground/80">
                                                                   {
-                                                                    activity.assemblyPointName
+                                                                    displayDescription
                                                                   }
                                                                 </p>
-                                                              )}
-                                                              {formatCoordinateLabel(
-                                                                activity.assemblyPointLatitude,
-                                                                activity.assemblyPointLongitude,
-                                                              ) && (
-                                                                <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
-                                                                  Tọa độ:{" "}
-                                                                  {formatCoordinateLabel(
-                                                                    activity.assemblyPointLatitude,
-                                                                    activity.assemblyPointLongitude,
-                                                                  )}
-                                                                </p>
-                                                              )}
+                                                              </div>
+                                                              {typeof activity.estimatedTime ===
+                                                              "number" ? (
+                                                                <div className="shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm">
+                                                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                                                    ETA
+                                                                  </p>
+                                                                  <p className="text-sm font-bold text-foreground">
+                                                                    {
+                                                                      activity.estimatedTime
+                                                                    }{" "}
+                                                                    phút
+                                                                  </p>
+                                                                </div>
+                                                              ) : null}
                                                             </div>
-                                                          )}
 
-                                                          {(activity.completedBy ||
-                                                            activity.completedAt) && (
-                                                            <div className="mt-2 p-2 rounded-md border border-slate-200/80 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-900/20">
-                                                              <p className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                                                                <CheckCircle
-                                                                  className="h-3 w-3"
-                                                                  weight="fill"
-                                                                />
-                                                                Thông tin hoàn
-                                                                tất bước
-                                                              </p>
-                                                              {activity.completedBy && (
-                                                                <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
-                                                                  Người hoàn
-                                                                  tất:{" "}
-                                                                  {
-                                                                    activity.completedBy
-                                                                  }
+                                                            {(activity.assemblyPointName ||
+                                                              (activity.assemblyPointLatitude !=
+                                                                null &&
+                                                                activity.assemblyPointLongitude !=
+                                                                  null)) && (
+                                                              <div className="mt-2 p-2 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15">
+                                                                <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
+                                                                  <MapPin
+                                                                    className="h-3 w-3"
+                                                                    weight="fill"
+                                                                  />
+                                                                  Điểm tập kết
+                                                                  hoạt động
                                                                 </p>
-                                                              )}
-                                                              {activity.completedAt && (
-                                                                <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
-                                                                  Thời điểm:{" "}
-                                                                  {new Date(
-                                                                    activity.completedAt,
-                                                                  ).toLocaleString(
-                                                                    "vi-VN",
-                                                                  )}
-                                                                </p>
-                                                              )}
-                                                            </div>
-                                                          )}
+                                                                {activity.assemblyPointName && (
+                                                                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
+                                                                    {
+                                                                      activity.assemblyPointName
+                                                                    }
+                                                                  </p>
+                                                                )}
+                                                                {formatCoordinateLabel(
+                                                                  activity.assemblyPointLatitude,
+                                                                  activity.assemblyPointLongitude,
+                                                                ) && (
+                                                                  <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                                                                    Tọa độ:{" "}
+                                                                    {formatCoordinateLabel(
+                                                                      activity.assemblyPointLatitude,
+                                                                      activity.assemblyPointLongitude,
+                                                                    )}
+                                                                  </p>
+                                                                )}
+                                                              </div>
+                                                            )}
 
-                                                          {teamsForStep.length >
-                                                            0 && (
-                                                            <div className="mt-2 p-2 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
-                                                              <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
-                                                                <ShieldCheck
-                                                                  className="h-3 w-3"
-                                                                  weight="fill"
-                                                                />
-                                                                Đội phụ trách
-                                                              </p>
-                                                              <div className="space-y-1.5">
-                                                                {teamsForStep.map(
-                                                                  (team) => {
-                                                                    const teamStatusMeta =
-                                                                      getTeamAssignmentStatusMeta(
-                                                                        team.status,
-                                                                      );
-                                                                    const rescueTeamStatusMeta =
-                                                                      getRescueTeamStatusMeta(
-                                                                        team.teamStatus,
-                                                                        rescueTeamStatusLabelsByKey,
-                                                                      );
-                                                                    const normalizedAssignmentStatus =
-                                                                      (
-                                                                        team.status ??
-                                                                        ""
-                                                                      )
-                                                                        .trim()
-                                                                        .toLowerCase()
-                                                                        .replaceAll(
-                                                                          "_",
-                                                                          "",
-                                                                        )
-                                                                        .replaceAll(
-                                                                          " ",
-                                                                          "",
+                                                            {(activity.completedBy ||
+                                                              activity.completedAt) && (
+                                                              <div className="mt-2 p-2 rounded-md border border-slate-200/80 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-900/20">
+                                                                <p className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                                                                  <CheckCircle
+                                                                    className="h-3 w-3"
+                                                                    weight="fill"
+                                                                  />
+                                                                  Thông tin hoàn
+                                                                  tất bước
+                                                                </p>
+                                                                {activity.completedBy && (
+                                                                  <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
+                                                                    Người hoàn
+                                                                    tất:{" "}
+                                                                    {
+                                                                      activity.completedBy
+                                                                    }
+                                                                  </p>
+                                                                )}
+                                                                {activity.completedAt && (
+                                                                  <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
+                                                                    Thời điểm:{" "}
+                                                                    {new Date(
+                                                                      activity.completedAt,
+                                                                    ).toLocaleString(
+                                                                      "vi-VN",
+                                                                    )}
+                                                                  </p>
+                                                                )}
+                                                              </div>
+                                                            )}
+
+                                                            {teamsForStep.length >
+                                                              0 && (
+                                                              <div className="mt-2 p-2 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
+                                                                <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
+                                                                  <ShieldCheck
+                                                                    className="h-3 w-3"
+                                                                    weight="fill"
+                                                                  />
+                                                                  Đội phụ trách
+                                                                </p>
+                                                                <div className="space-y-1.5">
+                                                                  {teamsForStep.map(
+                                                                    (team) => {
+                                                                      const teamStatusMeta =
+                                                                        getTeamAssignmentStatusMeta(
+                                                                          team.status,
                                                                         );
-                                                                    const normalizedRescueTeamStatus =
-                                                                      normalizeRescueTeamStatusKey(
-                                                                        team.teamStatus,
-                                                                      );
-                                                                    const shouldShowRescueTeamStatusBadge =
-                                                                      Boolean(
-                                                                        team.teamStatus,
-                                                                      ) &&
-                                                                      normalizedRescueTeamStatus !==
-                                                                        normalizedAssignmentStatus;
+                                                                      const rescueTeamStatusMeta =
+                                                                        getRescueTeamStatusMeta(
+                                                                          team.teamStatus,
+                                                                          rescueTeamStatusLabelsByKey,
+                                                                        );
+                                                                      const normalizedAssignmentStatus =
+                                                                        (
+                                                                          team.status ??
+                                                                          ""
+                                                                        )
+                                                                          .trim()
+                                                                          .toLowerCase()
+                                                                          .replaceAll(
+                                                                            "_",
+                                                                            "",
+                                                                          )
+                                                                          .replaceAll(
+                                                                            " ",
+                                                                            "",
+                                                                          );
+                                                                      const normalizedRescueTeamStatus =
+                                                                        normalizeRescueTeamStatusKey(
+                                                                          team.teamStatus,
+                                                                        );
+                                                                      const shouldShowRescueTeamStatusBadge =
+                                                                        Boolean(
+                                                                          team.teamStatus,
+                                                                        ) &&
+                                                                        normalizedRescueTeamStatus !==
+                                                                          normalizedAssignmentStatus;
 
-                                                                    return (
-                                                                      <div
-                                                                        key={
-                                                                          team.missionTeamId
-                                                                        }
-                                                                        className="rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-background/80 px-2 py-1.5"
-                                                                      >
-                                                                        <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                                                                          {team.teamName ||
-                                                                            `Đội #${team.rescueTeamId}`}
-                                                                        </p>
-                                                                        {team.assemblyPointName && (
-                                                                          <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
-                                                                            Điểm
-                                                                            tập
-                                                                            kết:{" "}
-                                                                            {
-                                                                              team.assemblyPointName
-                                                                            }
+                                                                      return (
+                                                                        <div
+                                                                          key={
+                                                                            team.missionTeamId
+                                                                          }
+                                                                          className="rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-background/80 px-2 py-1.5"
+                                                                        >
+                                                                          <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                                                                            {team.teamName ||
+                                                                              `Đội #${team.rescueTeamId}`}
                                                                           </p>
-                                                                        )}
-                                                                        {formatCoordinateLabel(
-                                                                          team.latitude,
-                                                                          team.longitude,
-                                                                        ) && (
-                                                                          <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
-                                                                            Vị
-                                                                            trí
-                                                                            đội:{" "}
-                                                                            {formatCoordinateLabel(
-                                                                              team.latitude,
-                                                                              team.longitude,
-                                                                            )}
-                                                                            {team.locationSource
-                                                                              ? ` (${team.locationSource})`
-                                                                              : ""}
-                                                                          </p>
-                                                                        )}
-                                                                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                                                                          {team.teamCode && (
-                                                                            <Badge
-                                                                              variant="outline"
-                                                                              className="h-5 px-1.5 text-sm border-emerald-300/70 text-emerald-800 dark:border-emerald-700 dark:text-emerald-200"
-                                                                            >
+                                                                          {team.assemblyPointName && (
+                                                                            <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                                              Điểm
+                                                                              tập
+                                                                              kết:{" "}
                                                                               {
-                                                                                team.teamCode
+                                                                                team.assemblyPointName
                                                                               }
-                                                                            </Badge>
+                                                                            </p>
                                                                           )}
-                                                                          {team.teamType && (
-                                                                            <span className="text-sm text-emerald-700/80 dark:text-emerald-300/80">
-                                                                              Loại:{" "}
-                                                                              {formatTeamTypeLabel(
-                                                                                team.teamType,
+                                                                          {formatCoordinateLabel(
+                                                                            team.latitude,
+                                                                            team.longitude,
+                                                                          ) && (
+                                                                            <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                                              Vị
+                                                                              trí
+                                                                              đội:{" "}
+                                                                              {formatCoordinateLabel(
+                                                                                team.latitude,
+                                                                                team.longitude,
                                                                               )}
-                                                                            </span>
+                                                                              {team.locationSource
+                                                                                ? ` (${team.locationSource})`
+                                                                                : ""}
+                                                                            </p>
                                                                           )}
-                                                                          <Badge
-                                                                            variant="outline"
-                                                                            className={cn(
-                                                                              "h-5 px-1.5 text-sm font-semibold",
-                                                                              teamStatusMeta.className,
+                                                                          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                                                            {team.teamCode && (
+                                                                              <Badge
+                                                                                variant="outline"
+                                                                                className="h-5 px-1.5 text-sm border-emerald-300/70 text-emerald-800 dark:border-emerald-700 dark:text-emerald-200"
+                                                                              >
+                                                                                {
+                                                                                  team.teamCode
+                                                                                }
+                                                                              </Badge>
                                                                             )}
-                                                                          >
-                                                                            {
-                                                                              teamStatusMeta.label
-                                                                            }
-                                                                          </Badge>
-                                                                          {shouldShowRescueTeamStatusBadge && (
+                                                                            {team.teamType && (
+                                                                              <span className="text-sm text-emerald-700/80 dark:text-emerald-300/80">
+                                                                                Loại:{" "}
+                                                                                {formatTeamTypeLabel(
+                                                                                  team.teamType,
+                                                                                )}
+                                                                              </span>
+                                                                            )}
                                                                             <Badge
                                                                               variant="outline"
                                                                               className={cn(
                                                                                 "h-5 px-1.5 text-sm font-semibold",
-                                                                                rescueTeamStatusMeta.className,
+                                                                                teamStatusMeta.className,
                                                                               )}
                                                                             >
-                                                                              Đội:{" "}
                                                                               {
-                                                                                rescueTeamStatusMeta.label
+                                                                                teamStatusMeta.label
                                                                               }
                                                                             </Badge>
-                                                                          )}
-                                                                          {typeof team.memberCount ===
-                                                                            "number" && (
-                                                                            <Badge
-                                                                              variant="outline"
-                                                                              className="h-5 px-1.5 text-sm"
-                                                                            >
-                                                                              {
-                                                                                team.memberCount
-                                                                              }{" "}
-                                                                              thành
-                                                                              viên
-                                                                            </Badge>
-                                                                          )}
+                                                                            {shouldShowRescueTeamStatusBadge && (
+                                                                              <Badge
+                                                                                variant="outline"
+                                                                                className={cn(
+                                                                                  "h-5 px-1.5 text-sm font-semibold",
+                                                                                  rescueTeamStatusMeta.className,
+                                                                                )}
+                                                                              >
+                                                                                Đội:{" "}
+                                                                                {
+                                                                                  rescueTeamStatusMeta.label
+                                                                                }
+                                                                              </Badge>
+                                                                            )}
+                                                                            {typeof team.memberCount ===
+                                                                              "number" && (
+                                                                              <Badge
+                                                                                variant="outline"
+                                                                                className="h-5 px-1.5 text-sm"
+                                                                              >
+                                                                                {
+                                                                                  team.memberCount
+                                                                                }{" "}
+                                                                                thành
+                                                                                viên
+                                                                              </Badge>
+                                                                            )}
+                                                                          </div>
+                                                                        </div>
+                                                                      );
+                                                                    },
+                                                                  )}
+                                                                </div>
+                                                              </div>
+                                                            )}
+                                                            {supplyItems.length >
+                                                              0 && (
+                                                              <div className="mt-2.5 p-2.5 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                                                                <p className="text-sm font-bold uppercase tracking-wider text-blue-600/80 dark:text-blue-400 mb-1.5 flex items-center gap-1.5">
+                                                                  <Package
+                                                                    className="h-3 w-3"
+                                                                    weight="fill"
+                                                                  />
+                                                                  {getSupplyStepTitle(
+                                                                    activity.activityType,
+                                                                  )}
+                                                                </p>
+                                                                <div className="space-y-1">
+                                                                  {supplyItems.map(
+                                                                    (
+                                                                      supply,
+                                                                      sIdx,
+                                                                    ) => (
+                                                                      <div
+                                                                        key={
+                                                                          sIdx
+                                                                        }
+                                                                        className="flex items-center justify-between gap-2 text-sm py-1 px-2 bg-background rounded border shadow-sm"
+                                                                      >
+                                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                                          <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                                          <span className="font-medium truncate">
+                                                                            {
+                                                                              supply.name
+                                                                            }
+                                                                          </span>
+                                                                        </div>
+                                                                        <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                                                                          {supply.quantityLabel ||
+                                                                            "-"}
                                                                         </div>
                                                                       </div>
-                                                                    );
-                                                                  },
-                                                                )}
+                                                                    ),
+                                                                  )}
+                                                                </div>
                                                               </div>
-                                                            </div>
-                                                          )}
-                                                          {supplyItems.length >
-                                                            0 && (
-                                                            <div className="mt-2.5 p-2.5 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                                                              <p className="text-sm font-bold uppercase tracking-wider text-blue-600/80 dark:text-blue-400 mb-1.5 flex items-center gap-1.5">
-                                                                <Package
-                                                                  className="h-3 w-3"
-                                                                  weight="fill"
-                                                                />
-                                                                {getSupplyStepTitle(
-                                                                  activity.activityType,
-                                                                )}
-                                                              </p>
-                                                              <div className="space-y-1">
-                                                                {supplyItems.map(
-                                                                  (
-                                                                    supply,
-                                                                    sIdx,
-                                                                  ) => (
-                                                                    <div
-                                                                      key={sIdx}
-                                                                      className="flex items-center justify-between gap-2 text-sm py-1 px-2 bg-background rounded border shadow-sm"
-                                                                    >
-                                                                      <div className="flex items-center gap-1.5 min-w-0">
-                                                                        <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                                                        <span className="font-medium truncate">
-                                                                          {
-                                                                            supply.name
-                                                                          }
-                                                                        </span>
-                                                                      </div>
-                                                                      <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
-                                                                        {supply.quantityLabel ||
-                                                                          "-"}
-                                                                      </div>
-                                                                    </div>
-                                                                  ),
-                                                                )}
-                                                              </div>
-                                                            </div>
-                                                          )}
+                                                            )}
+                                                          </div>
                                                         </div>
                                                       </div>
-                                                    </div>
-                                                  );
+                                                    );
                                                   },
                                                 )}
                                               </div>
@@ -7932,7 +7952,7 @@ const RescuePlanPanel = ({
                                         );
                                         if (isReturnSuppliesActivity) {
                                           toast.info(
-                                            "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật tư nên không thể kéo thả thủ công.",
+                                            "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể kéo thả thủ công.",
                                           );
                                           return;
                                         }

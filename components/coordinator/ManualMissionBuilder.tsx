@@ -171,8 +171,8 @@ const AUTO_RETURN_TRIGGER_TYPES = new Set<ClusterActivityType>([
 ]);
 
 const AUTO_RETURN_STEP_DESCRIPTION =
-  "Trả vật tư còn lại về kho sau khi hoàn tất nhiệm vụ.";
-const AUTO_RETURN_TARGET_FALLBACK = "Kho tiếp nhận vật tư";
+  "Trả vật phẩm còn lại về kho sau khi hoàn tất nhiệm vụ.";
+const AUTO_RETURN_TARGET_FALLBACK = "Kho tiếp nhận vật phẩm";
 
 function isSupplyActivityType(activityType: string): boolean {
   return SUPPLY_ACTIVITY_TYPES.has(activityType as ClusterActivityType);
@@ -180,14 +180,14 @@ function isSupplyActivityType(activityType: string): boolean {
 
 function getSupplyStepTitle(activityType: string): string {
   if (activityType === "DELIVER_SUPPLIES") {
-    return "Vật tư cần bàn giao ở bước này";
+    return "Vật phẩm cần bàn giao ở bước này";
   }
 
   if (activityType === "RETURN_SUPPLIES") {
-    return "Vật tư cần hoàn trả ở bước này";
+    return "Vật phẩm cần hoàn trả ở bước này";
   }
 
-  return "Vật tư cần thu gom ở bước này";
+  return "Vật phẩm cần thu gom ở bước này";
 }
 
 function buildSupplySummary(supplies: ManualSupplyItem[]): string {
@@ -363,7 +363,10 @@ function getDepotUtilizationPercent(
 
   return Math.max(
     0,
-    Math.min(100, Math.round(((currentUtilization ?? 0) / (capacity ?? 1)) * 100)),
+    Math.min(
+      100,
+      Math.round(((currentUtilization ?? 0) / (capacity ?? 1)) * 100),
+    ),
   );
 }
 
@@ -376,7 +379,7 @@ const TEMPLATES: { label: string; types: ClusterActivityType[] }[] = [
     types: ["ASSESS", "MEDICAL_AID", "EVACUATE"],
   },
   {
-    label: "Bàn giao vật tư",
+    label: "Bàn giao vật phẩm",
     types: ["ASSESS", "DELIVER_SUPPLIES", "EVACUATE"],
   },
 ];
@@ -567,7 +570,8 @@ function SortableActivityCard({
 
       {isAutoReturnStep ? (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 dark:border-blue-800/60 dark:bg-blue-900/20 dark:text-blue-300">
-          Bước này được tự động tạo khi có bước thu gom vật tư và luôn nằm ở cuối.
+          Bước này được tự động tạo khi có bước thu gom vật phẩm và luôn nằm ở
+          cuối.
         </div>
       ) : null}
 
@@ -705,7 +709,8 @@ function SortableActivityCard({
 
         {selectedTeam?.distanceKm != null ? (
           <p className="mt-1 text-xs text-emerald-700/65 dark:text-emerald-300/65">
-            Khoảng cách đến cụm: {formatDistanceKmLabel(selectedTeam.distanceKm)}
+            Khoảng cách đến cụm:{" "}
+            {formatDistanceKmLabel(selectedTeam.distanceKm)}
           </p>
         ) : null}
 
@@ -811,7 +816,7 @@ function SortableActivityCard({
                     size="icon"
                     className="h-5 w-5 text-muted-foreground hover:text-red-500"
                     onClick={() => onRemoveSupply(activity.id, supplyIndex)}
-                    aria-label={`Xóa vật tư ${supply.itemName}`}
+                    aria-label={`Xóa vật phẩm ${supply.itemName}`}
                   >
                     <X className="h-3 w-3" />
                   </Button>
@@ -820,14 +825,14 @@ function SortableActivityCard({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground/70 text-center py-1">
-              Kéo vật tư từ kho bên trái vào đây
+              Kéo vật phẩm từ kho bên trái vào đây
             </p>
           )}
         </div>
       ) : (
         <div>
           <Label className="text-sm text-muted-foreground uppercase tracking-wider">
-            Vật tư / Thiết bị
+            Vật phẩm / Thiết bị
           </Label>
           <Input
             placeholder="VD: Áo phao x5, Lương khô x10…"
@@ -955,7 +960,10 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
           <div className="flex shrink-0 flex-col items-end gap-1">
             <Badge
               variant="outline"
-              className={cn("h-5 rounded-full px-2 text-xs font-semibold", statusMeta.className)}
+              className={cn(
+                "h-5 rounded-full px-2 text-xs font-semibold",
+                statusMeta.className,
+              )}
             >
               {statusMeta.label}
             </Badge>
@@ -985,7 +993,7 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
               Tồn kho
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">
-              {data?.totalCount?.toLocaleString("vi-VN") ?? "—"} vật tư
+              {data?.totalCount?.toLocaleString("vi-VN") ?? "—"} vật phẩm
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               Trang {data?.pageNumber ?? 1}/{data?.totalPages ?? 1}
@@ -997,11 +1005,14 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
       <div className="space-y-2 px-3 py-3">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, index) => (
-            <Skeleton key={`${depot.id}-inventory-skeleton-${index}`} className="h-12 rounded-xl" />
+            <Skeleton
+              key={`${depot.id}-inventory-skeleton-${index}`}
+              className="h-12 rounded-xl"
+            />
           ))
         ) : isError ? (
           <div className="rounded-xl border border-dashed border-rose-200 bg-rose-50/80 px-3 py-3 text-xs text-rose-700 dark:border-rose-800/50 dark:bg-rose-950/20 dark:text-rose-300">
-            {getErrorMessage(error, "Không thể tải vật tư của kho này.")}
+            {getErrorMessage(error, "Không thể tải vật phẩm của kho này.")}
           </div>
         ) : availableItems.length > 0 ? (
           availableItems.map((item, index) => {
@@ -1068,10 +1079,10 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
         ) : (
           <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-3 py-4 text-center">
             <p className="text-sm font-medium text-foreground">
-              Không còn vật tư khả dụng
+              Không còn vật phẩm khả dụng
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Chuyển trang hoặc chọn kho khác để tiếp tục kéo-thả vật tư.
+              Chuyển trang hoặc chọn kho khác để tiếp tục kéo-thả vật phẩm.
             </p>
           </div>
         )}
@@ -1090,7 +1101,7 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
               Trước
             </Button>
             <p className="text-center text-[11px] text-muted-foreground">
-              {data.pageSize} vật tư / trang
+              {data.pageSize} vật phẩm / trang
             </p>
             <Button
               type="button"
@@ -1159,12 +1170,9 @@ const ManualMissionBuilder = ({
     isLoading: isNearbyTeamsLoading,
     isError: isNearbyTeamsError,
     error: nearbyTeamsError,
-  } = useRescueTeamsByCluster(
-    clusterId ?? 0,
-    {
-      enabled: open && !!clusterId && clusterId > 0,
-    },
-  );
+  } = useRescueTeamsByCluster(clusterId ?? 0, {
+    enabled: open && !!clusterId && clusterId > 0,
+  });
   const {
     data: nearbyDepotsData,
     isLoading: isNearbyDepotsLoading,
@@ -1238,7 +1246,7 @@ const ManualMissionBuilder = ({
                 : buildSupplySummary(
                     (a.suppliesToCollect ?? []).map((supply) => ({
                       itemId: supply.itemId ?? -1,
-                      itemName: supply.itemName ?? "Vật tư chưa rõ tên",
+                      itemName: supply.itemName ?? "Vật phẩm chưa rõ tên",
                       quantity: supply.quantity,
                       unit: supply.unit,
                       sourceDepotId: a.depotId,
@@ -1257,7 +1265,7 @@ const ManualMissionBuilder = ({
             depotAddress: a.depotAddress ?? null,
             suppliesToCollect: (a.suppliesToCollect ?? []).map((supply) => ({
               itemId: supply.itemId ?? -1,
-              itemName: supply.itemName ?? "Vật tư chưa rõ tên",
+              itemName: supply.itemName ?? "Vật phẩm chưa rõ tên",
               quantity: supply.quantity,
               unit: supply.unit,
               sourceDepotId: a.depotId,
@@ -1626,12 +1634,16 @@ const ManualMissionBuilder = ({
             ? lastCollectStep.targetLongitude
             : baseManagedStep.targetLongitude,
           rescueTeamId:
-            lastCollectStep.rescueTeamId ?? baseManagedStep.rescueTeamId ?? null,
+            lastCollectStep.rescueTeamId ??
+            baseManagedStep.rescueTeamId ??
+            null,
           depotId: lastCollectStep.depotId ?? baseManagedStep.depotId ?? null,
           depotName:
             lastCollectStep.depotName ?? baseManagedStep.depotName ?? null,
           depotAddress:
-            lastCollectStep.depotAddress ?? baseManagedStep.depotAddress ?? null,
+            lastCollectStep.depotAddress ??
+            baseManagedStep.depotAddress ??
+            null,
           suppliesToCollect: nextSupplies,
           items: buildSupplySummary(nextSupplies),
           isAutoReturnStep: true,
@@ -1709,7 +1721,7 @@ const ManualMissionBuilder = ({
         isSupplyActivityType(a.activityType) &&
         a.suppliesToCollect.length === 0
       ) {
-        toast.error(`Bước ${i + 1}: Vui lòng kéo thả ít nhất 1 vật tư`);
+        toast.error(`Bước ${i + 1}: Vui lòng kéo thả ít nhất 1 vật phẩm`);
         return false;
       }
     }
@@ -2136,8 +2148,8 @@ const ManualMissionBuilder = ({
                           Kho gần cụm SOS
                         </h3>
                         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                          Kéo vật tư từ kho khả dụng vào các bước lấy, giao hoặc
-                          trả vật tư ở bên phải.
+                          Kéo vật phẩm từ kho khả dụng vào các bước lấy, giao
+                          hoặc trả vật phẩm ở bên phải.
                         </p>
                       </div>
                       <Badge variant="secondary" className="h-5 px-1.5 text-xs">
@@ -2162,7 +2174,10 @@ const ManualMissionBuilder = ({
                         </div>
                       ) : hasNearbyDepots ? (
                         nearbyDepots.map((depot) => (
-                          <NearbyDepotInventoryCard key={depot.id} depot={depot} />
+                          <NearbyDepotInventoryCard
+                            key={depot.id}
+                            depot={depot}
+                          />
                         ))
                       ) : (
                         <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-3 py-4 text-center">
@@ -2257,17 +2272,26 @@ const ManualMissionBuilder = ({
                         </div>
                         <p className="text-sm text-amber-700/80 dark:text-amber-400/80">
                           Sắp xếp trình tự triển khai, gán đội phụ trách và kéo
-                          vật tư thực tế từ các kho gần cụm để tạo nhiệm vụ.
+                          vật phẩm thực tế từ các kho gần cụm để tạo nhiệm vụ.
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="h-6 rounded-full px-2">
+                        <Badge
+                          variant="outline"
+                          className="h-6 rounded-full px-2"
+                        >
                           {activities.length} bước
                         </Badge>
-                        <Badge variant="outline" className="h-6 rounded-full px-2">
+                        <Badge
+                          variant="outline"
+                          className="h-6 rounded-full px-2"
+                        >
                           {teamOptions.length} đội gần cụm
                         </Badge>
-                        <Badge variant="outline" className="h-6 rounded-full px-2">
+                        <Badge
+                          variant="outline"
+                          className="h-6 rounded-full px-2"
+                        >
                           {nearbyDepots.length} kho gần cụm
                         </Badge>
                       </div>
@@ -2280,7 +2304,7 @@ const ManualMissionBuilder = ({
                           <span>
                             {!hasNearbyTeams
                               ? "Chưa có đội gần cụm nên nhiệm vụ chưa thể xác nhận cho đến khi mỗi bước được gán một đội hợp lệ."
-                              : "Cụm này hiện chưa có kho khả dụng gần đó. Bạn vẫn có thể cấu hình bước, nhưng không thể kéo vật tư từ danh sách kho."}
+                              : "Cụm này hiện chưa có kho khả dụng gần đó. Bạn vẫn có thể cấu hình bước, nhưng không thể kéo vật phẩm từ danh sách kho."}
                           </span>
                         </p>
                       </div>
@@ -2295,8 +2319,8 @@ const ManualMissionBuilder = ({
                           Cấu hình nhiệm vụ
                         </h3>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Thiết lập loại nhiệm vụ, mức ưu tiên và khung thời gian
-                          triển khai trước khi xác nhận.
+                          Thiết lập loại nhiệm vụ, mức ưu tiên và khung thời
+                          gian triển khai trước khi xác nhận.
                         </p>
                       </div>
                       <div className="grid min-w-[220px] grid-cols-3 gap-2 text-xs">

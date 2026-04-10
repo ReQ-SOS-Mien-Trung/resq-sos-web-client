@@ -486,12 +486,28 @@
 }
 
 /* Leaflet Custom Marker Styles */
+.custom-sos-marker,
 .custom-cluster-marker,
+.custom-auto-cluster-marker,
 .custom-rescuer-marker,
 .custom-depot-marker,
-.custom-assembly-point-marker {
+.custom-assembly-point-marker,
+.custom-team-incident-marker,
+.custom-user-location-marker {
   background: transparent !important;
   border: none !important;
+  box-shadow: none !important;
+}
+
+.custom-sos-marker,
+.custom-cluster-marker,
+.custom-auto-cluster-marker,
+.custom-rescuer-marker,
+.custom-depot-marker,
+.custom-assembly-point-marker,
+.custom-team-incident-marker,
+.custom-user-location-marker {
+  overflow: visible !important;
 }
 
 .route-duration-marker-icon {
