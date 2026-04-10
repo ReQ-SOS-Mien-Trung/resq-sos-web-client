@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useEffect,
+  useDeferredValue,
+} from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import { RescuePlanPanelProps } from "@/type";
@@ -606,8 +613,11 @@ const DepotInventoryCard = ({
   isDraggable: boolean;
 }) => {
   const [page, setPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const deferredSearchTerm = useDeferredValue(searchTerm.trim());
   const { data, isLoading } = useDepotInventory({
     depotId,
+    itemName: deferredSearchTerm || undefined,
     pageNumber: page,
     pageSize: 6,
   });
@@ -634,6 +644,42 @@ const DepotInventoryCard = ({
         ) : null}
       </div>
       <div className="p-2 space-y-1">
+        <div className="space-y-1">
+          <Label
+            htmlFor={`rescue-plan-depot-search-${depotId}`}
+            className="text-sm font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            Tìm vật phẩm
+          </Label>
+          <div className="relative">
+            <Input
+              id={`rescue-plan-depot-search-${depotId}`}
+              value={searchTerm}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Nhập tên vật phẩm cần lấy..."
+              className="h-8 pr-9 text-sm"
+            />
+            {searchTerm ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-0.5 h-7 w-7"
+                onClick={() => {
+                  setSearchTerm("");
+                  setPage(1);
+                }}
+                aria-label="Xóa từ khóa tìm vật phẩm"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
         {isLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-8 w-full rounded" />
@@ -717,7 +763,9 @@ const DepotInventoryCard = ({
             )
         ) : (
           <p className="text-sm text-muted-foreground text-center py-2">
-            Kho trống
+            {deferredSearchTerm
+              ? "Không tìm thấy vật phẩm phù hợp"
+              : "Kho trống"}
           </p>
         )}
 

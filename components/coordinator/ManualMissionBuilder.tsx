@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+  useDeferredValue,
+} from "react";
 import type { AxiosError } from "axios";
 import {
   DndContext,
@@ -65,6 +72,8 @@ import {
   Buildings,
   Compass,
   Info,
+  Clock,
+  Phone,
 } from "@phosphor-icons/react";
 import type { SOSRequest } from "@/type";
 import type { SOSClusterEntity } from "@/services/sos_cluster/type";
@@ -370,6 +379,87 @@ function getDepotUtilizationPercent(
   );
 }
 
+function formatSOSStatusLabel(status?: string | null): string {
+  switch ((status ?? "").trim().toUpperCase()) {
+    case "ASSIGNED":
+      return "Đã phân công";
+    case "RESCUED":
+      return "Đã cứu hộ";
+    case "PENDING":
+    default:
+      return "Chờ xử lý";
+  }
+}
+
+function getSOSStatusClassName(status?: string | null): string {
+  switch ((status ?? "").trim().toUpperCase()) {
+    case "ASSIGNED":
+      return "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800/50 dark:bg-sky-950/20 dark:text-sky-300";
+    case "RESCUED":
+      return "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/20 dark:text-emerald-300";
+    case "PENDING":
+    default:
+      return "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/20 dark:text-amber-300";
+  }
+}
+
+function humanizeSOSValue(value?: string | null): string | null {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+
+  return normalized
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatSOSTypeLabel(sosType?: string | null): string {
+  const normalized = (sosType ?? "").trim().toLowerCase();
+
+  if (normalized.includes("rescue")) return "Cứu hộ";
+  if (normalized.includes("relief") || normalized.includes("support")) {
+    return "Cứu trợ";
+  }
+  if (normalized.includes("medical")) return "Y tế";
+  if (normalized.includes("evac")) return "Sơ tán";
+
+  return humanizeSOSValue(sosType) ?? "Chưa rõ";
+}
+
+function getSOSPeopleTotal(sos: SOSRequest): number | null {
+  if (!sos.peopleCount) return null;
+  return (
+    (sos.peopleCount.adult ?? 0) +
+    (sos.peopleCount.child ?? 0) +
+    (sos.peopleCount.elderly ?? 0)
+  );
+}
+
+function formatSOSWaitTime(waitTimeMinutes?: number | null): string | null {
+  if (!Number.isFinite(waitTimeMinutes)) return null;
+
+  const totalMinutes = Math.max(0, Math.round(waitTimeMinutes ?? 0));
+  if (totalMinutes >= 1440) {
+    return `${Math.floor(totalMinutes / 1440)} ngày`;
+  }
+  if (totalMinutes >= 60) {
+    return `${Math.max(1, Math.floor(totalMinutes / 60))} giờ`;
+  }
+  return `${Math.max(1, totalMinutes)} phút`;
+}
+
+function getSOSNeedBadges(sos: SOSRequest): string[] {
+  const badges: string[] = [];
+
+  if (sos.needs.medical) badges.push("Cần y tế");
+  if (sos.needs.food) badges.push("Cần lương thực");
+  if (sos.needs.boat) badges.push("Cần thuyền");
+  if (sos.hasInjured) badges.push("Có người bị thương");
+  if (sos.canMove === false) badges.push("Không thể tự di chuyển");
+
+  return badges;
+}
+
 // ── Preset templates ──
 
 const TEMPLATES: { label: string; types: ClusterActivityType[] }[] = [
@@ -446,6 +536,7 @@ function SortableActivityCard({
   activity,
   index,
   isLast,
+  isRecentlyInserted,
   onUpdate,
   onRemove,
   onAddSupply,
@@ -457,6 +548,7 @@ function SortableActivityCard({
   activity: ManualActivity;
   index: number;
   isLast: boolean;
+  isRecentlyInserted: boolean;
   onUpdate: (
     id: string,
     field: keyof ManualActivity,
@@ -516,6 +608,8 @@ function SortableActivityCard({
       className={cn(
         "rounded-xl border bg-background p-3 space-y-2.5 transition-all",
         isDragging ? "opacity-50 scale-[0.98]" : "hover:shadow-sm",
+        isRecentlyInserted &&
+          "animate-in fade-in slide-in-from-top-2 duration-200",
         !isLast && "border-border/90",
       )}
     >
@@ -921,8 +1015,11 @@ function TimelineDropZone({
 
 function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
   const [page, setPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const deferredSearchTerm = useDeferredValue(searchTerm.trim());
   const { data, isLoading, isError, error } = useDepotInventory({
     depotId: depot.id,
+    itemName: deferredSearchTerm || undefined,
     pageNumber: page,
     pageSize: 6,
   });
@@ -980,7 +1077,7 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
         <div className="mt-3 grid grid-cols-2 gap-2">
           <div className="rounded-xl border border-border/60 bg-background/80 p-2.5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Công suất
+              Sức chứa
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">
               {depot.currentUtilization.toLocaleString("vi-VN")} /{" "}
@@ -990,7 +1087,7 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
           </div>
           <div className="rounded-xl border border-border/60 bg-background/80 p-2.5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Tồn kho
+              Mặt hàng hiện có
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">
               {data?.totalCount?.toLocaleString("vi-VN") ?? "—"} vật phẩm
@@ -1003,6 +1100,42 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
       </div>
 
       <div className="space-y-2 px-3 py-3">
+        <div className="space-y-1.5">
+          <Label
+            htmlFor={`manual-depot-search-${depot.id}`}
+            className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+          >
+            Tìm vật phẩm
+          </Label>
+          <div className="relative">
+            <Input
+              id={`manual-depot-search-${depot.id}`}
+              value={searchTerm}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Nhập tên vật phẩm cần lấy..."
+              className="h-9 pr-9 text-sm"
+            />
+            {searchTerm ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1 h-7 w-7"
+                onClick={() => {
+                  setSearchTerm("");
+                  setPage(1);
+                }}
+                aria-label="Xóa từ khóa tìm vật phẩm"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
         {isLoading ? (
           Array.from({ length: 3 }).map((_, index) => (
             <Skeleton
@@ -1079,10 +1212,14 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
         ) : (
           <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-3 py-4 text-center">
             <p className="text-sm font-medium text-foreground">
-              Không còn vật phẩm khả dụng
+              {deferredSearchTerm
+                ? "Không tìm thấy vật phẩm phù hợp"
+                : "Không còn vật phẩm khả dụng"}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Chuyển trang hoặc chọn kho khác để tiếp tục kéo-thả vật phẩm.
+              {deferredSearchTerm
+                ? "Thử từ khóa khác để tiếp tục kéo-thả vật phẩm vào các bước."
+                : "Chuyển trang hoặc chọn kho khác để tiếp tục kéo-thả vật phẩm."}
             </p>
           </div>
         )}
@@ -1133,6 +1270,7 @@ const ManualMissionBuilder = ({
   existingMissionId,
 }: ManualMissionBuilderProps) => {
   // ── State ──
+  const [splitPercent, setSplitPercent] = useState(18);
   const [activities, setActivities] = useState<ManualActivity[]>([]);
   const [missionType, setMissionType] = useState<MissionType>("RESCUE");
   const [priorityScore, setPriorityScore] = useState(5);
@@ -1142,6 +1280,11 @@ const ManualMissionBuilder = ({
   const [activeDragType, setActiveDragType] =
     useState<ClusterActivityType | null>(null);
   const [hasLoadedExisting, setHasLoadedExisting] = useState(false);
+  const [selectedSOSId, setSelectedSOSId] = useState<string | null>(null);
+  const [recentlyInsertedActivityId, setRecentlyInsertedActivityId] =
+    useState<string | null>(null);
+  const isDraggingRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const { mutateAsync: createMissionAsync, isPending: isCreatingMission } =
     useCreateMission();
@@ -1210,6 +1353,13 @@ const ManualMissionBuilder = ({
   const nearbyDepots = nearbyDepotsData ?? [];
   const hasNearbyTeams = teamOptions.length > 0;
   const hasNearbyDepots = nearbyDepots.length > 0;
+  const selectedSOSRequest = useMemo(
+    () =>
+      clusterSOSRequests.find((sos) => sos.id === selectedSOSId) ??
+      clusterSOSRequests[0] ??
+      null,
+    [clusterSOSRequests, selectedSOSId],
+  );
 
   const isEditingExisting = !!existingMissionId;
 
@@ -1292,6 +1442,54 @@ const ManualMissionBuilder = ({
     return () => window.clearTimeout(timeoutId);
   }, [open]);
 
+  useEffect(() => {
+    if (!recentlyInsertedActivityId) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setRecentlyInsertedActivityId((current) =>
+        current === recentlyInsertedActivityId ? null : current,
+      );
+    }, 240);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [recentlyInsertedActivityId]);
+
+  const handleMouseDown = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    isDraggingRef.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!isDraggingRef.current || !containerRef.current) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const nextPercent = ((event.clientX - rect.left) / rect.width) * 100;
+
+      setSplitPercent(Math.min(28, Math.max(16, nextPercent)));
+    };
+
+    const handleMouseUp = () => {
+      if (!isDraggingRef.current) return;
+
+      isDraggingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, []);
+
   // ── DnD sensors ──
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -1359,6 +1557,7 @@ const ManualMissionBuilder = ({
         if (!type) return;
 
         const newActivity = createActivity(type);
+        setRecentlyInsertedActivityId(newActivity.id);
 
         if (overIdStr === DROPPABLE_ID) {
           // Drop onto the zone itself → append
@@ -1449,7 +1648,9 @@ const ManualMissionBuilder = ({
   );
 
   const handleAddActivity = useCallback(() => {
-    setActivities((previous) => [...previous, createActivity("ASSESS")]);
+    const newActivity = createActivity("ASSESS");
+    setRecentlyInsertedActivityId(newActivity.id);
+    setActivities((previous) => [...previous, newActivity]);
   }, [createActivity]);
 
   const handleAddSupplyToActivity = useCallback(
@@ -1695,6 +1896,15 @@ const ManualMissionBuilder = ({
     [activities, cluster, handleUpdateActivity],
   );
 
+  const handleCopySelectedSOSCoordinates = useCallback(() => {
+    if (!selectedSOSRequest) return;
+
+    navigator.clipboard.writeText(
+      `${selectedSOSRequest.location.lat}, ${selectedSOSRequest.location.lng}`,
+    );
+    toast.info("Đã sao chép tọa độ SOS vào clipboard");
+  }, [selectedSOSRequest]);
+
   // ── Validation ──
   const validate = useCallback((): boolean => {
     if (activities.length === 0) {
@@ -1914,6 +2124,29 @@ const ManualMissionBuilder = ({
     activities.every((activity) => toValidRescueTeamId(activity.rescueTeamId));
   const canSubmitMission =
     activities.length > 0 && hasNearbyTeams && hasAssignedTeamsForAllSteps;
+  const selectedSOSPeopleTotal = selectedSOSRequest
+    ? getSOSPeopleTotal(selectedSOSRequest)
+    : null;
+  const selectedSOSNeedBadges = selectedSOSRequest
+    ? getSOSNeedBadges(selectedSOSRequest)
+    : [];
+  const selectedSOSMedicalIssues =
+    selectedSOSRequest?.medicalIssues?.map((issue) =>
+      humanizeSOSValue(issue),
+    ) ?? [];
+  const selectedSOSSupplies =
+    selectedSOSRequest?.supplies?.map((supply) => humanizeSOSValue(supply)) ??
+    [];
+  const selectedSOSSituation =
+    humanizeSOSValue(selectedSOSRequest?.situation) ??
+    humanizeSOSValue(selectedSOSRequest?.structuredData?.situation);
+  const selectedSOSNarrative =
+    selectedSOSRequest?.additionalDescription?.trim() ||
+    selectedSOSRequest?.message?.trim() ||
+    "Chưa có mô tả bổ sung.";
+  const selectedSOSWaitTimeLabel = formatSOSWaitTime(
+    selectedSOSRequest?.waitTimeMinutes,
+  );
 
   if (!clusterId) return null;
 
@@ -1988,11 +2221,146 @@ const ManualMissionBuilder = ({
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex-1 flex overflow-hidden min-h-0">
+          <div
+            ref={containerRef}
+            className="flex min-h-0 flex-1 overflow-hidden"
+          >
             {/* ── Left Panel: Palette + Reference Data ── */}
-            <div className="w-62.5 shrink-0 border-r flex flex-col overflow-hidden">
+            <div
+              className="shrink-0 border-r flex flex-col overflow-hidden"
+              style={{
+                width: `${splitPercent}%`,
+                minWidth: "240px",
+                maxWidth: "420px",
+              }}
+            >
               <ScrollArea className="flex-1">
                 <div className="p-3 space-y-4">
+                  {/* SOS requests reference */}
+                  <section>
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Warning
+                            className="h-3 w-3 text-red-500"
+                            weight="fill"
+                          />
+                          SOS trong cụm ({clusterSOSRequests.length})
+                        </h3>
+                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                          Chọn một SOS để xem đầy đủ thông tin ở cột bên phải.
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {clusterSOSRequests.length}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      {clusterSOSRequests.map((sos) => {
+                        const isSelected = selectedSOSRequest?.id === sos.id;
+                        const totalPeople = getSOSPeopleTotal(sos);
+                        const summaryBadges = getSOSNeedBadges(sos).slice(0, 2);
+
+                        return (
+                          <button
+                            key={sos.id}
+                            type="button"
+                            className={cn(
+                              "w-full rounded-2xl border px-3 py-2.5 text-left transition-all",
+                              "hover:border-border hover:bg-accent/30 hover:shadow-sm",
+                              isSelected
+                                ? "border-emerald-300 bg-emerald-50/80 shadow-sm dark:border-emerald-700/60 dark:bg-emerald-950/20"
+                                : "border-border/70 bg-background/90",
+                            )}
+                            onClick={() => setSelectedSOSId(sos.id)}
+                            aria-pressed={isSelected}
+                          >
+                            <div className="flex items-start gap-2">
+                              <MapPin
+                                className={cn(
+                                  "mt-0.5 h-3.5 w-3.5 shrink-0",
+                                  sos.priority === "P1"
+                                    ? "text-red-500"
+                                    : sos.priority === "P2"
+                                      ? "text-orange-500"
+                                      : sos.priority === "P3"
+                                        ? "text-yellow-500"
+                                        : "text-teal-500",
+                                )}
+                                weight="fill"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Badge
+                                    variant={
+                                      PRIORITY_BADGE_VARIANT[sos.priority]
+                                    }
+                                    className="h-5 rounded-full px-2 text-[11px] font-semibold"
+                                  >
+                                    {PRIORITY_LABELS[sos.priority]}
+                                  </Badge>
+                                  <span className="text-sm font-semibold text-foreground">
+                                    #{sos.id}
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "h-5 rounded-full px-2 text-[11px] font-semibold",
+                                      getSOSStatusClassName(sos.status),
+                                    )}
+                                  >
+                                    {formatSOSStatusLabel(sos.status)}
+                                  </Badge>
+                                </div>
+
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                  <Badge
+                                    variant="outline"
+                                    className="h-5 rounded-full px-2 text-[11px]"
+                                  >
+                                    {formatSOSTypeLabel(sos.sosType)}
+                                  </Badge>
+                                  {totalPeople ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="h-5 rounded-full px-2 text-[11px]"
+                                    >
+                                      {totalPeople} người
+                                    </Badge>
+                                  ) : null}
+                                  {summaryBadges.map((badge) => (
+                                    <Badge
+                                      key={`${sos.id}-${badge}`}
+                                      variant="outline"
+                                      className="h-5 rounded-full px-2 text-[11px]"
+                                    >
+                                      {badge}
+                                    </Badge>
+                                  ))}
+                                </div>
+
+                                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                                  {sos.message}
+                                </p>
+
+                                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground/80">
+                                  <Compass className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">
+                                    {sos.location.lat.toFixed(4)},{" "}
+                                    {sos.location.lng.toFixed(4)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  <Separator />
+
                   {/* Activity palette */}
                   <section>
                     <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
@@ -2194,70 +2562,309 @@ const ManualMissionBuilder = ({
                   </section>
 
                   <Separator />
-
-                  {/* SOS requests reference */}
-                  <section>
-                    <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                      <Warning className="h-3 w-3 text-red-500" weight="fill" />
-                      SOS trong cụm ({clusterSOSRequests.length})
-                    </h3>
-                    <div className="space-y-1.5">
-                      {clusterSOSRequests.map((sos) => (
-                        <div
-                          key={sos.id}
-                          className="rounded-lg border p-2 cursor-pointer hover:bg-accent/50 transition-colors group"
-                          onClick={() =>
-                            handleSOSLocationFill(
-                              sos.location.lat,
-                              sos.location.lng,
-                            )
-                          }
-                          title="Click để gán tọa độ cho bước tiếp theo"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <MapPin
-                              className={cn(
-                                "h-3 w-3 shrink-0",
-                                sos.priority === "P1"
-                                  ? "text-red-500"
-                                  : sos.priority === "P2"
-                                    ? "text-orange-500"
-                                    : sos.priority === "P3"
-                                      ? "text-yellow-500"
-                                      : "text-teal-500",
-                              )}
-                              weight="fill"
-                            />
-                            <Badge
-                              variant={PRIORITY_BADGE_VARIANT[sos.priority]}
-                              className="text-xs h-3.5 px-1"
-                            >
-                              {PRIORITY_LABELS[sos.priority]}
-                            </Badge>
-                            <span className="text-xs font-mono text-muted-foreground">
-                              #{sos.id}
-                            </span>
-                            <CopySimple className="h-3 w-3 text-muted-foreground/0 group-hover:text-muted-foreground/60 ml-auto transition-colors" />
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
-                            {sos.message}
-                          </p>
-                          <div className="text-xs text-muted-foreground/70 mt-0.5">
-                            {sos.location.lat.toFixed(4)},{" "}
-                            {sos.location.lng.toFixed(4)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
                 </div>
               </ScrollArea>
+            </div>
+
+            <div
+              onMouseDown={handleMouseDown}
+              className="h-full w-2 shrink-0 cursor-col-resize select-none bg-border/50 transition-colors hover:bg-primary/20 active:bg-primary/30"
+              aria-label="Kéo để thay đổi độ rộng bảng tham chiếu"
+              role="separator"
+              aria-orientation="vertical"
+            >
+              <div className="flex h-full items-center justify-center">
+                <DotsSixVertical
+                  className="h-5 w-5 text-muted-foreground"
+                  weight="bold"
+                />
+              </div>
             </div>
 
             {/* ── Right Panel: Timeline + Mission Config ── */}
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
               <ScrollArea className="flex-1">
                 <div className="p-4 space-y-4">
+                  {selectedSOSRequest ? (
+                    <section className="rounded-2xl border border-rose-200/80 bg-[linear-gradient(135deg,rgba(255,241,242,0.96)_0%,rgba(255,255,255,0.98)_100%)] p-4 shadow-sm dark:border-rose-800/50 dark:bg-[linear-gradient(135deg,rgba(127,29,29,0.22)_0%,rgba(15,23,42,0.95)_100%)]">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                              <Warning
+                                className="h-3.5 w-3.5 text-rose-500"
+                                weight="fill"
+                              />
+                              SOS đang theo dõi
+                            </h3>
+                            <Badge
+                              variant={
+                                PRIORITY_BADGE_VARIANT[
+                                  selectedSOSRequest.priority
+                                ]
+                              }
+                              className="h-5 rounded-full px-2 text-[11px] font-semibold"
+                            >
+                              {PRIORITY_LABELS[selectedSOSRequest.priority]}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "h-5 rounded-full px-2 text-[11px] font-semibold",
+                                getSOSStatusClassName(
+                                  selectedSOSRequest.status,
+                                ),
+                              )}
+                            >
+                              {formatSOSStatusLabel(selectedSOSRequest.status)}
+                            </Badge>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <p className="text-base font-bold text-foreground">
+                              SOS #{selectedSOSRequest.id}
+                            </p>
+                            <Badge
+                              variant="outline"
+                              className="h-6 rounded-full px-2 text-xs"
+                            >
+                              {formatSOSTypeLabel(selectedSOSRequest.sosType)}
+                            </Badge>
+                            {selectedSOSSituation ? (
+                              <Badge
+                                variant="outline"
+                                className="h-6 rounded-full px-2 text-xs"
+                              >
+                                {selectedSOSSituation}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="mt-2 max-w-4xl text-sm leading-relaxed text-foreground/80">
+                            {selectedSOSNarrative}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5 text-sm"
+                            onClick={handleCopySelectedSOSCoordinates}
+                          >
+                            <CopySimple className="h-3.5 w-3.5" />
+                            Sao chép tọa độ
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 gap-1.5 text-sm"
+                            onClick={() =>
+                              handleSOSLocationFill(
+                                selectedSOSRequest.location.lat,
+                                selectedSOSRequest.location.lng,
+                              )
+                            }
+                          >
+                            <MapPin className="h-3.5 w-3.5" weight="fill" />
+                            Dùng tọa độ cho bước tiếp theo
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 xl:grid-cols-4 sm:grid-cols-2">
+                        <div className="rounded-xl border border-border/70 bg-background/80 px-3 py-2.5">
+                          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                            Tổng người
+                          </p>
+                          <p className="mt-1 text-lg font-semibold text-foreground">
+                            {selectedSOSPeopleTotal ?? "Chưa rõ"}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-border/70 bg-background/80 px-3 py-2.5">
+                          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                            Trẻ em / Người già
+                          </p>
+                          <p className="mt-1 text-lg font-semibold text-foreground">
+                            {selectedSOSRequest.peopleCount
+                              ? `${selectedSOSRequest.peopleCount.child}/${selectedSOSRequest.peopleCount.elderly}`
+                              : "Chưa rõ"}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-border/70 bg-background/80 px-3 py-2.5">
+                          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                            Chờ xử lý
+                          </p>
+                          <p className="mt-1 text-lg font-semibold text-foreground">
+                            {selectedSOSWaitTimeLabel ?? "Vừa gửi"}
+                          </p>
+                        </div>
+                        <div className="rounded-xl border border-border/70 bg-background/80 px-3 py-2.5">
+                          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                            Người bị thương
+                          </p>
+                          <p className="mt-1 text-lg font-semibold text-foreground">
+                            {selectedSOSRequest.hasInjured
+                              ? "Có"
+                              : "Chưa ghi nhận"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
+                        <div className="rounded-xl border border-border/70 bg-background/80 p-3">
+                          <p className="text-sm font-semibold text-foreground">
+                            Tóm tắt yêu cầu
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {selectedSOSNeedBadges.length > 0 ? (
+                              selectedSOSNeedBadges.map((badge) => (
+                                <Badge
+                                  key={`selected-sos-need-${badge}`}
+                                  variant="outline"
+                                  className="rounded-full px-2 py-0.5 text-xs"
+                                >
+                                  {badge}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                Chưa có cờ nhu cầu nhanh.
+                              </span>
+                            )}
+                          </div>
+
+                          {(selectedSOSMedicalIssues.length > 0 ||
+                            selectedSOSSupplies.length > 0) && (
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                              {selectedSOSMedicalIssues.length > 0 ? (
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                    Vấn đề y tế
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {selectedSOSMedicalIssues.map((issue) =>
+                                      issue ? (
+                                        <Badge
+                                          key={`medical-${issue}`}
+                                          variant="outline"
+                                          className="rounded-full px-2 py-0.5 text-xs"
+                                        >
+                                          {issue}
+                                        </Badge>
+                                      ) : null,
+                                    )}
+                                  </div>
+                                </div>
+                              ) : null}
+
+                              {selectedSOSSupplies.length > 0 ? (
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                    Vật phẩm cần
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {selectedSOSSupplies.map((supply) =>
+                                      supply ? (
+                                        <Badge
+                                          key={`supply-${supply}`}
+                                          variant="outline"
+                                          className="rounded-full px-2 py-0.5 text-xs"
+                                        >
+                                          {supply}
+                                        </Badge>
+                                      ) : null,
+                                    )}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border border-border/70 bg-background/80 p-3">
+                          <p className="text-sm font-semibold text-foreground">
+                            Vị trí và liên hệ
+                          </p>
+                          <div className="mt-3 space-y-2 text-sm">
+                            <div className="flex items-start gap-2 text-muted-foreground">
+                              <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                              <div>
+                                <p className="font-medium text-foreground">
+                                  {selectedSOSRequest.location.lat.toFixed(4)},{" "}
+                                  {selectedSOSRequest.location.lng.toFixed(4)}
+                                </p>
+                                {selectedSOSRequest.address ? (
+                                  <p className="mt-0.5 leading-relaxed">
+                                    {selectedSOSRequest.address}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            {(selectedSOSRequest.victimPhone ||
+                              selectedSOSRequest.reporterPhone) && (
+                              <div className="flex items-start gap-2 text-muted-foreground">
+                                <Phone className="mt-0.5 h-4 w-4 shrink-0" />
+                                <div className="space-y-1">
+                                  {selectedSOSRequest.victimPhone ? (
+                                    <p>
+                                      Nạn nhân:{" "}
+                                      <span className="font-medium text-foreground">
+                                        {selectedSOSRequest.victimName ||
+                                          "Chưa rõ tên"}
+                                        {" • "}
+                                        {selectedSOSRequest.victimPhone}
+                                      </span>
+                                    </p>
+                                  ) : null}
+                                  {selectedSOSRequest.reporterPhone ? (
+                                    <p>
+                                      Người báo tin:{" "}
+                                      <span className="font-medium text-foreground">
+                                        {selectedSOSRequest.reporterName ||
+                                          "Chưa rõ tên"}
+                                        {" • "}
+                                        {selectedSOSRequest.reporterPhone}
+                                      </span>
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex items-start gap-2 text-muted-foreground">
+                              <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+                              <div>
+                                <p className="font-medium text-foreground">
+                                  {new Date(
+                                    selectedSOSRequest.createdAt,
+                                  ).toLocaleString("vi-VN", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </p>
+                                <p className="mt-0.5">
+                                  {selectedSOSRequest.reporterIsOnline === true
+                                    ? "Người báo tin đang online"
+                                    : selectedSOSRequest.reporterIsOnline ===
+                                        false
+                                      ? "Người báo tin đang offline"
+                                      : "Chưa có trạng thái kết nối"}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+                  ) : (
+                    <section className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-5 text-sm text-muted-foreground">
+                      Chưa có SOS nào trong cụm để hiển thị chi tiết.
+                    </section>
+                  )}
+
                   <div className="rounded-2xl border border-amber-300/80 bg-[linear-gradient(135deg,rgba(255,247,237,0.95)_0%,rgba(255,255,255,0.98)_100%)] p-4 shadow-sm dark:border-amber-700/60 dark:bg-[linear-gradient(135deg,rgba(120,53,15,0.25)_0%,rgba(15,23,42,0.95)_100%)]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -2323,7 +2930,7 @@ const ManualMissionBuilder = ({
                           gian triển khai trước khi xác nhận.
                         </p>
                       </div>
-                      <div className="grid min-w-[220px] grid-cols-3 gap-2 text-xs">
+                      <div className="grid w-full grid-cols-3 gap-2 text-xs sm:w-auto sm:min-w-55">
                         <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2">
                           <p className="uppercase tracking-[0.14em] text-muted-foreground">
                             Loại
@@ -2476,6 +3083,9 @@ const ManualMissionBuilder = ({
                             activity={activity}
                             index={index}
                             isLast={index === activities.length - 1}
+                            isRecentlyInserted={
+                              recentlyInsertedActivityId === activity.id
+                            }
                             onUpdate={handleUpdateActivity}
                             onRemove={handleRemoveActivity}
                             onAddSupply={handleAddSupplyToActivity}
@@ -2541,7 +3151,11 @@ const ManualMissionBuilder = ({
           </div>
 
           {/* ── Drag Overlay ── */}
-          <DragOverlay>
+          <DragOverlay
+            dropAnimation={
+              activeId?.startsWith(PALETTE_PREFIX) ? null : undefined
+            }
+          >
             {activeId && activeDragType ? (
               <DragOverlayContent type={activeDragType} />
             ) : null}
