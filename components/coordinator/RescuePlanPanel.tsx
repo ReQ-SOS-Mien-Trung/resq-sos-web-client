@@ -48,10 +48,13 @@ import {
 } from "@/components/ui/dialog";
 import {
   useCreateMission,
+  useCreateActivity,
   useMissions,
   useMissionActivities,
   useActivityRoute,
   useMissionTeamRoute,
+  useUpdateActivity,
+  useUpdateMission,
 } from "@/services/mission/hooks";
 import {
   useRescueTeamStatuses,
@@ -1488,6 +1491,24 @@ function getSupplyStepTitle(activityType: string): string {
   }
 
   return "Vật phẩm cần thu gom ở bước này";
+}
+
+function buildSupplySummary(
+  supplies: Array<{
+    itemId?: number | null;
+    itemName?: string | null;
+    quantity: number;
+    unit: string;
+  }>,
+): string {
+  if (!supplies.length) return "";
+
+  return supplies
+    .map((supply) => {
+      const name = getSupplyDisplayName(supply);
+      return `${name} x${supply.quantity} ${supply.unit}`.trim();
+    })
+    .join(", ");
 }
 
 function toValidTeamId(value: unknown): number | null {
@@ -4945,7 +4966,7 @@ const SuggestionCard = ({
                             ? ` • SĐT: ${act.suggestedTeam.contactPhone}`
                             : ""}
                           {act.suggestedTeam.estimatedEtaMinutes != null
-                            ? ` • ETA: ${act.suggestedTeam.estimatedEtaMinutes} phút`
+                            ? ` • Thời gian dự kiến đến: ${act.suggestedTeam.estimatedEtaMinutes} phút`
                             : ""}
                         </p>
                         {act.suggestedTeam.reason && (
@@ -5072,7 +5093,10 @@ const RescuePlanPanel = ({
   // ── Edit mode state ──
   const [isEditMode, setIsEditMode] = useState(false);
 
-  type EditableActivity = ClusterSuggestedActivity & { _id: string };
+  type EditableActivity = ClusterSuggestedActivity & {
+    _id: string;
+    _missionActivityId?: number | null;
+  };
   type PendingRemoval =
     | {
         type: "activity";
@@ -5100,8 +5124,19 @@ const RescuePlanPanel = ({
   );
   const supplyUnitByItemIdRef = useRef<Record<number, string>>({});
 
-  const { mutate: createMission, isPending: isCreatingMission } =
+  const { mutateAsync: createMissionAsync, isPending: isCreatingMission } =
     useCreateMission();
+  const { mutateAsync: updateMissionAsync, isPending: isUpdatingMission } =
+    useUpdateMission();
+  const { mutateAsync: createActivityAsync, isPending: isCreatingActivity } =
+    useCreateActivity();
+  const { mutateAsync: updateActivityAsync, isPending: isUpdatingActivity } =
+    useUpdateActivity();
+  const isSubmittingMissionEdit =
+    isCreatingMission ||
+    isUpdatingMission ||
+    isCreatingActivity ||
+    isUpdatingActivity;
 
   const syncReturnActivitiesWithCollectors = useCallback(
     (activities: EditableActivity[]): EditableActivity[] =>
@@ -5530,138 +5565,215 @@ const RescuePlanPanel = ({
   const handleSubmitEdit = useCallback(() => {
     if (!validateEditMission() || !clusterId) return;
 
-    setConfirmSubmitOpen(false);
+    const submit = async () => {
+      setConfirmSubmitOpen(false);
 
-    const sos = clusterSOSRequests[0];
-    createMission(
-      {
-        clusterId,
-        missionType: editMissionType,
-        priorityScore: editPriorityScore,
-        startTime: new Date(editStartTime).toISOString(),
-        expectedEndTime: new Date(editExpectedEndTime).toISOString(),
-        activities: editActivities.map((a, i) => {
-          const syncedDescription = syncDescriptionWithSupplies(
-            a.description,
-            a.suppliesToCollect,
-          );
+      const sos = clusterSOSRequests[0];
+      const normalizedActivities = editActivities.map((activity, index) => {
+        const syncedDescription = syncDescriptionWithSupplies(
+          activity.description,
+          activity.suppliesToCollect,
+        );
 
-          const rawSosRequestId =
-            a.sosRequestId != null ? Number(a.sosRequestId) : Number(sos?.id);
-          const sosRequestId =
-            Number.isFinite(rawSosRequestId) && rawSosRequestId > 0
-              ? rawSosRequestId
-              : null;
-
-          const rawDepotId = a.depotId != null ? Number(a.depotId) : Number.NaN;
-          const depotId =
-            Number.isFinite(rawDepotId) && rawDepotId > 0 ? rawDepotId : null;
-
-          const depotName =
-            typeof a.depotName === "string" && a.depotName.trim()
-              ? a.depotName.trim()
-              : null;
-
-          const depotAddress =
-            typeof a.depotAddress === "string" && a.depotAddress.trim()
-              ? a.depotAddress.trim()
-              : null;
-
-          const rawAssemblyPointId =
-            a.assemblyPointId != null ? Number(a.assemblyPointId) : Number.NaN;
-          const assemblyPointId =
-            Number.isFinite(rawAssemblyPointId) && rawAssemblyPointId > 0
-              ? rawAssemblyPointId
-              : null;
-          const assemblyPointName =
-            typeof a.assemblyPointName === "string" &&
-            a.assemblyPointName.trim()
-              ? a.assemblyPointName.trim()
-              : null;
-          const rawAssemblyPointLat =
-            a.assemblyPointLatitude != null
-              ? Number(a.assemblyPointLatitude)
-              : Number.NaN;
-          const assemblyPointLatitude = Number.isFinite(rawAssemblyPointLat)
-            ? rawAssemblyPointLat
-            : null;
-          const rawAssemblyPointLng =
-            a.assemblyPointLongitude != null
-              ? Number(a.assemblyPointLongitude)
-              : Number.NaN;
-          const assemblyPointLongitude = Number.isFinite(rawAssemblyPointLng)
-            ? rawAssemblyPointLng
+        const rawSosRequestId =
+          activity.sosRequestId != null
+            ? Number(activity.sosRequestId)
+            : Number(sos?.id);
+        const sosRequestId =
+          Number.isFinite(rawSosRequestId) && rawSosRequestId > 0
+            ? rawSosRequestId
             : null;
 
-          const selectedSos =
-            sosRequestId != null
-              ? clusterSOSRequests.find(
-                  (s) => String(s.id) === String(sosRequestId),
-                )
-              : null;
+        const rawDepotId =
+          activity.depotId != null ? Number(activity.depotId) : Number.NaN;
+        const depotId =
+          Number.isFinite(rawDepotId) && rawDepotId > 0 ? rawDepotId : null;
+        const depotName =
+          typeof activity.depotName === "string" && activity.depotName.trim()
+            ? activity.depotName.trim()
+            : null;
+        const depotAddress =
+          typeof activity.depotAddress === "string" &&
+          activity.depotAddress.trim()
+            ? activity.depotAddress.trim()
+            : null;
 
-          const forcedCollectorActivity =
-            a.activityType === "RETURN_SUPPLIES"
-              ? findCollectorActivityForReturn(a, editActivities)
-              : null;
-          const rescueTeamId =
-            a.activityType === "RETURN_SUPPLIES"
-              ? toValidTeamId(forcedCollectorActivity?.suggestedTeam?.teamId)
-              : toValidTeamId(a.suggestedTeam?.teamId);
+        const rawAssemblyPointId =
+          activity.assemblyPointId != null
+            ? Number(activity.assemblyPointId)
+            : Number.NaN;
+        const assemblyPointId =
+          Number.isFinite(rawAssemblyPointId) && rawAssemblyPointId > 0
+            ? rawAssemblyPointId
+            : null;
+        const assemblyPointName =
+          typeof activity.assemblyPointName === "string" &&
+          activity.assemblyPointName.trim()
+            ? activity.assemblyPointName.trim()
+            : null;
+        const rawAssemblyPointLat =
+          activity.assemblyPointLatitude != null
+            ? Number(activity.assemblyPointLatitude)
+            : Number.NaN;
+        const assemblyPointLatitude = Number.isFinite(rawAssemblyPointLat)
+          ? rawAssemblyPointLat
+          : null;
+        const rawAssemblyPointLng =
+          activity.assemblyPointLongitude != null
+            ? Number(activity.assemblyPointLongitude)
+            : Number.NaN;
+        const assemblyPointLongitude = Number.isFinite(rawAssemblyPointLng)
+          ? rawAssemblyPointLng
+          : null;
 
-          return {
-            step: i + 1,
-            activityCode: `${a.activityType}_${i + 1}`,
-            activityType: a.activityType,
-            description: syncedDescription,
-            priority: a.priority || "Medium",
-            estimatedTime: Number.parseInt(String(a.estimatedTime), 10) || 30,
-            sosRequestId,
-            depotId,
-            depotName,
-            depotAddress,
-            assemblyPointId,
-            assemblyPointName,
-            assemblyPointLatitude,
-            assemblyPointLongitude,
-            suppliesToCollect: (a.suppliesToCollect ?? []).map((s) => ({
-              id: typeof s.itemId === "number" ? s.itemId : null,
-              name:
-                typeof s.itemName === "string" && s.itemName.trim()
-                  ? s.itemName.trim()
-                  : null,
-              quantity: s.quantity,
-              unit: s.unit,
+        const selectedSos =
+          sosRequestId != null
+            ? clusterSOSRequests.find((s) => String(s.id) === String(sosRequestId))
+            : null;
+
+        const forcedCollectorActivity =
+          activity.activityType === "RETURN_SUPPLIES"
+            ? findCollectorActivityForReturn(activity, editActivities)
+            : null;
+        const rescueTeamId =
+          activity.activityType === "RETURN_SUPPLIES"
+            ? toValidTeamId(forcedCollectorActivity?.suggestedTeam?.teamId)
+            : toValidTeamId(activity.suggestedTeam?.teamId);
+
+        const createRequest = {
+          step: index + 1,
+          activityCode: `${activity.activityType}_${index + 1}`,
+          activityType: activity.activityType,
+          description: syncedDescription,
+          priority: activity.priority || "Medium",
+          estimatedTime:
+            Number.parseInt(String(activity.estimatedTime), 10) || 30,
+          sosRequestId,
+          depotId,
+          depotName,
+          depotAddress,
+          assemblyPointId,
+          assemblyPointName,
+          assemblyPointLatitude,
+          assemblyPointLongitude,
+          suppliesToCollect: (activity.suppliesToCollect ?? []).map((s) => ({
+            id: typeof s.itemId === "number" ? s.itemId : null,
+            name:
+              typeof s.itemName === "string" && s.itemName.trim()
+                ? s.itemName.trim()
+                : null,
+            quantity: s.quantity,
+            unit: s.unit,
+          })),
+          target:
+            depotName || `SOS ${sosRequestId || sos?.id || "unknown"}`,
+          targetLatitude:
+            extractCoordsFromDescription(syncedDescription)?.lat ??
+            (sosRequestId
+              ? (selectedSos?.location?.lat ?? sos?.location?.lat ?? 0)
+              : (sos?.location?.lat ?? 0)),
+          targetLongitude:
+            extractCoordsFromDescription(syncedDescription)?.lng ??
+            (sosRequestId
+              ? (selectedSos?.location?.lng ?? sos?.location?.lng ?? 0)
+              : (sos?.location?.lng ?? 0)),
+          rescueTeamId,
+        };
+
+        return {
+          sourceActivityId: activity._missionActivityId ?? null,
+          createRequest,
+          itemsSummary: buildSupplySummary(
+            (activity.suppliesToCollect ?? []).map((supply) => ({
+              itemId:
+                typeof supply.itemId === "number" ? supply.itemId : -1,
+              itemName:
+                typeof supply.itemName === "string" && supply.itemName.trim()
+                  ? supply.itemName.trim()
+                  : "Vật phẩm chưa rõ tên",
+              quantity: supply.quantity,
+              unit: supply.unit,
             })),
-            target: depotName || `SOS ${sosRequestId || sos?.id || "unknown"}`,
-            targetLatitude:
-              extractCoordsFromDescription(syncedDescription)?.lat ??
-              (sosRequestId
-                ? (selectedSos?.location?.lat ?? sos?.location?.lat ?? 0)
-                : (sos?.location?.lat ?? 0)),
-            targetLongitude:
-              extractCoordsFromDescription(syncedDescription)?.lng ??
-              (sosRequestId
-                ? (selectedSos?.location?.lng ?? sos?.location?.lng ?? 0)
-                : (sos?.location?.lng ?? 0)),
-            rescueTeamId,
-          };
-        }),
-      },
-      {
-        onSuccess: () => {
-          exitEditMode();
-          onApprove();
-        },
-        onError: (error) => {
-          const backendMessage = extractBackendErrorMessage(error);
-          console.error("Failed to create mission:", error);
-          toast.error(
-            backendMessage ?? "Không thể tạo nhiệm vụ. Vui lòng thử lại.",
+          ),
+        };
+      });
+
+      try {
+        if (editingMissionId) {
+          await updateMissionAsync({
+            missionId: editingMissionId,
+            request: {
+              missionType: editMissionType,
+              priorityScore: editPriorityScore,
+              startTime: new Date(editStartTime).toISOString(),
+              expectedEndTime: new Date(editExpectedEndTime).toISOString(),
+            },
+          });
+
+          await Promise.all(
+            normalizedActivities.map(
+              ({ sourceActivityId, createRequest, itemsSummary }) => {
+              if (sourceActivityId) {
+                return updateActivityAsync({
+                  missionId: editingMissionId,
+                  activityId: sourceActivityId,
+                  request: {
+                    step: createRequest.step,
+                    activityCode: createRequest.activityCode,
+                    activityType: createRequest.activityType,
+                    description: createRequest.description,
+                    target: createRequest.target,
+                    items: itemsSummary,
+                    targetLatitude: createRequest.targetLatitude,
+                    targetLongitude: createRequest.targetLongitude,
+                    rescueTeamId: createRequest.rescueTeamId ?? null,
+                  },
+                });
+              }
+
+              return createActivityAsync({
+                missionId: editingMissionId,
+                request: createRequest,
+              });
+            }),
           );
-        },
-      },
-    );
+
+          toast.success("Đã cập nhật nhiệm vụ thành công!");
+        } else {
+          await createMissionAsync({
+            clusterId,
+            missionType: editMissionType,
+            priorityScore: editPriorityScore,
+            startTime: new Date(editStartTime).toISOString(),
+            expectedEndTime: new Date(editExpectedEndTime).toISOString(),
+            activities: normalizedActivities.map(
+              ({ createRequest }) => createRequest,
+            ),
+          });
+
+          toast.success("Đã tạo nhiệm vụ thành công!");
+        }
+
+        exitEditMode();
+        onApprove();
+      } catch (error) {
+        const backendMessage = extractBackendErrorMessage(error);
+        console.error(
+          editingMissionId
+            ? "Failed to update mission:"
+            : "Failed to create mission:",
+          error,
+        );
+        toast.error(
+          backendMessage ??
+            (editingMissionId
+              ? "Không thể cập nhật nhiệm vụ. Vui lòng thử lại."
+              : "Không thể tạo nhiệm vụ. Vui lòng thử lại."),
+        );
+      }
+    };
+
+    void submit();
   }, [
     clusterId,
     editActivities,
@@ -5670,9 +5782,13 @@ const RescuePlanPanel = ({
     editStartTime,
     editExpectedEndTime,
     clusterSOSRequests,
-    createMission,
+    editingMissionId,
+    createActivityAsync,
+    createMissionAsync,
     exitEditMode,
     onApprove,
+    updateActivityAsync,
+    updateMissionAsync,
     validateEditMission,
   ]);
 
@@ -5964,6 +6080,7 @@ const RescuePlanPanel = ({
           activeSuggestion.suggestedActivities.map((a, i) => ({
             ...a,
             _id: `edit-${i}-${Date.now()}`,
+            _missionActivityId: null,
           })),
         ),
       );
@@ -6012,6 +6129,7 @@ const RescuePlanPanel = ({
 
             return {
               _id: `edit-m-${i}-${Date.now()}`,
+              _missionActivityId: a.id,
               step: a.step,
               activityType: a.activityType as ClusterActivityType,
               description: a.description,
@@ -7050,8 +7168,9 @@ const RescuePlanPanel = ({
                                                               {typeof activity.estimatedTime ===
                                                               "number" ? (
                                                                 <div className="shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm">
-                                                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                                                    ETA
+                                                                  <p className="text-[10px] font-semibold leading-tight text-muted-foreground">
+                                                                    Thời gian dự
+                                                                    kiến đến
                                                                   </p>
                                                                   <p className="text-sm font-bold text-foreground">
                                                                     {
@@ -8692,7 +8811,7 @@ const RescuePlanPanel = ({
                       <CardContent className="p-2.5">
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="text-sm text-muted-foreground">
-                            Confidence
+                            Mức tự tin của AI
                           </span>
                           <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                             {(
@@ -8705,6 +8824,10 @@ const RescuePlanPanel = ({
                           value={(activeSuggestion?.confidenceScore ?? 0) * 100}
                           className="h-1.5"
                         />
+                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                          Chỉ số này thể hiện mức độ chắc chắn của AI với đề
+                          xuất hiện tại, không phải mức ưu tiên xử lý.
+                        </p>
                         <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
                           <div>
                             <p className="text-muted-foreground/60">Model</p>
@@ -8726,23 +8849,16 @@ const RescuePlanPanel = ({
                             </div>
                           )}
                           <div>
-                            <p className="text-muted-foreground/60">Ưu tiên</p>
+                            <p className="text-muted-foreground/60">Đánh giá</p>
                             <p className="font-medium text-foreground/80">
-                              {(
-                                activeSuggestion?.suggestedPriorityScore ?? 0
-                              ).toFixed(1)}
+                              {(activeSuggestion?.confidenceScore ?? 0) >= 0.8
+                                ? "Cao"
+                                : (activeSuggestion?.confidenceScore ?? 0) >=
+                                    0.6
+                                  ? "Trung bình"
+                                  : "Cần rà soát"}
                             </p>
                           </div>
-                          {activeSuggestion && (
-                            <div>
-                              <p className="text-muted-foreground/60">
-                                Thời lượng
-                              </p>
-                              <p className="font-medium text-foreground/80">
-                                {activeSuggestion.estimatedDuration}
-                              </p>
-                            </div>
-                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -8809,14 +8925,20 @@ const RescuePlanPanel = ({
               <Button
                 className="flex-1 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg shadow-amber-500/20"
                 onClick={handleOpenSubmitConfirm}
-                disabled={isCreatingMission}
+                disabled={isSubmittingMissionEdit}
               >
-                {isCreatingMission ? (
+                {isSubmittingMissionEdit ? (
                   <CircleNotch className="h-5 w-5 mr-2 animate-spin" />
                 ) : (
                   <FloppyDisk className="h-5 w-5 mr-2" weight="fill" />
                 )}
-                {isCreatingMission ? "Đang tạo..." : "Xác nhận nhiệm vụ"}
+                {isSubmittingMissionEdit
+                  ? editingMissionId
+                    ? "Đang cập nhật..."
+                    : "Đang tạo..."
+                  : editingMissionId
+                    ? "Lưu cập nhật nhiệm vụ"
+                    : "Xác nhận nhiệm vụ"}
               </Button>
             ) : activeSuggestion ? (
               <Button
@@ -8861,27 +8983,37 @@ const RescuePlanPanel = ({
         <Dialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Xác nhận tạo nhiệm vụ</DialogTitle>
+              <DialogTitle>
+                {editingMissionId
+                  ? "Xác nhận cập nhật nhiệm vụ"
+                  : "Xác nhận tạo nhiệm vụ"}
+              </DialogTitle>
               <DialogDescription>
-                Bạn có chắc muốn hoàn tất chỉnh sửa không? Sau khi tạo, nhiệm vụ
-                sẽ được lưu vào danh sách nhiệm vụ đã tạo và gửi đến đội cứu hộ
-                được chỉ định.
+                {editingMissionId
+                  ? "Bạn có chắc muốn lưu các thay đổi của nhiệm vụ hiện tại không? Hệ thống sẽ cập nhật kế hoạch đang giao cho đội cứu hộ."
+                  : "Bạn có chắc muốn hoàn tất chỉnh sửa không? Sau khi tạo, nhiệm vụ sẽ được lưu vào danh sách nhiệm vụ đã tạo và gửi đến đội cứu hộ được chỉ định."}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button
                 variant="outline"
                 onClick={() => setConfirmSubmitOpen(false)}
-                disabled={isCreatingMission}
+                disabled={isSubmittingMissionEdit}
               >
                 Quay lại chỉnh sửa
               </Button>
               <Button
                 className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
                 onClick={handleSubmitEdit}
-                disabled={isCreatingMission}
+                disabled={isSubmittingMissionEdit}
               >
-                {isCreatingMission ? "Đang tạo..." : "Đồng ý tạo nhiệm vụ"}
+                {isSubmittingMissionEdit
+                  ? editingMissionId
+                    ? "Đang cập nhật..."
+                    : "Đang tạo..."
+                  : editingMissionId
+                    ? "Đồng ý cập nhật"
+                    : "Đồng ý tạo nhiệm vụ"}
               </Button>
             </DialogFooter>
           </DialogContent>

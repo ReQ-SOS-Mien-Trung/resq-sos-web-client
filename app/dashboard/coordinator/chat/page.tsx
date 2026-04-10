@@ -361,6 +361,7 @@ export default function CoordinatorChatPage() {
           id: String(targetCluster.id),
           openPlan: "1",
           focusSosId: String(sosRequestId),
+          openAt: String(Date.now()),
         });
         router.push(`/dashboard/coordinator?${params.toString()}`);
         return;
@@ -369,6 +370,7 @@ export default function CoordinatorChatPage() {
       const params = new URLSearchParams({
         sel: "sos",
         id: String(sosRequestId),
+        openAt: String(Date.now()),
       });
       router.push(`/dashboard/coordinator?${params.toString()}`);
       toast.info(

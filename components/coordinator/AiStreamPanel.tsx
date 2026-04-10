@@ -710,7 +710,7 @@ function SonarRadar({
                     <span className="relative inline-flex h-3 w-3 rounded-full bg-primary" />
                   </span>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary/80">
-                    Suy nghĩ AI
+                    AI Suy nghĩ
                   </p>
                 </div>
 
@@ -730,7 +730,8 @@ function SonarRadar({
               >
                 {visibleStatusEntries.length > 0 ? (
                   visibleStatusEntries.map((entry, index) => {
-                    const reverseIndex = visibleStatusEntries.length - index - 1;
+                    const reverseIndex =
+                      visibleStatusEntries.length - index - 1;
                     const isLatest = reverseIndex === 0;
                     const ageOpacity = Math.max(0.38, 1 - reverseIndex * 0.16);
 

@@ -318,12 +318,12 @@ function SosRequestCommerceCard({
   onOpenSosRequest?: (sosRequestId: number) => void;
 }) {
   return (
-    <div className="rounded-xl border border-[#FF5722]/35 bg-linear-to-br from-[#fff7ed] via-white to-[#fff1e8] p-3 shadow-[0_6px_18px_rgba(255,87,34,0.1)]">
+    <div className="w-full max-w-[23rem] rounded-xl border border-[#FF5722]/35 bg-linear-to-br from-[#fff7ed] via-white to-[#fff1e8] p-3 shadow-[0_6px_18px_rgba(255,87,34,0.1)]">
       <div className="min-w-0">
         <p className="text-sm font-extrabold uppercase tracking-tight text-black">
           SOS #{card.sosRequestId}
         </p>
-        <p className="mt-0.5 text-sm text-black/70 line-clamp-2">
+        <p className="mt-0.5 text-sm text-black/70 line-clamp-3">
           {card.summary || "Yêu cầu hỗ trợ từ hiện trường"}
         </p>
       </div>
@@ -360,11 +360,11 @@ function SosRequestCommerceCard({
 
       {/* Ẩn các details nhỏ lẻ để giao diện gọn hơn */}
 
-      <div className="mt-3 flex justify-end">
+      <div className="mt-3 flex justify-start">
         <Button
           type="button"
           size="sm"
-          className="h-8 gap-1 rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19]"
+          className="h-8 gap-1 rounded-none bg-[#FF5722] px-3 text-white hover:bg-[#e64a19]"
           onClick={() => onOpenSosRequest?.(card.sosRequestId)}
           disabled={!onOpenSosRequest}
         >
@@ -387,6 +387,11 @@ export default function ChatMessageThread({
     alt: string;
     src: string;
   } | null>(null);
+  const visibleMessages = messages.filter((message) => {
+    const sosCards = parseSosCards(message.content);
+    const isAiMessage = message.messageType === "AiMessage";
+    return !isAiMessage || sosCards.length > 0;
+  });
 
   if (isLoading) {
     return (
@@ -396,7 +401,7 @@ export default function ChatMessageThread({
     );
   }
 
-  if (!messages.length) {
+  if (!visibleMessages.length) {
     return (
       <div className="p-4 text-sm text-muted-foreground">
         Chưa có tin nhắn. Hãy gửi tin đầu tiên.
@@ -408,8 +413,10 @@ export default function ChatMessageThread({
     <>
       <ScrollArea className="h-full">
         <div className="p-4 space-y-3">
-          {messages.map((message) => {
+          {visibleMessages.map((message) => {
             const sosCards = parseSosCards(message.content);
+            const isAiMessage = message.messageType === "AiMessage";
+            const isStructuredSosMessage = sosCards.length > 0;
 
             if (
               message.messageType === "SystemMessage" &&
@@ -429,8 +436,6 @@ export default function ChatMessageThread({
 
             const isOwnMessage =
               !!currentUserId && message.senderId === currentUserId;
-            const isAiMessage = message.messageType === "AiMessage";
-            const isStructuredSosMessage = sosCards.length > 0;
             const senderLabel =
               message.senderName?.trim() ||
               (message.messageType === "SystemMessage" ? "Hệ thống" : null) ||
@@ -450,7 +455,7 @@ export default function ChatMessageThread({
                 <div
                   className={cn(
                     isStructuredSosMessage
-                      ? "max-w-[90%] rounded-2xl border border-black/10 bg-white/90 p-2"
+                      ? "w-fit max-w-[26rem] rounded-2xl border border-black/10 bg-white/90 p-2"
                       : "max-w-[75%] rounded-2xl px-3 py-2",
                     !isStructuredSosMessage &&
                       (isOwnMessage
