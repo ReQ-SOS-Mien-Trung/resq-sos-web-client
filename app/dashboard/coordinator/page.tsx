@@ -1207,6 +1207,7 @@ const CoordinatorDashboardContent = () => {
                 flyToLocation={flyToLocation}
                 flyToZoom={flyToZoom}
                 userLocation={userLocation}
+                panelOpen={aiStreamOpen}
                 onViewChange={handleMapViewChange}
                 routeOverlay={routeOverlay}
               />

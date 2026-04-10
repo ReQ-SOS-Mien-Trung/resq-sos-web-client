@@ -30,7 +30,11 @@ export interface RescueTeamMember {
   isLeader: boolean;
 }
 
-export type RescueTeamMemberStatus = "Accepted" | "Pending" | "Rejected";
+export type RescueTeamMemberStatus =
+  | "Accepted"
+  | "Pending"
+  | "Rejected"
+  | "Removed";
 
 export type RescueTeamRoleInTeam = "Leader" | "Member";
 

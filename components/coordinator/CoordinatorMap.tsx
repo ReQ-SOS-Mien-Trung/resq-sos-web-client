@@ -74,6 +74,7 @@ const CoordinatorMap = ({
   onViewChange,
   isPickingLocation,
   onMapClick,
+  panelOpen,
   routeOverlay,
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
@@ -563,7 +564,11 @@ const CoordinatorMap = ({
       {/* Map Search Box - positioned top-left */}
       <div
         ref={searchContainerRef}
-        className="absolute top-4 left-3 z-[1000] w-80"
+        className={cn(
+          "absolute top-3 left-3 z-[1000] transition-all duration-200",
+          "w-[min(17rem,calc(100vw-1.5rem))] sm:w-72",
+          panelOpen && "pointer-events-none opacity-0 -translate-y-1",
+        )}
       >
         <div
           className={cn(
@@ -591,7 +596,7 @@ const CoordinatorMap = ({
                     searchInputRef.current?.select();
                   }, 0);
                 }}
-                className="pl-10 pr-20 h-11 w-full text-left text-sm truncate text-foreground"
+                className="pl-10 pr-20 h-10 w-full text-left text-sm truncate text-foreground"
               >
                 {selectedSearchName}
               </button>
@@ -612,7 +617,7 @@ const CoordinatorMap = ({
                   setIsSearchOpen(true);
                   setIsSearchFocused(true);
                 }}
-                className="pl-10 pr-20 h-11 bg-transparent border-0 shadow-none focus-visible:ring-0 rounded-2xl text-sm"
+                className="pl-10 pr-20 h-10 bg-transparent border-0 shadow-none focus-visible:ring-0 rounded-2xl text-sm"
               />
             )}
 
