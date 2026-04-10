@@ -1,6 +1,8 @@
 import type {
+  AiProvider,
   PromptEntity,
   PromptDetailEntity,
+  PromptType,
   CreatePromptRequest,
   UpdatePromptRequest,
 } from "@/services/prompt/type";
@@ -303,6 +305,8 @@ export type PromptTextField = "system_prompt" | "user_prompt_template";
 
 export interface PromptFormData {
   name: string;
+  prompt_type: PromptType;
+  provider: AiProvider;
   purpose: string;
   system_prompt: string;
   user_prompt_template: string;
@@ -311,6 +315,7 @@ export interface PromptFormData {
   max_tokens: number;
   version: string;
   api_url: string;
+  api_key: string;
   is_active: boolean;
 }
 

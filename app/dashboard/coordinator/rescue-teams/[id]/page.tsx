@@ -94,7 +94,7 @@ const statusMap: Record<
     tone: "warn",
   },
   Available: {
-    label: "Trống",
+    label: "Sẵn sàng",
     className: "border-teal-300 bg-teal-50 text-teal-800",
     tone: "good",
   },
@@ -183,10 +183,12 @@ function MemberCard({
   member,
   onRemove,
   isRemoving,
+  canRemove,
 }: {
   member: RescueTeamMemberDetail;
   onRemove: (member: RescueTeamMemberDetail) => void;
   isRemoving: boolean;
+  canRemove: boolean;
 }) {
   const initials =
     `${member.firstName?.[0] || ""}${member.lastName?.[0] || ""}`.toUpperCase() ||
@@ -230,21 +232,23 @@ function MemberCard({
                   </Badge>
                 )}
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 rounded-none border border-black/30 px-2 text-black hover:bg-black/5 hover:text-black"
-                onClick={() => onRemove(member)}
-                disabled={isRemoving}
-              >
-                {isRemoving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3.5 w-3.5" />
-                )}
-                <span className="ml-1 text-[11px]">Xóa</span>
-              </Button>
+              {canRemove && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 rounded-none border border-black/30 px-2 text-black hover:bg-black/5 hover:text-black"
+                  onClick={() => onRemove(member)}
+                  disabled={isRemoving}
+                >
+                  {isRemoving ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                  <span className="ml-1 text-[11px]">Xóa</span>
+                </Button>
+              )}
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-black/70">
@@ -323,7 +327,6 @@ export default function RescueTeamDetailPage() {
       accepted: members.filter((m) => m.status === "Accepted").length,
       pending: members.filter((m) => m.status === "Pending").length,
       rejected: members.filter((m) => m.status === "Rejected").length,
-      leaders: members.filter((m) => m.isLeader).length,
     };
   }, [data?.members]);
 
@@ -346,6 +349,9 @@ export default function RescueTeamDetailPage() {
     () => availableRescuers.find((rescuer) => rescuer.id === selectedRescuerId),
     [availableRescuers, selectedRescuerId],
   );
+
+  const canRemoveMembers =
+    data?.status === "Gathering" || data?.status === "Unavailable";
 
   const remainingSlots = Math.max(
     0,
@@ -386,6 +392,13 @@ export default function RescueTeamDetailPage() {
   };
 
   const handleRemoveMember = (member: RescueTeamMemberDetail) => {
+    if (!canRemoveMembers) {
+      toast.error(
+        "Chỉ có thể xóa thành viên khi đội đang ở trạng thái Gathering hoặc Unavailable.",
+      );
+      return;
+    }
+
     setMemberPendingRemove(member);
   };
 
@@ -425,8 +438,8 @@ export default function RescueTeamDetailPage() {
           <CardContent className="p-6 space-y-4">
             <Skeleton className="h-8 w-1/2" />
             <Skeleton className="h-6 w-40" />
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, i) => (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
                 <Skeleton key={i} className="h-20 rounded-xl" />
               ))}
             </div>
@@ -564,19 +577,13 @@ export default function RescueTeamDetailPage() {
                 </p>
               </div>
               <div className="border border-black p-2.5">
-                <p className="text-xs text-black/60">Đội trưởng</p>
-                <p className="mt-1 text-lg font-bold">{memberStats.leaders}</p>
+                <p className="text-xs text-black/60">Còn trống</p>
+                <p className="mt-1 text-lg font-bold">{remainingSlots}</p>
               </div>
-              <div className="border border-black p-2.5">
+              <div className="col-span-2 border border-black p-2.5">
                 <p className="text-xs text-black/60">Ngày lập</p>
                 <p className="mt-1 text-xs font-semibold leading-tight">
                   {formatDate(data.createdAt)}
-                </p>
-              </div>
-              <div className="border border-black p-2.5">
-                <p className="text-xs text-black/60">Ngày tập kết</p>
-                <p className="mt-1 text-xs font-semibold leading-tight">
-                  {formatDate(data.assemblyDate)}
                 </p>
               </div>
             </div>
@@ -591,45 +598,58 @@ export default function RescueTeamDetailPage() {
               <UserPlus className="h-4 w-4 text-[#FF5722]" />
               Bổ sung thành viên
             </CardTitle>
+            <p className="text-sm text-black/65">
+              Theo dõi chỗ trống và thêm người cứu hộ ngay trong một luồng thao
+              tác.
+            </p>
           </CardHeader>
 
           <CardContent className="p-3.5 md:p-4">
-            <div className="grid gap-2.5 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2 border border-black px-3 py-1.5 text-sm text-black/70">
-                  <span>Chỗ trống còn lại</span>
-                  <span className="font-semibold text-foreground">
-                    {remainingSlots}/{data.maxMembers}
-                  </span>
+            <div className="space-y-3">
+              <div className="grid gap-2 sm:grid-cols-3">
+                <div className="border border-black/20 bg-white px-3 py-2">
+                  <p className="text-xs text-black/60">Quân số hiện tại</p>
+                  <p className="mt-1 text-xl font-bold text-black">
+                    {memberStats.total}/{data.maxMembers}
+                  </p>
                 </div>
+                <div className="border border-black/20 bg-white px-3 py-2">
+                  <p className="text-xs text-black/60">Chỗ trống còn lại</p>
+                  <p className="mt-1 text-xl font-bold text-black">
+                    {remainingSlots}
+                  </p>
+                </div>
+                <div className="border border-black/20 bg-white px-3 py-2">
+                  <p className="text-xs text-black/60">Ứng viên khả dụng</p>
+                  <p className="mt-1 text-xl font-bold text-black">
+                    {availableRescuers.length}
+                  </p>
+                </div>
+              </div>
 
-                {remainingSlots <= 0 ? (
-                  <div className="border border-[#FF5722] bg-[#FF5722]/10 px-3 py-2 text-sm text-[#c2410c]">
-                    Đội đã đủ quân số tối đa. Không thể thêm thành viên mới.
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-black/50" />
-                        <Input
-                          value={rescuerSearch}
-                          onChange={(e) => setRescuerSearch(e.target.value)}
-                          placeholder="Tìm theo tên, email, số điện thoại"
-                          className="h-9 border-black/50 pl-8"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant={addAsLeader ? "default" : "outline"}
-                        className={`h-9 rounded-none border-black ${addAsLeader ? "bg-[#FF5722] text-white hover:bg-[#e64a19]" : ""}`}
-                        onClick={() => setAddAsLeader((prev) => !prev)}
-                        disabled={!selectedRescuerId}
-                      >
-                        {addAsLeader
-                          ? "Gán làm đội trưởng"
-                          : "Thêm dạng thành viên"}
-                      </Button>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10">
+                <div
+                  className="h-full bg-[#FF5722] transition-all"
+                  style={{ width: `${occupancyPercent}%` }}
+                />
+              </div>
+
+              {isTeamFull ? (
+                <div className="border border-[#FF5722] bg-[#FF5722]/10 px-3 py-2 text-sm text-[#c2410c]">
+                  Đội đã đủ quân số tối đa. Hãy xóa bớt thành viên trước khi bổ
+                  sung người mới.
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_240px] lg:items-start">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-black/50" />
+                      <Input
+                        value={rescuerSearch}
+                        onChange={(e) => setRescuerSearch(e.target.value)}
+                        placeholder="Tìm theo tên, email, số điện thoại"
+                        className="h-9 border-black/50 pl-8"
+                      />
                     </div>
 
                     <Select
@@ -640,15 +660,15 @@ export default function RescueTeamDetailPage() {
                         <SelectValue
                           placeholder={
                             isLoadingFreeRescuers
-                              ? "Đang tải danh sách cứu hộ..."
-                              : "Chọn thành viên để thêm"
+                              ? "Đang tải danh sách người cứu hộ..."
+                              : "Chọn người cứu hộ để thêm"
                           }
                         />
                       </SelectTrigger>
                       <SelectContent>
                         {availableRescuers.length === 0 ? (
                           <div className="px-2 py-2 text-xs text-muted-foreground">
-                            Không có cứu hộ phù hợp để thêm.
+                            Không có người cứu hộ phù hợp để thêm.
                           </div>
                         ) : (
                           availableRescuers.map((rescuer) => (
@@ -660,79 +680,53 @@ export default function RescueTeamDetailPage() {
                       </SelectContent>
                     </Select>
 
-                    {selectedCandidate ? (
-                      <div className="border border-black/20 bg-[#FFF8F4] px-3 py-2 text-sm text-black/75">
-                        <span className="font-semibold text-foreground">
-                          {selectedCandidate.firstName}{" "}
-                          {selectedCandidate.lastName}
-                        </span>
-                        {selectedCandidate.phone
-                          ? ` - ${selectedCandidate.phone}`
-                          : ""}
-                      </div>
-                    ) : null}
+                    <div className="grid gap-2">
+                      <Button
+                        type="button"
+                        variant={addAsLeader ? "default" : "outline"}
+                        className={`h-9 rounded-none border-black ${addAsLeader ? "bg-[#FF5722] text-white hover:bg-[#e64a19]" : ""}`}
+                        onClick={() => setAddAsLeader((prev) => !prev)}
+                        disabled={!selectedRescuerId}
+                      >
+                        {addAsLeader
+                          ? "Gán làm đội trưởng"
+                          : "Giữ vai trò thành viên"}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleAddMember}
+                        disabled={isAddingMember || !selectedRescuerId}
+                        className="h-9 rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19]"
+                      >
+                        {isAddingMember ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                            Đang thêm...
+                          </>
+                        ) : (
+                          "Thêm vào đội"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
 
-                    <Button
-                      type="button"
-                      onClick={handleAddMember}
-                      disabled={isAddingMember}
-                      className="h-9 w-full rounded-none bg-[#FF5722] text-white hover:bg-[#e64a19]"
-                    >
-                      {isAddingMember ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                          Đang thêm thành viên...
-                        </>
-                      ) : (
-                        "Thêm vào đội cứu hộ"
-                      )}
-                    </Button>
-                  </>
-                )}
-              </div>
-
-              <div className="space-y-2 border border-black/15 bg-[#FFF7F2] p-2.5">
-                <p className="text-sm font-semibold text-[#9A3412]">
-                  Trạng thái quân số
-                </p>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10">
-                  <div
-                    className="h-full bg-[#FF5722] transition-all"
-                    style={{ width: `${occupancyPercent}%` }}
-                  />
-                </div>
-                <div className="space-y-1 text-sm text-black/70">
-                  <p>
-                    Hiện tại có{" "}
-                    <span className="font-semibold text-black">
-                      {memberStats.total}
-                    </span>
-                    /{data.maxMembers} thành viên.
-                  </p>
-                  {isTeamFull ? (
-                    <>
-                      <p>Không còn vị trí có thể bổ sung.</p>
-                      <p className="text-sm text-[#9A3412]">
-                        Cần mở chỗ trống trước khi thêm thành viên mới.
-                      </p>
-                    </>
+                  {selectedCandidate ? (
+                    <div className="border border-[#FF5722]/30 bg-[#FFF8F4] px-3 py-2 text-sm text-black/80">
+                      <span className="font-semibold text-black">
+                        Đã chọn: {selectedCandidate.firstName}{" "}
+                        {selectedCandidate.lastName}
+                      </span>
+                      {selectedCandidate.phone
+                        ? ` - ${selectedCandidate.phone}`
+                        : ""}
+                    </div>
                   ) : (
-                    <>
-                      <p>
-                        Còn{" "}
-                        <span className="font-semibold text-black">
-                          {remainingSlots}
-                        </span>{" "}
-                        vị trí có thể bổ sung.
-                      </p>
-                      <p className="text-sm text-[#9A3412]">
-                        Mẹo: bật "Gán làm đội trưởng" sau khi chọn người phù
-                        hợp.
-                      </p>
-                    </>
+                    <p className="text-sm text-black/65">
+                      Chọn người cứu hộ từ danh sách để thêm vào đội.
+                    </p>
                   )}
-                </div>
-              </div>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -787,6 +781,13 @@ export default function RescueTeamDetailPage() {
           </h3>
         </div>
 
+        {!canRemoveMembers && (
+          <p className="mb-3 border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Nút xóa chỉ hiển thị khi đội ở trạng thái Gathering hoặc
+            Unavailable.
+          </p>
+        )}
+
         {data.members.length === 0 ? (
           <Card className="border-dashed border-black bg-white">
             <CardContent className="p-10 text-center">
@@ -806,6 +807,7 @@ export default function RescueTeamDetailPage() {
                 isRemoving={
                   isRemovingMember && removingUserId === member.userId
                 }
+                canRemove={canRemoveMembers}
               />
             ))}
           </div>

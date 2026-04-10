@@ -486,12 +486,28 @@
 }
 
 /* Leaflet Custom Marker Styles */
+.custom-sos-marker,
 .custom-cluster-marker,
+.custom-auto-cluster-marker,
 .custom-rescuer-marker,
 .custom-depot-marker,
-.custom-assembly-point-marker {
+.custom-assembly-point-marker,
+.custom-team-incident-marker,
+.custom-user-location-marker {
   background: transparent !important;
   border: none !important;
+  box-shadow: none !important;
+}
+
+.custom-sos-marker,
+.custom-cluster-marker,
+.custom-auto-cluster-marker,
+.custom-rescuer-marker,
+.custom-depot-marker,
+.custom-assembly-point-marker,
+.custom-team-incident-marker,
+.custom-user-location-marker {
+  overflow: visible !important;
 }
 
 .route-duration-marker-icon {
@@ -518,6 +534,74 @@
   color: #ffffff;
   background: #1d4ed8;
   border: 1px solid rgba(30, 64, 175, 0.95);
+}
+
+body.coordinator-dashboard-readable {
+  font-size: 14px;
+}
+
+body.coordinator-dashboard-readable :where(
+    [data-coordinator-dashboard-root],
+    [data-radix-popper-content-wrapper],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="select-content"],
+    [data-slot="popover-content"],
+    [data-slot="tooltip-content"],
+    [data-slot="dialog-content"],
+    [data-slot="sheet-content"]
+  ) {
+  font-size: 14px;
+}
+
+body.coordinator-dashboard-readable :where(
+    [data-coordinator-dashboard-root],
+    [data-radix-popper-content-wrapper],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="select-content"],
+    [data-slot="popover-content"],
+    [data-slot="tooltip-content"],
+    [data-slot="dialog-content"],
+    [data-slot="sheet-content"]
+  )
+  :is(
+    [class~="text-xs"],
+    [class~="text-sm"],
+    [class*="text-[10px]"],
+    [class*="text-[11px]"],
+    [class*="text-[12px]"],
+    [class*="text-[13px]"]
+  ) {
+  font-size: 14px !important;
+  line-height: 1.45 !important;
+}
+
+body.coordinator-dashboard-readable :where(
+    [data-coordinator-dashboard-root],
+    [data-radix-popper-content-wrapper],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="select-content"],
+    [data-slot="popover-content"],
+    [data-slot="tooltip-content"],
+    [data-slot="dialog-content"],
+    [data-slot="sheet-content"]
+  )
+  :is(button, input, textarea, select, label, p, span, a, li, th, td) {
+  font-size: max(14px, 0.875rem);
+}
+
+body.coordinator-dashboard-readable
+  :where(
+    [data-coordinator-dashboard-root],
+    [data-radix-popper-content-wrapper],
+    [data-slot="dropdown-menu-content"],
+    [data-slot="select-content"],
+    [data-slot="popover-content"],
+    [data-slot="tooltip-content"],
+    [data-slot="dialog-content"],
+    [data-slot="sheet-content"]
+  )
+  :is(.route-duration-badge, .leaflet-control, .leaflet-popup-content-wrapper, .leaflet-tooltip, .leaflet-container) {
+  font-size: 14px;
 }
 
 .route-duration-badge--neutral {

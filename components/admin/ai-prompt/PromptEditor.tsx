@@ -7,13 +7,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FloppyDisk, X, CircleNotch, Gear, Plus } from "@phosphor-icons/react";
 import type {
   PromptEditorProps,
   PromptFormData,
   PromptTextField,
 } from "@/type";
-import { PROMPT_VARIABLES, INITIAL_FORM_DATA } from "@/lib/constants";
+import {
+  AI_PROVIDER_OPTIONS,
+  INITIAL_FORM_DATA,
+  PROMPT_TYPE_OPTIONS,
+  PROMPT_VARIABLES_BY_TYPE,
+} from "@/lib/constants";
 import type {
   PromptDetailEntity,
   CreatePromptRequest,
@@ -30,32 +42,35 @@ const toVersionString = (version: string): string =>
 
 const mapDetailToForm = (detail: PromptDetailEntity): PromptFormData => ({
   name: detail.name,
-  purpose: detail.purpose,
-  system_prompt: detail.systemPrompt,
+  prompt_type: detail.promptType,
+  provider: detail.provider,
+  purpose: detail.purpose || "",
+  system_prompt: detail.systemPrompt || "",
   user_prompt_template: detail.userPromptTemplate || "",
-  model: detail.model,
-  temperature: detail.temperature,
-  max_tokens: detail.maxTokens,
-  version: stripVersionPrefix(detail.version),
-  api_url: detail.apiUrl,
+  model: detail.model || "",
+  temperature: detail.temperature ?? 0,
+  max_tokens: detail.maxTokens ?? 0,
+  version: stripVersionPrefix(detail.version || ""),
+  api_url: detail.apiUrl || "",
+  api_key: "",
   is_active: detail.isActive,
 });
 
 // --- Sub-components ---
 
 const VariableChips = ({
-  field,
+  variables,
   onInsert,
 }: {
-  field: PromptTextField;
+  variables: readonly { label: string; value: string }[];
   onInsert: (field: PromptTextField, variable: string) => void;
 }) => (
   <div className="flex flex-wrap gap-1.5 pb-1">
-    {PROMPT_VARIABLES.map((v) => (
+    {variables.map((v) => (
       <button
-        key={`${field}-${v.value}`}
+        key={`user_prompt_template-${v.value}`}
         type="button"
-        onClick={() => onInsert(field, v.value)}
+        onClick={() => onInsert("user_prompt_template", v.value)}
         className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
       >
         <Plus size={10} weight="bold" />
@@ -87,7 +102,12 @@ const PromptEditor = ({
   const [formData, setFormData] = useState<PromptFormData>(INITIAL_FORM_DATA);
 
   useEffect(() => {
-    if (prompt) setFormData(mapDetailToForm(prompt));
+    if (prompt) {
+      setFormData(mapDetailToForm(prompt));
+      return;
+    }
+
+    setFormData(INITIAL_FORM_DATA);
   }, [prompt]);
 
   const updateField = <K extends keyof PromptFormData>(
@@ -103,7 +123,7 @@ const PromptEditor = ({
       if (!textarea) return;
 
       const { selectionStart: start, selectionEnd: end } = textarea;
-      const insertion = `{${variable}}`;
+      const insertion = `{{${variable}}}`;
       const newText =
         formData[field].slice(0, start) +
         insertion +
@@ -123,16 +143,37 @@ const PromptEditor = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { ...formData, version: toVersionString(formData.version) };
+    const normalizedApiKey = formData.api_key.trim();
+    const payload = {
+      ...formData,
+      name: formData.name.trim(),
+      purpose: formData.purpose.trim(),
+      system_prompt: formData.system_prompt.trim(),
+      user_prompt_template: formData.user_prompt_template.trim(),
+      model: formData.model.trim(),
+      version: toVersionString(formData.version.trim()),
+      api_url: formData.api_url.trim(),
+      api_key: normalizedApiKey || undefined,
+    };
 
     if (isEditing) {
       onSave(payload as UpdatePromptRequest);
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { is_active, ...createData } = payload;
+      const createData: CreatePromptRequest = {
+        ...payload,
+        is_active: formData.is_active,
+      };
       onSave(createData as CreatePromptRequest);
     }
   };
+
+  const promptTypeVariables = PROMPT_VARIABLES_BY_TYPE[formData.prompt_type];
+  const selectedPromptType = PROMPT_TYPE_OPTIONS.find(
+    (option) => option.value === formData.prompt_type,
+  );
+  const selectedProvider = AI_PROVIDER_OPTIONS.find(
+    (option) => option.value === formData.provider,
+  );
 
   return (
     <Card className="border border-border/50 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -184,6 +225,29 @@ const PromptEditor = ({
                 />
               </div>
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="prompt_type">Loại Prompt *</Label>
+              <Select
+                value={formData.prompt_type}
+                onValueChange={(value) =>
+                  updateField("prompt_type", value as PromptFormData["prompt_type"])
+                }
+              >
+                <SelectTrigger id="prompt_type">
+                  <SelectValue placeholder="Chọn loại prompt" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROMPT_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {selectedPromptType?.description}
+              </p>
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -200,17 +264,49 @@ const PromptEditor = ({
           <Separator />
 
           {/* Model Config */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="model">Model *</Label>
+              <Label htmlFor="provider">AI Provider *</Label>
+              <Select
+                value={formData.provider}
+                onValueChange={(value) =>
+                  updateField("provider", value as PromptFormData["provider"])
+                }
+              >
+                <SelectTrigger id="provider">
+                  <SelectValue placeholder="Chọn provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AI_PROVIDER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {selectedProvider?.description}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="model">Model</Label>
               <Input
                 id="model"
                 value={formData.model}
                 onChange={(e) => updateField("model", e.target.value)}
-                required
-                placeholder="VD: gemini-2.0-flash"
+                placeholder={
+                  formData.provider === "OpenRouter"
+                    ? "VD: openai/gpt-4o-mini"
+                    : "VD: gemini-2.5-flash"
+                }
               />
+              <p className="text-xs text-muted-foreground">
+                Có thể để trống để backend dùng model mặc định theo provider.
+              </p>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="temperature">Temperature</Label>
               <Input
@@ -240,14 +336,41 @@ const PromptEditor = ({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="api_url">API URL *</Label>
+            <Label htmlFor="api_url">API URL</Label>
             <Input
               id="api_url"
               value={formData.api_url}
               onChange={(e) => updateField("api_url", e.target.value)}
-              required
-              placeholder="https://api.example.com/v1/chat"
+              placeholder={
+                formData.provider === "OpenRouter"
+                  ? "https://openrouter.ai/api/v1/chat/completions"
+                  : "https://generativelanguage.googleapis.com/v1beta/models/{0}:generateContent?key={1}"
+              }
             />
+            <p className="text-xs text-muted-foreground">
+              Có thể để trống để backend dùng API URL mặc định theo provider.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="api_key">API Key theo prompt</Label>
+            <Input
+              id="api_key"
+              type="password"
+              value={formData.api_key}
+              onChange={(e) => updateField("api_key", e.target.value)}
+              placeholder={
+                prompt?.hasApiKey
+                  ? prompt.apiKeyMasked || "Đang có key đã lưu"
+                  : "Để trống để dùng default key của backend"
+              }
+              autoComplete="new-password"
+            />
+            <p className="text-xs text-muted-foreground">
+              {prompt?.hasApiKey
+                ? "Để trống sẽ giữ key hiện có. Backend hiện chưa hỗ trợ xóa prompt-level key chỉ bằng cách gửi rỗng."
+                : "Dán key riêng cho prompt này nếu muốn test nhanh mà không sửa config mặc định ở server."}
+            </p>
           </div>
 
           <Separator />
@@ -255,10 +378,6 @@ const PromptEditor = ({
           {/* Prompts */}
           <div className="space-y-2">
             <Label htmlFor="system_prompt">System Prompt *</Label>
-            <VariableChips
-              field="system_prompt"
-              onInsert={handleInsertVariable}
-            />
             <Textarea
               id="system_prompt"
               ref={systemPromptRef}
@@ -269,12 +388,18 @@ const PromptEditor = ({
               className="font-mono text-base"
               placeholder="Nhập system prompt..."
             />
+            <p className="text-xs text-muted-foreground">
+              Backend không replace biến trong trường này. Với
+              {" "}
+              `MissionPlanning`, backend còn tự nối thêm agent/tool instructions
+              trước khi gọi AI.
+            </p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="user_prompt_template">User Prompt Template</Label>
             <VariableChips
-              field="user_prompt_template"
+              variables={promptTypeVariables}
               onInsert={handleInsertVariable}
             />
             <Textarea
@@ -286,8 +411,13 @@ const PromptEditor = ({
               }
               rows={4}
               className="font-mono text-base"
-              placeholder="Nhập user prompt template với biến {variable}..."
+              placeholder="Nhập user prompt template với biến {{placeholder}}..."
             />
+            <p className="text-xs text-muted-foreground">
+              {formData.prompt_type === "MissionPlanning"
+                ? "Mission planning hiện chỉ replace các biến {{sos_requests_data}}, {{total_count}}, {{depots_data}} trước khi agent gọi tool."
+                : "SOS analysis hiện replace {{structured_data}}, {{raw_message}}, {{sos_type}}."}
+            </p>
           </div>
 
           {/* Active toggle (only for edit mode) */}

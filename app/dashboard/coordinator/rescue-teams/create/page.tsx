@@ -399,12 +399,14 @@ function RescuerCard({
 
 // ── Main Page ──
 
-function CreateRescueTeamContent() {
+function CreateRescueTeamForm({
+  initialAssemblyPointId,
+  eventId,
+}: {
+  initialAssemblyPointId: string;
+  eventId: number | null;
+}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialAssemblyPointId =
-    searchParams.get("assemblyPointId")?.trim() ?? "";
-  const eventId = parsePositiveInteger(searchParams.get("eventId"));
   const lockedAssemblyPointId = parsePositiveInteger(initialAssemblyPointId);
   const isEventScopedTeamCreation =
     eventId !== null && lockedAssemblyPointId !== null;
@@ -459,8 +461,6 @@ function CreateRescueTeamContent() {
 
     if (
       lockedAssemblyPoint &&
-      (lockedAssemblyPoint.status === "Active" ||
-        lockedAssemblyPoint.status === "Overloaded") &&
       !activePoints.some((point) => point.id === lockedAssemblyPoint.id)
     ) {
       return [lockedAssemblyPoint, ...activePoints];
@@ -498,7 +498,6 @@ function CreateRescueTeamContent() {
   }, [
     rescuerTypeFilter,
     teamType,
-    isEventScopedTeamCreation,
     debouncedSearchQuery,
   ]);
 
@@ -629,10 +628,20 @@ function CreateRescueTeamContent() {
     : isLoadingFreeRescuers;
 
   const selectedAssemblyPoint = useMemo(
-    () =>
-      assemblyPoints.find((point) => String(point.id) === assemblyPointId) ??
-      null,
-    [assemblyPoints, assemblyPointId],
+    () => {
+      if (
+        lockedAssemblyPoint &&
+        String(lockedAssemblyPoint.id) === assemblyPointId
+      ) {
+        return lockedAssemblyPoint;
+      }
+
+      return (
+        assemblyPoints.find((point) => String(point.id) === assemblyPointId) ??
+        null
+      );
+    },
+    [assemblyPoints, assemblyPointId, lockedAssemblyPoint],
   );
 
   // ─── Member Selection Helpers ───
@@ -1174,6 +1183,21 @@ function CreateRescueTeamContent() {
         </form>
       </div>
     </div>
+  );
+}
+
+function CreateRescueTeamContent() {
+  const searchParams = useSearchParams();
+  const initialAssemblyPointId =
+    searchParams.get("assemblyPointId")?.trim() ?? "";
+  const eventId = parsePositiveInteger(searchParams.get("eventId"));
+
+  return (
+    <CreateRescueTeamForm
+      key={`${initialAssemblyPointId}:${eventId ?? "none"}`}
+      initialAssemblyPointId={initialAssemblyPointId}
+      eventId={eventId}
+    />
   );
 }
 

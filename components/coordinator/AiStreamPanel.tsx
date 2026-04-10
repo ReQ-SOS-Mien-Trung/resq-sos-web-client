@@ -177,7 +177,7 @@ export default function AiStreamPanel({
       />
       <div
         ref={panelRef}
-        className="relative w-full max-w-5xl max-h-[92vh] mx-4 rounded-2xl overflow-hidden flex flex-col bg-background border shadow-2xl"
+        className="relative w-full max-w-5xl max-h-[92vh] mx-4 rounded-2xl overflow-hidden flex flex-col bg-background border text-[14px] shadow-2xl"
         style={{ opacity: 0 }}
       >
         <TopBar
@@ -189,7 +189,7 @@ export default function AiStreamPanel({
           onStop={onStop}
           onClose={onClose}
         />
-        <div className="relative flex-1 min-h-0 overflow-auto">
+        <div className="relative flex-1 min-h-0 overflow-auto bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_34%),linear-gradient(180deg,_rgba(255,255,255,0.82)_0%,_rgba(255,255,255,0.96)_24%,_rgba(255,255,255,1)_100%)]">
           {showProgress && (
             <LoadingStreamView
               status={status}
@@ -254,13 +254,13 @@ function TopBar({
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
             AI Mission Suggestion
             {clusterId && (
-              <Badge variant="outline" className="text-xs font-mono px-1.5">
+              <Badge variant="outline" className="text-sm font-mono px-1.5">
                 Cụm #{clusterId}
               </Badge>
             )}
           </h3>
           <p
-            className="max-w-xl truncate text-xs text-muted-foreground"
+            className="max-w-xl truncate text-sm text-muted-foreground"
             title={error ? normalizeAiErrorText(error) : undefined}
           >
             {statusLabel}
@@ -272,7 +272,7 @@ function TopBar({
           <Button
             variant="destructive"
             size="sm"
-            className="h-7 text-xs"
+            className="h-7 text-sm"
             onClick={onStop}
           >
             <Stop className="h-3 w-3 mr-1" weight="fill" />
@@ -309,6 +309,69 @@ function phaseLabel(phase: string): string {
   }
 }
 
+function phaseDescription(phase: string): string {
+  switch (phase) {
+    case "connecting":
+      return "Thiết lập kết nối thời gian thực với AI agent.";
+    case "loading-data":
+      return "AI đang gom dữ liệu hiện trường, đội cứu hộ và kho gần nhất.";
+    case "calling-ai":
+      return "Model đang cân nhắc phương án điều phối và thứ tự hành động.";
+    case "processing":
+      return "Chuẩn hóa kết quả và dựng mission flow để hiển thị.";
+    case "done":
+      return "Mission suggestion đã sẵn sàng để xem và duyệt.";
+    default:
+      return "Khởi tạo pipeline phân tích mission.";
+  }
+}
+
+function phaseProgressValue(phase: string): number {
+  switch (phase) {
+    case "connecting":
+      return 16;
+    case "loading-data":
+      return 42;
+    case "calling-ai":
+      return 72;
+    case "processing":
+      return 90;
+    case "done":
+      return 100;
+    default:
+      return 8;
+  }
+}
+
+function phaseToneClasses(phase: string) {
+  switch (phase) {
+    case "done":
+      return {
+        pill: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600",
+        dot: "bg-emerald-500 shadow-emerald-500/50",
+        glow: "from-emerald-500/22 via-emerald-500/8 to-transparent",
+      };
+    case "processing":
+      return {
+        pill: "border-sky-500/25 bg-sky-500/10 text-sky-600",
+        dot: "bg-sky-500 shadow-sky-500/50",
+        glow: "from-sky-500/20 via-sky-500/8 to-transparent",
+      };
+    case "calling-ai":
+      return {
+        pill: "border-fuchsia-500/25 bg-fuchsia-500/10 text-fuchsia-600",
+        dot: "bg-fuchsia-500 shadow-fuchsia-500/50",
+        glow: "from-fuchsia-500/24 via-fuchsia-500/8 to-transparent",
+      };
+    default:
+      return {
+        pill: "border-primary/25 bg-primary/10 text-primary",
+        dot: "bg-primary shadow-primary/50",
+        glow: "from-primary/20 via-primary/8 to-transparent",
+      };
+  }
+}
+
 function LoadingStreamView({
   status,
   statusLog,
@@ -342,7 +405,11 @@ function LoadingStreamView({
   }, []);
 
   return (
-    <div ref={wrapperRef} className="h-full px-4 py-8 md:px-6 md:py-10">
+    <div
+      ref={wrapperRef}
+      className="h-full px-4 py-6 md:px-6 md:py-8"
+      style={{ contentVisibility: "auto" }}
+    >
       <div className="mx-auto flex w-full flex-col items-center gap-5">
         <div className="loading-block w-full">
           <SonarRadar
@@ -373,10 +440,13 @@ function SonarRadar({
   const ringRefs = useRef<(SVGCircleElement | null)[]>([]);
   const tickerRef = useRef<HTMLDivElement>(null);
   const thinkingRef = useRef<HTMLDivElement>(null);
-  const previousStatusCountRef = useRef(0);
   const statusEntries = statusLog.filter(
     (entry) => entry.type === "status" || entry.type === "result",
   );
+  const visibleStatusEntries = statusEntries.slice(-7);
+  const latestEntry = visibleStatusEntries[visibleStatusEntries.length - 1];
+  const phaseTone = phaseToneClasses(phase);
+  const progressValue = phaseProgressValue(phase);
 
   useEffect(() => {
     const rings = ringRefs.current.filter(Boolean) as SVGCircleElement[];
@@ -406,66 +476,53 @@ function SonarRadar({
     );
 
     if (items.length === 0) {
-      previousStatusCountRef.current = 0;
       return;
     }
 
-    const previousCount = previousStatusCountRef.current;
+    const earlierItems = items.slice(0, -1);
+    const newestItem = items.at(-1);
 
-    if (previousCount === 0 || items.length <= previousCount) {
-      gsap.killTweensOf(items);
+    if (earlierItems.length > 0) {
+      gsap.killTweensOf(earlierItems);
       gsap.fromTo(
-        items,
-        { y: 10, opacity: 0 },
+        earlierItems,
+        { y: 0, opacity: 1 },
         {
-          y: 0,
-          opacity: 1,
-          duration: 0.28,
-          stagger: 0.04,
-          ease: "power2.out",
+          y: -10,
+          opacity: 0.74,
+          duration: 0.24,
+          stagger: 0.028,
+          ease: "power1.out",
+          yoyo: true,
+          repeat: 1,
           overwrite: "auto",
         },
       );
-    } else {
-      const existingItems = items.slice(0, previousCount);
-      const newItems = items.slice(previousCount);
+    }
 
-      if (existingItems.length > 0) {
-        gsap.killTweensOf(existingItems);
-        gsap.fromTo(
-          existingItems,
-          { y: 0 },
-          {
-            y: -8,
-            duration: 0.18,
-            stagger: 0.014,
-            ease: "power1.out",
-            yoyo: true,
-            repeat: 1,
-            overwrite: "auto",
-          },
-        );
-      }
-
-      gsap.killTweensOf(newItems);
+    if (newestItem) {
+      gsap.killTweensOf(newestItem);
       gsap.fromTo(
-        newItems,
-        { y: 16, x: 10, opacity: 0 },
+        newestItem,
+        { y: 22, opacity: 0, scale: 0.96 },
         {
           y: 0,
-          x: 0,
           opacity: 1,
-          duration: 0.34,
-          stagger: 0.05,
+          scale: 1,
+          duration: 0.38,
           ease: "power2.out",
           overwrite: "auto",
         },
       );
     }
 
-    previousStatusCountRef.current = items.length;
-    tickerRef.current.scrollTop = tickerRef.current.scrollHeight;
-  }, [statusEntries.length]);
+    gsap.to(tickerRef.current, {
+      scrollTop: tickerRef.current.scrollHeight,
+      duration: 0.34,
+      ease: "power2.out",
+      overwrite: "auto",
+    });
+  }, [latestEntry?.id]);
 
   useEffect(() => {
     if (thinkingRef.current) {
@@ -474,159 +531,265 @@ function SonarRadar({
   }, [thinkingText]);
 
   return (
-    <div className="w-full px-2 py-5 md:px-4">
-      <div className="mx-auto grid w-full max-w-5xl gap-5 md:grid-cols-[280px_minmax(0,1fr)] md:items-start">
-        <div className="rounded-2xl border bg-card/40 p-3 md:p-4">
-          <div className="flex flex-col items-center">
-            <div className="relative h-52 w-52 md:h-56 md:w-56">
-              <svg viewBox="0 0 300 300" className="w-full h-full">
-                {[60, 100, 140].map((r) => (
-                  <circle
-                    key={r}
-                    cx="150"
-                    cy="150"
-                    r={r}
-                    fill="none"
-                    className="stroke-primary/10"
-                    strokeWidth="0.5"
+    <div className="w-full px-2 py-4 md:px-4">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+        <div className="rounded-2xl border border-primary/10 bg-white/92 px-4 py-3 shadow-[0_20px_60px_-42px_rgba(249,115,22,0.45)] backdrop-blur">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-sm font-semibold uppercase tracking-[0.18em]",
+                    phaseTone.pill,
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "mr-2 h-2 w-2 rounded-full shadow-[0_0_14px]",
+                      phaseTone.dot,
+                    )}
                   />
-                ))}
-                <line
-                  x1="150"
-                  y1="30"
-                  x2="150"
-                  y2="270"
-                  className="stroke-primary/10"
-                  strokeWidth="0.5"
-                />
-                <line
-                  x1="30"
-                  y1="150"
-                  x2="270"
-                  y2="150"
-                  className="stroke-primary/10"
-                  strokeWidth="0.5"
-                />
-                {[0, 1, 2, 3].map((i) => (
-                  <circle
-                    key={`ring-${i}`}
-                    ref={(el) => {
-                      ringRefs.current[i] = el;
-                    }}
-                    cx="150"
-                    cy="150"
-                    r="20"
-                    fill="none"
-                    stroke="url(#sonarGrad)"
-                    strokeWidth={2.5 - i * 0.4}
-                    opacity="0"
-                  />
-                ))}
-                <circle
-                  cx="150"
-                  cy="150"
-                  r="18"
-                  className="fill-primary/15 stroke-primary/60"
-                  strokeWidth="2"
-                />
-                <circle cx="150" cy="150" r="8" className="fill-primary/50">
-                  <animate
-                    attributeName="r"
-                    values="6;10;6"
-                    dur="1.5s"
-                    repeatCount="indefinite"
-                  />
-                  <animate
-                    attributeName="opacity"
-                    values="0.8;0.4;0.8"
-                    dur="1.5s"
-                    repeatCount="indefinite"
-                  />
-                </circle>
-                <defs>
-                  <radialGradient id="sonarGrad">
-                    <stop offset="0%" stopColor="rgba(249,115,22,0.8)" />
-                    <stop offset="100%" stopColor="rgba(249,115,22,0)" />
-                  </radialGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <Brain
-                  className="h-6 w-6 text-primary animate-pulse"
-                  weight="fill"
-                />
+                  {phaseLabel(phase)}
+                </Badge>
+                <span className="text-sm font-medium text-foreground/90">
+                  {latestEntry?.message || status || phaseDescription(phase)}
+                </span>
               </div>
             </div>
 
-            <Badge className="mt-1 border-primary/20 bg-primary/10 text-primary hover:bg-primary/10">
-              {phaseLabel(phase)}
-            </Badge>
-            <p className="mt-2 text-center text-xs text-muted-foreground/80">
-              AI đang phân tích
-            </p>
+            <div className="flex w-full items-center gap-3 md:max-w-xs">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-primary/8">
+                <div
+                  className={cn(
+                    "h-full rounded-full bg-gradient-to-r transition-[width] duration-700 ease-out",
+                    phase === "done"
+                      ? "from-emerald-500 to-emerald-400"
+                      : phase === "calling-ai"
+                        ? "from-fuchsia-500 via-primary to-orange-400"
+                        : "from-primary to-orange-400",
+                  )}
+                  style={{ width: `${progressValue}%` }}
+                />
+              </div>
+              <span className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {progressValue}%
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-card/40 p-3 md:p-4">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-primary/70 animate-pulse" />
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
-              SUY NGHĨ AI
-            </p>
-          </div>
-
-          <div
-            ref={tickerRef}
-            className="mt-3 max-h-65 overflow-y-auto space-y-1.5 pr-1"
-          >
-            {statusEntries.length > 0 ? (
-              statusEntries.map((entry, index) => {
-                const isLatest = index === statusEntries.length - 1;
-                return (
-                  <div
-                    key={entry.id}
-                    className={cn(
-                      "status-ticker-item flex items-start gap-2 rounded-lg border border-transparent bg-background/50 px-2.5 py-2 transition-colors",
-                      isLatest
-                        ? "border-primary/25 bg-primary/8"
-                        : "text-muted-foreground/85",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
-                        isLatest ? "bg-primary/70" : "bg-primary/30",
-                      )}
+        <div className="mx-auto grid w-full max-w-5xl gap-5 md:grid-cols-[300px_minmax(0,1fr)] md:items-start">
+          <div className="overflow-hidden rounded-[28px] border border-primary/10 bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_55%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(255,248,244,0.96))] p-4 shadow-[0_20px_60px_-42px_rgba(249,115,22,0.55)] md:p-5">
+            <div className="flex flex-col items-center">
+              <div className="relative h-56 w-56 md:h-60 md:w-60">
+                <div
+                  className={cn(
+                    "absolute inset-0 rounded-full bg-gradient-to-b opacity-80 blur-3xl",
+                    phaseTone.glow,
+                  )}
+                />
+                <svg viewBox="0 0 300 300" className="relative h-full w-full">
+                  {[56, 96, 136].map((r) => (
+                    <circle
+                      key={r}
+                      cx="150"
+                      cy="150"
+                      r={r}
+                      fill="none"
+                      className="stroke-primary/10"
+                      strokeWidth="0.7"
                     />
-                    <p
-                      className={cn(
-                        "font-mono wrap-break-word leading-relaxed",
-                        isLatest ? "text-[13px] text-primary/90" : "text-xs",
-                      )}
-                    >
-                      {entry.message}
-                    </p>
+                  ))}
+                  {[40, 80, 120, 160].map((offset) => (
+                    <circle
+                      key={`grid-${offset}`}
+                      cx="150"
+                      cy="150"
+                      r={offset / 4}
+                      fill="none"
+                      className="stroke-primary/5"
+                      strokeDasharray="2 10"
+                      strokeWidth="0.9"
+                    />
+                  ))}
+                  <line
+                    x1="150"
+                    y1="24"
+                    x2="150"
+                    y2="276"
+                    className="stroke-primary/10"
+                    strokeWidth="0.6"
+                  />
+                  <line
+                    x1="24"
+                    y1="150"
+                    x2="276"
+                    y2="150"
+                    className="stroke-primary/10"
+                    strokeWidth="0.6"
+                  />
+                  {[0, 1, 2, 3].map((i) => (
+                    <circle
+                      key={`ring-${i}`}
+                      ref={(el) => {
+                        ringRefs.current[i] = el;
+                      }}
+                      cx="150"
+                      cy="150"
+                      r="20"
+                      fill="none"
+                      stroke="url(#sonarGrad)"
+                      strokeWidth={2.5 - i * 0.4}
+                      opacity="0"
+                    />
+                  ))}
+                  <circle
+                    cx="150"
+                    cy="150"
+                    r="28"
+                    className="fill-primary/10 stroke-primary/35"
+                    strokeWidth="1.5"
+                  />
+                  <circle
+                    cx="150"
+                    cy="150"
+                    r="18"
+                    className="fill-white stroke-primary/60"
+                    strokeWidth="2"
+                  />
+                  <circle cx="150" cy="150" r="8" className="fill-primary/50">
+                    <animate
+                      attributeName="r"
+                      values="6;10;6"
+                      dur="1.5s"
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="0.8;0.4;0.8"
+                      dur="1.5s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                  <defs>
+                    <radialGradient id="sonarGrad">
+                      <stop offset="0%" stopColor="rgba(249,115,22,0.8)" />
+                      <stop offset="100%" stopColor="rgba(249,115,22,0)" />
+                    </radialGradient>
+                  </defs>
+                </svg>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/85 shadow-lg shadow-primary/10 backdrop-blur">
+                    <Brain
+                      className="h-7 w-7 text-primary animate-pulse"
+                      weight="fill"
+                    />
                   </div>
-                );
-              })
-            ) : (
-              <div className="status-ticker-item rounded-lg bg-background/50 px-2.5 py-2 text-xs font-mono text-primary/80">
-                {status || "Đang khởi tạo..."}
+                </div>
               </div>
-            )}
-          </div>
 
-          {thinkingText && (
-            <div
-              ref={thinkingRef}
-              className="mt-3 max-h-28 overflow-y-auto rounded-lg border border-primary/15 bg-primary/4 p-3 scrollbar-none"
-            >
-              <p className="text-xs font-mono leading-5 text-primary/65 whitespace-pre-wrap wrap-break-word">
-                {thinkingText}
-                <span className="ml-1 inline-block h-3 w-1.5 animate-pulse bg-primary/60 align-middle" />
+              <Badge className="mt-2 border-primary/20 bg-white text-primary shadow-sm hover:bg-white">
+                {phaseLabel(phase)}
+              </Badge>
+              <p className="mt-3 text-center text-sm font-medium tracking-tight text-foreground">
+                {status || phaseDescription(phase)}
+              </p>
+              <p className="mt-1 text-center text-sm text-muted-foreground">
+                AI đang phân tích
               </p>
             </div>
-          )}
+          </div>
+
+          <div className="overflow-hidden rounded-[28px] border border-primary/10 bg-white/92 shadow-[0_24px_72px_-42px_rgba(15,23,42,0.28)] backdrop-blur">
+            <div className="border-b border-primary/10 bg-[linear-gradient(135deg,rgba(249,115,22,0.08),rgba(249,115,22,0.02)_55%,transparent)] px-4 py-4 md:px-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-3 w-3 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/35" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-primary" />
+                  </span>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary/80">
+                    AI Suy nghĩ
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-full border border-primary/10 bg-primary/5 px-3 py-1.5 text-sm text-primary/80">
+                  <ArrowsClockwise className="h-3.5 w-3.5 animate-spin" />
+                  {statusEntries.length}
+                </div>
+              </div>
+            </div>
+
+            <div className="relative px-4 py-4 md:px-5">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-white via-white/90 to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white via-white/90 to-transparent" />
+              <div
+                ref={tickerRef}
+                className="relative max-h-[23rem] space-y-2 overflow-y-auto pr-1"
+              >
+                {visibleStatusEntries.length > 0 ? (
+                  visibleStatusEntries.map((entry, index) => {
+                    const reverseIndex =
+                      visibleStatusEntries.length - index - 1;
+                    const isLatest = reverseIndex === 0;
+                    const ageOpacity = Math.max(0.38, 1 - reverseIndex * 0.16);
+
+                    return (
+                      <div
+                        key={entry.id}
+                        className={cn(
+                          "status-ticker-item relative flex items-start gap-3 rounded-2xl border px-3 py-3 transition-colors md:px-4",
+                          isLatest
+                            ? "border-primary/18 bg-primary/[0.07] shadow-[0_12px_40px_-28px_rgba(249,115,22,0.65)]"
+                            : "border-border/50 bg-white/72",
+                        )}
+                        style={{ opacity: ageOpacity }}
+                      >
+                        <div className="relative mt-1 flex h-4 w-4 shrink-0 items-center justify-center">
+                          <span
+                            className={cn(
+                              "h-2.5 w-2.5 rounded-full",
+                              isLatest ? "bg-primary" : "bg-primary/35",
+                            )}
+                          />
+                          {isLatest && (
+                            <span className="absolute inline-flex h-4 w-4 animate-ping rounded-full bg-primary/20" />
+                          )}
+                        </div>
+                        <p
+                          className={cn(
+                            "min-w-0 flex-1 wrap-break-word font-medium leading-6",
+                            isLatest
+                              ? "text-[15px] text-foreground"
+                              : "text-sm text-muted-foreground",
+                          )}
+                        >
+                          {entry.message}
+                        </p>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="status-ticker-item rounded-2xl border border-primary/12 bg-primary/[0.06] px-4 py-3 text-sm font-medium text-primary/85">
+                    {status || "Đang khởi tạo..."}
+                  </div>
+                )}
+              </div>
+
+              {thinkingText && (
+                <div
+                  ref={thinkingRef}
+                  className="mt-3 rounded-2xl border border-primary/10 bg-primary/[0.04] px-3 py-2.5"
+                >
+                  <p className="line-clamp-2 text-sm font-mono leading-5 text-primary/70 whitespace-pre-wrap wrap-break-word">
+                    {thinkingText}
+                    <span className="ml-1 inline-block h-3 w-1 animate-pulse rounded-full bg-primary/60 align-middle" />
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -697,7 +860,7 @@ function ActionFlowTimeline({
       </div>
       {revealedCount < activities.length && (
         <div className="ml-12 border-l-2 border-dashed border-primary/20 py-3 pl-4">
-          <div className="flex items-center gap-2 text-xs font-mono text-primary/40">
+          <div className="flex items-center gap-2 text-sm font-mono text-primary/40">
             <span className="h-2 w-2 rounded-full bg-primary/30 animate-pulse" />
             Đang tải bước {revealedCount + 1}/{activities.length}...
           </div>
@@ -746,11 +909,11 @@ function MissionBanner({
             {result.suggestedMissionTitle}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge className="text-xs bg-primary text-white border-primary hover:bg-primary/90">
+            <Badge className="text-sm bg-primary text-white border-primary hover:bg-primary/90">
               {severityConfig[result.suggestedSeverityLevel]?.label ||
                 result.suggestedSeverityLevel}
             </Badge>
-            <span className="text-xs font-mono text-muted-foreground">
+            <span className="text-sm font-mono text-muted-foreground">
               {result.modelName} • {result.responseTimeMs}ms
             </span>
           </div>
@@ -824,7 +987,7 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
             <span className={cn("text-sm font-bold font-mono", s.color)}>
               {s.value}
             </span>
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">
+            <span className="text-sm text-muted-foreground uppercase tracking-wider">
               {s.label}
             </span>
           </div>
@@ -853,8 +1016,8 @@ function AiOriginNode() {
         <Brain className="h-4 w-4 text-primary" weight="fill" />
       </div>
       <div>
-        <span className="text-xs font-bold text-primary">AI Engine</span>
-        <p className="text-xs text-muted-foreground font-mono">
+        <span className="text-sm font-bold text-primary">AI Engine</span>
+        <p className="text-sm text-muted-foreground font-mono">
           Bắt đầu thực thi kế hoạch
         </p>
       </div>
@@ -988,13 +1151,13 @@ function ActivityFlowNode({
                 strokeWidth="1"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-primary">
+            <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-primary">
               {activity.step}
             </span>
           </div>
           <Badge
             className={cn(
-              "text-xs px-1.5 h-5 border",
+              "text-sm px-1.5 h-5 border",
               config.bgColor,
               config.color,
               "border-current/20",
@@ -1003,33 +1166,33 @@ function ActivityFlowNode({
             <Icon className="h-3 w-3 mr-0.5" weight="fill" />
             {config.label}
           </Badge>
-          <Badge className="text-xs px-1.5 h-5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+          <Badge className="text-sm px-1.5 h-5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
             {severityConfig[activity.priority]?.label || activity.priority}
           </Badge>
           {activity.estimatedTime && (
-            <span className="text-xs font-mono text-muted-foreground flex items-center gap-0.5 ml-auto">
+            <span className="text-sm font-mono text-muted-foreground flex items-center gap-0.5 ml-auto">
               <Clock className="h-3 w-3" />
               {activity.estimatedTime}
             </span>
           )}
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground mb-2 pl-9">
+        <p className="text-sm leading-relaxed text-muted-foreground mb-2 pl-9">
           {activity.description}
         </p>
 
         {activity.suggestedTeam && (
           <div className="ml-9 mb-2 rounded-lg border border-emerald-300/40 bg-emerald-50/50 dark:bg-emerald-900/15 dark:border-emerald-700/40 p-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+            <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
               <ShieldCheck className="h-3 w-3" weight="fill" />
               Đội đề xuất
             </p>
-            <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
+            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
               {activity.suggestedTeam.teamName ||
                 (activity.suggestedTeam.teamId
                   ? `Đội #${activity.suggestedTeam.teamId}`
                   : "Đội chưa đặt tên")}
             </p>
-            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+            <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
               {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
               {activity.suggestedTeam.contactPhone
                 ? ` • SĐT: ${activity.suggestedTeam.contactPhone}`
@@ -1039,12 +1202,12 @@ function ActivityFlowNode({
                 : ""}
             </p>
             {activity.suggestedTeam.reason && (
-              <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
+              <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
                 Lý do: {activity.suggestedTeam.reason}
               </p>
             )}
             {activity.suggestedTeam.assemblyPointName && (
-              <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
+              <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
                 Điểm tập kết đội: {activity.suggestedTeam.assemblyPointName}
               </p>
             )}
@@ -1055,18 +1218,18 @@ function ActivityFlowNode({
           (activity.assemblyPointLatitude != null &&
             activity.assemblyPointLongitude != null)) && (
           <div className="ml-9 mb-2 rounded-lg border border-blue-300/40 bg-blue-50/50 dark:bg-blue-900/15 dark:border-blue-700/40 p-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
+            <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
               <MapPin className="h-3 w-3" weight="fill" />
               Điểm tập kết hoạt động
             </p>
             {activity.assemblyPointName && (
-              <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
+              <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
                 {activity.assemblyPointName}
               </p>
             )}
             {activity.assemblyPointLatitude != null &&
               activity.assemblyPointLongitude != null && (
-                <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
                   Tọa độ: {activity.assemblyPointLatitude.toFixed(4)},{" "}
                   {activity.assemblyPointLongitude.toFixed(4)}
                 </p>
@@ -1090,11 +1253,11 @@ function ActivityFlowNode({
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold text-amber-600 dark:text-amber-400 truncate">
+              <p className="text-sm font-bold text-amber-600 dark:text-amber-400 truncate">
                 {activity.depotName}
               </p>
               {activity.depotAddress && (
-                <p className="text-xs text-amber-600/50 dark:text-amber-500/50 truncate">
+                <p className="text-sm text-amber-600/50 dark:text-amber-500/50 truncate">
                   {activity.depotAddress}
                 </p>
               )}
@@ -1117,7 +1280,7 @@ function ActivityFlowNode({
               className="h-3.5 w-3.5 text-red-500 shrink-0"
               weight="fill"
             />
-            <span className="text-xs font-mono text-red-500/70">
+            <span className="text-sm font-mono text-red-500/70">
               SOS #{activity.sosRequestId}
             </span>
           </div>
@@ -1129,7 +1292,7 @@ function ActivityFlowNode({
               {activity.suppliesToCollect.map((supply) => (
                 <div
                   key={supply.itemId}
-                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-xs"
+                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-sm"
                 >
                   <Package className="h-2.5 w-2.5 text-primary" weight="fill" />
                   <span className="text-primary">{supply.itemName}</span>
@@ -1169,12 +1332,12 @@ function AssessmentBlock({ text }: { text: string }) {
           className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400"
           weight="fill"
         />
-        <span className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+        <span className="text-sm font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
           Đánh giá tổng thể
         </span>
       </div>
       <div className="p-3">
-        <p className="text-xs leading-relaxed text-muted-foreground">{text}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{text}</p>
       </div>
     </div>
   );
@@ -1217,7 +1380,7 @@ function ResourcesBlock({
           className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400"
           weight="fill"
         />
-        <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+        <span className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
           Tài nguyên cần thiết
         </span>
       </div>
@@ -1233,14 +1396,14 @@ function ResourcesBlock({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-foreground truncate">
+              <p className="text-sm font-semibold text-foreground truncate">
                 {res.description}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-xs font-mono text-blue-500 dark:text-blue-400">
+                <span className="text-sm font-mono text-blue-500 dark:text-blue-400">
                   SL: {res.quantity}
                 </span>
-                <Badge variant="outline" className="h-5 px-1.5 text-xs">
+                <Badge variant="outline" className="h-5 px-1.5 text-sm">
                   {res.priority}
                 </Badge>
               </div>
@@ -1271,7 +1434,7 @@ function WarningsBlock({
       {result.needsManualReview && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/[0.06] border border-yellow-500/15">
           <Warning className="h-4 w-4 text-yellow-500 shrink-0" weight="fill" />
-          <p className="text-xs text-yellow-600 dark:text-yellow-400/80">
+          <p className="text-sm text-yellow-600 dark:text-yellow-400/80">
             {result.lowConfidenceWarning ||
               "Cần kiểm tra thủ công trước khi phê duyệt."}
           </p>
@@ -1283,7 +1446,7 @@ function WarningsBlock({
             className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0"
             weight="fill"
           />
-          <p className="text-xs text-blue-600 dark:text-blue-400/80">
+          <p className="text-sm text-blue-600 dark:text-blue-400/80">
             Kế hoạch yêu cầu phối hợp nhiều kho tiếp tế.
           </p>
         </div>
@@ -1295,10 +1458,10 @@ function WarningsBlock({
             weight="fill"
           />
           <div>
-            <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
+            <p className="text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
               Lưu ý đặc biệt
             </p>
-            <p className="text-xs text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
+            <p className="text-sm text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
               {result.specialNotes}
             </p>
           </div>
@@ -1338,11 +1501,11 @@ function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
         <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">
           Phân tích thất bại
         </p>
-        <p className="text-xs text-red-500/60 mb-4">{readableError}</p>
+        <p className="text-sm text-red-500/60 mb-4">{readableError}</p>
         <Button
           variant="destructive"
           size="sm"
-          className="h-8 text-xs"
+          className="h-8 text-sm"
           onClick={onRetry}
         >
           <ArrowsClockwise className="h-3.5 w-3.5 mr-1.5" />
@@ -1380,7 +1543,7 @@ function FooterBar({
       <Button
         variant="outline"
         size="sm"
-        className="h-9 text-xs"
+        className="h-9 text-sm"
         onClick={onRetry}
       >
         <ArrowsClockwise className="h-3.5 w-3.5 mr-1.5" />
@@ -1389,7 +1552,7 @@ function FooterBar({
       <div className="flex-1" />
       <Button
         size="sm"
-        className="h-9 text-xs bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
+        className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
         onClick={onViewPlan}
       >
         <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getDepots,
+  getDepotsByCluster,
   getDepotById,
   getDepotStatuses,
   getDepotMetadata,
@@ -28,6 +29,7 @@ import {
 } from "./api";
 import {
   GetDepotsResponse,
+  GetDepotsByClusterResponse,
   GetDepotsParams,
   CreateDepotRequest,
   DepotEntity,
@@ -59,6 +61,10 @@ import {
 } from "./type";
 
 export const DEPOTS_QUERY_KEY = ["depots"] as const;
+export const DEPOTS_BY_CLUSTER_QUERY_KEY = [
+  ...DEPOTS_QUERY_KEY,
+  "by-cluster",
+] as const;
 export const DEPOT_STATUSES_QUERY_KEY = ["depot-statuses"] as const;
 export const DEPOT_METADATA_QUERY_KEY = ["depot-metadata"] as const;
 export const DEPOT_AVAILABLE_MANAGERS_QUERY_KEY = [
@@ -73,6 +79,10 @@ export interface UseDepotsOptions {
 }
 
 export interface UseDepotByIdOptions {
+  enabled?: boolean;
+}
+
+export interface UseDepotsByClusterOptions {
   enabled?: boolean;
 }
 
@@ -96,6 +106,21 @@ export function useDepots(options?: UseDepotsOptions) {
     queryKey: [...DEPOTS_QUERY_KEY, options?.params],
     queryFn: () => getDepots(options?.params),
     enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Hook to fetch depots nearest to a SOS cluster
+ */
+export function useDepotsByCluster(
+  clusterId: number,
+  options?: UseDepotsByClusterOptions,
+) {
+  return useQuery<GetDepotsByClusterResponse>({
+    queryKey: [...DEPOTS_BY_CLUSTER_QUERY_KEY, clusterId],
+    queryFn: () => getDepotsByCluster(clusterId),
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(clusterId) && clusterId > 0,
   });
 }
 

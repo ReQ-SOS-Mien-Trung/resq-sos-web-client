@@ -101,21 +101,21 @@ const ACTIVITY_COPY: Record<
     historyEmpty: "Chưa có lịch sử lấy hàng",
     upcomingLabel: "hoạt động lấy hàng",
     historyLabel: "lượt lấy hàng",
-    upcomingItemsLabel: "Vật tư cần lấy",
-    historyItemsLabel: "Vật tư đã lấy",
+    upcomingItemsLabel: "Vật phẩm cần lấy",
+    historyItemsLabel: "Vật phẩm đã lấy",
     detailCardTitle: "Chi tiết hoạt động",
     statusFilterLabel: "Trạng thái hoạt động",
   },
   return: {
     sectionTitle: "Hoạt động trả hàng",
     sectionDescription:
-      "Theo dõi vật tư đang được trả về kho và lịch sử kho xác nhận hoàn trả",
+      "Theo dõi vật phẩm đang được trả về kho và lịch sử kho xác nhận hoàn trả",
     upcomingEmpty: "Không có hoạt động trả hàng sắp tới",
     historyEmpty: "Chưa có lịch sử trả hàng",
     upcomingLabel: "hoạt động trả hàng",
     historyLabel: "lượt trả hàng",
-    upcomingItemsLabel: "Vật tư dự kiến trả",
-    historyItemsLabel: "Vật tư đã trả",
+    upcomingItemsLabel: "Vật phẩm dự kiến trả",
+    historyItemsLabel: "Vật phẩm đã trả",
     detailCardTitle: "Chi tiết trả hàng",
     statusFilterLabel: "Trạng thái trả hàng",
   },
@@ -128,9 +128,9 @@ const RETURN_UPCOMING_STATUS_OPTIONS = [
 
 const RETURN_DISCREPANCY_NOTE_TEMPLATE = [
   "- Chênh lệch số lượng:",
-  "- Vật tư/đơn vị thiếu:",
-  "- Vật tư/đơn vị hư hỏng:",
-  "- Vật tư/đơn vị trả thêm:",
+  "- Vật phẩm/đơn vị thiếu:",
+  "- Vật phẩm/đơn vị hư hỏng:",
+  "- Vật phẩm/đơn vị trả thêm:",
   "- Nguyên nhân / ghi chú bổ sung:",
 ].join("\n");
 
@@ -780,7 +780,7 @@ function ReturnItemCard({
                 {item.itemName}
               </p>
               <p className="text-xs text-muted-foreground tracking-tighter">
-                Mã vật tư #{item.itemId}
+                Mã vật phẩm #{item.itemId}
               </p>
             </div>
             <div className="text-right shrink-0">
@@ -1063,7 +1063,7 @@ function ConfirmReturnFormSection({
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex h-7 items-center rounded-full bg-orange-100 px-3 text-sm font-medium tracking-tighter text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
-                    Vật tư tiêu hao
+                    Vật phẩm tiêu hao
                   </span>
                   <span className="text-sm tracking-tighter text-muted-foreground">
                     Xác nhận số lượng thực kho nhận
@@ -1127,13 +1127,13 @@ function ConfirmReturnFormSection({
               <div className="space-y-3">
                 <div className="flex items-center">
                   <span className="inline-flex h-7 items-center rounded-full bg-emerald-100 px-3 text-sm font-medium tracking-tighter text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    Vật tư tái sử dụng
+                    Vật phẩm tái sử dụng
                   </span>
                 </div>
 
                 {!isConditionsLoading && conditionOptions.length === 0 && (
                   <div className="rounded-xl border border-red-200/70 bg-red-50/80 px-3 py-2 text-sm tracking-tighter text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
-                    Chưa tải được danh sách tình trạng vật tư tái sử dụng. Bạn
+                    Chưa tải được danh sách tình trạng vật phẩm tái sử dụng. Bạn
                     vẫn có thể xem danh sách, nhưng cần có tình trạng để xác
                     nhận.
                   </div>
@@ -1591,7 +1591,7 @@ function DetailPanel({
                   </div>
                   {item.items.length === 0 ? (
                     <p className="text-sm text-muted-foreground tracking-tighter py-2">
-                      Không có vật tư
+                      Không có vật phẩm
                     </p>
                   ) : (
                     <div className="flex flex-col gap-1.5">
@@ -1764,7 +1764,7 @@ function UpcomingTable({
                 ["status", "Trạng thái"],
                 [
                   "itemCount",
-                  activityKind === "return" ? "Vật tư trả" : "Vật tư",
+                  activityKind === "return" ? "Vật phẩm trả" : "Vật phẩm",
                 ],
                 ["missionStartTime", "Thời gian bắt đầu"],
               ] as [string, string][]
@@ -1965,7 +1965,7 @@ function HistoryTable({
                   "itemCount",
                   activityKind === "return"
                     ? copy.historyItemsLabel
-                    : "Vật tư đã giao",
+                    : "Vật phẩm đã giao",
                 ],
                 ["completedByName", "Thực hiện bởi"],
                 ["completedAt", "Hoàn thành lúc"],
