@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Plus, ArrowCounterClockwise } from "@phosphor-icons/react";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -22,10 +23,12 @@ import {
 import type {
   PromptEntity,
   PromptDetailEntity,
+  PromptType,
   CreatePromptRequest,
   UpdatePromptRequest,
 } from "@/services/prompt/type";
 import type { EditorMode } from "@/type";
+import { PROMPT_TYPE_OPTIONS } from "@/lib/constants";
 
 const AIPromptPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -33,7 +36,12 @@ const AIPromptPage = () => {
 
   // Prompt state
   const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
+  const [selectedPromptType, setSelectedPromptType] =
+    useState<PromptType | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>("closed");
+  const [editingPromptSeed, setEditingPromptSeed] =
+    useState<PromptEntity | null>(null);
   const [editingPrompt, setEditingPrompt] = useState<PromptDetailEntity | null>(
     null,
   );
@@ -72,17 +80,11 @@ const AIPromptPage = () => {
     fetchData();
   }, []);
 
-  // Auto-select first prompt when data loads
-  useEffect(() => {
-    if (promptsData?.items?.length && !selectedPromptId) {
-      setSelectedPromptId(promptsData.items[0].id);
-    }
-  }, [promptsData, selectedPromptId]);
-
   // --- Handlers ---
 
   const closeEditor = useCallback(() => {
     setEditorMode("closed");
+    setEditingPromptSeed(null);
     setEditingPrompt(null);
   }, []);
 
@@ -90,19 +92,36 @@ const AIPromptPage = () => {
     (prompt: PromptEntity) => {
       setSelectedPromptId(prompt.id);
       closeEditor();
+      setIsDetailModalOpen(true);
     },
     [closeEditor],
   );
 
   const handleCreateNew = useCallback(() => {
+    setIsDetailModalOpen(false);
+    setEditingPromptSeed(null);
     setEditingPrompt(null);
     setEditorMode("creating");
   }, []);
 
   const handleEdit = useCallback((prompt: PromptEntity) => {
+    setIsDetailModalOpen(false);
+    setEditingPromptSeed(prompt);
+    setEditingPrompt(null);
     setSelectedPromptId(prompt.id);
+    setSelectedPromptType(prompt.promptType);
     setEditorMode("editing");
   }, []);
+
+  const handleSelectPromptType = useCallback(
+    (promptType: PromptType) => {
+      setSelectedPromptType(promptType);
+      setSelectedPromptId(null);
+      setIsDetailModalOpen(false);
+      closeEditor();
+    },
+    [closeEditor],
+  );
 
   // Populate editor with detail data when editing (skip when creating)
   useEffect(() => {
@@ -110,11 +129,29 @@ const AIPromptPage = () => {
       editorMode === "editing" &&
       selectedPromptId &&
       promptDetail &&
-      !editingPrompt
+      promptDetail.id === selectedPromptId
     ) {
-      setEditingPrompt(promptDetail);
+      const promptSummary = promptsData?.items?.find(
+        (item) => item.id === selectedPromptId,
+      );
+      const resolvedModel =
+        promptDetail.model?.trim() ||
+        editingPromptSeed?.model?.trim() ||
+        promptSummary?.model?.trim() ||
+        null;
+
+      setEditingPrompt({
+        ...promptDetail,
+        model: resolvedModel,
+      });
     }
-  }, [editorMode, selectedPromptId, promptDetail, editingPrompt]);
+  }, [
+    editorMode,
+    selectedPromptId,
+    promptDetail,
+    promptsData,
+    editingPromptSeed,
+  ]);
 
   const handleSave = useCallback(
     async (data: CreatePromptRequest | UpdatePromptRequest) => {
@@ -127,6 +164,7 @@ const AIPromptPage = () => {
         } else {
           await createMutation.mutateAsync(data as CreatePromptRequest);
         }
+        setSelectedPromptType(data.prompt_type);
         closeEditor();
       } catch (error) {
         console.error("Error saving prompt:", error);
@@ -161,6 +199,22 @@ const AIPromptPage = () => {
   }
 
   const prompts = promptsData?.items ?? [];
+  const filteredPrompts = selectedPromptType
+    ? prompts.filter((prompt) => prompt.promptType === selectedPromptType)
+    : [];
+  const selectedPromptDetail =
+    promptDetail && selectedPromptId && promptDetail.id === selectedPromptId
+      ? promptDetail
+      : null;
+  const promptTypeCounts = PROMPT_TYPE_OPTIONS.reduce(
+    (acc, option) => {
+      acc[option.value] = prompts.filter(
+        (prompt) => prompt.promptType === option.value,
+      ).length;
+      return acc;
+    },
+    {} as Record<PromptType, number>,
+  );
 
   return (
     <DashboardLayout
@@ -204,36 +258,51 @@ const AIPromptPage = () => {
           </div>
         </div>
 
-        {/* Editor (shown when creating/editing) */}
-        {editorMode !== "closed" && (
+        {/* Main Content: Prompt List */}
+        <div>
+          <PromptList
+            prompts={filteredPrompts}
+            isLoading={promptsLoading}
+            selectedId={selectedPromptId}
+            selectedPromptType={selectedPromptType}
+            promptTypeCounts={promptTypeCounts}
+            onSelectPromptType={handleSelectPromptType}
+            onSelect={handleSelectPrompt}
+            onEdit={handleEdit}
+            onDelete={setDeletingPrompt}
+          />
+        </div>
+      </div>
+
+      <Dialog
+        open={editorMode !== "closed"}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeEditor();
+          }
+        }}
+      >
+        <DialogContent className="max-w-[min(1180px,96vw)] max-h-[94vh] overflow-y-auto p-0 [&>button]:hidden">
           <PromptEditor
             prompt={editingPrompt}
             isSubmitting={createMutation.isPending || updateMutation.isPending}
             onSave={handleSave}
             onCancel={closeEditor}
           />
-        )}
+        </DialogContent>
+      </Dialog>
 
-        {/* Main Content: List + Detail */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-2">
-            <PromptList
-              prompts={prompts}
-              isLoading={promptsLoading}
-              selectedId={selectedPromptId}
-              onSelect={handleSelectPrompt}
-              onEdit={handleEdit}
-              onDelete={setDeletingPrompt}
-            />
-          </div>
-          <div className="lg:col-span-3">
-            <PromptDetailPanel
-              prompt={promptDetail ?? null}
-              isLoading={detailLoading && !!selectedPromptId}
-            />
-          </div>
-        </div>
-      </div>
+      <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+        <DialogContent className="max-w-[min(1180px,96vw)] max-h-[94vh] overflow-y-auto p-0">
+          <PromptDetailPanel
+            prompt={selectedPromptDetail}
+            isLoading={
+              Boolean(selectedPromptId) &&
+              (detailLoading || !selectedPromptDetail)
+            }
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <DeletePromptDialog
