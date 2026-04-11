@@ -17,13 +17,11 @@ function resolveNotificationUrl(data) {
   }
 
   var sourceDepotId = toPositiveInt(data && data.sourceDepotId);
-  var closureId = toPositiveInt(data && data.closureId);
   var transferId = toPositiveInt(data && data.transferId);
 
-  if (sourceDepotId && closureId && transferId) {
+  if (sourceDepotId && transferId) {
     var params = new URLSearchParams({
       sourceDepotId: String(sourceDepotId),
-      closureId: String(closureId),
       transferId: String(transferId),
     });
     return "/dashboard/inventory/depot-closure?" + params.toString();
@@ -50,8 +48,8 @@ self.addEventListener('push', function(event) {
       isBroadcastAlert = d.type === "broadcast_alert";
       targetUrl = resolveNotificationUrl(d);
     }
-  } catch (e) {
-    try { if (event.data) body = event.data.text(); } catch (e2) { /* ignore */ }
+  } catch {
+    try { if (event.data) body = event.data.text(); } catch { /* ignore */ }
   }
 
   var tag = isBroadcastAlert ? "broadcast-alert" : ("fcm-" + Date.now());

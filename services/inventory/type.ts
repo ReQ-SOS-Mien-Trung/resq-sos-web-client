@@ -148,6 +148,8 @@ export interface ImportInventoryItem {
   unit: string;
   itemType: string;
   targetGroups: string[];
+  volumePerUnit?: number | null;
+  weightPerUnit?: number | null;
   receivedDate: string;
   expiredDate?: string | null;
 }
@@ -183,6 +185,8 @@ export interface ImportPurchaseItem {
   unit: string;
   itemType: string;
   targetGroups: string[];
+  volumePerUnit?: number | null;
+  weightPerUnit?: number | null;
   receivedDate: string;
   expiredDate?: string | null;
 }
@@ -196,6 +200,18 @@ export type ImportRegularRequest = {
     campaignDisbursementId?: number;
   }>;
 };
+
+export interface UpdateItemModelPayload {
+  categoryId: number;
+  name: string;
+  description?: string | null;
+  unit: string;
+  itemType: string;
+  targetGroups: string[];
+  imageUrl?: string | null;
+  volumePerUnit: number;
+  weightPerUnit: number;
+}
 
 // ─── Stock Movement History ───
 

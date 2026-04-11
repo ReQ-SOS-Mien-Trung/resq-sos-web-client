@@ -9,6 +9,7 @@ import {
   GetMyDepotCategoryQuantitiesResponse,
   ImportInventoryRequest,
   ImportRegularRequest,
+  UpdateItemModelPayload,
   InventoryCategory,
   InventoryItemType,
   InventoryOrganization,
@@ -504,6 +505,13 @@ export async function importRegularInventory(
   await api.post("/logistics/inventory/import-purchase", payload, {
     timeout: 60000,
   });
+}
+
+export async function updateItemModel(
+  itemModelId: number,
+  payload: UpdateItemModelPayload,
+): Promise<void> {
+  await api.put(`/logistics/item-model/${itemModelId}`, payload);
 }
 
 /**

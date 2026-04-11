@@ -141,13 +141,13 @@ export default function ExportReportPage() {
     () =>
       userMe
         ? getUserDisplayName(
-          {
-            firstName: userMe.firstName,
-            lastName: userMe.lastName,
-            username: userMe.username,
-          },
-          getUserDisplayName(user),
-        )
+            {
+              firstName: userMe.firstName,
+              lastName: userMe.lastName,
+              username: userMe.username,
+            },
+            getUserDisplayName(user),
+          )
         : getUserDisplayName(user),
     [userMe, user],
   );
@@ -155,13 +155,13 @@ export default function ExportReportPage() {
     () =>
       userMe
         ? getUserAvatarInitials(
-          {
-            firstName: userMe.firstName,
-            lastName: userMe.lastName,
-            username: userMe.username,
-          },
-          getUserAvatarInitials(user),
-        )
+            {
+              firstName: userMe.firstName,
+              lastName: userMe.lastName,
+              username: userMe.username,
+            },
+            getUserAvatarInitials(user),
+          )
         : getUserAvatarInitials(user),
     [userMe, user],
   );
@@ -205,15 +205,15 @@ export default function ExportReportPage() {
     const params =
       panel === "range"
         ? {
-          periodType: "ByDateRange" as const,
-          fromDate: leftFromDate,
-          toDate: leftToDate,
-        }
+            periodType: "ByDateRange" as const,
+            fromDate: leftFromDate,
+            toDate: leftToDate,
+          }
         : {
-          periodType: "ByMonth" as const,
-          month: Number(rightMonth),
-          year: Number(rightYear),
-        };
+            periodType: "ByMonth" as const,
+            month: Number(rightMonth),
+            year: Number(rightYear),
+          };
 
     exportMovements(params, {
       onSuccess: ({ blob, filename }) => {
@@ -352,7 +352,7 @@ export default function ExportReportPage() {
             onClick={() => router.push("/dashboard/inventory/stock-movements")}
           >
             <FileTextIcon className="h-4 w-4" />
-            Truy xuất
+            Xem biến động kho
           </Button>
 
           <NotificationBell />
@@ -431,13 +431,13 @@ export default function ExportReportPage() {
               inventoryItems={mockInventoryItems}
               supplyRequests={mockSupplyRequests}
               shipments={mockShipments}
-              onItemSelect={() => { }}
-              onRequestSelect={() => { }}
-              onShipmentSelect={() => { }}
+              onItemSelect={() => {}}
+              onRequestSelect={() => {}}
+              onShipmentSelect={() => {}}
               selectedItem={null}
               selectedRequest={null}
               selectedCategory={null}
-              onCategorySelect={() => { }}
+              onCategorySelect={() => {}}
               apiCategories={categoriesData?.items}
               activeTab={activeTab}
               onActiveTabChange={setActiveTab}

@@ -21,19 +21,20 @@ function toPositiveInt(value: unknown): number | null {
 export function buildDepotClosureTransferRoute(
   data?: NotificationRouteData | null,
 ): string | null {
-  const sourceDepotId = toPositiveInt(data?.sourceDepotId);
   const closureId = toPositiveInt(data?.closureId);
   const transferId = toPositiveInt(data?.transferId);
 
-  if (!sourceDepotId || !closureId || !transferId) {
+  if (!closureId && !transferId) {
     return null;
   }
 
-  const params = new URLSearchParams({
-    sourceDepotId: String(sourceDepotId),
-    closureId: String(closureId),
-    transferId: String(transferId),
-  });
+  const params = new URLSearchParams();
+  if (closureId) {
+    params.set("closureId", String(closureId));
+  }
+  if (transferId) {
+    params.set("transferId", String(transferId));
+  }
 
   return `/dashboard/inventory/depot-closure?${params.toString()}`;
 }

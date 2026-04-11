@@ -39,6 +39,7 @@ import type {
 } from "@/services/user/type";
 import { ArrowRight } from "@phosphor-icons/react";
 import { useAuthStore } from "@/stores/auth.store";
+import { ArrowLeft } from "lucide-react";
 
 function normalizeRoleLabel(value: string) {
   return value.trim().toLowerCase();
@@ -52,7 +53,9 @@ function isRescuerRole(role?: RoleMetadataOption) {
   return role ? normalizeRoleLabel(role.value) === "rescuer" : false;
 }
 
-function extractCreatedUserId(response: AdminCreateUserResponse): string | null {
+function extractCreatedUserId(
+  response: AdminCreateUserResponse,
+): string | null {
   if (typeof response.userId === "string" && response.userId.length > 0) {
     return response.userId;
   }
@@ -115,7 +118,9 @@ export default function CreateUserPage() {
   );
 
   const activeRoleId = useMemo(() => {
-    const matchedRole = availableRoles.find((role) => role.key === formData.roleId);
+    const matchedRole = availableRoles.find(
+      (role) => role.key === formData.roleId,
+    );
 
     if (matchedRole) return matchedRole.key;
 
@@ -136,7 +141,7 @@ export default function CreateUserPage() {
     fetch("https://provinces.open-api.vn/api/v2/")
       .then((r) => r.json())
       .then((data) => setProvinces(data))
-      .catch(() => { });
+      .catch(() => {});
   }, []);
 
   // Fetch wards when province changes
@@ -149,7 +154,7 @@ export default function CreateUserPage() {
     )
       .then((r) => r.json())
       .then((data) => setWards(data.wards || []))
-      .catch(() => { });
+      .catch(() => {});
   }, [selectedProvinceCode]);
 
   // Close dropdowns on outside click
@@ -372,15 +377,18 @@ export default function CreateUserPage() {
       <div className="w-full space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
         {/* Header & Back Action */}
         <div>
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
             onClick={() => router.push("/dashboard/admin/users")}
-            className="gap-1.5 mb-4 -ml-2 text-muted-foreground hover:text-foreground tracking-tighter"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
-            <CaretLeft className="w-4 h-4" />
-            Quay lại
-          </Button>
+            <ArrowLeft
+              size={16}
+              className="group-hover:-translate-x-0.5 transition-transform"
+            />
+            <span className="tracking-tighter text-sm font-medium">
+              Quay lại
+            </span>
+          </button>
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-2">
             <div>
               <h1 className="text-3xl sm:text-4xl font-bold tracking-tighter text-foreground leading-tight flex items-center gap-3">
@@ -395,7 +403,9 @@ export default function CreateUserPage() {
             <Button
               type="submit"
               form="create-user-form"
-              disabled={!isFormValid || createUserMutation.isPending || isUploading}
+              disabled={
+                !isFormValid || createUserMutation.isPending || isUploading
+              }
               className="gap-2 tracking-tighter shrink-0"
             >
               {createUserMutation.isPending || isUploading ? (
@@ -414,7 +424,11 @@ export default function CreateUserPage() {
         </div>
 
         {/* Form */}
-        <form id="create-user-form" onSubmit={handleSubmit} className="space-y-10">
+        <form
+          id="create-user-form"
+          onSubmit={handleSubmit}
+          className="space-y-10"
+        >
           <div className="grid grid-cols-1 md:grid-cols-12 gap-x-8 gap-y-5">
             {/* THÔNG TIN CÁ NHÂN */}
             <div className="col-span-1 md:col-span-4 border-t border-black/10 dark:border-white/10 pt-4">
@@ -531,7 +545,10 @@ export default function CreateUserPage() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       {/* City/Province */}
-                      <div className="relative space-y-1.5" ref={cityDropdownRef}>
+                      <div
+                        className="relative space-y-1.5"
+                        ref={cityDropdownRef}
+                      >
                         <label className="text-sm font-semibold text-foreground tracking-tighter">
                           Tỉnh/Thành phố
                         </label>
@@ -594,10 +611,11 @@ export default function CreateUserPage() {
                                     setCityOpen(false);
                                     setCitySearch("");
                                   }}
-                                  className={`w-full text-left px-4 py-2.5 text-sm tracking-tighter hover:bg-muted/50 transition-colors ${formData.city === p.name
-                                    ? "bg-primary/5 text-primary font-bold"
-                                    : ""
-                                    }`}
+                                  className={`w-full text-left px-4 py-2.5 text-sm tracking-tighter hover:bg-muted/50 transition-colors ${
+                                    formData.city === p.name
+                                      ? "bg-primary/5 text-primary font-bold"
+                                      : ""
+                                  }`}
                                 >
                                   {p.name}
                                 </button>
@@ -617,7 +635,10 @@ export default function CreateUserPage() {
                       </div>
 
                       {/* Ward */}
-                      <div className="relative space-y-1.5" ref={wardDropdownRef}>
+                      <div
+                        className="relative space-y-1.5"
+                        ref={wardDropdownRef}
+                      >
                         <label className="text-sm font-semibold text-foreground tracking-tighter">
                           Phường/Xã
                         </label>
@@ -667,10 +688,11 @@ export default function CreateUserPage() {
                                     setWardOpen(false);
                                     setWardSearch("");
                                   }}
-                                  className={`w-full text-left px-4 py-2.5 text-sm tracking-tighter hover:bg-muted/50 transition-colors ${formData.ward === w.name
-                                    ? "bg-primary/5 text-primary font-bold"
-                                    : ""
-                                    }`}
+                                  className={`w-full text-left px-4 py-2.5 text-sm tracking-tighter hover:bg-muted/50 transition-colors ${
+                                    formData.ward === w.name
+                                      ? "bg-primary/5 text-primary font-bold"
+                                      : ""
+                                  }`}
                                 >
                                   {w.name}
                                 </button>
@@ -680,10 +702,10 @@ export default function CreateUserPage() {
                                 .toLowerCase()
                                 .includes((wardSearch || "").toLowerCase()),
                             ).length === 0 && (
-                                <p className="text-sm text-muted-foreground px-4 py-3 text-center tracking-tighter">
-                                  Không tìm thấy
-                                </p>
-                              )}
+                              <p className="text-sm text-muted-foreground px-4 py-3 text-center tracking-tighter">
+                                Không tìm thấy
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -770,8 +792,7 @@ export default function CreateUserPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="space-y-1.5">
                   <label className="text-sm font-semibold text-foreground tracking-tighter">
-                    Tên đăng nhập {" "}
-                    <span className="text-primary">*</span>
+                    Tên đăng nhập <span className="text-primary">*</span>
                   </label>
                   <Input
                     name="username"
@@ -817,7 +838,9 @@ export default function CreateUserPage() {
                   <Select
                     value={activeRoleId || undefined}
                     onValueChange={handleRoleChange}
-                    disabled={isRoleMetadataLoading || availableRoles.length === 0}
+                    disabled={
+                      isRoleMetadataLoading || availableRoles.length === 0
+                    }
                   >
                     <SelectTrigger className="h-11 rounded-none border-x-0 border-t-0 border-b border-border/60 bg-transparent px-0 focus:ring-0 focus:border-foreground text-sm font-medium tracking-tighter">
                       <SelectValue
@@ -850,7 +873,6 @@ export default function CreateUserPage() {
               </div>
             </div>
           </div>
-
         </form>
       </div>
     </DashboardLayout>
