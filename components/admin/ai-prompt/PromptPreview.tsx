@@ -15,11 +15,7 @@ import {
   Key,
 } from "@phosphor-icons/react";
 import { PromptDetailEntity } from "@/services/prompt/type";
-
-const PROMPT_TYPE_LABELS = {
-  SosPriorityAnalysis: "Phân tích SOS",
-  MissionPlanning: "Mission planning",
-} as const;
+import { PROMPT_TYPE_LABELS } from "@/services/prompt/constants";
 
 interface PromptDetailPanelProps {
   prompt: PromptDetailEntity | null;
@@ -85,7 +81,7 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge variant="outline">
-                {PROMPT_TYPE_LABELS[prompt.promptType]}
+                {PROMPT_TYPE_LABELS[prompt.promptType] ?? prompt.promptType}
               </Badge>
               <Badge variant="outline">{prompt.provider}</Badge>
               <Badge variant="outline">

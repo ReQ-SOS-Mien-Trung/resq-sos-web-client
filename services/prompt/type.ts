@@ -1,4 +1,10 @@
-export type PromptType = "SosPriorityAnalysis" | "MissionPlanning";
+export type PromptType =
+  | "SosPriorityAnalysis"
+  | "MissionPlanning"
+  | "MissionRequirementsAssessment"
+  | "MissionDepotPlanning"
+  | "MissionTeamPlanning"
+  | "MissionPlanValidation";
 
 export type AiProvider = "Gemini" | "OpenRouter";
 
