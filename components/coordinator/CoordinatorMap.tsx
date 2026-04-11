@@ -994,9 +994,6 @@ const CoordinatorMap = ({
           </>
         )}
       </div>
-
-      {/* Map Legend */}
-      <MapLegend />
     </div>
   );
 };
@@ -1462,67 +1459,6 @@ function UserLocationMarker({
   if (!icon) return null;
 
   return <Marker position={[location.lat, location.lng]} icon={icon} />;
-}
-
-// Map Legend Component
-function MapLegend() {
-  return (
-    <div className="absolute bottom-4 left-4 z-[400] bg-background/95 backdrop-blur-sm rounded-lg border shadow-lg p-3">
-      <div className="text-xs font-semibold mb-2">Chú thích</div>
-      <div className="space-y-1.5 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-          <span>P1 - Rất nghiêm trọng</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-          <span>P2 - Nghiêm trọng</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-          <span>P3 - Trung bình</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-teal-500"></div>
-          <span>P4 - Thấp</span>
-        </div>
-        <div className="border-t pt-1.5 mt-1.5">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span>Đội cứu hộ sẵn sàng</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-            <span>Đội cứu hộ đang bận</span>
-          </div>
-        </div>
-        <div className="border-t pt-1.5 mt-1.5">
-          <div className="flex items-center gap-2">
-            <span>📦</span>
-            <span>Kho vật phẩm (Depot)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span>📍</span>
-            <span>Điểm tập kết</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <span>Sự cố đội cứu hộ</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-teal-500 ring-2 ring-teal-300"></div>
-            <span>Cụm SOS đã gom</span>
-          </div>
-        </div>
-        <div className="border-t pt-1.5 mt-1.5">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500 ring-2 ring-blue-300"></div>
-            <span>Vị trí của tôi</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // Map Click Handler Component for location picking

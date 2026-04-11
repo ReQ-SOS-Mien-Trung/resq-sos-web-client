@@ -304,7 +304,7 @@ function getSosTypeLabel(sosType?: string) {
     case "RELIEF":
       return "Cứu trợ";
     case "BOTH":
-      return "Cứu hộ + cứu trợ";
+      return "Cứu hộ + Cứu trợ";
     default:
       return sosType ?? "";
   }

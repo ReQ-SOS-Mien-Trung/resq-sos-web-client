@@ -83,8 +83,6 @@ import {
   useMission,
   useMissionActivities,
   useUpdateMission,
-  useUpdateActivity,
-  useCreateActivity,
 } from "@/services/mission/hooks";
 import { useRescueTeamsByCluster } from "@/services/rescue_teams/hooks";
 import { useDepotInventory } from "@/services/inventory/hooks";
@@ -462,15 +460,64 @@ function getSOSNeedBadges(sos: SOSRequest): string[] {
 
 // ── Preset templates ──
 
-const TEMPLATES: { label: string; types: ClusterActivityType[] }[] = [
-  { label: "Giải cứu cơ bản", types: ["ASSESS", "RESCUE", "EVACUATE"] },
+type ManualTemplateKey =
+  | "DEEP_RESCUE"
+  | "EMERGENCY_MEDICAL"
+  | "SUPPLY_HANDOVER";
+
+interface ManualTemplateConfig {
+  key: ManualTemplateKey;
+  label: string;
+  missionType: MissionType;
+  priorityScore: number;
+  summaryTypes: ClusterActivityType[];
+  summaryHint: string;
+}
+
+const TEMPLATES: ManualTemplateConfig[] = [
   {
-    label: "Y tế khẩn cấp",
-    types: ["ASSESS", "MEDICAL_AID", "EVACUATE"],
+    key: "DEEP_RESCUE",
+    label: "Giải cứu chuyên sâu",
+    missionType: "MIXED",
+    priorityScore: 9,
+    summaryTypes: [
+      "COLLECT_SUPPLIES",
+      "DELIVER_SUPPLIES",
+      "RESCUE",
+      "MEDICAL_AID",
+      "EVACUATE",
+      "RETURN_SUPPLIES",
+    ],
+    summaryHint:
+      "Tự dựng theo SOS ưu tiên, đội và kho gần cụm. Có thu gom nhiều chặng và hoàn trả vật phẩm tự động.",
   },
   {
+    key: "EMERGENCY_MEDICAL",
+    label: "Y tế khẩn cấp",
+    missionType: "RELIEF",
+    priorityScore: 9,
+    summaryTypes: [
+      "COLLECT_SUPPLIES",
+      "DELIVER_SUPPLIES",
+      "MEDICAL_AID",
+      "EVACUATE",
+    ],
+    summaryHint:
+      "Ưu tiên tuyến lấy vật tư y tế, can thiệp tại chỗ và chuyển các ca nặng.",
+  },
+  {
+    key: "SUPPLY_HANDOVER",
     label: "Bàn giao vật phẩm",
-    types: ["ASSESS", "DELIVER_SUPPLIES", "EVACUATE"],
+    missionType: "RELIEF",
+    priorityScore: 8,
+    summaryTypes: [
+      "COLLECT_SUPPLIES",
+      "DELIVER_SUPPLIES",
+      "ASSESS",
+      "RETURN_SUPPLIES",
+    ],
+    summaryHint:
+      "Tập trung tiếp tế theo nhu cầu SOS rồi xác nhận tiếp nhận tại hiện trường.",
   },
 ];
 
@@ -822,6 +869,10 @@ function SortableActivityCard({
             "border-blue-200 dark:border-blue-800/40 bg-blue-50/30 dark:bg-blue-900/10",
           )}
           onDragOver={(event) => {
+            if (isAutoReturnStep) {
+              return;
+            }
+
             if (event.dataTransfer.types.includes(MANUAL_INVENTORY_MIME)) {
               event.preventDefault();
               event.stopPropagation();
@@ -838,6 +889,12 @@ function SortableActivityCard({
             );
           }}
           onDrop={(event) => {
+            if (isAutoReturnStep) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+
             event.preventDefault();
             event.stopPropagation();
             event.currentTarget.classList.remove(
@@ -891,6 +948,7 @@ function SortableActivityCard({
                     type="number"
                     min={1}
                     value={supply.quantity}
+                    disabled={isAutoReturnStep}
                     onChange={(event) =>
                       onUpdateSupplyQuantity(
                         activity.id,
@@ -909,6 +967,7 @@ function SortableActivityCard({
                     variant="ghost"
                     size="icon"
                     className="h-5 w-5 text-muted-foreground hover:text-red-500"
+                    disabled={isAutoReturnStep}
                     onClick={() => onRemoveSupply(activity.id, supplyIndex)}
                     aria-label={`Xóa vật phẩm ${supply.itemName}`}
                   >
@@ -919,7 +978,9 @@ function SortableActivityCard({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground/70 text-center py-1">
-              Kéo vật phẩm từ kho bên trái vào đây
+              {isAutoReturnStep
+                ? "Danh sách vật phẩm hoàn trả sẽ tự đồng bộ từ các bước tiếp nhận."
+                : "Kéo vật phẩm từ kho bên trái vào đây"}
             </p>
           )}
         </div>
@@ -1281,8 +1342,9 @@ const ManualMissionBuilder = ({
     useState<ClusterActivityType | null>(null);
   const [hasLoadedExisting, setHasLoadedExisting] = useState(false);
   const [selectedSOSId, setSelectedSOSId] = useState<string | null>(null);
-  const [recentlyInsertedActivityId, setRecentlyInsertedActivityId] =
-    useState<string | null>(null);
+  const [recentlyInsertedActivityId, setRecentlyInsertedActivityId] = useState<
+    string | null
+  >(null);
   const isDraggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -1290,13 +1352,8 @@ const ManualMissionBuilder = ({
     useCreateMission();
   const { mutateAsync: updateMissionAsync, isPending: isUpdatingMission } =
     useUpdateMission();
-  const { mutateAsync: updateActivityAsync, isPending: isUpdatingAct } =
-    useUpdateActivity();
-  const { mutateAsync: createActivityAsync, isPending: isCreatingAct } =
-    useCreateActivity();
 
-  const isSubmitting =
-    isCreatingMission || isUpdatingMission || isUpdatingAct || isCreatingAct;
+  const isSubmitting = isCreatingMission || isUpdatingMission;
 
   // ── Fetch existing mission ──
   const { data: existingMission } = useMission(existingMissionId ?? 0, {
@@ -1641,10 +1698,326 @@ const ManualMissionBuilder = ({
 
   // ── Apply template ──
   const applyTemplate = useCallback(
-    (types: ClusterActivityType[]) => {
-      setActivities(types.map((type) => createActivity(type)));
+    (template: ManualTemplateConfig) => {
+      const priorityRank: Record<string, number> = {
+        P1: 1,
+        P2: 2,
+        P3: 3,
+        P4: 4,
+      };
+
+      const sortedSOS = [...clusterSOSRequests].sort((sosA, sosB) => {
+        const rankA = priorityRank[(sosA.priority ?? "").toUpperCase()] ?? 99;
+        const rankB = priorityRank[(sosB.priority ?? "").toUpperCase()] ?? 99;
+
+        if (rankA !== rankB) {
+          return rankA - rankB;
+        }
+
+        const createdAtA = new Date(sosA.createdAt).getTime();
+        const createdAtB = new Date(sosB.createdAt).getTime();
+        if (Number.isFinite(createdAtA) && Number.isFinite(createdAtB)) {
+          return createdAtA - createdAtB;
+        }
+
+        return String(sosA.id).localeCompare(String(sosB.id), "vi");
+      });
+
+      const prioritizedSOS = selectedSOSRequest
+        ? [
+            selectedSOSRequest,
+            ...sortedSOS.filter((sos) => sos.id !== selectedSOSRequest.id),
+          ]
+        : sortedSOS;
+
+      const sosTargets =
+        template.key === "DEEP_RESCUE"
+          ? prioritizedSOS.slice(0, Math.min(2, prioritizedSOS.length))
+          : prioritizedSOS.slice(0, 1);
+
+      const fallbackSOS = selectedSOSRequest ?? prioritizedSOS[0] ?? null;
+      const primaryDepot = nearbyDepots[0] ?? null;
+      const secondaryDepot = nearbyDepots[1] ?? null;
+      const canUseSupplyFlow = nearbyDepots.length > 0;
+
+      const plannedActivities: ManualActivity[] = [];
+
+      const formatSosTarget = (sos: SOSRequest | null): string => {
+        if (!sos) return "Khu vực cứu hộ trọng điểm";
+
+        const address = sos.address?.trim();
+        return address || `Vị trí SOS #${sos.id}`;
+      };
+
+      const formatSosCoordinate = (sos: SOSRequest | null): string => {
+        if (!sos) return "tọa độ cụm";
+        return `${sos.location.lat.toFixed(3)}, ${sos.location.lng.toFixed(3)}`;
+      };
+
+      const pushTemplateStep = ({
+        activityType,
+        description,
+        target,
+        sos,
+        depot,
+        team,
+      }: {
+        activityType: ClusterActivityType;
+        description: string;
+        target: string;
+        sos?: SOSRequest | null;
+        depot?: DepotByClusterEntity | null;
+        team?: ManualTeamOption | null;
+      }) => {
+        const activity = createActivity(activityType);
+        activity.description = description.trim();
+        activity.target = target.trim();
+        activity.rescueTeamId = toValidRescueTeamId(team?.id ?? null);
+
+        if (sos) {
+          activity.targetLatitude = sos.location.lat;
+          activity.targetLongitude = sos.location.lng;
+        }
+
+        if (depot) {
+          activity.depotId = depot.id;
+          activity.depotName = depot.name;
+          activity.depotAddress = depot.address;
+
+          if (!activity.target) {
+            activity.target = depot.name;
+          }
+
+          if (hasRenderableCoordinates(depot.latitude, depot.longitude)) {
+            activity.targetLatitude = depot.latitude;
+            activity.targetLongitude = depot.longitude;
+          }
+        }
+
+        plannedActivities.push(activity);
+      };
+
+      const applyFallbackTemplate = (types: ClusterActivityType[]) => {
+        setActivities(types.map((type) => createActivity(type)));
+      };
+
+      setMissionType(template.missionType);
+      setPriorityScore(template.priorityScore);
+
+      if (template.key === "SUPPLY_HANDOVER" && !canUseSupplyFlow) {
+        toast.info(
+          "Cụm này chưa có kho gần để kéo vật phẩm. Đã áp dụng mẫu thay thế.",
+        );
+        applyFallbackTemplate(["ASSESS", "RESCUE", "EVACUATE"]);
+        return;
+      }
+
+      if (sosTargets.length === 0 && !fallbackSOS) {
+        const fallbackTypes: ClusterActivityType[] =
+          template.key === "DEEP_RESCUE"
+            ? ["ASSESS", "RESCUE", "MEDICAL_AID", "EVACUATE"]
+            : template.key === "EMERGENCY_MEDICAL"
+              ? ["ASSESS", "MEDICAL_AID", "EVACUATE"]
+              : ["ASSESS", "RESCUE", "EVACUATE"];
+        applyFallbackTemplate(fallbackTypes);
+        return;
+      }
+
+      const executionTargets =
+        sosTargets.length > 0 ? sosTargets : fallbackSOS ? [fallbackSOS] : [];
+
+      switch (template.key) {
+        case "DEEP_RESCUE": {
+          executionTargets.forEach((sos, sosIndex) => {
+            const team = teamOptions[sosIndex] ?? teamOptions[0] ?? null;
+            const teamName = team?.name ?? "Đội cứu hộ";
+            const assemblyPoint =
+              team?.assemblyPointName?.trim() || "điểm tập kết";
+            const sosLabel = `SOS #${sos.id}`;
+            const sosCoordinate = formatSosCoordinate(sos);
+
+            if (canUseSupplyFlow && primaryDepot) {
+              pushTemplateStep({
+                activityType: "COLLECT_SUPPLIES",
+                description: `${teamName} di chuyển từ ${assemblyPoint} đến kho ${primaryDepot.name} để thu gom vật phẩm thiết yếu cho ${sosLabel}.`,
+                target: primaryDepot.name,
+                depot: primaryDepot,
+                team,
+              });
+            }
+
+            if (
+              canUseSupplyFlow &&
+              secondaryDepot &&
+              secondaryDepot.id !== primaryDepot?.id
+            ) {
+              pushTemplateStep({
+                activityType: "COLLECT_SUPPLIES",
+                description: `${teamName} tiếp tục lấy bổ sung vật phẩm tại kho ${secondaryDepot.name} trước khi tới ${sosLabel}.`,
+                target: secondaryDepot.name,
+                depot: secondaryDepot,
+                team,
+              });
+            }
+
+            if (canUseSupplyFlow) {
+              pushTemplateStep({
+                activityType: "DELIVER_SUPPLIES",
+                description: `${teamName} di chuyển đến ${sosCoordinate} để bàn giao vật phẩm cho ${sosLabel}.`,
+                target: formatSosTarget(sos),
+                sos,
+                team,
+              });
+            }
+
+            pushTemplateStep({
+              activityType: "RESCUE",
+              description: `${teamName} triển khai cứu hộ tại ${sosCoordinate}, ưu tiên người mắc kẹt và nhóm nguy cơ cao.`,
+              target: formatSosTarget(sos),
+              sos,
+              team,
+            });
+
+            pushTemplateStep({
+              activityType: "MEDICAL_AID",
+              description: `${teamName} sơ cứu và ổn định y tế ban đầu tại khu vực ${sosLabel}.`,
+              target: formatSosTarget(sos),
+              sos,
+              team,
+            });
+          });
+
+          const evacuationSOS =
+            executionTargets[executionTargets.length - 1] ?? fallbackSOS;
+          const evacuationTeam =
+            teamOptions[Math.max(0, executionTargets.length - 1)] ??
+            teamOptions[0] ??
+            null;
+          const evacuationTeamName = evacuationTeam?.name ?? "Đội cứu hộ";
+          const evacuationTarget =
+            evacuationTeam?.assemblyPointName?.trim() || "Điểm tập kết an toàn";
+
+          pushTemplateStep({
+            activityType: "EVACUATE",
+            description: `${evacuationTeamName} tổ chức sơ tán nạn nhân về ${evacuationTarget} và bàn giao theo quy trình.`,
+            target: evacuationTarget,
+            sos: evacuationSOS,
+            team: evacuationTeam,
+          });
+
+          break;
+        }
+        case "EMERGENCY_MEDICAL": {
+          const sos = executionTargets[0];
+          const team = teamOptions[0] ?? null;
+          const teamName = team?.name ?? "Đội cứu hộ";
+          const assemblyPoint =
+            team?.assemblyPointName?.trim() || "điểm tập kết";
+          const sosCoordinate = formatSosCoordinate(sos);
+
+          if (canUseSupplyFlow && primaryDepot) {
+            pushTemplateStep({
+              activityType: "COLLECT_SUPPLIES",
+              description: `${teamName} lấy nhanh vật tư y tế tại kho ${primaryDepot.name} trước khi tiếp cận hiện trường.`,
+              target: primaryDepot.name,
+              depot: primaryDepot,
+              team,
+            });
+
+            pushTemplateStep({
+              activityType: "DELIVER_SUPPLIES",
+              description: `${teamName} đưa vật tư y tế đến ${sosCoordinate} để xử lý ca khẩn cấp tại hiện trường.`,
+              target: formatSosTarget(sos),
+              sos,
+              team,
+            });
+          }
+
+          pushTemplateStep({
+            activityType: "MEDICAL_AID",
+            description: `${teamName} triển khai phân loại, sơ cứu và theo dõi y tế cho nạn nhân tại điểm SOS.`,
+            target: formatSosTarget(sos),
+            sos,
+            team,
+          });
+
+          pushTemplateStep({
+            activityType: "EVACUATE",
+            description: `${teamName} chuyển các ca nặng từ hiện trường về ${assemblyPoint} hoặc cơ sở y tế gần nhất.`,
+            target: assemblyPoint,
+            sos,
+            team,
+          });
+
+          break;
+        }
+        case "SUPPLY_HANDOVER": {
+          const sos = executionTargets[0];
+          const team = teamOptions[0] ?? null;
+          const teamName = team?.name ?? "Đội cứu hộ";
+          const assemblyPoint =
+            team?.assemblyPointName?.trim() || "điểm tập kết";
+
+          if (primaryDepot) {
+            pushTemplateStep({
+              activityType: "COLLECT_SUPPLIES",
+              description: `${teamName} xuất phát từ ${assemblyPoint}, thu gom vật phẩm cần bàn giao tại kho ${primaryDepot.name}.`,
+              target: primaryDepot.name,
+              depot: primaryDepot,
+              team,
+            });
+          }
+
+          if (secondaryDepot && secondaryDepot.id !== primaryDepot?.id) {
+            pushTemplateStep({
+              activityType: "COLLECT_SUPPLIES",
+              description: `${teamName} bổ sung thêm vật phẩm tại kho ${secondaryDepot.name} để đủ cơ số bàn giao.`,
+              target: secondaryDepot.name,
+              depot: secondaryDepot,
+              team,
+            });
+          }
+
+          pushTemplateStep({
+            activityType: "DELIVER_SUPPLIES",
+            description: `${teamName} bàn giao vật phẩm theo danh sách nhu cầu tại điểm SOS.`,
+            target: formatSosTarget(sos),
+            sos,
+            team,
+          });
+
+          pushTemplateStep({
+            activityType: "ASSESS",
+            description: `${teamName} xác nhận tình trạng tiếp nhận vật phẩm và ghi nhận nhu cầu phát sinh sau bàn giao.`,
+            target: formatSosTarget(sos),
+            sos,
+            team,
+          });
+
+          break;
+        }
+      }
+
+      if (plannedActivities.length === 0) {
+        const fallbackTypes: ClusterActivityType[] =
+          template.key === "DEEP_RESCUE"
+            ? ["ASSESS", "RESCUE", "MEDICAL_AID", "EVACUATE"]
+            : template.key === "EMERGENCY_MEDICAL"
+              ? ["ASSESS", "MEDICAL_AID", "EVACUATE"]
+              : ["ASSESS", "RESCUE", "EVACUATE"];
+        applyFallbackTemplate(fallbackTypes);
+        return;
+      }
+
+      setActivities(plannedActivities);
     },
-    [createActivity],
+    [
+      clusterSOSRequests,
+      createActivity,
+      nearbyDepots,
+      selectedSOSRequest,
+      teamOptions,
+    ],
   );
 
   const handleAddActivity = useCallback(() => {
@@ -1658,6 +2031,10 @@ const ManualMissionBuilder = ({
       setActivities((previous) =>
         previous.map((activity) => {
           if (activity.id !== activityId) {
+            return activity;
+          }
+
+          if (activity.isAutoReturnStep) {
             return activity;
           }
 
@@ -1710,6 +2087,10 @@ const ManualMissionBuilder = ({
             return activity;
           }
 
+          if (activity.isAutoReturnStep) {
+            return activity;
+          }
+
           const nextSupplies = [...activity.suppliesToCollect];
           if (!nextSupplies[supplyIndex]) {
             return activity;
@@ -1736,6 +2117,10 @@ const ManualMissionBuilder = ({
       setActivities((previous) =>
         previous.map((activity) => {
           if (activity.id !== activityId) {
+            return activity;
+          }
+
+          if (activity.isAutoReturnStep) {
             return activity;
           }
 
@@ -1807,10 +2192,8 @@ const ManualMissionBuilder = ({
             ? previous[managedReturnIndex]
             : createActivity("RETURN_SUPPLIES");
 
-        const nextSupplies =
-          mergedSupplies.length > 0
-            ? mergedSupplies
-            : baseManagedStep.suppliesToCollect;
+        // Always mirror collected supplies exactly, never keep stale manual data.
+        const nextSupplies = mergedSupplies;
 
         const autoReturnStep: ManualActivity = {
           ...baseManagedStep,
@@ -1963,54 +2346,39 @@ const ManualMissionBuilder = ({
             priorityScore,
             startTime: new Date(startTime).toISOString(),
             expectedEndTime: new Date(expectedEndTime).toISOString(),
+            activities: activities.map((activity, index) => {
+              const parsedExistingActivityId = activity.id.startsWith(
+                `${TIMELINE_PREFIX}existing-`,
+              )
+                ? Number.parseInt(activity.id.split("-")[2] ?? "", 10)
+                : Number.NaN;
+              const activityId =
+                Number.isFinite(parsedExistingActivityId) &&
+                parsedExistingActivityId > 0
+                  ? parsedExistingActivityId
+                  : 0;
+
+              return {
+                activityId,
+                step: index + 1,
+                description: activity.description,
+                target: activity.target,
+                targetLatitude: activity.targetLatitude,
+                targetLongitude: activity.targetLongitude,
+                items: activity.suppliesToCollect.map((supply) => ({
+                  itemId: supply.itemId > 0 ? supply.itemId : null,
+                  itemName:
+                    typeof supply.itemName === "string" &&
+                    supply.itemName.trim()
+                      ? supply.itemName.trim()
+                      : null,
+                  quantity: supply.quantity,
+                  unit: supply.unit,
+                })),
+              };
+            }),
           },
         });
-
-        // Update or create activities
-        await Promise.all(
-          activities.map((a, i) => {
-            const step = i + 1;
-            const activityCode = `${a.activityType}_${step}`;
-            const rescueTeamId = toValidRescueTeamId(a.rescueTeamId);
-            const reqData = {
-              step,
-              activityCode,
-              activityType: a.activityType,
-              description: a.description,
-              priority: "Medium",
-              estimatedTime: 30,
-              sosRequestId: 0,
-              depotId: 0,
-              depotName: "",
-              depotAddress: "",
-              suppliesToCollect: a.suppliesToCollect.map((supply) => ({
-                id: supply.itemId > 0 ? supply.itemId : null,
-                name: supply.itemName,
-                quantity: supply.quantity,
-                unit: supply.unit,
-              })),
-              target: a.target,
-              items: a.items || buildSupplySummary(a.suppliesToCollect),
-              targetLatitude: a.targetLatitude,
-              targetLongitude: a.targetLongitude,
-              rescueTeamId,
-            };
-
-            if (a.id.startsWith(`${TIMELINE_PREFIX}existing-`)) {
-              const activityId = parseInt(a.id.split("-")[2], 10);
-              return updateActivityAsync({
-                missionId: existingMissionId,
-                activityId: activityId,
-                request: reqData,
-              });
-            } else {
-              return createActivityAsync({
-                missionId: existingMissionId,
-                request: reqData,
-              });
-            }
-          }),
-        );
 
         toast.success("Đã cập nhật nhiệm vụ và hoạt động thành công!");
         onOpenChange(false);
@@ -2105,8 +2473,6 @@ const ManualMissionBuilder = ({
     existingMissionId,
     updateMissionAsync,
     createMissionAsync,
-    updateActivityAsync,
-    createActivityAsync,
     missionType,
     priorityScore,
     startTime,
@@ -2388,15 +2754,18 @@ const ManualMissionBuilder = ({
                           key={tpl.label}
                           variant="outline"
                           size="sm"
-                          className="w-full h-auto py-2 px-3 text-left justify-start text-xs"
-                          onClick={() => applyTemplate(tpl.types)}
+                          className="w-full h-auto items-start justify-start overflow-hidden px-3 py-2 text-left text-xs whitespace-normal"
+                          onClick={() => applyTemplate(tpl)}
                         >
-                          <div>
+                          <div className="min-w-0 w-full">
                             <div className="font-semibold">{tpl.label}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {tpl.types
+                            <div className="mt-0.5 text-xs text-muted-foreground leading-relaxed whitespace-normal wrap-break-word">
+                              {tpl.summaryTypes
                                 .map((t) => activityTypeConfig[t]?.label || t)
                                 .join(" → ")}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground/80 leading-relaxed whitespace-normal wrap-break-word">
+                              {tpl.summaryHint}
                             </div>
                           </div>
                         </Button>

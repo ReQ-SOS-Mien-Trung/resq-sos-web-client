@@ -246,6 +246,109 @@ function normalizeCreateMissionRequest(
   };
 }
 
+type UpdateMissionActivityPayload = NonNullable<
+  UpdateMissionRequest["activities"]
+>[number];
+type UpdateMissionActivityItemPayload =
+  UpdateMissionActivityPayload["items"][number];
+type UpdateMissionLotAllocationPayload = NonNullable<
+  UpdateMissionActivityItemPayload["plannedPickupLotAllocations"]
+>[number];
+type UpdateMissionReusableUnitPayload = NonNullable<
+  UpdateMissionActivityItemPayload["plannedPickupReusableUnits"]
+>[number];
+
+function normalizeMissionLotAllocation(
+  allocation: UpdateMissionLotAllocationPayload,
+): UpdateMissionLotAllocationPayload {
+  return {
+    lotId: toNumberOrZero(allocation?.lotId),
+    quantityTaken: toNumberOrZero(allocation?.quantityTaken),
+    receivedDate: String(allocation?.receivedDate ?? ""),
+    expiredDate: String(allocation?.expiredDate ?? ""),
+    remainingQuantityAfterExecution: toNumberOrZero(
+      allocation?.remainingQuantityAfterExecution,
+    ),
+  };
+}
+
+function normalizeMissionReusableUnit(
+  unit: UpdateMissionReusableUnitPayload,
+): UpdateMissionReusableUnitPayload {
+  return {
+    reusableItemId: toNumberOrZero(unit?.reusableItemId),
+    itemModelId: toNumberOrZero(unit?.itemModelId),
+    itemName: String(unit?.itemName ?? "").trim(),
+    serialNumber: String(unit?.serialNumber ?? "").trim(),
+    condition: String(unit?.condition ?? "").trim(),
+    note: toTrimmedStringOrNull(unit?.note),
+  };
+}
+
+function normalizeUpdateMissionActivityItem(
+  item: UpdateMissionActivityItemPayload,
+): UpdateMissionActivityItemPayload {
+  return {
+    itemId: toNumberOrNull(item?.itemId),
+    itemName: toTrimmedStringOrNull(item?.itemName),
+    imageUrl: toTrimmedStringOrNull(item?.imageUrl),
+    quantity: toNumberOrZero(item?.quantity),
+    unit: String(item?.unit ?? "").trim(),
+    plannedPickupLotAllocations: Array.isArray(
+      item?.plannedPickupLotAllocations,
+    )
+      ? item.plannedPickupLotAllocations.map(normalizeMissionLotAllocation)
+      : [],
+    plannedPickupReusableUnits: Array.isArray(item?.plannedPickupReusableUnits)
+      ? item.plannedPickupReusableUnits.map(normalizeMissionReusableUnit)
+      : [],
+    pickupLotAllocations: Array.isArray(item?.pickupLotAllocations)
+      ? item.pickupLotAllocations.map(normalizeMissionLotAllocation)
+      : [],
+    pickedReusableUnits: Array.isArray(item?.pickedReusableUnits)
+      ? item.pickedReusableUnits.map(normalizeMissionReusableUnit)
+      : [],
+    expectedReturnUnits: Array.isArray(item?.expectedReturnUnits)
+      ? item.expectedReturnUnits.map(normalizeMissionReusableUnit)
+      : [],
+    returnedReusableUnits: Array.isArray(item?.returnedReusableUnits)
+      ? item.returnedReusableUnits.map(normalizeMissionReusableUnit)
+      : [],
+    actualReturnedQuantity: toNumberOrZero(item?.actualReturnedQuantity),
+    bufferRatio: toNumberOrZero(item?.bufferRatio),
+    bufferQuantity: toNumberOrZero(item?.bufferQuantity),
+    bufferUsedQuantity: toNumberOrZero(item?.bufferUsedQuantity),
+    bufferUsedReason: toTrimmedStringOrNull(item?.bufferUsedReason),
+    actualDeliveredQuantity: toNumberOrZero(item?.actualDeliveredQuantity),
+  };
+}
+
+function normalizeUpdateMissionRequest(
+  request: UpdateMissionRequest,
+): UpdateMissionRequest {
+  const normalizedActivities = Array.isArray(request.activities)
+    ? request.activities.map((activity, index) => ({
+        activityId: toNumberOrZero(activity?.activityId),
+        step: toNumberOrZero(activity?.step) || index + 1,
+        description: String(activity?.description ?? "").trim(),
+        target: String(activity?.target ?? "").trim(),
+        targetLatitude: toNumberOrZero(activity?.targetLatitude),
+        targetLongitude: toNumberOrZero(activity?.targetLongitude),
+        items: Array.isArray(activity?.items)
+          ? activity.items.map(normalizeUpdateMissionActivityItem)
+          : [],
+      }))
+    : undefined;
+
+  return {
+    missionType: String(request.missionType || "RESCUE").toUpperCase(),
+    priorityScore: toNumberOrZero(request.priorityScore),
+    startTime: request.startTime,
+    expectedEndTime: request.expectedEndTime,
+    ...(normalizedActivities ? { activities: normalizedActivities } : {}),
+  };
+}
+
 function normalizeActivityStatusInput(status: string): ActivityStatus | string {
   const normalizedStatus = status
     .trim()
@@ -330,7 +433,8 @@ export async function updateMission(
   missionId: number,
   request: UpdateMissionRequest,
 ): Promise<UpdateMissionResponse> {
-  const { data } = await api.put(`/operations/missions/${missionId}`, request);
+  const payload = normalizeUpdateMissionRequest(request);
+  const { data } = await api.put(`/operations/missions/${missionId}`, payload);
   return data;
 }
 
