@@ -49,6 +49,8 @@ import {
   UsersIcon,
 } from "@phosphor-icons/react";
 import { Icon as IconifyIcon } from "@iconify/react";
+import { PROMPT_TYPE_LABELS } from "@/services/prompt/constants";
+import type { PromptType } from "@/services/prompt/type";
 
 export const navLinks = [
   { href: "#features", label: "Tính năng" },
@@ -238,16 +240,44 @@ export { CENTRAL_VN_LOCATIONS } from "./locations";
 //Admin Prompt
 export const PROMPT_TYPE_OPTIONS = [
   {
-    label: "Phân tích SOS",
+    label: PROMPT_TYPE_LABELS.SosPriorityAnalysis,
     value: "SosPriorityAnalysis",
     description: "Dùng để phân tích mức độ ưu tiên và dữ liệu SOS.",
   },
   {
-    label: "Lập kế hoạch mission",
+    label: PROMPT_TYPE_LABELS.MissionPlanning,
     value: "MissionPlanning",
-    description: "Dùng cho AI gợi ý mission và rescue plan.",
+    description: "Prompt legacy fallback cho AI gợi ý mission và rescue plan.",
   },
-] as const;
+  {
+    label: PROMPT_TYPE_LABELS.MissionRequirementsAssessment,
+    value: "MissionRequirementsAssessment",
+    description:
+      "Stage pipeline phân tích SOS và trả fragment nhu cầu mission.",
+  },
+  {
+    label: PROMPT_TYPE_LABELS.MissionDepotPlanning,
+    value: "MissionDepotPlanning",
+    description:
+      "Stage pipeline chọn một kho và lập kế hoạch vật tư bằng inventory tool.",
+  },
+  {
+    label: PROMPT_TYPE_LABELS.MissionTeamPlanning,
+    value: "MissionTeamPlanning",
+    description:
+      "Stage pipeline gán đội cứu hộ và điểm tập kết bằng team/assembly tools.",
+  },
+  {
+    label: PROMPT_TYPE_LABELS.MissionPlanValidation,
+    value: "MissionPlanValidation",
+    description:
+      "Stage pipeline chuẩn hóa draft thành JSON mission cuối cùng.",
+  },
+] as const satisfies readonly {
+  label: string;
+  value: PromptType;
+  description: string;
+}[];
 
 export const AI_PROVIDER_OPTIONS = [
   {
@@ -255,12 +285,52 @@ export const AI_PROVIDER_OPTIONS = [
     value: "Gemini",
     description:
       "Dùng Google AI Studio API key hoặc default Gemini config của server.",
+    models: [
+      {
+        label: "Gemini 3.1 Pro",
+        code: "gemini-3.1-pro-preview",
+      },
+      {
+        label: "Gemini 3.1 Flash Lite",
+        code: "gemini-3.1-flash-lite-preview",
+      },
+      {
+        label: "Gemini 3 Flash",
+        code: "gemini-3-flash-preview",
+      },
+      {
+        label: "Gemini 2.5 Flash",
+        code: "gemini-2.5-flash",
+      },
+      {
+        label: "Gemini 2.5 Pro",
+        code: "gemini-2.5-pro",
+      },
+    ],
   },
   {
     label: "OpenRouter",
     value: "OpenRouter",
     description:
       "Dùng endpoint OpenRouter theo chuẩn OpenAI-compatible chat completions.",
+    models: [
+      {
+        label: "GPT-4o Mini",
+        code: "openai/gpt-4o-mini",
+      },
+      {
+        label: "GPT-4.1 Mini",
+        code: "openai/gpt-4.1-mini",
+      },
+      {
+        label: "Claude 3.5 Sonnet",
+        code: "anthropic/claude-3.5-sonnet",
+      },
+      {
+        label: "Llama 3.3 70B Instruct",
+        code: "meta-llama/llama-3.3-70b-instruct",
+      },
+    ],
   },
 ] as const;
 
@@ -275,7 +345,30 @@ export const PROMPT_VARIABLES_BY_TYPE = {
     { label: "Tổng số SOS", value: "total_count" },
     { label: "Ghi chú kho", value: "depots_data" },
   ],
-} as const;
+  MissionRequirementsAssessment: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Tổng số SOS", value: "total_count" },
+  ],
+  MissionDepotPlanning: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Requirements fragment", value: "requirements_fragment" },
+    { label: "Yêu cầu một kho", value: "single_depot_required" },
+    { label: "Số kho hợp lệ", value: "eligible_depot_count" },
+  ],
+  MissionTeamPlanning: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Requirements fragment", value: "requirements_fragment" },
+    { label: "Depot fragment", value: "depot_fragment" },
+    { label: "Số đội gần khu vực", value: "nearby_team_count" },
+  ],
+  MissionPlanValidation: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Mission draft body", value: "mission_draft_body" },
+  ],
+} as const satisfies Record<
+  PromptType,
+  readonly { label: string; value: string }[]
+>;
 
 export const INITIAL_FORM_DATA: PromptFormData = {
   name: "",

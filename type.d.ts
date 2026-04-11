@@ -330,6 +330,9 @@ export interface PromptListProps {
   prompts: PromptEntity[];
   isLoading: boolean;
   selectedId: number | null;
+  selectedPromptType: PromptType | null;
+  promptTypeCounts: Record<PromptType, number>;
+  onSelectPromptType: (promptType: PromptType) => void;
   onSelect: (prompt: PromptEntity) => void;
   onEdit: (prompt: PromptEntity) => void;
   onDelete: (prompt: PromptEntity) => void;
