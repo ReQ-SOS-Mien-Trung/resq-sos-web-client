@@ -6,6 +6,7 @@ import {
   registerFcmToken,
   unregisterFcmToken,
 } from "@/services/noti_alert/api";
+import { resolveNotificationRoute } from "@/services/noti_alert/navigation";
 import {
   clearStoredFcmRegistration,
   ensureNotificationServiceWorker,
@@ -20,11 +21,54 @@ import {
   isWebPushSupported,
 } from "@/services/noti_alert/push";
 
+function navigateToUrl(url: string) {
+  if (typeof window === "undefined" || !url) {
+    return;
+  }
+
+  if (window.location.href === url) {
+    return;
+  }
+
+  window.location.assign(url);
+}
+
 export function useNotificationPushLifecycle() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.userId ?? null);
   const roleId = useAuthStore((state) => state.user?.roleId);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+      return;
+    }
+
+    function handleServiceWorkerMessage(event: MessageEvent) {
+      const payload =
+        typeof event.data === "object" && event.data
+          ? (event.data as { type?: unknown; url?: unknown })
+          : null;
+
+      if (payload?.type !== "OPEN_URL" || typeof payload.url !== "string") {
+        return;
+      }
+
+      navigateToUrl(payload.url);
+    }
+
+    navigator.serviceWorker.addEventListener(
+      "message",
+      handleServiceWorkerMessage,
+    );
+
+    return () => {
+      navigator.serviceWorker.removeEventListener(
+        "message",
+        handleServiceWorkerMessage,
+      );
+    };
+  }, []);
 
   // ── 1. Register FCM token with backend ──
   useEffect(() => {
@@ -109,6 +153,11 @@ export function useNotificationPushLifecycle() {
         const title = notification?.title ?? "Thông báo mới từ RESQ";
         const body =
           (notification as Record<string, string> | undefined)?.body ?? "";
+        const targetUrl = resolveNotificationRoute(
+          data?.type ?? "",
+          roleId,
+          data,
+        );
 
         navigator.serviceWorker?.ready
           .then((reg) =>
@@ -118,14 +167,21 @@ export function useNotificationPushLifecycle() {
               badge: "/icons/logo-192.png",
               tag: `fcm-${Date.now()}`,
               requireInteraction: false,
+              data: { url: targetUrl },
             } as NotificationOptions),
           )
           .catch(() => {
             try {
-              new Notification(title, {
+              const browserNotification = new Notification(title, {
                 body: body || undefined,
                 icon: "/icons/logo-192.png",
+                data: { url: targetUrl },
               });
+              browserNotification.onclick = () => {
+                window.focus();
+                navigateToUrl(targetUrl);
+                browserNotification.close();
+              };
             } catch {
               // ignore
             }

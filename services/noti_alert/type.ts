@@ -36,6 +36,14 @@ export interface NotificationListParams {
   pageSize?: number;
 }
 
+export interface NotificationRouteData {
+  url?: string | null;
+  sourceDepotId?: string | number | null;
+  closureId?: string | number | null;
+  transferId?: string | number | null;
+  [key: string]: unknown;
+}
+
 export interface UserNotificationItem {
   userNotificationId: number;
   title: string;
@@ -43,6 +51,7 @@ export interface UserNotificationItem {
   body: string;
   isRead: boolean;
   createdAt: string;
+  data?: NotificationRouteData | null;
 }
 
 export interface NotificationListResponse {

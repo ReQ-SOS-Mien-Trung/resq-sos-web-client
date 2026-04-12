@@ -1,12 +1,15 @@
 import api from "@/config/axios";
+import { useAuthStore } from "@/stores/auth.store";
 import {
   GetDepotsResponse,
   GetDepotsByClusterResponse,
   GetDepotsParams,
   CreateDepotRequest,
   DepotEntity,
+  ChangeableDepotStatusMetadata,
   DepotStatusMetadata,
   DepotMetadataItem,
+  DepotClosureResolutionMetadataItem,
   AvailableDepotManager,
   DepotFund,
   UpdateDepotRequest,
@@ -17,19 +20,64 @@ import {
   DepotManagerAssignmentResponse,
   GetDepotFundTransactionsResponse,
   GetDepotFundTransactionsParams,
-  DepotClosureMetadata,
   InitiateDepotClosureRequest,
   InitiateDepotClosureResponse,
-  ResolveDepotClosureRequest,
-  ResolveDepotClosureResponse,
-  CancelDepotClosureRequest,
-  CancelDepotClosureResponse,
+  MarkDepotClosureExternalRequest,
+  MarkDepotClosureExternalResponse,
+  SubmitDepotExternalResolutionRequest,
+  SubmitDepotExternalResolutionResponse,
+  InitiateDepotClosureTransferRequest,
+  InitiateDepotClosureTransferResponse,
+  GetMyDepotTransfersResponse,
+  GetMyDepotClosuresResponse,
+  DepotClosureDetail,
   DepotClosureTransfer,
   DepotTransferActionRequest,
   DepotTransferActionResponse,
   DepotReceiveTransferResponse,
-  DepotClosureRecord,
 } from "./type";
+
+function parseContentDispositionFilename(
+  disposition: string,
+  fallback: string,
+): string {
+  const utf8Match = disposition.match(/filename\*=[^']*'[^']*'([^;\s]+)/i);
+  if (utf8Match) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const asciiMatch = disposition.match(/filename="([^"]+)"/);
+  if (asciiMatch) {
+    return asciiMatch[1];
+  }
+
+  const plainMatch = disposition.match(/filename=([^;\s]+)/);
+  if (plainMatch) {
+    return plainMatch[1];
+  }
+
+  return fallback;
+}
+
+function normalizeDepotClosureDetailResponse(
+  payload: unknown,
+): DepotClosureDetail | null {
+  if (Array.isArray(payload)) {
+    if (payload.length === 0) return null;
+    return normalizeDepotClosureDetailResponse(payload[0]);
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidate = payload as Partial<DepotClosureDetail>;
+  if (typeof candidate.id !== "number" || candidate.id <= 0) {
+    return null;
+  }
+
+  return candidate as DepotClosureDetail;
+}
 
 /**
  * Get all depots with pagination
@@ -81,11 +129,35 @@ export async function getDepotStatuses(): Promise<DepotStatusMetadata[]> {
 }
 
 /**
+ * Get changeable statuses for PATCH /logistics/depot/{id}/status
+ * GET /logistics/depot/metadata/changeable-statuses
+ */
+export async function getDepotChangeableStatuses(): Promise<
+  ChangeableDepotStatusMetadata[]
+> {
+  const { data } = await api.get(
+    "/logistics/depot/metadata/changeable-statuses",
+  );
+  return data;
+}
+
+/**
  * Get depot metadata (key-value pairs for dropdown)
  * GET /logistics/depot/metadata/depots
  */
 export async function getDepotMetadata(): Promise<DepotMetadataItem[]> {
   const { data } = await api.get("/logistics/depot/metadata/depots");
+  return data;
+}
+
+/**
+ * Get closure resolution metadata
+ * GET /logistics/depot/metadata/closure
+ */
+export async function getDepotClosureResolutionMetadata(): Promise<
+  DepotClosureResolutionMetadataItem[]
+> {
+  const { data } = await api.get("/logistics/depot/metadata/closure");
   return data;
 }
 
@@ -215,26 +287,6 @@ export async function getMyDepotFundTransactions(
 }
 
 /**
- * [Admin] Get all closure records for a depot
- * GET /logistics/depot/{id}/closures
- */
-export async function getDepotClosures(
-  id: number,
-): Promise<DepotClosureRecord[]> {
-  const { data } = await api.get(`/logistics/depot/${id}/closures`);
-  return data;
-}
-
-/**
- * Get depot closure metadata (resolution type enum)
- * GET /logistics/depot/metadata/closure
- */
-export async function getDepotClosureMetadata(): Promise<DepotClosureMetadata> {
-  const { data } = await api.get("/logistics/depot/metadata/closure");
-  return data;
-}
-
-/**
  * [Admin] Initiate depot closure
  * Nếu kho trống → đóng ngay. Nếu còn hàng → chuyển sang Closing, chờ resolve.
  * POST /logistics/depot/{id}/close
@@ -243,115 +295,216 @@ export async function initiateDepotClosure(
   request: InitiateDepotClosureRequest,
 ): Promise<InitiateDepotClosureResponse> {
   const { id, ...body } = request;
-  const { data } = await api.post(`/logistics/depot/${id}/close`, body);
-  return data;
+  const response = await api.post(`/logistics/depot/${id}/close`, body, {
+    validateStatus: (status) => status === 200 || status === 409,
+  });
+  return {
+    ...response.data,
+    httpStatus: response.status,
+  };
 }
 
 /**
- * [Admin] Resolve depot closure — chọn cách xử lý tồn kho trước khi đóng
- * Option 1: TransferToDepot (cần targetDepotId)
- * Option 2: ExternalResolution (ghi chú externalNote)
- * POST /logistics/depot/{id}/close/{closureId}/resolve
+ * [Admin] Mark an active depot closure as externally handled
+ * POST /logistics/depot/{id}/close/mark-external
  */
-export async function resolveDepotClosure(
-  request: ResolveDepotClosureRequest,
-): Promise<ResolveDepotClosureResponse> {
-  const { id, closureId, ...body } = request;
+export async function markDepotClosureExternal(
+  request: MarkDepotClosureExternalRequest,
+): Promise<MarkDepotClosureExternalResponse> {
+  const { id, ...body } = request;
   const { data } = await api.post(
-    `/logistics/depot/${id}/close/${closureId}/resolve`,
+    `/logistics/depot/${id}/close/mark-external`,
     body,
   );
   return data;
 }
 
 /**
- * [Admin] Cancel depot closure — huỷ quy trình đóng kho, kho quay về Available/Full
- * POST /logistics/depot/{id}/close/{closureId}/cancel
+ * [Admin] Submit external resolution JSON result for depot closure
+ * POST /logistics/depot/close/external-resolution
  */
-export async function cancelDepotClosure(
-  request: CancelDepotClosureRequest,
-): Promise<CancelDepotClosureResponse> {
-  const { id, closureId, ...body } = request;
-  const { data } = await api.delete(
-    `/logistics/depot/${id}/close/${closureId}`,
-    { data: body },
+export async function submitDepotExternalResolution(
+  request: SubmitDepotExternalResolutionRequest,
+): Promise<SubmitDepotExternalResolutionResponse> {
+  const { data } = await api.post(
+    "/logistics/depot/close/external-resolution",
+    request,
   );
   return data;
+}
+
+/**
+ * Download depot close external-resolution template
+ * Proxied via /api/depot/close-export-template
+ * → GET /logistics/depot/close/export-template
+ */
+export async function downloadDepotClosureExportTemplate(): Promise<{
+  blob: Blob;
+  filename: string;
+}> {
+  const token = useAuthStore.getState().accessToken;
+  const response = await fetch("/api/depot/close-export-template", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status}`);
+  }
+
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const filename = parseContentDispositionFilename(
+    disposition,
+    "mau_xu_ly_dong_kho.xlsx",
+  );
+
+  return { blob: await response.blob(), filename };
+}
+
+/**
+ * [Admin] Start transfer flow for depot closure
+ * POST /logistics/depot/{id}/close/transfer
+ */
+export async function initiateDepotClosureTransfer(
+  request: InitiateDepotClosureTransferRequest,
+): Promise<InitiateDepotClosureTransferResponse> {
+  const { id, ...body } = request;
+  const { data } = await api.post(`/logistics/depot/${id}/close/transfer`, body);
+  return data;
+}
+
+/**
+ * [Manager] Get transfers where current depot participates
+ * GET /logistics/depot/transfer
+ */
+export async function getMyDepotTransfers(): Promise<GetMyDepotTransfersResponse> {
+  const { data } = await api.get("/logistics/depot/transfer");
+  return data;
+}
+
+/**
+ * [Manager] Get closure history/list for current depot
+ * GET /logistics/depot/closures
+ */
+export async function getMyDepotClosures(): Promise<GetMyDepotClosuresResponse> {
+  const { data } = await api.get("/logistics/depot/closures");
+  return data;
+}
+
+/**
+ * [Manager] Get closure detail
+ * GET /logistics/depot/closures/{closureId}
+ */
+export async function getMyDepotClosureDetail(
+  closureId: number,
+): Promise<DepotClosureDetail> {
+  const { data } = await api.get(`/logistics/depot/closures/${closureId}`);
+  return data;
+}
+
+/**
+ * [Admin] Get current/latest closure detail of a depot
+ * GET /logistics/depot/{depotId}/closures
+ */
+export async function getDepotClosureByDepotId(
+  depotId: number,
+): Promise<DepotClosureDetail | null> {
+  const response = await api.get(`/logistics/depot/${depotId}/closures`, {
+    validateStatus: (status) => status === 200 || status === 404,
+  });
+  return response.status === 404
+    ? null
+    : normalizeDepotClosureDetailResponse(response.data);
+}
+
+/**
+ * [Admin] Get specific closure detail by depotId + closureId
+ * GET /logistics/depot/{depotId}/closures/{closureId}
+ */
+export async function getDepotClosureDetailByDepotId(
+  depotId: number,
+  closureId: number,
+): Promise<DepotClosureDetail | null> {
+  const response = await api.get(
+    `/logistics/depot/${depotId}/closures/${closureId}`,
+    {
+      validateStatus: (status) => status === 200 || status === 404,
+    },
+  );
+  return response.status === 404
+    ? null
+    : normalizeDepotClosureDetailResponse(response.data);
 }
 
 // ── Depot Closure Transfer ───────────────────────────────────────────
 
 /**
  * Get transfer record
- * GET /logistics/depot/{id}/close/{closureId}/transfer/{transferId}
+ * GET /logistics/depot/{id}/transfer/{transferId}
  */
 export async function getDepotClosureTransfer(
   id: number,
-  closureId: number,
   transferId: number,
 ): Promise<DepotClosureTransfer> {
-  const { data } = await api.get(
-    `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}`,
-  );
+  const { data } = await api.get(`/logistics/depot/${id}/transfer/${transferId}`);
   return data;
 }
 
 /**
  * [Manager kho nguồn] Xác nhận đang chuẩn bị hàng — chuyển transfer sang Preparing
- * POST /logistics/depot/{id}/close/{closureId}/transfer/{transferId}/prepare
+ * POST /logistics/depot/transfer/{transferId}/prepare
  */
 export async function prepareDepotTransfer(
   request: DepotTransferActionRequest,
 ): Promise<DepotTransferActionResponse> {
-  const { id, closureId, transferId, ...body } = request;
+  const { transferId, note } = request;
   const { data } = await api.post(
-    `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}/prepare`,
-    body,
+    `/logistics/depot/transfer/${transferId}/prepare`,
+    note ? { note } : {},
   );
   return data;
 }
 
 /**
  * [Manager kho nguồn] Xác nhận đã xuất hàng — chuyển transfer sang Shipping
- * POST /logistics/depot/{id}/close/{closureId}/transfer/{transferId}/ship
+ * POST /logistics/depot/transfer/{transferId}/ship
  */
 export async function shipDepotTransfer(
   request: DepotTransferActionRequest,
 ): Promise<DepotTransferActionResponse> {
-  const { id, closureId, transferId, ...body } = request;
+  const { transferId, note } = request;
   const { data } = await api.post(
-    `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}/ship`,
-    body,
+    `/logistics/depot/transfer/${transferId}/ship`,
+    note ? { note } : {},
   );
   return data;
 }
 
 /**
  * [Manager kho nguồn] Xác nhận đã xuất toàn bộ hàng — chuyển transfer sang Completed
- * POST /logistics/depot/{id}/close/{closureId}/transfer/{transferId}/complete
+ * POST /logistics/depot/transfer/{transferId}/complete
  */
 export async function completeDepotTransfer(
   request: DepotTransferActionRequest,
 ): Promise<DepotTransferActionResponse> {
-  const { id, closureId, transferId, ...body } = request;
+  const { transferId, note } = request;
   const { data } = await api.post(
-    `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}/complete`,
-    body,
+    `/logistics/depot/transfer/${transferId}/complete`,
+    note ? { note } : {},
   );
   return data;
 }
 
 /**
  * [Manager kho đích] Xác nhận đã nhận hàng — kích hoạt bulk transfer và hoàn tất đóng kho
- * POST /logistics/depot/{id}/close/{closureId}/transfer/{transferId}/receive
+ * POST /logistics/depot/transfer/{transferId}/receive
  */
 export async function receiveDepotTransfer(
   request: DepotTransferActionRequest,
 ): Promise<DepotReceiveTransferResponse> {
-  const { id, closureId, transferId, ...body } = request;
+  const { transferId, note } = request;
   const { data } = await api.post(
-    `/logistics/depot/${id}/close/${closureId}/transfer/${transferId}/receive`,
-    body,
+    `/logistics/depot/transfer/${transferId}/receive`,
+    note ? { note } : {},
   );
   return data;
 }

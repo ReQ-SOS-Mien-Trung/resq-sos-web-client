@@ -158,6 +158,9 @@ export function NotificationBell({
 
   // ── Detect new notifications → ring + sound ──
   useEffect(() => {
+    let ringStartId: number | null = null;
+    let ringEndId: number | null = null;
+
     if (notifications.length === 0) return;
 
     const currentIds = new Set(notifications.map((n) => n.userNotificationId));
@@ -171,8 +174,10 @@ export function NotificationBell({
 
     const hasNew = notifications.some((n) => !prevIds.has(n.userNotificationId));
     if (hasNew) {
-      setIsRinging(true);
-      setTimeout(() => setIsRinging(false), 950);
+      ringStartId = window.setTimeout(() => {
+        setIsRinging(true);
+        ringEndId = window.setTimeout(() => setIsRinging(false), 950);
+      }, 0);
 
       try {
         const audio = new Audio("/sounds/notification.mp3");
@@ -184,6 +189,15 @@ export function NotificationBell({
     }
 
     prevIdsRef.current = currentIds;
+
+    return () => {
+      if (ringStartId !== null) {
+        window.clearTimeout(ringStartId);
+      }
+      if (ringEndId !== null) {
+        window.clearTimeout(ringEndId);
+      }
+    };
   }, [notifications]);
 
   const handleOpenChange = (next: boolean) => {
@@ -202,7 +216,11 @@ export function NotificationBell({
       return;
     }
 
-    const destination = resolveNotificationRoute(notification.type, roleId);
+    const destination = resolveNotificationRoute(
+      notification.type,
+      roleId,
+      notification.data,
+    );
     if (destination) router.push(destination);
   };
 

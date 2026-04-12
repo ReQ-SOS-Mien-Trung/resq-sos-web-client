@@ -16,6 +16,9 @@ import {
 } from "@/lib/backend-circuit";
 
 const API_URL = process.env.NEXT_PUBLIC_BASE_URL;
+const DEPOT_MANAGER_NOT_ASSIGNED_ERROR_CODE = "DEPOT_MANAGER_NOT_ASSIGNED";
+const DEPOT_MANAGER_NOT_ASSIGNED_REDIRECT_PATH =
+  "/depot-manager-not-assigned";
 
 // Khởi tạo 1 Axios instance duy nhất cho toàn app
 const axiosInstance: AxiosInstance = axios.create({
@@ -99,6 +102,22 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
     };
+    const backendErrorCode = error.response?.data?.code;
+
+    if (
+      error.response?.status === 403 &&
+      backendErrorCode === DEPOT_MANAGER_NOT_ASSIGNED_ERROR_CODE
+    ) {
+      if (typeof window !== "undefined") {
+        const currentPath = window.location.pathname;
+
+        if (currentPath !== DEPOT_MANAGER_NOT_ASSIGNED_REDIRECT_PATH) {
+          window.location.replace(DEPOT_MANAGER_NOT_ASSIGNED_REDIRECT_PATH);
+        }
+      }
+
+      return Promise.reject(error);
+    }
 
     // Chỉ xử lý lỗi 401 (Unauthorized) và chưa retry
     // Bỏ qua nếu request là refresh-token hoặc login (tránh vòng lặp vô tận)
