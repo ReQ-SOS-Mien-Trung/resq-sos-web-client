@@ -9,6 +9,7 @@ import {
   GetMyDepotCategoryQuantitiesResponse,
   ImportInventoryRequest,
   ImportRegularRequest,
+  UpdateItemModelPayload,
   InventoryCategory,
   InventoryItemType,
   InventoryOrganization,
@@ -113,8 +114,8 @@ function normalizeInventoryItem(item: InventoryItemLike): InventoryItemEntity {
   const quantity = toFiniteNumber(item.quantity ?? item.unit, 0);
   const reservedQuantity = toFiniteNumber(
     item.reservedQuantity ??
-      item.totalReservedQuantity ??
-      item.reservedForMissionQuantity,
+    item.totalReservedQuantity ??
+    item.reservedForMissionQuantity,
     0,
   );
   const availableQuantity = toFiniteNumber(
@@ -506,6 +507,13 @@ export async function importRegularInventory(
   });
 }
 
+export async function updateItemModel(
+  itemModelId: number,
+  payload: UpdateItemModelPayload,
+): Promise<void> {
+  await api.put(`/logistics/item-model/${itemModelId}`, payload);
+}
+
 /**
  * Get depot stock movement history
  * GET /logistics/inventory/stock-movements/my-depot
@@ -536,11 +544,6 @@ export async function getInventoryLots(
   return data;
 }
 
-/**
- * Export inventory movements to Excel.
- * Routes through /api/inventory/export-movements (Next.js server-side proxy)
- * so Content-Disposition header is readable without CORS restrictions.
- */
 /**
  * Download donation import template
  * Proxied via /api/inventory/template-donation → GET /logistics/inventory/template/donation-import
@@ -601,22 +604,26 @@ export async function downloadPurchaseImportTemplate(): Promise<{
   return { blob, filename };
 }
 
+/**
+ * Export inventory movements to Excel.
+ * Routes through /api/inventory/export-movements so the browser can read the
+ * original Content-Disposition header and keep the backend-provided filename.
+ */
 export async function exportInventoryMovements(
   params: ExportMovementsParams,
 ): Promise<{ blob: Blob; filename: string }> {
-  // Build query string
   const searchParams = new URLSearchParams();
   searchParams.set("periodType", params.periodType);
   if (params.fromDate) searchParams.set("fromDate", params.fromDate);
   if (params.toDate) searchParams.set("toDate", params.toDate);
-  if (params.month !== undefined)
+  if (params.month !== undefined) {
     searchParams.set("month", String(params.month));
-  if (params.year !== undefined) searchParams.set("year", String(params.year));
+  }
+  if (params.year !== undefined) {
+    searchParams.set("year", String(params.year));
+  }
 
-  // Get token from store (Zustand getState works outside React)
   const token = useAuthStore.getState().accessToken;
-
-  // Call the Next.js proxy — same-origin, so all response headers are readable
   const response = await fetch(
     `/api/inventory/export-movements?${searchParams.toString()}`,
     {
@@ -630,7 +637,6 @@ export async function exportInventoryMovements(
     throw new Error(`Export failed: ${response.status}`);
   }
 
-  // Content-Disposition is now readable (same-origin response)
   const disposition = response.headers.get("content-disposition") ?? "";
   let filename = "BaoCao.xlsx";
 
@@ -641,10 +647,13 @@ export async function exportInventoryMovements(
   } else {
     const asciiMatch = disposition.match(/filename="([^"]+)"/);
     if (asciiMatch) filename = asciiMatch[1];
+    else if (disposition.includes("filename=")) {
+      const plainMatch = disposition.match(/filename=([^;\s]+)/);
+      if (plainMatch) filename = plainMatch[1];
+    }
   }
 
-  const blob = await response.blob();
-  return { blob, filename };
+  return { blob: await response.blob(), filename };
 }
 
 // ─── Thresholds ───

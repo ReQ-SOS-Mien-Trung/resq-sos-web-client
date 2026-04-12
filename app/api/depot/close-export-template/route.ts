@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   const authorization = request.headers.get("authorization");
 
   const backendUrl = new URL(
-    "/logistics/inventory/template/purchase-import",
+    "/logistics/depot/close/export-template",
     BACKEND_URL,
   );
 

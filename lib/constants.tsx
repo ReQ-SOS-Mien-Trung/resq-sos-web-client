@@ -28,7 +28,6 @@ import {
   Pulse,
   Radio,
   Shield,
-  Spinner,
   SquaresFour,
   Stethoscope,
   Target,
@@ -51,6 +50,23 @@ import {
 import { Icon as IconifyIcon } from "@iconify/react";
 import { PROMPT_TYPE_LABELS } from "@/services/prompt/constants";
 import type { PromptType } from "@/services/prompt/type";
+
+function MaintenanceTriangleIcon({
+  className,
+  size = 20,
+}: {
+  className?: string;
+  size?: number | string;
+}) {
+  return (
+    <IconifyIcon
+      icon="ix:maintenance-triangle-filled"
+      width={size}
+      height={size}
+      className={className}
+    />
+  );
+}
 
 export const navLinks = [
   { href: "#features", label: "Tính năng" },
@@ -800,7 +816,7 @@ export const assemblyPointStatusConfig = {
     color: "bg-violet-500",
     textColor: "text-violet-700 dark:text-violet-400",
     bgColor: "bg-violet-50 dark:bg-violet-950/30",
-    icon: Spinner,
+    icon: MaintenanceTriangleIcon,
   },
   Closed: {
     label: "Đã đóng",

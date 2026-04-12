@@ -60,6 +60,8 @@ function normalizeRealtimeNotification(
     body: String(payload.body ?? ""),
     isRead: Boolean(payload.isRead),
     createdAt: String(payload.createdAt ?? new Date().toISOString()),
+    data:
+      payload.data && typeof payload.data === "object" ? payload.data : null,
   };
 }
 

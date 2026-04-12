@@ -60,7 +60,8 @@ import {
   useImportRegularInventory,
   useDownloadPurchaseImportTemplate,
 } from "@/services/inventory/hooks";
-import type { ImportPurchaseItem, VatInvoice } from "@/services/inventory/type";
+import type { ImportPurchaseItem, InventoryItemEntity, VatInvoice } from "@/services/inventory/type";
+import { updateItemModel } from "@/services/inventory/api";
 import { uploadImageToCloudinary, uploadRawToCloudinary } from "@/utils/uploadFile";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { DateTimePickerInput } from "@/components/ui/date-time-picker-input";
@@ -69,6 +70,10 @@ import {
   getSheetRowsWithOptionalImageColumn,
   revokeBlobUrl,
 } from "@/components/inventory/import-image-helpers";
+import {
+  assignCreatedInventoryItemsToRows,
+  fetchInventorySnapshotByCategoryCodes,
+} from "@/components/inventory/import-post-submit-image-helpers";
 
 const SYSTEM_CATEGORIES = [
   { label: "Thực phẩm", value: "Food" },
@@ -102,6 +107,10 @@ const CATEGORY_VI_MAP: Record<string, string> = {
   rescueequipment: "RescueEquipment",
   heating: "Heating",
 };
+
+const CATEGORY_NAME_BY_CODE = Object.fromEntries(
+  SYSTEM_CATEGORIES.map((category) => [category.value, category.label]),
+) as Record<string, string>;
 
 /** Match category from bilingual format like "Thực phẩm - Food" */
 function matchCategoryCode(rawCategory: string): string {
@@ -137,6 +146,8 @@ const COL = {
   ANH: "Ảnh",
   DONGIA: "Đơn giá",
   SOLUONG: "Số lượng",
+  THETICH: "Thể tích (dm3)",
+  CANNANG: "Cân nặng (kg)",
   HETHAN: "Ngày hết hạn",
   NHAN: "Ngày nhận",
 } as const;
@@ -151,6 +162,8 @@ const LEGACY_COLS = [
   COL.MOTA,
   COL.DONGIA,
   COL.SOLUONG,
+  COL.THETICH,
+  COL.CANNANG,
   COL.HETHAN,
   COL.NHAN,
 ] as const;
@@ -166,6 +179,8 @@ const SHEET_COLS = [
   COL.ANH,
   COL.DONGIA,
   COL.SOLUONG,
+  COL.THETICH,
+  COL.CANNANG,
   COL.HETHAN,
   COL.NHAN,
 ] as const;
@@ -190,6 +205,8 @@ interface ImportRow {
   unit: string;
   quantity: number;
   unitPrice: number;
+  volumePerUnit?: number;
+  weightPerUnit?: number;
   expiredDate: string;
   receivedDate: string;
   description: string;
@@ -209,6 +226,8 @@ type EditableField =
   | "unit"
   | "quantity"
   | "unitPrice"
+  | "volumePerUnit"
+  | "weightPerUnit"
   | "expiredDate"
   | "receivedDate"
   | "description";
@@ -247,6 +266,23 @@ function parseExcelDate(val: unknown): string {
   const d = new Date(str);
   if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
   return str;
+}
+
+function parseOptionalExcelNumber(val: unknown): number | undefined {
+  if (val === null || val === undefined || String(val).trim() === "") return undefined;
+  const parsed = Number(String(val).replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseOptionalDecimalInput(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const normalized = trimmed
+    .replace(/\s/g, "")
+    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+    .replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 /** Parse datetime from Excel cell — returns "yyyy-MM-ddTHH:mm" */
@@ -707,6 +743,15 @@ export default function ExcelImportRegular() {
       errors.targetGroups = "Đối với vật phẩm ‘Tái sử dụng’, đối tượng áp dụng là ‘Lực lượng cứu hộ’.";
     if (!row.itemModelId && !row.imageFile && !row.imageUrl)
       errors.imageUrl = "Vui lòng tải ảnh cho vật phẩm mới";
+    if (row.volumePerUnit === undefined)
+      errors.volumePerUnit = "Thể tích không được trống";
+    else if (row.volumePerUnit < 0)
+      errors.volumePerUnit = "Thể tích không được âm";
+
+    if (row.weightPerUnit === undefined)
+      errors.weightPerUnit = "Cân nặng không được trống";
+    else if (row.weightPerUnit < 0)
+      errors.weightPerUnit = "Cân nặng không được âm";
     if (!row.receivedDate) errors.receivedDate = "Ngày nhận không được trống";
     else if (new Date(row.receivedDate) > new Date()) errors.receivedDate = "Ngày nhận không được là thời điểm trong tương lai";
     return errors;
@@ -807,6 +852,8 @@ export default function ExcelImportRegular() {
           unit: String(raw[COL.DONVI] ?? "").trim(),
           quantity: Number(raw[COL.SOLUONG] ?? 0) > 0 ? Number(raw[COL.SOLUONG]) : 0,
           unitPrice: Number(raw[COL.DONGIA] ?? 0) >= 0 ? Number(raw[COL.DONGIA]) : 0,
+          volumePerUnit: parseOptionalExcelNumber(raw[COL.THETICH]),
+          weightPerUnit: parseOptionalExcelNumber(raw[COL.CANNANG]),
           expiredDate: parseExcelDate(raw[COL.HETHAN]),
           receivedDate: parseExcelDateTime(raw[COL.NHAN]),
           description: String(raw[COL.MOTA] ?? "").trim(),
@@ -934,7 +981,8 @@ export default function ExcelImportRegular() {
           id: `row-manual-${Date.now()}-${Math.random()}`,
           row: g.rows.length + 1,
           itemModelId: undefined, itemName: "", categoryCode: "", targetGroups: [], itemType: "",
-          unit: "", quantity: 0, unitPrice: 0, expiredDate: "", receivedDate: "", description: "",
+          unit: "", quantity: 0, unitPrice: 0, volumePerUnit: undefined, weightPerUnit: undefined,
+          expiredDate: "", receivedDate: "", description: "",
           imageUrl: "", imagePreviewUrl: "", imageFile: null,
           showErrors: false,
           errors: {},
@@ -1036,46 +1084,28 @@ export default function ExcelImportRegular() {
         .map((row) => ({ groupId: group.id, row })),
     );
 
+    const deferredImageCategoryCodes = Array.from(
+      new Set(rowsNeedingImageUpload.map(({ row }) => row.categoryCode)),
+    );
+    let beforeImportItems: InventoryItemEntity[] = [];
+    if (deferredImageCategoryCodes.length > 0) {
+      try {
+        beforeImportItems = await fetchInventorySnapshotByCategoryCodes(
+          deferredImageCategoryCodes,
+        );
+      } catch {
+        toast.error("Không thể lấy dữ liệu kho trước khi nhập để đối chiếu ảnh.");
+        return;
+      }
+    }
+
     setIsUploading(true);
     const uploadToastId = toast.loading(
-      rowsNeedingImageUpload.length > 0
-        ? `Đang tải ${groups.length} hóa đơn PDF và ${rowsNeedingImageUpload.length} ảnh lên...`
-        : `Đang tải ${groups.length} hóa đơn PDF lên...`,
+      `Đang tải ${groups.length} hóa đơn PDF lên...`,
     );
     let fileUrls: string[];
     try {
-      const [uploadedPdfUrls, uploadedImages] = await Promise.all([
-        Promise.all(groups.map((g) => uploadRawToCloudinary(g.vatFile!))),
-        Promise.all(
-          rowsNeedingImageUpload.map(async ({ groupId, row }) => ({
-            rowKey: `${groupId}:${row.id}`,
-            imageUrl: await uploadImageToCloudinary(
-              row.imageFile!,
-              "item_model_img",
-            ),
-          })),
-        ),
-      ]);
-
-      fileUrls = uploadedPdfUrls;
-      uploadedImages.forEach(({ rowKey, imageUrl }) => {
-        imageUrlByRowKey.set(rowKey, imageUrl);
-      });
-
-      if (uploadedImages.length > 0) {
-        setGroups((prev) =>
-          prev.map((group) => ({
-            ...group,
-            rows: group.rows.map((row) => {
-              const uploadedImageUrl =
-                imageUrlByRowKey.get(`${group.id}:${row.id}`) || "";
-              return uploadedImageUrl && uploadedImageUrl !== row.imageUrl
-                ? { ...row, imageUrl: uploadedImageUrl }
-                : row;
-            }),
-          })),
-        );
-      }
+      fileUrls = await Promise.all(groups.map((g) => uploadRawToCloudinary(g.vatFile!)));
     } catch {
       setIsUploading(false);
       toast.dismiss(uploadToastId);
@@ -1103,12 +1133,17 @@ export default function ExcelImportRegular() {
           ...(r.itemModelId ? { itemModelId: r.itemModelId } : {}),
           itemName: r.itemName,
           categoryCode: r.categoryCode,
-          imageUrl: r.itemModelId ? null : imageUrlByRowKey.get(`${g.id}:${r.id}`) || null,
+          imageUrl:
+            r.itemModelId || r.imageFile
+              ? null
+              : imageUrlByRowKey.get(`${g.id}:${r.id}`) || null,
           quantity: r.quantity,
           unitPrice: r.unitPrice,
           unit: r.unit,
           itemType: r.itemType,
           targetGroups: r.targetGroups,
+          volumePerUnit: r.volumePerUnit ?? null,
+          weightPerUnit: r.weightPerUnit ?? null,
           receivedDate: r.receivedDate ? new Date(r.receivedDate).toISOString() : r.receivedDate,
           expiredDate: r.expiredDate || null,
           description: r.description || null,
@@ -1118,7 +1153,106 @@ export default function ExcelImportRegular() {
 
     try {
       await importMutation.mutateAsync(payload);
-      toast.success(`Nhập kho thành công ${totalRows} vật phẩm!`);
+      let uploadedImageCount = 0;
+      let deferredImageFailures = 0;
+
+      if (rowsNeedingImageUpload.length > 0) {
+        setIsUploading(true);
+        const imageToastId = toast.loading(
+          `Nhập kho thành công. Đang tải ${rowsNeedingImageUpload.length} ảnh vật phẩm...`,
+        );
+
+        try {
+          const afterImportItems = await fetchInventorySnapshotByCategoryCodes(
+            deferredImageCategoryCodes,
+          );
+          const assignments = assignCreatedInventoryItemsToRows(
+            rowsNeedingImageUpload.map(({ groupId, row }) => ({
+              key: `${groupId}:${row.id}`,
+              itemName: row.itemName,
+              categoryCode: row.categoryCode,
+              itemType: row.itemType,
+              targetGroups: row.targetGroups,
+            })),
+            beforeImportItems,
+            afterImportItems,
+            (categoryCode) => CATEGORY_NAME_BY_CODE[categoryCode] ?? categoryCode,
+          );
+
+          const uploadedImages = await Promise.all(
+            rowsNeedingImageUpload.map(async ({ groupId, row }) => {
+              const rowKey = `${groupId}:${row.id}`;
+              const matchedItem = assignments.get(rowKey);
+              if (!matchedItem || !row.imageFile) {
+                deferredImageFailures += 1;
+                return null;
+              }
+
+              const imageUrl = await uploadImageToCloudinary(
+                row.imageFile,
+                "item_model_img",
+              );
+
+              await updateItemModel(matchedItem.itemModelId, {
+                categoryId: matchedItem.categoryId,
+                name: row.itemName,
+                description: row.description || null,
+                unit: row.unit,
+                itemType: row.itemType,
+                targetGroups: row.targetGroups,
+                imageUrl,
+                volumePerUnit: row.volumePerUnit ?? 0,
+                weightPerUnit: row.weightPerUnit ?? 0,
+              });
+
+              return { rowKey, imageUrl };
+            }),
+          );
+
+          uploadedImages.forEach((entry) => {
+            if (!entry) return;
+            uploadedImageCount += 1;
+            imageUrlByRowKey.set(entry.rowKey, entry.imageUrl);
+          });
+
+          if (uploadedImageCount > 0) {
+            setGroups((prev) =>
+              prev.map((group) => ({
+                ...group,
+                rows: group.rows.map((row) => {
+                  const rowKey = `${group.id}:${row.id}`;
+                  const nextImageUrl = imageUrlByRowKey.get(rowKey);
+                  return nextImageUrl
+                    ? { ...row, imageUrl: nextImageUrl }
+                    : row;
+                }),
+              })),
+            );
+          }
+
+          toast.dismiss(imageToastId);
+        } catch {
+          toast.dismiss(imageToastId);
+          setIsUploading(false);
+          toast.warning("Phiếu nhập đã tạo nhưng có ảnh chưa tải lên được.");
+          router.push("/dashboard/inventory");
+          return;
+        }
+
+        setIsUploading(false);
+      }
+
+      if (deferredImageFailures > 0) {
+        toast.warning(
+          `Nhập kho thành công ${totalRows} vật phẩm, nhưng còn ${deferredImageFailures} ảnh chưa gắn được.`,
+        );
+      } else if (uploadedImageCount > 0) {
+        toast.success(
+          `Nhập kho thành công ${totalRows} vật phẩm và đã tải ${uploadedImageCount} ảnh.`,
+        );
+      } else {
+        toast.success(`Nhập kho thành công ${totalRows} vật phẩm!`);
+      }
       router.push("/dashboard/inventory");
     } catch (err: any) {
       toast.error(`Nhập kho thất bại: ${err.response?.data?.message || err.message || "Lỗi không xác định"}`);
@@ -1164,7 +1298,7 @@ export default function ExcelImportRegular() {
             />
           )}
         </div>
-        {error && <p className="text-[11px] text-red-500">{error}</p>}
+        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
       </div>
     );
   };
@@ -1190,7 +1324,7 @@ export default function ExcelImportRegular() {
             ))}
           </SelectContent>
         </Select>
-        {error && <p className="text-[11px] text-red-500">{error}</p>}
+        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
       </div>
     );
   };
@@ -1255,7 +1389,7 @@ export default function ExcelImportRegular() {
             })}
           </PopoverContent>
         </Popover>
-        {error && <p className="text-[11px] text-red-500">{error}</p>}
+        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
       </div>
     );
   };
@@ -1288,7 +1422,43 @@ export default function ExcelImportRegular() {
             />
           )}
         </div>
-        {error && <p className="text-[11px] text-red-500">{error}</p>}
+        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
+      </div>
+    );
+  };
+
+  const renderOptionalDecimalCell = (
+    groupId: string,
+    row: ImportRow,
+    field: "volumePerUnit" | "weightPerUnit",
+    placeholder: string,
+  ) => {
+    const error = row.errors[field];
+    const rawValue = row[field];
+    return (
+      <div className="space-y-1">
+        <div className="relative">
+          <Input
+            type="number"
+            lang="en-US"
+            step="any"
+            min={0}
+            value={rawValue ?? ""}
+            onChange={(e) => {
+              const val = e.target.value;
+              updateRow(groupId, row.id, field, val === "" ? undefined : parseFloat(val));
+            }}
+            placeholder={placeholder}
+            className={cn("h-8 text-sm", error && "border-red-500 focus-visible:ring-red-500")}
+          />
+          {error && (
+            <WarningCircle
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-red-500"
+              weight="fill"
+            />
+          )}
+        </div>
+        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
       </div>
     );
   };
@@ -1368,7 +1538,7 @@ export default function ExcelImportRegular() {
           </div>
         ) : null}
 
-        {error && <p className="text-[11px] text-red-500">{error}</p>}
+        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
       </div>
     );
   };
@@ -1875,6 +2045,8 @@ export default function ExcelImportRegular() {
                           <TableHead className="min-w-32 w-32">Ảnh</TableHead>
                           <TableHead className="min-w-28">Đơn giá</TableHead>
                           <TableHead className="min-w-24">Số lượng</TableHead>
+                          <TableHead className="min-w-28">Thể tích / đơn vị</TableHead>
+                          <TableHead className="min-w-28">Cân nặng / đơn vị</TableHead>
                           <TableHead className="min-w-36">Ngày hết hạn</TableHead>
                           <TableHead className="min-w-36">Ngày nhận</TableHead>
                           <TableHead className="w-10" />
@@ -1925,6 +2097,12 @@ export default function ExcelImportRegular() {
                               <TableCell>{renderCurrencyCell(group.id, row, "unitPrice")}</TableCell>
                               <TableCell>{renderInputCell(group.id, row, "quantity", "0", "number")}</TableCell>
                               <TableCell>
+                                {renderOptionalDecimalCell(group.id, row, "volumePerUnit", "dm3")}
+                              </TableCell>
+                              <TableCell>
+                                {renderOptionalDecimalCell(group.id, row, "weightPerUnit", "kg")}
+                              </TableCell>
+                              <TableCell>
                                 <DatePickerInput
                                   value={row.expiredDate}
                                   onChange={(v) => updateRow(group.id, row.id, "expiredDate", v)}
@@ -1940,7 +2118,7 @@ export default function ExcelImportRegular() {
                                     hasError={!!row.errors.receivedDate}
                                   />
                                   {row.errors.receivedDate && (
-                                    <p className="text-[11px] text-red-500">{row.errors.receivedDate}</p>
+                                    <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{row.errors.receivedDate}</p>
                                   )}
                                 </div>
                               </TableCell>
@@ -1959,7 +2137,7 @@ export default function ExcelImportRegular() {
                         })}
                         {group.rows.length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={14} className="h-24 text-center text-muted-foreground">
+                            <TableCell colSpan={16} className="h-24 text-center text-muted-foreground">
                               <div className="flex flex-col items-center gap-2">
                                 <Trash className="h-7 w-7" weight="duotone" />
                                 <p className="text-sm tracking-tighter">Chưa có vật phẩm</p>

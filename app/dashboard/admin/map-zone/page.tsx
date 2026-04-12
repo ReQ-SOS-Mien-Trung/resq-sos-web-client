@@ -33,7 +33,9 @@ const MapZoneEditor = dynamic(
     ssr: false,
     loading: () => (
       <div className="w-full h-full bg-muted/30 animate-pulse flex items-center justify-center">
-        <span className="text-sm text-muted-foreground">Đang tải bản đồ...</span>
+        <span className="text-sm text-muted-foreground">
+          Đang tải bản đồ...
+        </span>
       </div>
     ),
   },
@@ -63,8 +65,12 @@ const MapZonePage = () => {
 
   const [mode, setMode] = useState<PageMode>("list");
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
-  const [selectedZone, setSelectedZone] = useState<ServiceZoneEntity | null>(null);
-  const [drawnCoordinates, setDrawnCoordinates] = useState<Coordinate[] | null>(null);
+  const [selectedZone, setSelectedZone] = useState<ServiceZoneEntity | null>(
+    null,
+  );
+  const [drawnCoordinates, setDrawnCoordinates] = useState<Coordinate[] | null>(
+    null,
+  );
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredZoneId, setHoveredZoneId] = useState<number | null>(null);
 
@@ -92,19 +98,19 @@ const MapZonePage = () => {
 
   const handleCreate = useCallback(
     (name: string, coords: Coordinate[], isActive: boolean) => {
-      const toastId = toast.loading("Đang tạo vùng dịch vụ...");
+      const toastId = toast.loading("Đang tạo vùng...");
       createMutation.mutate(
         { name, coordinates: coords, isActive },
         {
           onSuccess: () => {
             toast.dismiss(toastId);
-            toast.success("Đã tạo vùng dịch vụ thành công");
+            toast.success("Đã tạo vùng thành công");
             refetchZones();
             goBackToList();
           },
           onError: () => {
             toast.dismiss(toastId);
-            toast.error("Có lỗi xảy ra khi tạo vùng dịch vụ");
+            toast.error("Có lỗi xảy ra khi tạo vùng");
           },
         },
       );
@@ -115,19 +121,19 @@ const MapZonePage = () => {
   const handleUpdate = useCallback(
     (name: string, coords: Coordinate[], isActive: boolean) => {
       if (!selectedZone) return;
-      const toastId = toast.loading("Đang cập nhật vùng dịch vụ...");
+      const toastId = toast.loading("Đang cập nhật vùng...");
       updateMutation.mutate(
         { id: selectedZone.id, body: { name, coordinates: coords, isActive } },
         {
           onSuccess: () => {
             toast.dismiss(toastId);
-            toast.success("Đã cập nhật vùng dịch vụ thành công");
+            toast.success("Đã cập nhật vùng thành công");
             refetchZones();
             goBackToList();
           },
           onError: () => {
             toast.dismiss(toastId);
-            toast.error("Có lỗi xảy ra khi cập nhật vùng dịch vụ");
+            toast.error("Có lỗi xảy ra khi cập nhật vùng");
           },
         },
       );
@@ -148,14 +154,21 @@ const MapZonePage = () => {
     );
   }
 
-  const allZones: ServiceZoneEntity[] = Array.isArray(allZonesData) ? allZonesData : [];
+  const allZones: ServiceZoneEntity[] = Array.isArray(allZonesData)
+    ? allZonesData
+    : [];
   const filteredZones = allZones.filter((z) =>
-    filterMode === "all" ? true : filterMode === "active" ? z.isActive : !z.isActive,
+    filterMode === "all"
+      ? true
+      : filterMode === "active"
+        ? z.isActive
+        : !z.isActive,
   );
   // When editing, remove selected zone from background (shown separately as reference)
-  const backgroundZones = mode === "edit" && selectedZone
-    ? allZones.filter((z) => z.id !== selectedZone.id)
-    : allZones;
+  const backgroundZones =
+    mode === "edit" && selectedZone
+      ? allZones.filter((z) => z.id !== selectedZone.id)
+      : allZones;
 
   return (
     <DashboardLayout
@@ -184,17 +197,22 @@ const MapZonePage = () => {
               </button>
             )}
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <MapPin className="h-5 w-5 text-[#FF5722] shrink-0" weight="fill" />
+              <MapPin
+                className="h-5 w-5 text-[#FF5722] shrink-0"
+                weight="fill"
+              />
               <div className="min-w-0">
                 <h1 className="text-lg font-semibold tracking-tighter truncate">
-                  {mode === "list" && "Khoanh vùng dịch vụ SOS"}
+                  {mode === "list" && "Khoanh vùng SOS"}
                   {mode === "create" && "Tạo vùng mới"}
                   {mode === "edit" && "Chỉnh sửa vùng"}
                 </h1>
                 <p className="text-[14px] text-muted-foreground tracking-tighter truncate">
                   {mode === "list" && "Xác định phạm vi nhận SOS"}
-                  {mode === "create" && "Vẽ vùng trên bản đồ rồi điền thông tin"}
-                  {mode === "edit" && `Vùng số ${selectedZone?.id} · ${selectedZone?.name}`}
+                  {mode === "create" &&
+                    "Vẽ vùng trên bản đồ rồi điền thông tin"}
+                  {mode === "edit" &&
+                    `Vùng số ${selectedZone?.id} · ${selectedZone?.name}`}
                 </p>
               </div>
             </div>
@@ -227,7 +245,11 @@ const MapZonePage = () => {
                             ? allZones.filter((z) => z.isActive).length
                             : allZones.filter((z) => !z.isActive).length;
                       const label =
-                        f === "all" ? "Tất cả" : f === "active" ? "Hoạt động" : "Tạm tắt";
+                        f === "all"
+                          ? "Tất cả"
+                          : f === "active"
+                            ? "Hoạt động"
+                            : "Tạm tắt";
                       return (
                         <button
                           key={f}
@@ -243,7 +265,9 @@ const MapZonePage = () => {
                           <span
                             className={cn(
                               "ml-2 tracking-tighter text-[12px]",
-                              filterMode === f ? "text-[#FF5722]" : "opacity-60",
+                              filterMode === f
+                                ? "text-[#FF5722]"
+                                : "opacity-60",
                             )}
                           >
                             {count}
@@ -259,7 +283,10 @@ const MapZonePage = () => {
                   {isZonesLoading ? (
                     <div className="space-y-2">
                       {[1, 2, 3].map((i) => (
-                        <div key={i} className="h-18 bg-muted/60 animate-pulse rounded-xl" />
+                        <div
+                          key={i}
+                          className="h-18 bg-muted/60 animate-pulse rounded-xl"
+                        />
                       ))}
                     </div>
                   ) : filteredZones.length === 0 ? (
@@ -269,7 +296,9 @@ const MapZonePage = () => {
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-medium">
-                          {allZones.length === 0 ? "Chưa có vùng nào" : "Không khớp bộ lọc"}
+                          {allZones.length === 0
+                            ? "Chưa có vùng nào"
+                            : "Không khớp bộ lọc"}
                         </p>
                         {allZones.length === 0 && (
                           <p className="text-xs mt-0.5 opacity-60">
@@ -290,7 +319,9 @@ const MapZonePage = () => {
                         <div
                           className={cn(
                             "shrink-0 w-2 h-2 rounded-full mt-0.5",
-                            zone.isActive ? "bg-[#22C55E]" : "bg-gray-300 dark:bg-gray-600",
+                            zone.isActive
+                              ? "bg-[#22C55E]"
+                              : "bg-gray-300 dark:bg-gray-600",
                           )}
                         />
 
@@ -303,11 +334,15 @@ const MapZonePage = () => {
                             <span className="text-[12px] tracking-tighter text-muted-foreground">
                               {zone.coordinates?.length ?? 0} điểm
                             </span>
-                            <span className="text-[11px] text-muted-foreground/40">·</span>
+                            <span className="text-[11px] text-muted-foreground/40">
+                              ·
+                            </span>
                             <span
                               className={cn(
                                 "text-[12px] tracking-tighter font-medium",
-                                zone.isActive ? "text-[#22C55E]" : "text-muted-foreground",
+                                zone.isActive
+                                  ? "text-[#22C55E]"
+                                  : "text-muted-foreground",
                               )}
                             >
                               {zone.isActive ? "Hoạt động" : "Tạm tắt"}
@@ -334,7 +369,11 @@ const MapZonePage = () => {
                 zone={mode === "edit" ? selectedZone : null}
                 isLoading={false}
                 drawnCoordinates={drawnCoordinates}
-                isSaving={mode === "create" ? createMutation.isPending : updateMutation.isPending}
+                isSaving={
+                  mode === "create"
+                    ? createMutation.isPending
+                    : updateMutation.isPending
+                }
                 onSave={mode === "create" ? handleCreate : handleUpdate}
               />
             )}
@@ -352,13 +391,18 @@ const MapZonePage = () => {
             title={sidebarOpen ? "Thu gọn panel" : "Mở panel"}
           >
             <SidebarSimple
-              className={cn("h-5 w-5 transition-transform", !sidebarOpen && "rotate-180")}
+              className={cn(
+                "h-5 w-5 transition-transform",
+                !sidebarOpen && "rotate-180",
+              )}
               weight={sidebarOpen ? "fill" : "regular"}
             />
           </Button>
 
           <MapZoneEditor
-            existingCoordinates={mode === "edit" ? selectedZone?.coordinates : undefined}
+            existingCoordinates={
+              mode === "edit" ? selectedZone?.coordinates : undefined
+            }
             onCoordinatesChange={handleCoordinatesChange}
             sidebarOpen={sidebarOpen}
             allZones={backgroundZones}
@@ -371,4 +415,3 @@ const MapZonePage = () => {
 };
 
 export default MapZonePage;
-

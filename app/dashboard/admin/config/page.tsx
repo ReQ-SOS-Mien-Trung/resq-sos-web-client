@@ -1,8 +1,17 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import {
   closestCenter,
+  defaultDropAnimationSideEffects,
   pointerWithin,
   DndContext,
   DragOverlay,
@@ -15,6 +24,7 @@ import {
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
+  type Modifier,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -26,6 +36,8 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowCounterClockwise,
   CaretDown,
+  CaretLeft,
+  CaretRight,
   CheckCircle,
   DotsSixVertical,
   FadersIcon,
@@ -85,6 +97,8 @@ import type {
   UpdateRescuerScoreVisibilityConfigRequest,
 } from "@/services/config/type";
 
+type AdminDashboardData = Awaited<ReturnType<typeof getDashboardData>>;
+
 type FormulaField = "vulnerability" | "relief" | "priority";
 type ConfigSectionId =
   | "medical"
@@ -92,6 +106,7 @@ type ConfigSectionId =
   | "threshold"
   | "formula"
   | "validation";
+type ConfigHelperPanelId = "flow" | "editCluster";
 type FormulaTokenKind =
   | "variable"
   | "number"
@@ -147,65 +162,66 @@ const EMPTY_FORMULA_TOKENS: Record<FormulaField, FormulaToken[]> = {
   priority: [],
 };
 
-const DEFAULT_DISPLAY_LABELS: SosPriorityRuleConfigDocument["display_labels"] = {
-  medical_issues: {
-    UNCONSCIOUS: "Bất tỉnh",
-    BREATHING_DIFFICULTY: "Khó thở",
-    CHEST_PAIN_STROKE: "Đau ngực/đột quỵ",
-    DROWNING: "Đuối nước",
-    SEVERELY_BLEEDING: "Chảy máu nặng",
-    BLEEDING: "Chảy máu",
-    BURNS: "Bỏng",
-    HEAD_INJURY: "Chấn thương đầu",
-    CANNOT_MOVE: "Không thể di chuyển",
-    HIGH_FEVER: "Sốt cao",
-    DEHYDRATION: "Mất nước",
-    FRACTURE: "Gãy xương",
-    INFANT_NEEDS_MILK: "Trẻ sơ sinh cần sữa",
-    LOST_PARENT: "Trẻ lạc người thân",
-    CHRONIC_DISEASE: "Bệnh nền",
-    CONFUSION: "Mất phương hướng",
-    NEEDS_MEDICAL_DEVICE: "Cần thiết bị y tế",
-    OTHER: "Khác",
-    PREGNANCY: "Bầu",
-    COVID: "Covid",
-  },
-  situations: {
-    FLOODING: "Ngập lụt",
-    COLLAPSED: "Sập công trình",
-    TRAPPED: "Mắc kẹt",
-    DANGER_ZONE: "Vùng nguy hiểm",
-    CANNOT_MOVE: "Không thể di chuyển",
-    OTHER: "Khác",
-    DEFAULT_WHEN_NULL: "Mặc định",
-  },
-  water_duration: {
-    UNDER_6H: "Dưới 6 giờ",
-    "6_TO_12H": "6 đến 12 giờ",
-    "12_TO_24H": "12 đến 24 giờ",
-    "1_TO_2_DAYS": "1 đến 2 ngày",
-    OVER_2_DAYS: "Trên 2 ngày",
-    NOT_SELECTED: "Chưa chọn",
-  },
-  food_duration: {
-    UNDER_12H: "Dưới 12 giờ",
-    "12_TO_24H": "12 đến 24 giờ",
-    "1_TO_2_DAYS": "1 đến 2 ngày",
-    "2_TO_3_DAYS": "2 đến 3 ngày",
-    OVER_3_DAYS: "Trên 3 ngày",
-    NOT_SELECTED: "Chưa chọn",
-  },
-  age_groups: {
-    ADULT: "Người lớn",
-    CHILD: "Trẻ em",
-    ELDERLY: "Người cao tuổi",
-  },
-  request_types: {
-    RESCUE: "Cứu nạn",
-    RELIEF: "Tiếp tế",
-    OTHER: "Khác",
-  },
-};
+const DEFAULT_DISPLAY_LABELS: SosPriorityRuleConfigDocument["display_labels"] =
+  {
+    medical_issues: {
+      UNCONSCIOUS: "Bất tỉnh",
+      BREATHING_DIFFICULTY: "Khó thở",
+      CHEST_PAIN_STROKE: "Đau ngực/đột quỵ",
+      DROWNING: "Đuối nước",
+      SEVERELY_BLEEDING: "Chảy máu nặng",
+      BLEEDING: "Chảy máu",
+      BURNS: "Bỏng",
+      HEAD_INJURY: "Chấn thương đầu",
+      CANNOT_MOVE: "Không thể di chuyển",
+      HIGH_FEVER: "Sốt cao",
+      DEHYDRATION: "Mất nước",
+      FRACTURE: "Gãy xương",
+      INFANT_NEEDS_MILK: "Trẻ sơ sinh cần sữa",
+      LOST_PARENT: "Trẻ lạc người thân",
+      CHRONIC_DISEASE: "Bệnh nền",
+      CONFUSION: "Mất phương hướng",
+      NEEDS_MEDICAL_DEVICE: "Cần thiết bị y tế",
+      OTHER: "Khác",
+      PREGNANCY: "Bầu",
+      COVID: "Covid",
+    },
+    situations: {
+      FLOODING: "Ngập lụt",
+      COLLAPSED: "Sập công trình",
+      TRAPPED: "Mắc kẹt",
+      DANGER_ZONE: "Vùng nguy hiểm",
+      CANNOT_MOVE: "Không thể di chuyển",
+      OTHER: "Khác",
+      DEFAULT_WHEN_NULL: "Mặc định",
+    },
+    water_duration: {
+      UNDER_6H: "Dưới 6 giờ",
+      "6_TO_12H": "6 đến 12 giờ",
+      "12_TO_24H": "12 đến 24 giờ",
+      "1_TO_2_DAYS": "1 đến 2 ngày",
+      OVER_2_DAYS: "Trên 2 ngày",
+      NOT_SELECTED: "Chưa chọn",
+    },
+    food_duration: {
+      UNDER_12H: "Dưới 12 giờ",
+      "12_TO_24H": "12 đến 24 giờ",
+      "1_TO_2_DAYS": "1 đến 2 ngày",
+      "2_TO_3_DAYS": "2 đến 3 ngày",
+      OVER_3_DAYS: "Trên 3 ngày",
+      NOT_SELECTED: "Chưa chọn",
+    },
+    age_groups: {
+      ADULT: "Người lớn",
+      CHILD: "Trẻ em",
+      ELDERLY: "Người cao tuổi",
+    },
+    request_types: {
+      RESCUE: "Cứu nạn",
+      RELIEF: "Tiếp tế",
+      OTHER: "Khác",
+    },
+  };
 
 const INFIX_OPERATOR_META = {
   ADD: { symbol: "+", precedence: 1 },
@@ -228,6 +244,111 @@ const FUNCTION_ARITY = {
   CEIL: 1,
   FLOOR: 1,
 } as const;
+
+const FORMULA_DRAG_ACTIVATION_CONSTRAINT = {
+  distance: 10,
+};
+
+const FORMULA_SORTABLE_TRANSITION = {
+  duration: 240,
+  easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+};
+
+const FORMULA_DROP_ANIMATION = {
+  duration: 260,
+  easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: {
+      active: {
+        opacity: "0.2",
+      },
+    },
+  }),
+};
+
+const FORMULA_DROP_TARGET_PROGRESS_THRESHOLD = 0.6;
+
+function isTouchList(value: unknown): value is TouchList {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "length" in value &&
+    typeof value.length === "number"
+  );
+}
+
+function hasTouches(event: Event): event is Event & { touches: TouchList } {
+  return isTouchList((event as Event & { touches?: unknown }).touches);
+}
+
+function hasChangedTouches(
+  event: Event,
+): event is Event & { changedTouches: TouchList } {
+  return isTouchList(
+    (event as Event & { changedTouches?: unknown }).changedTouches,
+  );
+}
+
+function hasClientCoordinates(
+  event: Event,
+): event is Event & { clientX: number; clientY: number } {
+  const candidate = event as Event & { clientX?: unknown; clientY?: unknown };
+
+  return (
+    typeof candidate.clientX === "number" &&
+    typeof candidate.clientY === "number"
+  );
+}
+
+function getEventClientCoordinates(event: Event | null) {
+  if (!event) {
+    return null;
+  }
+
+  if (hasTouches(event) && event.touches.length > 0) {
+    const touch = event.touches[0];
+    return { x: touch.clientX, y: touch.clientY };
+  }
+
+  if (hasChangedTouches(event) && event.changedTouches.length > 0) {
+    const touch = event.changedTouches[0];
+    return { x: touch.clientX, y: touch.clientY };
+  }
+
+  if (hasClientCoordinates(event)) {
+    return { x: event.clientX, y: event.clientY };
+  }
+
+  return null;
+}
+
+const centerFormulaDragOverlayToCursor: Modifier = ({
+  activatorEvent,
+  activeNodeRect,
+  overlayNodeRect,
+  transform,
+}) => {
+  const pointerCoordinates = getEventClientCoordinates(activatorEvent);
+  const referenceRect = overlayNodeRect ?? activeNodeRect;
+
+  if (!pointerCoordinates || !activeNodeRect || !referenceRect) {
+    return transform;
+  }
+
+  return {
+    ...transform,
+    x:
+      transform.x +
+      (pointerCoordinates.x - activeNodeRect.left - referenceRect.width / 2),
+    y:
+      transform.y +
+      (pointerCoordinates.y - activeNodeRect.top - referenceRect.height / 2),
+  };
+};
+
+const FORMULA_DRAG_OVERLAY_MODIFIERS: Modifier[] = [
+  centerFormulaDragOverlayToCursor,
+];
 
 const VARIABLE_META: Record<
   string,
@@ -288,25 +409,31 @@ const FORMULA_FIELD_META: Record<
     title: "Vulnerability score",
     description:
       "Biểu thức này dùng raw vulnerability, cap ratio và supply urgency để ra điểm dễ tổn thương cuối cùng.",
-    tone:
-      "border-emerald-500/25 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_42%)]",
-    suggestedVariables: ["vulnerability_raw", "supply_urgency_score", "cap_ratio"],
+    tone: "border-emerald-500/25 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.14),transparent_42%)]",
+    suggestedVariables: [
+      "vulnerability_raw",
+      "supply_urgency_score",
+      "cap_ratio",
+    ],
   },
   relief: {
     title: "Relief score",
     description:
       "Biểu thức này gộp phần tiếp tế với vulnerability score sau khi raw calculators đã tính xong.",
-    tone:
-      "border-sky-500/25 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_42%)]",
+    tone: "border-sky-500/25 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.14),transparent_42%)]",
     suggestedVariables: ["supply_urgency_score", "vulnerability_score"],
   },
   priority: {
     title: "Priority score",
     description:
       "Biểu thức cuối cùng đưa medical, relief và situation multiplier vào cùng một công thức để ra priority score.",
-    tone:
-      "border-amber-500/25 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.14),transparent_42%)]",
-    suggestedVariables: ["medical_score", "relief_score", "situation_multiplier", "request_type_score"],
+    tone: "border-amber-500/25 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.14),transparent_42%)]",
+    suggestedVariables: [
+      "medical_score",
+      "relief_score",
+      "situation_multiplier",
+      "request_type_score",
+    ],
   },
 };
 
@@ -317,7 +444,8 @@ const FORMULA_PALETTE_GROUPS: Array<{
 }> = [
   {
     title: "Biến runtime",
-    description: "Những giá trị backend đã tính trước khi evaluator chạy expression tree.",
+    description:
+      "Những giá trị backend đã tính trước khi evaluator chạy expression tree.",
     items: Object.entries(VARIABLE_META).map(([key, value]) => ({
       id: `variable-${key}`,
       title: value.label,
@@ -327,7 +455,8 @@ const FORMULA_PALETTE_GROUPS: Array<{
   },
   {
     title: "Toán tử",
-    description: "Dùng để ghép các biến theo dạng infix như trong công thức thông thường.",
+    description:
+      "Dùng để ghép các biến theo dạng infix như trong công thức thông thường.",
     items: [
       {
         id: "operator-add",
@@ -422,7 +551,8 @@ const FORMULA_PALETTE_GROUPS: Array<{
   },
   {
     title: "Dấu và hằng số",
-    description: "Dùng để tinh chỉnh vị trí, nhóm toán hạng hoặc nhập literal number.",
+    description:
+      "Dùng để tinh chỉnh vị trí, nhóm toán hạng hoặc nhập literal number.",
     items: [
       {
         id: "punctuation-left",
@@ -575,7 +705,11 @@ function expressionToTokens(node: SosExpressionNode): FormulaToken[] {
       ...materializeTokens([{ kind: "leftParen", value: "(" }]),
       ...expressionToTokens(left),
       ...materializeTokens([
-        { kind: "operator", value: INFIX_OPERATOR_META[op as keyof typeof INFIX_OPERATOR_META].symbol },
+        {
+          kind: "operator",
+          value:
+            INFIX_OPERATOR_META[op as keyof typeof INFIX_OPERATOR_META].symbol,
+        },
       ]),
       ...expressionToTokens(right),
       ...materializeTokens([{ kind: "rightParen", value: ")" }]),
@@ -647,13 +781,13 @@ function validateTokenSequence(tokens: FormulaToken[]) {
         break;
       case "function":
         if (!expectOperand) {
-          throw new Error(
-            `Thiếu toán tử trước hàm \`${token.value}\`.`,
-          );
+          throw new Error(`Thiếu toán tử trước hàm \`${token.value}\`.`);
         }
 
         if (!nextToken || nextToken.kind !== "leftParen") {
-          throw new Error(`Hàm ${token.value} phải đi kèm dấu \`(\` ngay sau đó.`);
+          throw new Error(
+            `Hàm ${token.value} phải đi kèm dấu \`(\` ngay sau đó.`,
+          );
         }
         break;
       case "leftParen":
@@ -664,14 +798,18 @@ function validateTokenSequence(tokens: FormulaToken[]) {
         frames.push({
           type: previousToken?.kind === "function" ? "function" : "group",
           functionName:
-            previousToken?.kind === "function" ? previousToken.value : undefined,
+            previousToken?.kind === "function"
+              ? previousToken.value
+              : undefined,
           commaCount: 0,
         });
         expectOperand = true;
         break;
       case "rightParen": {
         if (expectOperand) {
-          throw new Error("Không thể đóng ngoặc khi biểu thức bên trong còn dang dở.");
+          throw new Error(
+            "Không thể đóng ngoặc khi biểu thức bên trong còn dang dở.",
+          );
         }
 
         const frame = frames.pop();
@@ -680,9 +818,8 @@ function validateTokenSequence(tokens: FormulaToken[]) {
         }
 
         if (frame.type === "function") {
-          const arity = FUNCTION_ARITY[
-            frame.functionName as keyof typeof FUNCTION_ARITY
-          ];
+          const arity =
+            FUNCTION_ARITY[frame.functionName as keyof typeof FUNCTION_ARITY];
 
           if (!arity) {
             throw new Error(`Hàm ${frame.functionName} chưa được hỗ trợ.`);
@@ -716,9 +853,8 @@ function validateTokenSequence(tokens: FormulaToken[]) {
           throw new Error("Dấu phẩy chỉ hợp lệ bên trong MIN/MAX.");
         }
 
-        const arity = FUNCTION_ARITY[
-          frame.functionName as keyof typeof FUNCTION_ARITY
-        ];
+        const arity =
+          FUNCTION_ARITY[frame.functionName as keyof typeof FUNCTION_ARITY];
         if (!arity || frame.commaCount >= arity - 1) {
           throw new Error(`Hàm ${frame.functionName} không nhận thêm tham số.`);
         }
@@ -731,7 +867,9 @@ function validateTokenSequence(tokens: FormulaToken[]) {
   }
 
   if (expectOperand) {
-    throw new Error("Công thức không thể kết thúc bằng toán tử hoặc dấu mở ngoặc.");
+    throw new Error(
+      "Công thức không thể kết thúc bằng toán tử hoặc dấu mở ngoặc.",
+    );
   }
 
   if (frames.length > 0) {
@@ -901,7 +1039,9 @@ function parseTokensToExpression(tokens: FormulaToken[]): SosExpressionNode {
   }
 
   if (values.length !== 1) {
-    throw new Error("Công thức chưa khép kín. Hãy kiểm tra lại toán tử và toán hạng.");
+    throw new Error(
+      "Công thức chưa khép kín. Hãy kiểm tra lại toán tử và toán hạng.",
+    );
   }
 
   return values[0];
@@ -943,7 +1083,8 @@ function resolveDisplayLabel(
 ) {
   if (labels) {
     const matched = Object.entries(labels).find(
-      ([candidate]) => candidate.trim().toLowerCase() === key.trim().toLowerCase(),
+      ([candidate]) =>
+        candidate.trim().toLowerCase() === key.trim().toLowerCase(),
     );
 
     if (matched?.[1]) {
@@ -960,7 +1101,10 @@ function updateDocumentAtPath(
   value: unknown,
 ) {
   const next = cloneDocument(source);
-  let cursor: Record<string, unknown> = next as unknown as Record<string, unknown>;
+  let cursor: Record<string, unknown> = next as unknown as Record<
+    string,
+    unknown
+  >;
 
   for (let index = 0; index < path.length - 1; index += 1) {
     cursor = cursor[path[index]] as Record<string, unknown>;
@@ -1021,7 +1165,9 @@ function buildFormulaState(document: SosPriorityRuleConfigDocument) {
       getFormulaFieldExpression(document, "vulnerability"),
     ),
     relief: expressionToTokens(getFormulaFieldExpression(document, "relief")),
-    priority: expressionToTokens(getFormulaFieldExpression(document, "priority")),
+    priority: expressionToTokens(
+      getFormulaFieldExpression(document, "priority"),
+    ),
   };
 }
 
@@ -1050,6 +1196,72 @@ function getTokenLabel(token: FormulaToken) {
   }
 
   return token.value;
+}
+
+function areDropTargetsEqual(
+  left: FormulaDropTarget | null,
+  right: FormulaDropTarget | null,
+) {
+  if (left === right) {
+    return true;
+  }
+
+  if (!left || !right || left.kind !== right.kind) {
+    return false;
+  }
+
+  if (left.kind === "end") {
+    return true;
+  }
+
+  return (
+    right.kind === "token" &&
+    left.tokenId === right.tokenId &&
+    left.insertAfter === right.insertAfter
+  );
+}
+
+function clampFormulaInsertIndex(index: number, tokenCount: number) {
+  const safeTokenCount = Math.max(tokenCount, 0);
+  return Math.min(Math.max(index, 0), safeTokenCount);
+}
+
+function describeFormulaInsertionPoint(tokens: FormulaToken[], index: number) {
+  const normalizedIndex = clampFormulaInsertIndex(index, tokens.length);
+
+  if (tokens.length === 0) {
+    return "Canvas đang trống";
+  }
+
+  if (normalizedIndex === 0) {
+    return `Trước ${getTokenLabel(tokens[0])}`;
+  }
+
+  if (normalizedIndex === tokens.length) {
+    return `Sau ${getTokenLabel(tokens[tokens.length - 1])}`;
+  }
+
+  return `Giữa ${getTokenLabel(tokens[normalizedIndex - 1])} và ${getTokenLabel(
+    tokens[normalizedIndex],
+  )}`;
+}
+
+function getMetricCardsGridTemplateColumns(versionValue: string) {
+  const normalizedLength = versionValue.trim().length;
+
+  if (normalizedLength >= 34) {
+    return "minmax(0,2.35fr) minmax(0,0.88fr) minmax(0,0.88fr) minmax(0,0.88fr)";
+  }
+
+  if (normalizedLength >= 28) {
+    return "minmax(0,2.1fr) minmax(0,0.93fr) minmax(0,0.93fr) minmax(0,0.93fr)";
+  }
+
+  if (normalizedLength >= 22) {
+    return "minmax(0,1.8fr) minmax(0,0.98fr) minmax(0,0.98fr) minmax(0,0.98fr)";
+  }
+
+  return "repeat(4,minmax(0,1fr))";
 }
 
 function FieldShell({
@@ -1100,15 +1312,17 @@ function SectionShell({
   children: ReactNode;
 }) {
   return (
-    <Card className={cn("overflow-hidden border-border/60 shadow-sm", className)}>
+    <Card
+      className={cn("overflow-hidden border-border/60 shadow-sm", className)}
+    >
       <CardHeader className="border-b border-border/50 pb-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-primary">
               {eyebrow}
             </p>
-            <CardTitle className="text-lg tracking-tight">{title}</CardTitle>
-            <CardDescription className="max-w-3xl text-sm tracking-tight">
+            <CardTitle className="text-2xl tracking-tight">{title}</CardTitle>
+            <CardDescription className="max-w-3xl text-sm tracking-tighter">
               {description}
             </CardDescription>
           </div>
@@ -1125,7 +1339,10 @@ function SectionShell({
                 {open ? "Thu gọn" : "Mở cụm"}
                 <CaretDown
                   size={14}
-                  className={cn("transition-transform", open ? "rotate-0" : "-rotate-90")}
+                  className={cn(
+                    "transition-transform",
+                    open ? "rotate-0" : "-rotate-90",
+                  )}
                 />
               </Button>
             )}
@@ -1135,7 +1352,9 @@ function SectionShell({
           <div className="mt-4">{summary}</div>
         ) : null}
       </CardHeader>
-      {open ? <CardContent className="space-y-4 p-5">{children}</CardContent> : null}
+      {open ? (
+        <CardContent className="space-y-4 p-5">{children}</CardContent>
+      ) : null}
     </Card>
   );
 }
@@ -1145,26 +1364,36 @@ function MetricCard({
   value,
   hint,
   accent,
+  className,
+  valueClassName,
 }: {
   label: string;
   value: string;
   hint: string;
   accent: string;
+  className?: string;
+  valueClassName?: string;
 }) {
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border/60 px-4 py-3 shadow-sm",
+        "min-w-0 rounded-2xl border border-border/60 px-4 py-3 shadow-sm",
         accent,
+        className,
       )}
     >
-      <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+      <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+      <p
+        className={cn(
+          "mt-1 min-w-0 text-lg font-semibold leading-tight tracking-tight text-foreground",
+          valueClassName,
+        )}
+      >
         {value}
       </p>
-      <p className="mt-1 text-xs tracking-tight text-muted-foreground">{hint}</p>
+      <p className="mt-2 text-xs tracking-tighter">{hint}</p>
     </div>
   );
 }
@@ -1247,7 +1476,9 @@ function StringListEditor({
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => onChange(items.filter((current) => current !== item))}
+                onClick={() =>
+                  onChange(items.filter((current) => current !== item))
+                }
                 className="text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
               >
                 <Trash size={12} />
@@ -1291,7 +1522,7 @@ function StringListEditor({
   );
 }
 
-function NumericRecordEditor({
+function NumericRecordEditor<TEntries extends object>({
   title,
   description,
   entries,
@@ -1302,14 +1533,15 @@ function NumericRecordEditor({
 }: {
   title: string;
   description: string;
-  entries: Record<string, number>;
+  entries: TEntries;
   labels?: Record<string, string>;
   disabled?: boolean;
   entriesScrollClassName?: string;
-  onChange: (next: Record<string, number>) => void;
+  onChange: (next: TEntries) => void;
 }) {
   const [draftKey, setDraftKey] = useState("");
   const [draftValue, setDraftValue] = useState("0");
+  const numericEntries = entries as unknown as Record<string, number>;
 
   return (
     <FieldShell title={title} description={description}>
@@ -1322,7 +1554,7 @@ function NumericRecordEditor({
           )}
         >
           <div className={cn("space-y-3", entriesScrollClassName && "pr-3")}>
-            {Object.entries(entries).map(([key, value]) => (
+            {Object.entries(numericEntries).map(([key, value]) => (
               <div
                 key={key}
                 className="grid gap-2 rounded-2xl border border-border/60 bg-background/80 p-3 sm:grid-cols-[minmax(0,1fr)_132px_auto]"
@@ -1347,9 +1579,9 @@ function NumericRecordEditor({
                     }
 
                     onChange({
-                      ...entries,
+                      ...numericEntries,
                       [key]: nextValue,
-                    });
+                    } as unknown as TEntries);
                   }}
                 />
                 <Button
@@ -1358,9 +1590,9 @@ function NumericRecordEditor({
                   variant="ghost"
                   disabled={disabled}
                   onClick={() => {
-                    const nextEntries = { ...entries };
+                    const nextEntries = { ...numericEntries };
                     delete nextEntries[key];
-                    onChange(nextEntries);
+                    onChange(nextEntries as unknown as TEntries);
                   }}
                 >
                   <Trash size={14} />
@@ -1397,9 +1629,9 @@ function NumericRecordEditor({
               }
 
               onChange({
-                ...entries,
+                ...numericEntries,
                 [key]: value,
-              });
+              } as unknown as TEntries);
               setDraftKey("");
               setDraftValue("0");
             }}
@@ -1493,7 +1725,7 @@ function PaletteItemButton({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex items-start gap-3 rounded-2xl border px-3 py-3 text-left transition-all",
+        "flex items-start gap-3 rounded-2xl border px-3 py-3 text-left transition-all select-none",
         isHighlighted
           ? "border-foreground/20 bg-foreground/[0.045]"
           : "border-border/60 bg-background/70",
@@ -1505,26 +1737,38 @@ function PaletteItemButton({
         disabled={disabled}
         {...listeners}
         {...attributes}
-        className="mt-0.5 rounded-full border border-border/60 bg-background/80 p-2 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        onClick={(event) => event.stopPropagation()}
+        className="mt-0.5 rounded-full border border-border/60 bg-background/80 p-2 text-muted-foreground transition-colors touch-none hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
         <DotsSixVertical size={14} />
       </button>
 
-      <div className="space-y-1">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onInsert(item)}
+        className="flex-1 space-y-1 text-left disabled:cursor-not-allowed"
+      >
         <p className="font-mono text-sm font-semibold tracking-tight text-foreground">
           {item.title}
         </p>
         <p className="text-xs tracking-tight text-muted-foreground">
           {item.hint}
         </p>
-      </div>
+        <p className="text-[11px] tracking-tight text-muted-foreground/80">
+          Bấm vào để chèn tại vị trí đang chọn.
+        </p>
+      </button>
       <Button
         type="button"
         size="icon-sm"
         variant="ghost"
         className="ml-auto shrink-0"
         disabled={disabled}
-        onClick={() => onInsert(item)}
+        onClick={(event) => {
+          event.stopPropagation();
+          onInsert(item);
+        }}
       >
         <Plus size={14} />
       </Button>
@@ -1536,26 +1780,53 @@ function FormulaInsertionSlot({
   compact,
   dragActive,
   isPreviewTarget,
+  isActive,
+  disabled,
+  onSelect,
 }: {
   compact?: boolean;
   dragActive?: boolean;
   isPreviewTarget?: boolean;
+  isActive?: boolean;
+  disabled?: boolean;
+  onSelect?: () => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onSelect}
+      aria-label="Chọn vị trí chèn công thức"
       className={cn(
-        "flex items-center justify-center rounded-full border border-dashed transition-all duration-150",
-        compact
-          ? "h-11 w-5"
-          : "h-12 min-w-[92px] px-3",
+        "inline-flex items-center justify-center gap-1 rounded-full border border-dashed text-[10px] font-medium uppercase tracking-[0.14em] transition-all duration-150",
+        compact ? "h-11 min-w-[28px] px-1.5" : "h-12 min-w-[112px] px-3",
         dragActive
           ? "border-border/50 bg-background/45"
-          : "border-transparent bg-transparent",
+          : "border-border/30 bg-transparent hover:border-border/50 hover:bg-background/40",
+        isActive &&
+          !dragActive &&
+          "border-primary/30 bg-primary/[0.06] text-foreground",
         isPreviewTarget &&
-          (compact ? "w-8" : "min-w-[44px] px-2"),
-        isPreviewTarget ? "border-foreground/30 bg-foreground/[0.06]" : undefined,
+          (compact ? "min-w-[56px] px-2" : "min-w-[72px] px-2"),
+        isPreviewTarget
+          ? "border-foreground/30 bg-foreground/[0.06] text-foreground"
+          : undefined,
+        disabled && "cursor-not-allowed opacity-60",
       )}
-    />
+    >
+      <Plus
+        size={10}
+        className={cn(
+          "shrink-0",
+          !isActive && !isPreviewTarget && "text-muted-foreground/70",
+        )}
+      />
+      {(isActive || isPreviewTarget || !compact) && (
+        <span className="whitespace-nowrap">
+          {isPreviewTarget ? "Thả vào đây" : "Chèn"}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -1587,14 +1858,26 @@ function FormulaPreviewTokenChip({
 
 function SortableFormulaTokenChip({
   token,
+  index,
+  totalTokens,
+  isInsertAnchor,
   disabled,
   onChange,
+  onMoveLeft,
+  onMoveRight,
   onRemove,
+  onSelectInsertAfter,
 }: {
   token: FormulaToken;
+  index: number;
+  totalTokens: number;
+  isInsertAnchor?: boolean;
   disabled?: boolean;
   onChange: (id: string, value: string) => void;
+  onMoveLeft: (id: string) => void;
+  onMoveRight: (id: string) => void;
   onRemove: (id: string) => void;
+  onSelectInsertAfter: (index: number) => void;
 }) {
   const {
     attributes,
@@ -1610,6 +1893,7 @@ function SortableFormulaTokenChip({
       tokenId: token.id,
     },
     disabled,
+    transition: FORMULA_SORTABLE_TRANSITION,
   });
 
   return (
@@ -1619,17 +1903,26 @@ function SortableFormulaTokenChip({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
+      onClick={() => {
+        if (!disabled) {
+          onSelectInsertAfter(index + 1);
+        }
+      }}
       className={cn(
-        "inline-flex items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm",
+        "inline-flex items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm select-none will-change-transform",
         getTokenTone(token),
+        !disabled && "cursor-pointer",
+        isInsertAnchor &&
+          "ring-2 ring-foreground/15 ring-offset-2 ring-offset-background",
         isDragging && "z-50 hidden",
       )}
     >
       <div
         className={cn(
-          "rounded-full p-1 text-muted-foreground",
+          "rounded-full p-1 text-muted-foreground touch-none",
           disabled ? "cursor-default" : "cursor-grab active:cursor-grabbing",
         )}
+        onClick={(event) => event.stopPropagation()}
         {...attributes}
         {...listeners}
       >
@@ -1643,6 +1936,7 @@ function SortableFormulaTokenChip({
           disabled={disabled}
           value={token.value}
           onChange={(event) => onChange(token.id, event.target.value)}
+          onClick={(event) => event.stopPropagation()}
           className="h-8 w-24 border-border/50 bg-background/70 font-mono text-xs"
         />
       ) : (
@@ -1653,8 +1947,35 @@ function SortableFormulaTokenChip({
 
       <button
         type="button"
+        disabled={disabled || index === 0}
+        onClick={(event) => {
+          event.stopPropagation();
+          onMoveLeft(token.id);
+        }}
+        className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+        aria-label="Di chuyển sang trái"
+      >
+        <CaretLeft size={12} />
+      </button>
+      <button
+        type="button"
+        disabled={disabled || index >= totalTokens - 1}
+        onClick={(event) => {
+          event.stopPropagation();
+          onMoveRight(token.id);
+        }}
+        className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+        aria-label="Di chuyển sang phải"
+      >
+        <CaretRight size={12} />
+      </button>
+      <button
+        type="button"
         disabled={disabled}
-        onClick={() => onRemove(token.id)}
+        onClick={(event) => {
+          event.stopPropagation();
+          onRemove(token.id);
+        }}
         className="text-muted-foreground transition-colors hover:text-destructive disabled:opacity-40"
       >
         <Trash size={12} />
@@ -1680,13 +2001,31 @@ function FormulaCanvas({
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 6,
-      },
+      activationConstraint: FORMULA_DRAG_ACTIVATION_CONSTRAINT,
     }),
   );
-  const [activeDrag, setActiveDrag] = useState<ActiveFormulaDragState | null>(null);
+  const [activeDrag, setActiveDrag] = useState<ActiveFormulaDragState | null>(
+    null,
+  );
   const [dropTarget, setDropTarget] = useState<FormulaDropTarget | null>(null);
+  const [insertIndex, setInsertIndex] = useState(() => tokens.length);
+  const previousFieldIdRef = useRef(id);
+
+  useEffect(() => {
+    if (previousFieldIdRef.current === id) {
+      return;
+    }
+
+    previousFieldIdRef.current = id;
+    setInsertIndex(tokens.length);
+  }, [id, tokens.length]);
+
+  useEffect(() => {
+    setInsertIndex((currentIndex) =>
+      clampFormulaInsertIndex(currentIndex, tokens.length),
+    );
+  }, [tokens.length]);
+
   const visibleTokens = useMemo(() => {
     if (activeDrag?.source !== "canvas") {
       return tokens;
@@ -1704,13 +2043,15 @@ function FormulaCanvas({
   });
   const collisionDetectionStrategy = useMemo<CollisionDetection>(
     () => (args) => {
-      const relevantContainers = args.droppableContainers.filter((container) => {
-        const containerId = container.id?.toString();
-        return (
-          containerId === `${id}-canvas` ||
-          (containerId ? visibleTokenIds.has(containerId) : false)
-        );
-      });
+      const relevantContainers = args.droppableContainers.filter(
+        (container) => {
+          const containerId = container.id?.toString();
+          return (
+            containerId === `${id}-canvas` ||
+            (containerId ? visibleTokenIds.has(containerId) : false)
+          );
+        },
+      );
 
       const normalizedArgs = {
         ...args,
@@ -1752,7 +2093,7 @@ function FormulaCanvas({
 
   const insertTokens = (
     item: FormulaPaletteItem,
-    index = tokens.length,
+    index = clampFormulaInsertIndex(insertIndex, tokens.length),
   ) => {
     const payload = materializeTokens(item.tokens);
     const normalizedIndex = Math.min(Math.max(index, 0), tokens.length);
@@ -1761,11 +2102,12 @@ function FormulaCanvas({
       ...payload,
       ...tokens.slice(normalizedIndex),
     ]);
+    setInsertIndex(normalizedIndex + payload.length);
   };
 
   const insertPreparedTokens = (
     payload: FormulaToken[],
-    index = tokens.length,
+    index = clampFormulaInsertIndex(insertIndex, tokens.length),
   ) => {
     const normalizedIndex = Math.min(Math.max(index, 0), tokens.length);
     onTokensChange([
@@ -1773,9 +2115,12 @@ function FormulaCanvas({
       ...payload,
       ...tokens.slice(normalizedIndex),
     ]);
+    setInsertIndex(normalizedIndex + payload.length);
   };
 
-  const resolveDropTarget = (event: DragOverEvent | DragEndEvent): FormulaDropTarget | null => {
+  const resolveDropTarget = (
+    event: DragOverEvent | DragEndEvent,
+  ): FormulaDropTarget | null => {
     const overId = event.over?.id?.toString();
     if (!overId) {
       return null;
@@ -1796,12 +2141,16 @@ function FormulaCanvas({
     const overRect = event.over.rect;
     const activeCenterX = activeRect.left + activeRect.width / 2;
     const activeCenterY = activeRect.top + activeRect.height / 2;
-    const overCenterX = overRect.left + overRect.width / 2;
     const overCenterY = overRect.top + overRect.height / 2;
-    const isRowTransition = Math.abs(activeCenterY - overCenterY) > overRect.height * 0.45;
+    const isRowTransition =
+      Math.abs(activeCenterY - overCenterY) > overRect.height * 0.45;
+    const horizontalProgress =
+      (activeCenterX - overRect.left) / Math.max(overRect.width, 1);
+    const verticalProgress =
+      (activeCenterY - overRect.top) / Math.max(overRect.height, 1);
     const insertAfter = isRowTransition
-      ? activeCenterY > overCenterY
-      : activeCenterX > overCenterX;
+      ? verticalProgress > FORMULA_DROP_TARGET_PROGRESS_THRESHOLD
+      : horizontalProgress > FORMULA_DROP_TARGET_PROGRESS_THRESHOLD;
 
     return {
       kind: "token",
@@ -1819,7 +2168,9 @@ function FormulaCanvas({
       return visibleTokens.length;
     }
 
-    const hoveredIndex = visibleTokens.findIndex((token) => token.id === target.tokenId);
+    const hoveredIndex = visibleTokens.findIndex(
+      (token) => token.id === target.tokenId,
+    );
     if (hoveredIndex === -1) {
       return null;
     }
@@ -1855,7 +2206,12 @@ function FormulaCanvas({
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    setDropTarget(resolveDropTarget(event));
+    const nextTarget = resolveDropTarget(event);
+    setDropTarget((currentTarget) =>
+      areDropTargetsEqual(currentTarget, nextTarget)
+        ? currentTarget
+        : nextTarget,
+    );
   };
 
   const resetDragState = () => {
@@ -1887,7 +2243,9 @@ function FormulaCanvas({
       return;
     }
 
-    const activeIndex = tokens.findIndex((token) => token.id === payload.tokenId);
+    const activeIndex = tokens.findIndex(
+      (token) => token.id === payload.tokenId,
+    );
     if (activeIndex === -1) {
       return;
     }
@@ -1897,9 +2255,16 @@ function FormulaCanvas({
     }
 
     onTokensChange(arrayMove(tokens, activeIndex, previewIndex));
+    setInsertIndex(clampFormulaInsertIndex(previewIndex + 1, tokens.length));
   };
 
   const previewIndex = getPreviewIndex(dropTarget);
+  const effectiveInsertIndex =
+    activeDrag && previewIndex !== null ? previewIndex : insertIndex;
+  const insertionDescription = useMemo(
+    () => describeFormulaInsertionPoint(tokens, insertIndex),
+    [insertIndex, tokens],
+  );
 
   const previewTokens = useMemo(() => {
     if (!activeDrag) {
@@ -1913,6 +2278,43 @@ function FormulaCanvas({
     const token = tokens.find((entry) => entry.id === activeDrag.tokenId);
     return token ? [token] : [];
   }, [activeDrag, tokens]);
+
+  const handleSelectInsertIndex = (nextIndex: number) => {
+    setInsertIndex(clampFormulaInsertIndex(nextIndex, tokens.length));
+  };
+
+  const handleRemoveToken = (tokenId: string) => {
+    const removedIndex = tokens.findIndex((entry) => entry.id === tokenId);
+    if (removedIndex === -1) {
+      return;
+    }
+
+    onTokensChange(tokens.filter((entry) => entry.id !== tokenId));
+    setInsertIndex((currentIndex) =>
+      clampFormulaInsertIndex(
+        removedIndex < currentIndex ? currentIndex - 1 : currentIndex,
+        tokens.length - 1,
+      ),
+    );
+  };
+
+  const handleMoveToken = (tokenId: string, direction: -1 | 1) => {
+    const currentIndex = tokens.findIndex((entry) => entry.id === tokenId);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    const nextIndex = clampFormulaInsertIndex(
+      currentIndex + direction,
+      Math.max(tokens.length - 1, 0),
+    );
+    if (nextIndex === currentIndex) {
+      return;
+    }
+
+    onTokensChange(arrayMove(tokens, currentIndex, nextIndex));
+    setInsertIndex(clampFormulaInsertIndex(nextIndex + 1, tokens.length));
+  };
 
   return (
     <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -1937,12 +2339,13 @@ function FormulaCanvas({
                   item={item}
                   onInsert={insertTokens}
                   disabled={disabled}
-                  isHighlighted={FORMULA_FIELD_META[activeField].suggestedVariables.some(
-                    (variable) =>
-                      item.tokens.some(
-                        (token) =>
-                          token.kind === "variable" && token.value === variable,
-                      ),
+                  isHighlighted={FORMULA_FIELD_META[
+                    activeField
+                  ].suggestedVariables.some((variable) =>
+                    item.tokens.some(
+                      (token) =>
+                        token.kind === "variable" && token.value === variable,
+                    ),
                   )}
                 />
               ))}
@@ -1974,8 +2377,38 @@ function FormulaCanvas({
                 {compile.error ? "Expression lỗi" : "Expression hợp lệ"}
               </Badge>
               <p className="text-xs tracking-tight text-muted-foreground">
-                Kéo thả vào canvas, hoặc bấm trực tiếp ở palette để chèn nhanh.
+                Bấm token để chọn điểm chèn, bấm item bên trái để chèn, hoặc
+                dùng mũi tên trên token để đổi vị trí.
               </p>
+            </div>
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-muted/20 px-3 py-2">
+              <span className="text-xs font-medium tracking-tight text-muted-foreground">
+                Vị trí chèn:
+              </span>
+              <Badge
+                variant="outline"
+                className="border-border/60 bg-background/80"
+              >
+                {insertionDescription}
+              </Badge>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => handleSelectInsertIndex(0)}
+              >
+                Đầu
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => handleSelectInsertIndex(tokens.length)}
+              >
+                Cuối
+              </Button>
             </div>
 
             <SortableContext
@@ -1988,6 +2421,9 @@ function FormulaCanvas({
                     compact
                     dragActive={Boolean(activeDrag)}
                     isPreviewTarget={previewIndex === 0}
+                    isActive={!activeDrag && effectiveInsertIndex === 0}
+                    disabled={disabled}
+                    onSelect={() => handleSelectInsertIndex(0)}
                   />
                 )}
                 {previewIndex === 0 &&
@@ -2001,10 +2437,13 @@ function FormulaCanvas({
                   <Fragment key={token.id}>
                     <SortableFormulaTokenChip
                       token={token}
-                      disabled={disabled}
-                      onRemove={(tokenId) =>
-                        onTokensChange(tokens.filter((entry) => entry.id !== tokenId))
+                      index={index}
+                      totalTokens={tokens.length}
+                      isInsertAnchor={
+                        !activeDrag && effectiveInsertIndex === index + 1
                       }
+                      disabled={disabled}
+                      onRemove={handleRemoveToken}
                       onChange={(tokenId, value) =>
                         onTokensChange(
                           tokens.map((entry) =>
@@ -2012,11 +2451,19 @@ function FormulaCanvas({
                           ),
                         )
                       }
+                      onMoveLeft={(tokenId) => handleMoveToken(tokenId, -1)}
+                      onMoveRight={(tokenId) => handleMoveToken(tokenId, 1)}
+                      onSelectInsertAfter={handleSelectInsertIndex}
                     />
                     <FormulaInsertionSlot
                       compact
                       dragActive={Boolean(activeDrag)}
                       isPreviewTarget={previewIndex === index + 1}
+                      isActive={
+                        !activeDrag && effectiveInsertIndex === index + 1
+                      }
+                      disabled={disabled}
+                      onSelect={() => handleSelectInsertIndex(index + 1)}
                     />
                     {previewIndex === index + 1 &&
                       previewTokens.map((previewToken) => (
@@ -2030,12 +2477,16 @@ function FormulaCanvas({
 
                 {tokens.length === 0 && !activeDrag && (
                   <div className="flex w-full flex-col items-center justify-center rounded-2xl border border-border/60 bg-muted/20 px-4 py-8 text-center">
-                    <FormulaInsertionSlot />
+                    <FormulaInsertionSlot
+                      disabled={disabled}
+                      isActive
+                      onSelect={() => handleSelectInsertIndex(0)}
+                    />
                     <p className="mt-4 text-sm font-semibold tracking-tight text-foreground">
                       Canvas đang trống
                     </p>
                     <p className="mt-1 max-w-md text-xs tracking-tight text-muted-foreground">
-                      Kéo vào slot ở trên hoặc bấm nút `+` trong palette để chèn nhanh cho{" "}
+                      Bấm item bên trái hoặc nút `+` để chèn nhanh cho{" "}
                       {FORMULA_FIELD_META[activeField].title.toLowerCase()}.
                     </p>
                   </div>
@@ -2058,7 +2509,8 @@ function FormulaCanvas({
                 </p>
               ) : (
                 <p className="mt-2 text-xs tracking-tight text-muted-foreground">
-                  Công thức này sẽ được chuyển thành expression tree trước khi lưu.
+                  Công thức này sẽ được chuyển thành expression tree trước khi
+                  lưu.
                 </p>
               )}
             </div>
@@ -2076,9 +2528,12 @@ function FormulaCanvas({
           </div>
         </div>
 
-        <DragOverlay>
+        <DragOverlay
+          dropAnimation={FORMULA_DROP_ANIMATION}
+          modifiers={FORMULA_DRAG_OVERLAY_MODIFIERS}
+        >
           {previewTokens.length > 0 ? (
-            <div className="flex max-w-[520px] flex-wrap gap-2">
+            <div className="flex max-w-[520px] flex-wrap gap-2 will-change-transform">
               {previewTokens.map((token) => (
                 <FormulaPreviewTokenChip
                   key={`overlay-${token.id}`}
@@ -2095,12 +2550,8 @@ function FormulaCanvas({
 }
 
 function RescuerScoreVisibilityConfigCard() {
-  const {
-    data,
-    isLoading,
-    isFetching,
-    refetch,
-  } = useRescuerScoreVisibilityConfig();
+  const { data, isLoading, isFetching, refetch } =
+    useRescuerScoreVisibilityConfig();
   const updateMutation = useUpdateRescuerScoreVisibilityConfig();
 
   const [draft, setDraft] = useState<string | null>(null);
@@ -2214,16 +2665,9 @@ function RescuerScoreVisibilityConfigCard() {
 }
 
 const AdminConfigPage = () => {
-  const [dashboardData, setDashboardData] = useState<{
-    favorites: unknown[];
-    projects: unknown[];
-    cloudStorage: {
-      used: number;
-      total: number;
-      percentage: number;
-      unit: string;
-    };
-  } | null>(null);
+  const [dashboardData, setDashboardData] = useState<AdminDashboardData | null>(
+    null,
+  );
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [selectedConfigId, setSelectedConfigId] = useState<number | null>(null);
   const [deleteDraftTarget, setDeleteDraftTarget] = useState<{
@@ -2241,12 +2685,20 @@ const AdminConfigPage = () => {
   const [activeFormulaField, setActiveFormulaField] =
     useState<FormulaField>("priority");
   const [showRawJson, setShowRawJson] = useState(false);
-  const [openSections, setOpenSections] = useState<Record<ConfigSectionId, boolean>>({
+  const [openSections, setOpenSections] = useState<
+    Record<ConfigSectionId, boolean>
+  >({
     medical: false,
     relief: false,
     threshold: false,
     formula: true,
     validation: true,
+  });
+  const [openHelperPanels, setOpenHelperPanels] = useState<
+    Record<ConfigHelperPanelId, boolean>
+  >({
+    flow: false,
+    editCluster: false,
   });
 
   const {
@@ -2274,15 +2726,17 @@ const AdminConfigPage = () => {
     (effectiveSelectedConfigId === activeConfig?.id ||
       versions.some((item) => item.id === effectiveSelectedConfigId));
   const shouldLoadSelectedConfig =
-    selectionExists &&
-    effectiveSelectedConfigId !== activeConfig?.id;
+    selectionExists && effectiveSelectedConfigId !== activeConfig?.id;
 
   const {
     data: selectedConfigData,
     isLoading: selectedConfigLoading,
     isFetching: selectedConfigFetching,
     refetch: refetchSelectedConfig,
-  } = useSosPriorityRuleConfigById(effectiveSelectedConfigId, shouldLoadSelectedConfig);
+  } = useSosPriorityRuleConfigById(
+    effectiveSelectedConfigId,
+    shouldLoadSelectedConfig,
+  );
 
   const createDraftMutation = useCreateSosPriorityRuleConfigDraft();
   const deleteDraftMutation = useDeleteSosPriorityRuleConfigDraft();
@@ -2318,7 +2772,8 @@ const AdminConfigPage = () => {
   ]);
 
   const selectedVersionSummary = useMemo(
-    () => versions.find((item) => item.id === effectiveSelectedConfigId) ?? null,
+    () =>
+      versions.find((item) => item.id === effectiveSelectedConfigId) ?? null,
     [effectiveSelectedConfigId, versions],
   );
 
@@ -2426,14 +2881,19 @@ const AdminConfigPage = () => {
     }
 
     if (formulaErrorEntries.length > 0) {
-      toast.error("Hãy sửa các công thức đang lỗi trước khi validate hoặc lưu.");
+      toast.error(
+        "Hãy sửa các công thức đang lỗi trước khi validate hoặc lưu.",
+      );
       return false;
     }
 
     return true;
   };
 
-  const handleCreateDraft = (sourceConfigId?: number | null, sourceVersion?: string) => {
+  const handleCreateDraft = (
+    sourceConfigId?: number | null,
+    sourceVersion?: string,
+  ) => {
     const resolvedSourceId = sourceConfigId ?? effectiveSelectedConfigId;
     if (!resolvedSourceId) {
       toast.error("Chưa có version để clone.");
@@ -2474,17 +2934,20 @@ const AdminConfigPage = () => {
       return;
     }
 
-    validateMutation.mutate({
-      ...workingDocument,
-      sos_request_id: numericRequestId,
-    }, {
-      onError: (error) => {
-        toast.error(
-          error.response?.data?.message ??
-            "Không thể validate config với SOS request này.",
-        );
+    validateMutation.mutate(
+      {
+        ...workingDocument,
+        sos_request_id: numericRequestId,
       },
-    });
+      {
+        onError: (error) => {
+          toast.error(
+            error.response?.data?.message ??
+              "Không thể validate config với SOS request này.",
+          );
+        },
+      },
+    );
   };
 
   const handleSaveDraft = () => {
@@ -2629,6 +3092,13 @@ const AdminConfigPage = () => {
     }));
   };
 
+  const toggleHelperPanel = (panel: ConfigHelperPanelId) => {
+    setOpenHelperPanels((current) => ({
+      ...current,
+      [panel]: !current[panel],
+    }));
+  };
+
   const isBusy =
     activeLoading ||
     versionsLoading ||
@@ -2660,6 +3130,14 @@ const AdminConfigPage = () => {
   };
 
   const activeFormulaCompile = compileByField[activeFormulaField];
+  const versionMetricValue =
+    workingDocument?.config_version ??
+    selectedConfig?.config_version ??
+    "Chưa chọn";
+  const metricCardsGridStyle = {
+    "--metric-grid-columns":
+      getMetricCardsGridTemplateColumns(versionMetricValue),
+  } as CSSProperties;
 
   return (
     <DashboardLayout
@@ -2714,17 +3192,23 @@ const AdminConfigPage = () => {
           </TabsList>
 
           <TabsContent value="sos-priority" className="mt-5 space-y-5">
-            <Card className="overflow-hidden border-border/60 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.15),transparent_26%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.12),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.85),rgba(255,255,255,0.78))] shadow-sm">
+            <Card className="overflow-hidden py-0 border-border/60 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.15),transparent_26%),radial-gradient(circle_at_top_right,rgba(14,165,233,0.12),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.85),rgba(255,255,255,0.78))] shadow-sm">
               <CardContent className="flex flex-col gap-5 p-6 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl space-y-2">
-                  <Badge variant="outline" className="border-foreground/10 bg-background/70">
+                  <Badge
+                    variant="outline"
+                    className="border-foreground/10 bg-background/70"
+                  >
                     Workspace versioned rule-base
                   </Badge>
                   <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-                    Biên tập rule-base SOS theo cụm tham số và formula studio kéo thả
+                    Biên tập rule-base SOS theo cụm tham số và formula studio
+                    kéo thả
                   </h2>
                   <p className="text-sm tracking-tight text-muted-foreground">
-                    Thay vì chỉnh JSON thô, admin có thể cập nhật các nhóm tham số theo ngữ cảnh, thử trên `sos_request_id` thật và sắp xếp lại biến, toán tử, khối hàm ngay trên canvas công thức.
+                    Cập nhật các nhóm tham số theo ngữ cảnh, `sos_request_id`
+                    thật và sắp xếp lại biến, toán tử, khối hàm ngay trên canvas
+                    công thức.
                   </p>
                 </div>
 
@@ -2732,7 +3216,9 @@ const AdminConfigPage = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleRefresh}
+                    onClick={() => {
+                      void handleRefresh();
+                    }}
                     disabled={isBusy}
                     className="bg-background/70"
                   >
@@ -2752,7 +3238,10 @@ const AdminConfigPage = () => {
                           selectedConfig?.config_version,
                       )
                     }
-                    disabled={createDraftMutation.isPending || !effectiveSelectedConfigId}
+                    disabled={
+                      createDraftMutation.isPending ||
+                      !effectiveSelectedConfigId
+                    }
                     className="bg-background/70"
                   >
                     <Plus size={14} className="mr-1.5" />
@@ -2802,7 +3291,9 @@ const AdminConfigPage = () => {
                     className="bg-background/70"
                   >
                     <Play size={14} className="mr-1.5" />
-                    {selectedStatus === "Archived" ? "Kích hoạt lại" : "Activate"}
+                    {selectedStatus === "Archived"
+                      ? "Kích hoạt lại"
+                      : "Activate"}
                   </Button>
                 </div>
               </CardContent>
@@ -2810,14 +3301,15 @@ const AdminConfigPage = () => {
 
             <div className="space-y-5">
               <Card className="overflow-hidden border-border/60 shadow-sm">
-                <CardHeader className="border-b border-border/50 pb-4">
+                <CardHeader className="border-b border-border/50 [.border-b]:pb-2">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-1">
-                      <CardTitle className="text-base tracking-tight">
+                      <CardTitle className="text-2xl tracking-tight ">
                         Version rail
                       </CardTitle>
-                      <CardDescription className="tracking-tight">
-                        Đưa version lên trên để chọn nhanh, phần thân chỉ dành cho cụm đang chỉnh.
+                      <CardDescription className="tracking-tighter">
+                        Đưa version lên trên để chọn nhanh, phần thân chỉ dành
+                        cho cụm đang chỉnh.
                       </CardDescription>
                     </div>
                     <Badge variant={getStatusVariant(selectedStatus)}>
@@ -2825,11 +3317,12 @@ const AdminConfigPage = () => {
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4 p-5">
+                <CardContent className="space-y-4 px-5 py-2">
                   <ScrollArea className="w-full whitespace-nowrap">
-                    <div className="flex gap-3 pb-3">
+                    <div className="flex gap-3 pb-1">
                       {versions.map((version) => {
-                        const isSelected = version.id === effectiveSelectedConfigId;
+                        const isSelected =
+                          version.id === effectiveSelectedConfigId;
                         return (
                           <div
                             key={version.id}
@@ -2848,10 +3341,7 @@ const AdminConfigPage = () => {
                                 return;
                               }
 
-                              if (
-                                event.key === "Enter" ||
-                                event.key === " "
-                              ) {
+                              if (event.key === "Enter" || event.key === " ") {
                                 event.preventDefault();
                                 setSelectedConfigId(version.id);
                                 setOptimisticSelectedEntity(null);
@@ -2862,26 +3352,56 @@ const AdminConfigPage = () => {
                               }
                             }}
                             className={cn(
-                              "w-[280px] shrink-0 rounded-[24px] border p-4 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 cursor-pointer",
+                              "w-80 shrink-0 rounded-[24px] border p-4 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 cursor-pointer",
                               isSelected
-                                ? "border-foreground/20 bg-foreground/[0.04] shadow-sm"
+                                ? "border-foreground/20 bg-foreground/4 shadow-sm"
                                 : "border-border/60 bg-background/75 hover:border-foreground/15",
                             )}
                           >
-                            <div className="mb-3 flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate font-mono text-sm font-semibold tracking-tight">
-                                  {version.config_version}
-                                </p>
-                                <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-                                  ID {version.id}
-                                </p>
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3">
+                              <div className="min-w-0 space-y-4">
+                                <div className="space-y-1">
+                                  <p className="whitespace-normal break-words font-mono text-base font-semibold leading-tight tracking-tight">
+                                    {version.config_version}
+                                  </p>
+                                  <p className="text-sm uppercase text-muted-foreground">
+                                    ID {version.id}
+                                  </p>
+                                </div>
+
+                                <div className="space-y-1.5 text-[13px] tracking-tighter text-muted-foreground">
+                                  <p>
+                                    Tạo:{" "}
+                                    <span className="text-black font-medium">
+                                      {formatDateTime(version.created_at)}
+                                    </span>
+                                  </p>
+                                  <p>
+                                    Cập nhật:{" "}
+                                    <span className="text-black font-medium">
+                                      {formatDateTime(version.updated_at)}
+                                    </span>
+                                  </p>
+                                  <p>
+                                    Activate:{" "}
+                                    <span className="text-black font-medium">
+                                      {formatDateTime(version.activated_at)}
+                                    </span>
+                                  </p>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
+
+                              <div className="flex shrink-0 flex-col items-end gap-2">
+                                <Badge
+                                  variant={getStatusVariant(version.status)}
+                                  className="inline-flex h-10 items-center self-end rounded-full px-5 text-sm leading-none"
+                                >
+                                  {version.status}
+                                </Badge>
                                 <button
                                   type="button"
                                   aria-label={`Clone version ${version.config_version}`}
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-foreground/15 bg-background/70 text-foreground transition-colors hover:bg-foreground/[0.06]"
+                                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-foreground/15 bg-background/70 text-foreground transition-colors hover:bg-foreground/6"
                                   onPointerDown={(event) => {
                                     event.preventDefault();
                                     event.stopPropagation();
@@ -2893,7 +3413,10 @@ const AdminConfigPage = () => {
                                   onClick={(event) => {
                                     event.preventDefault();
                                     event.stopPropagation();
-                                    handleCreateDraft(version.id, version.config_version);
+                                    handleCreateDraft(
+                                      version.id,
+                                      version.config_version,
+                                    );
                                   }}
                                 >
                                   <Plus size={14} />
@@ -2902,7 +3425,7 @@ const AdminConfigPage = () => {
                                   <button
                                     type="button"
                                     aria-label={`Xoá draft ${version.config_version}`}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-destructive/20 bg-destructive/5 text-destructive transition-colors hover:bg-destructive/10"
+                                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-destructive/20 bg-destructive/5 text-destructive transition-colors hover:bg-destructive/10"
                                     onPointerDown={(event) => {
                                       event.preventDefault();
                                       event.stopPropagation();
@@ -2923,16 +3446,7 @@ const AdminConfigPage = () => {
                                     <Trash size={14} />
                                   </button>
                                 ) : null}
-                                <Badge variant={getStatusVariant(version.status)}>
-                                  {version.status}
-                                </Badge>
                               </div>
-                            </div>
-
-                            <div className="space-y-1.5 text-xs tracking-tight text-muted-foreground">
-                              <p>Tạo: {formatDateTime(version.created_at)}</p>
-                              <p>Cập nhật: {formatDateTime(version.updated_at)}</p>
-                              <p>Activate: {formatDateTime(version.activated_at)}</p>
                             </div>
                           </div>
                         );
@@ -2941,63 +3455,118 @@ const AdminConfigPage = () => {
                   </ScrollArea>
 
                   <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                    <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-                      <p className="text-sm font-semibold tracking-tight text-foreground">
-                        Flow thao tác
-                      </p>
-                      <div className="mt-2 space-y-1.5 text-sm tracking-tight text-muted-foreground">
-                        <p>1. Chọn version bất kỳ rồi clone thành draft nếu cần chỉnh sửa.</p>
-                        <p>2. Mở đúng cụm tham số cần chỉnh thay vì xem toàn trang.</p>
-                        <p>3. Xây công thức bằng canvas kéo thả.</p>
-                        <p>4. Validate với `sos_request_id`, sau đó activate draft hoặc kích hoạt lại archived.</p>
-                      </div>
+                    <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleHelperPanel("flow")}
+                        className="flex w-full items-center justify-between gap-3 text-left"
+                      >
+                        <div>
+                          <p className="text-base font-semibold tracking-tighter text-foreground">
+                            Flow thao tác
+                          </p>
+                          <p className="mt-0.5 text-sm tracking-tighter text-muted-foreground">
+                            {openHelperPanels.flow
+                              ? "Thu gọn hướng dẫn"
+                              : "Bấm để xem hướng dẫn thao tác"}
+                          </p>
+                        </div>
+                        <CaretDown
+                          size={16}
+                          className={cn(
+                            "shrink-0 text-muted-foreground transition-transform duration-200",
+                            openHelperPanels.flow ? "rotate-0" : "-rotate-90",
+                          )}
+                        />
+                      </button>
+                      {openHelperPanels.flow ? (
+                        <div className="mt-3 space-y-1.5 text-sm tracking-tighter">
+                          <p>
+                            1. Chọn version bất kỳ rồi clone thành draft nếu cần
+                            chỉnh sửa.
+                          </p>
+                          <p>
+                            2. Mở đúng cụm tham số cần chỉnh thay vì xem toàn
+                            trang.
+                          </p>
+                          <p>3. Xây công thức bằng canvas kéo thả.</p>
+                          <p>
+                            4. Validate với `sos_request_id`, sau đó activate
+                            draft hoặc kích hoạt lại archived.
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
 
-                    <div className="rounded-2xl border border-border/60 bg-background/75 p-4">
-                      <p className="text-sm font-semibold tracking-tight text-foreground">
-                        Cụm chỉnh sửa
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {(
-                          [
-                            ["medical", "Y tế"],
-                            ["relief", "Tiếp tế"],
-                            ["threshold", "Ngưỡng"],
-                            ["formula", "Công thức"],
-                            ["validation", "Preview"],
-                          ] as Array<[ConfigSectionId, string]>
-                        ).map(([sectionId, label]) => (
-                          <button
-                            type="button"
-                            key={sectionId}
-                            onClick={() => toggleSection(sectionId)}
-                            className={cn(
-                              "rounded-full border px-3 py-1.5 text-sm font-medium tracking-tight transition-colors",
-                              openSections[sectionId]
-                                ? "border-foreground/20 bg-foreground/[0.06] text-foreground"
-                                : "border-border/60 bg-background text-muted-foreground",
-                            )}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="rounded-2xl border border-border/60 bg-background/75 px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleHelperPanel("editCluster")}
+                        className="flex w-full items-center justify-between gap-3 text-left"
+                      >
+                        <div>
+                          <p className="text-base font-semibold tracking-tighter text-foreground">
+                            Cụm chỉnh sửa
+                          </p>
+                          <p className="mt-0.5 text-sm tracking-tighter text-muted-foreground">
+                            {openHelperPanels.editCluster
+                              ? "Thu gọn danh sách cụm"
+                              : "Bấm để mở nhanh các cụm chỉnh sửa"}
+                          </p>
+                        </div>
+                        <CaretDown
+                          size={16}
+                          className={cn(
+                            "shrink-0 text-muted-foreground tracking-tighter transition-transform duration-200",
+                            openHelperPanels.editCluster
+                              ? "rotate-0"
+                              : "-rotate-90",
+                          )}
+                        />
+                      </button>
+                      {openHelperPanels.editCluster ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {(
+                            [
+                              ["medical", "Y tế"],
+                              ["relief", "Tiếp tế"],
+                              ["threshold", "Ngưỡng"],
+                              ["formula", "Công thức"],
+                              ["validation", "Preview"],
+                            ] as Array<[ConfigSectionId, string]>
+                          ).map(([sectionId, label]) => (
+                            <button
+                              type="button"
+                              key={sectionId}
+                              onClick={() => toggleSection(sectionId)}
+                              className={cn(
+                                "rounded-full border px-3 py-1.5 text-sm font-medium tracking-tighter transition-colors",
+                                openSections[sectionId]
+                                  ? "border-primary bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+                                  : "border-border/60 bg-background text-muted-foreground",
+                              )}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <div className="space-y-5">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div
+                  className="grid gap-3 md:grid-cols-2 xl:[grid-template-columns:var(--metric-grid-columns)]"
+                  style={metricCardsGridStyle}
+                >
                   <MetricCard
                     label="Version"
-                    value={
-                      workingDocument?.config_version ??
-                      selectedConfig?.config_version ??
-                      "Chưa chọn"
-                    }
+                    value={versionMetricValue}
                     hint="Định danh version đang được mở trong workspace."
                     accent="bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_55%)]"
+                    valueClassName="whitespace-nowrap"
                   />
                   <MetricCard
                     label="Trạng thái"
@@ -3015,7 +3584,8 @@ const AdminConfigPage = () => {
                     label="Biến y tế"
                     value={String(
                       Object.keys(
-                        workingDocument?.medical_score.medical_issue_severity ?? {},
+                        workingDocument?.medical_score.medical_issue_severity ??
+                          {},
                       ).length,
                     )}
                     hint="Số issue y tế đang có trong rule-base."
@@ -3044,8 +3614,12 @@ const AdminConfigPage = () => {
                       open={openSections.medical}
                       onToggle={() => toggleSection("medical")}
                       badge={
-                        <Badge variant="outline" className="border-rose-500/20 bg-rose-500/5">
-                          {workingDocument.medical_severe_issues.length} severe flags
+                        <Badge
+                          variant="outline"
+                          className="border-rose-500/20 bg-rose-500/5"
+                        >
+                          {workingDocument.medical_severe_issues.length} severe
+                          flags
                         </Badge>
                       }
                       summary={
@@ -3054,24 +3628,36 @@ const AdminConfigPage = () => {
                             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                               Issue weights
                             </p>
-                            <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
-                              {Object.keys(workingDocument.medical_score.medical_issue_severity).length} mục
+                            <p className="mt-0.5 text-base font-semibold tracking-tighter text-foreground">
+                              {
+                                Object.keys(
+                                  workingDocument.medical_score
+                                    .medical_issue_severity,
+                                ).length
+                              }{" "}
+                              mục
                             </p>
                           </div>
                           <div className="rounded-2xl border border-border/60 bg-background/75 px-3 py-2">
                             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                               Age weights
                             </p>
-                            <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
-                              {Object.keys(workingDocument.medical_score.age_weights).length} nhóm
+                            <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
+                              {
+                                Object.keys(
+                                  workingDocument.medical_score.age_weights,
+                                ).length
+                              }{" "}
+                              nhóm
                             </p>
                           </div>
                           <div className="rounded-2xl border border-border/60 bg-background/75 px-3 py-2">
                             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                               Severe set
                             </p>
-                            <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
-                              {workingDocument.medical_severe_issues.length} issue
+                            <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
+                              {workingDocument.medical_severe_issues.length}{" "}
+                              issue
                             </p>
                           </div>
                         </div>
@@ -3081,7 +3667,9 @@ const AdminConfigPage = () => {
                         <NumericRecordEditor
                           title="Trọng số issue y tế"
                           description="Điểm severity của từng medical issue trước khi nhân age weight theo nạn nhân."
-                          entries={workingDocument.medical_score.medical_issue_severity}
+                          entries={
+                            workingDocument.medical_score.medical_issue_severity
+                          }
                           labels={workingDocument.display_labels.medical_issues}
                           entriesScrollClassName="max-h-[min(65vh,42rem)] rounded-[20px]"
                           disabled={!isDraft}
@@ -3118,7 +3706,9 @@ const AdminConfigPage = () => {
                                   <span className="italic">medical_score</span>
                                   <span>=</span>
                                   <span className="relative inline-flex h-[2.55em] w-[1.45em] shrink-0 items-center justify-center align-middle">
-                                    <span className="text-[1.08em] leading-none">∑</span>
+                                    <span className="text-[1.08em] leading-none">
+                                      ∑
+                                    </span>
                                     <span className="absolute top-[0.14em] left-1/2 -translate-x-1/2 text-[0.4em] italic">
                                       n
                                     </span>
@@ -3148,7 +3738,9 @@ const AdminConfigPage = () => {
                             title="Severe issue set"
                             description="Nếu request chứa một trong các issue này thì threshold P1/P2 mới có hiệu lực."
                             items={workingDocument.medical_severe_issues}
-                            labels={workingDocument.display_labels.medical_issues}
+                            labels={
+                              workingDocument.display_labels.medical_issues
+                            }
                             disabled={!isDraft}
                             placeholder="Ví dụ: UNCONSCIOUS"
                             onChange={(next) =>
@@ -3171,7 +3763,10 @@ const AdminConfigPage = () => {
                       open={openSections.relief}
                       onToggle={() => toggleSection("relief")}
                       badge={
-                        <Badge variant="outline" className="border-sky-500/20 bg-sky-500/5">
+                        <Badge
+                          variant="outline"
+                          className="border-sky-500/20 bg-sky-500/5"
+                        >
                           Relief + vulnerability
                         </Badge>
                       }
@@ -3181,28 +3776,39 @@ const AdminConfigPage = () => {
                             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                               Water urgency
                             </p>
-                            <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
-                              {Object.keys(
-                                workingDocument.relief_score.supply_urgency_score.water_urgency_score,
-                              ).length} mức
+                            <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
+                              {
+                                Object.keys(
+                                  workingDocument.relief_score
+                                    .supply_urgency_score.water_urgency_score,
+                                ).length
+                              }{" "}
+                              mức
                             </p>
                           </div>
                           <div className="rounded-2xl border border-border/60 bg-background/75 px-3 py-2">
                             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                               Food urgency
                             </p>
-                            <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
-                              {Object.keys(
-                                workingDocument.relief_score.supply_urgency_score.food_urgency_score,
-                              ).length} mức
+                            <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
+                              {
+                                Object.keys(
+                                  workingDocument.relief_score
+                                    .supply_urgency_score.food_urgency_score,
+                                ).length
+                              }{" "}
+                              mức
                             </p>
                           </div>
                           <div className="rounded-2xl border border-border/60 bg-background/75 px-3 py-2">
                             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                               Cap ratio
                             </p>
-                            <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
-                              {workingDocument.relief_score.vulnerability_score.cap_ratio}
+                            <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
+                              {
+                                workingDocument.relief_score.vulnerability_score
+                                  .cap_ratio
+                              }
                             </p>
                           </div>
                         </div>
@@ -3213,7 +3819,8 @@ const AdminConfigPage = () => {
                           title="Water urgency score"
                           description="Map thời lượng thiếu nước sang điểm urgency."
                           entries={
-                            workingDocument.relief_score.supply_urgency_score.water_urgency_score
+                            workingDocument.relief_score.supply_urgency_score
+                              .water_urgency_score
                           }
                           labels={workingDocument.display_labels.water_duration}
                           disabled={!isDraft}
@@ -3232,7 +3839,8 @@ const AdminConfigPage = () => {
                           title="Food urgency score"
                           description="Map thời lượng thiếu thức ăn sang điểm urgency."
                           entries={
-                            workingDocument.relief_score.supply_urgency_score.food_urgency_score
+                            workingDocument.relief_score.supply_urgency_score
+                              .food_urgency_score
                           }
                           labels={workingDocument.display_labels.food_duration}
                           disabled={!isDraft}
@@ -3259,8 +3867,8 @@ const AdminConfigPage = () => {
                               label="Chỉ áp khi supply được chọn"
                               description="Nếu tắt, score chăn có thể được tính cả khi chưa đánh dấu mục supply."
                               value={
-                                workingDocument.relief_score.supply_urgency_score
-                                  .blanket_urgency_score
+                                workingDocument.relief_score
+                                  .supply_urgency_score.blanket_urgency_score
                                   .apply_only_when_supply_selected
                               }
                               disabled={!isDraft}
@@ -3280,8 +3888,8 @@ const AdminConfigPage = () => {
                               label="Chỉ áp khi chăn không đủ"
                               description="Nếu bật, backend cần cờ `are_blankets_enough = false` mới chấm điểm."
                               value={
-                                workingDocument.relief_score.supply_urgency_score
-                                  .blanket_urgency_score
+                                workingDocument.relief_score
+                                  .supply_urgency_score.blanket_urgency_score
                                   .apply_only_when_are_blankets_enough_is_false
                               }
                               disabled={!isDraft}
@@ -3306,7 +3914,8 @@ const AdminConfigPage = () => {
                                   keyName: "none_or_not_selected_score",
                                   label: "None or not selected",
                                   value:
-                                    workingDocument.relief_score.supply_urgency_score
+                                    workingDocument.relief_score
+                                      .supply_urgency_score
                                       .blanket_urgency_score
                                       .none_or_not_selected_score,
                                   inputType: "number",
@@ -3315,25 +3924,30 @@ const AdminConfigPage = () => {
                                   keyName: "requested_count_equals_1_score",
                                   label: "Requested count = 1",
                                   value:
-                                    workingDocument.relief_score.supply_urgency_score
+                                    workingDocument.relief_score
+                                      .supply_urgency_score
                                       .blanket_urgency_score
                                       .requested_count_equals_1_score,
                                   inputType: "number",
                                 },
                                 {
-                                  keyName: "requested_count_between_2_and_half_people_score",
+                                  keyName:
+                                    "requested_count_between_2_and_half_people_score",
                                   label: "2 đến half people",
                                   value:
-                                    workingDocument.relief_score.supply_urgency_score
+                                    workingDocument.relief_score
+                                      .supply_urgency_score
                                       .blanket_urgency_score
                                       .requested_count_between_2_and_half_people_score,
                                   inputType: "number",
                                 },
                                 {
-                                  keyName: "requested_count_more_than_half_people_score",
+                                  keyName:
+                                    "requested_count_more_than_half_people_score",
                                   label: "> half people",
                                   value:
-                                    workingDocument.relief_score.supply_urgency_score
+                                    workingDocument.relief_score
+                                      .supply_urgency_score
                                       .blanket_urgency_score
                                       .requested_count_more_than_half_people_score,
                                   inputType: "number",
@@ -3342,7 +3956,8 @@ const AdminConfigPage = () => {
                                   keyName: "half_people_operator",
                                   label: "Half people operator",
                                   value:
-                                    workingDocument.relief_score.supply_urgency_score
+                                    workingDocument.relief_score
+                                      .supply_urgency_score
                                       .blanket_urgency_score
                                       .half_people_operator,
                                   inputType: "text",
@@ -3372,8 +3987,8 @@ const AdminConfigPage = () => {
                               label="Chỉ áp khi supply được chọn"
                               description="Giữ clothing score bám đúng flow chọn loại nhu cầu."
                               value={
-                                workingDocument.relief_score.supply_urgency_score
-                                  .clothing_urgency_score
+                                workingDocument.relief_score
+                                  .supply_urgency_score.clothing_urgency_score
                                   .apply_only_when_supply_selected
                               }
                               disabled={!isDraft}
@@ -3398,7 +4013,8 @@ const AdminConfigPage = () => {
                                   keyName: "none_or_not_selected_score",
                                   label: "None or not selected",
                                   value:
-                                    workingDocument.relief_score.supply_urgency_score
+                                    workingDocument.relief_score
+                                      .supply_urgency_score
                                       .clothing_urgency_score
                                       .none_or_not_selected_score,
                                   inputType: "number",
@@ -3407,25 +4023,30 @@ const AdminConfigPage = () => {
                                   keyName: "needed_people_equals_1_score",
                                   label: "Needed people = 1",
                                   value:
-                                    workingDocument.relief_score.supply_urgency_score
+                                    workingDocument.relief_score
+                                      .supply_urgency_score
                                       .clothing_urgency_score
                                       .needed_people_equals_1_score,
                                   inputType: "number",
                                 },
                                 {
-                                  keyName: "needed_people_between_2_and_half_people_score",
+                                  keyName:
+                                    "needed_people_between_2_and_half_people_score",
                                   label: "2 đến half people",
                                   value:
-                                    workingDocument.relief_score.supply_urgency_score
+                                    workingDocument.relief_score
+                                      .supply_urgency_score
                                       .clothing_urgency_score
                                       .needed_people_between_2_and_half_people_score,
                                   inputType: "number",
                                 },
                                 {
-                                  keyName: "needed_people_more_than_half_people_score",
+                                  keyName:
+                                    "needed_people_more_than_half_people_score",
                                   label: "> half people",
                                   value:
-                                    workingDocument.relief_score.supply_urgency_score
+                                    workingDocument.relief_score
+                                      .supply_urgency_score
                                       .clothing_urgency_score
                                       .needed_people_more_than_half_people_score,
                                   inputType: "number",
@@ -3434,7 +4055,8 @@ const AdminConfigPage = () => {
                                   keyName: "half_people_operator",
                                   label: "Half people operator",
                                   value:
-                                    workingDocument.relief_score.supply_urgency_score
+                                    workingDocument.relief_score
+                                      .supply_urgency_score
                                       .clothing_urgency_score
                                       .half_people_operator,
                                   inputType: "text",
@@ -3491,8 +4113,8 @@ const AdminConfigPage = () => {
                                 step="0.01"
                                 disabled={!isDraft}
                                 value={
-                                  workingDocument.relief_score.vulnerability_score
-                                    .cap_ratio
+                                  workingDocument.relief_score
+                                    .vulnerability_score.cap_ratio
                                 }
                                 onChange={(event) => {
                                   const nextValue = Number(event.target.value);
@@ -3519,8 +4141,8 @@ const AdminConfigPage = () => {
                                 className="mt-2 min-h-[110px]"
                                 disabled={!isDraft}
                                 value={
-                                  workingDocument.relief_score.supply_urgency_score
-                                    .formula
+                                  workingDocument.relief_score
+                                    .supply_urgency_score.formula
                                 }
                                 onChange={(event) =>
                                   handleDocumentFieldChange(
@@ -3545,7 +4167,9 @@ const AdminConfigPage = () => {
                               title="Water duration"
                               description="Danh sách option UI cho nước."
                               items={workingDocument.ui_options.WATER_DURATION}
-                              labels={workingDocument.display_labels.water_duration}
+                              labels={
+                                workingDocument.display_labels.water_duration
+                              }
                               disabled={!isDraft}
                               placeholder="Ví dụ: UNDER_6H"
                               onChange={(next) =>
@@ -3559,7 +4183,9 @@ const AdminConfigPage = () => {
                               title="Food duration"
                               description="Danh sách option UI cho thức ăn."
                               items={workingDocument.ui_options.FOOD_DURATION}
-                              labels={workingDocument.display_labels.food_duration}
+                              labels={
+                                workingDocument.display_labels.food_duration
+                              }
                               disabled={!isDraft}
                               placeholder="Ví dụ: UNDER_12H"
                               onChange={(next) =>
@@ -3583,7 +4209,10 @@ const AdminConfigPage = () => {
                       open={openSections.threshold}
                       onToggle={() => toggleSection("threshold")}
                       badge={
-                        <Badge variant="outline" className="border-amber-500/20 bg-amber-500/5">
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/20 bg-amber-500/5"
+                        >
                           Threshold orchestration
                         </Badge>
                       }
@@ -3593,24 +4222,35 @@ const AdminConfigPage = () => {
                             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                               Multipliers
                             </p>
-                            <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
-                              {Object.keys(workingDocument.situation_multiplier).length} tình huống
+                            <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
+                              {
+                                Object.keys(
+                                  workingDocument.situation_multiplier,
+                                ).length
+                              }{" "}
+                              tình huống
                             </p>
                           </div>
                           <div className="rounded-2xl border border-border/60 bg-background/75 px-3 py-2">
                             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                               Thresholds
                             </p>
-                            <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
-                              {workingDocument.priority_level.P1_THRESHOLD}/{workingDocument.priority_level.P2_THRESHOLD}/{workingDocument.priority_level.P3_THRESHOLD}
+                            <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
+                              {workingDocument.priority_level.P1_THRESHOLD}/
+                              {workingDocument.priority_level.P2_THRESHOLD}/
+                              {workingDocument.priority_level.P3_THRESHOLD}
                             </p>
                           </div>
                           <div className="rounded-2xl border border-border/60 bg-background/75 px-3 py-2">
                             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
                               UI guardrails
                             </p>
-                            <p className="mt-1 text-sm font-semibold tracking-tight text-foreground">
-                              Min people {workingDocument.ui_constraints.MIN_TOTAL_PEOPLE_TO_PROCEED}
+                            <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground">
+                              Min people{" "}
+                              {
+                                workingDocument.ui_constraints
+                                  .MIN_TOTAL_PEOPLE_TO_PROCEED
+                              }
                             </p>
                           </div>
                         </div>
@@ -3659,7 +4299,9 @@ const AdminConfigPage = () => {
                                 className="mt-2"
                                 type="number"
                                 disabled={!isDraft}
-                                value={workingDocument.priority_level.P1_THRESHOLD}
+                                value={
+                                  workingDocument.priority_level.P1_THRESHOLD
+                                }
                                 onChange={(event) => {
                                   const nextValue = Number(event.target.value);
                                   if (Number.isNaN(nextValue)) return;
@@ -3678,7 +4320,9 @@ const AdminConfigPage = () => {
                                 className="mt-2"
                                 type="number"
                                 disabled={!isDraft}
-                                value={workingDocument.priority_level.P2_THRESHOLD}
+                                value={
+                                  workingDocument.priority_level.P2_THRESHOLD
+                                }
                                 onChange={(event) => {
                                   const nextValue = Number(event.target.value);
                                   if (Number.isNaN(nextValue)) return;
@@ -3697,7 +4341,9 @@ const AdminConfigPage = () => {
                                 className="mt-2"
                                 type="number"
                                 disabled={!isDraft}
-                                value={workingDocument.priority_level.P3_THRESHOLD}
+                                value={
+                                  workingDocument.priority_level.P3_THRESHOLD
+                                }
                                 onChange={(event) => {
                                   const nextValue = Number(event.target.value);
                                   if (Number.isNaN(nextValue)) return;
@@ -3740,7 +4386,10 @@ const AdminConfigPage = () => {
                                 className="mt-2"
                                 type="number"
                                 disabled={!isDraft}
-                                value={workingDocument.ui_constraints.MIN_TOTAL_PEOPLE_TO_PROCEED}
+                                value={
+                                  workingDocument.ui_constraints
+                                    .MIN_TOTAL_PEOPLE_TO_PROCEED
+                                }
                                 onChange={(event) => {
                                   const nextValue = Number(event.target.value);
                                   if (Number.isNaN(nextValue)) return;
@@ -3762,7 +4411,10 @@ const AdminConfigPage = () => {
                                 className="mt-2"
                                 type="number"
                                 disabled={!isDraft}
-                                value={workingDocument.ui_constraints.BLANKET_REQUEST_COUNT_DEFAULT}
+                                value={
+                                  workingDocument.ui_constraints
+                                    .BLANKET_REQUEST_COUNT_DEFAULT
+                                }
                                 onChange={(event) => {
                                   const nextValue = Number(event.target.value);
                                   if (Number.isNaN(nextValue)) return;
@@ -3784,7 +4436,10 @@ const AdminConfigPage = () => {
                                 className="mt-2"
                                 type="number"
                                 disabled={!isDraft}
-                                value={workingDocument.ui_constraints.BLANKET_REQUEST_COUNT_MIN}
+                                value={
+                                  workingDocument.ui_constraints
+                                    .BLANKET_REQUEST_COUNT_MIN
+                                }
                                 onChange={(event) => {
                                   const nextValue = Number(event.target.value);
                                   if (Number.isNaN(nextValue)) return;
@@ -3805,7 +4460,10 @@ const AdminConfigPage = () => {
                               <Input
                                 className="mt-2"
                                 disabled={!isDraft}
-                                value={workingDocument.ui_constraints.BLANKET_REQUEST_COUNT_MAX_FORMULA}
+                                value={
+                                  workingDocument.ui_constraints
+                                    .BLANKET_REQUEST_COUNT_MAX_FORMULA
+                                }
                                 onChange={(event) =>
                                   handleDocumentFieldChange(
                                     [
@@ -3844,7 +4502,10 @@ const AdminConfigPage = () => {
                             <TogglePill
                               label="use_request_type_score"
                               description="Giữ cờ cấu hình này nếu muốn cho phép expression cuối tham chiếu request type score."
-                              value={workingDocument.priority_score.use_request_type_score}
+                              value={
+                                workingDocument.priority_score
+                                  .use_request_type_score
+                              }
                               disabled={!isDraft}
                               onChange={(value) =>
                                 handleDocumentFieldChange(
@@ -3855,13 +4516,16 @@ const AdminConfigPage = () => {
                             />
                             <div className="rounded-2xl border border-border/60 bg-muted/20 p-3">
                               <p className="text-xs tracking-tight text-muted-foreground">
-                                Created: {formatDateTime(selectedConfig?.created_at)}
+                                Created:{" "}
+                                {formatDateTime(selectedConfig?.created_at)}
                               </p>
                               <p className="mt-1 text-xs tracking-tight text-muted-foreground">
-                                Updated: {formatDateTime(selectedConfig?.updated_at)}
+                                Updated:{" "}
+                                {formatDateTime(selectedConfig?.updated_at)}
                               </p>
                               <p className="mt-1 text-xs tracking-tight text-muted-foreground">
-                                Activated: {formatDateTime(selectedConfig?.activated_at)}
+                                Activated:{" "}
+                                {formatDateTime(selectedConfig?.activated_at)}
                               </p>
                             </div>
                           </div>
@@ -3935,11 +4599,18 @@ const AdminConfigPage = () => {
                               {FORMULA_FIELD_META[activeFormulaField].title}
                             </h3>
                             <p className="text-sm tracking-tight text-muted-foreground">
-                              {FORMULA_FIELD_META[activeFormulaField].description}
+                              {
+                                FORMULA_FIELD_META[activeFormulaField]
+                                  .description
+                              }
                             </p>
                           </div>
                           <Badge
-                            variant={activeFormulaCompile.error ? "destructive" : "success"}
+                            variant={
+                              activeFormulaCompile.error
+                                ? "destructive"
+                                : "success"
+                            }
                           >
                             {activeFormulaCompile.error
                               ? "Compile lỗi"
@@ -3969,7 +4640,10 @@ const AdminConfigPage = () => {
                       open={openSections.validation}
                       onToggle={() => toggleSection("validation")}
                       badge={
-                        <Badge variant="outline" className="border-border/60 bg-background/70">
+                        <Badge
+                          variant="outline"
+                          className="border-border/60 bg-background/70"
+                        >
                           End-to-end preview
                         </Badge>
                       }
@@ -4032,7 +4706,9 @@ const AdminConfigPage = () => {
                               <Button
                                 type="button"
                                 variant="outline"
-                                disabled={validateMutation.isPending || !workingDocument}
+                                disabled={
+                                  validateMutation.isPending || !workingDocument
+                                }
                                 onClick={handleValidate}
                                 className="sm:min-w-[120px]"
                               >
@@ -4047,7 +4723,8 @@ const AdminConfigPage = () => {
                               !validateMutation.isError && (
                                 <div className="rounded-2xl border border-border/60 bg-muted/20 p-3">
                                   <p className="text-sm tracking-tight text-muted-foreground">
-                                    Nhập ID xong hãy bấm `Preview` hoặc nhấn `Enter` để tải kết quả validate.
+                                    Nhập ID xong hãy bấm `Preview` hoặc nhấn
+                                    `Enter` để tải kết quả validate.
                                   </p>
                                 </div>
                               )}
@@ -4058,11 +4735,18 @@ const AdminConfigPage = () => {
                                   Formula issues
                                 </p>
                                 <div className="mt-2 space-y-1 text-xs tracking-tight text-destructive">
-                                  {formulaErrorEntries.map(([field, message]) => (
-                                    <p key={field}>
-                                      {FORMULA_FIELD_META[field as FormulaField].title}: {message}
-                                    </p>
-                                  ))}
+                                  {formulaErrorEntries.map(
+                                    ([field, message]) => (
+                                      <p key={field}>
+                                        {
+                                          FORMULA_FIELD_META[
+                                            field as FormulaField
+                                          ].title
+                                        }
+                                        : {message}
+                                      </p>
+                                    ),
+                                  )}
                                 </div>
                               </div>
                             )}
@@ -4083,7 +4767,8 @@ const AdminConfigPage = () => {
                                       Validate thất bại
                                     </p>
                                     <p className="mt-2 text-sm tracking-tight text-destructive">
-                                      {validateMutation.error?.response?.data?.message ??
+                                      {validateMutation.error?.response?.data
+                                        ?.message ??
                                         "Không lấy được preview cho SOS request này."}
                                     </p>
                                   </div>
@@ -4104,16 +4789,20 @@ const AdminConfigPage = () => {
                                           : "Config lỗi"}
                                       </Badge>
                                       <span className="text-sm tracking-tight text-muted-foreground">
-                                        {validateMutation.data.errors.length} lỗi
+                                        {validateMutation.data.errors.length}{" "}
+                                        lỗi
                                       </span>
                                     </div>
 
-                                    {validateMutation.data.errors.length > 0 && (
+                                    {validateMutation.data.errors.length >
+                                      0 && (
                                       <div className="rounded-2xl border border-destructive/25 bg-destructive/5 p-3">
                                         <div className="space-y-1.5 text-sm tracking-tight text-destructive">
-                                          {validateMutation.data.errors.map((error) => (
-                                            <p key={error}>• {error}</p>
-                                          ))}
+                                          {validateMutation.data.errors.map(
+                                            (error) => (
+                                              <p key={error}>• {error}</p>
+                                            ),
+                                          )}
                                         </div>
                                       </div>
                                     )}
@@ -4126,7 +4815,10 @@ const AdminConfigPage = () => {
                                               SOS Request
                                             </p>
                                             <p className="mt-1 font-mono text-sm font-semibold">
-                                              {validateMutation.data.preview.sos_request_id}
+                                              {
+                                                validateMutation.data.preview
+                                                  .sos_request_id
+                                              }
                                             </p>
                                           </div>
                                           <div>
@@ -4134,7 +4826,10 @@ const AdminConfigPage = () => {
                                               Priority score
                                             </p>
                                             <p className="mt-1 font-mono text-sm font-semibold">
-                                              {validateMutation.data.preview.priority_score}
+                                              {
+                                                validateMutation.data.preview
+                                                  .priority_score
+                                              }
                                             </p>
                                           </div>
                                           <div>
@@ -4142,7 +4837,10 @@ const AdminConfigPage = () => {
                                               Priority level
                                             </p>
                                             <p className="mt-1 font-mono text-sm font-semibold">
-                                              {validateMutation.data.preview.priority_level}
+                                              {
+                                                validateMutation.data.preview
+                                                  .priority_level
+                                              }
                                             </p>
                                           </div>
                                         </div>
@@ -4150,7 +4848,8 @@ const AdminConfigPage = () => {
                                         <Textarea
                                           readOnly
                                           value={JSON.stringify(
-                                            validateMutation.data.preview.breakdown ?? {},
+                                            validateMutation.data.preview
+                                              .breakdown ?? {},
                                             null,
                                             2,
                                           )}
@@ -4161,10 +4860,13 @@ const AdminConfigPage = () => {
 
                                     {!validateMutation.data.preview &&
                                       previewSosRequestId.trim().length > 0 &&
-                                      validateMutation.data.errors.length === 0 && (
+                                      validateMutation.data.errors.length ===
+                                        0 && (
                                         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-3">
                                           <p className="text-sm tracking-tight text-amber-700">
-                                            Config hợp lệ nhưng backend không trả về preview cho `sos_request_id` này.
+                                            Config hợp lệ nhưng backend không
+                                            trả về preview cho `sos_request_id`
+                                            này.
                                           </p>
                                         </div>
                                       )}
@@ -4182,13 +4884,16 @@ const AdminConfigPage = () => {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between gap-3">
                               <p className="text-xs tracking-tight text-muted-foreground">
-                                Có thể dùng như read-only audit trail cho những field ít dùng.
+                                Có thể dùng như read-only audit trail cho những
+                                field ít dùng.
                               </p>
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                onClick={() => setShowRawJson((current) => !current)}
+                                onClick={() =>
+                                  setShowRawJson((current) => !current)
+                                }
                               >
                                 {showRawJson ? "Ẩn JSON" : "Xem JSON"}
                               </Button>
@@ -4201,11 +4906,9 @@ const AdminConfigPage = () => {
                               />
                             ) : (
                               <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-5 text-sm tracking-tight text-muted-foreground">
-                                JSON snapshot đang được ẩn để giao diện tập trung vào editor trực quan. Bấm
-                                {" "}
-                                `Xem JSON`
-                                {" "}
-                                khi cần kiểm tra payload chi tiết.
+                                JSON snapshot đang được ẩn để giao diện tập
+                                trung vào editor trực quan. Bấm `Xem JSON` khi
+                                cần kiểm tra payload chi tiết.
                               </div>
                             )}
                           </div>
@@ -4226,7 +4929,10 @@ const AdminConfigPage = () => {
             <SupplyRequestPriorityConfigCard />
           </TabsContent>
 
-          <TabsContent value="rescuer-score-visibility" className="mt-5 space-y-4">
+          <TabsContent
+            value="rescuer-score-visibility"
+            className="mt-5 space-y-4"
+          >
             <RescuerScoreVisibilityConfigCard />
           </TabsContent>
         </Tabs>

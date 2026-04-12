@@ -65,8 +65,7 @@ export default function ServiceZonePanel({
 
   // Create mode: must draw; Edit mode: existing coords are enough + must have changes
   const canSave =
-    name.trim().length > 0 &&
-    (zone ? hasCoords && hasChanges : hasDrawing);
+    name.trim().length > 0 && (zone ? hasCoords && hasChanges : hasDrawing);
 
   const handleSave = () => {
     if (!canSave || !effectiveCoords) return;
@@ -125,7 +124,6 @@ export default function ServiceZonePanel({
               />
             </button>
           </div>
-
         </div>
 
         <Separator className="border-border/40" />
@@ -182,7 +180,7 @@ export default function ServiceZonePanel({
                 </span>
               </div>
               <p className="text-sm tracking-tighter text-muted-foreground">
-                Vẽ mới trên bản đồ để thay đổi vùng dịch vụ
+                Vẽ mới trên bản đồ để thay đổi vùng
               </p>
               <div className="max-h-65 overflow-y-auto space-y-1 text-xs font-mono">
                 {zone.coordinates.map((c, i) => (
@@ -204,7 +202,7 @@ export default function ServiceZonePanel({
             <div className="border border-dashed border-border/60 bg-muted/20 p-6 text-center space-y-2">
               <Warning className="h-6 w-6 mx-auto text-muted-foreground/50" />
               <p className="text-xs tracking-tighter text-muted-foreground">
-                Chưa có vùng dịch vụ. Sử dụng công cụ trên bản đồ để vẽ.
+                Chưa có vùng. Sử dụng công cụ trên bản đồ để vẽ.
               </p>
               <div className="flex justify-center tracking-tighter gap-3 text-[12px] text-muted-foreground/70">
                 <span className="flex items-center gap-1">
@@ -257,10 +255,7 @@ export default function ServiceZonePanel({
               Đang lưu...
             </>
           ) : (
-            <>
-             
-              {zone ? "Cập nhật vùng" : "Tạo vùng mới"}
-            </>
+            <>{zone ? "Cập nhật vùng" : "Tạo vùng mới"}</>
           )}
         </Button>
         {!hasCoords && (

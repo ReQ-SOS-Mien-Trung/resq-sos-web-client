@@ -84,6 +84,8 @@ function normalizeFundingRequestItem(
     expiredDate: item.expiredDate ?? null,
     notes: item.notes ?? item.note,
     description: item.description,
+    volumePerUnit: item.volumePerUnit,
+    weightPerUnit: item.weightPerUnit,
   };
 }
 

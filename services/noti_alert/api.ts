@@ -41,6 +41,10 @@ function normalizeNotificationItem(raw: unknown): UserNotificationItem | null {
     body: String(record.body ?? record.message ?? ""),
     isRead: Boolean(record.isRead),
     createdAt: String(record.createdAt ?? new Date().toISOString()),
+    data:
+      record.data && typeof record.data === "object"
+        ? record.data
+        : null,
   };
 }
 

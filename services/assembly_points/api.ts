@@ -9,8 +9,6 @@ import {
   AssemblyPointMetadataOption,
   UpdateAssemblyPointRequest,
   UpdateAssemblyPointResponse,
-  UpdateAssemblyPointStatusRequest,
-  UpdateAssemblyPointStatusResponse,
   UpdateRescuerAssemblyPointAssignmentRequest,
   ScheduleAssemblyPointGatheringRequest,
   ScheduleAssemblyPointGatheringResponse,
@@ -94,25 +92,37 @@ export async function updateAssemblyPoint(
 }
 
 /**
- * Update assembly point status
- * PATCH /personnel/assembly-point/{id}/status
+ * Activate an assembly point
+ * PATCH /personnel/assembly-point/{id}/activate
  */
-export async function updateAssemblyPointStatus(
-  payload: UpdateAssemblyPointStatusRequest,
-): Promise<UpdateAssemblyPointStatusResponse> {
-  const { id, status } = payload;
-  const { data } = await api.patch(
-    `/personnel/assembly-point/${id}/status?status=${status}`,
-  );
-  return data;
+export async function activateAssemblyPoint(id: number): Promise<void> {
+  await api.patch(`/personnel/assembly-point/${id}/activate`);
 }
 
 /**
- * Delete an assembly point
- * DELETE /personnel/assembly-point/{id}
+ * Put an assembly point into maintenance
+ * PATCH /personnel/assembly-point/{id}/start-maintenance
  */
-export async function deleteAssemblyPoint(id: number): Promise<void> {
-  await api.delete(`/personnel/assembly-point/${id}`);
+export async function startAssemblyPointMaintenance(id: number): Promise<void> {
+  await api.patch(`/personnel/assembly-point/${id}/start-maintenance`);
+}
+
+/**
+ * Complete maintenance for an assembly point
+ * PATCH /personnel/assembly-point/{id}/complete-maintenance
+ */
+export async function completeAssemblyPointMaintenance(
+  id: number,
+): Promise<void> {
+  await api.patch(`/personnel/assembly-point/${id}/complete-maintenance`);
+}
+
+/**
+ * Close an assembly point permanently
+ * PATCH /personnel/assembly-point/{id}/close
+ */
+export async function closeAssemblyPoint(id: number): Promise<void> {
+  await api.patch(`/personnel/assembly-point/${id}/close`);
 }
 
 /**
