@@ -4,6 +4,7 @@ import {
   getSOSClusters,
   createSOSCluster,
   getMissionSuggestions,
+  getAlternativeDepots,
   getClusterRescueSuggestion,
   streamClusterRescueSuggestion,
 } from "./api";
@@ -13,12 +14,18 @@ import {
   CreateSOSClusterResponse,
   GetMissionSuggestionsResponse,
   ClusterRescueSuggestionResponse,
+  AlternativeDepotsResponse,
 } from "./type";
 
 export const SOS_CLUSTERS_QUERY_KEY = ["sos-clusters"] as const;
 export const MISSION_SUGGESTIONS_QUERY_KEY = ["mission-suggestions"] as const;
+export const ALTERNATIVE_DEPOTS_QUERY_KEY = ["alternative-depots"] as const;
 
 export interface UseMissionSuggestionsOptions {
+  enabled?: boolean;
+}
+
+export interface UseAlternativeDepotsOptions {
   enabled?: boolean;
 }
 
@@ -52,6 +59,26 @@ export function useMissionSuggestions(
     queryKey: [...MISSION_SUGGESTIONS_QUERY_KEY, clusterId],
     queryFn: () => getMissionSuggestions(clusterId),
     enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Hook to fetch alternative depots for shortage items inferred by AI.
+ */
+export function useAlternativeDepots(
+  clusterId: number,
+  selectedDepotId: number,
+  options?: UseAlternativeDepotsOptions,
+) {
+  return useQuery<AlternativeDepotsResponse>({
+    queryKey: [...ALTERNATIVE_DEPOTS_QUERY_KEY, clusterId, selectedDepotId],
+    queryFn: () => getAlternativeDepots(clusterId, selectedDepotId),
+    enabled:
+      (options?.enabled ?? true) &&
+      Number.isFinite(clusterId) &&
+      clusterId > 0 &&
+      Number.isFinite(selectedDepotId) &&
+      selectedDepotId > 0,
   });
 }
 

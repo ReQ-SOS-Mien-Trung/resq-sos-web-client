@@ -48,6 +48,7 @@ type PromptDetailModelFallback = PromptDetailEntity & {
   modelName?: string | null;
   model_code?: string | null;
   model_name?: string | null;
+  prompt_type?: string | null;
 };
 
 const stripVersionPrefix = (version: string): string =>
@@ -80,6 +81,41 @@ const resolveModelCode = (detail: PromptDetailModelFallback): string => {
 const normalizeModelCode = (modelCode: string): string =>
   sanitizeModelCode(modelCode).toLowerCase();
 
+const canonicalizePromptType = (value: string): string =>
+  value.replace(/[^a-z0-9]/gi, "").toLowerCase();
+
+const normalizePromptType = (
+  ...candidates: Array<string | null | undefined>
+): PromptFormData["prompt_type"] => {
+  const promptTypeByCanonical = new Map(
+    PROMPT_TYPE_OPTIONS.map((option) => [
+      canonicalizePromptType(option.value),
+      option.value,
+    ]),
+  );
+
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") {
+      continue;
+    }
+
+    const trimmedCandidate = candidate.trim();
+    if (!trimmedCandidate) {
+      continue;
+    }
+
+    const normalizedMatch = promptTypeByCanonical.get(
+      canonicalizePromptType(trimmedCandidate),
+    );
+
+    if (normalizedMatch) {
+      return normalizedMatch;
+    }
+  }
+
+  return INITIAL_FORM_DATA.prompt_type;
+};
+
 const findProviderModelByCode = (
   provider: PromptFormData["provider"],
   modelCode: string,
@@ -99,7 +135,10 @@ const findProviderModelByCode = (
 
 const mapDetailToForm = (detail: PromptDetailEntity): PromptFormData => ({
   name: detail.name,
-  prompt_type: detail.promptType,
+  prompt_type: normalizePromptType(
+    detail.promptType,
+    (detail as PromptDetailModelFallback).prompt_type,
+  ),
   provider: detail.provider,
   purpose: detail.purpose || "",
   system_prompt: detail.systemPrompt || "",
@@ -263,18 +302,22 @@ const PromptEditor = ({
     [formData],
   );
 
-  const promptTypeVariables = PROMPT_VARIABLES_BY_TYPE[formData.prompt_type];
+  const effectivePromptType = normalizePromptType(
+    formData.prompt_type,
+    prompt?.promptType,
+  );
+  const promptTypeVariables = PROMPT_VARIABLES_BY_TYPE[effectivePromptType];
   const selectedPromptType = PROMPT_TYPE_OPTIONS.find(
-    (option) => option.value === formData.prompt_type,
+    (option) => option.value === effectivePromptType,
   );
   const selectedProvider = AI_PROVIDER_OPTIONS.find(
     (option) => option.value === formData.provider,
   );
   const systemPromptHelperText =
-    formData.prompt_type === "SosPriorityAnalysis"
+    effectivePromptType === "SosPriorityAnalysis"
       ? "Backend không replace biến trong trường này."
       : "Backend không replace biến trong trường này. Các prompt mission có thể được nối thêm hướng dẫn stage/tool phù hợp trước khi gọi AI.";
-  const userPromptHelperText = USER_PROMPT_TEMPLATE_HINTS[formData.prompt_type];
+  const userPromptHelperText = USER_PROMPT_TEMPLATE_HINTS[effectivePromptType];
   const providerModelOptions = selectedProvider?.models ?? [];
   const matchedProviderModel = providerModelOptions.find(
     (model) =>
@@ -388,6 +431,7 @@ const PromptEditor = ({
     const normalizedApiKey = formData.api_key.trim();
     const payload = {
       ...formData,
+      prompt_type: normalizePromptType(formData.prompt_type, prompt?.promptType),
       name: formData.name.trim(),
       purpose: formData.purpose.trim(),
       system_prompt: formData.system_prompt.trim(),
@@ -496,11 +540,11 @@ const PromptEditor = ({
                 <div className="space-y-1.5">
                   <Label htmlFor="prompt_type">Loại Prompt *</Label>
                   <Select
-                    value={formData.prompt_type}
+                    value={effectivePromptType}
                     onValueChange={(value) =>
                       updateField(
                         "prompt_type",
-                        value as PromptFormData["prompt_type"],
+                        normalizePromptType(value),
                       )
                     }
                   >
@@ -994,11 +1038,11 @@ const PromptEditor = ({
                     <div className="space-y-1.5">
                       <Label htmlFor="prompt_type">Loại Prompt *</Label>
                       <Select
-                        value={formData.prompt_type}
+                        value={effectivePromptType}
                         onValueChange={(value) =>
                           updateField(
                             "prompt_type",
-                            value as PromptFormData["prompt_type"],
+                            normalizePromptType(value),
                           )
                         }
                       >

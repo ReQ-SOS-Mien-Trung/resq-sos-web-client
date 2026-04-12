@@ -26,6 +26,7 @@ import {
   resourceTypeIcons,
   severityConfig,
 } from "@/lib/constants";
+import { analyzeMissionSupplyBalance } from "@/lib/mission-supply-balance";
 import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -79,12 +80,14 @@ import type {
 import {
   useAiMissionStream,
   useMissionSuggestions,
+  useAlternativeDepots,
 } from "@/services/sos_cluster/hooks";
 import {
   ClusterSuggestedActivity,
   ClusterActivityType,
   ClusterSupplyCollection,
   MissionSuggestionEntity,
+  AlternativeDepot,
 } from "@/services/sos_cluster/type";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
@@ -137,6 +140,7 @@ const BACKEND_ERROR_DEPOT_ID_REGEX = /\bkho\s*#?\s*(\d+)\b/i;
 type EditableActivity = ClusterSuggestedActivity & {
   _id: string;
   _missionActivityId?: number | null;
+  _autoSyncedDeliveryStep?: boolean;
 };
 
 type EditActivityErrorState = {
@@ -155,6 +159,14 @@ type EditActivityGroup = {
   startIndex: number;
   endIndex: number;
   activities: Array<{ activity: EditableActivity; index: number }>;
+};
+
+type SidebarDepotEntry = {
+  depotId: number;
+  depotName: string;
+  depotAddress: string | null;
+  kind: "primary" | "alternative";
+  sourceReason?: string | null;
 };
 
 type BackendActivityErrorClues = {
@@ -476,7 +488,9 @@ function resolveEditActivityGroupContext(
   const sosRequestId =
     rawSosRequestId != null && rawSosRequestId > 0 ? rawSosRequestId : null;
   const matchedSOS =
-    sosRequestId != null ? (sosRequestById.get(String(sosRequestId)) ?? null) : null;
+    sosRequestId != null
+      ? (sosRequestById.get(String(sosRequestId)) ?? null)
+      : null;
   const assemblyPointCoords = resolveCoordinatePair(
     activity.assemblyPointLatitude,
     activity.assemblyPointLongitude,
@@ -980,11 +994,13 @@ const DepotInventoryCard = ({
   depotName,
   depotAddress,
   isDraggable,
+  kind = "primary",
 }: {
   depotId: number;
   depotName: string;
   depotAddress: string | null;
   isDraggable: boolean;
+  kind?: "primary" | "alternative";
 }) => {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
@@ -1008,6 +1024,17 @@ const DepotInventoryCard = ({
             </p>
           )}
         </div>
+        <Badge
+          variant="outline"
+          className={cn(
+            "h-5 shrink-0 rounded-full px-2 text-xs font-semibold",
+            kind === "alternative"
+              ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-blue-300"
+              : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300",
+          )}
+        >
+          {kind === "alternative" ? "Kho thay thế" : "Kho kế hoạch"}
+        </Badge>
         {data ? (
           <Badge
             variant="secondary"
@@ -2088,6 +2115,130 @@ function hasValidReturnSupplySelections(
   });
 }
 
+function mergeSupplyCollections(
+  supplies: ClusterSupplyCollection[] | null | undefined,
+): ClusterSupplyCollection[] | null {
+  const normalizedSupplies = cloneSupplyCollections(supplies);
+  if (!normalizedSupplies || normalizedSupplies.length === 0) {
+    return null;
+  }
+
+  const buckets = new Map<string, ClusterSupplyCollection>();
+
+  normalizedSupplies.forEach((supply) => {
+    const key = buildSupplyComparisonKey(supply);
+    const existing = buckets.get(key);
+
+    if (existing) {
+      buckets.set(key, {
+        ...existing,
+        quantity: existing.quantity + supply.quantity,
+      });
+      return;
+    }
+
+    buckets.set(key, {
+      ...supply,
+      quantity: Math.max(1, Number(supply.quantity) || 1),
+    });
+  });
+
+  return Array.from(buckets.values());
+}
+
+function syncDeliveryActivitiesWithCollectors(
+  activities: EditableActivity[],
+): EditableActivity[] {
+  const pendingByTeam = new Map<number, ClusterSupplyCollection[]>();
+  const returnSupplyKeysByTeam = new Map<number, Set<string>>();
+
+  activities.forEach((activity) => {
+    if (activity.activityType !== "RETURN_SUPPLIES") {
+      return;
+    }
+
+    const teamId = toValidTeamId(activity.suggestedTeam?.teamId);
+    if (teamId == null) {
+      return;
+    }
+
+    const keys = returnSupplyKeysByTeam.get(teamId) ?? new Set<string>();
+
+    for (const supply of activity.suppliesToCollect ?? []) {
+      keys.add(buildSupplyComparisonKey(supply));
+    }
+
+    returnSupplyKeysByTeam.set(teamId, keys);
+  });
+
+  return activities.map((activity) => {
+    if (activity.activityType === "COLLECT_SUPPLIES") {
+      const teamId = toValidTeamId(activity.suggestedTeam?.teamId);
+      const mergedSupplies = mergeSupplyCollections(activity.suppliesToCollect);
+
+      if (teamId != null && mergedSupplies && mergedSupplies.length > 0) {
+        const returnKeys = returnSupplyKeysByTeam.get(teamId) ?? null;
+        const deliverableSupplies = mergedSupplies.filter(
+          (supply) => !returnKeys?.has(buildSupplyComparisonKey(supply)),
+        );
+
+        if (deliverableSupplies.length === 0) {
+          return activity._autoSyncedDeliveryStep
+            ? { ...activity, _autoSyncedDeliveryStep: false }
+            : activity;
+        }
+
+        const pending = pendingByTeam.get(teamId) ?? [];
+        pendingByTeam.set(
+          teamId,
+          mergeSupplyCollections([...pending, ...deliverableSupplies]) ??
+            pending,
+        );
+      }
+
+      return activity._autoSyncedDeliveryStep
+        ? { ...activity, _autoSyncedDeliveryStep: false }
+        : activity;
+    }
+
+    if (activity.activityType !== "DELIVER_SUPPLIES") {
+      return activity._autoSyncedDeliveryStep
+        ? { ...activity, _autoSyncedDeliveryStep: false }
+        : activity;
+    }
+
+    const teamId = toValidTeamId(activity.suggestedTeam?.teamId);
+    const pending = teamId != null ? (pendingByTeam.get(teamId) ?? null) : null;
+
+    if (teamId != null && pending && pending.length > 0) {
+      pendingByTeam.delete(teamId);
+
+      if (
+        activity._autoSyncedDeliveryStep &&
+        haveMatchingSupplyCollections(activity.suppliesToCollect, pending)
+      ) {
+        return activity;
+      }
+
+      return {
+        ...activity,
+        suppliesToCollect: pending,
+        _autoSyncedDeliveryStep: true,
+      };
+    }
+
+    if (!activity._autoSyncedDeliveryStep) {
+      return activity;
+    }
+
+    return {
+      ...activity,
+      suppliesToCollect: null,
+      _autoSyncedDeliveryStep: false,
+    };
+  });
+}
+
 function normalizeDepotName(value?: string | null): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
@@ -2300,10 +2451,16 @@ function getActivityStatusMeta(status: string | null | undefined): {
     };
   }
 
-  if (
-    normalizedStatus === "pendingconfirmation" ||
-    normalizedStatus === "pending"
-  ) {
+  if (normalizedStatus === "pendingconfirmation") {
+    return {
+      label: "Chờ kho xác nhận",
+      className:
+        "bg-[#f59e0b]/12 text-[#f59e0b] border-[#f59e0b]/40 dark:bg-[#c07e09]/20 dark:text-[#c07e09] dark:border-[#c07e09]/45",
+      icon: <Clock className="h-3.5 w-3.5" />,
+    };
+  }
+
+  if (normalizedStatus === "pending") {
     return {
       label: "Chờ xác nhận",
       className:
@@ -5539,7 +5696,7 @@ const RescuePlanPanel = ({
 
   const syncReturnActivitiesWithCollectors = useCallback(
     (activities: EditableActivity[]): EditableActivity[] =>
-      activities.map((activity) => {
+      syncDeliveryActivitiesWithCollectors(activities).map((activity) => {
         if (activity.activityType !== "RETURN_SUPPLIES") {
           return activity;
         }
@@ -5745,9 +5902,14 @@ const RescuePlanPanel = ({
       },
     ) => {
       const targetActivity = editActivities.find((a) => a._id === activityId);
-      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+      if (
+        targetActivity?.activityType === "RETURN_SUPPLIES" ||
+        targetActivity?._autoSyncedDeliveryStep
+      ) {
         toast.info(
-          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể thêm thủ công.",
+          targetActivity?.activityType === "RETURN_SUPPLIES"
+            ? "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể thêm thủ công."
+            : "Vật phẩm ở bước Phân phát đang tự đồng bộ từ bước Tiếp nhận nên không thể thêm thủ công.",
         );
         return;
       }
@@ -5845,9 +6007,14 @@ const RescuePlanPanel = ({
   const handleRemoveSupply = useCallback(
     (activityId: string, supplyIndex: number) => {
       const targetActivity = editActivities.find((a) => a._id === activityId);
-      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+      if (
+        targetActivity?.activityType === "RETURN_SUPPLIES" ||
+        targetActivity?._autoSyncedDeliveryStep
+      ) {
         toast.info(
-          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể xóa thủ công.",
+          targetActivity?.activityType === "RETURN_SUPPLIES"
+            ? "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể xóa thủ công."
+            : "Vật phẩm ở bước Phân phát đang tự đồng bộ từ bước Tiếp nhận nên không thể xóa thủ công.",
         );
         return;
       }
@@ -5874,9 +6041,14 @@ const RescuePlanPanel = ({
   const handleUpdateSupplyQuantity = useCallback(
     (activityId: string, supplyIndex: number, quantity: number) => {
       const targetActivity = editActivities.find((a) => a._id === activityId);
-      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+      if (
+        targetActivity?.activityType === "RETURN_SUPPLIES" ||
+        targetActivity?._autoSyncedDeliveryStep
+      ) {
         toast.info(
-          "Số lượng ở bước Hoàn trả được tự động đồng bộ theo số lượng đã thu gom nên không thể sửa thủ công.",
+          targetActivity?.activityType === "RETURN_SUPPLIES"
+            ? "Số lượng ở bước Hoàn trả được tự động đồng bộ theo số lượng đã thu gom nên không thể sửa thủ công."
+            : "Số lượng ở bước Phân phát đang tự đồng bộ theo bước Tiếp nhận nên không thể sửa thủ công.",
         );
         return;
       }
@@ -5951,6 +6123,21 @@ const RescuePlanPanel = ({
     setPendingRemoval(null);
   }, [pendingRemoval, removeEditActivity, handleRemoveSupply]);
 
+  const editSupplyBalanceAnalysis = useMemo(
+    () =>
+      analyzeMissionSupplyBalance(
+        editActivities.map((activity, index) => ({
+          activityId: activity._id,
+          activityType: activity.activityType,
+          step: index + 1,
+          teamId: toValidTeamId(activity.suggestedTeam?.teamId),
+          teamName: activity.suggestedTeam?.teamName ?? null,
+          supplies: activity.suppliesToCollect,
+        })),
+      ),
+    [editActivities],
+  );
+
   const validateEditMission = useCallback(() => {
     if (!clusterId) return false;
     if (editActivities.length === 0) {
@@ -6002,13 +6189,25 @@ const RescuePlanPanel = ({
         }
       }
     }
+
+    if (editSupplyBalanceAnalysis.firstIssue) {
+      toast.error(editSupplyBalanceAnalysis.firstIssue.message);
+      return false;
+    }
+
     if (!editStartTime || !editExpectedEndTime) {
       toast.error("Vui lòng chọn thời gian bắt đầu và kết thúc");
       return false;
     }
 
     return true;
-  }, [clusterId, editActivities, editStartTime, editExpectedEndTime]);
+  }, [
+    clusterId,
+    editActivities,
+    editExpectedEndTime,
+    editStartTime,
+    editSupplyBalanceAnalysis.firstIssue,
+  ]);
 
   const handleOpenSubmitConfirm = useCallback(() => {
     if (!validateEditMission()) return;
@@ -6569,7 +6768,11 @@ const RescuePlanPanel = ({
         const sourceIndex = groups.findIndex((group) => group.id === groupId);
         const targetIndex = sourceIndex + dir;
 
-        if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= groups.length) {
+        if (
+          sourceIndex < 0 ||
+          targetIndex < 0 ||
+          targetIndex >= groups.length
+        ) {
           return previous;
         }
 
@@ -6582,7 +6785,8 @@ const RescuePlanPanel = ({
         const movingActivities = sourceIndexes.map((index) => previous[index]);
         const next = previous.filter((_, index) => !sourceIndexSet.has(index));
 
-        let insertIndex = dir === -1 ? targetGroup.startIndex : targetGroup.endIndex + 1;
+        let insertIndex =
+          dir === -1 ? targetGroup.startIndex : targetGroup.endIndex + 1;
         let removedBeforeInsert = 0;
         for (const index of sourceIndexes) {
           if (index < insertIndex) {
@@ -6594,7 +6798,11 @@ const RescuePlanPanel = ({
         return syncReturnActivitiesWithCollectors(next);
       });
     },
-    [clearEditActivityErrors, panelSOSRequestById, syncReturnActivitiesWithCollectors],
+    [
+      clearEditActivityErrors,
+      panelSOSRequestById,
+      syncReturnActivitiesWithCollectors,
+    ],
   );
 
   const handleGroupDragStart = useCallback((groupId: string) => {
@@ -6709,7 +6917,8 @@ const RescuePlanPanel = ({
           const intensity = (rect.top + thresholdPx - pointerY) / thresholdPx;
           delta = -Math.max(6, Math.round(intensity * maxScrollStep));
         } else if (pointerY > rect.bottom - thresholdPx) {
-          const intensity = (pointerY - (rect.bottom - thresholdPx)) / thresholdPx;
+          const intensity =
+            (pointerY - (rect.bottom - thresholdPx)) / thresholdPx;
           delta = Math.max(6, Math.round(intensity * maxScrollStep));
         }
 
@@ -6848,36 +7057,131 @@ const RescuePlanPanel = ({
   );
 
   const hasSidebar = !!activeSuggestion;
+  const [selectedShortageDepotId, setSelectedShortageDepotId] = useState<
+    number | null
+  >(null);
+  const [pinnedAlternativeDepots, setPinnedAlternativeDepots] = useState<
+    SidebarDepotEntry[]
+  >([]);
 
   // Extract unique depots for inventory sidebar
   // In view mode: from activeSuggestion; in edit mode: from editActivities
-  const sidebarDepots = useMemo(() => {
+  const sidebarDepots = useMemo<SidebarDepotEntry[]>(() => {
     const source = isEditMode
       ? editActivities
       : (activeSuggestion?.suggestedActivities ?? []);
-    const map = new Map<
-      number,
-      { depotId: number; depotName: string; depotAddress: string | null }
-    >();
+    const map = new Map<number, SidebarDepotEntry>();
     for (const act of source) {
       if (act.depotId && !map.has(act.depotId)) {
         map.set(act.depotId, {
           depotId: act.depotId,
           depotName: act.depotName || `Kho #${act.depotId}`,
           depotAddress: act.depotAddress,
+          kind: "primary",
         });
       }
     }
     return Array.from(map.values());
   }, [isEditMode, editActivities, activeSuggestion]);
 
-  const showSidebar = hasSidebar || sidebarDepots.length > 0;
+  const effectiveSelectedShortageDepotId =
+    selectedShortageDepotId != null &&
+    sidebarDepots.some((depot) => depot.depotId === selectedShortageDepotId)
+      ? selectedShortageDepotId
+      : (sidebarDepots[0]?.depotId ?? null);
+
+  const selectedShortageDepot = useMemo(
+    () =>
+      sidebarDepots.find(
+        (depot) => depot.depotId === effectiveSelectedShortageDepotId,
+      ) ??
+      sidebarDepots[0] ??
+      null,
+    [sidebarDepots, effectiveSelectedShortageDepotId],
+  );
+
+  const {
+    data: alternativeDepotsData,
+    isLoading: isAlternativeDepotsLoading,
+    isFetching: isAlternativeDepotsFetching,
+    error: alternativeDepotsError,
+  } = useAlternativeDepots(
+    clusterId ?? 0,
+    selectedShortageDepot?.depotId ?? 0,
+    {
+      enabled:
+        open &&
+        !!activeSuggestion &&
+        !!clusterId &&
+        (selectedShortageDepot?.depotId ?? 0) > 0,
+    },
+  );
+
+  const alternativeDepotRecommendations = useMemo(
+    () => alternativeDepotsData?.alternativeDepots ?? [],
+    [alternativeDepotsData],
+  );
+  const hasAlternativeDepotShortage =
+    (alternativeDepotsData?.totalMissingQuantity ?? 0) > 0;
+  const shouldShowAlternativeDepotPanel =
+    !!activeSuggestion &&
+    !!selectedShortageDepot &&
+    (isAlternativeDepotsLoading ||
+      isAlternativeDepotsFetching ||
+      !!alternativeDepotsError ||
+      hasAlternativeDepotShortage);
+
+  const visibleSidebarDepots = useMemo<SidebarDepotEntry[]>(() => {
+    const merged = new Map<number, SidebarDepotEntry>();
+
+    for (const depot of sidebarDepots) {
+      merged.set(depot.depotId, depot);
+    }
+
+    const activePinnedAlternativeDepots = hasAlternativeDepotShortage
+      ? pinnedAlternativeDepots
+      : [];
+
+    for (const depot of activePinnedAlternativeDepots) {
+      if (!merged.has(depot.depotId)) {
+        merged.set(depot.depotId, depot);
+      }
+    }
+
+    return Array.from(merged.values());
+  }, [sidebarDepots, pinnedAlternativeDepots, hasAlternativeDepotShortage]);
+
+  const showSidebar = hasSidebar || visibleSidebarDepots.length > 0;
+  const useCompactMissionCards = showSidebar && splitPercent <= 48;
 
   useDepotInventoryRealtime({
-    depotIds: sidebarDepots.map((depot) => depot.depotId),
+    depotIds: visibleSidebarDepots.map((depot) => depot.depotId),
     missionId: editingMissionId,
-    enabled: open && sidebarDepots.length > 0,
+    enabled: open && visibleSidebarDepots.length > 0,
   });
+
+  const togglePinnedAlternativeDepot = useCallback(
+    (depot: AlternativeDepot) => {
+      setPinnedAlternativeDepots((previous) => {
+        const exists = previous.some((item) => item.depotId === depot.depotId);
+        if (exists) {
+          return previous.filter((item) => item.depotId !== depot.depotId);
+        }
+
+        return [
+          ...previous,
+          {
+            depotId: depot.depotId,
+            depotName: depot.depotName || `Kho #${depot.depotId}`,
+            depotAddress: depot.depotAddress || null,
+            kind: "alternative",
+            sourceReason: depot.reason,
+          },
+        ];
+      });
+    },
+    [],
+  );
 
   const sortedMissions = useMemo(() => {
     const source = (missionsData?.missions ?? []).slice();
@@ -7695,7 +7999,14 @@ const RescuePlanPanel = ({
                                             </div>
 
                                             <div className="bg-card p-3">
-                                              <div className="grid gap-3 lg:grid-cols-2 lg:auto-rows-fr">
+                                              <div
+                                                className={cn(
+                                                  "grid gap-3",
+                                                  useCompactMissionCards
+                                                    ? "grid-cols-1"
+                                                    : "lg:grid-cols-2 lg:auto-rows-fr",
+                                                )}
+                                              >
                                                 {group.activities.map(
                                                   (activity) => {
                                                     const assignedMissionTeams =
@@ -7789,7 +8100,13 @@ const RescuePlanPanel = ({
                                                             {activity.step}
                                                           </div>
                                                           <div className="flex min-w-0 flex-1 flex-col gap-2">
-                                                            <div className="flex items-start justify-between gap-3">
+                                                            <div
+                                                              className={cn(
+                                                                "flex items-start justify-between gap-3",
+                                                                useCompactMissionCards &&
+                                                                  "flex-col",
+                                                              )}
+                                                            >
                                                               <div className="min-w-0 space-y-2">
                                                                 <div className="flex items-center gap-2 flex-wrap">
                                                                   <span className="text-sm font-bold text-foreground">
@@ -7833,7 +8150,13 @@ const RescuePlanPanel = ({
                                                               </div>
                                                               {typeof activity.estimatedTime ===
                                                               "number" ? (
-                                                                <div className="shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm">
+                                                                <div
+                                                                  className={cn(
+                                                                    "shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm",
+                                                                    useCompactMissionCards &&
+                                                                      "self-start",
+                                                                  )}
+                                                                >
                                                                   <p className="text-[10px] font-semibold leading-tight text-muted-foreground">
                                                                     Thời gian dự
                                                                     kiến đến
@@ -8323,7 +8646,8 @@ const RescuePlanPanel = ({
                                 ({ activity }) =>
                                   editActivityErrors[activity._id] != null,
                               );
-                              const isGroupedExecution = group.activities.length > 1;
+                              const isGroupedExecution =
+                                group.activities.length > 1;
                               const groupStepIndexes = group.activities
                                 .map(({ index }) => index)
                                 .sort((a, b) => a - b);
@@ -8365,7 +8689,8 @@ const RescuePlanPanel = ({
                                           ? "border-red-200/80 bg-red-50/40 dark:border-red-800/40 dark:bg-red-950/10"
                                           : group.matchedSOS?.priority === "P2"
                                             ? "border-orange-200/80 bg-orange-50/40 dark:border-orange-800/40 dark:bg-orange-950/10"
-                                            : group.matchedSOS?.priority === "P3"
+                                            : group.matchedSOS?.priority ===
+                                                "P3"
                                               ? "border-amber-200/80 bg-amber-50/40 dark:border-amber-800/40 dark:bg-amber-950/10"
                                               : "border-border/80 bg-card/80"),
                                     dragOverGroupId === group.id &&
@@ -8431,7 +8756,8 @@ const RescuePlanPanel = ({
                                               variant="secondary"
                                               className="h-6 px-2 text-sm font-semibold"
                                             >
-                                              Cụm thao tác {group.activities.length} bước
+                                              Cụm thao tác{" "}
+                                              {group.activities.length} bước
                                             </Badge>
                                             {groupHasError ? (
                                               <Badge className="h-6 bg-red-100 px-2 text-sm font-semibold text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300">
@@ -8446,8 +8772,8 @@ const RescuePlanPanel = ({
                                                 "Cùng một điểm thực hiện"}
                                             </p>
                                             <p className="text-sm text-muted-foreground">
-                                              Có thể kéo nguyên cụm lên trên thay
-                                              vì kéo từng bước.
+                                              Có thể kéo nguyên cụm lên trên
+                                              thay vì kéo từng bước.
                                             </p>
                                           </div>
                                         </div>
@@ -8475,7 +8801,8 @@ const RescuePlanPanel = ({
                                             moveEditActivityGroup(group.id, 1)
                                           }
                                           disabled={
-                                            groupIdx === editActivityGroups.length - 1
+                                            groupIdx ===
+                                            editActivityGroups.length - 1
                                           }
                                         >
                                           <CaretDown className="h-4 w-4" />
@@ -8497,7 +8824,8 @@ const RescuePlanPanel = ({
                                             activity.activityType
                                           ] || activityTypeConfig["ASSESS"];
                                         const activityError =
-                                          editActivityErrors[activity._id] ?? null;
+                                          editActivityErrors[activity._id] ??
+                                          null;
                                         const hasActivityError =
                                           activityError != null;
                                         const isManual =
@@ -8508,8 +8836,9 @@ const RescuePlanPanel = ({
                                           activity.suggestedTeam?.teamId,
                                         );
                                         const hasValidSuggestedTeamId =
-                                          Number.isFinite(parsedSuggestedTeamId) &&
-                                          parsedSuggestedTeamId > 0;
+                                          Number.isFinite(
+                                            parsedSuggestedTeamId,
+                                          ) && parsedSuggestedTeamId > 0;
                                         const selectedNearbyTeam =
                                           hasValidSuggestedTeamId
                                             ? nearbyRescueTeamById.get(
@@ -8536,6 +8865,12 @@ const RescuePlanPanel = ({
                                         const isReturnSuppliesActivity =
                                           activity.activityType ===
                                           "RETURN_SUPPLIES";
+                                        const isAutoSyncedDeliveryStep =
+                                          activity._autoSyncedDeliveryStep ===
+                                          true;
+                                        const isAutoManagedSupplyStep =
+                                          isReturnSuppliesActivity ||
+                                          isAutoSyncedDeliveryStep;
                                         const selectedTeamDisplayName =
                                           activity.suggestedTeam?.teamName ||
                                           (hasValidSuggestedTeamId
@@ -8548,6 +8883,14 @@ const RescuePlanPanel = ({
                                           expandedEditSupplyKeys[
                                             activity._id
                                           ] ?? defaultSupplyExpanded;
+                                        const supplyBalanceIssues =
+                                          editSupplyBalanceAnalysis
+                                            .issuesByActivityId[activity._id] ??
+                                          [];
+                                        const hasSupplyBalanceIssues =
+                                          supplyBalanceIssues.length > 0;
+                                        const primarySupplyBalanceIssue =
+                                          supplyBalanceIssues[0] ?? null;
 
                                         return (
                                           <div
@@ -8562,6 +8905,9 @@ const RescuePlanPanel = ({
                                               "space-y-2.5 rounded-xl border bg-background p-3 transition-all",
                                               hasActivityError &&
                                                 "border-red-300 bg-red-50/40 shadow-sm shadow-red-100/60 dark:border-red-800/70 dark:bg-red-950/10 dark:shadow-none",
+                                              !hasActivityError &&
+                                                hasSupplyBalanceIssues &&
+                                                "border-amber-300 bg-amber-50/30 shadow-sm shadow-amber-100/60 dark:border-amber-700/60 dark:bg-amber-950/10 dark:shadow-none",
                                               dragIdx === idx
                                                 ? "scale-[0.98] opacity-50"
                                                 : "hover:shadow-sm",
@@ -8667,6 +9013,19 @@ const RescuePlanPanel = ({
                                                   Lỗi
                                                 </Badge>
                                               ) : null}
+                                              {!activityError &&
+                                              hasSupplyBalanceIssues ? (
+                                                <Badge
+                                                  variant="outline"
+                                                  className="h-6 border-amber-300 bg-amber-100 px-2 text-sm font-semibold text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/25 dark:text-amber-300"
+                                                >
+                                                  <Warning
+                                                    className="mr-1 h-3.5 w-3.5"
+                                                    weight="fill"
+                                                  />
+                                                  Lệch vật phẩm
+                                                </Badge>
+                                              ) : null}
                                               <div className="flex-1" />
                                               <div className="flex items-center gap-0.5">
                                                 <Button
@@ -8688,7 +9047,8 @@ const RescuePlanPanel = ({
                                                     moveEditActivity(idx, 1)
                                                   }
                                                   disabled={
-                                                    idx === editActivities.length - 1
+                                                    idx ===
+                                                    editActivities.length - 1
                                                   }
                                                 >
                                                   <CaretDown className="h-3 w-3" />
@@ -8824,7 +9184,8 @@ const RescuePlanPanel = ({
                                               <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
                                                 <Select
                                                   value={
-                                                    selectedTeamValue || undefined
+                                                    selectedTeamValue ||
+                                                    undefined
                                                   }
                                                   onValueChange={(value) =>
                                                     handleSelectNearbyTeamForActivity(
@@ -8855,10 +9216,14 @@ const RescuePlanPanel = ({
                                                     {hasValidSuggestedTeamId &&
                                                     !selectedTeamInNearbyOptions ? (
                                                       <SelectItem
-                                                        value={selectedTeamValue}
+                                                        value={
+                                                          selectedTeamValue
+                                                        }
                                                         className="text-sm"
                                                       >
-                                                        {selectedTeamDisplayName}{" "}
+                                                        {
+                                                          selectedTeamDisplayName
+                                                        }{" "}
                                                         (đang chọn)
                                                       </SelectItem>
                                                     ) : null}
@@ -8867,7 +9232,9 @@ const RescuePlanPanel = ({
                                                       (team) => (
                                                         <SelectItem
                                                           key={team.id}
-                                                          value={String(team.id)}
+                                                          value={String(
+                                                            team.id,
+                                                          )}
                                                           className="text-sm"
                                                         >
                                                           {team.name} •{" "}
@@ -8911,7 +9278,8 @@ const RescuePlanPanel = ({
                                                 </Button>
                                               </div>
 
-                                              {activityNearbyTeams.length > 0 ? (
+                                              {activityNearbyTeams.length >
+                                              0 ? (
                                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                                   {activityNearbyTeams
                                                     .slice(0, 4)
@@ -8979,28 +9347,40 @@ const RescuePlanPanel = ({
                                                     </span>
                                                   ) : null}
                                                 </div>
-                                              ) : activity.suggestedTeam?.reason ? (
+                                              ) : activity.suggestedTeam
+                                                  ?.reason ? (
                                                 <p className="mt-2 text-sm leading-relaxed text-emerald-700/75 dark:text-emerald-300/75">
                                                   Lý do AI:{" "}
-                                                  {activity.suggestedTeam.reason}
+                                                  {
+                                                    activity.suggestedTeam
+                                                      .reason
+                                                  }
                                                 </p>
                                               ) : null}
 
                                               {isReturnSuppliesActivity ? (
                                                 <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
                                                   Bước Hoàn trả vật phẩm được tự
-                                                  động gán cùng đội đã thu gom vật
-                                                  phẩm và không thể thay đổi thủ
-                                                  công.
+                                                  động gán cùng đội đã thu gom
+                                                  vật phẩm và không thể thay đổi
+                                                  thủ công.
+                                                </p>
+                                              ) : isAutoSyncedDeliveryStep ? (
+                                                <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
+                                                  Bước Phân phát vật phẩm đang
+                                                  tự đồng bộ theo các bước tiếp
+                                                  nhận trước đó của cùng đội.
                                                 </p>
                                               ) : null}
                                             </div>
 
-                                            {isSupplyStep(activity.activityType) ? (
+                                            {isSupplyStep(
+                                              activity.activityType,
+                                            ) ? (
                                               <div
                                                 className="mt-1"
                                                 onDragOver={(event) => {
-                                                  if (isReturnSuppliesActivity) {
+                                                  if (isAutoManagedSupplyStep) {
                                                     return;
                                                   }
                                                   if (
@@ -9029,11 +9409,11 @@ const RescuePlanPanel = ({
                                                     "border-blue-400",
                                                     "bg-blue-100/50",
                                                   );
-                                                  if (
-                                                    isReturnSuppliesActivity
-                                                  ) {
+                                                  if (isAutoManagedSupplyStep) {
                                                     toast.info(
-                                                      "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể kéo thả thủ công.",
+                                                      isReturnSuppliesActivity
+                                                        ? "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể kéo thả thủ công."
+                                                        : "Vật phẩm ở bước Phân phát đang được đồng bộ tự động từ bước Tiếp nhận nên không thể kéo thả thủ công.",
                                                     );
                                                     return;
                                                   }
@@ -9086,120 +9466,154 @@ const RescuePlanPanel = ({
                                                       "rounded-xl border-2 border-dashed px-3 py-2 transition-colors",
                                                       hasActivityError
                                                         ? "border-red-200 bg-red-50/60 dark:border-red-800/60 dark:bg-red-950/15"
-                                                        : "border-blue-200 bg-blue-50/30 dark:border-blue-800/40 dark:bg-blue-900/10",
+                                                        : hasSupplyBalanceIssues
+                                                          ? "border-amber-300 bg-amber-50/60 dark:border-amber-700/60 dark:bg-amber-950/15"
+                                                          : "border-blue-200 bg-blue-50/30 dark:border-blue-800/40 dark:bg-blue-900/10",
                                                       isReturnSuppliesActivity &&
                                                         "border-blue-300/70 bg-blue-100/40 dark:bg-blue-900/15",
                                                     )}
                                                   >
-                                                  {isReturnSuppliesActivity ? (
-                                                    <p className="mb-1.5 text-sm leading-relaxed text-blue-700/80 dark:text-blue-300/80">
-                                                      Hệ thống chỉ đồng bộ số lượng
-                                                      cho những vật phẩm AI đã
-                                                      chọn hoàn trả ở bước này,
-                                                      không tự thêm toàn bộ vật
-                                                      phẩm đã thu gom.
-                                                    </p>
-                                                  ) : null}
+                                                    {hasSupplyBalanceIssues &&
+                                                    primarySupplyBalanceIssue ? (
+                                                      <div className="mb-2 rounded-lg border border-amber-300/80 bg-amber-100/80 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/30 dark:text-amber-200">
+                                                        <p className="flex items-center gap-1.5 font-semibold">
+                                                          <Warning
+                                                            className="h-3.5 w-3.5 shrink-0"
+                                                            weight="fill"
+                                                          />
+                                                          Cân đối vật phẩm chưa
+                                                          khớp
+                                                        </p>
+                                                        <p className="mt-1 leading-relaxed">
+                                                          {
+                                                            primarySupplyBalanceIssue.message
+                                                          }
+                                                        </p>
+                                                        {supplyBalanceIssues.length >
+                                                        1 ? (
+                                                          <p className="mt-1 text-xs opacity-80">
+                                                            +
+                                                            {supplyBalanceIssues.length -
+                                                              1}{" "}
+                                                            cảnh báo tương tự
+                                                          </p>
+                                                        ) : null}
+                                                      </div>
+                                                    ) : null}
 
-                                                  {isSupplyExpanded ? (
-                                                    activity.suppliesToCollect &&
-                                                    activity.suppliesToCollect.length >
-                                                      0 ? (
-                                                      <div className="space-y-1">
-                                                        {activity.suppliesToCollect.map(
-                                                          (supply, sIdx) => (
-                                                            <div
-                                                              key={sIdx}
-                                                              className={cn(
-                                                                "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm",
-                                                                hasActivityError
-                                                                  ? "border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-950/10"
-                                                                  : "bg-background",
-                                                              )}
-                                                            >
-                                                              <div className="flex min-w-0 items-center gap-1.5">
-                                                                <Package
-                                                                  className={cn(
-                                                                    "h-3 w-3 shrink-0",
-                                                                    hasActivityError
-                                                                      ? "text-red-500"
-                                                                      : "text-blue-500",
-                                                                  )}
-                                                                />
-                                                                <span
-                                                                  className={cn(
-                                                                    "truncate font-medium",
-                                                                    hasActivityError
-                                                                      ? "text-red-700 dark:text-red-200"
-                                                                      : "text-foreground",
-                                                                  )}
-                                                                  title={
-                                                                    getSupplyDisplayName(
+                                                    {isReturnSuppliesActivity ? (
+                                                      <p className="mb-1.5 text-sm leading-relaxed text-blue-700/80 dark:text-blue-300/80">
+                                                        Hệ thống chỉ đồng bộ số
+                                                        lượng cho những vật phẩm
+                                                        AI đã chọn hoàn trả ở
+                                                        bước này, không tự thêm
+                                                        toàn bộ vật phẩm đã thu
+                                                        gom.
+                                                      </p>
+                                                    ) : null}
+
+                                                    {isSupplyExpanded ? (
+                                                      activity.suppliesToCollect &&
+                                                      activity.suppliesToCollect
+                                                        .length > 0 ? (
+                                                        <div className="space-y-1">
+                                                          {activity.suppliesToCollect.map(
+                                                            (supply, sIdx) => (
+                                                              <div
+                                                                key={sIdx}
+                                                                className={cn(
+                                                                  "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm",
+                                                                  hasActivityError
+                                                                    ? "border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-950/10"
+                                                                    : "bg-background",
+                                                                )}
+                                                              >
+                                                                <div className="flex min-w-0 items-center gap-1.5">
+                                                                  <Package
+                                                                    className={cn(
+                                                                      "h-3 w-3 shrink-0",
+                                                                      hasActivityError
+                                                                        ? "text-red-500"
+                                                                        : "text-blue-500",
+                                                                    )}
+                                                                  />
+                                                                  <span
+                                                                    className={cn(
+                                                                      "truncate font-medium",
+                                                                      hasActivityError
+                                                                        ? "text-red-700 dark:text-red-200"
+                                                                        : "text-foreground",
+                                                                    )}
+                                                                    title={
+                                                                      getSupplyDisplayName(
+                                                                        supply,
+                                                                      ) ||
+                                                                      "Vật phẩm chưa rõ tên"
+                                                                    }
+                                                                  >
+                                                                    {getSupplyDisplayName(
                                                                       supply,
                                                                     ) ||
-                                                                    "Vật phẩm chưa rõ tên"
+                                                                      "Vật phẩm chưa rõ tên"}
+                                                                  </span>
+                                                                </div>
+                                                                <Input
+                                                                  type="number"
+                                                                  min={1}
+                                                                  value={
+                                                                    supply.quantity
+                                                                  }
+                                                                  onChange={(
+                                                                    event,
+                                                                  ) =>
+                                                                    handleUpdateSupplyQuantity(
+                                                                      activity._id,
+                                                                      sIdx,
+                                                                      parseInt(
+                                                                        event
+                                                                          .target
+                                                                          .value,
+                                                                      ) || 1,
+                                                                    )
+                                                                  }
+                                                                  disabled={
+                                                                    isAutoManagedSupplyStep
+                                                                  }
+                                                                  className="h-6 w-full px-1 text-center text-sm"
+                                                                />
+                                                                <span className="text-right text-sm text-muted-foreground">
+                                                                  {supply.unit}
+                                                                </span>
+                                                                <Button
+                                                                  variant="ghost"
+                                                                  size="icon"
+                                                                  className="h-5 w-5 text-muted-foreground hover:text-red-500"
+                                                                  onClick={() =>
+                                                                    handleRemoveSupplyWithConfirm(
+                                                                      activity._id,
+                                                                      sIdx,
+                                                                      getSupplyDisplayName(
+                                                                        supply,
+                                                                      ),
+                                                                    )
+                                                                  }
+                                                                  disabled={
+                                                                    isAutoManagedSupplyStep
                                                                   }
                                                                 >
-                                                                  {getSupplyDisplayName(
-                                                                    supply,
-                                                                  ) ||
-                                                                    "Vật phẩm chưa rõ tên"}
-                                                                </span>
+                                                                  <X className="h-3 w-3" />
+                                                                </Button>
                                                               </div>
-                                                              <Input
-                                                                type="number"
-                                                                min={1}
-                                                                value={supply.quantity}
-                                                                onChange={(
-                                                                  event,
-                                                                ) =>
-                                                                  handleUpdateSupplyQuantity(
-                                                                    activity._id,
-                                                                    sIdx,
-                                                                    parseInt(
-                                                                      event.target
-                                                                        .value,
-                                                                    ) || 1,
-                                                                  )
-                                                                }
-                                                                disabled={
-                                                                  isReturnSuppliesActivity
-                                                                }
-                                                                className="h-6 w-full px-1 text-center text-sm"
-                                                              />
-                                                              <span className="text-right text-sm text-muted-foreground">
-                                                                {supply.unit}
-                                                              </span>
-                                                              <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-5 w-5 text-muted-foreground hover:text-red-500"
-                                                                onClick={() =>
-                                                                  handleRemoveSupplyWithConfirm(
-                                                                    activity._id,
-                                                                    sIdx,
-                                                                    getSupplyDisplayName(
-                                                                      supply,
-                                                                    ),
-                                                                  )
-                                                                }
-                                                                disabled={
-                                                                  isReturnSuppliesActivity
-                                                                }
-                                                              >
-                                                                <X className="h-3 w-3" />
-                                                              </Button>
-                                                            </div>
-                                                          ),
-                                                        )}
-                                                      </div>
-                                                    ) : (
-                                                      <p className="py-1 text-center text-sm text-muted-foreground/60">
-                                                        Kéo vật phẩm từ kho bên
-                                                        phải vào đây
-                                                      </p>
-                                                    )
-                                                  ) : null}
+                                                            ),
+                                                          )}
+                                                        </div>
+                                                      ) : (
+                                                        <p className="py-1 text-center text-sm text-muted-foreground/60">
+                                                          Kéo vật phẩm từ kho
+                                                          bên phải vào đây
+                                                        </p>
+                                                      )
+                                                    ) : null}
                                                   </div>
                                                 ) : null}
                                               </div>
@@ -9810,7 +10224,7 @@ const RescuePlanPanel = ({
                       {activeSuggestion.specialNotes && (
                         <>
                           <Separator />
-                          <section>
+                          <section className="space-y-2.5">
                             <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
                               <Warning
                                 className="h-3.5 w-3.5 text-orange-500"
@@ -9823,6 +10237,282 @@ const RescuePlanPanel = ({
                                 {activeSuggestion.specialNotes}
                               </p>
                             </div>
+
+                            {sidebarDepots.length > 0 &&
+                              shouldShowAlternativeDepotPanel && (
+                                <div className="rounded-lg border border-sky-200/80 bg-sky-50/60 p-2.5 dark:border-sky-800/30 dark:bg-sky-950/10">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                      <p className="text-sm font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+                                        Kho thay thế gợi ý
+                                      </p>
+                                      <p className="mt-0.5 text-sm text-sky-800/80 dark:text-sky-200/80">
+                                        AI đang rà shortage theo kho chính để
+                                        gợi ý nguồn bổ sung gần cụm.
+                                      </p>
+                                    </div>
+                                    {sidebarDepots.length > 1 ? (
+                                      <div className="min-w-56">
+                                        <Select
+                                          value={
+                                            effectiveSelectedShortageDepotId !=
+                                            null
+                                              ? String(
+                                                  effectiveSelectedShortageDepotId,
+                                                )
+                                              : undefined
+                                          }
+                                          onValueChange={(value) =>
+                                            setSelectedShortageDepotId(
+                                              Number(value),
+                                            )
+                                          }
+                                        >
+                                          <SelectTrigger className="h-8 bg-white/90 text-sm dark:bg-slate-950/30">
+                                            <SelectValue placeholder="Chọn kho chính đang thiếu" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {sidebarDepots.map((depot) => (
+                                              <SelectItem
+                                                key={depot.depotId}
+                                                value={String(depot.depotId)}
+                                              >
+                                                {depot.depotName}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    ) : null}
+                                  </div>
+
+                                  {selectedShortageDepot ? (
+                                    <div className="mt-2 rounded-md border border-sky-200/70 bg-white/80 px-2.5 py-2 dark:border-sky-800/30 dark:bg-slate-950/20">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                          <p className="text-sm font-semibold text-foreground">
+                                            Kho chính đang rà thiếu hụt:{" "}
+                                            {selectedShortageDepot.depotName}
+                                          </p>
+                                          {selectedShortageDepot.depotAddress ? (
+                                            <p className="text-xs text-muted-foreground">
+                                              {
+                                                selectedShortageDepot.depotAddress
+                                              }
+                                            </p>
+                                          ) : null}
+                                        </div>
+                                        {isAlternativeDepotsFetching ? (
+                                          <Badge
+                                            variant="secondary"
+                                            className="h-5 shrink-0 rounded-full px-2 text-xs"
+                                          >
+                                            Đang cập nhật
+                                          </Badge>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  ) : null}
+
+                                  {isAlternativeDepotsLoading ? (
+                                    <div className="mt-2 space-y-2">
+                                      {Array.from({ length: 2 }).map(
+                                        (_, index) => (
+                                          <Skeleton
+                                            key={`alternative-depot-skeleton-${index}`}
+                                            className="h-26 w-full rounded-lg"
+                                          />
+                                        ),
+                                      )}
+                                    </div>
+                                  ) : alternativeDepotsError ? (
+                                    <div className="mt-2 rounded-md border border-dashed border-rose-200 bg-rose-50/80 px-3 py-2 text-sm text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/20 dark:text-rose-300">
+                                      {(
+                                        alternativeDepotsError as AxiosError<{
+                                          message?: string;
+                                        }>
+                                      )?.response?.data?.message ||
+                                        alternativeDepotsError.message ||
+                                        "Không tải được gợi ý kho thay thế. Hãy thử chọn kho khác hoặc phân tích lại AI."}
+                                    </div>
+                                  ) : alternativeDepotsData ? (
+                                    <div className="mt-2 space-y-2">
+                                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 rounded-full px-2"
+                                        >
+                                          {
+                                            alternativeDepotsData.totalShortageItems
+                                          }{" "}
+                                          loại thiếu
+                                        </Badge>
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 rounded-full px-2"
+                                        >
+                                          {
+                                            alternativeDepotsData.totalMissingQuantity
+                                          }{" "}
+                                          đơn vị thiếu
+                                        </Badge>
+                                      </div>
+
+                                      {alternativeDepotRecommendations.map(
+                                        (depot) => {
+                                          const isPinned =
+                                            visibleSidebarDepots.some(
+                                              (item) =>
+                                                item.depotId === depot.depotId,
+                                            );
+
+                                          return (
+                                            <div
+                                              key={depot.depotId}
+                                              className="rounded-lg border border-sky-200/70 bg-white/90 p-2.5 dark:border-sky-800/30 dark:bg-slate-950/20"
+                                            >
+                                              <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                  <div className="flex flex-wrap items-center gap-2">
+                                                    <p className="text-sm font-semibold text-foreground">
+                                                      {depot.depotName}
+                                                    </p>
+                                                    {depot.coversAllShortages ? (
+                                                      <Badge className="h-5 rounded-full bg-emerald-500 px-2 text-xs text-white hover:bg-emerald-500">
+                                                        Đủ toàn bộ
+                                                      </Badge>
+                                                    ) : (
+                                                      <Badge
+                                                        variant="secondary"
+                                                        className="h-5 rounded-full bg-amber-100 px-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                                                      >
+                                                        Cover một phần
+                                                      </Badge>
+                                                    )}
+                                                  </div>
+                                                  <p className="mt-0.5 text-xs text-muted-foreground">
+                                                    {depot.depotAddress}
+                                                  </p>
+                                                </div>
+                                                <Button
+                                                  type="button"
+                                                  variant={
+                                                    isPinned
+                                                      ? "outline"
+                                                      : "default"
+                                                  }
+                                                  size="sm"
+                                                  className="h-7 shrink-0"
+                                                  onClick={() =>
+                                                    togglePinnedAlternativeDepot(
+                                                      depot,
+                                                    )
+                                                  }
+                                                >
+                                                  {isPinned
+                                                    ? "Ẩn khỏi kho vật phẩm"
+                                                    : "Hiện trong kho vật phẩm"}
+                                                </Button>
+                                              </div>
+
+                                              <div className="mt-2 grid grid-cols-3 gap-2">
+                                                <div className="rounded-md border bg-slate-50/80 px-2 py-1.5 dark:bg-slate-900/40">
+                                                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                                                    Cover
+                                                  </p>
+                                                  <p className="text-sm font-semibold text-foreground">
+                                                    {(
+                                                      depot.coveragePercent *
+                                                      100
+                                                    ).toFixed(0)}
+                                                    %
+                                                  </p>
+                                                </div>
+                                                <div className="rounded-md border bg-slate-50/80 px-2 py-1.5 dark:bg-slate-900/40">
+                                                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                                                    Khối lượng
+                                                  </p>
+                                                  <p className="text-sm font-semibold text-foreground">
+                                                    {depot.coveredQuantity}/
+                                                    {depot.totalMissingQuantity}
+                                                  </p>
+                                                </div>
+                                                <div className="rounded-md border bg-slate-50/80 px-2 py-1.5 dark:bg-slate-900/40">
+                                                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                                                    Khoảng cách
+                                                  </p>
+                                                  <p className="text-sm font-semibold text-foreground">
+                                                    {depot.distanceKm.toFixed(
+                                                      1,
+                                                    )}{" "}
+                                                    km
+                                                  </p>
+                                                </div>
+                                              </div>
+
+                                              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                                                {depot.reason}
+                                              </p>
+
+                                              {depot.itemCoverageDetails
+                                                .length > 0 ? (
+                                                <div className="mt-2 space-y-1.5">
+                                                  {depot.itemCoverageDetails.map(
+                                                    (item) => (
+                                                      <div
+                                                        key={`${depot.depotId}-${item.itemId ?? item.itemName}`}
+                                                        className="flex items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5"
+                                                      >
+                                                        <div className="min-w-0">
+                                                          <p className="truncate text-sm font-medium text-foreground">
+                                                            {item.itemName}
+                                                          </p>
+                                                          <p className="text-xs text-muted-foreground">
+                                                            Cần{" "}
+                                                            {
+                                                              item.neededQuantity
+                                                            }
+                                                            {item.unit
+                                                              ? ` ${item.unit}`
+                                                              : ""}{" "}
+                                                            • Có{" "}
+                                                            {
+                                                              item.availableQuantity
+                                                            }
+                                                            {item.unit
+                                                              ? ` ${item.unit}`
+                                                              : ""}
+                                                          </p>
+                                                        </div>
+                                                        <Badge
+                                                          variant="outline"
+                                                          className={cn(
+                                                            "h-5 shrink-0 rounded-full px-2 text-xs font-semibold",
+                                                            item.coverageStatus ===
+                                                              "Full"
+                                                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                                              : item.coverageStatus ===
+                                                                  "Partial"
+                                                                ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300"
+                                                                : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/30 dark:text-rose-300",
+                                                          )}
+                                                        >
+                                                          {item.coveredQuantity}
+                                                          /{item.neededQuantity}
+                                                        </Badge>
+                                                      </div>
+                                                    ),
+                                                  )}
+                                                </div>
+                                              ) : null}
+                                            </div>
+                                          );
+                                        },
+                                      )}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              )}
                           </section>
                         </>
                       )}
@@ -9898,7 +10588,7 @@ const RescuePlanPanel = ({
                   </section>
 
                   {/* Depot Inventory — shown whenever depots are present */}
-                  {sidebarDepots.length > 0 && (
+                  {visibleSidebarDepots.length > 0 && (
                     <>
                       <Separator />
                       <section>
@@ -9915,13 +10605,14 @@ const RescuePlanPanel = ({
                             : "Vào chế độ chỉnh sửa để kéo vật phẩm vào bước"}
                         </p>
                         <div className="space-y-2">
-                          {sidebarDepots.map((depot) => (
+                          {visibleSidebarDepots.map((depot) => (
                             <DepotInventoryCard
                               key={depot.depotId}
                               depotId={depot.depotId}
                               depotName={depot.depotName}
                               depotAddress={depot.depotAddress}
                               isDraggable={isEditMode}
+                              kind={depot.kind}
                             />
                           ))}
                         </div>
@@ -9936,6 +10627,17 @@ const RescuePlanPanel = ({
 
         {/* Footer */}
         <div className="p-4 border-t shrink-0 bg-background">
+          {isEditMode && editSupplyBalanceAnalysis.firstIssue ? (
+            <div className="mb-3 rounded-xl border border-amber-300/80 bg-amber-50/90 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/25 dark:text-amber-200">
+              <p className="font-semibold">
+                Cần xử lý cảnh báo vật phẩm trước khi xác nhận
+              </p>
+              <p className="mt-1 leading-relaxed">
+                {editSupplyBalanceAnalysis.firstIssue.message}
+              </p>
+            </div>
+          ) : null}
+
           <div className="flex items-center gap-3">
             <Button
               variant="outline"
@@ -9958,7 +10660,9 @@ const RescuePlanPanel = ({
               <Button
                 className="flex-1 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg shadow-amber-500/20"
                 onClick={handleOpenSubmitConfirm}
-                disabled={isSubmittingMissionEdit}
+                disabled={
+                  isSubmittingMissionEdit || editSupplyBalanceAnalysis.hasIssues
+                }
               >
                 {isSubmittingMissionEdit ? (
                   <CircleNotch className="h-5 w-5 mr-2 animate-spin" />
