@@ -196,7 +196,7 @@ function ParsedMessage({
             <div key={index} className="mb-1">
               <Badge
                 variant="destructive"
-                className="font-bold text-xs px-2 py-0 uppercase tracking-wider rounded"
+                className="font-bold text-sm px-2 py-0 uppercase tracking-wider rounded"
               >
                 {part.replace(/[\[\]]/g, "")}
               </Badge>
@@ -297,7 +297,7 @@ function ParsedMessage({
                           </div>
                           <Badge
                             variant="outline"
-                            className={`shrink-0 text-xs px-2.5 py-0.5 h-6 font-medium ${severityColor}`}
+                            className={`shrink-0 text-sm px-2.5 py-0.5 h-6 font-medium ${severityColor}`}
                           >
                             {severity}
                           </Badge>
@@ -325,10 +325,10 @@ function ParsedMessage({
                 key={index}
                 className="bg-muted/30 rounded-lg p-3.5 mt-2 border border-dashed flex gap-2 items-start"
               >
-                <span className="text-[13px] font-semibold text-foreground shrink-0 mt-0.5">
+                <span className="text-sm font-semibold text-foreground shrink-0 mt-0.5">
                   {title}:
                 </span>
-                <p className="text-[13px] text-muted-foreground italic leading-relaxed">
+                <p className="text-sm text-muted-foreground italic leading-relaxed">
                   {content}
                 </p>
               </div>
@@ -401,7 +401,7 @@ function FormulaTooltip({
         open &&
         createPortal(
           <div
-            className="fixed z-[9999] w-80 max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-3 text-xs leading-relaxed shadow-md"
+            className="fixed z-[9999] w-80 max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-3 text-sm leading-relaxed shadow-md"
             style={{ top: pos.top, left: pos.left }}
             onMouseEnter={() => setOpen(true)}
             onMouseLeave={() => setOpen(false)}
@@ -436,7 +436,7 @@ function DetailCard({
 
   return (
     <div className="rounded-lg border bg-background px-3 py-3 shadow-sm">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
       </div>
       <div className="mt-2 space-y-1 text-sm text-foreground">
@@ -777,7 +777,7 @@ const SOSDetailsPanel = ({
             </div>
             <div className="bg-muted rounded-lg p-3 text-center">
               <Users className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-              <div className="text-xs text-muted-foreground">
+              <div className="text-sm text-muted-foreground">
                 {sosRequest.peopleCount
                   ? `${sosRequest.peopleCount.adult + sosRequest.peopleCount.child + sosRequest.peopleCount.elderly} người`
                   : "N/A"}
@@ -785,7 +785,7 @@ const SOSDetailsPanel = ({
             </div>
             <div className="bg-muted rounded-lg p-3 text-center">
               <Timer className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-              <div className="text-xs text-muted-foreground leading-tight">
+              <div className="text-sm text-muted-foreground leading-tight">
                 Chờ {waitDurationLabel}
               </div>
             </div>
@@ -810,14 +810,14 @@ const SOSDetailsPanel = ({
                   <div className="text-sm space-y-1">
                     {victimPrimaryContact && (
                       <div>
-                        <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                        <span className="text-sm text-muted-foreground uppercase tracking-wide">
                           Nạn nhân
                         </span>
                         <div className="font-medium">
                           {victimPrimaryContact}
                         </div>
                         {victimSecondaryContact && (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-sm text-muted-foreground">
                             {victimSecondaryContact}
                           </div>
                         )}
@@ -825,14 +825,14 @@ const SOSDetailsPanel = ({
                     )}
                     {reporterPrimaryContact && (
                       <div>
-                        <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                        <span className="text-sm text-muted-foreground uppercase tracking-wide">
                           {reporterRoleLabel}
                         </span>
                         <div className="font-medium">
                           {reporterPrimaryContact}
                         </div>
                         {reporterSecondaryContact && (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-sm text-muted-foreground">
                             {reporterSecondaryContact}
                           </div>
                         )}
@@ -841,17 +841,17 @@ const SOSDetailsPanel = ({
                     {!victimPrimaryContact &&
                       !sosRequest.isSentOnBehalf &&
                       reporterPrimaryContact && (
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-sm text-muted-foreground">
                           Người gửi đang là đầu mối liên hệ cho yêu cầu này.
                         </div>
                       )}
                     {!victimPrimaryContact && !reporterPrimaryContact && (
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-sm text-muted-foreground">
                         Chưa có thông tin liên hệ của người gửi/nạn nhân.
                       </div>
                     )}
                     {sosRequest.address && (
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-sm text-muted-foreground">
                         Địa chỉ nhập tay: {sosRequest.address}
                       </div>
                     )}
@@ -863,7 +863,7 @@ const SOSDetailsPanel = ({
                           className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400"
                           weight="fill"
                         />
-                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300">
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
                           Gửi hộ
                         </span>
                       </div>
@@ -875,7 +875,7 @@ const SOSDetailsPanel = ({
                             className="h-3.5 w-3.5 text-green-600 dark:text-green-400"
                             weight="fill"
                           />
-                          <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                          <span className="text-sm font-medium text-green-700 dark:text-green-300">
                             Gửi qua Internet
                           </span>
                         </div>
@@ -885,7 +885,7 @@ const SOSDetailsPanel = ({
                             className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400"
                             weight="fill"
                           />
-                          <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
+                          <span className="text-sm font-medium text-orange-700 dark:text-orange-300">
                             Gửi ngoại tuyến (Mesh)
                           </span>
                         </div>
@@ -893,7 +893,7 @@ const SOSDetailsPanel = ({
                   </div>
                 </div>
                 {sosRequest.hopCount != null && sosRequest.hopCount > 0 && (
-                  <div className="text-xs text-muted-foreground mt-2">
+                  <div className="text-sm text-muted-foreground mt-2">
                     Tin nhắn qua {sosRequest.hopCount} hop relay
                   </div>
                 )}
@@ -912,7 +912,7 @@ const SOSDetailsPanel = ({
                     <div className="text-lg font-bold text-blue-700 dark:text-blue-300">
                       {sosRequest.peopleCount.adult}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-sm text-muted-foreground">
                       Người lớn
                     </div>
                   </div>
@@ -920,13 +920,13 @@ const SOSDetailsPanel = ({
                     <div className="text-lg font-bold text-amber-700 dark:text-amber-300">
                       {sosRequest.peopleCount.child}
                     </div>
-                    <div className="text-xs text-muted-foreground">Trẻ em</div>
+                    <div className="text-sm text-muted-foreground">Trẻ em</div>
                   </div>
                   <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-center">
                     <div className="text-lg font-bold text-purple-700 dark:text-purple-300">
                       {sosRequest.peopleCount.elderly}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-sm text-muted-foreground">
                       Người già
                     </div>
                   </div>
@@ -1004,14 +1004,14 @@ const SOSDetailsPanel = ({
                               <p className="text-sm font-semibold leading-snug">
                                 {displayName}
                               </p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
+                              <p className="text-sm text-muted-foreground mt-0.5">
                                 {personTypeLabel(person.personType)}
                               </p>
                             </div>
                             <Badge
                               variant="outline"
                               className={cn(
-                                "text-xs px-2.5 py-0.5 h-6 shrink-0 font-medium",
+                                "text-sm px-2.5 py-0.5 h-6 shrink-0 font-medium",
                                 severityBadgeClass(person.severity),
                               )}
                             >
@@ -1028,7 +1028,7 @@ const SOSDetailsPanel = ({
                                     <Badge
                                       key={`${displayName}-${issue}-${idx}`}
                                       variant="secondary"
-                                      className="text-xs h-6 px-2 inline-flex items-center gap-1"
+                                      className="text-sm h-6 px-2 inline-flex items-center gap-1"
                                     >
                                       {issueMeta ? (
                                         <>
@@ -1145,7 +1145,7 @@ const SOSDetailsPanel = ({
 
                 {sosRequest.supplies && sosRequest.supplies.length > 0 && (
                   <div>
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                       Nhu yếu phẩm yêu cầu
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1153,7 +1153,7 @@ const SOSDetailsPanel = ({
                         <Badge
                           key={supply}
                           variant="outline"
-                          className="text-xs px-2 py-1"
+                          className="text-sm px-2 py-1"
                         >
                           {getSupplyLabel(supply)}
                         </Badge>
@@ -1253,7 +1253,7 @@ const SOSDetailsPanel = ({
 
                 {requestedPeople.length > 0 && (
                   <div className="space-y-3">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <div className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                       Yêu cầu theo người
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1268,7 +1268,7 @@ const SOSDetailsPanel = ({
                                 {person.name}
                               </p>
                               {person.personType && (
-                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                <p className="mt-0.5 text-sm text-muted-foreground">
                                   {person.personType === "ELDERLY"
                                     ? "Người già"
                                     : person.personType === "CHILD"
@@ -1278,7 +1278,7 @@ const SOSDetailsPanel = ({
                               )}
                             </div>
                             {person.gender && (
-                              <Badge variant="outline" className="text-xs">
+                              <Badge variant="outline" className="text-sm">
                                 {getClothingGenderLabel(person.gender)}
                               </Badge>
                             )}
@@ -1347,7 +1347,7 @@ const SOSDetailsPanel = ({
                                           : "secondary"
                                   }
                                   className={cn(
-                                    "text-xs px-2 h-6",
+                                    "text-sm px-2 h-6",
                                     ruleEvaluation.priorityLevel ===
                                       "Critical" &&
                                       "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
@@ -1385,7 +1385,7 @@ const SOSDetailsPanel = ({
                               </Badge>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-[13px]">
+                          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
                             {displayScoreRows.map((row) => {
                               const RowIcon = row.icon;
                               return (
@@ -1439,7 +1439,7 @@ const SOSDetailsPanel = ({
                                 icon: "ph:first-aid-kit",
                               },
                               MEDICAL_SUPPLIES: {
-                                label: "Vật tư y tế",
+                                label: "Vật phẩm y tế",
                                 icon: "ph:pill",
                               },
                               BANDAGES: {
@@ -1503,7 +1503,7 @@ const SOSDetailsPanel = ({
                                       <Badge
                                         key={idx}
                                         variant="outline"
-                                        className="text-xs px-2.5 py-1 h-auto font-medium bg-background border-border/60 inline-flex items-center gap-1.5"
+                                        className="text-sm px-2.5 py-1 h-auto font-medium bg-background border-border/60 inline-flex items-center gap-1.5"
                                       >
                                         {config ? (
                                           <>
@@ -1543,7 +1543,7 @@ const SOSDetailsPanel = ({
                               <Badge
                                 key={idx}
                                 variant="outline"
-                                className="text-xs bg-violet-50/30 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800"
+                                className="text-sm bg-violet-50/30 dark:bg-violet-900/10 border-violet-200 dark:border-violet-800"
                               >
                                 {factor}
                               </Badge>
@@ -1555,13 +1555,13 @@ const SOSDetailsPanel = ({
                           <div className="bg-violet-50/50 dark:bg-violet-900/10 rounded-lg p-3.5 border border-violet-200 dark:border-violet-800/30 shadow-sm relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full pointer-events-none" />
                             <div className="flex items-center justify-between mb-2 relative z-10">
-                              <span className="text-[13px] font-semibold text-violet-900 dark:text-violet-300">
+                              <span className="text-sm font-semibold text-violet-900 dark:text-violet-300">
                                 Nhận định tình hình
                               </span>
                               {aiAnalyses[0].confidenceScore && (
                                 <Badge
                                   variant="secondary"
-                                  className="text-xs bg-white/60 dark:bg-black/40 text-violet-700 dark:text-violet-300 hover:bg-white/80 border border-violet-200/50 dark:border-violet-800/50"
+                                  className="text-sm bg-white/60 dark:bg-black/40 text-violet-700 dark:text-violet-300 hover:bg-white/80 border border-violet-200/50 dark:border-violet-800/50"
                                 >
                                   Tin cậy:{" "}
                                   {(
@@ -1571,7 +1571,7 @@ const SOSDetailsPanel = ({
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-[13px] text-violet-800/80 dark:text-violet-300/80 leading-relaxed italic relative z-10">
+                            <p className="text-sm text-violet-800/80 dark:text-violet-300/80 leading-relaxed italic relative z-10">
                               "{aiAnalyses[0].explanation}"
                             </p>
                           </div>
@@ -1618,15 +1618,15 @@ const SOSDetailsPanel = ({
                           <div className="flex items-center gap-2">
                             <Badge
                               variant={PRIORITY_BADGE_VARIANT[sos.priority]}
-                              className="text-xs px-1.5 py-0 h-5"
+                              className="text-sm px-1.5 py-0 h-5"
                             >
                               {PRIORITY_LABELS[sos.priority]}
                             </Badge>
-                            <span className="text-xs font-mono text-muted-foreground">
+                            <span className="text-sm font-mono text-muted-foreground">
                               SOS {sos.id}
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                          <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
                             {sos.message}
                           </p>
                         </div>

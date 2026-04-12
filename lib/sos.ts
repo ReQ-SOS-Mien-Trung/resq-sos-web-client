@@ -87,7 +87,7 @@ export const SOS_TYPE_OPTIONS: Array<
   },
   {
     value: "BOTH",
-    label: "Cả hai",
+    label: "Cứu hộ + cứu trợ",
     description: "Vừa cần cứu hộ, vừa cần cứu trợ",
   },
 ];
@@ -140,7 +140,7 @@ export const MEDICAL_SUPPORT_OPTIONS: Option<MedicalSupportNeedType>[] = [
   },
   {
     value: "FIRST_AID",
-    label: "Vật tư sơ cứu (băng gạc, oxy già, thuốc đỏ...)",
+    label: "Vật phẩm sơ cứu (băng gạc, oxy già, thuốc đỏ...)",
   },
   {
     value: "CHRONIC_MAINTENANCE",

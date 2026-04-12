@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -25,50 +25,16 @@ import {
 } from "@phosphor-icons/react";
 import { useAssemblyPointById } from "@/services/assembly_points";
 import type {
+  AssemblyPointStatusMetadata,
   AssemblyPointTeam,
   AssemblyPointTeamMember,
   AssemblyPointTeamType,
   AssemblyPointTeamStatus,
-  AssemblyPointStatus,
 } from "@/services/assembly_points";
-
-/* ── Status configs ── */
-
-const statusConfig: Record<
-  AssemblyPointStatus,
-  { label: string; class: string }
-> = {
-  Created: {
-    label: "Mới tạo",
-    class: "bg-sky-500/10 text-sky-700 border-sky-200",
-  },
-  Active: {
-    label: "Hoạt động",
-    class: "bg-emerald-500/10 text-emerald-700 border-emerald-200",
-  },
-  Overloaded: {
-    label: "Quá tải",
-    class: "bg-amber-500/10 text-amber-700 border-amber-200",
-  },
-  UnderMaintenance: {
-    label: "Đang bảo trì",
-    class: "bg-violet-500/10 text-violet-700 border-violet-200",
-  },
-  Closed: {
-    label: "Đã đóng",
-    class: "bg-red-500/10 text-red-700 border-red-200",
-  },
-};
-
-const fallbackStatusConfig = {
-  label: "Không xác định",
-  class: "bg-slate-500/10 text-slate-700 border-slate-200",
-};
-
-function getStatusConfig(status: string | null | undefined) {
-  if (!status) return fallbackStatusConfig;
-  return statusConfig[status as AssemblyPointStatus] ?? fallbackStatusConfig;
-}
+import {
+  buildAssemblyPointStatusConfig,
+  getAssemblyPointStatusConfig,
+} from "@/components/admin/assembly-points/status-config";
 
 function formatLastUpdated(date: string | null) {
   if (!date) return "Chưa cập nhật";
@@ -309,6 +275,7 @@ interface Props {
   pointId: number | null;
   /** Called when open state changes — parent adjusts margin-right */
   onPanelChange?: (open: boolean) => void;
+  statusMetadata?: AssemblyPointStatusMetadata[];
 }
 
 export function AssemblyPointDetailSheet({
@@ -316,6 +283,7 @@ export function AssemblyPointDetailSheet({
   onOpenChange,
   pointId,
   onPanelChange,
+  statusMetadata,
 }: Props) {
   const sheetRef = useRef<HTMLDivElement>(null);
 
@@ -323,7 +291,11 @@ export function AssemblyPointDetailSheet({
     enabled: open && pointId !== null,
   });
 
-  const st = data ? getStatusConfig(data.status) : null;
+  const statusConfig = useMemo(
+    () => buildAssemblyPointStatusConfig(statusMetadata),
+    [statusMetadata],
+  );
+  const st = data ? getAssemblyPointStatusConfig(data.status, statusConfig) : null;
 
   const handleOpenChange = useCallback(
     (val: boolean) => {
@@ -373,7 +345,10 @@ export function AssemblyPointDetailSheet({
                   </p>
                 </div>
                 {st && (
-                  <Badge variant="outline" className={cn("text-sm", st.class)}>
+                  <Badge
+                    variant="outline"
+                    className={cn("text-sm", st.className)}
+                  >
                     {st.label}
                   </Badge>
                 )}

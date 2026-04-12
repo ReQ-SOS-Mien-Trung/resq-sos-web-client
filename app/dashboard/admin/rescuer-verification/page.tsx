@@ -545,7 +545,7 @@ const RescuerVerificationPage = () => {
                 size={16}
                 className="group-hover:-translate-x-0.5 transition-transform"
               />
-              <span className="uppercase tracking-wider text-sm font-semibold">
+              <span className="tracking-tighter text-sm font-semibold">
                 Quay lại
               </span>
             </button>
@@ -581,7 +581,7 @@ const RescuerVerificationPage = () => {
                   size={16}
                   className="group-hover:-translate-x-0.5 transition-transform"
                 />
-                <span className="uppercase tracking-wider text-sm font-semibold">
+                <span className="tracking-tighter text-sm font-medium">
                   Quay lại
                 </span>
               </button>

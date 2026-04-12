@@ -6,12 +6,37 @@
 // ─── 1. Register OUR push handler BEFORE Firebase is loaded ────────────────────
 //    This ensures our handler fires first. We call stopImmediatePropagation()
 //    to prevent Firebase's handler from auto-showing a duplicate notification.
+function toPositiveInt(value) {
+  var parsed = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function resolveNotificationUrl(data) {
+  if (data && typeof data.url === "string" && data.url.trim()) {
+    return data.url.trim();
+  }
+
+  var sourceDepotId = toPositiveInt(data && data.sourceDepotId);
+  var transferId = toPositiveInt(data && data.transferId);
+
+  if (sourceDepotId && transferId) {
+    var params = new URLSearchParams({
+      sourceDepotId: String(sourceDepotId),
+      transferId: String(transferId),
+    });
+    return "/dashboard/inventory/depot-closure?" + params.toString();
+  }
+
+  return "/";
+}
+
 self.addEventListener('push', function(event) {
   event.stopImmediatePropagation();
 
   var title = "Thông báo từ RESQ";
   var body = "";
   var isBroadcastAlert = false;
+  var targetUrl = "/";
 
   try {
     if (event.data) {
@@ -21,9 +46,10 @@ self.addEventListener('push', function(event) {
       title = n.title || d.title || title;
       body  = n.body  || d.body  || body;
       isBroadcastAlert = d.type === "broadcast_alert";
+      targetUrl = resolveNotificationUrl(d);
     }
-  } catch (e) {
-    try { if (event.data) body = event.data.text(); } catch (e2) { /* ignore */ }
+  } catch {
+    try { if (event.data) body = event.data.text(); } catch { /* ignore */ }
   }
 
   var tag = isBroadcastAlert ? "broadcast-alert" : ("fcm-" + Date.now());
@@ -35,7 +61,7 @@ self.addEventListener('push', function(event) {
       badge: "/icons/logo-192.png",
       tag: tag,
       requireInteraction: !!isBroadcastAlert,
-      data: { url: "/" }
+      data: { url: targetUrl }
     })
   );
 });

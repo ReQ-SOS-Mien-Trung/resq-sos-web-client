@@ -1,6 +1,8 @@
 import type {
+  AiProvider,
   PromptEntity,
   PromptDetailEntity,
+  PromptType,
   CreatePromptRequest,
   UpdatePromptRequest,
 } from "@/services/prompt/type";
@@ -303,6 +305,8 @@ export type PromptTextField = "system_prompt" | "user_prompt_template";
 
 export interface PromptFormData {
   name: string;
+  prompt_type: PromptType;
+  provider: AiProvider;
   purpose: string;
   system_prompt: string;
   user_prompt_template: string;
@@ -311,6 +315,7 @@ export interface PromptFormData {
   max_tokens: number;
   version: string;
   api_url: string;
+  api_key: string;
   is_active: boolean;
 }
 
@@ -325,6 +330,9 @@ export interface PromptListProps {
   prompts: PromptEntity[];
   isLoading: boolean;
   selectedId: number | null;
+  selectedPromptType: PromptType | null;
+  promptTypeCounts: Record<PromptType, number>;
+  onSelectPromptType: (promptType: PromptType) => void;
   onSelect: (prompt: PromptEntity) => void;
   onEdit: (prompt: PromptEntity) => void;
   onDelete: (prompt: PromptEntity) => void;
@@ -892,39 +900,8 @@ export interface CoordinatorMapProps {
   selectedTeamIncident?:
     | import("@/services/team_incidents/type").TeamIncidentEntity
     | null;
-  // DepotEntity from backend
-  depots: {
-    id: number;
-    name: string;
-    address: string;
-    latitude: number;
-    longitude: number;
-    capacity: number;
-    currentUtilization: number;
-    status: "Available" | "Full" | "PendingAssignment" | "Closed";
-    imageUrl?: string | null;
-    manager: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string | null;
-      phone: string | null;
-      fullName?: string | null;
-    } | null;
-    lastUpdatedAt: string;
-  }[];
-  // AssemblyPointEntity from backend
-  assemblyPoints?: {
-    id: number;
-    code: string;
-    name: string;
-    latitude: number;
-    longitude: number;
-    maxCapacity: number;
-    status: "Created" | "Active" | "Overloaded" | "UnderMaintenance" | "Closed";
-    lastUpdatedAt: string | null;
-    hasActiveEvent?: boolean;
-  }[];
+  depots: import("@/services/depot/type").DepotEntity[];
+  assemblyPoints?: import("@/services/assembly_points/type").AssemblyPointEntity[];
   // SOS Clusters from backend
   clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
   /** Client-side auto-clusters (groups of nearby PENDING SOS) */
@@ -1339,27 +1316,7 @@ export interface MapViewState {
 export interface WindyLeafletMapProps {
   sosRequests?: SOSRequest[];
   rescuers?: Rescuer[];
-  // DepotEntity from backend
-  depots?: {
-    id: number;
-    name: string;
-    address: string;
-    latitude: number;
-    longitude: number;
-    capacity: number;
-    currentUtilization: number;
-    status: "Available" | "Full" | "PendingAssignment" | "Closed";
-    imageUrl?: string | null;
-    manager: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string | null;
-      phone: string | null;
-      fullName?: string | null;
-    } | null;
-    lastUpdatedAt: string;
-  }[];
+  depots?: import("@/services/depot/type").DepotEntity[];
   selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
   onSOSSelect?: (sos: SOSRequest) => void;

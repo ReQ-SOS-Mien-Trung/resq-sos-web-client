@@ -10,6 +10,7 @@ import {
   adminCreateUser,
   updateAdminUser,
   getUsersForPermission,
+  getRoleMetadata,
 } from "./api";
 import {
   UserMeResponse,
@@ -19,11 +20,12 @@ import {
   GetRescuersResponse,
   BanUserRequest,
   AdminCreateUserRequest,
+  AdminCreateUserResponse,
   AdminUpdateUserRequest,
-  UserEntity,
   GetAdminUserByIdResponse,
   GetUsersForPermissionParams,
   GetUsersForPermissionResponse,
+  RoleMetadataOption,
 } from "./type";
 
 export const USER_ME_QUERY_KEY = ["user", "me"] as const;
@@ -32,6 +34,10 @@ export interface UseUserMeOptions {
   enabled?: boolean;
   onSuccess?: (data: UserMeResponse) => void;
   onError?: (error: Error) => void;
+}
+
+export interface UseRoleMetadataOptions {
+  enabled?: boolean;
 }
 
 export function useUserMe(options?: UseUserMeOptions) {
@@ -115,7 +121,23 @@ export function useUnbanUser() {
 
 export function useAdminCreateUser() {
   return useMutation({
-    mutationFn: (data: AdminCreateUserRequest) => adminCreateUser(data),
+    mutationFn: (data: AdminCreateUserRequest): Promise<AdminCreateUserResponse> =>
+      adminCreateUser(data),
+  });
+}
+
+export const ROLE_METADATA_QUERY_KEY = [
+  "identity",
+  "roles",
+  "metadata",
+] as const;
+
+export function useRoleMetadata(options?: UseRoleMetadataOptions) {
+  return useQuery<RoleMetadataOption[], Error>({
+    queryKey: ROLE_METADATA_QUERY_KEY,
+    queryFn: getRoleMetadata,
+    enabled: options?.enabled ?? true,
+    staleTime: Infinity,
   });
 }
 

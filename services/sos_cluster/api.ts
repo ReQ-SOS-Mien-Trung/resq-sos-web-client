@@ -30,6 +30,16 @@ const CONNECTIVITY_ERROR_HINTS = [
   "negotiation",
 ] as const;
 
+const TEMPORARY_PROVIDER_ERROR_HINTS = [
+  "serviceunavailable",
+  "service unavailable",
+  "unavailable",
+  "model is overloaded",
+  "temporarily overloaded",
+  "temporarily unavailable",
+  "backend is temporarily overloaded",
+] as const;
+
 type BackendErrorEnvelope = {
   message?: unknown;
   title?: unknown;
@@ -113,6 +123,14 @@ function isConnectivityMessage(message: string): boolean {
   return CONNECTIVITY_ERROR_HINTS.some((hint) => normalized.includes(hint));
 }
 
+function isTemporaryProviderFailure(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  if (!normalized) return false;
+  return TEMPORARY_PROVIDER_ERROR_HINTS.some((hint) =>
+    normalized.includes(hint),
+  );
+}
+
 function isGenericMessage(message: string): boolean {
   const normalized = message.trim().toLowerCase();
   if (!normalized) return true;
@@ -135,6 +153,10 @@ export function formatAiAnalysisErrorMessage(
 
   if (statusCode === 429) {
     return "AI đang quá tải yêu cầu (HTTP 429). Vui lòng thử lại sau ít phút.";
+  }
+
+  if (extractedMessage && isTemporaryProviderFailure(extractedMessage)) {
+    return "Dịch vụ AI đang tạm thời không sẵn sàng (ServiceUnavailable/503). Đây thường là lỗi capacity hoặc model quá tải ở phía nhà cung cấp, không phải do API key. Hãy thử lại sau ít phút hoặc chuyển sang model fallback ổn định hơn.";
   }
 
   if (typeof statusCode === "number" && statusCode >= 500) {

@@ -50,7 +50,13 @@ export async function getRescueTeamById(
   id: number,
 ): Promise<GetRescueTeamByIdResponse> {
   const { data } = await api.get(`/personnel/rescue-teams/${id}`);
-  return data;
+
+  return {
+    ...data,
+    members: (data.members ?? []).filter(
+      (member) => member.status !== "Removed",
+    ),
+  };
 }
 
 /**

@@ -90,6 +90,8 @@ const COL = {
   GHICHU: "Mô tả vật phẩm",
   SOLUONG: "Số lượng (*)",
   DONGIA: "Đơn giá (VNĐ)",
+  THETICH: "Thể tích / đơn vị (dm3)",
+  CANNANG: "Cân nặng / đơn vị (kg)",
 } as const;
 
 type FundingColumnKey = keyof typeof COL;
@@ -104,6 +106,20 @@ const COLUMN_ALIASES: Record<FundingColumnKey, string[]> = {
   GHICHU: ["mo ta vat pham", "ghi chu", "mo ta"],
   SOLUONG: ["so luong", "so luong *", "so luong (*)"],
   DONGIA: ["don gia", "don gia vnd", "don gia (vnd)"],
+  THETICH: [
+    "the tich don vi dm3",
+    "the tich dm3",
+    "the tich / don vi dm3",
+    "the tich don vi (dm3)",
+    "the tich / don vi (dm3)",
+  ],
+  CANNANG: [
+    "can nang don vi kg",
+    "can nang kg",
+    "can nang / don vi kg",
+    "can nang don vi (kg)",
+    "can nang / don vi (kg)",
+  ],
 };
 
 const FALLBACK_CATEGORY_MAP: Record<string, string> = {
@@ -157,8 +173,9 @@ const statusConfig: Record<
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
-function formatMoney(value: number) {
-  return value.toLocaleString("vi-VN") + "đ";
+function formatMoney(value: number | null | undefined) {
+  const amount = typeof value === "number" && Number.isFinite(value) ? value : 0;
+  return amount.toLocaleString("vi-VN") + "đ";
 }
 
 function formatMoneyInput(value: string | number): string {
@@ -190,13 +207,41 @@ function parseExcelNumber(value: unknown): number {
   const raw = String(value ?? "").trim();
   if (!raw) return 0;
 
-  const normalized = raw
-    .replace(/[^\d,.-]/g, "")
-    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
-    .replace(",", ".");
+  const normalized = raw.replace(/,/g, "");
 
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseOptionalExcelNumber(value: unknown): number | undefined {
+  const raw = String(value ?? "").trim();
+  if (!raw) return undefined;
+  const parsed = Number(raw.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseOptionalDecimalInput(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  const normalized = trimmed
+    .replace(/\s/g, "")
+    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+    .replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function formatMeasurementNumber(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  return value.toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  });
+}
+
+function hasMeasurementValue(value: number | null | undefined): boolean {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function findHeaderLayout(rows: unknown[][]): {
@@ -326,6 +371,16 @@ function validateRow(
   if (!row.unit.trim()) errors.unit = "Bắt buộc";
   if (!row.quantity || row.quantity <= 0) errors.quantity = "Phải > 0";
   if (!row.unitPrice || row.unitPrice <= 0) errors.unitPrice = "Phải > 0";
+  if (row.volumePerUnit === undefined) {
+    errors.volumePerUnit = "Bắt buộc";
+  } else if (row.volumePerUnit < 0) {
+    errors.volumePerUnit = "Không được âm";
+  }
+  if (row.weightPerUnit === undefined) {
+    errors.weightPerUnit = "Bắt buộc";
+  } else if (row.weightPerUnit < 0) {
+    errors.weightPerUnit = "Không được âm";
+  }
   return errors;
 }
 
@@ -342,12 +397,16 @@ function createEmptyRow(rowNum: number): ImportRow {
     itemType: "",
     targetGroup: "",
     notes: "",
+    volumePerUnit: undefined,
+    weightPerUnit: undefined,
     errors: {
       itemName: "Bắt buộc",
       categoryCode: "Bắt buộc",
       unit: "Bắt buộc",
       quantity: "Phải > 0",
       unitPrice: "Phải > 0",
+      volumePerUnit: "Bắt buộc",
+      weightPerUnit: "Bắt buộc",
     },
   };
 }
@@ -526,6 +585,8 @@ export default function FundingRequestPage() {
                 itemType,
                 targetGroup,
                 notes: String(raw.GHICHU ?? "").trim(),
+                volumePerUnit: parseOptionalExcelNumber(raw.THETICH),
+                weightPerUnit: parseOptionalExcelNumber(raw.CANNANG),
               };
               rowData.totalPrice =
                 rowData.quantity * rowData.unitPrice;
@@ -582,7 +643,7 @@ export default function FundingRequestPage() {
     (
       rowId: string,
       field: keyof CreateFundingRequestItem,
-      value: string | number,
+      value: string | number | undefined,
     ) => {
       setRows((prev) =>
         prev.map((r) => {
@@ -637,7 +698,9 @@ export default function FundingRequestPage() {
             r.categoryCode === "" &&
             r.unit.trim() === "" &&
             r.quantity === 0 &&
-            r.unitPrice === 0
+            r.unitPrice === 0 &&
+            r.volumePerUnit === undefined &&
+            r.weightPerUnit === undefined
           ),
       ),
     [rows],
@@ -690,6 +753,8 @@ export default function FundingRequestPage() {
       targetGroup: r.targetGroup,
       notes: r.notes,
       description: r.notes,
+      volumePerUnit: r.volumePerUnit,
+      weightPerUnit: r.weightPerUnit,
     }));
     createRequest(
       { description: description.trim(), items },
@@ -771,6 +836,40 @@ export default function FundingRequestPage() {
             );
           }}
           placeholder="0"
+          className={cn(
+            "h-8 text-sm",
+            error && "border-red-400 focus-visible:ring-red-400",
+          )}
+        />
+        {error && (
+          <p className="text-[10px] text-red-500 leading-tight">
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  const renderOptionalDecimalCell = (
+    row: ImportRow,
+    field: "volumePerUnit" | "weightPerUnit",
+    placeholder: string,
+  ) => {
+    const error = row.errors[field];
+    const rawValue = row[field];
+    return (
+      <div className="space-y-0.5">
+        <Input
+          type="number"
+          lang="en-US"
+          step="any"
+          min={0}
+          value={rawValue ?? ""}
+          onChange={(e) => {
+            const val = e.target.value;
+            updateRow(row.id, field, val === "" ? undefined : parseFloat(val));
+          }}
+          placeholder={placeholder}
           className={cn(
             "h-8 text-sm",
             error && "border-red-400 focus-visible:ring-red-400",
@@ -1280,6 +1379,10 @@ export default function FundingRequestPage() {
                             </span>
                           ))}
                         </div>
+                        <p className="mt-2 text-xs text-muted-foreground tracking-tight">
+                          Hai cột thể tích và cân nặng là tùy chọn. Có thể để trống
+                          nếu chưa có dữ liệu.
+                        </p>
                       </div>
                       <Button
                         variant="default"
@@ -1343,6 +1446,12 @@ export default function FundingRequestPage() {
                           </TableHead>
                           <TableHead className="min-w-28 text-sm">
                             Đơn giá *
+                          </TableHead>
+                          <TableHead className="min-w-28 text-sm">
+                            Thể tích / đơn vị
+                          </TableHead>
+                          <TableHead className="min-w-28 text-sm">
+                            Cân nặng / đơn vị
                           </TableHead>
                           <TableHead className="min-w-28 text-sm">
                             Thành tiền
@@ -1411,6 +1520,20 @@ export default function FundingRequestPage() {
                                 )}
                               </TableCell>
                               <TableCell>
+                                {renderOptionalDecimalCell(
+                                  row,
+                                  "volumePerUnit",
+                                  "dm3",
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {renderOptionalDecimalCell(
+                                  row,
+                                  "weightPerUnit",
+                                  "kg",
+                                )}
+                              </TableCell>
+                              <TableCell>
                                 <span className="text-sm font-semibold text-emerald-600 tracking-tight whitespace-nowrap">
                                   {formatMoney(row.totalPrice)}
                                 </span>
@@ -1475,7 +1598,7 @@ export default function FundingRequestPage() {
                         {rows.length === 0 && (
                           <TableRow>
                             <TableCell
-                              colSpan={11}
+                              colSpan={13}
                               className="h-32 text-center text-muted-foreground"
                             >
                               <div className="flex flex-col items-center gap-2">
@@ -1980,6 +2103,16 @@ export default function FundingRequestPage() {
                           <span>
                             Đơn giá: {formatMoney(item.unitPrice)}
                           </span>
+                          {hasMeasurementValue(item.volumePerUnit) && (
+                            <span>
+                              Thể tích/đv: {formatMeasurementNumber(item.volumePerUnit)} dm3
+                            </span>
+                          )}
+                          {hasMeasurementValue(item.weightPerUnit) && (
+                            <span>
+                              Cân nặng/đv: {formatMeasurementNumber(item.weightPerUnit)} kg
+                            </span>
+                          )}
                           <span>
                             Danh mục:{" "}
                             {categoryMap[item.categoryCode] ??

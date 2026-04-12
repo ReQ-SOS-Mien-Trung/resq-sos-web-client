@@ -22,6 +22,8 @@ export type MissionActivityStatus =
 
 export type ActivityStatus = MissionActivityStatus;
 
+export type ActivityStatusInput = ActivityStatus | string;
+
 export interface MissionTeam {
   missionTeamId: number;
   rescueTeamId: number;
@@ -203,7 +205,7 @@ export interface CreateMissionResponse {
 }
 
 export interface UpdateActivityStatusRequest {
-  status: ActivityStatus;
+  status: ActivityStatusInput;
 }
 
 export interface UpdateActivityStatusResponse {
@@ -231,6 +233,30 @@ export interface UpdateActivityResponse {
   activityType: string;
   description: string;
   status: ActivityStatus;
+}
+
+export interface ConfirmReturnConsumableItemRequest {
+  itemModelId: number;
+  quantity: number;
+}
+
+export interface ConfirmReturnReusableUnitRequest {
+  reusableItemId: number;
+  serialNumber: string;
+  condition: string;
+  note?: string | null;
+}
+
+export interface ConfirmReturnReusableItemRequest {
+  itemModelId: number;
+  quantity: number;
+  units: ConfirmReturnReusableUnitRequest[];
+}
+
+export interface ConfirmReturnSuppliesRequest {
+  discrepancyNote?: string | null;
+  consumableItems: ConfirmReturnConsumableItemRequest[];
+  reusableItems: ConfirmReturnReusableItemRequest[];
 }
 
 // ── Route types ──

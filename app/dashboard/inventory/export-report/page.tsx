@@ -191,6 +191,17 @@ export default function ExportReportPage() {
     useExportInventoryMovements();
 
   const handleExport = (panel: "range" | "month") => {
+    if (panel === "range") {
+      if (!leftFromDate || !leftToDate) {
+        toast.error("Vui lòng chọn đủ ngày bắt đầu và ngày kết thúc.");
+        return;
+      }
+      if (leftFromDate > leftToDate) {
+        toast.error("Ngày bắt đầu không được lớn hơn ngày kết thúc.");
+        return;
+      }
+    }
+
     const params =
       panel === "range"
         ? {
@@ -341,7 +352,7 @@ export default function ExportReportPage() {
             onClick={() => router.push("/dashboard/inventory/stock-movements")}
           >
             <FileTextIcon className="h-4 w-4" />
-            Truy xuất
+            Xem biến động kho
           </Button>
 
           <NotificationBell />
@@ -505,7 +516,14 @@ export default function ExportReportPage() {
                         </Label>
                         <DatePickerInput
                           value={leftFromDate}
-                          onChange={setLeftFromDate}
+                          onChange={(val) => {
+                            setLeftFromDate(val);
+                            // If fromDate > toDate, reset toDate
+                            if (val && leftToDate && val > leftToDate) {
+                              setLeftToDate(val);
+                            }
+                          }}
+                          maxDate={leftToDate || undefined}
                           placeholder="Chọn ngày..."
                           className="h-10 mt-1"
                         />
@@ -516,7 +534,14 @@ export default function ExportReportPage() {
                         </Label>
                         <DatePickerInput
                           value={leftToDate}
-                          onChange={setLeftToDate}
+                          onChange={(val) => {
+                            setLeftToDate(val);
+                            // If toDate < fromDate, reset fromDate
+                            if (val && leftFromDate && val < leftFromDate) {
+                              setLeftFromDate(val);
+                            }
+                          }}
+                          minDate={leftFromDate || undefined}
                           placeholder="Chọn ngày..."
                           className="h-10 mt-1"
                         />

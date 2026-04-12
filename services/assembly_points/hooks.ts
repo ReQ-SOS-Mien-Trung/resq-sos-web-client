@@ -13,8 +13,10 @@ import {
   getAssemblyPointMetadata,
   createAssemblyPoint,
   updateAssemblyPoint,
-  updateAssemblyPointStatus,
-  deleteAssemblyPoint,
+  activateAssemblyPoint,
+  startAssemblyPointMaintenance,
+  completeAssemblyPointMaintenance,
+  closeAssemblyPoint,
   updateRescuerAssemblyPointAssignment,
   scheduleAssemblyPointGathering,
   startAssemblyPointGathering,
@@ -29,8 +31,6 @@ import {
   AssemblyPointMetadataOption,
   UpdateAssemblyPointRequest,
   UpdateAssemblyPointResponse,
-  UpdateAssemblyPointStatusRequest,
-  UpdateAssemblyPointStatusResponse,
   UpdateRescuerAssemblyPointAssignmentRequest,
   ScheduleAssemblyPointGatheringRequest,
   ScheduleAssemblyPointGatheringResponse,
@@ -178,6 +178,7 @@ export function useAssemblyPointStatuses(
     queryKey: ASSEMBLY_POINT_STATUSES_QUERY_KEY,
     queryFn: getAssemblyPointStatuses,
     enabled: options?.enabled ?? true,
+    staleTime: Infinity,
   });
 }
 
@@ -237,39 +238,72 @@ export function useUpdateAssemblyPoint() {
 }
 
 /**
- * Hook to update assembly point status
+ * Shared invalidation after an assembly point mutation
  */
-export function useUpdateAssemblyPointStatus() {
+function invalidateAssemblyPointQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id?: number,
+) {
+  queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
+  if (typeof id === "number") {
+    queryClient.invalidateQueries({
+      queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, id],
+    });
+  }
+}
+
+/**
+ * Hook to activate an assembly point
+ */
+export function useActivateAssemblyPoint() {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    UpdateAssemblyPointStatusResponse,
-    Error,
-    UpdateAssemblyPointStatusRequest
-  >({
-    mutationFn: updateAssemblyPointStatus,
-    onSuccess: (data) => {
-      // Invalidate assembly points query to refetch the list
-      queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
-      // Invalidate specific assembly point query
-      queryClient.invalidateQueries({
-        queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, data.id],
-      });
+  return useMutation<void, Error, number>({
+    mutationFn: activateAssemblyPoint,
+    onSuccess: (_data, id) => {
+      invalidateAssemblyPointQueries(queryClient, id);
     },
   });
 }
 
 /**
- * Hook to delete an assembly point
+ * Hook to start maintenance for an assembly point
  */
-export function useDeleteAssemblyPoint() {
+export function useStartAssemblyPointMaintenance() {
   const queryClient = useQueryClient();
 
   return useMutation<void, Error, number>({
-    mutationFn: deleteAssemblyPoint,
-    onSuccess: () => {
-      // Invalidate assembly points query to refetch the list
-      queryClient.invalidateQueries({ queryKey: ASSEMBLY_POINTS_QUERY_KEY });
+    mutationFn: startAssemblyPointMaintenance,
+    onSuccess: (_data, id) => {
+      invalidateAssemblyPointQueries(queryClient, id);
+    },
+  });
+}
+
+/**
+ * Hook to complete maintenance for an assembly point
+ */
+export function useCompleteAssemblyPointMaintenance() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, number>({
+    mutationFn: completeAssemblyPointMaintenance,
+    onSuccess: (_data, id) => {
+      invalidateAssemblyPointQueries(queryClient, id);
+    },
+  });
+}
+
+/**
+ * Hook to close an assembly point permanently
+ */
+export function useCloseAssemblyPoint() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, number>({
+    mutationFn: closeAssemblyPoint,
+    onSuccess: (_data, id) => {
+      invalidateAssemblyPointQueries(queryClient, id);
     },
   });
 }

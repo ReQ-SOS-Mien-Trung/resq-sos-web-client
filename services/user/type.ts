@@ -164,6 +164,11 @@ export interface GetUsersForPermissionResponse {
   totalCount: number;
 }
 
+export interface RoleMetadataOption {
+  key: string;
+  value: string;
+}
+
 export interface AdminUpdateUserRequest {
   firstName?: string;
   lastName?: string;
@@ -209,4 +214,9 @@ export interface AdminCreateUserRequest {
   isEligibleRescuer?: boolean;
   approvedBy?: string;
   approvedAt?: string;
+}
+
+export interface AdminCreateUserResponse {
+  id?: string;
+  userId?: string;
 }

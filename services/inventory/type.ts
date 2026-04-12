@@ -28,6 +28,8 @@ export type InventorySourceType = InventoryCategory;
 
 export type InventoryReliefItem = InventoryCategory;
 
+export type ReusableItemCondition = InventoryCategory;
+
 export interface ReusableBreakdown {
   totalUnits: number;
   availableUnits: number;
@@ -146,6 +148,8 @@ export interface ImportInventoryItem {
   unit: string;
   itemType: string;
   targetGroups: string[];
+  volumePerUnit?: number | null;
+  weightPerUnit?: number | null;
   receivedDate: string;
   expiredDate?: string | null;
 }
@@ -181,6 +185,8 @@ export interface ImportPurchaseItem {
   unit: string;
   itemType: string;
   targetGroups: string[];
+  volumePerUnit?: number | null;
+  weightPerUnit?: number | null;
   receivedDate: string;
   expiredDate?: string | null;
 }
@@ -194,6 +200,18 @@ export type ImportRegularRequest = {
     campaignDisbursementId?: number;
   }>;
 };
+
+export interface UpdateItemModelPayload {
+  categoryId: number;
+  name: string;
+  description?: string | null;
+  unit: string;
+  itemType: string;
+  targetGroups: string[];
+  imageUrl?: string | null;
+  volumePerUnit: number;
+  weightPerUnit: number;
+}
 
 // ─── Stock Movement History ───
 
@@ -414,6 +432,7 @@ export type GetDepotInventoryResponse = GetMyDepotInventoryResponse;
 export interface UpcomingPickupItem {
   itemId: number;
   itemName: string;
+  imageUrl: string;
   quantity: number;
   unit: string;
 }
@@ -428,7 +447,7 @@ export interface UpcomingPickupEntity {
   missionExpectedEndTime: string;
   activityId: number;
   step: number;
-  activityCode: string;
+  activityCode?: string;
   activityType: string;
   description: string;
   priority: string;
@@ -462,6 +481,7 @@ export interface GetUpcomingPickupsResponse {
 export interface PickupHistoryItem {
   itemId: number;
   itemName: string;
+  imageUrl: string;
   quantity: number;
   unit: string;
 }
@@ -477,7 +497,7 @@ export interface PickupHistoryEntity {
   missionExpectedEndTime: string;
   activityId: number;
   step: number;
-  activityCode: string;
+  activityCode?: string;
   activityType: string;
   description: string;
   priority: string;
@@ -503,6 +523,95 @@ export interface GetPickupHistoryParams {
 
 export interface GetPickupHistoryResponse {
   items: PickupHistoryEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+// ─── Upcoming Returns (My Depot) ───
+
+export interface ReturnReusableUnit {
+  reusableItemId: number;
+  itemModelId: number;
+  itemName: string;
+  serialNumber: string;
+  condition: string;
+  note: string | null;
+}
+
+export interface UpcomingReturnItem {
+  itemId: number;
+  itemName: string;
+  imageUrl: string | null;
+  quantity: number;
+  unit: string;
+  actualReturnedQuantity: number;
+  expectedReturnUnits: ReturnReusableUnit[];
+  returnedReusableUnits: ReturnReusableUnit[];
+}
+
+interface ReturnActivityEntityBase {
+  depotId: number;
+  depotName: string;
+  missionId: number;
+  missionType: string;
+  missionStatus: string;
+  missionStartTime: string;
+  missionExpectedEndTime: string;
+  activityId: number;
+  step: number;
+  activityType: string;
+  description: string;
+  priority: string;
+  estimatedTime: number;
+  status: string;
+  assignedAt: string;
+  missionTeamId: number;
+  rescueTeamId: number;
+  rescueTeamName: string;
+  teamType: string;
+  items: UpcomingReturnItem[];
+}
+
+export type UpcomingReturnEntity = ReturnActivityEntityBase;
+
+export interface GetUpcomingReturnsParams {
+  status?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetUpcomingReturnsResponse {
+  items: UpcomingReturnEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+// ─── Return History (My Depot) ───
+
+export interface ReturnHistoryEntity extends ReturnActivityEntityBase {
+  depotAddress: string;
+  completedAt: string;
+  completedBy: string;
+  completedByName: string;
+}
+
+export interface GetReturnHistoryParams {
+  fromDate?: string;
+  toDate?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetReturnHistoryResponse {
+  items: ReturnHistoryEntity[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;

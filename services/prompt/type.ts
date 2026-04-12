@@ -1,13 +1,27 @@
+export type PromptType =
+  | "SosPriorityAnalysis"
+  | "MissionPlanning"
+  | "MissionRequirementsAssessment"
+  | "MissionDepotPlanning"
+  | "MissionTeamPlanning"
+  | "MissionPlanValidation";
+
+export type AiProvider = "Gemini" | "OpenRouter";
+
 // Prompt Entity (item in paginated list)
 export interface PromptEntity {
   id: number;
   name: string;
-  purpose: string;
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  version: string;
-  apiUrl: string;
+  promptType: PromptType;
+  provider: AiProvider;
+  purpose: string | null;
+  model: string | null;
+  temperature: number | null;
+  maxTokens: number | null;
+  version: string | null;
+  apiUrl: string | null;
+  apiKeyMasked: string | null;
+  hasApiKey: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string | null;
@@ -15,8 +29,9 @@ export interface PromptEntity {
 
 // Prompt Detail Entity (GET /system/prompts/{id})
 export interface PromptDetailEntity extends PromptEntity {
-  systemPrompt: string;
+  systemPrompt: string | null;
   userPromptTemplate: string | null;
+  apiKey: string | null;
 }
 
 // Paginated Response for Prompts
@@ -39,6 +54,8 @@ export interface GetPromptsParams {
 // Create Prompt Request
 export interface CreatePromptRequest {
   name: string;
+  prompt_type: PromptType;
+  provider: AiProvider;
   purpose: string;
   system_prompt: string;
   user_prompt_template: string;
@@ -46,7 +63,9 @@ export interface CreatePromptRequest {
   temperature: number;
   max_tokens: number;
   version: string;
-  api_url: string;
+  api_url?: string;
+  api_key?: string;
+  is_active?: boolean;
 }
 
 // Create Prompt Response
@@ -58,6 +77,8 @@ export interface CreatePromptResponse {
 // Update Prompt Request
 export interface UpdatePromptRequest {
   name: string;
+  prompt_type: PromptType;
+  provider: AiProvider;
   purpose: string;
   system_prompt: string;
   user_prompt_template: string;
@@ -65,6 +86,7 @@ export interface UpdatePromptRequest {
   temperature: number;
   max_tokens: number;
   version: string;
-  api_url: string;
+  api_url?: string;
+  api_key?: string;
   is_active: boolean;
 }

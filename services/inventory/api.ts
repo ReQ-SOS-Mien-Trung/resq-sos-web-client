@@ -9,6 +9,7 @@ import {
   GetMyDepotCategoryQuantitiesResponse,
   ImportInventoryRequest,
   ImportRegularRequest,
+  UpdateItemModelPayload,
   InventoryCategory,
   InventoryItemType,
   InventoryOrganization,
@@ -16,6 +17,7 @@ import {
   InventoryActionType,
   InventorySourceType,
   InventoryReliefItem,
+  ReusableItemCondition,
   SearchDepotsParams,
   SearchDepotsResponse,
   CreateSupplyRequestsPayload,
@@ -45,6 +47,11 @@ import {
   GetUpcomingPickupsResponse,
   GetPickupHistoryParams,
   GetPickupHistoryResponse,
+  GetUpcomingReturnsParams,
+  GetUpcomingReturnsResponse,
+  GetReturnHistoryParams,
+  GetReturnHistoryResponse,
+  UpcomingReturnEntity,
 } from "./type";
 
 type InventoryItemLike = Partial<InventoryItemEntity> & {
@@ -107,8 +114,8 @@ function normalizeInventoryItem(item: InventoryItemLike): InventoryItemEntity {
   const quantity = toFiniteNumber(item.quantity ?? item.unit, 0);
   const reservedQuantity = toFiniteNumber(
     item.reservedQuantity ??
-      item.totalReservedQuantity ??
-      item.reservedForMissionQuantity,
+    item.totalReservedQuantity ??
+    item.reservedForMissionQuantity,
     0,
   );
   const availableQuantity = toFiniteNumber(
@@ -262,6 +269,19 @@ export async function getInventoryReliefItemsByCategory(
 }
 
 /**
+ * Get reusable item conditions metadata
+ * GET /logistics/inventory/metadata/reusable-item-conditions
+ */
+export async function getReusableItemConditions(): Promise<
+  ReusableItemCondition[]
+> {
+  const { data } = await api.get(
+    "/logistics/inventory/metadata/reusable-item-conditions",
+  );
+  return data;
+}
+
+/**
  * Search depots by requested relief items and quantities
  * GET /logistics/inventory/search-depots
  */
@@ -326,6 +346,85 @@ export async function getMyDepotPickupHistory(
 ): Promise<GetPickupHistoryResponse> {
   const { data } = await api.get(
     "/logistics/inventory/my-depot/pickup-history",
+    {
+      params,
+    },
+  );
+  return data;
+}
+
+/**
+ * Get upcoming return activities for current depot manager
+ * GET /logistics/inventory/my-depot/upcoming-returns
+ */
+export async function getMyDepotUpcomingReturns(
+  params: GetUpcomingReturnsParams,
+): Promise<GetUpcomingReturnsResponse> {
+  const { data } = await api.get(
+    "/logistics/inventory/my-depot/upcoming-returns",
+    {
+      params,
+      paramsSerializer: {
+        indexes: null,
+      },
+    },
+  );
+  return data;
+}
+
+const UPCOMING_RETURNS_BATCH_SIZE = 100;
+
+export async function getMyDepotUpcomingReturnsByStatuses(
+  statuses: string[],
+): Promise<UpcomingReturnEntity[]> {
+  const uniqueStatuses = Array.from(
+    new Set(statuses.map((status) => status.trim()).filter(Boolean)),
+  );
+
+  if (uniqueStatuses.length === 0) {
+    return [];
+  }
+
+  const groups = await Promise.all(
+    uniqueStatuses.map(async (status) => {
+      const firstPage = await getMyDepotUpcomingReturns({
+        status,
+        pageNumber: 1,
+        pageSize: UPCOMING_RETURNS_BATCH_SIZE,
+      });
+
+      const totalPages = Math.max(firstPage.totalPages ?? 1, 1);
+
+      if (totalPages === 1) {
+        return firstPage.items ?? [];
+      }
+
+      const remainingPages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          getMyDepotUpcomingReturns({
+            status,
+            pageNumber: index + 2,
+            pageSize: UPCOMING_RETURNS_BATCH_SIZE,
+          }).then((page) => page.items ?? []),
+        ),
+      );
+
+      return [...(firstPage.items ?? []), ...remainingPages.flat()];
+    }),
+  );
+
+  return groups.flat();
+}
+
+/**
+ * Get historical return activities for current depot manager
+ * GET /logistics/inventory/my-depot/return-history
+ */
+export async function getMyDepotReturnHistory(
+  params: GetReturnHistoryParams,
+): Promise<GetReturnHistoryResponse> {
+  const { data } = await api.get(
+    "/logistics/inventory/my-depot/return-history",
     {
       params,
     },
@@ -408,6 +507,13 @@ export async function importRegularInventory(
   });
 }
 
+export async function updateItemModel(
+  itemModelId: number,
+  payload: UpdateItemModelPayload,
+): Promise<void> {
+  await api.put(`/logistics/item-model/${itemModelId}`, payload);
+}
+
 /**
  * Get depot stock movement history
  * GET /logistics/inventory/stock-movements/my-depot
@@ -438,11 +544,6 @@ export async function getInventoryLots(
   return data;
 }
 
-/**
- * Export inventory movements to Excel.
- * Routes through /api/inventory/export-movements (Next.js server-side proxy)
- * so Content-Disposition header is readable without CORS restrictions.
- */
 /**
  * Download donation import template
  * Proxied via /api/inventory/template-donation → GET /logistics/inventory/template/donation-import
@@ -503,22 +604,26 @@ export async function downloadPurchaseImportTemplate(): Promise<{
   return { blob, filename };
 }
 
+/**
+ * Export inventory movements to Excel.
+ * Routes through /api/inventory/export-movements so the browser can read the
+ * original Content-Disposition header and keep the backend-provided filename.
+ */
 export async function exportInventoryMovements(
   params: ExportMovementsParams,
 ): Promise<{ blob: Blob; filename: string }> {
-  // Build query string
   const searchParams = new URLSearchParams();
   searchParams.set("periodType", params.periodType);
   if (params.fromDate) searchParams.set("fromDate", params.fromDate);
   if (params.toDate) searchParams.set("toDate", params.toDate);
-  if (params.month !== undefined)
+  if (params.month !== undefined) {
     searchParams.set("month", String(params.month));
-  if (params.year !== undefined) searchParams.set("year", String(params.year));
+  }
+  if (params.year !== undefined) {
+    searchParams.set("year", String(params.year));
+  }
 
-  // Get token from store (Zustand getState works outside React)
   const token = useAuthStore.getState().accessToken;
-
-  // Call the Next.js proxy — same-origin, so all response headers are readable
   const response = await fetch(
     `/api/inventory/export-movements?${searchParams.toString()}`,
     {
@@ -532,7 +637,6 @@ export async function exportInventoryMovements(
     throw new Error(`Export failed: ${response.status}`);
   }
 
-  // Content-Disposition is now readable (same-origin response)
   const disposition = response.headers.get("content-disposition") ?? "";
   let filename = "BaoCao.xlsx";
 
@@ -543,10 +647,13 @@ export async function exportInventoryMovements(
   } else {
     const asciiMatch = disposition.match(/filename="([^"]+)"/);
     if (asciiMatch) filename = asciiMatch[1];
+    else if (disposition.includes("filename=")) {
+      const plainMatch = disposition.match(/filename=([^;\s]+)/);
+      if (plainMatch) filename = plainMatch[1];
+    }
   }
 
-  const blob = await response.blob();
-  return { blob, filename };
+  return { blob: await response.blob(), filename };
 }
 
 // ─── Thresholds ───

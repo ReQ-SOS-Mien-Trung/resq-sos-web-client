@@ -22,6 +22,10 @@ interface DatePickerInputProps {
   hasError?: boolean;
   className?: string;
   disabled?: boolean;
+  /** Earliest selectable date in yyyy-MM-dd format */
+  minDate?: string;
+  /** Latest selectable date in yyyy-MM-dd format */
+  maxDate?: string;
 }
 
 /**
@@ -35,6 +39,8 @@ export function DatePickerInput({
   hasError = false,
   className,
   disabled,
+  minDate,
+  maxDate,
 }: DatePickerInputProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -44,6 +50,18 @@ export function DatePickerInput({
     const d = parse(value, "yyyy-MM-dd", new Date());
     return isValid(d) ? d : undefined;
   }, [value]);
+
+  const parsedMinDate = React.useMemo(() => {
+    if (!minDate) return undefined;
+    const d = parse(minDate, "yyyy-MM-dd", new Date());
+    return isValid(d) ? d : undefined;
+  }, [minDate]);
+
+  const parsedMaxDate = React.useMemo(() => {
+    if (!maxDate) return undefined;
+    const d = parse(maxDate, "yyyy-MM-dd", new Date());
+    return isValid(d) ? d : undefined;
+  }, [maxDate]);
 
   const handleSelect = (date: Date | undefined) => {
     onChange(date ? format(date, "yyyy-MM-dd") : "");
@@ -88,6 +106,10 @@ export function DatePickerInput({
           defaultMonth={selectedDate}
           locale={vi}
           initialFocus
+          disabled={[
+            ...(parsedMinDate ? [{ before: parsedMinDate }] : []),
+            ...(parsedMaxDate ? [{ after: parsedMaxDate }] : []),
+          ]}
         />
         <div className="flex items-center justify-between border-t px-3 py-2">
           <Button

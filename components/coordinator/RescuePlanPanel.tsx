@@ -48,10 +48,13 @@ import {
 } from "@/components/ui/dialog";
 import {
   useCreateMission,
+  useCreateActivity,
   useMissions,
   useMissionActivities,
   useActivityRoute,
   useMissionTeamRoute,
+  useUpdateActivity,
+  useUpdateMission,
 } from "@/services/mission/hooks";
 import {
   useRescueTeamStatuses,
@@ -626,7 +629,7 @@ const DepotInventoryCard = ({
             variant="secondary"
             className="h-5 shrink-0 rounded-full px-2 text-sm font-semibold"
           >
-            {data.totalCount} vật tư
+            {data.totalCount} Vật phẩm
           </Badge>
         ) : null}
       </div>
@@ -737,7 +740,7 @@ const DepotInventoryCard = ({
                 Trang {data.pageNumber}/{data.totalPages}
               </p>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                6 vật tư mỗi trang
+                6 Vật phẩm mỗi trang
               </p>
             </div>
 
@@ -1369,8 +1372,8 @@ function getSupplyDisplayName(supply: {
   const name =
     typeof supply.itemName === "string" ? supply.itemName.trim() : "";
   if (name) return name;
-  if (typeof supply.itemId === "number") return `Vật tư #${supply.itemId}`;
-  return "Vật tư chưa rõ tên";
+  if (typeof supply.itemId === "number") return `Vật phẩm #${supply.itemId}`;
+  return "Vật phẩm chưa rõ tên";
 }
 
 function escapeRegExp(value: string): string {
@@ -1386,9 +1389,9 @@ function syncDescriptionWithSupplies(
   let next = description;
   for (const supply of supplies) {
     const name = getSupplyDisplayName(supply);
-    if (!name || name === "Vật tư chưa rõ tên") continue;
+    if (!name || name === "Vật phẩm chưa rõ tên") continue;
 
-    // Match patterns like "Tên vật tư x20", "Tên vật tư x 20", "Tên vật tư ×20".
+    // Match patterns like "Tên Vật phẩm x20", "Tên Vật phẩm x 20", "Tên Vật phẩm ×20".
     const qtyPattern = new RegExp(
       `(${escapeRegExp(name)}\\s*[xX×]\\s*)\\d+`,
       "g",
@@ -1480,14 +1483,32 @@ function isSupplyStep(activityType: string): boolean {
 
 function getSupplyStepTitle(activityType: string): string {
   if (activityType === "DELIVER_SUPPLIES") {
-    return "Danh sách giao hàng";
+    return "Vật phẩm cần bàn giao ở bước này";
   }
 
   if (activityType === "RETURN_SUPPLIES") {
-    return "Danh sách trả đồ";
+    return "Vật phẩm cần hoàn trả ở bước này";
   }
 
-  return "Yêu cầu lấy vật tư";
+  return "Vật phẩm cần thu gom ở bước này";
+}
+
+function buildSupplySummary(
+  supplies: Array<{
+    itemId?: number | null;
+    itemName?: string | null;
+    quantity: number;
+    unit: string;
+  }>,
+): string {
+  if (!supplies.length) return "";
+
+  return supplies
+    .map((supply) => {
+      const name = getSupplyDisplayName(supply);
+      return `${name} x${supply.quantity} ${supply.unit}`.trim();
+    })
+    .join(", ");
 }
 
 function toValidTeamId(value: unknown): number | null {
@@ -1511,6 +1532,156 @@ function getSupplyItemIdSet(activity: {
   }
 
   return ids;
+}
+
+function cloneSupplyCollections(
+  supplies: ClusterSupplyCollection[] | null | undefined,
+): ClusterSupplyCollection[] | null {
+  if (!supplies || supplies.length === 0) {
+    return null;
+  }
+
+  return supplies.map((supply) => ({
+    itemId: Number.isFinite(supply.itemId) ? supply.itemId : 0,
+    itemName: typeof supply.itemName === "string" ? supply.itemName.trim() : "",
+    quantity: Math.max(1, Number(supply.quantity) || 1),
+    unit:
+      typeof supply.unit === "string" && supply.unit.trim()
+        ? supply.unit.trim()
+        : "đơn vị",
+  }));
+}
+
+function buildSupplyComparisonKey(
+  supply: Pick<ClusterSupplyCollection, "itemId" | "itemName" | "unit">,
+): string {
+  const itemId = Number(supply.itemId);
+  if (Number.isFinite(itemId) && itemId > 0) {
+    return `id:${itemId}`;
+  }
+
+  const itemName =
+    typeof supply.itemName === "string"
+      ? supply.itemName.trim().toLowerCase()
+      : "";
+  const unit =
+    typeof supply.unit === "string" ? supply.unit.trim().toLowerCase() : "";
+  return `name:${itemName}|unit:${unit}`;
+}
+
+function haveMatchingSupplyCollections(
+  left: ClusterSupplyCollection[] | null | undefined,
+  right: ClusterSupplyCollection[] | null | undefined,
+): boolean {
+  const normalizedLeft = (cloneSupplyCollections(left) ?? [])
+    .map((supply) => ({
+      key: buildSupplyComparisonKey(supply),
+      quantity: supply.quantity,
+      unit: supply.unit.trim().toLowerCase(),
+    }))
+    .sort(
+      (a, b) =>
+        a.key.localeCompare(b.key, "vi") ||
+        a.unit.localeCompare(b.unit, "vi") ||
+        a.quantity - b.quantity,
+    );
+  const normalizedRight = (cloneSupplyCollections(right) ?? [])
+    .map((supply) => ({
+      key: buildSupplyComparisonKey(supply),
+      quantity: supply.quantity,
+      unit: supply.unit.trim().toLowerCase(),
+    }))
+    .sort(
+      (a, b) =>
+        a.key.localeCompare(b.key, "vi") ||
+        a.unit.localeCompare(b.unit, "vi") ||
+        a.quantity - b.quantity,
+    );
+
+  if (normalizedLeft.length !== normalizedRight.length) {
+    return false;
+  }
+
+  return normalizedLeft.every((supply, index) => {
+    const peer = normalizedRight[index];
+    return (
+      supply.key === peer?.key &&
+      supply.unit === peer.unit &&
+      supply.quantity === peer.quantity
+    );
+  });
+}
+
+function findMatchingSupplyInCollection(
+  target: Pick<ClusterSupplyCollection, "itemId" | "itemName" | "unit">,
+  supplies: ClusterSupplyCollection[] | null | undefined,
+): ClusterSupplyCollection | null {
+  const targetItemId = Number(target.itemId);
+  if (Number.isFinite(targetItemId) && targetItemId > 0) {
+    const matchedById = (supplies ?? []).find(
+      (supply) => Number(supply.itemId) === targetItemId,
+    );
+    if (matchedById) {
+      return matchedById;
+    }
+  }
+
+  const targetKey = buildSupplyComparisonKey(target);
+  return (
+    (supplies ?? []).find(
+      (supply) => buildSupplyComparisonKey(supply) === targetKey,
+    ) ?? null
+  );
+}
+
+function syncExplicitReturnSuppliesWithCollector(
+  returnSupplies: ClusterSupplyCollection[] | null | undefined,
+  collectorSupplies: ClusterSupplyCollection[] | null | undefined,
+): ClusterSupplyCollection[] | null {
+  const normalizedReturnSupplies = cloneSupplyCollections(returnSupplies);
+  if (!normalizedReturnSupplies || normalizedReturnSupplies.length === 0) {
+    return null;
+  }
+
+  return normalizedReturnSupplies.map((returnSupply) => {
+    const matchedCollectorSupply = findMatchingSupplyInCollection(
+      returnSupply,
+      collectorSupplies,
+    );
+
+    if (!matchedCollectorSupply) {
+      return returnSupply;
+    }
+
+    return {
+      itemId: matchedCollectorSupply.itemId,
+      itemName: matchedCollectorSupply.itemName,
+      quantity: matchedCollectorSupply.quantity,
+      unit: matchedCollectorSupply.unit,
+    };
+  });
+}
+
+function hasValidReturnSupplySelections(
+  returnSupplies: ClusterSupplyCollection[] | null | undefined,
+  collectorSupplies: ClusterSupplyCollection[] | null | undefined,
+): boolean {
+  const normalizedReturnSupplies = cloneSupplyCollections(returnSupplies);
+  if (!normalizedReturnSupplies || normalizedReturnSupplies.length === 0) {
+    return true;
+  }
+
+  return normalizedReturnSupplies.every((returnSupply) => {
+    const matchedCollectorSupply = findMatchingSupplyInCollection(
+      returnSupply,
+      collectorSupplies,
+    );
+
+    return (
+      !!matchedCollectorSupply &&
+      matchedCollectorSupply.quantity === returnSupply.quantity
+    );
+  });
 }
 
 function normalizeDepotName(value?: string | null): string {
@@ -1629,7 +1800,7 @@ function parseSupplyItemsFromDescription(
   description: string,
 ): SupplyDisplayItem[] {
   const markerMatch = description.match(
-    /(?:Lấy|Lay|Giao vật tư|Tiếp tế|Tiep te|Trả|Tra|Hoàn trả|Hoan tra|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?|Return(?: supplies)?)[^:]*:\s*(.+)$/i,
+    /(?:Lấy|Lay|Thu gom|Thu gom Vật phẩm|Thu gom vat tu|Giao Vật phẩm|Ban giao|Bàn giao|Tiếp tế|Tiep te|Trả|Tra|Hoàn trả|Hoan tra|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?|Return(?: supplies)?)[^:]*:\s*(.+)$/i,
   );
   if (!markerMatch?.[1]) return [];
 
@@ -1689,7 +1860,7 @@ function getSupplyDisplayItems(activity: {
 function stripSupplyDetailsFromDescription(description: string): string {
   return description
     .replace(
-      /\s*(?:Lấy|Lay|Giao vật tư|Tiếp tế|Tiep te|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?)[^:]*:\s*.*$/i,
+      /\s*(?:Lấy|Lay|Thu gom|Thu gom Vật phẩm|Thu gom vat tu|Giao Vật phẩm|Ban giao|Bàn giao|Tiếp tế|Tiep te|Hoàn trả|Hoan tra|Cấp phát|Cap phat|Collect(?: supplies)?|Deliver(?: supplies)?|Return(?: supplies)?)[^:]*:\s*.*$/i,
       "",
     )
     .replace(/[\s,;:.]+$/, "")
@@ -1769,6 +1940,63 @@ function getActivityStatusMeta(status: string | null | undefined): {
     className:
       "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
     icon: <Clock className="h-3.5 w-3.5" />,
+  };
+}
+
+function getMissionStatusMeta(status: string | null | undefined): {
+  label: string;
+  className: string;
+} {
+  const normalizedStatus = (status ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "")
+    .replaceAll(" ", "");
+
+  if (normalizedStatus === "completed") {
+    return {
+      label: "Hoàn thành",
+      className:
+        "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700",
+    };
+  }
+
+  if (normalizedStatus === "ongoing" || normalizedStatus === "inprogress") {
+    return {
+      label: "Đang thực hiện",
+      className:
+        "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
+    };
+  }
+
+  if (normalizedStatus === "cancelled" || normalizedStatus === "canceled") {
+    return {
+      label: "Đã hủy",
+      className:
+        "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700",
+    };
+  }
+
+  if (normalizedStatus === "pending") {
+    return {
+      label: "Chờ xử lý",
+      className:
+        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+    };
+  }
+
+  if (normalizedStatus === "planned") {
+    return {
+      label: "Đã lập kế hoạch",
+      className:
+        "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+    };
+  }
+
+  return {
+    label: status || "Chưa rõ",
+    className:
+      "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600",
   };
 }
 
@@ -4738,7 +4966,7 @@ const SuggestionCard = ({
                             ? ` • SĐT: ${act.suggestedTeam.contactPhone}`
                             : ""}
                           {act.suggestedTeam.estimatedEtaMinutes != null
-                            ? ` • ETA: ${act.suggestedTeam.estimatedEtaMinutes} phút`
+                            ? ` • Thời gian dự kiến đến: ${act.suggestedTeam.estimatedEtaMinutes} phút`
                             : ""}
                         </p>
                         {act.suggestedTeam.reason && (
@@ -4865,7 +5093,10 @@ const RescuePlanPanel = ({
   // ── Edit mode state ──
   const [isEditMode, setIsEditMode] = useState(false);
 
-  type EditableActivity = ClusterSuggestedActivity & { _id: string };
+  type EditableActivity = ClusterSuggestedActivity & {
+    _id: string;
+    _missionActivityId?: number | null;
+  };
   type PendingRemoval =
     | {
         type: "activity";
@@ -4893,8 +5124,86 @@ const RescuePlanPanel = ({
   );
   const supplyUnitByItemIdRef = useRef<Record<number, string>>({});
 
-  const { mutate: createMission, isPending: isCreatingMission } =
+  const { mutateAsync: createMissionAsync, isPending: isCreatingMission } =
     useCreateMission();
+  const { mutateAsync: updateMissionAsync, isPending: isUpdatingMission } =
+    useUpdateMission();
+  const { mutateAsync: createActivityAsync, isPending: isCreatingActivity } =
+    useCreateActivity();
+  const { mutateAsync: updateActivityAsync, isPending: isUpdatingActivity } =
+    useUpdateActivity();
+  const isSubmittingMissionEdit =
+    isCreatingMission ||
+    isUpdatingMission ||
+    isCreatingActivity ||
+    isUpdatingActivity;
+
+  const syncReturnActivitiesWithCollectors = useCallback(
+    (activities: EditableActivity[]): EditableActivity[] =>
+      activities.map((activity) => {
+        if (activity.activityType !== "RETURN_SUPPLIES") {
+          return activity;
+        }
+
+        const collectorActivity = findCollectorActivityForReturn(
+          activity,
+          activities,
+        );
+        const collectorTeamId = toValidTeamId(
+          collectorActivity?.suggestedTeam?.teamId,
+        );
+        const currentTeamId = toValidTeamId(activity.suggestedTeam?.teamId);
+        const collectorSupplies = cloneSupplyCollections(
+          collectorActivity?.suppliesToCollect ?? null,
+        );
+        const currentSupplies = cloneSupplyCollections(
+          activity.suppliesToCollect ?? null,
+        );
+        const syncedReturnSupplies = syncExplicitReturnSuppliesWithCollector(
+          currentSupplies,
+          collectorSupplies,
+        );
+
+        if (!collectorActivity || collectorTeamId == null) {
+          if (
+            activity.suggestedTeam == null &&
+            haveMatchingSupplyCollections(currentSupplies, null)
+          ) {
+            return activity;
+          }
+
+          return {
+            ...activity,
+            suggestedTeam: null,
+            suppliesToCollect: null,
+          };
+        }
+
+        const expectedReason = `Tự động gán theo đội thu gom Vật phẩm ở Bước ${collectorActivity.step}.`;
+        const hasMatchingSupplies = haveMatchingSupplyCollections(
+          currentSupplies,
+          syncedReturnSupplies,
+        );
+
+        if (
+          currentTeamId === collectorTeamId &&
+          activity.suggestedTeam?.reason === expectedReason &&
+          hasMatchingSupplies
+        ) {
+          return activity;
+        }
+
+        return {
+          ...activity,
+          suggestedTeam: {
+            ...collectorActivity.suggestedTeam,
+            reason: expectedReason,
+          },
+          suppliesToCollect: syncedReturnSupplies,
+        };
+      }),
+    [],
+  );
 
   const exitEditMode = useCallback(() => {
     setIsEditMode(false);
@@ -4905,32 +5214,39 @@ const RescuePlanPanel = ({
   const updateEditActivity = useCallback(
     (id: string, field: string, value: string | number | null) => {
       setEditActivities((prev) =>
-        prev.map((a) => {
-          if (a._id !== id) return a;
+        syncReturnActivitiesWithCollectors(
+          prev.map((a) => {
+            if (a._id !== id) return a;
 
-          // Only supply-related activities should keep the supply list.
-          if (field === "activityType") {
-            const nextType = value as ClusterActivityType;
-            if (!isSupplyStep(nextType)) {
-              return {
-                ...a,
-                activityType: nextType,
-                suppliesToCollect: null,
-              };
+            // Only supply-related activities should keep the supply list.
+            if (field === "activityType") {
+              const nextType = value as ClusterActivityType;
+              if (!isSupplyStep(nextType)) {
+                return {
+                  ...a,
+                  activityType: nextType,
+                  suppliesToCollect: null,
+                };
+              }
+              return { ...a, activityType: nextType };
             }
-            return { ...a, activityType: nextType };
-          }
 
-          return { ...a, [field]: value } as EditableActivity;
-        }),
+            return { ...a, [field]: value } as EditableActivity;
+          }),
+        ),
       );
     },
-    [],
+    [syncReturnActivitiesWithCollectors],
   );
 
-  const removeEditActivity = useCallback((id: string) => {
-    setEditActivities((prev) => prev.filter((a) => a._id !== id));
-  }, []);
+  const removeEditActivity = useCallback(
+    (id: string) => {
+      setEditActivities((prev) =>
+        syncReturnActivitiesWithCollectors(prev.filter((a) => a._id !== id)),
+      );
+    },
+    [syncReturnActivitiesWithCollectors],
+  );
 
   const addEditActivity = useCallback(() => {
     const newAct: EditableActivity = {
@@ -4946,18 +5262,23 @@ const RescuePlanPanel = ({
       depotAddress: null,
       suppliesToCollect: null,
     };
-    setEditActivities((prev) => [...prev, newAct]);
-  }, [editActivities.length]);
+    setEditActivities((prev) =>
+      syncReturnActivitiesWithCollectors([...prev, newAct]),
+    );
+  }, [editActivities.length, syncReturnActivitiesWithCollectors]);
 
-  const moveEditActivity = useCallback((idx: number, dir: -1 | 1) => {
-    setEditActivities((prev) => {
-      const next = [...prev];
-      const target = idx + dir;
-      if (target < 0 || target >= next.length) return prev;
-      [next[idx], next[target]] = [next[target], next[idx]];
-      return next;
-    });
-  }, []);
+  const moveEditActivity = useCallback(
+    (idx: number, dir: -1 | 1) => {
+      setEditActivities((prev) => {
+        const next = [...prev];
+        const target = idx + dir;
+        if (target < 0 || target >= next.length) return prev;
+        [next[idx], next[target]] = [next[target], next[idx]];
+        return syncReturnActivitiesWithCollectors(next);
+      });
+    },
+    [syncReturnActivitiesWithCollectors],
+  );
 
   useEffect(() => {
     const next = { ...supplyUnitByItemIdRef.current };
@@ -4989,167 +5310,146 @@ const RescuePlanPanel = ({
         sourceDepotAddress?: string | null;
       },
     ) => {
+      const targetActivity = editActivities.find((a) => a._id === activityId);
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+        toast.info(
+          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể thêm thủ công.",
+        );
+        return;
+      }
+
       setEditActivities((prev) =>
-        prev.map((a) => {
-          if (a._id !== activityId) return a;
+        syncReturnActivitiesWithCollectors(
+          prev.map((a) => {
+            if (a._id !== activityId) return a;
 
-          const dragUnit =
-            typeof item.unit === "string" ? item.unit.trim() : "";
-          const cachedUnit =
-            supplyUnitByItemIdRef.current[item.itemId]?.trim() ?? "";
-          const resolvedUnit = dragUnit || cachedUnit || "đơn vị";
-          if (resolvedUnit) {
-            supplyUnitByItemIdRef.current[item.itemId] = resolvedUnit;
-          }
+            const dragUnit =
+              typeof item.unit === "string" ? item.unit.trim() : "";
+            const cachedUnit =
+              supplyUnitByItemIdRef.current[item.itemId]?.trim() ?? "";
+            const resolvedUnit = dragUnit || cachedUnit || "đơn vị";
+            if (resolvedUnit) {
+              supplyUnitByItemIdRef.current[item.itemId] = resolvedUnit;
+            }
 
-          const nextDepotId =
-            isDepotSupplyStep(a.activityType) &&
-            typeof item.sourceDepotId === "number" &&
-            item.sourceDepotId > 0
-              ? item.sourceDepotId
-              : a.depotId;
-          const nextDepotName =
-            isDepotSupplyStep(a.activityType) &&
-            typeof item.sourceDepotName === "string" &&
-            item.sourceDepotName.trim()
-              ? item.sourceDepotName.trim()
-              : a.depotName;
-          const nextDepotAddress =
-            isDepotSupplyStep(a.activityType) &&
-            typeof item.sourceDepotAddress === "string" &&
-            item.sourceDepotAddress.trim()
-              ? item.sourceDepotAddress.trim()
-              : a.depotAddress;
+            const nextDepotId =
+              isDepotSupplyStep(a.activityType) &&
+              typeof item.sourceDepotId === "number" &&
+              item.sourceDepotId > 0
+                ? item.sourceDepotId
+                : a.depotId;
+            const nextDepotName =
+              isDepotSupplyStep(a.activityType) &&
+              typeof item.sourceDepotName === "string" &&
+              item.sourceDepotName.trim()
+                ? item.sourceDepotName.trim()
+                : a.depotName;
+            const nextDepotAddress =
+              isDepotSupplyStep(a.activityType) &&
+              typeof item.sourceDepotAddress === "string" &&
+              item.sourceDepotAddress.trim()
+                ? item.sourceDepotAddress.trim()
+                : a.depotAddress;
 
-          const existing = a.suppliesToCollect ?? [];
-          const foundIdx = existing.findIndex((s) => s.itemId === item.itemId);
-          if (foundIdx >= 0) {
-            const next = [...existing];
-            const currentUnit =
-              typeof next[foundIdx].unit === "string"
-                ? next[foundIdx].unit.trim()
-                : "";
-            const shouldUpgradeUnit =
-              (!currentUnit || currentUnit === "đơn vị") &&
-              resolvedUnit !== "đơn vị";
-            next[foundIdx] = {
-              ...next[foundIdx],
-              quantity: next[foundIdx].quantity + 1,
-              unit: shouldUpgradeUnit ? resolvedUnit : next[foundIdx].unit,
-            };
+            const existing = a.suppliesToCollect ?? [];
+            const foundIdx = existing.findIndex(
+              (s) => s.itemId === item.itemId,
+            );
+            if (foundIdx >= 0) {
+              const next = [...existing];
+              const currentUnit =
+                typeof next[foundIdx].unit === "string"
+                  ? next[foundIdx].unit.trim()
+                  : "";
+              const shouldUpgradeUnit =
+                (!currentUnit || currentUnit === "đơn vị") &&
+                resolvedUnit !== "đơn vị";
+              next[foundIdx] = {
+                ...next[foundIdx],
+                quantity: next[foundIdx].quantity + 1,
+                unit: shouldUpgradeUnit ? resolvedUnit : next[foundIdx].unit,
+              };
+              return {
+                ...a,
+                depotId: nextDepotId,
+                depotName: nextDepotName,
+                depotAddress: nextDepotAddress,
+                suppliesToCollect: next,
+              };
+            }
             return {
               ...a,
               depotId: nextDepotId,
               depotName: nextDepotName,
               depotAddress: nextDepotAddress,
-              suppliesToCollect: next,
+              suppliesToCollect: [
+                ...existing,
+                {
+                  itemId: item.itemId,
+                  itemName: item.itemName,
+                  quantity: 1,
+                  unit: resolvedUnit,
+                },
+              ],
             };
-          }
-          return {
-            ...a,
-            depotId: nextDepotId,
-            depotName: nextDepotName,
-            depotAddress: nextDepotAddress,
-            suppliesToCollect: [
-              ...existing,
-              {
-                itemId: item.itemId,
-                itemName: item.itemName,
-                quantity: 1,
-                unit: resolvedUnit,
-              },
-            ],
-          };
-        }),
+          }),
+        ),
       );
     },
-    [],
+    [editActivities, syncReturnActivitiesWithCollectors],
   );
-
-  useEffect(() => {
-    setEditActivities((previous) => {
-      let hasChange = false;
-
-      const next = previous.map((activity) => {
-        if (activity.activityType !== "RETURN_SUPPLIES") {
-          return activity;
-        }
-
-        const collectorActivity = findCollectorActivityForReturn(
-          activity,
-          previous,
-        );
-        const collectorTeamId = toValidTeamId(
-          collectorActivity?.suggestedTeam?.teamId,
-        );
-        const currentTeamId = toValidTeamId(activity.suggestedTeam?.teamId);
-
-        if (!collectorActivity || collectorTeamId == null) {
-          if (activity.suggestedTeam == null) {
-            return activity;
-          }
-
-          hasChange = true;
-          return {
-            ...activity,
-            suggestedTeam: null,
-          };
-        }
-
-        const expectedReason = `Tự động gán theo đội lấy vật tư ở Bước ${collectorActivity.step}.`;
-
-        if (
-          currentTeamId === collectorTeamId &&
-          activity.suggestedTeam?.reason === expectedReason
-        ) {
-          return activity;
-        }
-
-        hasChange = true;
-        return {
-          ...activity,
-          suggestedTeam: {
-            ...collectorActivity.suggestedTeam,
-            reason: expectedReason,
-          },
-        };
-      });
-
-      return hasChange ? next : previous;
-    });
-  }, [editActivities]);
 
   const handleRemoveSupply = useCallback(
     (activityId: string, supplyIndex: number) => {
+      const targetActivity = editActivities.find((a) => a._id === activityId);
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+        toast.info(
+          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể xóa thủ công.",
+        );
+        return;
+      }
+
       setEditActivities((prev) =>
-        prev.map((a) => {
-          if (a._id !== activityId) return a;
-          const next = [...(a.suppliesToCollect ?? [])];
-          next.splice(supplyIndex, 1);
-          return { ...a, suppliesToCollect: next.length > 0 ? next : null };
-        }),
+        syncReturnActivitiesWithCollectors(
+          prev.map((a) => {
+            if (a._id !== activityId) return a;
+            const next = [...(a.suppliesToCollect ?? [])];
+            next.splice(supplyIndex, 1);
+            return { ...a, suppliesToCollect: next.length > 0 ? next : null };
+          }),
+        ),
       );
     },
-    [],
+    [editActivities, syncReturnActivitiesWithCollectors],
   );
 
   const handleUpdateSupplyQuantity = useCallback(
     (activityId: string, supplyIndex: number, quantity: number) => {
+      const targetActivity = editActivities.find((a) => a._id === activityId);
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+        toast.info(
+          "Số lượng ở bước Hoàn trả được tự động đồng bộ theo số lượng đã thu gom nên không thể sửa thủ công.",
+        );
+        return;
+      }
+
       setEditActivities((prev) =>
-        prev.map((a) => {
-          if (a._id !== activityId) return a;
-          const next = [...(a.suppliesToCollect ?? [])];
-          if (next[supplyIndex]) {
-            next[supplyIndex] = {
-              ...next[supplyIndex],
-              quantity: Math.max(1, quantity),
-            };
-          }
-          return { ...a, suppliesToCollect: next };
-        }),
+        syncReturnActivitiesWithCollectors(
+          prev.map((a) => {
+            if (a._id !== activityId) return a;
+            const next = [...(a.suppliesToCollect ?? [])];
+            if (next[supplyIndex]) {
+              next[supplyIndex] = {
+                ...next[supplyIndex],
+                quantity: Math.max(1, quantity),
+              };
+            }
+            return { ...a, suppliesToCollect: next };
+          }),
+        ),
       );
     },
-    [],
+    [editActivities, syncReturnActivitiesWithCollectors],
   );
 
   const handleRemoveActivityWithConfirm = useCallback(
@@ -5224,14 +5524,26 @@ const RescuePlanPanel = ({
 
         if (collectorTeamId == null || !collectorActivity) {
           toast.error(
-            `Bước ${i + 1}: Chưa xác định được đội đã lấy vật tư để gán cho bước Trả đồ.`,
+            `Bước ${i + 1}: Chưa xác định được đội đã thu gom Vật phẩm để gán cho bước Hoàn trả Vật phẩm.`,
           );
           return false;
         }
 
         if (returnTeamId !== collectorTeamId) {
           toast.error(
-            `Bước ${i + 1}: Đội Trả đồ phải trùng với đội lấy vật tư ở Bước ${collectorActivity.step}.`,
+            `Bước ${i + 1}: Đội Hoàn trả Vật phẩm phải trùng với đội thu gom Vật phẩm ở Bước ${collectorActivity.step}.`,
+          );
+          return false;
+        }
+
+        if (
+          !hasValidReturnSupplySelections(
+            editActivities[i].suppliesToCollect,
+            collectorActivity.suppliesToCollect,
+          )
+        ) {
+          toast.error(
+            `Bước ${i + 1}: Những vật phẩm được chọn để hoàn trả phải khớp số lượng đã thu gom ở Bước ${collectorActivity.step}.`,
           );
           return false;
         }
@@ -5253,138 +5565,215 @@ const RescuePlanPanel = ({
   const handleSubmitEdit = useCallback(() => {
     if (!validateEditMission() || !clusterId) return;
 
-    setConfirmSubmitOpen(false);
+    const submit = async () => {
+      setConfirmSubmitOpen(false);
 
-    const sos = clusterSOSRequests[0];
-    createMission(
-      {
-        clusterId,
-        missionType: editMissionType,
-        priorityScore: editPriorityScore,
-        startTime: new Date(editStartTime).toISOString(),
-        expectedEndTime: new Date(editExpectedEndTime).toISOString(),
-        activities: editActivities.map((a, i) => {
-          const syncedDescription = syncDescriptionWithSupplies(
-            a.description,
-            a.suppliesToCollect,
-          );
+      const sos = clusterSOSRequests[0];
+      const normalizedActivities = editActivities.map((activity, index) => {
+        const syncedDescription = syncDescriptionWithSupplies(
+          activity.description,
+          activity.suppliesToCollect,
+        );
 
-          const rawSosRequestId =
-            a.sosRequestId != null ? Number(a.sosRequestId) : Number(sos?.id);
-          const sosRequestId =
-            Number.isFinite(rawSosRequestId) && rawSosRequestId > 0
-              ? rawSosRequestId
-              : null;
-
-          const rawDepotId = a.depotId != null ? Number(a.depotId) : Number.NaN;
-          const depotId =
-            Number.isFinite(rawDepotId) && rawDepotId > 0 ? rawDepotId : null;
-
-          const depotName =
-            typeof a.depotName === "string" && a.depotName.trim()
-              ? a.depotName.trim()
-              : null;
-
-          const depotAddress =
-            typeof a.depotAddress === "string" && a.depotAddress.trim()
-              ? a.depotAddress.trim()
-              : null;
-
-          const rawAssemblyPointId =
-            a.assemblyPointId != null ? Number(a.assemblyPointId) : Number.NaN;
-          const assemblyPointId =
-            Number.isFinite(rawAssemblyPointId) && rawAssemblyPointId > 0
-              ? rawAssemblyPointId
-              : null;
-          const assemblyPointName =
-            typeof a.assemblyPointName === "string" &&
-            a.assemblyPointName.trim()
-              ? a.assemblyPointName.trim()
-              : null;
-          const rawAssemblyPointLat =
-            a.assemblyPointLatitude != null
-              ? Number(a.assemblyPointLatitude)
-              : Number.NaN;
-          const assemblyPointLatitude = Number.isFinite(rawAssemblyPointLat)
-            ? rawAssemblyPointLat
-            : null;
-          const rawAssemblyPointLng =
-            a.assemblyPointLongitude != null
-              ? Number(a.assemblyPointLongitude)
-              : Number.NaN;
-          const assemblyPointLongitude = Number.isFinite(rawAssemblyPointLng)
-            ? rawAssemblyPointLng
+        const rawSosRequestId =
+          activity.sosRequestId != null
+            ? Number(activity.sosRequestId)
+            : Number(sos?.id);
+        const sosRequestId =
+          Number.isFinite(rawSosRequestId) && rawSosRequestId > 0
+            ? rawSosRequestId
             : null;
 
-          const selectedSos =
-            sosRequestId != null
-              ? clusterSOSRequests.find(
-                  (s) => String(s.id) === String(sosRequestId),
-                )
-              : null;
+        const rawDepotId =
+          activity.depotId != null ? Number(activity.depotId) : Number.NaN;
+        const depotId =
+          Number.isFinite(rawDepotId) && rawDepotId > 0 ? rawDepotId : null;
+        const depotName =
+          typeof activity.depotName === "string" && activity.depotName.trim()
+            ? activity.depotName.trim()
+            : null;
+        const depotAddress =
+          typeof activity.depotAddress === "string" &&
+          activity.depotAddress.trim()
+            ? activity.depotAddress.trim()
+            : null;
 
-          const forcedCollectorActivity =
-            a.activityType === "RETURN_SUPPLIES"
-              ? findCollectorActivityForReturn(a, editActivities)
-              : null;
-          const rescueTeamId =
-            a.activityType === "RETURN_SUPPLIES"
-              ? toValidTeamId(forcedCollectorActivity?.suggestedTeam?.teamId)
-              : toValidTeamId(a.suggestedTeam?.teamId);
+        const rawAssemblyPointId =
+          activity.assemblyPointId != null
+            ? Number(activity.assemblyPointId)
+            : Number.NaN;
+        const assemblyPointId =
+          Number.isFinite(rawAssemblyPointId) && rawAssemblyPointId > 0
+            ? rawAssemblyPointId
+            : null;
+        const assemblyPointName =
+          typeof activity.assemblyPointName === "string" &&
+          activity.assemblyPointName.trim()
+            ? activity.assemblyPointName.trim()
+            : null;
+        const rawAssemblyPointLat =
+          activity.assemblyPointLatitude != null
+            ? Number(activity.assemblyPointLatitude)
+            : Number.NaN;
+        const assemblyPointLatitude = Number.isFinite(rawAssemblyPointLat)
+          ? rawAssemblyPointLat
+          : null;
+        const rawAssemblyPointLng =
+          activity.assemblyPointLongitude != null
+            ? Number(activity.assemblyPointLongitude)
+            : Number.NaN;
+        const assemblyPointLongitude = Number.isFinite(rawAssemblyPointLng)
+          ? rawAssemblyPointLng
+          : null;
 
-          return {
-            step: i + 1,
-            activityCode: `${a.activityType}_${i + 1}`,
-            activityType: a.activityType,
-            description: syncedDescription,
-            priority: a.priority || "Medium",
-            estimatedTime: Number.parseInt(String(a.estimatedTime), 10) || 30,
-            sosRequestId,
-            depotId,
-            depotName,
-            depotAddress,
-            assemblyPointId,
-            assemblyPointName,
-            assemblyPointLatitude,
-            assemblyPointLongitude,
-            suppliesToCollect: (a.suppliesToCollect ?? []).map((s) => ({
-              id: typeof s.itemId === "number" ? s.itemId : null,
-              name:
-                typeof s.itemName === "string" && s.itemName.trim()
-                  ? s.itemName.trim()
-                  : null,
-              quantity: s.quantity,
-              unit: s.unit,
+        const selectedSos =
+          sosRequestId != null
+            ? clusterSOSRequests.find((s) => String(s.id) === String(sosRequestId))
+            : null;
+
+        const forcedCollectorActivity =
+          activity.activityType === "RETURN_SUPPLIES"
+            ? findCollectorActivityForReturn(activity, editActivities)
+            : null;
+        const rescueTeamId =
+          activity.activityType === "RETURN_SUPPLIES"
+            ? toValidTeamId(forcedCollectorActivity?.suggestedTeam?.teamId)
+            : toValidTeamId(activity.suggestedTeam?.teamId);
+
+        const createRequest = {
+          step: index + 1,
+          activityCode: `${activity.activityType}_${index + 1}`,
+          activityType: activity.activityType,
+          description: syncedDescription,
+          priority: activity.priority || "Medium",
+          estimatedTime:
+            Number.parseInt(String(activity.estimatedTime), 10) || 30,
+          sosRequestId,
+          depotId,
+          depotName,
+          depotAddress,
+          assemblyPointId,
+          assemblyPointName,
+          assemblyPointLatitude,
+          assemblyPointLongitude,
+          suppliesToCollect: (activity.suppliesToCollect ?? []).map((s) => ({
+            id: typeof s.itemId === "number" ? s.itemId : null,
+            name:
+              typeof s.itemName === "string" && s.itemName.trim()
+                ? s.itemName.trim()
+                : null,
+            quantity: s.quantity,
+            unit: s.unit,
+          })),
+          target:
+            depotName || `SOS ${sosRequestId || sos?.id || "unknown"}`,
+          targetLatitude:
+            extractCoordsFromDescription(syncedDescription)?.lat ??
+            (sosRequestId
+              ? (selectedSos?.location?.lat ?? sos?.location?.lat ?? 0)
+              : (sos?.location?.lat ?? 0)),
+          targetLongitude:
+            extractCoordsFromDescription(syncedDescription)?.lng ??
+            (sosRequestId
+              ? (selectedSos?.location?.lng ?? sos?.location?.lng ?? 0)
+              : (sos?.location?.lng ?? 0)),
+          rescueTeamId,
+        };
+
+        return {
+          sourceActivityId: activity._missionActivityId ?? null,
+          createRequest,
+          itemsSummary: buildSupplySummary(
+            (activity.suppliesToCollect ?? []).map((supply) => ({
+              itemId:
+                typeof supply.itemId === "number" ? supply.itemId : -1,
+              itemName:
+                typeof supply.itemName === "string" && supply.itemName.trim()
+                  ? supply.itemName.trim()
+                  : "Vật phẩm chưa rõ tên",
+              quantity: supply.quantity,
+              unit: supply.unit,
             })),
-            target: depotName || `SOS ${sosRequestId || sos?.id || "unknown"}`,
-            targetLatitude:
-              extractCoordsFromDescription(syncedDescription)?.lat ??
-              (sosRequestId
-                ? (selectedSos?.location?.lat ?? sos?.location?.lat ?? 0)
-                : (sos?.location?.lat ?? 0)),
-            targetLongitude:
-              extractCoordsFromDescription(syncedDescription)?.lng ??
-              (sosRequestId
-                ? (selectedSos?.location?.lng ?? sos?.location?.lng ?? 0)
-                : (sos?.location?.lng ?? 0)),
-            rescueTeamId,
-          };
-        }),
-      },
-      {
-        onSuccess: () => {
-          exitEditMode();
-          onApprove();
-        },
-        onError: (error) => {
-          const backendMessage = extractBackendErrorMessage(error);
-          console.error("Failed to create mission:", error);
-          toast.error(
-            backendMessage ?? "Không thể tạo nhiệm vụ. Vui lòng thử lại.",
+          ),
+        };
+      });
+
+      try {
+        if (editingMissionId) {
+          await updateMissionAsync({
+            missionId: editingMissionId,
+            request: {
+              missionType: editMissionType,
+              priorityScore: editPriorityScore,
+              startTime: new Date(editStartTime).toISOString(),
+              expectedEndTime: new Date(editExpectedEndTime).toISOString(),
+            },
+          });
+
+          await Promise.all(
+            normalizedActivities.map(
+              ({ sourceActivityId, createRequest, itemsSummary }) => {
+              if (sourceActivityId) {
+                return updateActivityAsync({
+                  missionId: editingMissionId,
+                  activityId: sourceActivityId,
+                  request: {
+                    step: createRequest.step,
+                    activityCode: createRequest.activityCode,
+                    activityType: createRequest.activityType,
+                    description: createRequest.description,
+                    target: createRequest.target,
+                    items: itemsSummary,
+                    targetLatitude: createRequest.targetLatitude,
+                    targetLongitude: createRequest.targetLongitude,
+                    rescueTeamId: createRequest.rescueTeamId ?? null,
+                  },
+                });
+              }
+
+              return createActivityAsync({
+                missionId: editingMissionId,
+                request: createRequest,
+              });
+            }),
           );
-        },
-      },
-    );
+
+          toast.success("Đã cập nhật nhiệm vụ thành công!");
+        } else {
+          await createMissionAsync({
+            clusterId,
+            missionType: editMissionType,
+            priorityScore: editPriorityScore,
+            startTime: new Date(editStartTime).toISOString(),
+            expectedEndTime: new Date(editExpectedEndTime).toISOString(),
+            activities: normalizedActivities.map(
+              ({ createRequest }) => createRequest,
+            ),
+          });
+
+          toast.success("Đã tạo nhiệm vụ thành công!");
+        }
+
+        exitEditMode();
+        onApprove();
+      } catch (error) {
+        const backendMessage = extractBackendErrorMessage(error);
+        console.error(
+          editingMissionId
+            ? "Failed to update mission:"
+            : "Failed to create mission:",
+          error,
+        );
+        toast.error(
+          backendMessage ??
+            (editingMissionId
+              ? "Không thể cập nhật nhiệm vụ. Vui lòng thử lại."
+              : "Không thể tạo nhiệm vụ. Vui lòng thử lại."),
+        );
+      }
+    };
+
+    void submit();
   }, [
     clusterId,
     editActivities,
@@ -5393,9 +5782,13 @@ const RescuePlanPanel = ({
     editStartTime,
     editExpectedEndTime,
     clusterSOSRequests,
-    createMission,
+    editingMissionId,
+    createActivityAsync,
+    createMissionAsync,
     exitEditMode,
     onApprove,
+    updateActivityAsync,
+    updateMissionAsync,
     validateEditMission,
   ]);
 
@@ -5489,36 +5882,38 @@ const RescuePlanPanel = ({
   const updateEditActivitySuggestedTeam = useCallback(
     (activityId: string, team: RescueTeamByClusterEntity | null) => {
       setEditActivities((previous) =>
-        previous.map((activity) => {
-          if (activity._id !== activityId) {
-            return activity;
-          }
+        syncReturnActivitiesWithCollectors(
+          previous.map((activity) => {
+            if (activity._id !== activityId) {
+              return activity;
+            }
 
-          if (activity.activityType === "RETURN_SUPPLIES") {
-            return activity;
-          }
+            if (activity.activityType === "RETURN_SUPPLIES") {
+              return activity;
+            }
 
-          if (!team) {
+            if (!team) {
+              return {
+                ...activity,
+                suggestedTeam: null,
+              };
+            }
+
             return {
               ...activity,
-              suggestedTeam: null,
+              suggestedTeam: {
+                teamId: team.id,
+                teamName: team.name,
+                teamType: team.teamType,
+                assemblyPointName: team.assemblyPointName,
+                reason: `Điều phối viên cập nhật từ danh sách đội gần cụm SOS (${formatDistanceKmLabel(team.distanceKm)}).`,
+              },
             };
-          }
-
-          return {
-            ...activity,
-            suggestedTeam: {
-              teamId: team.id,
-              teamName: team.name,
-              teamType: team.teamType,
-              assemblyPointName: team.assemblyPointName,
-              reason: `Điều phối viên cập nhật từ danh sách đội gần cụm SOS (${formatDistanceKmLabel(team.distanceKm)}).`,
-            },
-          };
-        }),
+          }),
+        ),
       );
     },
-    [],
+    [syncReturnActivitiesWithCollectors],
   );
 
   const handleSelectNearbyTeamForActivity = useCallback(
@@ -5526,7 +5921,7 @@ const RescuePlanPanel = ({
       const targetActivity = editActivities.find((a) => a._id === activityId);
       if (targetActivity?.activityType === "RETURN_SUPPLIES") {
         toast.info(
-          "Bước Trả đồ được tự động gán theo đội đã lấy vật tư và không thể thay đổi thủ công.",
+          "Bước Hoàn trả vật phẩm được tự động gán theo đội đã thu gom vật phẩm và không thể thay đổi thủ công.",
         );
         return;
       }
@@ -5623,12 +6018,12 @@ const RescuePlanPanel = ({
         const next = [...prev];
         const [removed] = next.splice(dragIdx, 1);
         next.splice(idx, 0, removed);
-        return next;
+        return syncReturnActivitiesWithCollectors(next);
       });
       setDragIdx(null);
       setDragOverIdx(null);
     },
-    [dragIdx],
+    [dragIdx, syncReturnActivitiesWithCollectors],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -5681,10 +6076,13 @@ const RescuePlanPanel = ({
   const enterEditMode = useCallback(() => {
     if (activeSuggestion) {
       setEditActivities(
-        activeSuggestion.suggestedActivities.map((a, i) => ({
-          ...a,
-          _id: `edit-${i}-${Date.now()}`,
-        })),
+        syncReturnActivitiesWithCollectors(
+          activeSuggestion.suggestedActivities.map((a, i) => ({
+            ...a,
+            _id: `edit-${i}-${Date.now()}`,
+            _missionActivityId: null,
+          })),
+        ),
       );
       setEditPriorityScore(activeSuggestion.suggestedPriorityScore || 5);
     } else {
@@ -5700,7 +6098,7 @@ const RescuePlanPanel = ({
     setEditExpectedEndTime(end.toISOString().slice(0, 16));
     setEditingMissionId(null);
     setIsEditMode(true);
-  }, [activeSuggestion]);
+  }, [activeSuggestion, syncReturnActivitiesWithCollectors]);
 
   // Enter edit from an existing mission (missions tab -> edit)
   const enterEditFromMission = useCallback(
@@ -5717,50 +6115,53 @@ const RescuePlanPanel = ({
       );
 
       setEditActivities(
-        sortedActivities.map((a, i) => {
-          const inferredSosRequestId = inferSOSRequestIdFromActivity(
-            a,
-            panelSOSRequests,
-          );
-          const isDepot = isDepotSupplyStep(a.activityType);
-          const linkedMissionTeam =
-            typeof a.missionTeamId === "number"
-              ? missionTeamsByMissionTeamId.get(a.missionTeamId)
-              : null;
+        syncReturnActivitiesWithCollectors(
+          sortedActivities.map((a, i) => {
+            const inferredSosRequestId = inferSOSRequestIdFromActivity(
+              a,
+              panelSOSRequests,
+            );
+            const isDepot = isDepotSupplyStep(a.activityType);
+            const linkedMissionTeam =
+              typeof a.missionTeamId === "number"
+                ? missionTeamsByMissionTeamId.get(a.missionTeamId)
+                : null;
 
-          return {
-            _id: `edit-m-${i}-${Date.now()}`,
-            step: a.step,
-            activityType: a.activityType as ClusterActivityType,
-            description: a.description,
-            priority: "Medium",
-            estimatedTime: "",
-            sosRequestId: isDepot
-              ? null
-              : inferredSosRequestId
-                ? Number(inferredSosRequestId)
+            return {
+              _id: `edit-m-${i}-${Date.now()}`,
+              _missionActivityId: a.id,
+              step: a.step,
+              activityType: a.activityType as ClusterActivityType,
+              description: a.description,
+              priority: "Medium",
+              estimatedTime: "",
+              sosRequestId: isDepot
+                ? null
+                : inferredSosRequestId
+                  ? Number(inferredSosRequestId)
+                  : null,
+              depotId: isDepot ? (a.depotId ?? null) : null,
+              depotName: isDepot ? (a.depotName ?? a.target ?? null) : null,
+              depotAddress: isDepot ? (a.depotAddress ?? null) : null,
+              assemblyPointId: a.assemblyPointId ?? null,
+              assemblyPointName: a.assemblyPointName ?? null,
+              assemblyPointLatitude: a.assemblyPointLatitude ?? null,
+              assemblyPointLongitude: a.assemblyPointLongitude ?? null,
+              suppliesToCollect: a.suppliesToCollect,
+              suggestedTeam: linkedMissionTeam
+                ? {
+                    teamId: linkedMissionTeam.rescueTeamId,
+                    teamName: linkedMissionTeam.teamName,
+                    teamType: linkedMissionTeam.teamType,
+                    assemblyPointName: linkedMissionTeam.assemblyPointName,
+                    latitude: linkedMissionTeam.latitude,
+                    longitude: linkedMissionTeam.longitude,
+                    reason: "Đồng bộ từ nhiệm vụ hiện tại.",
+                  }
                 : null,
-            depotId: isDepot ? (a.depotId ?? null) : null,
-            depotName: isDepot ? (a.depotName ?? a.target ?? null) : null,
-            depotAddress: isDepot ? (a.depotAddress ?? null) : null,
-            assemblyPointId: a.assemblyPointId ?? null,
-            assemblyPointName: a.assemblyPointName ?? null,
-            assemblyPointLatitude: a.assemblyPointLatitude ?? null,
-            assemblyPointLongitude: a.assemblyPointLongitude ?? null,
-            suppliesToCollect: a.suppliesToCollect,
-            suggestedTeam: linkedMissionTeam
-              ? {
-                  teamId: linkedMissionTeam.rescueTeamId,
-                  teamName: linkedMissionTeam.teamName,
-                  teamType: linkedMissionTeam.teamType,
-                  assemblyPointName: linkedMissionTeam.assemblyPointName,
-                  latitude: linkedMissionTeam.latitude,
-                  longitude: linkedMissionTeam.longitude,
-                  reason: "Đồng bộ từ nhiệm vụ hiện tại.",
-                }
-              : null,
-          };
-        }),
+            };
+          }),
+        ),
       );
       setEditMissionType(normalizeEditMissionType(mission.missionType));
       setEditPriorityScore(mission.priorityScore);
@@ -5772,7 +6173,7 @@ const RescuePlanPanel = ({
       setActiveTab("plan");
       setIsEditMode(true);
     },
-    [panelSOSRequests],
+    [panelSOSRequests, syncReturnActivitiesWithCollectors],
   );
 
   const hasSidebar = !!activeSuggestion;
@@ -5906,15 +6307,15 @@ const RescuePlanPanel = ({
   const removeDialogTitle =
     pendingRemoval?.type === "activity"
       ? "Xác nhận xóa bước trong kế hoạch"
-      : "Xác nhận xóa vật tư khỏi gợi ý AI";
+      : "Xác nhận xóa vật phẩm khỏi gợi ý AI";
 
   const removeDialogDescription =
     pendingRemoval?.type === "activity"
       ? pendingRemoval.hasSupplyItems
-        ? `Bạn sắp xóa Bước ${pendingRemoval.displayStep} trong kế hoạch AI. Toàn bộ vật tư và nội dung thuộc bước này sẽ bị loại khỏi kế hoạch khi xác nhận nhiệm vụ.`
+        ? `Bạn sắp xóa Bước ${pendingRemoval.displayStep} trong kế hoạch AI. Toàn bộ vật phẩm và nội dung thuộc bước này sẽ bị loại khỏi kế hoạch khi xác nhận nhiệm vụ.`
         : `Bạn sắp xóa Bước ${pendingRemoval.displayStep} trong kế hoạch AI. Bước này sẽ không còn trong nhiệm vụ khi bạn xác nhận.`
       : pendingRemoval?.type === "supply"
-        ? `Bạn có chắc chắn muốn xóa vật tư \"${pendingRemoval.supplyName}\" khỏi gợi ý AI này không? Vật tư này sẽ bị loại khỏi kế hoạch khi bạn xác nhận nhiệm vụ.`
+        ? `Bạn có chắc chắn muốn xóa vật phẩm \"${pendingRemoval.supplyName}\" khỏi gợi ý AI này không? vật phẩm này sẽ bị loại khỏi kế hoạch khi bạn xác nhận nhiệm vụ.`
         : "";
 
   return (
@@ -6249,38 +6650,9 @@ const RescuePlanPanel = ({
                             >
                               <CardContent className="p-3 space-y-2">
                                 {(() => {
-                                  const normalizedStatus = mission.status
-                                    .trim()
-                                    .toLowerCase();
-                                  const statusText =
-                                    normalizedStatus === "completed"
-                                      ? "Hoàn thành"
-                                      : normalizedStatus === "inprogress" ||
-                                          normalizedStatus === "in_progress" ||
-                                          normalizedStatus === "in progress"
-                                        ? "Đang thực hiện"
-                                        : normalizedStatus === "cancelled" ||
-                                            normalizedStatus === "canceled"
-                                          ? "Đã hủy"
-                                          : normalizedStatus === "pending"
-                                            ? "Chờ xử lý"
-                                            : normalizedStatus === "planned"
-                                              ? "Đã lập kế hoạch"
-                                              : mission.status;
-                                  const statusClass =
-                                    normalizedStatus === "completed"
-                                      ? "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
-                                      : normalizedStatus === "inprogress" ||
-                                          normalizedStatus === "in_progress" ||
-                                          normalizedStatus === "in progress"
-                                        ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700"
-                                        : normalizedStatus === "cancelled" ||
-                                            normalizedStatus === "canceled"
-                                          ? "bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-700"
-                                          : normalizedStatus === "pending" ||
-                                              normalizedStatus === "planned"
-                                            ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
-                                            : "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-600";
+                                  const missionStatus = getMissionStatusMeta(
+                                    mission.status,
+                                  );
 
                                   return (
                                     <div className="flex items-center justify-between">
@@ -6323,10 +6695,10 @@ const RescuePlanPanel = ({
                                           variant="outline"
                                           className={cn(
                                             "text-sm h-7 px-3 font-extrabold uppercase tracking-wide border-2",
-                                            statusClass,
+                                            missionStatus.className,
                                           )}
                                         >
-                                          {statusText}
+                                          {missionStatus.label}
                                         </Badge>
                                       </div>
                                     </div>
@@ -6663,398 +7035,422 @@ const RescuePlanPanel = ({
                                               )}
                                             </div>
 
-                                            <div className="p-3 space-y-2.5 bg-card">
-                                              {group.activities.map(
-                                                (activity) => {
-                                                  const assignedMissionTeams = (
-                                                    mission.teams ?? []
-                                                  ).filter((team) => {
-                                                    const normalizedStatus = (
-                                                      team.status ?? ""
-                                                    )
-                                                      .trim()
-                                                      .toLowerCase();
+                                            <div className="bg-card p-3">
+                                              <div className="grid gap-3 lg:grid-cols-2 lg:[grid-auto-rows:1fr]">
+                                                {group.activities.map(
+                                                  (activity) => {
+                                                    const assignedMissionTeams =
+                                                      (
+                                                        mission.teams ?? []
+                                                      ).filter((team) => {
+                                                        const normalizedStatus =
+                                                          (team.status ?? "")
+                                                            .trim()
+                                                            .toLowerCase();
+                                                        return (
+                                                          team.unassignedAt ==
+                                                            null &&
+                                                          (normalizedStatus ===
+                                                            "assigned" ||
+                                                            normalizedStatus ===
+                                                              "inprogress" ||
+                                                            normalizedStatus ===
+                                                              "in_progress" ||
+                                                            normalizedStatus ===
+                                                              "in progress")
+                                                        );
+                                                      });
+                                                    const teamsForStep =
+                                                      typeof activity.missionTeamId ===
+                                                      "number"
+                                                        ? (
+                                                            mission.teams ?? []
+                                                          ).filter(
+                                                            (team) =>
+                                                              team.missionTeamId ===
+                                                              activity.missionTeamId,
+                                                          )
+                                                        : assignedMissionTeams.length >
+                                                            0
+                                                          ? assignedMissionTeams
+                                                          : (mission.teams ??
+                                                            []);
+                                                    const config =
+                                                      activityTypeConfig[
+                                                        activity.activityType
+                                                      ] ||
+                                                      activityTypeConfig[
+                                                        "ASSESS"
+                                                      ];
+                                                    const cleanDescription =
+                                                      activity.description
+                                                        .replace(
+                                                          /\b\d{1,2}\.\d+,\s*\d{1,2}\.\d+\b\s*(\([^\)]*\))?/g,
+                                                          "",
+                                                        )
+                                                        .replace(/\s+/g, " ")
+                                                        .replace(/\(\s*\)/g, "")
+                                                        .replace(/: \./g, ":")
+                                                        .trim();
+                                                    const supplyItems =
+                                                      getSupplyDisplayItems(
+                                                        activity,
+                                                      );
+                                                    const displayDescription =
+                                                      supplyItems.length > 0
+                                                        ? stripSupplyDetailsFromDescription(
+                                                            cleanDescription,
+                                                          )
+                                                        : cleanDescription;
+                                                    const stepStatus =
+                                                      getActivityStatusMeta(
+                                                        activity.status,
+                                                      );
+
                                                     return (
-                                                      team.unassignedAt ==
-                                                        null &&
-                                                      (normalizedStatus ===
-                                                        "assigned" ||
-                                                        normalizedStatus ===
-                                                          "inprogress" ||
-                                                        normalizedStatus ===
-                                                          "in_progress" ||
-                                                        normalizedStatus ===
-                                                          "in progress")
-                                                    );
-                                                  });
-                                                  const teamsForStep =
-                                                    typeof activity.missionTeamId ===
-                                                    "number"
-                                                      ? (
-                                                          mission.teams ?? []
-                                                        ).filter(
-                                                          (team) =>
-                                                            team.missionTeamId ===
-                                                            activity.missionTeamId,
-                                                        )
-                                                      : assignedMissionTeams.length >
-                                                          0
-                                                        ? assignedMissionTeams
-                                                        : (mission.teams ?? []);
-                                                  const config =
-                                                    activityTypeConfig[
-                                                      activity.activityType
-                                                    ] ||
-                                                    activityTypeConfig[
-                                                      "ASSESS"
-                                                    ];
-                                                  const cleanDescription =
-                                                    activity.description
-                                                      .replace(
-                                                        /\b\d{1,2}\.\d+,\s*\d{1,2}\.\d+\b\s*(\([^\)]*\))?/g,
-                                                        "",
-                                                      )
-                                                      .replace(/\s+/g, " ")
-                                                      .replace(/\(\s*\)/g, "")
-                                                      .replace(/: \./g, ":")
-                                                      .trim();
-                                                  const supplyItems =
-                                                    getSupplyDisplayItems(
-                                                      activity,
-                                                    );
-                                                  const displayDescription =
-                                                    supplyItems.length > 0
-                                                      ? stripSupplyDetailsFromDescription(
-                                                          cleanDescription,
-                                                        )
-                                                      : cleanDescription;
-                                                  const stepStatus =
-                                                    getActivityStatusMeta(
-                                                      activity.status,
-                                                    );
-
-                                                  return (
-                                                    <div
-                                                      key={activity.id}
-                                                      className="rounded-lg border bg-background p-3 hover:bg-accent/20 transition-colors shadow-sm"
-                                                    >
-                                                      <div className="flex items-start gap-3">
-                                                        <div
-                                                          className={cn(
-                                                            "w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5",
-                                                            config.bgColor,
-                                                            config.color,
-                                                          )}
-                                                        >
-                                                          {activity.step}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0 space-y-1.5">
-                                                          <div className="flex items-center gap-1.5 flex-wrap">
-                                                            <Badge
-                                                              variant="outline"
-                                                              className={cn(
-                                                                "text-sm font-semibold px-2 py-0 h-5",
-                                                                config.color,
-                                                                config.bgColor,
-                                                                "border-transparent",
-                                                              )}
-                                                            >
-                                                              {config.label}
-                                                            </Badge>
-                                                            <Badge
-                                                              variant="outline"
-                                                              className={cn(
-                                                                "text-sm h-6 px-2 font-bold border flex items-center gap-1",
-                                                                stepStatus.className,
-                                                              )}
-                                                            >
-                                                              {stepStatus.icon}
-                                                              {stepStatus.label}
-                                                            </Badge>
-                                                            {typeof activity.estimatedTime ===
-                                                            "number" ? (
-                                                              <Badge
-                                                                variant="outline"
-                                                                className="text-sm h-6 px-2 font-semibold"
-                                                              >
-                                                                ETA:{" "}
-                                                                {
-                                                                  activity.estimatedTime
-                                                                }{" "}
-                                                                phút
-                                                              </Badge>
-                                                            ) : null}
+                                                      <div
+                                                        key={activity.id}
+                                                        className="flex h-full flex-col rounded-2xl border border-border/70 bg-gradient-to-b from-background via-background to-muted/20 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md"
+                                                      >
+                                                        <div className="flex h-full items-start gap-3">
+                                                          <div
+                                                            className={cn(
+                                                              "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-base font-extrabold shadow-sm ring-1 ring-black/5",
+                                                              config.bgColor,
+                                                              config.color,
+                                                            )}
+                                                          >
+                                                            {activity.step}
                                                           </div>
-                                                          <p className="text-sm text-foreground/80 leading-relaxed font-medium">
-                                                            {displayDescription}
-                                                          </p>
-
-                                                          {(activity.assemblyPointName ||
-                                                            (activity.assemblyPointLatitude !=
-                                                              null &&
-                                                              activity.assemblyPointLongitude !=
-                                                                null)) && (
-                                                            <div className="mt-2 p-2 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15">
-                                                              <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
-                                                                <MapPin
-                                                                  className="h-3 w-3"
-                                                                  weight="fill"
-                                                                />
-                                                                Điểm tập kết
-                                                                hoạt động
-                                                              </p>
-                                                              {activity.assemblyPointName && (
-                                                                <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
+                                                          <div className="flex min-h-full min-w-0 flex-1 flex-col gap-3">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                              <div className="min-w-0 space-y-2">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                  <span className="text-sm font-bold text-foreground">
+                                                                    Bước{" "}
+                                                                    {
+                                                                      activity.step
+                                                                    }
+                                                                  </span>
+                                                                  <Badge
+                                                                    variant="outline"
+                                                                    className={cn(
+                                                                      "h-6 border-transparent px-2 text-sm font-semibold",
+                                                                      config.color,
+                                                                      config.bgColor,
+                                                                    )}
+                                                                  >
+                                                                    {
+                                                                      config.label
+                                                                    }
+                                                                  </Badge>
+                                                                  <Badge
+                                                                    variant="outline"
+                                                                    className={cn(
+                                                                      "flex h-6 items-center gap-1 border px-2 text-sm font-bold",
+                                                                      stepStatus.className,
+                                                                    )}
+                                                                  >
+                                                                    {
+                                                                      stepStatus.icon
+                                                                    }
+                                                                    {
+                                                                      stepStatus.label
+                                                                    }
+                                                                  </Badge>
+                                                                </div>
+                                                                <p className="text-sm font-medium leading-relaxed text-foreground/80">
                                                                   {
-                                                                    activity.assemblyPointName
+                                                                    displayDescription
                                                                   }
                                                                 </p>
-                                                              )}
-                                                              {formatCoordinateLabel(
-                                                                activity.assemblyPointLatitude,
-                                                                activity.assemblyPointLongitude,
-                                                              ) && (
-                                                                <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
-                                                                  Tọa độ:{" "}
-                                                                  {formatCoordinateLabel(
-                                                                    activity.assemblyPointLatitude,
-                                                                    activity.assemblyPointLongitude,
-                                                                  )}
-                                                                </p>
-                                                              )}
+                                                              </div>
+                                                              {typeof activity.estimatedTime ===
+                                                              "number" ? (
+                                                                <div className="shrink-0 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-right shadow-sm">
+                                                                  <p className="text-[10px] font-semibold leading-tight text-muted-foreground">
+                                                                    Thời gian dự
+                                                                    kiến đến
+                                                                  </p>
+                                                                  <p className="text-sm font-bold text-foreground">
+                                                                    {
+                                                                      activity.estimatedTime
+                                                                    }{" "}
+                                                                    phút
+                                                                  </p>
+                                                                </div>
+                                                              ) : null}
                                                             </div>
-                                                          )}
 
-                                                          {(activity.completedBy ||
-                                                            activity.completedAt) && (
-                                                            <div className="mt-2 p-2 rounded-md border border-slate-200/80 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-900/20">
-                                                              <p className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                                                                <CheckCircle
-                                                                  className="h-3 w-3"
-                                                                  weight="fill"
-                                                                />
-                                                                Thông tin hoàn
-                                                                tất bước
-                                                              </p>
-                                                              {activity.completedBy && (
-                                                                <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
-                                                                  Người hoàn
-                                                                  tất:{" "}
-                                                                  {
-                                                                    activity.completedBy
-                                                                  }
+                                                            {(activity.assemblyPointName ||
+                                                              (activity.assemblyPointLatitude !=
+                                                                null &&
+                                                                activity.assemblyPointLongitude !=
+                                                                  null)) && (
+                                                              <div className="mt-2 p-2 rounded-md border border-blue-200/70 dark:border-blue-700/50 bg-blue-50/60 dark:bg-blue-900/15">
+                                                                <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1 flex items-center gap-1">
+                                                                  <MapPin
+                                                                    className="h-3 w-3"
+                                                                    weight="fill"
+                                                                  />
+                                                                  Điểm tập kết
+                                                                  hoạt động
                                                                 </p>
-                                                              )}
-                                                              {activity.completedAt && (
-                                                                <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
-                                                                  Thời điểm:{" "}
-                                                                  {new Date(
-                                                                    activity.completedAt,
-                                                                  ).toLocaleString(
-                                                                    "vi-VN",
-                                                                  )}
-                                                                </p>
-                                                              )}
-                                                            </div>
-                                                          )}
+                                                                {activity.assemblyPointName && (
+                                                                  <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">
+                                                                    {
+                                                                      activity.assemblyPointName
+                                                                    }
+                                                                  </p>
+                                                                )}
+                                                                {formatCoordinateLabel(
+                                                                  activity.assemblyPointLatitude,
+                                                                  activity.assemblyPointLongitude,
+                                                                ) && (
+                                                                  <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                                                                    Tọa độ:{" "}
+                                                                    {formatCoordinateLabel(
+                                                                      activity.assemblyPointLatitude,
+                                                                      activity.assemblyPointLongitude,
+                                                                    )}
+                                                                  </p>
+                                                                )}
+                                                              </div>
+                                                            )}
 
-                                                          {teamsForStep.length >
-                                                            0 && (
-                                                            <div className="mt-2 p-2 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
-                                                              <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
-                                                                <ShieldCheck
-                                                                  className="h-3 w-3"
-                                                                  weight="fill"
-                                                                />
-                                                                Đội phụ trách
-                                                              </p>
-                                                              <div className="space-y-1.5">
-                                                                {teamsForStep.map(
-                                                                  (team) => {
-                                                                    const teamStatusMeta =
-                                                                      getTeamAssignmentStatusMeta(
-                                                                        team.status,
-                                                                      );
-                                                                    const rescueTeamStatusMeta =
-                                                                      getRescueTeamStatusMeta(
-                                                                        team.teamStatus,
-                                                                        rescueTeamStatusLabelsByKey,
-                                                                      );
-                                                                    const normalizedAssignmentStatus =
-                                                                      (
-                                                                        team.status ??
-                                                                        ""
-                                                                      )
-                                                                        .trim()
-                                                                        .toLowerCase()
-                                                                        .replaceAll(
-                                                                          "_",
-                                                                          "",
-                                                                        )
-                                                                        .replaceAll(
-                                                                          " ",
-                                                                          "",
+                                                            {(activity.completedBy ||
+                                                              activity.completedAt) && (
+                                                              <div className="mt-2 p-2 rounded-md border border-slate-200/80 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-900/20">
+                                                                <p className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                                                                  <CheckCircle
+                                                                    className="h-3 w-3"
+                                                                    weight="fill"
+                                                                  />
+                                                                  Thông tin hoàn
+                                                                  tất bước
+                                                                </p>
+                                                                {activity.completedBy && (
+                                                                  <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
+                                                                    Người hoàn
+                                                                    tất:{" "}
+                                                                    {
+                                                                      activity.completedBy
+                                                                    }
+                                                                  </p>
+                                                                )}
+                                                                {activity.completedAt && (
+                                                                  <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
+                                                                    Thời điểm:{" "}
+                                                                    {new Date(
+                                                                      activity.completedAt,
+                                                                    ).toLocaleString(
+                                                                      "vi-VN",
+                                                                    )}
+                                                                  </p>
+                                                                )}
+                                                              </div>
+                                                            )}
+
+                                                            {teamsForStep.length >
+                                                              0 && (
+                                                              <div className="mt-2 p-2 rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-emerald-50/60 dark:bg-emerald-900/15">
+                                                                <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mb-1 flex items-center gap-1">
+                                                                  <ShieldCheck
+                                                                    className="h-3 w-3"
+                                                                    weight="fill"
+                                                                  />
+                                                                  Đội phụ trách
+                                                                </p>
+                                                                <div className="space-y-1.5">
+                                                                  {teamsForStep.map(
+                                                                    (team) => {
+                                                                      const teamStatusMeta =
+                                                                        getTeamAssignmentStatusMeta(
+                                                                          team.status,
                                                                         );
-                                                                    const normalizedRescueTeamStatus =
-                                                                      normalizeRescueTeamStatusKey(
-                                                                        team.teamStatus,
-                                                                      );
-                                                                    const shouldShowRescueTeamStatusBadge =
-                                                                      Boolean(
-                                                                        team.teamStatus,
-                                                                      ) &&
-                                                                      normalizedRescueTeamStatus !==
-                                                                        normalizedAssignmentStatus;
+                                                                      const rescueTeamStatusMeta =
+                                                                        getRescueTeamStatusMeta(
+                                                                          team.teamStatus,
+                                                                          rescueTeamStatusLabelsByKey,
+                                                                        );
+                                                                      const normalizedAssignmentStatus =
+                                                                        (
+                                                                          team.status ??
+                                                                          ""
+                                                                        )
+                                                                          .trim()
+                                                                          .toLowerCase()
+                                                                          .replaceAll(
+                                                                            "_",
+                                                                            "",
+                                                                          )
+                                                                          .replaceAll(
+                                                                            " ",
+                                                                            "",
+                                                                          );
+                                                                      const normalizedRescueTeamStatus =
+                                                                        normalizeRescueTeamStatusKey(
+                                                                          team.teamStatus,
+                                                                        );
+                                                                      const shouldShowRescueTeamStatusBadge =
+                                                                        Boolean(
+                                                                          team.teamStatus,
+                                                                        ) &&
+                                                                        normalizedRescueTeamStatus !==
+                                                                          normalizedAssignmentStatus;
 
-                                                                    return (
-                                                                      <div
-                                                                        key={
-                                                                          team.missionTeamId
-                                                                        }
-                                                                        className="rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-background/80 px-2 py-1.5"
-                                                                      >
-                                                                        <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-                                                                          {team.teamName ||
-                                                                            `Đội #${team.rescueTeamId}`}
-                                                                        </p>
-                                                                        {team.assemblyPointName && (
-                                                                          <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
-                                                                            Điểm
-                                                                            tập
-                                                                            kết:{" "}
-                                                                            {
-                                                                              team.assemblyPointName
-                                                                            }
+                                                                      return (
+                                                                        <div
+                                                                          key={
+                                                                            team.missionTeamId
+                                                                          }
+                                                                          className="rounded-md border border-emerald-200/70 dark:border-emerald-700/50 bg-background/80 px-2 py-1.5"
+                                                                        >
+                                                                          <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                                                                            {team.teamName ||
+                                                                              `Đội #${team.rescueTeamId}`}
                                                                           </p>
-                                                                        )}
-                                                                        {formatCoordinateLabel(
-                                                                          team.latitude,
-                                                                          team.longitude,
-                                                                        ) && (
-                                                                          <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
-                                                                            Vị
-                                                                            trí
-                                                                            đội:{" "}
-                                                                            {formatCoordinateLabel(
-                                                                              team.latitude,
-                                                                              team.longitude,
-                                                                            )}
-                                                                            {team.locationSource
-                                                                              ? ` (${team.locationSource})`
-                                                                              : ""}
-                                                                          </p>
-                                                                        )}
-                                                                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                                                                          {team.teamCode && (
-                                                                            <Badge
-                                                                              variant="outline"
-                                                                              className="h-5 px-1.5 text-sm border-emerald-300/70 text-emerald-800 dark:border-emerald-700 dark:text-emerald-200"
-                                                                            >
+                                                                          {team.assemblyPointName && (
+                                                                            <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                                              Điểm
+                                                                              tập
+                                                                              kết:{" "}
                                                                               {
-                                                                                team.teamCode
+                                                                                team.assemblyPointName
                                                                               }
-                                                                            </Badge>
+                                                                            </p>
                                                                           )}
-                                                                          {team.teamType && (
-                                                                            <span className="text-sm text-emerald-700/80 dark:text-emerald-300/80">
-                                                                              Loại:{" "}
-                                                                              {formatTeamTypeLabel(
-                                                                                team.teamType,
+                                                                          {formatCoordinateLabel(
+                                                                            team.latitude,
+                                                                            team.longitude,
+                                                                          ) && (
+                                                                            <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+                                                                              Vị
+                                                                              trí
+                                                                              đội:{" "}
+                                                                              {formatCoordinateLabel(
+                                                                                team.latitude,
+                                                                                team.longitude,
                                                                               )}
-                                                                            </span>
+                                                                              {team.locationSource
+                                                                                ? ` (${team.locationSource})`
+                                                                                : ""}
+                                                                            </p>
                                                                           )}
-                                                                          <Badge
-                                                                            variant="outline"
-                                                                            className={cn(
-                                                                              "h-5 px-1.5 text-sm font-semibold",
-                                                                              teamStatusMeta.className,
+                                                                          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                                                            {team.teamCode && (
+                                                                              <Badge
+                                                                                variant="outline"
+                                                                                className="h-5 px-1.5 text-sm border-emerald-300/70 text-emerald-800 dark:border-emerald-700 dark:text-emerald-200"
+                                                                              >
+                                                                                {
+                                                                                  team.teamCode
+                                                                                }
+                                                                              </Badge>
                                                                             )}
-                                                                          >
-                                                                            {
-                                                                              teamStatusMeta.label
-                                                                            }
-                                                                          </Badge>
-                                                                          {shouldShowRescueTeamStatusBadge && (
+                                                                            {team.teamType && (
+                                                                              <span className="text-sm text-emerald-700/80 dark:text-emerald-300/80">
+                                                                                Loại:{" "}
+                                                                                {formatTeamTypeLabel(
+                                                                                  team.teamType,
+                                                                                )}
+                                                                              </span>
+                                                                            )}
                                                                             <Badge
                                                                               variant="outline"
                                                                               className={cn(
                                                                                 "h-5 px-1.5 text-sm font-semibold",
-                                                                                rescueTeamStatusMeta.className,
+                                                                                teamStatusMeta.className,
                                                                               )}
                                                                             >
-                                                                              Đội:{" "}
                                                                               {
-                                                                                rescueTeamStatusMeta.label
+                                                                                teamStatusMeta.label
                                                                               }
                                                                             </Badge>
-                                                                          )}
-                                                                          {typeof team.memberCount ===
-                                                                            "number" && (
-                                                                            <Badge
-                                                                              variant="outline"
-                                                                              className="h-5 px-1.5 text-sm"
-                                                                            >
-                                                                              {
-                                                                                team.memberCount
-                                                                              }{" "}
-                                                                              thành
-                                                                              viên
-                                                                            </Badge>
-                                                                          )}
+                                                                            {shouldShowRescueTeamStatusBadge && (
+                                                                              <Badge
+                                                                                variant="outline"
+                                                                                className={cn(
+                                                                                  "h-5 px-1.5 text-sm font-semibold",
+                                                                                  rescueTeamStatusMeta.className,
+                                                                                )}
+                                                                              >
+                                                                                Đội:{" "}
+                                                                                {
+                                                                                  rescueTeamStatusMeta.label
+                                                                                }
+                                                                              </Badge>
+                                                                            )}
+                                                                            {typeof team.memberCount ===
+                                                                              "number" && (
+                                                                              <Badge
+                                                                                variant="outline"
+                                                                                className="h-5 px-1.5 text-sm"
+                                                                              >
+                                                                                {
+                                                                                  team.memberCount
+                                                                                }{" "}
+                                                                                thành
+                                                                                viên
+                                                                              </Badge>
+                                                                            )}
+                                                                          </div>
+                                                                        </div>
+                                                                      );
+                                                                    },
+                                                                  )}
+                                                                </div>
+                                                              </div>
+                                                            )}
+                                                            {supplyItems.length >
+                                                              0 && (
+                                                              <div className="mt-2.5 p-2.5 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                                                                <p className="text-sm font-bold uppercase tracking-wider text-blue-600/80 dark:text-blue-400 mb-1.5 flex items-center gap-1.5">
+                                                                  <Package
+                                                                    className="h-3 w-3"
+                                                                    weight="fill"
+                                                                  />
+                                                                  {getSupplyStepTitle(
+                                                                    activity.activityType,
+                                                                  )}
+                                                                </p>
+                                                                <div className="space-y-1">
+                                                                  {supplyItems.map(
+                                                                    (
+                                                                      supply,
+                                                                      sIdx,
+                                                                    ) => (
+                                                                      <div
+                                                                        key={
+                                                                          sIdx
+                                                                        }
+                                                                        className="flex items-center justify-between gap-2 text-sm py-1 px-2 bg-background rounded border shadow-sm"
+                                                                      >
+                                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                                          <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                                          <span className="font-medium truncate">
+                                                                            {
+                                                                              supply.name
+                                                                            }
+                                                                          </span>
+                                                                        </div>
+                                                                        <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                                                                          {supply.quantityLabel ||
+                                                                            "-"}
                                                                         </div>
                                                                       </div>
-                                                                    );
-                                                                  },
-                                                                )}
+                                                                    ),
+                                                                  )}
+                                                                </div>
                                                               </div>
-                                                            </div>
-                                                          )}
-                                                          {supplyItems.length >
-                                                            0 && (
-                                                            <div className="mt-2.5 p-2.5 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                                                              <p className="text-sm font-bold uppercase tracking-wider text-blue-600/80 dark:text-blue-400 mb-1.5 flex items-center gap-1.5">
-                                                                <Package
-                                                                  className="h-3 w-3"
-                                                                  weight="fill"
-                                                                />
-                                                                {getSupplyStepTitle(
-                                                                  activity.activityType,
-                                                                )}
-                                                              </p>
-                                                              <div className="space-y-1">
-                                                                {supplyItems.map(
-                                                                  (
-                                                                    supply,
-                                                                    sIdx,
-                                                                  ) => (
-                                                                    <div
-                                                                      key={sIdx}
-                                                                      className="flex items-center justify-between gap-2 text-sm py-1 px-2 bg-background rounded border shadow-sm"
-                                                                    >
-                                                                      <div className="flex items-center gap-1.5 min-w-0">
-                                                                        <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                                                        <span className="font-medium truncate">
-                                                                          {
-                                                                            supply.name
-                                                                          }
-                                                                        </span>
-                                                                      </div>
-                                                                      <div className="shrink-0 text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
-                                                                        {supply.quantityLabel ||
-                                                                          "-"}
-                                                                      </div>
-                                                                    </div>
-                                                                  ),
-                                                                )}
-                                                              </div>
-                                                            </div>
-                                                          )}
+                                                            )}
+                                                          </div>
                                                         </div>
                                                       </div>
-                                                    </div>
-                                                  );
-                                                },
-                                              )}
+                                                    );
+                                                  },
+                                                )}
+                                              </div>
                                             </div>
                                           </div>
                                         );
@@ -7122,7 +7518,7 @@ const RescuePlanPanel = ({
                                   className="h-3.5 w-3.5 mt-0.5 shrink-0"
                                   weight="fill"
                                 />
-                                Khi xóa vật tư hoặc xóa bước trong phần chỉnh
+                                Khi xóa vật phẩm hoặc xóa bước trong phần chỉnh
                                 sửa, dữ liệu đó sẽ bị loại khỏi nhiệm vụ lúc xác
                                 nhận.
                               </p>
@@ -7284,7 +7680,7 @@ const RescuePlanPanel = ({
                                 (hasValidSuggestedTeamId
                                   ? `Đội #${parsedSuggestedTeamId}`
                                   : isReturnSuppliesActivity
-                                    ? "Chưa xác định đội lấy vật tư"
+                                    ? "Chưa xác định đội thu gom vật phẩm"
                                     : "Chưa chọn đội");
                               return (
                                 <div
@@ -7627,9 +8023,9 @@ const RescuePlanPanel = ({
 
                                     {isReturnSuppliesActivity && (
                                       <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
-                                        Bước Trả đồ được tự động gán cùng đội đã
-                                        lấy vật tư và không thể thay đổi thủ
-                                        công.
+                                        Bước Hoàn trả vật phẩm được tự động gán
+                                        cùng đội đã thu gom vật phẩm và không
+                                        thể thay đổi thủ công.
                                       </p>
                                     )}
                                   </div>
@@ -7640,8 +8036,13 @@ const RescuePlanPanel = ({
                                       className={cn(
                                         "mt-1 p-2 rounded-lg border-2 border-dashed transition-colors",
                                         "border-blue-200 dark:border-blue-800/40 bg-blue-50/30 dark:bg-blue-900/10",
+                                        isReturnSuppliesActivity &&
+                                          "border-blue-300/70 bg-blue-100/40 dark:bg-blue-900/15",
                                       )}
                                       onDragOver={(e) => {
+                                        if (isReturnSuppliesActivity) {
+                                          return;
+                                        }
                                         if (
                                           e.dataTransfer.types.includes(
                                             "application/inventory-item",
@@ -7668,6 +8069,12 @@ const RescuePlanPanel = ({
                                           "border-blue-400",
                                           "bg-blue-100/50",
                                         );
+                                        if (isReturnSuppliesActivity) {
+                                          toast.info(
+                                            "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể kéo thả thủ công.",
+                                          );
+                                          return;
+                                        }
                                         const data = e.dataTransfer.getData(
                                           "application/inventory-item",
                                         );
@@ -7683,8 +8090,16 @@ const RescuePlanPanel = ({
                                     >
                                       <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
                                         <Package className="h-3 w-3" />
-                                        Vật tư
+                                        Vật phẩm
                                       </p>
+                                      {isReturnSuppliesActivity && (
+                                        <p className="mb-1.5 text-sm leading-relaxed text-blue-700/80 dark:text-blue-300/80">
+                                          Hệ thống chỉ đồng bộ số lượng cho
+                                          những vật phẩm AI đã chọn hoàn trả ở
+                                          bước này, không tự thêm toàn bộ vật
+                                          phẩm đã thu gom.
+                                        </p>
+                                      )}
                                       {activity.suppliesToCollect &&
                                       activity.suppliesToCollect.length > 0 ? (
                                         <div className="space-y-1">
@@ -7701,12 +8116,13 @@ const RescuePlanPanel = ({
                                                     title={
                                                       getSupplyDisplayName(
                                                         supply,
-                                                      ) || "Vật tư chưa rõ tên"
+                                                      ) ||
+                                                      "Vật phẩm chưa rõ tên"
                                                     }
                                                   >
                                                     {getSupplyDisplayName(
                                                       supply,
-                                                    ) || "Vật tư chưa rõ tên"}
+                                                    ) || "Vật phẩm chưa rõ tên"}
                                                   </span>
                                                 </div>
                                                 <Input
@@ -7721,6 +8137,9 @@ const RescuePlanPanel = ({
                                                         e.target.value,
                                                       ) || 1,
                                                     )
+                                                  }
+                                                  disabled={
+                                                    isReturnSuppliesActivity
                                                   }
                                                   className="h-6 w-full text-sm text-center px-1"
                                                 />
@@ -7740,6 +8159,9 @@ const RescuePlanPanel = ({
                                                       ),
                                                     )
                                                   }
+                                                  disabled={
+                                                    isReturnSuppliesActivity
+                                                  }
                                                 >
                                                   <X className="h-3 w-3" />
                                                 </Button>
@@ -7749,7 +8171,7 @@ const RescuePlanPanel = ({
                                         </div>
                                       ) : (
                                         <p className="text-sm text-muted-foreground/60 text-center py-1">
-                                          Kéo vật tư từ kho bên phải vào đây
+                                          Kéo vật phẩm từ kho bên phải vào đây
                                         </p>
                                       )}
                                     </div>
@@ -7909,10 +8331,12 @@ const RescuePlanPanel = ({
                                         (ag) => ag.suggestedActivities,
                                       );
                                     setEditActivities(
-                                      allActivities.map((a, i) => ({
-                                        ...a,
-                                        _id: `edit-sug-${i}-${Date.now()}`,
-                                      })),
+                                      syncReturnActivitiesWithCollectors(
+                                        allActivities.map((a, i) => ({
+                                          ...a,
+                                          _id: `edit-sug-${i}-${Date.now()}`,
+                                        })),
+                                      ),
                                     );
                                     setEditPriorityScore(
                                       suggestion.suggestedPriorityScore || 5,
@@ -7994,7 +8418,7 @@ const RescuePlanPanel = ({
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                             <ListChecks className="h-3.5 w-3.5" weight="bold" />
-                            Kế hoạch thực hiện
+                            Các bước thực hiện
                           </h3>
                           <div className="flex items-center gap-2">
                             <Button
@@ -8341,7 +8765,7 @@ const RescuePlanPanel = ({
                               <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30 rounded-lg p-2.5">
                                 <p className="text-sm text-blue-800 dark:text-blue-300 leading-relaxed">
                                   Kế hoạch đề xuất phối hợp nhiều kho để đáp ứng
-                                  đủ vật tư.
+                                  đủ vật phẩm.
                                 </p>
                               </div>
                             )}
@@ -8387,7 +8811,7 @@ const RescuePlanPanel = ({
                       <CardContent className="p-2.5">
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="text-sm text-muted-foreground">
-                            Confidence
+                            Mức tự tin của AI
                           </span>
                           <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                             {(
@@ -8400,6 +8824,10 @@ const RescuePlanPanel = ({
                           value={(activeSuggestion?.confidenceScore ?? 0) * 100}
                           className="h-1.5"
                         />
+                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                          Chỉ số này thể hiện mức độ chắc chắn của AI với đề
+                          xuất hiện tại, không phải mức ưu tiên xử lý.
+                        </p>
                         <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-muted-foreground">
                           <div>
                             <p className="text-muted-foreground/60">Model</p>
@@ -8421,23 +8849,16 @@ const RescuePlanPanel = ({
                             </div>
                           )}
                           <div>
-                            <p className="text-muted-foreground/60">Ưu tiên</p>
+                            <p className="text-muted-foreground/60">Đánh giá</p>
                             <p className="font-medium text-foreground/80">
-                              {(
-                                activeSuggestion?.suggestedPriorityScore ?? 0
-                              ).toFixed(1)}
+                              {(activeSuggestion?.confidenceScore ?? 0) >= 0.8
+                                ? "Cao"
+                                : (activeSuggestion?.confidenceScore ?? 0) >=
+                                    0.6
+                                  ? "Trung bình"
+                                  : "Cần rà soát"}
                             </p>
                           </div>
-                          {activeSuggestion && (
-                            <div>
-                              <p className="text-muted-foreground/60">
-                                Thời lượng
-                              </p>
-                              <p className="font-medium text-foreground/80">
-                                {activeSuggestion.estimatedDuration}
-                              </p>
-                            </div>
-                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -8453,12 +8874,12 @@ const RescuePlanPanel = ({
                             className="h-3.5 w-3.5 text-amber-500"
                             weight="fill"
                           />
-                          Kho vật tư
+                          Kho vật phẩm
                         </h4>
                         <p className="text-sm text-muted-foreground mb-2">
                           {isEditMode
-                            ? "Kéo vật tư vào bước thực hiện bên trái"
-                            : "Vào chế độ chỉnh sửa để kéo vật tư vào bước"}
+                            ? "Kéo vật phẩm vào bước thực hiện bên trái"
+                            : "Vào chế độ chỉnh sửa để kéo vật phẩm vào bước"}
                         </p>
                         <div className="space-y-2">
                           {sidebarDepots.map((depot) => (
@@ -8504,14 +8925,20 @@ const RescuePlanPanel = ({
               <Button
                 className="flex-1 bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-lg shadow-amber-500/20"
                 onClick={handleOpenSubmitConfirm}
-                disabled={isCreatingMission}
+                disabled={isSubmittingMissionEdit}
               >
-                {isCreatingMission ? (
+                {isSubmittingMissionEdit ? (
                   <CircleNotch className="h-5 w-5 mr-2 animate-spin" />
                 ) : (
                   <FloppyDisk className="h-5 w-5 mr-2" weight="fill" />
                 )}
-                {isCreatingMission ? "Đang tạo..." : "Xác nhận nhiệm vụ"}
+                {isSubmittingMissionEdit
+                  ? editingMissionId
+                    ? "Đang cập nhật..."
+                    : "Đang tạo..."
+                  : editingMissionId
+                    ? "Lưu cập nhật nhiệm vụ"
+                    : "Xác nhận nhiệm vụ"}
               </Button>
             ) : activeSuggestion ? (
               <Button
@@ -8556,27 +8983,37 @@ const RescuePlanPanel = ({
         <Dialog open={confirmSubmitOpen} onOpenChange={setConfirmSubmitOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Xác nhận tạo nhiệm vụ</DialogTitle>
+              <DialogTitle>
+                {editingMissionId
+                  ? "Xác nhận cập nhật nhiệm vụ"
+                  : "Xác nhận tạo nhiệm vụ"}
+              </DialogTitle>
               <DialogDescription>
-                Bạn có chắc muốn hoàn tất chỉnh sửa không? Sau khi tạo, nhiệm vụ
-                sẽ được lưu vào danh sách nhiệm vụ đã tạo và gửi đến đội cứu hộ
-                được chỉ định.
+                {editingMissionId
+                  ? "Bạn có chắc muốn lưu các thay đổi của nhiệm vụ hiện tại không? Hệ thống sẽ cập nhật kế hoạch đang giao cho đội cứu hộ."
+                  : "Bạn có chắc muốn hoàn tất chỉnh sửa không? Sau khi tạo, nhiệm vụ sẽ được lưu vào danh sách nhiệm vụ đã tạo và gửi đến đội cứu hộ được chỉ định."}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button
                 variant="outline"
                 onClick={() => setConfirmSubmitOpen(false)}
-                disabled={isCreatingMission}
+                disabled={isSubmittingMissionEdit}
               >
                 Quay lại chỉnh sửa
               </Button>
               <Button
                 className="bg-linear-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
                 onClick={handleSubmitEdit}
-                disabled={isCreatingMission}
+                disabled={isSubmittingMissionEdit}
               >
-                {isCreatingMission ? "Đang tạo..." : "Đồng ý tạo nhiệm vụ"}
+                {isSubmittingMissionEdit
+                  ? editingMissionId
+                    ? "Đang cập nhật..."
+                    : "Đang tạo..."
+                  : editingMissionId
+                    ? "Đồng ý cập nhật"
+                    : "Đồng ý tạo nhiệm vụ"}
               </Button>
             </DialogFooter>
           </DialogContent>

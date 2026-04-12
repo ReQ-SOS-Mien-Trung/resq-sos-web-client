@@ -40,7 +40,6 @@ import {
   WalletIcon,
   SunIcon,
   MoonIcon,
-  ProhibitInset,
   LockIcon,
 } from "@phosphor-icons/react";
 import {
@@ -646,7 +645,7 @@ const InventoryDashboardPage = () => {
             onClick={() => router.push("/dashboard/inventory/stock-movements")}
           >
             <FileTextIcon className="h-4 w-4" />
-            Truy xuất
+            Xem biến động kho
           </Button>
           <Button
             variant="outline"
@@ -655,7 +654,7 @@ const InventoryDashboardPage = () => {
             onClick={() => router.push("/dashboard/inventory/pickups")}
           >
             <TruckIcon className="h-4 w-4" />
-            Quản lý lấy hàng
+            Quản lý giao nhận
           </Button>
           <Button
             variant="outline"

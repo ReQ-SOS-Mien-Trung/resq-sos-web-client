@@ -1,12 +1,9 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,7 +54,6 @@ import {
   CheckCircle,
   XCircle,
   Receipt,
-  CurrencyDollar,
   CalendarBlank,
   CaretDown,
   Check,
@@ -144,6 +140,18 @@ function formatMoney(value: number) {
   return value.toLocaleString("vi-VN") + "đ";
 }
 
+function formatMeasurementNumber(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  return value.toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  });
+}
+
+function hasMeasurementValue(value: number | null | undefined): boolean {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
 /* ── Advance Limit Section ───────────────────────────────── */
 
 function AdvanceLimitModal({
@@ -159,13 +167,6 @@ function AdvanceLimitModal({
   const updateLimit = useUpdateDepotAdvanceLimit();
   const [selectedDepotId, setSelectedDepotId] = useState<string>("");
   const [limitInput, setLimitInput] = useState<string>("");
-
-  useEffect(() => {
-    if (open) {
-      setSelectedDepotId("");
-      setLimitInput("");
-    }
-  }, [open]);
 
   const currentFund = useMemo(
     () => depotFunds.find((f) => f.depotId === Number(selectedDepotId)),
@@ -207,7 +208,16 @@ function AdvanceLimitModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setSelectedDepotId("");
+          setLimitInput("");
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-md gap-3">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-1.5 mb-0 text-base tracking-tighter">
@@ -724,9 +734,9 @@ export default function FundingRequestsPage() {
               </p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                {depotFunds.map((fund) => (
+                {depotFunds.map((fund, index) => (
                   <div
-                    key={fund.depotId}
+                    key={`${fund.depotId}-${fund.lastUpdatedAt}-${fund.balance}-${index}`}
                     onClick={() => openDepotFundPanel(fund)}
                     className={`rounded-xl border bg-background p-3.5 cursor-pointer transition-all active:scale-[0.97] ${
                       selectedDepotFund?.depotId === fund.depotId &&
@@ -1264,6 +1274,16 @@ export default function FundingRequestsPage() {
                             SL: {item.quantity} {item.unit}
                           </span>
                           <span>Đơn giá: {formatMoney(item.unitPrice)}</span>
+                          {hasMeasurementValue(item.volumePerUnit) && (
+                            <span>
+                              Thể tích/đv: {formatMeasurementNumber(item.volumePerUnit)} dm3
+                            </span>
+                          )}
+                          {hasMeasurementValue(item.weightPerUnit) && (
+                            <span>
+                              Cân nặng/đv: {formatMeasurementNumber(item.weightPerUnit)} kg
+                            </span>
+                          )}
                           <span>
                             Danh mục:{" "}
                             {categoryMap[item.categoryCode] ??
