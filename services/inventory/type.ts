@@ -192,7 +192,6 @@ export interface ImportPurchaseItem {
 }
 
 export type ImportRegularRequest = {
-  advancedByName?: string;
   invoices: Array<{
     batchNote?: string;
     vatInvoice: VatInvoice;

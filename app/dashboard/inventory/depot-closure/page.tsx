@@ -915,44 +915,44 @@ export default function DepotClosurePage() {
             {(activeClosureDetail.externalNote ||
               activeClosureDetail.driftNote ||
               activeClosureDetail.failureReason) && (
-              <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Ghi chú bổ sung
-                </p>
-                <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-3">
-                  {activeClosureDetail.externalNote && (
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-muted-foreground tracking-tight">
-                        Xử lý bên ngoài
-                      </p>
-                      <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words">
-                        {activeClosureDetail.externalNote}
-                      </p>
-                    </div>
-                  )}
-                  {activeClosureDetail.driftNote && (
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-muted-foreground tracking-tight">
-                        Ghi chú chênh lệch
-                      </p>
-                      <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words">
-                        {activeClosureDetail.driftNote}
-                      </p>
-                    </div>
-                  )}
-                  {activeClosureDetail.failureReason && (
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-red-600 dark:text-red-400 tracking-tight">
-                        Nguyên nhân thất bại
-                      </p>
-                      <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words text-red-700 dark:text-red-300">
-                        {activeClosureDetail.failureReason}
-                      </p>
-                    </div>
-                  )}
+                <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Ghi chú bổ sung
+                  </p>
+                  <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-3">
+                    {activeClosureDetail.externalNote && (
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-muted-foreground tracking-tight">
+                          Xử lý bên ngoài
+                        </p>
+                        <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words">
+                          {activeClosureDetail.externalNote}
+                        </p>
+                      </div>
+                    )}
+                    {activeClosureDetail.driftNote && (
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-muted-foreground tracking-tight">
+                          Ghi chú chênh lệch
+                        </p>
+                        <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words">
+                          {activeClosureDetail.driftNote}
+                        </p>
+                      </div>
+                    )}
+                    {activeClosureDetail.failureReason && (
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-red-600 dark:text-red-400 tracking-tight">
+                          Nguyên nhân thất bại
+                        </p>
+                        <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words text-red-700 dark:text-red-300">
+                          {activeClosureDetail.failureReason}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {activeClosureDetail.externalItems.length > 0 && (
               <div className="rounded-xl border border-border/60 overflow-hidden">
@@ -977,12 +977,12 @@ export default function DepotClosurePage() {
                       const hmBadgeCls = hm === "DonatedToOrganization"
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400"
                         : hm === "Liquidated"
-                        ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-400"
-                        : hm === "Destroyed" || hm === "Expired"
-                        ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:border-red-800 dark:text-red-400"
-                        : hm === "Disposed"
-                        ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-900/30 dark:border-zinc-700 dark:text-zinc-400"
-                        : "bg-muted border-border text-muted-foreground";
+                          ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-400"
+                          : hm === "Destroyed" || hm === "Expired"
+                            ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:border-red-800 dark:text-red-400"
+                            : hm === "Disposed"
+                              ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-900/30 dark:border-zinc-700 dark:text-zinc-400"
+                              : "bg-muted border-border text-muted-foreground";
 
                       return (
                         <div
@@ -1130,67 +1130,67 @@ export default function DepotClosurePage() {
               {/* Step Progress */}
               <div className="rounded-[24px] border border-white/70 dark:border-blue-900/60 bg-white/75 dark:bg-slate-950/25 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
                 <div className="flex items-start">
-                {TRANSFER_STEPS.map((step, i) => {
-                  const cur = STEP_ORDER.indexOf(currentTransferStatus);
-                  const me = STEP_ORDER.indexOf(step.key);
-                  const done = me < cur;
-                  const active = me === cur;
-                  return (
-                    <React.Fragment key={step.key}>
-                      {i > 0 && (
-                        <div
-                          className={cn(
-                            "h-1 flex-1 mt-3.5 mx-1 rounded-full transition-colors",
-                            done || active
-                              ? "bg-blue-400 dark:bg-blue-500"
-                              : "bg-blue-100 dark:bg-blue-950/70",
-                          )}
-                        />
-                      )}
-                      <div className="flex flex-col items-center gap-1.5 shrink-0 w-24">
-                        <div
-                          className={cn(
-                            "relative h-9 w-9 rounded-full border-2 flex items-center justify-center transition-all shadow-sm",
-                            done
-                              ? "bg-blue-500 border-blue-500 text-white shadow-[0_16px_24px_-16px_rgba(59,130,246,0.9)]"
-                              : active
-                                ? "bg-white border-blue-500 text-blue-600 dark:bg-blue-950 ring-4 ring-blue-100 dark:ring-blue-900/80 shadow-[0_12px_24px_-18px_rgba(59,130,246,0.9)]"
-                                : "bg-white/80 border-blue-100 text-blue-300 dark:bg-blue-950/50 dark:border-blue-900",
-                          )}
-                        >
-                          {active && (
-                            <>
-                              <span className="absolute inset-[-8px] rounded-full border border-blue-300/80 dark:border-blue-500/50 animate-ping" />
-                              <span
-                                className="absolute inset-[-14px] rounded-full border border-blue-200/60 dark:border-blue-400/30 animate-ping"
-                                style={{ animationDelay: "250ms" }}
-                              />
-                            </>
-                          )}
-                          {done ? (
-                            <CheckFat size={13} weight="fill" />
-                          ) : (
-                            <span className="text-xs font-black leading-none">
-                              {i + 1}
-                            </span>
-                          )}
+                  {TRANSFER_STEPS.map((step, i) => {
+                    const cur = STEP_ORDER.indexOf(currentTransferStatus);
+                    const me = STEP_ORDER.indexOf(step.key);
+                    const done = me < cur;
+                    const active = me === cur;
+                    return (
+                      <React.Fragment key={step.key}>
+                        {i > 0 && (
+                          <div
+                            className={cn(
+                              "h-1 flex-1 mt-3.5 mx-1 rounded-full transition-colors",
+                              done || active
+                                ? "bg-blue-400 dark:bg-blue-500"
+                                : "bg-blue-100 dark:bg-blue-950/70",
+                            )}
+                          />
+                        )}
+                        <div className="flex flex-col items-center gap-1.5 shrink-0 w-24">
+                          <div
+                            className={cn(
+                              "relative h-9 w-9 rounded-full border-2 flex items-center justify-center transition-all shadow-sm",
+                              done
+                                ? "bg-blue-500 border-blue-500 text-white shadow-[0_16px_24px_-16px_rgba(59,130,246,0.9)]"
+                                : active
+                                  ? "bg-white border-blue-500 text-blue-600 dark:bg-blue-950 ring-4 ring-blue-100 dark:ring-blue-900/80 shadow-[0_12px_24px_-18px_rgba(59,130,246,0.9)]"
+                                  : "bg-white/80 border-blue-100 text-blue-300 dark:bg-blue-950/50 dark:border-blue-900",
+                            )}
+                          >
+                            {active && (
+                              <>
+                                <span className="absolute inset-[-8px] rounded-full border border-blue-300/80 dark:border-blue-500/50 animate-ping" />
+                                <span
+                                  className="absolute inset-[-14px] rounded-full border border-blue-200/60 dark:border-blue-400/30 animate-ping"
+                                  style={{ animationDelay: "250ms" }}
+                                />
+                              </>
+                            )}
+                            {done ? (
+                              <CheckFat size={13} weight="fill" />
+                            ) : (
+                              <span className="text-xs font-black leading-none">
+                                {i + 1}
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            className={cn(
+                              "text-sm font-medium text-center leading-tight tracking-tighter whitespace-nowrap",
+                              done
+                                ? "text-blue-600 dark:text-blue-300 font-semibold"
+                                : active
+                                  ? "text-blue-800 dark:text-blue-200 font-bold"
+                                  : "text-muted-foreground",
+                            )}
+                          >
+                            {step.label}
+                          </span>
                         </div>
-                        <span
-                          className={cn(
-                            "text-sm font-medium text-center leading-tight tracking-tighter whitespace-nowrap",
-                            done
-                              ? "text-blue-600 dark:text-blue-300 font-semibold"
-                              : active
-                                ? "text-blue-800 dark:text-blue-200 font-bold"
-                                : "text-muted-foreground",
-                          )}
-                        >
-                          {step.label}
-                        </span>
-                      </div>
-                    </React.Fragment>
-                  );
-                })}
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1225,8 +1225,8 @@ export default function DepotClosurePage() {
                         : currentTransferStatus === "Shipping"
                           ? "Đang đi đường"
                           : currentTransferStatus === "Preparing"
-                          ? "Đang soạn hàng"
-                          : "Sẵn sàng thao tác",
+                            ? "Đang soạn hàng"
+                            : "Sẵn sàng thao tác",
                     icon: <Truck size={16} weight="fill" />,
                     tone: "text-cyan-700 dark:text-cyan-300",
                   },

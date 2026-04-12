@@ -10,6 +10,8 @@ import {
   getAvailableDepotManagers,
   getDepotFunds,
   getMyDepotFund,
+  createInternalAdvance,
+  createInternalRepayment,
   createDepot,
   updateDepot,
   updateDepotStatus,
@@ -45,6 +47,7 @@ import {
   DepotClosureResolutionMetadataItem,
   AvailableDepotManager,
   DepotFund,
+  MyDepotFund,
   UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
@@ -53,6 +56,8 @@ import {
   DepotManagerAssignmentResponse,
   GetDepotFundTransactionsResponse,
   GetDepotFundTransactionsParams,
+  CreateInternalAdvanceRequest,
+  CreateInternalRepaymentRequest,
   InitiateDepotClosureRequest,
   InitiateDepotClosureResponse,
   MarkDepotClosureExternalRequest,
@@ -99,6 +104,18 @@ export const DEPOT_CLOSURE_DETAIL_BY_DEPOT_QUERY_KEY = [
 ] as const;
 export const DEPOT_FUNDS_QUERY_KEY = ["depot-funds"] as const;
 export const MY_DEPOT_FUND_QUERY_KEY = ["my-depot-fund"] as const;
+export const MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY = [
+  "my-depot-fund-transactions",
+] as const;
+
+function invalidateDepotFundFinanceQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+) {
+  queryClient.invalidateQueries({ queryKey: MY_DEPOT_FUND_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: DEPOT_FUNDS_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: ["transactions"] });
+}
 
 export interface UseDepotsOptions {
   params?: GetDepotsParams;
@@ -229,15 +246,11 @@ export function useDepotFunds(options?: { enabled?: boolean }) {
   });
 }
 
-export const MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY = [
-  "my-depot-fund-transactions",
-] as const;
-
 /**
  * [Manager] Hook to fetch my depot fund
  */
 export function useMyDepotFund(options?: { enabled?: boolean }) {
-  return useQuery<DepotFund>({
+  return useQuery<MyDepotFund>({
     queryKey: MY_DEPOT_FUND_QUERY_KEY,
     queryFn: getMyDepotFund,
     enabled: options?.enabled ?? true,
@@ -268,10 +281,41 @@ export function useUpdateDepotAdvanceLimit() {
       mutationFn: ({ depotId, maxAdvanceLimit }) =>
         updateDepotAdvanceLimit(depotId, maxAdvanceLimit),
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: DEPOT_FUNDS_QUERY_KEY });
+        invalidateDepotFundFinanceQueries(queryClient);
       },
     },
   );
+}
+
+export function useCreateInternalAdvance() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    Error,
+    { depotFundId: number; payload: CreateInternalAdvanceRequest }
+  >({
+    mutationFn: ({ depotFundId, payload }) =>
+      createInternalAdvance(depotFundId, payload),
+    onSuccess: () => {
+      invalidateDepotFundFinanceQueries(queryClient);
+    },
+  });
+}
+
+export function useCreateInternalRepayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    Error,
+    CreateInternalRepaymentRequest
+  >({
+    mutationFn: createInternalRepayment,
+    onSuccess: () => {
+      invalidateDepotFundFinanceQueries(queryClient);
+    },
+  });
 }
 
 /**
