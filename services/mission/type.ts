@@ -130,11 +130,59 @@ export interface GetMissionsParams {
   clusterId: number;
 }
 
+export interface MissionSupplyLotAllocationRequest {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate: string;
+  expiredDate: string;
+  remainingQuantityAfterExecution: number;
+}
+
+export interface MissionSupplyReusableUnitRequest {
+  reusableItemId: number;
+  itemModelId: number;
+  itemName: string;
+  serialNumber: string;
+  condition: string;
+  note?: string | null;
+}
+
+export interface UpdateMissionActivityItemRequest {
+  itemId: number | null;
+  itemName: string | null;
+  imageUrl?: string | null;
+  quantity: number;
+  unit: string;
+  plannedPickupLotAllocations?: MissionSupplyLotAllocationRequest[];
+  plannedPickupReusableUnits?: MissionSupplyReusableUnitRequest[];
+  pickupLotAllocations?: MissionSupplyLotAllocationRequest[];
+  pickedReusableUnits?: MissionSupplyReusableUnitRequest[];
+  expectedReturnUnits?: MissionSupplyReusableUnitRequest[];
+  returnedReusableUnits?: MissionSupplyReusableUnitRequest[];
+  actualReturnedQuantity?: number;
+  bufferRatio?: number;
+  bufferQuantity?: number;
+  bufferUsedQuantity?: number;
+  bufferUsedReason?: string | null;
+  actualDeliveredQuantity?: number;
+}
+
+export interface UpdateMissionActivityRequest {
+  activityId: number;
+  step: number;
+  description: string;
+  target: string;
+  targetLatitude: number;
+  targetLongitude: number;
+  items: UpdateMissionActivityItemRequest[];
+}
+
 export interface UpdateMissionRequest {
   missionType: MissionType;
   priorityScore: number;
   startTime: string;
   expectedEndTime: string;
+  activities?: UpdateMissionActivityRequest[];
 }
 
 export interface UpdateMissionResponse {

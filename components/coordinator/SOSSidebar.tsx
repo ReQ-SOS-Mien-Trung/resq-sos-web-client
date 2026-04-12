@@ -180,12 +180,7 @@ const SOSSidebar = ({
   const [expandedClusters, setExpandedClusters] = useState<Set<number>>(
     new Set(),
   );
-
-  useEffect(() => {
-    if (selectedTeamIncident) {
-      setActiveTab("incidents");
-    }
-  }, [selectedTeamIncident]);
+  const currentTab = selectedTeamIncident ? "incidents" : activeTab;
 
   const pendingRequests = sosRequests.filter((s) => s.status === "PENDING");
   const assignedRequests = sosRequests.filter((s) => s.status === "ASSIGNED");
@@ -233,7 +228,7 @@ const SOSSidebar = ({
   });
 
   return (
-    <div className="h-full flex flex-col bg-background border-r text-[14px]">
+    <div className="flex h-full min-h-0 flex-col border-r bg-background text-[14px]">
       {/* Header */}
       <div className="p-4 border-b">
         <h2 className="font-bold text-[16px] flex items-center gap-2">
@@ -269,9 +264,9 @@ const SOSSidebar = ({
 
       {/* Tabs */}
       <Tabs
-        value={activeTab}
+        value={currentTab}
         onValueChange={setActiveTab}
-        className="flex-1 flex flex-col overflow-hidden"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <TabsList className="mx-3 mt-3 grid h-auto w-auto grid-cols-3 rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-inner dark:border-white/10 dark:bg-white/5">
           <TabsTrigger
@@ -297,9 +292,9 @@ const SOSSidebar = ({
         {/* Incoming SOS Tab */}
         <TabsContent
           value="incoming"
-          className="flex-1 overflow-hidden m-0 mt-3"
+          className="m-0 mt-3 flex min-h-0 flex-1 overflow-hidden"
         >
-          <ScrollArea className="h-full">
+          <ScrollArea className="h-full min-h-0">
             <div className="p-3 space-y-3">
               {/* Auto-cluster all nearby groups button */}
               {autoClusters.length > 0 && (
@@ -785,9 +780,9 @@ const SOSSidebar = ({
         {/* Rescuers Tab */}
         <TabsContent
           value="rescuers"
-          className="flex-1 overflow-hidden m-0 mt-3"
+          className="m-0 mt-3 flex min-h-0 flex-1 overflow-hidden"
         >
-          <ScrollArea className="h-full">
+          <ScrollArea className="h-full min-h-0">
             <div className="p-3 space-y-3">
               <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                 Sẵn sàng ({availableRescuers.length})
@@ -817,9 +812,9 @@ const SOSSidebar = ({
         {/* Team Incidents Tab */}
         <TabsContent
           value="incidents"
-          className="flex-1 overflow-hidden m-0 mt-3"
+          className="m-0 mt-3 flex min-h-0 flex-1 overflow-hidden"
         >
-          <ScrollArea className="h-full">
+          <ScrollArea className="h-full min-h-0">
             <div className="p-3 space-y-3">
               <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                 Mới báo cáo ({reportedIncidents.length})
