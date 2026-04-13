@@ -19,7 +19,7 @@ const NetworkMapSection = () => {
           </h2>
           <p className="text-gray-600 text-lg max-w-2xl mx-auto mb-6">
             Hệ thống phủ sóng toàn bộ 12 tỉnh thành Miền Trung, với các trung
-            tâm điều phối, kho vật tư và đội cứu hộ sẵn sàng ứng cứu kịp thời.
+            tâm điều phối, kho vật phẩm và đội cứu hộ sẵn sàng ứng cứu kịp thời.
           </p>
           <a
             href="#"

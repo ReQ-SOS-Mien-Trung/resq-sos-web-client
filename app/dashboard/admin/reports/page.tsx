@@ -1,10 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useCallback } from "react";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -136,8 +133,53 @@ const STATUS_LABEL_MAP: Record<string, string> = {
 
 const PANEL_WIDTH = 480;
 
-function formatMoney(value: number) {
-  return value.toLocaleString("vi-VN") + "đ";
+const DEPOT_CARD_ACCENTS = [
+  {
+    border: "border-l-sky-500",
+    background: "bg-sky-50/45 hover:bg-sky-100/75",
+    hover:
+      "hover:border-sky-200 hover:shadow-[0_22px_44px_-32px_rgba(14,165,233,0.55)]",
+  },
+  {
+    border: "border-l-emerald-500",
+    background: "bg-emerald-50/45 hover:bg-emerald-100/75",
+    hover:
+      "hover:border-emerald-200 hover:shadow-[0_22px_44px_-32px_rgba(16,185,129,0.55)]",
+  },
+  {
+    border: "border-l-violet-500",
+    background: "bg-violet-50/45 hover:bg-violet-100/75",
+    hover:
+      "hover:border-violet-200 hover:shadow-[0_22px_44px_-32px_rgba(139,92,246,0.45)]",
+  },
+  {
+    border: "border-l-amber-500",
+    background: "bg-amber-50/45 hover:bg-amber-100/75",
+    hover:
+      "hover:border-amber-200 hover:shadow-[0_22px_44px_-32px_rgba(245,158,11,0.45)]",
+  },
+  {
+    border: "border-l-rose-500",
+    background: "bg-rose-50/45 hover:bg-rose-100/75",
+    hover:
+      "hover:border-rose-200 hover:shadow-[0_22px_44px_-32px_rgba(244,63,94,0.45)]",
+  },
+  {
+    border: "border-l-cyan-500",
+    background: "bg-cyan-50/45 hover:bg-cyan-100/75",
+    hover:
+      "hover:border-cyan-200 hover:shadow-[0_22px_44px_-32px_rgba(6,182,212,0.45)]",
+  },
+] as const;
+
+function formatMoney(
+  value: number | null | undefined,
+  options?: Intl.NumberFormatOptions,
+): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+
+  const formatted = value.toLocaleString("vi-VN", options);
+  return options?.style === "currency" ? formatted : `${formatted}đ`;
 }
 
 function formatMeasurementNumber(value: number | null | undefined): string {
@@ -150,6 +192,32 @@ function formatMeasurementNumber(value: number | null | undefined): string {
 
 function hasMeasurementValue(value: number | null | undefined): boolean {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+function getDepotFundTotalBalance(fund: DepotFund | null | undefined): number {
+  if (!fund) return 0;
+
+  return fund.funds.reduce((sum, source) => {
+    const balance =
+      typeof source.balance === "number" && Number.isFinite(source.balance)
+        ? source.balance
+        : 0;
+    return sum + balance;
+  }, 0);
+}
+
+function getDepotFundLatestUpdatedAt(
+  fund: DepotFund | null | undefined,
+): string | null {
+  if (!fund?.funds.length) return null;
+
+  return fund.funds.reduce<string | null>((latest, source) => {
+    if (!source.lastUpdatedAt) return latest;
+    if (!latest) return source.lastUpdatedAt;
+    return new Date(source.lastUpdatedAt) > new Date(latest)
+      ? source.lastUpdatedAt
+      : latest;
+  }, null);
 }
 
 /* ── Advance Limit Section ───────────────────────────────── */
@@ -176,7 +244,7 @@ function AdvanceLimitModal({
   const handleSelectDepot = (val: string) => {
     setSelectedDepotId(val);
     const fund = depotFunds.find((f) => f.depotId === Number(val));
-    setLimitInput(fund ? String(fund.maxAdvanceLimit) : "");
+    setLimitInput(fund ? String(fund.advanceLimit) : "");
   };
 
   const handleSaveLimit = () => {
@@ -256,12 +324,12 @@ function AdvanceLimitModal({
                 Số dư hiện tại:{" "}
                 <span
                   className={
-                    currentFund.balance < 0
+                    getDepotFundTotalBalance(currentFund) < 0
                       ? "font-semibold text-red-600"
                       : "font-semibold text-emerald-600"
                   }
                 >
-                  {currentFund.balance.toLocaleString("vi-VN", {
+                  {formatMoney(getDepotFundTotalBalance(currentFund), {
                     style: "currency",
                     currency: "VND",
                   })}
@@ -270,7 +338,16 @@ function AdvanceLimitModal({
               <p className="text-muted-foreground">
                 Hạn mức hiện tại:{" "}
                 <span className="font-semibold">
-                  {currentFund.maxAdvanceLimit.toLocaleString("vi-VN", {
+                  {formatMoney(currentFund.advanceLimit, {
+                    style: "currency",
+                    currency: "VND",
+                  })}
+                </span>
+              </p>
+              <p className="text-muted-foreground">
+                Đang ứng nội bộ:{" "}
+                <span className="font-semibold text-amber-600">
+                  {formatMoney(currentFund.outstandingAdvanceAmount, {
                     style: "currency",
                     currency: "VND",
                   })}
@@ -618,14 +695,14 @@ export default function FundingRequestsPage() {
           <div className="flex items-center gap-2">
             <Button
               onClick={() => setAdvanceLimitOpen(true)}
-              className="gap-2 tracking-tight bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25"
+              className="gap-2 tracking-tighter bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25"
             >
               <Warehouse size={16} />
               Cấu hình hạn mức
             </Button>
             <Button
               onClick={() => setAllocateOpen(true)}
-              className="gap-2 tracking-tight bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25"
+              className="gap-2 tracking-tighter bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25"
             >
               <Money size={16} weight="bold" />
               Cấp quỹ cho kho
@@ -715,17 +792,24 @@ export default function FundingRequestsPage() {
                 <Storefront size={15} className="text-primary" />
                 Quỹ các kho ({depotFunds.length})
               </h3>
-              <p className="text-xs text-muted-foreground tracking-tighter">
-                Tổng:{" "}
-                <span className="font-bold text-emerald-600 text-sm">
-                  {formatMoney(depotFunds.reduce((s, d) => s + d.balance, 0))}
-                </span>
-              </p>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground tracking-tighter">
+                  Tổng số tiền quỹ
+                </p>
+                <p className="font-bold text-emerald-600 text-xl">
+                  {formatMoney(
+                    depotFunds.reduce(
+                      (sum, fund) => sum + getDepotFundTotalBalance(fund),
+                      0,
+                    ),
+                  )}
+                </p>
+              </div>
             </div>
             {loadingFunds ? (
               <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                  <Skeleton key={i} className="h-34 w-full rounded-2xl" />
                 ))}
               </div>
             ) : depotFunds.length === 0 ? (
@@ -733,46 +817,105 @@ export default function FundingRequestsPage() {
                 Chưa có dữ liệu quỹ
               </p>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                {depotFunds.map((fund, index) => (
-                  <div
-                    key={`${fund.depotId}-${fund.lastUpdatedAt}-${fund.balance}-${index}`}
-                    onClick={() => openDepotFundPanel(fund)}
-                    className={`rounded-xl border bg-background p-3.5 cursor-pointer transition-all active:scale-[0.97] ${
-                      selectedDepotFund?.depotId === fund.depotId &&
-                      depotTxPanelOpen
-                        ? "border-primary ring-1 ring-primary/30 shadow-sm"
-                        : "border-border/60 hover:bg-muted/30 hover:border-border"
-                    }`}
-                  >
-                    <p className="text-sm font-semibold tracking-tighter text-muted-foreground truncate mb-1.5">
-                      {fund.depotName}
-                    </p>
-                    <p
-                      className={`text-lg font-bold tracking-tighter ${
-                        fund.balance < 0
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }`}
-                    >
-                      {formatMoney(fund.balance)}
-                    </p>
-                    {fund.balance < 0 && (
-                      <p className="text-xs text-red-500 tracking-tight font-medium mt-0.5">
-                        Ứng trước • Hạn mức: {formatMoney(fund.maxAdvanceLimit)}
-                      </p>
-                    )}
-                    {fund.balance >= 0 && (
-                      <p className="text-xs text-muted-foreground tracking-tight mt-0.5">
-                        Hạn ứng: {formatMoney(fund.maxAdvanceLimit)}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground tracking-tight mt-1">
-                      Cập nhật:{" "}
-                      {new Date(fund.lastUpdatedAt).toLocaleDateString("vi-VN")}
-                    </p>
-                  </div>
-                ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {depotFunds.map((fund, index) =>
+                  (() => {
+                    const accent =
+                      DEPOT_CARD_ACCENTS[index % DEPOT_CARD_ACCENTS.length];
+                    const primarySource = fund.funds[0];
+
+                    return (
+                      <div
+                        key={`${fund.depotId}-${fund.depotName}-${fund.funds.length}-${index}`}
+                        onClick={() => openDepotFundPanel(fund)}
+                        className={`rounded-2xl border border-l-[6px] p-4 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 ${accent.border} ${accent.background} ${accent.hover} ${
+                          selectedDepotFund?.depotId === fund.depotId &&
+                          depotTxPanelOpen
+                            ? "border-primary ring-1 ring-primary/30 shadow-sm"
+                            : "border-border/60 hover:border-border"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold tracking-tighter text-foreground line-clamp-2">
+                              {fund.depotName}
+                            </p>
+                            <p className="text-xs text-muted-foreground tracking-tighter mt-1">
+                              {fund.funds.length} quỹ nguồn
+                            </p>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium"
+                          >
+                            ID {fund.depotId}
+                          </Badge>
+                        </div>
+
+                        <p
+                          className={`text-2xl font-bold tracking-tighter ${
+                            getDepotFundTotalBalance(fund) < 0
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                          }`}
+                        >
+                          {formatMoney(getDepotFundTotalBalance(fund))}
+                        </p>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+                            <p className="text-xs tracking-tighter font-medium text-muted-foreground">
+                              Hạn mức ứng
+                            </p>
+                            <p className="mt-1 text-sm font-semibold tracking-tighter">
+                              {formatMoney(fund.advanceLimit)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+                            <p className="text-xs tracking-tighter font-medium text-muted-foreground">
+                              Đang ứng
+                            </p>
+                            <p className="mt-1 text-sm font-semibold tracking-tighter text-blue-600">
+                              {formatMoney(fund.outstandingAdvanceAmount)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {primarySource && (
+                          <div className="mt-3 space-y-1.5">
+                            <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border/50 px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium tracking-tighter truncate">
+                                  {primarySource.fundSourceName}
+                                </p>
+                                <p className="text-xs text-muted-foreground tracking-tighter">
+                                  {primarySource.fundSourceType}
+                                </p>
+                              </div>
+                              <span className="text-sm font-semibold tracking-tighter text-foreground shrink-0">
+                                {formatMoney(primarySource.balance)}
+                              </span>
+                            </div>
+                            {fund.funds.length > 1 && (
+                              <p className="text-xs text-muted-foreground tracking-tighter">
+                                Thêm {fund.funds.length - 1} nguồn quỹ khác
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <p className="text-xs text-muted-foreground tracking-tighter mt-3">
+                          Cập nhật gần nhất:{" "}
+                          {getDepotFundLatestUpdatedAt(fund)
+                            ? new Date(
+                                getDepotFundLatestUpdatedAt(fund) as string,
+                              ).toLocaleString("vi-VN")
+                            : "—"}
+                        </p>
+                      </div>
+                    );
+                  })(),
+                )}
               </div>
             )}
           </CardContent>
@@ -1234,7 +1377,7 @@ export default function FundingRequestsPage() {
               <div>
                 <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
                   <Package size={15} className="text-primary" />
-                  Danh sách vật tư ({selectedRequestItems.length})
+                  Danh sách vật phẩm ({selectedRequestItems.length})
                 </h4>
                 {loadingSelectedItems ? (
                   <div className="space-y-2">
@@ -1249,7 +1392,7 @@ export default function FundingRequestsPage() {
                       className="mx-auto text-muted-foreground/40 mb-2"
                     />
                     <p className="text-sm text-muted-foreground tracking-tight">
-                      Không có danh sách vật tư
+                      Không có danh sách vật phẩm
                     </p>
                   </div>
                 ) : (
@@ -1276,12 +1419,14 @@ export default function FundingRequestsPage() {
                           <span>Đơn giá: {formatMoney(item.unitPrice)}</span>
                           {hasMeasurementValue(item.volumePerUnit) && (
                             <span>
-                              Thể tích/đv: {formatMeasurementNumber(item.volumePerUnit)} dm3
+                              Thể tích/đv:{" "}
+                              {formatMeasurementNumber(item.volumePerUnit)} dm3
                             </span>
                           )}
                           {hasMeasurementValue(item.weightPerUnit) && (
                             <span>
-                              Cân nặng/đv: {formatMeasurementNumber(item.weightPerUnit)} kg
+                              Cân nặng/đv:{" "}
+                              {formatMeasurementNumber(item.weightPerUnit)} kg
                             </span>
                           )}
                           <span>
@@ -1345,7 +1490,7 @@ export default function FundingRequestsPage() {
               <List size={18} className="text-primary" />
               Lịch sử giao dịch quỹ kho
             </SheetTitle>
-            <SheetDescription className="tracking-tight text-sm">
+            <SheetDescription className="tracking-tighter text-base">
               {selectedDepotFund?.depotName}
             </SheetDescription>
           </SheetHeader>
@@ -1353,29 +1498,88 @@ export default function FundingRequestsPage() {
           {selectedDepotFund && (
             <div className="space-y-4">
               {/* Fund summary */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                  <p className="text-xs text-muted-foreground tracking-tight mb-1">
-                    Số dư hiện tại
+                  <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
+                    Tổng số dư
                   </p>
                   <p
-                    className={`text-sm font-bold tracking-tight ${
-                      selectedDepotFund.balance < 0
+                    className={`text-xl font-bold tracking-tighter ${
+                      getDepotFundTotalBalance(selectedDepotFund) < 0
                         ? "text-red-600"
                         : "text-emerald-600"
                     }`}
                   >
-                    {formatMoney(selectedDepotFund.balance)}
+                    {formatMoney(getDepotFundTotalBalance(selectedDepotFund))}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                  <p className="text-xs text-muted-foreground tracking-tight mb-1">
+                  <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
                     Hạn mức ứng
                   </p>
-                  <p className="text-sm font-bold tracking-tight">
-                    {formatMoney(selectedDepotFund.maxAdvanceLimit)}
+                  <p className="text-xl font-bold tracking-tighter">
+                    {formatMoney(selectedDepotFund.advanceLimit)}
                   </p>
                 </div>
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                  <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
+                    Đang ứng nội bộ
+                  </p>
+                  <p className="text-xl font-bold tracking-tighter text-blue-600">
+                    {formatMoney(selectedDepotFund.outstandingAdvanceAmount)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                  <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
+                    Nguồn quỹ
+                  </p>
+                  <p className="text-xl font-bold tracking-tighter">
+                    {selectedDepotFund.funds.length}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
+                  <PiggyBankIcon size={14} className="text-primary" />
+                  Nguồn quỹ hiện tại
+                </h4>
+                {selectedDepotFund.funds.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
+                    <p className="text-sm text-muted-foreground tracking-tighter">
+                      Chưa có quỹ nguồn nào
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {selectedDepotFund.funds.map((fundSource) => (
+                      <div
+                        key={fundSource.id}
+                        className="rounded-xl border border-border/60 bg-background p-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-base font-semibold tracking-tighter truncate">
+                              {fundSource.fundSourceName}
+                            </p>
+                            <p className="text-xs text-muted-foreground tracking-tighter mt-1">
+                              {fundSource.fundSourceType}
+                            </p>
+                          </div>
+                          <span className="text-base font-bold tracking-tighter text-emerald-600 shrink-0">
+                            {formatMoney(fundSource.balance)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground tracking-tighter mt-3">
+                          Cập nhật:{" "}
+                          {new Date(fundSource.lastUpdatedAt).toLocaleString(
+                            "vi-VN",
+                          )}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Transaction list */}
@@ -1409,7 +1613,7 @@ export default function FundingRequestsPage() {
                       size={28}
                       className="mx-auto text-muted-foreground/40 mb-2"
                     />
-                    <p className="text-sm text-muted-foreground tracking-tight">
+                    <p className="text-sm text-muted-foreground tracking-tighter">
                       Chưa có giao dịch
                     </p>
                   </div>
@@ -1427,6 +1631,7 @@ export default function FundingRequestsPage() {
                           <TableHead className="text-sm">
                             Nguồn tham chiếu
                           </TableHead>
+                          <TableHead className="text-sm">Người ứng</TableHead>
                           <TableHead className="text-sm min-w-36">
                             Ghi chú
                           </TableHead>
@@ -1466,6 +1671,20 @@ export default function FundingRequestsPage() {
                                   ? `${refTypeMap[tx.referenceType] ?? tx.referenceType}${tx.referenceId ? ` #${tx.referenceId}` : ""}`
                                   : "—"}
                               </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {tx.contributorName ? (
+                                  <div className="leading-tight">
+                                    <p className="font-medium text-foreground">
+                                      {tx.contributorName}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {tx.phoneNumber || "—"}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  "—"
+                                )}
+                              </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-48 truncate">
                                 {tx.note || "—"}
                               </TableCell>
@@ -1475,7 +1694,7 @@ export default function FundingRequestsPage() {
                                 }`}
                               >
                                 {isIn ? "+" : ""}
-                                {tx.amount.toLocaleString("vi-VN")}đ
+                                {formatMoney(tx.amount)}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground text-right whitespace-nowrap">
                                 {new Date(tx.createdAt).toLocaleString("vi-VN")}
@@ -1491,7 +1710,7 @@ export default function FundingRequestsPage() {
                 {/* Pagination */}
                 <div className="flex items-center justify-between pt-3 border-t border-border/40 mt-3">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm text-muted-foreground tracking-tight">
+                    <p className="text-sm text-muted-foreground tracking-tighter">
                       Trang {depotTxPage}/{depotTxData?.totalPages ?? 1}
                     </p>
                     <Select
@@ -1511,7 +1730,7 @@ export default function FundingRequestsPage() {
                         <SelectItem value="50">50</SelectItem>
                       </SelectContent>
                     </Select>
-                    <span className="text-sm text-muted-foreground tracking-tight">
+                    <span className="text-sm text-muted-foreground tracking-tighter">
                       / trang
                     </span>
                   </div>
@@ -1558,7 +1777,7 @@ export default function FundingRequestsPage() {
                 <DialogTitle className="tracking-tighter">
                   Phê duyệt yêu cầu
                 </DialogTitle>
-                <DialogDescription className="tracking-tight">
+                <DialogDescription className="tracking-tighter">
                   {approveDialog.item?.depotName} —{" "}
                   {approveDialog.item
                     ? formatMoney(approveDialog.item.totalAmount)
@@ -1595,7 +1814,7 @@ export default function FundingRequestsPage() {
                             </span>
                           )}
                           <span className="text-sm font-semibold text-emerald-600">
-                            {c.totalAmount.toLocaleString("vi-VN")}đ
+                            {formatMoney(c.totalAmount)}
                           </span>
                         </div>
                       </div>
@@ -1661,7 +1880,7 @@ export default function FundingRequestsPage() {
                 <DialogTitle className="tracking-tighter">
                   Từ chối yêu cầu
                 </DialogTitle>
-                <DialogDescription className="tracking-tight">
+                <DialogDescription className="tracking-tighter">
                   {rejectDialog.item?.depotName}
                 </DialogDescription>
               </div>
@@ -1735,7 +1954,7 @@ export default function FundingRequestsPage() {
                 <DialogTitle className="tracking-tighter">
                   Cấp quỹ cho kho
                 </DialogTitle>
-                <DialogDescription className="tracking-tight">
+                <DialogDescription className="tracking-tighter">
                   Phân bổ ngân sách từ chiến dịch quỹ cho các kho
                 </DialogDescription>
               </div>
@@ -1771,7 +1990,7 @@ export default function FundingRequestsPage() {
                             </span>
                           )}
                           <span className="text-sm font-semibold text-emerald-600">
-                            {c.totalAmount.toLocaleString("vi-VN")}đ
+                            {formatMoney(c.totalAmount)}
                           </span>
                         </div>
                       </div>

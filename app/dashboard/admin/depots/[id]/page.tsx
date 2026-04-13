@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +46,10 @@ import {
   WarehouseIcon,
   LockIcon,
   ArrowLeftIcon,
+  Plus,
+  Trash,
+  ArrowsOutIcon,
+  ArrowsInIcon,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
@@ -61,11 +66,18 @@ import {
   useInitiateDepotClosure,
   useMarkDepotClosureExternal,
   useInitiateDepotClosureTransfer,
+  useDepotClosureTransferSuggestions,
   useDepotClosureByDepotId,
   useDepotClosureDetailByDepotId,
 } from "@/services/depot/hooks";
 import { useDepotManagers } from "@/services/depot_manager";
-import type { DepotStatus, DepotStatusMetadata } from "@/services/depot/type";
+import { useInventoryItemTypes } from "@/services/inventory/hooks";
+import type {
+  DepotClosureRemainingInventoryItem,
+  DepotClosureSuggestedTransfer,
+  DepotStatus,
+  DepotStatusMetadata,
+} from "@/services/depot/type";
 import { AxiosError } from "axios";
 import { Icon } from "@iconify/react";
 
@@ -99,6 +111,198 @@ function useCountdown(deadline: string | null | undefined): string {
     return () => clearInterval(id);
   }, [deadline]);
   return computeCountdown(deadline);
+}
+
+interface TransferAssignmentItemDraft {
+  itemKey: string;
+  quantity: string;
+}
+
+interface TransferAssignmentDraft {
+  id: string;
+  targetDepotId: string;
+  items: TransferAssignmentItemDraft[];
+}
+
+interface ClosureInventoryOption {
+  itemKey: string;
+  itemModelId: number;
+  itemName: string;
+  itemType: string;
+  quantity: number;
+  stockQuantity: number;
+  transferableQuantity: number;
+  blockedQuantity: number;
+  unit: string | null;
+  categoryName: string | null;
+  weightPerUnit: number | null;
+}
+
+const TRANSFER_ASSIGNMENT_ACCENTS = [
+  {
+    border: "border-l-sky-500",
+    bg: "bg-sky-50/70",
+    badge: "bg-sky-100 text-sky-700 border-sky-200",
+  },
+  {
+    border: "border-l-violet-500",
+    bg: "bg-violet-50/70",
+    badge: "bg-violet-100 text-violet-700 border-violet-200",
+  },
+  {
+    border: "border-l-emerald-500",
+    bg: "bg-emerald-50/70",
+    badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  },
+  {
+    border: "border-l-amber-500",
+    bg: "bg-amber-50/70",
+    badge: "bg-amber-100 text-amber-700 border-amber-200",
+  },
+  {
+    border: "border-l-rose-500",
+    bg: "bg-rose-50/70",
+    badge: "bg-rose-100 text-rose-700 border-rose-200",
+  },
+];
+
+function createDraftId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createTransferAssignmentItemsFromInventory(
+  inventoryItems: ClosureInventoryOption[],
+  existingItems?: TransferAssignmentItemDraft[],
+): TransferAssignmentItemDraft[] {
+  const existingMap = new Map(
+    (existingItems ?? []).map((item) => [item.itemKey, item.quantity]),
+  );
+
+  return inventoryItems.map((inventoryItem) => ({
+    itemKey: inventoryItem.itemKey,
+    quantity: existingMap.get(inventoryItem.itemKey) ?? "",
+  }));
+}
+
+function createTransferAssignmentDraft(
+  inventoryItems: ClosureInventoryOption[] = [],
+  existingItems?: TransferAssignmentItemDraft[],
+): TransferAssignmentDraft {
+  return {
+    id: createDraftId("transfer-assignment"),
+    targetDepotId: "",
+    items: createTransferAssignmentItemsFromInventory(
+      inventoryItems,
+      existingItems,
+    ),
+  };
+}
+
+function normalizeClosureInventoryItems(
+  items: DepotClosureRemainingInventoryItem[] | null | undefined,
+): ClosureInventoryOption[] {
+  if (!items?.length) return [];
+
+  return items
+    .map((item) => {
+      const itemModelId = Number(item.itemModelId);
+      const stockQuantity = Number(item.quantity);
+      const transferableRaw = item.transferableQuantity ?? item.quantity;
+      const blockedRaw = item.blockedQuantity ?? 0;
+      const quantity = Number(transferableRaw);
+      const blockedQuantity = Number(blockedRaw);
+      const itemType = String(item.itemType ?? "").trim();
+      if (!Number.isFinite(itemModelId) || itemModelId <= 0) return null;
+      if (!Number.isFinite(stockQuantity) || stockQuantity <= 0) return null;
+      if (!Number.isFinite(quantity) || quantity <= 0) return null;
+      if (!itemType) return null;
+
+      const itemName = item.itemName?.trim() || `Vật phẩm #${itemModelId}`;
+      const weightRaw = item.weightPerUnit ?? item.WeightPerUnit ?? null;
+      const weightPerUnit =
+        typeof weightRaw === "number" && Number.isFinite(weightRaw)
+          ? weightRaw
+          : null;
+
+      return {
+        itemKey: `${itemModelId}::${itemType}`,
+        itemModelId,
+        itemName,
+        itemType,
+        quantity,
+        stockQuantity,
+        transferableQuantity: quantity,
+        blockedQuantity:
+          Number.isFinite(blockedQuantity) && blockedQuantity > 0
+            ? blockedQuantity
+            : 0,
+        unit: item.unit?.trim() || null,
+        categoryName: item.categoryName?.trim() || null,
+        weightPerUnit,
+      } satisfies ClosureInventoryOption;
+    })
+    .filter((item): item is ClosureInventoryOption => item !== null)
+    .sort((a, b) => a.itemName.localeCompare(b.itemName, "vi"));
+}
+
+function createTransferAssignmentsFromSuggestions(
+  inventoryItems: ClosureInventoryOption[],
+  suggestions: DepotClosureSuggestedTransfer[] | null | undefined,
+): TransferAssignmentDraft[] {
+  if (!inventoryItems.length || !suggestions?.length) {
+    return [createTransferAssignmentDraft(inventoryItems)];
+  }
+
+  const quantitiesByTargetDepot = new Map<number, Map<string, number>>();
+
+  for (const suggestion of suggestions) {
+    if (
+      suggestion.targetDepotId == null ||
+      !Number.isFinite(suggestion.targetDepotId) ||
+      suggestion.targetDepotId <= 0
+    ) {
+      continue;
+    }
+
+    const quantity = Number(suggestion.suggestedQuantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+
+    const itemKey = `${suggestion.itemModelId}::${suggestion.itemType}`;
+    const itemExists = inventoryItems.some((item) => item.itemKey === itemKey);
+    if (!itemExists) continue;
+
+    const targetMap =
+      quantitiesByTargetDepot.get(suggestion.targetDepotId) ??
+      (() => {
+        const created = new Map<string, number>();
+        quantitiesByTargetDepot.set(suggestion.targetDepotId!, created);
+        return created;
+      })();
+
+    targetMap.set(itemKey, (targetMap.get(itemKey) ?? 0) + quantity);
+  }
+
+  const entries = Array.from(quantitiesByTargetDepot.entries());
+
+  if (!entries.length) {
+    return [createTransferAssignmentDraft(inventoryItems)];
+  }
+
+  return entries.map(([targetDepotId, quantitiesMap], index) => ({
+    ...createTransferAssignmentDraft(
+      inventoryItems,
+      inventoryItems.map((item) => ({
+        itemKey: item.itemKey,
+        quantity:
+          quantitiesMap.has(item.itemKey) &&
+          (quantitiesMap.get(item.itemKey) ?? 0) > 0
+            ? String(quantitiesMap.get(item.itemKey))
+            : "",
+      })),
+    ),
+    id: createDraftId(`transfer-suggestion-${index + 1}`),
+    targetDepotId: String(targetDepotId),
+  }));
 }
 
 /* ── Status config ────────────────────────────────────────────── */
@@ -219,11 +423,13 @@ export default function DepotDetailPage() {
   const { data: closureResolutionMetadata = [] } =
     useDepotClosureResolutionMetadata();
   const { data: statusMetadata } = useDepotStatuses();
-  const canManageDepotManager = depot?.status !== "Closed";
+  const canManageDepotManager =
+    depot?.status !== "Closed" && depot?.status !== "Closing";
   const { data: changeableStatusMetadata } = useDepotChangeableStatuses();
   const { data: availableManagers = [] } = useDepotAvailableManagers();
   const [managerHistoryPage, setManagerHistoryPage] = useState(1);
   const [managerHistoryPageSize, setManagerHistoryPageSize] = useState(10);
+  const { data: itemTypes = [] } = useInventoryItemTypes();
   const {
     data: managerHistoryData,
     isLoading: managerHistoryLoading,
@@ -237,12 +443,38 @@ export default function DepotDetailPage() {
     enabled: Number.isFinite(depotId) && depotId > 0,
   });
   const managerHistory = managerHistoryData?.items ?? [];
-  const changeableStatusOptions = changeableStatusMetadata?.length
-    ? changeableStatusMetadata
-    : [
-        { key: "Available" as const, value: "Đang hoạt động" },
-        { key: "Unavailable" as const, value: "Ngưng hoạt động" },
-      ];
+  const changeableStatusOptions = useMemo<
+    Array<{ key: "Available" | "Unavailable" | "Closing"; value: string }>
+  >(() => {
+    const filtered =
+      changeableStatusMetadata?.filter(
+        (option) =>
+          option.key === "Available" ||
+          option.key === "Unavailable" ||
+          option.key === "Closing",
+      ) ?? [];
+
+    const closingLabel =
+      statusMetadata?.find((status) => status.key === "Closing")?.value ??
+      "Đang đóng kho";
+
+    if (filtered.length > 0) {
+      const normalized = filtered as Array<{
+        key: "Available" | "Unavailable" | "Closing";
+        value: string;
+      }>;
+
+      return normalized.some((option) => option.key === "Closing")
+        ? normalized
+        : [...normalized, { key: "Closing", value: closingLabel }];
+    }
+
+    return [
+      { key: "Available", value: "Đang hoạt động" },
+      { key: "Unavailable", value: "Ngưng hoạt động" },
+      { key: "Closing", value: closingLabel },
+    ];
+  }, [changeableStatusMetadata, statusMetadata]);
 
   const statusCfg = buildStatusCfg(statusMetadata);
   const listDepot = allDepotsData?.items.find((d) => d.id === depotId);
@@ -250,13 +482,10 @@ export default function DepotDetailPage() {
   const activeChangeableStatusOption = depot
     ? changeableStatusOptions.find((option) => option.key === depot.status)
     : undefined;
-  const isCloseOptionSelected = Boolean(
-    activeChangeableStatusOption?.value
-      ?.toLocaleLowerCase("vi-VN")
-      .includes("đóng kho"),
-  );
+  const isCloseOptionSelected = activeChangeableStatusOption?.key === "Closing";
 
   /* ── State ── */
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [initiateOpen, setInitiateOpen] = useState(false);
   const [initiateStep, setInitiateStep] = useState<1 | 2>(1);
@@ -272,13 +501,20 @@ export default function DepotDetailPage() {
       reusableAvailableCount: number;
       reusableInUseCount: number;
     } | null;
+    remainingInventoryItems: DepotClosureRemainingInventoryItem[];
   } | null>(null);
 
   const [resolveOpen, setResolveOpen] = useState(false);
   const [resolutionType, setResolutionType] = useState<
     "TransferToDepot" | "ExternalResolution"
   >("TransferToDepot");
-  const [targetDepotId, setTargetDepotId] = useState("");
+  const [transferAssignments, setTransferAssignments] = useState<
+    TransferAssignmentDraft[]
+  >([]);
+  const [isTransferDialogExpanded, setIsTransferDialogExpanded] =
+    useState(false);
+  const [hasAppliedTransferSuggestions, setHasAppliedTransferSuggestions] =
+    useState(false);
   const [externalNote, setExternalNote] = useState("");
   const [managerDialogOpen, setManagerDialogOpen] = useState(false);
   const [selectedManagerId, setSelectedManagerId] = useState("");
@@ -310,9 +546,6 @@ export default function DepotDetailPage() {
   const activeTransfer = activeClosure?.transferDetail ?? null;
   const activeTransferId = activeTransfer?.id ?? null;
 
-  const initiateTimeoutCountdown = useCountdown(
-    initiateResult?.closingTimeoutAt ?? initiateResult?.timeoutAt,
-  );
   const closingTimeoutCountdown = useCountdown(null);
 
   const currentTransferStatus = normalizeTransferStatus(activeTransfer?.status);
@@ -328,7 +561,7 @@ export default function DepotDetailPage() {
       : [
           {
             key: "TransferToDepot",
-            value: "Chuyển toàn bộ hàng sang kho khác",
+            value: "Điều phối hàng tồn sang kho khác",
           },
           {
             key: "ExternalResolution",
@@ -337,6 +570,930 @@ export default function DepotDetailPage() {
         ];
   const resolveActionPending =
     markExternalMutation.isPending || initiateTransferMutation.isPending;
+
+  const closureInventoryItems = useMemo(
+    () =>
+      normalizeClosureInventoryItems(
+        initiateResult?.remainingInventoryItems ??
+          activeClosure?.remainingInventoryItems ??
+          [],
+      ),
+    [
+      activeClosure?.remainingInventoryItems,
+      initiateResult?.remainingInventoryItems,
+    ],
+  );
+  const closureInventoryMap = useMemo(
+    () => new Map(closureInventoryItems.map((item) => [item.itemKey, item])),
+    [closureInventoryItems],
+  );
+  const targetDepotChoices = useMemo(
+    () =>
+      depotOptions.filter((option) => option.key !== (depot?.id ?? depotId)),
+    [depot?.id, depotId, depotOptions],
+  );
+
+  const shouldLoadTransferSuggestions =
+    Number.isFinite(depotId) &&
+    depotId > 0 &&
+    resolutionType === "TransferToDepot" &&
+    closureInventoryItems.length > 0 &&
+    ((initiateOpen && initiateStep === 2) || resolveOpen);
+
+  const {
+    data: transferSuggestions,
+    isFetching: transferSuggestionsFetching,
+    error: transferSuggestionsError,
+    refetch: refetchTransferSuggestions,
+  } = useDepotClosureTransferSuggestions(depotId, {
+    enabled: shouldLoadTransferSuggestions,
+  });
+
+  const mergedTargetDepotChoices = useMemo(() => {
+    const map = new Map<number, { key: number; value: string }>();
+
+    for (const option of targetDepotChoices) {
+      map.set(option.key, option);
+    }
+
+    for (const metric of transferSuggestions?.targetDepotMetrics ?? []) {
+      if (
+        Number.isFinite(metric.depotId) &&
+        metric.depotId > 0 &&
+        metric.depotId !== (depot?.id ?? depotId) &&
+        !map.has(metric.depotId)
+      ) {
+        map.set(metric.depotId, {
+          key: metric.depotId,
+          value: metric.depotName,
+        });
+      }
+    }
+
+    for (const suggestion of transferSuggestions?.suggestedTransfers ?? []) {
+      if (
+        suggestion.targetDepotId != null &&
+        Number.isFinite(suggestion.targetDepotId) &&
+        suggestion.targetDepotId > 0 &&
+        suggestion.targetDepotName &&
+        suggestion.targetDepotId !== (depot?.id ?? depotId) &&
+        !map.has(suggestion.targetDepotId)
+      ) {
+        map.set(suggestion.targetDepotId, {
+          key: suggestion.targetDepotId,
+          value: suggestion.targetDepotName,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.value.localeCompare(b.value, "vi"),
+    );
+  }, [depot?.id, depotId, targetDepotChoices, transferSuggestions]);
+
+  const resetTransferAssignments = useCallback(
+    (inventoryItems: ClosureInventoryOption[] = closureInventoryItems) => {
+      setHasAppliedTransferSuggestions(false);
+      setTransferAssignments([createTransferAssignmentDraft(inventoryItems)]);
+    },
+    [closureInventoryItems],
+  );
+
+  const applyTransferSuggestionsToAssignments = useCallback(
+    (
+      suggestions:
+        | DepotClosureSuggestedTransfer[]
+        | null
+        | undefined = transferSuggestions?.suggestedTransfers,
+    ) => {
+      setTransferAssignments(
+        createTransferAssignmentsFromSuggestions(
+          closureInventoryItems,
+          suggestions,
+        ),
+      );
+      setHasAppliedTransferSuggestions(true);
+    },
+    [closureInventoryItems, transferSuggestions?.suggestedTransfers],
+  );
+
+  const addTransferAssignment = useCallback(() => {
+    setTransferAssignments((current) => [
+      ...current,
+      createTransferAssignmentDraft(closureInventoryItems),
+    ]);
+  }, [closureInventoryItems]);
+
+  const removeTransferAssignment = useCallback((assignmentId: string) => {
+    setTransferAssignments((current) => {
+      if (current.length === 1) return current;
+      return current.filter((assignment) => assignment.id !== assignmentId);
+    });
+  }, []);
+
+  const updateTransferAssignmentTarget = useCallback(
+    (assignmentId: string, targetDepotId: string) => {
+      setTransferAssignments((current) =>
+        current.map((assignment) =>
+          assignment.id === assignmentId
+            ? { ...assignment, targetDepotId }
+            : assignment,
+        ),
+      );
+    },
+    [],
+  );
+
+  const getAssignedQuantityExcludingRow = useCallback(
+    (itemKey: string, excludedAssignmentId?: string): number =>
+      transferAssignments.reduce((total, assignment) => {
+        return (
+          total +
+          assignment.items.reduce((itemSum, item) => {
+            if (!item.itemKey || item.itemKey !== itemKey) return itemSum;
+            if (
+              excludedAssignmentId &&
+              assignment.id === excludedAssignmentId
+            ) {
+              return itemSum;
+            }
+            const quantity = Number(item.quantity);
+            return itemSum + (Number.isFinite(quantity) ? quantity : 0);
+          }, 0)
+        );
+      }, 0),
+    [transferAssignments],
+  );
+
+  const updateTransferAssignmentQuantity = useCallback(
+    (assignmentId: string, itemKey: string, rawValue: string) => {
+      const digitsOnly = rawValue.replace(/\D/g, "");
+
+      setTransferAssignments((current) => {
+        const selectedItem = closureInventoryMap.get(itemKey);
+        const transferableQuantity = selectedItem?.transferableQuantity ?? 0;
+        const usedByOtherAssignments = current.reduce((sum, assignment) => {
+          if (assignment.id === assignmentId) return sum;
+          const matchedItem = assignment.items.find(
+            (item) => item.itemKey === itemKey,
+          );
+          const quantity = Number(matchedItem?.quantity ?? "");
+          return sum + (Number.isFinite(quantity) ? quantity : 0);
+        }, 0);
+        const maxAllowed = Math.max(
+          transferableQuantity - usedByOtherAssignments,
+          0,
+        );
+
+        const normalizedValue = digitsOnly
+          ? String(Math.min(Number(digitsOnly), maxAllowed))
+          : "";
+
+        return current.map((assignment) =>
+          assignment.id === assignmentId
+            ? {
+                ...assignment,
+                items: assignment.items.map((item) =>
+                  item.itemKey === itemKey
+                    ? { ...item, quantity: normalizedValue }
+                    : item,
+                ),
+              }
+            : assignment,
+        );
+      });
+    },
+    [closureInventoryMap],
+  );
+
+  useEffect(() => {
+    if (!closureInventoryItems.length) return;
+
+    setTransferAssignments((current) => {
+      if (!current.length) {
+        return [createTransferAssignmentDraft(closureInventoryItems)];
+      }
+
+      return current.map((assignment) => ({
+        ...assignment,
+        items: createTransferAssignmentItemsFromInventory(
+          closureInventoryItems,
+          assignment.items,
+        ),
+      }));
+    });
+  }, [closureInventoryItems]);
+
+  useEffect(() => {
+    const isTransferWorkflowOpen =
+      (initiateOpen && initiateStep === 2) || resolveOpen;
+
+    if (!isTransferWorkflowOpen) {
+      setHasAppliedTransferSuggestions(false);
+      return;
+    }
+
+    if (
+      !shouldLoadTransferSuggestions ||
+      !transferSuggestions ||
+      hasAppliedTransferSuggestions
+    ) {
+      return;
+    }
+
+    applyTransferSuggestionsToAssignments(
+      transferSuggestions.suggestedTransfers,
+    );
+  }, [
+    applyTransferSuggestionsToAssignments,
+    hasAppliedTransferSuggestions,
+    initiateOpen,
+    initiateStep,
+    resolveOpen,
+    shouldLoadTransferSuggestions,
+    transferSuggestions,
+  ]);
+
+  const unallocatedSuggestedTransfers = useMemo(
+    () =>
+      transferSuggestions?.suggestedTransfers.filter(
+        (item) => item.targetDepotId == null,
+      ) ?? [],
+    [transferSuggestions],
+  );
+
+  const hasUnallocatedSuggestion = Boolean(
+    (transferSuggestions?.unallocatedVolume ?? 0) > 0 ||
+    (transferSuggestions?.unallocatedWeight ?? 0) > 0 ||
+    unallocatedSuggestedTransfers.length > 0,
+  );
+
+  const buildTransferAssignmentsPayload = useCallback(() => {
+    if (!closureInventoryItems.length) {
+      toast.error("Chưa có danh sách vật phẩm tồn để phân bổ chuyển kho.");
+      return null;
+    }
+
+    const usedQuantityByItemKey = new Map<string, number>();
+    const assignmentsByTargetDepotId = new Map<
+      number,
+      {
+        targetDepotId: number;
+        items: Array<{
+          itemModelId: number;
+          itemType: string;
+          quantity: number;
+        }>;
+      }
+    >();
+
+    for (const assignment of transferAssignments) {
+      const nonEmptyItems = assignment.items.filter((item) =>
+        item.quantity.trim(),
+      );
+      const hasAnyData = assignment.targetDepotId || nonEmptyItems.length > 0;
+      if (!hasAnyData) continue;
+
+      const targetDepotId = Number(assignment.targetDepotId);
+      if (!Number.isFinite(targetDepotId) || targetDepotId <= 0) {
+        toast.error(
+          "Mỗi kho đích cần được chọn trước khi xác nhận chuyển kho.",
+        );
+        return null;
+      }
+
+      if (targetDepotId === depotId) {
+        toast.error("Kho đích không thể trùng với kho đang đóng.");
+        return null;
+      }
+
+      if (nonEmptyItems.length === 0) {
+        toast.error("Mỗi kho đích cần có ít nhất một vật phẩm để chuyển.");
+        return null;
+      }
+
+      const targetAssignment =
+        assignmentsByTargetDepotId.get(targetDepotId) ??
+        (() => {
+          const created = {
+            targetDepotId,
+            items: [] as Array<{
+              itemModelId: number;
+              itemType: string;
+              quantity: number;
+            }>,
+          };
+          assignmentsByTargetDepotId.set(targetDepotId, created);
+          return created;
+        })();
+
+      for (const item of nonEmptyItems) {
+        const selectedItem = closureInventoryMap.get(item.itemKey);
+        if (!selectedItem) {
+          toast.error(
+            "Có vật phẩm chưa được chọn đúng trong danh sách chuyển kho.",
+          );
+          return null;
+        }
+
+        const quantity = Number(item.quantity);
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          toast.error("Số lượng chuyển phải lớn hơn 0.");
+          return null;
+        }
+
+        const nextUsed =
+          (usedQuantityByItemKey.get(item.itemKey) ?? 0) + quantity;
+        if (nextUsed > selectedItem.quantity) {
+          toast.error(
+            `Số lượng "${selectedItem.itemName}" đang vượt tồn còn lại của kho.`,
+          );
+          return null;
+        }
+        usedQuantityByItemKey.set(item.itemKey, nextUsed);
+
+        const existingTargetItem = targetAssignment.items.find(
+          (entry) =>
+            entry.itemModelId === selectedItem.itemModelId &&
+            entry.itemType === selectedItem.itemType,
+        );
+        if (existingTargetItem) {
+          existingTargetItem.quantity += quantity;
+        } else {
+          targetAssignment.items.push({
+            itemModelId: selectedItem.itemModelId,
+            itemType: selectedItem.itemType,
+            quantity,
+          });
+        }
+      }
+    }
+
+    const payload = Array.from(assignmentsByTargetDepotId.values()).filter(
+      (assignment) => assignment.items.length > 0,
+    );
+
+    if (!payload.length) {
+      toast.error("Hãy chọn ít nhất một kho đích và một vật phẩm để chuyển.");
+      return null;
+    }
+
+    return payload;
+  }, [
+    closureInventoryItems.length,
+    closureInventoryMap,
+    depotId,
+    transferAssignments,
+  ]);
+
+  const renderTransferAssignmentsEditor = useCallback(
+    (context: "dialog" | "inline") => {
+      const wrapperClassName = context === "dialog" ? "space-y-4" : "space-y-3";
+      const sourceGridCols =
+        context === "dialog"
+          ? "grid-cols-[minmax(0,1.5fr)_140px_140px]"
+          : "grid-cols-[minmax(0,1.35fr)_120px_128px]";
+
+      return (
+        <div className={wrapperClassName}>
+          <div className="rounded-2xl border border-border/60 bg-muted/20 p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold tracking-tighter">
+                  Phân bổ vật phẩm sang nhiều kho đích
+                </p>
+                <p className="text-xs text-muted-foreground tracking-tighter mt-0.5">
+                  Chọn một hoặc nhiều kho nhận, rồi phân chia vật phẩm tồn theo
+                  từng kho.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {transferSuggestionsFetching && (
+                  <Badge variant="outline" className="gap-1.5 tracking-tighter">
+                    <Spinner size={12} className="animate-spin" />
+                    Đang lấy gợi ý AI
+                  </Badge>
+                )}
+                <Badge variant="outline" className="tracking-tighter">
+                  {closureInventoryItems.length} vật phẩm nguồn
+                </Badge>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 tracking-tighter"
+                  disabled={
+                    transferSuggestionsFetching || !closureInventoryItems.length
+                  }
+                  onClick={async () => {
+                    const result = await refetchTransferSuggestions();
+                    if (result.data) {
+                      applyTransferSuggestionsToAssignments(
+                        result.data.suggestedTransfers,
+                      );
+                      toast.success("Đã lấy lại gợi ý phân bổ AI.");
+                    } else {
+                      toast.error(
+                        "Chưa lấy được gợi ý AI. Bạn vẫn có thể phân bổ thủ công.",
+                      );
+                    }
+                  }}
+                >
+                  {transferSuggestionsFetching ? (
+                    <Spinner size={13} className="animate-spin" />
+                  ) : (
+                    <ArrowClockwise size={13} />
+                  )}
+                  Lấy gợi ý AI
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {Boolean(transferSuggestions?.targetDepotMetrics.length) && (
+            <div className="rounded-2xl border border-border/60 bg-background/90 p-3.5">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold tracking-tighter">
+                    Gợi ý sức chứa kho đích
+                  </p>
+                  <p className="text-xs text-muted-foreground tracking-tighter mt-0.5">
+                    AI quét phần trống còn lại theo thể tích và cân nặng để đề
+                    xuất phương án chuyển kho.
+                  </p>
+                </div>
+                <Badge variant="outline" className="tracking-tighter">
+                  {transferSuggestions?.targetDepotMetrics.length ?? 0} kho khả
+                  dụng
+                </Badge>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {transferSuggestions?.targetDepotMetrics.map((metric) => (
+                  <div
+                    key={metric.depotId}
+                    className="rounded-xl border border-border/60 bg-muted/20 px-3.5 py-3"
+                  >
+                    <p className="truncate text-sm font-semibold tracking-tighter">
+                      {metric.depotName}
+                    </p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+                          Còn trống thể tích
+                        </p>
+                        <p className="mt-1 text-base font-semibold tracking-tighter tabular-nums">
+                          {metric.remainingVolume.toLocaleString("vi-VN")}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+                          Còn trống cân nặng
+                        </p>
+                        <p className="mt-1 text-base font-semibold tracking-tighter tabular-nums">
+                          {metric.remainingWeight.toLocaleString("vi-VN")}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs tracking-tighter text-muted-foreground">
+                      Đang dùng{" "}
+                      {metric.currentUtilization.toLocaleString("vi-VN")} /{" "}
+                      {metric.capacity.toLocaleString("vi-VN")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {hasUnallocatedSuggestion && (
+            <div className="rounded-2xl border border-red-300 bg-red-50/80 p-4 text-red-900">
+              <div className="flex items-start gap-3">
+                <WarningCircle
+                  size={18}
+                  className="mt-0.5 shrink-0 text-red-600"
+                  weight="fill"
+                />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold tracking-tighter">
+                    Hệ thống chưa đủ không gian để phân bổ hết hàng tồn kho
+                  </p>
+                  <p className="text-xs tracking-tighter leading-5 text-red-800/90">
+                    Quản trị viên cần giảm số lượng, chỉnh lại đề xuất AI hoặc
+                    chuyển sang phương án xử lý bên ngoài cho phần hàng chưa có
+                    chỗ chứa phù hợp.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Badge
+                      variant="outline"
+                      className="border-red-300 bg-white/70 tracking-tighter text-red-700"
+                    >
+                      Thể tích dôi:{" "}
+                      {(
+                        transferSuggestions?.unallocatedVolume ?? 0
+                      ).toLocaleString("vi-VN")}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="border-red-300 bg-white/70 tracking-tighter text-red-700"
+                    >
+                      Cân nặng dôi:{" "}
+                      {(
+                        transferSuggestions?.unallocatedWeight ?? 0
+                      ).toLocaleString("vi-VN")}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="border-red-300 bg-white/70 tracking-tighter text-red-700"
+                    >
+                      {unallocatedSuggestedTransfers.length} dòng chưa phân bổ
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {transferSuggestionsError && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-3 text-sm tracking-tighter text-amber-800">
+              Không lấy được gợi ý AI từ hệ thống. Bạn vẫn có thể phân bổ thủ
+              công bằng form bên dưới.
+            </div>
+          )}
+
+          {!closureInventoryItems.length ? (
+            <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/60 p-3 text-sm tracking-tighter text-amber-700">
+              Backend chưa trả danh sách vật phẩm tồn có thể điều phối, nên hiện
+              chưa thể chia vật phẩm sang nhiều kho đích từ màn hình này.
+            </div>
+          ) : (
+            <>
+              {hasUnallocatedSuggestion &&
+                unallocatedSuggestedTransfers.length > 0 && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50/60 p-3.5">
+                    <div className="mb-2">
+                      <p className="text-sm font-semibold tracking-tighter text-red-700">
+                        Chưa phân bổ được
+                      </p>
+                      <p className="text-xs tracking-tighter text-red-600/90 mt-0.5">
+                        Các dòng dưới đây đang được AI đánh dấu là chưa tìm thấy
+                        kho đích phù hợp. Chúng sẽ không được gửi vào payload
+                        chuyển kho cho đến khi bạn tự phân bổ sang kho đích hợp
+                        lệ.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      {unallocatedSuggestedTransfers.map((item, index) => (
+                        <div
+                          key={`unallocated-${item.itemModelId}-${item.itemType}-${index}`}
+                          className="rounded-xl border border-red-200 bg-white/80 px-3 py-2.5"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold tracking-tighter text-red-900">
+                                {item.itemName}
+                              </p>
+                              <p className="text-xs tracking-tighter text-red-700/80 mt-0.5">
+                                {item.itemType}
+                                {item.unit ? ` · Đơn vị: ${item.unit}` : ""}
+                              </p>
+                            </div>
+                            <div className="grid gap-1 text-right text-xs tracking-tighter text-red-800 sm:text-sm">
+                              <span>
+                                SL đề xuất dôi:{" "}
+                                <strong>
+                                  {item.suggestedQuantity.toLocaleString(
+                                    "vi-VN",
+                                  )}
+                                  {item.unit ? ` ${item.unit}` : ""}
+                                </strong>
+                              </span>
+                              <span>
+                                Thể tích:{" "}
+                                <strong>
+                                  {item.totalVolume.toLocaleString("vi-VN")}
+                                </strong>
+                              </span>
+                              <span>
+                                Cân nặng:{" "}
+                                <strong>
+                                  {item.totalWeight.toLocaleString("vi-VN")}
+                                </strong>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              <div className="space-y-3">
+                {transferAssignments.map((assignment, assignmentIndex) =>
+                  (() => {
+                    const selectedTargetDepotIds = new Set(
+                      transferAssignments
+                        .filter(
+                          (otherAssignment) =>
+                            otherAssignment.id !== assignment.id &&
+                            otherAssignment.targetDepotId,
+                        )
+                        .map(
+                          (otherAssignment) => otherAssignment.targetDepotId,
+                        ),
+                    );
+                    const availableTargetDepotChoices = Array.from(
+                      new Map(
+                        mergedTargetDepotChoices
+                          .filter(
+                            (option) =>
+                              String(option.key) === assignment.targetDepotId ||
+                              !selectedTargetDepotIds.has(String(option.key)),
+                          )
+                          .map(
+                            (option) => [String(option.key), option] as const,
+                          ),
+                      ).values(),
+                    );
+
+                    return (
+                      <div
+                        key={assignment.id}
+                        className={cn(
+                          "overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm",
+                          "border-l-4",
+                          TRANSFER_ASSIGNMENT_ACCENTS[
+                            assignmentIndex % TRANSFER_ASSIGNMENT_ACCENTS.length
+                          ]?.border,
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-4 py-3",
+                            TRANSFER_ASSIGNMENT_ACCENTS[
+                              assignmentIndex %
+                                TRANSFER_ASSIGNMENT_ACCENTS.length
+                            ]?.bg,
+                          )}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold tracking-tighter">
+                                Kho đích #{assignmentIndex + 1}
+                              </p>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "tracking-tighter",
+                                  TRANSFER_ASSIGNMENT_ACCENTS[
+                                    assignmentIndex %
+                                      TRANSFER_ASSIGNMENT_ACCENTS.length
+                                  ]?.badge,
+                                )}
+                              >
+                                {
+                                  assignment.items.filter(
+                                    (item) => Number(item.quantity) > 0,
+                                  ).length
+                                }{" "}
+                                vật phẩm đã chọn
+                              </Badge>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                            disabled={transferAssignments.length === 1}
+                            onClick={() =>
+                              removeTransferAssignment(assignment.id)
+                            }
+                          >
+                            <Trash size={14} />
+                          </Button>
+                        </div>
+
+                        <div className="space-y-3 px-4 py-3">
+                          <div className="grid gap-3 xl:grid-cols-[minmax(0,280px)_1fr] xl:items-end">
+                            <div className="space-y-1.5">
+                              <Label className="text-sm font-semibold tracking-tighter">
+                                Kho nhận hàng{" "}
+                                <span className="text-red-500">*</span>
+                              </Label>
+                              <Select
+                                value={assignment.targetDepotId}
+                                onValueChange={(value) =>
+                                  updateTransferAssignmentTarget(
+                                    assignment.id,
+                                    value,
+                                  )
+                                }
+                              >
+                                <SelectTrigger className="w-full text-sm tracking-tighter">
+                                  <SelectValue placeholder="Chọn kho đích..." />
+                                </SelectTrigger>
+                                <SelectContent
+                                  position="popper"
+                                  side="bottom"
+                                  align="start"
+                                  sideOffset={4}
+                                  avoidCollisions={false}
+                                  className="z-[10000] w-(--radix-select-trigger-width)"
+                                >
+                                  {availableTargetDepotChoices.map((option) => (
+                                    <SelectItem
+                                      key={option.key}
+                                      value={String(option.key)}
+                                      className="text-sm tracking-tighter"
+                                    >
+                                      {option.value}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="grid gap-2 sm:grid-cols-3">
+                              <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                                <p className="text-xs font-medium tracking-tighter">
+                                  Tổng mặt hàng
+                                </p>
+                                <p className="text-base font-semibold tracking-tighter">
+                                  {closureInventoryItems.length.toLocaleString(
+                                    "vi-VN",
+                                  )}
+                                </p>
+                              </div>
+                              <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                                <p className="text-xs font-medium tracking-tighter">
+                                  Đã nhập số lượng
+                                </p>
+                                <p className="text-base font-semibold tracking-tighter">
+                                  {assignment.items
+                                    .filter((item) => Number(item.quantity) > 0)
+                                    .length.toLocaleString("vi-VN")}
+                                </p>
+                              </div>
+                              <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+                                <p className="text-xs font-medium tracking-tighter">
+                                  Tổng đơn vị chuyển
+                                </p>
+                                <p className="text-base font-semibold tracking-tighter tabular-nums">
+                                  {assignment.items
+                                    .reduce((sum, item) => {
+                                      const quantity = Number(item.quantity);
+                                      return (
+                                        sum +
+                                        (Number.isFinite(quantity)
+                                          ? quantity
+                                          : 0)
+                                      );
+                                    }, 0)
+                                    .toLocaleString("vi-VN")}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="overflow-hidden rounded-xl border border-border/60">
+                            <div
+                              className={cn(
+                                "grid gap-3 border-b border-border/60 bg-muted/30 px-3 py-2 text-xs font-normal tracking-tighter",
+                                sourceGridCols,
+                              )}
+                            >
+                              <span>Vật phẩm nguồn</span>
+                              <span>Có thể chuyển</span>
+                              <span>Số lượng</span>
+                            </div>
+                            <div className="divide-y divide-border/50">
+                              {closureInventoryItems.map((inventoryItem) => {
+                                const assignmentItem =
+                                  assignment.items.find(
+                                    (item) =>
+                                      item.itemKey === inventoryItem.itemKey,
+                                  ) ?? null;
+                                const remainingQuantity = Math.max(
+                                  inventoryItem.transferableQuantity -
+                                    getAssignedQuantityExcludingRow(
+                                      inventoryItem.itemKey,
+                                      assignment.id,
+                                    ),
+                                  0,
+                                );
+
+                                return (
+                                  <div
+                                    key={`${assignment.id}-${inventoryItem.itemKey}`}
+                                    className={cn(
+                                      "grid items-center gap-3 px-3 py-2.5",
+                                      sourceGridCols,
+                                    )}
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-semibold tracking-tighter text-foreground">
+                                        {inventoryItem.itemName}
+                                      </p>
+                                      <p className="truncate text-xs tracking-tighter text-muted-foreground">
+                                        {itemTypes.find(
+                                          (t) =>
+                                            String(t.key) ===
+                                            String(inventoryItem.itemType),
+                                        )?.value ?? inventoryItem.itemType}
+                                        {inventoryItem.unit
+                                          ? ` · Đơn vị: ${inventoryItem.unit}`
+                                          : ""}
+                                        {inventoryItem.categoryName
+                                          ? ` · Danh mục: ${inventoryItem.categoryName}`
+                                          : ""}
+                                        {inventoryItem.weightPerUnit != null
+                                          ? ` · Khối lượng: ${inventoryItem.weightPerUnit.toLocaleString("vi-VN")} kg/đv`
+                                          : ""}
+                                        {inventoryItem.blockedQuantity > 0
+                                          ? ` · Khóa ${inventoryItem.blockedQuantity.toLocaleString("vi-VN")}`
+                                          : ""}
+                                      </p>
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold tracking-tighter tabular-nums">
+                                        {remainingQuantity.toLocaleString(
+                                          "vi-VN",
+                                        )}
+                                        {inventoryItem.unit
+                                          ? ` ${inventoryItem.unit}`
+                                          : ""}
+                                      </p>
+                                      <p className="text-xs tracking-tighter text-muted-foreground">
+                                        Tồn gốc{" "}
+                                        {inventoryItem.stockQuantity.toLocaleString(
+                                          "vi-VN",
+                                        )}
+                                      </p>
+                                    </div>
+                                    <Input
+                                      inputMode="numeric"
+                                      value={assignmentItem?.quantity ?? ""}
+                                      onChange={(event) =>
+                                        updateTransferAssignmentQuantity(
+                                          assignment.id,
+                                          inventoryItem.itemKey,
+                                          event.target.value,
+                                        )
+                                      }
+                                      placeholder="0"
+                                      className="h-9 text-sm tracking-tighter tabular-nums"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })(),
+                )}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-1.5 tracking-tighter"
+                onClick={addTransferAssignment}
+              >
+                <Plus size={14} />
+                Thêm kho đích
+              </Button>
+            </>
+          )}
+        </div>
+      );
+    },
+    [
+      addTransferAssignment,
+      applyTransferSuggestionsToAssignments,
+      closureInventoryItems,
+      getAssignedQuantityExcludingRow,
+      hasUnallocatedSuggestion,
+      itemTypes,
+      mergedTargetDepotChoices,
+      removeTransferAssignment,
+      refetchTransferSuggestions,
+      transferSuggestions?.targetDepotMetrics,
+      transferSuggestions?.unallocatedVolume,
+      transferSuggestions?.unallocatedWeight,
+      transferSuggestionsError,
+      transferSuggestionsFetching,
+      transferAssignments,
+      unallocatedSuggestedTransfers,
+      updateTransferAssignmentQuantity,
+      updateTransferAssignmentTarget,
+    ],
+  );
+
+  const transferDialogClassName = isTransferDialogExpanded
+    ? "h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-none overflow-hidden p-0 gap-0"
+    : "w-[min(100vw-2rem,1280px)] sm:max-w-[1280px] max-h-[90vh] overflow-hidden p-0 gap-0";
 
   function handleRefresh() {
     setIsRefreshing(true);
@@ -395,7 +1552,7 @@ export default function DepotDetailPage() {
   }
 
   async function handleDepotStatusChange(
-    nextStatus: "Available" | "Unavailable",
+    nextStatus: "Available" | "Unavailable" | "Closing",
   ) {
     if (!depot || depot.status === nextStatus) return;
 
@@ -407,7 +1564,9 @@ export default function DepotDetailPage() {
       toast.success(
         nextStatus === "Unavailable"
           ? "Đã chuyển kho sang trạng thái ngưng hoạt động."
-          : "Đã mở lại trạng thái hoạt động cho kho.",
+          : nextStatus === "Closing"
+            ? "Đã chuyển kho sang trạng thái đang đóng kho."
+            : "Đã mở lại trạng thái hoạt động cho kho.",
       );
       handleRefresh();
     } catch (err) {
@@ -430,22 +1589,30 @@ export default function DepotDetailPage() {
             res.closingTimeoutAt ?? res.timeoutAt ?? null;
 
           if (requiresResolution) {
+            const normalizedRemainingInventoryItems =
+              normalizeClosureInventoryItems(
+                res.remainingInventoryItems ?? res.remainingItems ?? [],
+              );
             setInitiateResult({
               closureId: res.closureId ?? 0,
               closureStatus,
               closingTimeoutAt,
               timeoutAt: res.timeoutAt ?? null,
               inventorySummary: res.inventorySummary ?? null,
+              remainingInventoryItems:
+                res.remainingInventoryItems ?? res.remainingItems ?? [],
             });
             setResolutionType("TransferToDepot");
-            setTargetDepotId("");
+            resetTransferAssignments(normalizedRemainingInventoryItems);
             setExternalNote("");
+            setIsTransferDialogExpanded(false);
             setInitiateStep(2);
             handleRefresh();
           } else {
             setInitiateOpen(false);
             setInitiateStep(1);
             setInitiateResult(null);
+            setIsTransferDialogExpanded(false);
 
             if (closureStatus === "Processing") {
               toast.info(
@@ -481,22 +1648,27 @@ export default function DepotDetailPage() {
     const transferReason =
       initiateReason.trim() ||
       activeClosure?.closeReason?.trim() ||
-      "Đóng kho và chuyển toàn bộ hàng tồn";
+      "Đóng kho và điều phối hàng tồn sang kho đích";
 
     if (resolutionType === "TransferToDepot") {
+      const assignments = buildTransferAssignmentsPayload();
+      if (!assignments) return;
+
       initiateTransferMutation.mutate(
         {
           id: depot.id,
-          targetDepotId: Number(targetDepotId),
           reason: transferReason,
+          assignments,
         },
         {
           onSuccess: (res) => {
             toast.success(
               res.message ||
-                `Đã tạo Transfer #${res.transferId} cho quy trình đóng kho.`,
+                "Đã tạo phương án chuyển kho cho quy trình đóng kho.",
             );
             setResolveOpen(false);
+            resetTransferAssignments();
+            setIsTransferDialogExpanded(false);
             handleRefresh();
           },
           onError: (err) =>
@@ -531,24 +1703,29 @@ export default function DepotDetailPage() {
     const transferReason =
       initiateReason.trim() ||
       activeClosure?.closeReason?.trim() ||
-      "Đóng kho và chuyển toàn bộ hàng tồn";
+      "Đóng kho và điều phối hàng tồn sang kho đích";
 
     if (resolutionType === "TransferToDepot") {
+      const assignments = buildTransferAssignmentsPayload();
+      if (!assignments) return;
+
       initiateTransferMutation.mutate(
         {
           id: depot.id,
-          targetDepotId: Number(targetDepotId),
           reason: transferReason,
+          assignments,
         },
         {
           onSuccess: (res) => {
             toast.success(
               res.message ||
-                `Đã tạo Transfer #${res.transferId}. Chờ xác nhận giao nhận.`,
+                "Đã tạo phương án chuyển kho. Chờ xác nhận giao nhận.",
             );
             setInitiateOpen(false);
             setInitiateStep(1);
             setInitiateResult(null);
+            resetTransferAssignments();
+            setIsTransferDialogExpanded(false);
             handleRefresh();
           },
           onError: (err) =>
@@ -860,51 +2037,71 @@ export default function DepotDetailPage() {
               </div>
 
               <div className="p-5 xl:mt-auto">
-                {depot.status !== "Closed" && depot.status !== "Closing" && (
+                {depot.status !== "Closed" && (
                   <div>
                     <p className="px-3 pb-2 font-semibold text-sm uppercase tracking-tighter text-muted-foreground">
                       Chuyển trạng thái kho
                     </p>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      {changeableStatusOptions.map((option) => {
-                        const isActive = depot.status === option.key;
-                        const isAvailable = option.key === "Available";
-
-                        return (
-                          <Button
-                            key={option.key}
-                            size="sm"
-                            variant={isActive ? "default" : "outline"}
-                            className={cn(
-                              "h-11 flex-1 rounded-md px-4 text-sm font-semibold tracking-tighter shadow-none",
-                              isActive
-                                ? isAvailable
-                                  ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
-                                  : "border-yellow-500 bg-yellow-500 text-white hover:bg-yellow-600"
-                                : "border-border/60 bg-background text-foreground hover:bg-muted/30",
-                            )}
-                            disabled={
-                              updateStatusMutation.isPending || isActive
-                            }
-                            onClick={() => handleDepotStatusChange(option.key)}
-                          >
-                            {isAvailable ? (
-                              <Icon
-                                icon="line-md:confirm"
-                                width="24"
-                                height="24"
-                              />
-                            ) : (
-                              <Icon
-                                icon="line-md:pause"
-                                width="24"
-                                height="24"
-                              />
-                            )}
-                            {option.value}
-                          </Button>
-                        );
-                      })}
+                    <div className="flex items-center gap-2 px-3">
+                      <Select
+                        value={selectedStatus || depot.status}
+                        onValueChange={setSelectedStatus}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        <SelectTrigger className="h-11! flex-1 rounded-md shadow-none font-medium bg-background border-border/60 py-0">
+                          <SelectValue placeholder="Chọn trạng thái" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {changeableStatusOptions.map((option) => (
+                            <SelectItem
+                              key={option.key}
+                              value={option.key}
+                              className="cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={cn(
+                                    "w-2 h-2 rounded-full",
+                                    option.key === "Available"
+                                      ? "bg-emerald-500"
+                                      : option.key === "Closing"
+                                        ? "bg-red-500"
+                                        : "bg-yellow-500",
+                                  )}
+                                />
+                                {option.value}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        className="h-11 px-6 font-semibold tracking-tighter shadow-none shrink-0"
+                        variant="default"
+                        disabled={
+                          updateStatusMutation.isPending ||
+                          (selectedStatus || depot.status) === depot.status ||
+                          !selectedStatus
+                        }
+                        onClick={() => {
+                          if (
+                            selectedStatus &&
+                            selectedStatus !== depot.status
+                          ) {
+                            handleDepotStatusChange(selectedStatus as any);
+                          }
+                        }}
+                      >
+                        {updateStatusMutation.isPending && (
+                          <Icon
+                            icon="line-md:loading-loop"
+                            width="16"
+                            height="16"
+                            className="mr-2"
+                          />
+                        )}
+                        Thực hiện
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -956,6 +2153,8 @@ export default function DepotDetailPage() {
                       variant="outline"
                       onClick={() => {
                         setInitiateReason("");
+                        resetTransferAssignments();
+                        setIsTransferDialogExpanded(false);
                         setInitiateOpen(true);
                       }}
                     >
@@ -969,8 +2168,9 @@ export default function DepotDetailPage() {
                       className="h-12 w-full rounded-md bg-foreground px-5 text-base font-semibold text-background hover:bg-foreground/90 shadow-none"
                       onClick={() => {
                         setResolutionType("TransferToDepot");
-                        setTargetDepotId("");
+                        resetTransferAssignments();
                         setExternalNote("");
+                        setIsTransferDialogExpanded(false);
                         setResolveOpen(true);
                       }}
                     >
@@ -1055,7 +2255,7 @@ export default function DepotDetailPage() {
               <p className="text-sm tracking-tighter leading-6">
                 {pct > 80
                   ? "Kho đang khá đầy, nên chuẩn bị phương án điều phối."
-                  : "Kho vẫn còn không gian để tiếp nhận vật tư mới."}
+                  : "Kho vẫn còn không gian để tiếp nhận vật phẩm mới."}
               </p>
             </CardContent>
           </Card>
@@ -1414,7 +2614,7 @@ export default function DepotDetailPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
                     {
-                      label: "Vật tư tiêu thụ",
+                      label: "Vật phẩm tiêu thụ",
                       value: (
                         activeTransfer?.snapshotConsumableUnits ??
                         activeClosure?.snapshotConsumableUnits ??
@@ -1922,12 +3122,14 @@ export default function DepotDetailPage() {
             setInitiateOpen(false);
             setInitiateStep(1);
             setInitiateResult(null);
+            resetTransferAssignments();
+            setIsTransferDialogExpanded(false);
           }
         }}
       >
         <DialogContent
           className={
-            initiateStep === 2 ? "sm:max-w-lg gap-3" : "gap-2 sm:max-w-md"
+            initiateStep === 2 ? transferDialogClassName : "gap-2 sm:max-w-md"
           }
         >
           {initiateStep === 1 ? (
@@ -1965,9 +3167,7 @@ export default function DepotDetailPage() {
                     />
                     <p className="text-sm text-amber-800 dark:text-amber-300 tracking-tighter leading-relaxed">
                       Kho đang có hàng — sau khi xác nhận sẽ chuyển sang{" "}
-                      <strong>Đang đóng</strong>. Nếu không chọn phương án xử lý
-                      trong <strong>30 phút</strong>, kho sẽ{" "}
-                      <strong>tự động trở về Available</strong>.
+                      <strong>Đang đóng</strong>.
                     </p>
                   </div>
                 )}
@@ -2013,92 +3213,268 @@ export default function DepotDetailPage() {
             </>
           ) : (
             <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 tracking-tighter text-amber-600 dark:text-amber-400">
-                  <HourglassHigh size={18} weight="fill" />
-                  Kho còn hàng — Vui lòng xử lý tồn kho
-                </DialogTitle>
-                <DialogDescription className="tracking-tighter">
-                  Kho đã chuyển sang{" "}
-                  <span className="font-semibold text-primary">Đang đóng</span>.
-                  Nếu không chọn phương án trong vòng{" "}
-                  <strong className="text-red-600">30 phút</strong>, kho sẽ{" "}
-                  <strong>tự động trở về Available</strong>.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-1">
-                {/* Summary row */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-                    <span className="text-base text-amber-600 dark:text-amber-400 font-bold tracking-tighter uppercase">
-                      Tồn kho
-                    </span>
-                    {initiateResult?.inventorySummary ? (
-                      <div className="space-y-0.5">
-                        <p className="text-base font-bold tracking-tighter text-amber-900 dark:text-amber-200">
-                          {initiateResult.inventorySummary.consumableUnitTotal.toLocaleString(
-                            "vi-VN",
-                          )}{" "}
-                          <span className="text-sm font-normal">
-                            vật tư tiêu thụ
-                          </span>
-                        </p>
-                        <p className="text-base font-bold tracking-tighter text-amber-900 dark:text-amber-200">
-                          {initiateResult.inventorySummary.reusableAvailableCount.toLocaleString(
-                            "vi-VN",
-                          )}{" "}
-                          <span className="text-sm font-normal">
-                            thiết bị sẵn sàng
-                          </span>
-                        </p>
-                        <p className="text-base font-bold tracking-tighter text-amber-900 dark:text-amber-200">
-                          {initiateResult.inventorySummary.reusableInUseCount.toLocaleString(
-                            "vi-VN",
-                          )}{" "}
-                          <span className="text-sm font-normal">
-                            thiết bị đang dùng
-                          </span>
-                        </p>
-                      </div>
-                    ) : (
-                      <span className="text-xl font-bold tracking-tighter text-amber-900 dark:text-amber-200">
-                        {depot.currentUtilization.toLocaleString("vi-VN")}{" "}
-                        <span className="text-sm font-normal">mục</span>
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1 p-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
-                    <span className="text-base text-red-600 dark:text-red-400 font-semibold tracking-tighter uppercase">
-                      Hết hạn xử lý
-                    </span>
-                    {initiateResult?.closingTimeoutAt ||
-                    initiateResult?.timeoutAt ? (
-                      <>
-                        <span className="text-base font-semibold tracking-tighter text-black dark:text-white">
-                          {new Date(
-                            initiateResult.closingTimeoutAt ??
-                              initiateResult.timeoutAt ??
-                              Date.now(),
-                          ).toLocaleString("vi-VN")}
-                        </span>
+              <button
+                type="button"
+                aria-label={
+                  isTransferDialogExpanded
+                    ? "Thu gọn cửa sổ xử lý tồn kho"
+                    : "Mở rộng cửa sổ xử lý tồn kho"
+                }
+                className="absolute right-12 top-4 z-10 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                onClick={() =>
+                  setIsTransferDialogExpanded((current) => !current)
+                }
+              >
+                {isTransferDialogExpanded ? (
+                  <ArrowsInIcon className="h-5 w-5" />
+                ) : (
+                  <ArrowsOutIcon className="h-5 w-5" />
+                )}
+              </button>
+              <div className="flex h-full max-h-[inherit] min-h-0 flex-col">
+                <DialogHeader className="border-b border-border/60 px-6 py-4 sm:px-5">
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pr-16 sm:pr-20">
+                    <div className="min-w-0">
+                      <DialogTitle className="flex items-center gap-2 tracking-tighter text-amber-600 dark:text-amber-400">
+                        <HourglassHigh size={18} weight="fill" />
+                        Kho còn hàng — Vui lòng xử lý tồn kho
+                      </DialogTitle>
+                      <DialogDescription className="mt-1 tracking-tighter">
+                        Kho đã chuyển sang trạng thái{" "}
+                        <span className="font-semibold text-red-500">
+                          Đang đóng.
+                        </span>{" "}
+                        Vui lòng chọn phương án xử lý hàng tồn kho.
+                      </DialogDescription>
+                    </div>
 
-                        {initiateTimeoutCountdown && (
-                          <span className="text-base font-mono font-semibold text-red-600 dark:text-red-400 tabular-nums">
-                            <span className="text-black">Còn lại:</span>{" "}
-                            {initiateTimeoutCountdown}
+                    <div className="shrink-0 md:text-right">
+                      <p className="text-xs font-bold uppercase tracking-tight text-amber-600/80 dark:text-amber-400/80 mb-0.5">
+                        Tồn kho
+                      </p>
+                      {initiateResult?.inventorySummary ? (
+                        <div className="space-y-0 text-amber-900 dark:text-amber-200">
+                          <p className="text-sm tracking-tighter">
+                            <strong className="text-base">
+                              {initiateResult.inventorySummary.consumableUnitTotal.toLocaleString(
+                                "vi-VN",
+                              )}
+                            </strong>{" "}
+                            vật phẩm tiêu thụ
+                          </p>
+                          <p className="text-sm tracking-tighter">
+                            <strong className="text-base">
+                              {initiateResult.inventorySummary.reusableAvailableCount.toLocaleString(
+                                "vi-VN",
+                              )}
+                            </strong>{" "}
+                            tb sẵn sàng
+                          </p>
+                          <p className="text-sm tracking-tighter">
+                            <strong className="text-base">
+                              {initiateResult.inventorySummary.reusableInUseCount.toLocaleString(
+                                "vi-VN",
+                              )}
+                            </strong>{" "}
+                            tb đang dùng
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex items-center md:justify-end gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 px-2.5 py-1 text-amber-900 dark:text-amber-200">
+                          <strong className="text-xl tracking-tighter">
+                            {depot.currentUtilization.toLocaleString("vi-VN")}
+                          </strong>
+                          <span className="text-sm tracking-tighter pt-0.5">
+                            vật phẩm
                           </span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-xl font-bold tracking-tighter text-red-800 dark:text-red-300">
-                        30 <span className="text-sm font-normal">phút</span>
-                      </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </DialogHeader>
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-1 sm:pt-2 pb-3 sm:pb-4">
+                  <div className="space-y-4">
+                    {/* Resolution type */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold tracking-tighter">
+                        Phương án xử lý <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="grid gap-2 mt-1">
+                        {resolutionTypes.map((opt) => (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() =>
+                              setResolutionType(
+                                opt.key as typeof resolutionType,
+                              )
+                            }
+                            className={cn(
+                              "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
+                              resolutionType === opt.key
+                                ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                                : "border-border/60 hover:border-border hover:bg-muted/30",
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
+                                resolutionType === opt.key
+                                  ? "bg-primary/10"
+                                  : "bg-muted",
+                              )}
+                            >
+                              {opt.key === "TransferToDepot" ? (
+                                <Icon
+                                  icon="material-symbols:delivery-truck-bolt-outline-rounded"
+                                  width="24"
+                                  height="24"
+                                  className={
+                                    resolutionType === opt.key
+                                      ? "text-primary"
+                                      : "text-muted-foreground"
+                                  }
+                                />
+                              ) : (
+                                <Icon
+                                  icon="mdi:human-hand-truck"
+                                  width="24"
+                                  height="24"
+                                  className={
+                                    resolutionType === opt.key
+                                      ? "text-primary"
+                                      : "text-muted-foreground"
+                                  }
+                                />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold tracking-tighter">
+                                {opt.value}
+                              </p>
+                              <p className="text-xs text-muted-foreground tracking-tighter mt-0.5">
+                                {opt.key === "TransferToDepot"
+                                  ? "Phân bổ vật phẩm sang một hoặc nhiều kho đích"
+                                  : "Đóng kho ngay, ghi lại cách xử lý bên ngoài"}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {resolutionType === "TransferToDepot" &&
+                      renderTransferAssignmentsEditor("dialog")}
+                    {resolutionType === "ExternalResolution" && (
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="ext-note-inline"
+                          className="text-sm font-semibold tracking-tighter"
+                        >
+                          Ghi chú cách xử lý{" "}
+                          <span className="text-red-500">*</span>
+                        </Label>
+                        <Textarea
+                          id="ext-note-inline"
+                          placeholder="Mô tả cách xử lý tồn kho bên ngoài..."
+                          value={externalNote}
+                          onChange={(e) => setExternalNote(e.target.value)}
+                          rows={2}
+                          className="text-sm tracking-tighter resize-none"
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
-                {/* Resolution type */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold tracking-tighter">
+                <DialogFooter className="border-t border-border/60 px-6 py-4 sm:px-7">
+                  <Button
+                    variant="ghost"
+                    className="tracking-tighter text-muted-foreground"
+                    onClick={() => {
+                      setInitiateOpen(false);
+                      setInitiateStep(1);
+                      setIsTransferDialogExpanded(false);
+                    }}
+                  >
+                    Xử lý sau
+                  </Button>
+                  <Button
+                    className="tracking-tighter gap-1.5"
+                    disabled={
+                      resolveActionPending ||
+                      (resolutionType === "TransferToDepot" &&
+                        !closureInventoryItems.length) ||
+                      (resolutionType === "ExternalResolution" &&
+                        !externalNote.trim())
+                    }
+                    onClick={handleResolveInDialog}
+                  >
+                    {resolveActionPending && (
+                      <Spinner size={13} className="animate-spin" />
+                    )}
+                    Xử lý ngay
+                  </Button>
+                </DialogFooter>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════
+          Dialog: Resolve Closure
+      ═══════════════════════════════════ */}
+      <Dialog
+        open={resolveOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setResolveOpen(false);
+            resetTransferAssignments();
+            setIsTransferDialogExpanded(false);
+          }
+        }}
+      >
+        <DialogContent
+          className={
+            resolutionType === "TransferToDepot"
+              ? transferDialogClassName
+              : "sm:max-w-lg"
+          }
+        >
+          {resolutionType === "TransferToDepot" && (
+            <button
+              type="button"
+              aria-label={
+                isTransferDialogExpanded
+                  ? "Thu gọn cửa sổ xử lý tồn kho"
+                  : "Mở rộng cửa sổ xử lý tồn kho"
+              }
+              className="absolute right-12 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-sm text-muted-foreground/80 transition hover:text-foreground"
+              onClick={() => setIsTransferDialogExpanded((current) => !current)}
+            >
+              {isTransferDialogExpanded ? (
+                <ArrowsInIcon className="h-6 w-6" />
+              ) : (
+                <ArrowsOutIcon className="h-6 w-6" />
+              )}
+            </button>
+          )}
+          <div className="flex h-full max-h-[inherit] min-h-0 flex-col">
+            <DialogHeader className="border-b border-border/60 px-6 py-5 sm:px-7">
+              <div className="min-w-0 pr-10">
+                <DialogTitle className="flex items-center gap-2 tracking-tighter">
+                  <WarehouseIcon size={18} className="text-blue-500" />
+                  Xử lý tồn kho
+                </DialogTitle>
+                <DialogDescription className="mt-1 tracking-tight">
+                  Kho: <strong>{depot.name}</strong> — chọn phương án xử lý hàng
+                  trước khi đóng kho chính thức.
+                </DialogDescription>
+              </div>
+            </DialogHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 sm:px-7">
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-semibold tracking-tight">
                     Phương án xử lý <span className="text-red-500">*</span>
                   </Label>
                   <div className="grid gap-2">
@@ -2110,7 +3486,7 @@ export default function DepotDetailPage() {
                           setResolutionType(opt.key as typeof resolutionType)
                         }
                         className={cn(
-                          "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
+                          "flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
                           resolutionType === opt.key
                             ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                             : "border-border/60 hover:border-border hover:bg-muted/30",
@@ -2118,7 +3494,7 @@ export default function DepotDetailPage() {
                       >
                         <div
                           className={cn(
-                            "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
+                            "h-9 w-9 rounded-lg flex items-center justify-center shrink-0",
                             resolutionType === opt.key
                               ? "bg-primary/10"
                               : "bg-muted",
@@ -2148,265 +3524,71 @@ export default function DepotDetailPage() {
                             />
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold tracking-tighter">
+                        <div>
+                          <p className="text-sm font-semibold tracking-tight">
                             {opt.value}
                           </p>
-                          <p className="text-xs text-muted-foreground tracking-tighter mt-0.5">
+                          <p className="text-sm text-muted-foreground tracking-tight mt-0.5">
                             {opt.key === "TransferToDepot"
-                              ? "Chuyển toàn bộ sang kho đích"
-                              : "Đóng kho ngay, ghi lại cách xử lý bên ngoài"}
+                              ? "Phân bổ vật phẩm sang một hoặc nhiều kho đích"
+                              : "Admin ghi lại cách xử lý bên ngoài"}
                           </p>
                         </div>
                       </button>
                     ))}
                   </div>
                 </div>
-                {resolutionType === "TransferToDepot" && (
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-semibold tracking-tighter">
-                      Kho nhận hàng <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={targetDepotId}
-                      onValueChange={setTargetDepotId}
-                    >
-                      <SelectTrigger className="text-sm tracking-tighter">
-                        <SelectValue placeholder="Chọn kho nhận hàng..." />
-                      </SelectTrigger>
-                      <SelectContent
-                        position="popper"
-                        side="bottom"
-                        align="start"
-                        sideOffset={4}
-                        avoidCollisions={false}
-                        className="z-10000 w-(--radix-select-trigger-width)"
-                      >
-                        {depotOptions
-                          .filter((d) => d.key !== depot.id)
-                          .map((d) => (
-                            <SelectItem
-                              key={d.key}
-                              value={String(d.key)}
-                              className="text-sm tracking-tighter"
-                            >
-                              {d.value}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                {resolutionType === "TransferToDepot" &&
+                  renderTransferAssignmentsEditor("inline")}
                 {resolutionType === "ExternalResolution" && (
                   <div className="space-y-1.5">
                     <Label
-                      htmlFor="ext-note-inline"
-                      className="text-sm font-semibold tracking-tighter"
+                      htmlFor="ext-note"
+                      className="text-sm font-semibold tracking-tight"
                     >
                       Ghi chú cách xử lý <span className="text-red-500">*</span>
                     </Label>
                     <Textarea
-                      id="ext-note-inline"
+                      id="ext-note"
                       placeholder="Mô tả cách xử lý tồn kho bên ngoài..."
                       value={externalNote}
                       onChange={(e) => setExternalNote(e.target.value)}
-                      rows={2}
-                      className="text-sm tracking-tighter resize-none"
+                      rows={3}
+                      className="text-sm tracking-tight resize-none"
                     />
                   </div>
                 )}
               </div>
-              <DialogFooter>
-                <Button
-                  variant="ghost"
-                  className="tracking-tighter text-muted-foreground"
-                  onClick={() => {
-                    setInitiateOpen(false);
-                    setInitiateStep(1);
-                  }}
-                >
-                  Xử lý sau
-                </Button>
-                <Button
-                  className="tracking-tighter gap-1.5"
-                  disabled={
-                    resolveActionPending ||
-                    (resolutionType === "TransferToDepot" && !targetDepotId) ||
-                    (resolutionType === "ExternalResolution" &&
-                      !externalNote.trim())
-                  }
-                  onClick={handleResolveInDialog}
-                >
-                  {resolveActionPending && (
-                    <Spinner size={13} className="animate-spin" />
-                  )}
-                  Xử lý ngay
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ═══════════════════════════════════
-          Dialog: Resolve Closure
-      ═══════════════════════════════════ */}
-      <Dialog
-        open={resolveOpen}
-        onOpenChange={(o) => !o && setResolveOpen(false)}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 tracking-tighter">
-              <WarehouseIcon size={18} className="text-blue-500" />
-              Xử lý tồn kho
-            </DialogTitle>
-            <DialogDescription className="tracking-tight">
-              Kho: <strong>{depot.name}</strong> — chọn phương án xử lý hàng
-              trước khi đóng kho chính thức.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-1">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-semibold tracking-tight">
-                Phương án xử lý <span className="text-red-500">*</span>
-              </Label>
-              <div className="grid gap-2">
-                {resolutionTypes.map((opt) => (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() =>
-                      setResolutionType(opt.key as typeof resolutionType)
-                    }
-                    className={cn(
-                      "flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
-                      resolutionType === opt.key
-                        ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                        : "border-border/60 hover:border-border hover:bg-muted/30",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "h-9 w-9 rounded-lg flex items-center justify-center shrink-0",
-                        resolutionType === opt.key
-                          ? "bg-primary/10"
-                          : "bg-muted",
-                      )}
-                    >
-                      {opt.key === "TransferToDepot" ? (
-                        <Icon
-                          icon="material-symbols:delivery-truck-bolt-outline-rounded"
-                          width="24"
-                          height="24"
-                          className={
-                            resolutionType === opt.key
-                              ? "text-primary"
-                              : "text-muted-foreground"
-                          }
-                        />
-                      ) : (
-                        <Icon
-                          icon="mdi:human-hand-truck"
-                          width="24"
-                          height="24"
-                          className={
-                            resolutionType === opt.key
-                              ? "text-primary"
-                              : "text-muted-foreground"
-                          }
-                        />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold tracking-tight">
-                        {opt.value}
-                      </p>
-                      <p className="text-sm text-muted-foreground tracking-tight mt-0.5">
-                        {opt.key === "TransferToDepot"
-                          ? "Chuyển toàn bộ sang kho đích"
-                          : "Admin ghi lại cách xử lý bên ngoài"}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
             </div>
-            {resolutionType === "TransferToDepot" && (
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold tracking-tight">
-                  Kho nhận hàng <span className="text-red-500">*</span>
-                </Label>
-                <Select value={targetDepotId} onValueChange={setTargetDepotId}>
-                  <SelectTrigger className="text-sm tracking-tight">
-                    <SelectValue placeholder="Chọn kho nhận hàng..." />
-                  </SelectTrigger>
-                  <SelectContent
-                    position="popper"
-                    side="bottom"
-                    align="start"
-                    sideOffset={4}
-                    avoidCollisions={false}
-                    className="z-10000 w-(--radix-select-trigger-width)"
-                  >
-                    {depotOptions
-                      .filter((d) => d.key !== depot.id)
-                      .map((d) => (
-                        <SelectItem
-                          key={d.key}
-                          value={String(d.key)}
-                          className="text-sm tracking-tight"
-                        >
-                          {d.value}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {resolutionType === "ExternalResolution" && (
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="ext-note"
-                  className="text-sm font-semibold tracking-tight"
-                >
-                  Ghi chú cách xử lý <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="ext-note"
-                  placeholder="Mô tả cách xử lý tồn kho bên ngoài..."
-                  value={externalNote}
-                  onChange={(e) => setExternalNote(e.target.value)}
-                  rows={3}
-                  className="text-sm tracking-tight resize-none"
-                />
-              </div>
-            )}
+            <DialogFooter className="border-t border-border/60 px-6 py-4 sm:px-7">
+              <Button
+                variant="outline"
+                className="tracking-tight"
+                onClick={() => {
+                  setResolveOpen(false);
+                  setIsTransferDialogExpanded(false);
+                }}
+              >
+                Hủy
+              </Button>
+              <Button
+                className="tracking-tight gap-1.5"
+                disabled={
+                  resolveActionPending ||
+                  (resolutionType === "TransferToDepot" &&
+                    !closureInventoryItems.length) ||
+                  (resolutionType === "ExternalResolution" &&
+                    !externalNote.trim())
+                }
+                onClick={handleResolve}
+              >
+                {resolveActionPending && (
+                  <Spinner size={13} className="animate-spin" />
+                )}
+                Xác nhận xử lý
+              </Button>
+            </DialogFooter>
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              className="tracking-tight"
-              onClick={() => setResolveOpen(false)}
-            >
-              Hủy
-            </Button>
-            <Button
-              className="tracking-tight gap-1.5"
-              disabled={
-                resolveActionPending ||
-                (resolutionType === "TransferToDepot" && !targetDepotId) ||
-                (resolutionType === "ExternalResolution" &&
-                  !externalNote.trim())
-              }
-              onClick={handleResolve}
-            >
-              {resolveActionPending && (
-                <Spinner size={13} className="animate-spin" />
-              )}
-              Xác nhận xử lý
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -2444,7 +3626,7 @@ export default function DepotDetailPage() {
                   setSelectedManagerId(value === "__none" ? "" : value)
                 }
               >
-                <SelectTrigger className="tracking-tight">
+                <SelectTrigger className="w-full tracking-tight">
                   <SelectValue placeholder="Chọn quản kho" />
                 </SelectTrigger>
                 <SelectContent
@@ -2453,7 +3635,7 @@ export default function DepotDetailPage() {
                   align="start"
                   sideOffset={4}
                   avoidCollisions={false}
-                  className="z-10000 w-(--radix-select-trigger-width)"
+                  className="z-[10000] w-(--radix-select-trigger-width)"
                 >
                   <SelectItem value="__none">Chọn quản kho</SelectItem>
                   {Array.from(

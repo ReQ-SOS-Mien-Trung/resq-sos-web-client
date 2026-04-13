@@ -16,10 +16,13 @@ export interface GetDepotFundTransactionsParams {
 export interface DepotFundTransactionItem {
   id: number;
   depotFundId: number;
+  ledgerEntryId?: number | string | null;
   transactionType: string;
   amount: number;
   referenceType: string;
-  referenceId: number;
+  referenceId: number | null;
+  contributorName?: string | null;
+  phoneNumber?: string | null;
   note: string;
   createdBy: string;
   createdAt: string;
@@ -54,7 +57,7 @@ export interface CampaignTransactionItem {
   direction: string;
   amount: number;
   referenceType: string;
-  referenceId: number;
+  referenceId: number | null;
   createdByUserName: string;
   createdAt: string;
 }

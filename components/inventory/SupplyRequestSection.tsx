@@ -136,7 +136,9 @@ function RequestLineRow({
         >
           <SelectTrigger className="w-full">
             <SelectValue
-              placeholder={isCategoriesLoading ? "Đang tải danh mục..." : "Chọn danh mục"}
+              placeholder={
+                isCategoriesLoading ? "Đang tải danh mục..." : "Chọn danh mục"
+              }
             />
           </SelectTrigger>
           <SelectContent>
@@ -151,7 +153,7 @@ function RequestLineRow({
 
       <div className="lg:col-span-5 space-y-1 lg:space-y-0">
         <Label className="text-sm tracking-tighter text-muted-foreground lg:hidden">
-          Vật tư tiếp tế
+          Vật phẩm tiếp tế
         </Label>
         <Select
           value={line.reliefItemKey || undefined}
@@ -164,8 +166,8 @@ function RequestLineRow({
                 !line.categoryCode
                   ? "Chọn danh mục trước"
                   : isLoadingReliefItems
-                    ? "Đang tải vật tư..."
-                    : "Chọn vật tư"
+                    ? "Đang tải vật phẩm..."
+                    : "Chọn vật phẩm"
               }
             />
           </SelectTrigger>
@@ -221,7 +223,12 @@ export default function SupplyRequestSection({
   const { data: priorityLevels = [] } = useSupplyRequestPriorityLevels();
 
   const [lines, setLines] = useState<RequestLine[]>([
-    { id: crypto.randomUUID(), categoryCode: "", reliefItemKey: "", quantity: "" },
+    {
+      id: crypto.randomUUID(),
+      categoryCode: "",
+      reliefItemKey: "",
+      quantity: "",
+    },
   ]);
   const [submittedParams, setSubmittedParams] =
     useState<SearchDepotsParams | null>(null);
@@ -229,7 +236,9 @@ export default function SupplyRequestSection({
     Record<number, SelectedDepotByItem>
   >({});
   const [depotNotes, setDepotNotes] = useState<Record<number, string>>({});
-  const [depotPriorities, setDepotPriorities] = useState<Record<number, string>>({});
+  const [depotPriorities, setDepotPriorities] = useState<
+    Record<number, string>
+  >({});
   const [isSelectionSheetOpen, setIsSelectionSheetOpen] = useState(false);
   const [animatedDepotId, setAnimatedDepotId] = useState<number | null>(null);
   const [flyTokens, setFlyTokens] = useState<FlyToken[]>([]);
@@ -243,7 +252,10 @@ export default function SupplyRequestSection({
       const startWidth = panelWidthRef.current;
 
       const onMove = (ev: MouseEvent) => {
-        const newW = Math.min(860, Math.max(300, startWidth + startX - ev.clientX));
+        const newW = Math.min(
+          860,
+          Math.max(300, startWidth + startX - ev.clientX),
+        );
         panelWidthRef.current = newW;
         // Direct DOM — zero React re-renders during drag
         if (sheetRef.current) sheetRef.current.style.width = `${newW}px`;
@@ -347,7 +359,12 @@ export default function SupplyRequestSection({
   const handleAddLine = () => {
     setLines((prev) => [
       ...prev,
-      { id: crypto.randomUUID(), categoryCode: "", reliefItemKey: "", quantity: "" },
+      {
+        id: crypto.randomUUID(),
+        categoryCode: "",
+        reliefItemKey: "",
+        quantity: "",
+      },
     ]);
   };
 
@@ -357,7 +374,7 @@ export default function SupplyRequestSection({
 
   const handleSearch = () => {
     if (lines.length === 0) {
-      toast.error("Vui lòng chọn ít nhất 1 vật tư");
+      toast.error("Vui lòng chọn ít nhất 1 vật phẩm");
       return;
     }
 
@@ -367,7 +384,7 @@ export default function SupplyRequestSection({
         return;
       }
       if (!line.reliefItemKey) {
-        toast.error(`Dòng ${index + 1}: Vui lòng chọn vật tư`);
+        toast.error(`Dòng ${index + 1}: Vui lòng chọn vật phẩm`);
         return;
       }
       const qty = Number(line.quantity);
@@ -537,7 +554,9 @@ export default function SupplyRequestSection({
       });
     });
 
-    return Array.from(grouped.values()).sort((a, b) => a.distanceKm - b.distanceKm);
+    return Array.from(grouped.values()).sort(
+      (a, b) => a.distanceKm - b.distanceKm,
+    );
   }, [selectedDepotByItem]);
 
   const handleSubmitSupplyRequests = async () => {
@@ -548,15 +567,17 @@ export default function SupplyRequestSection({
 
     const requests = groupedSelectedDepots
       .map((depot) => ({
-      sourceDepotId: depot.depotId,
-      priorityLevel: depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "Urgent"),
-      items: depot.items
-        .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
-        .map((item) => ({
-          itemModelId: item.itemModelId,
-          quantity: item.quantity,
-        })),
-      note: depotNotes[depot.depotId]?.trim() || undefined,
+        sourceDepotId: depot.depotId,
+        priorityLevel:
+          depotPriorities[depot.depotId] ||
+          (priorityLevels[0]?.key ?? "Urgent"),
+        items: depot.items
+          .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0)
+          .map((item) => ({
+            itemModelId: item.itemModelId,
+            quantity: item.quantity,
+          })),
+        note: depotNotes[depot.depotId]?.trim() || undefined,
       }))
       .filter((request) => request.items.length > 0);
 
@@ -608,7 +629,7 @@ export default function SupplyRequestSection({
             Tạo yêu cầu tiếp tế
           </CardTitle>
           <CardDescription className="tracking-tighter text-sm">
-            Chọn vật tư cần tiếp tế và số lượng để tìm kho phù hợp.
+            Chọn vật phẩm cần tiếp tế và số lượng để tìm kho phù hợp.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -618,7 +639,7 @@ export default function SupplyRequestSection({
                 Danh mục
               </p>
               <p className="lg:col-span-5 text-sm font-medium tracking-tighter">
-                Vật tư tiếp tế
+                Vật phẩm tiếp tế
               </p>
               <p className="lg:col-span-2 text-sm font-medium tracking-tighter">
                 Số lượng
@@ -650,7 +671,7 @@ export default function SupplyRequestSection({
               onClick={handleAddLine}
             >
               <Plus size={14} />
-              Thêm vật tư
+              Thêm vật phẩm
             </Button>
 
             <Button
@@ -675,19 +696,21 @@ export default function SupplyRequestSection({
                 <Warehouse className="h-5 w-5 text-primary" />
                 Kết quả tìm kho
               </CardTitle>
-              {!isSearching && !isError && (searchResult?.items?.length ?? 0) > 0 && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="gap-2"
-                  onClick={handleOpenSelectionSheet}
-                  disabled={groupedSelectedDepots.length === 0}
-                >
-                  <ShoppingCartSimple size={16} />
-                  Kho đã chọn ({groupedSelectedDepots.length})
-                </Button>
-              )}
+              {!isSearching &&
+                !isError &&
+                (searchResult?.items?.length ?? 0) > 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={handleOpenSelectionSheet}
+                    disabled={groupedSelectedDepots.length === 0}
+                  >
+                    <ShoppingCartSimple size={16} />
+                    Kho đã chọn ({groupedSelectedDepots.length})
+                  </Button>
+                )}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -711,130 +734,159 @@ export default function SupplyRequestSection({
               </div>
             )}
 
-            {!isSearching && !isError && (searchResult?.items?.length ?? 0) === 0 && (
-              <div className="text-sm text-muted-foreground tracking-tighter">
-                Không có kho đáp ứng yêu cầu hiện tại.
-              </div>
-            )}
+            {!isSearching &&
+              !isError &&
+              (searchResult?.items?.length ?? 0) === 0 && (
+                <div className="text-sm text-muted-foreground tracking-tighter">
+                  Không có kho đáp ứng yêu cầu hiện tại.
+                </div>
+              )}
 
-            {!isSearching && !isError && (searchResult?.items?.length ?? 0) > 0 && (
-              <div className="space-y-4">
-
-                {searchResult!.items.map((item) => (
-                  <Card key={item.itemModelId} className="border-border/60">
-                    <CardHeader className="pb-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <div>
-                          <CardTitle className="text-[16px] font-semibold tracking-tighter">
-                            {item.itemModelName}
-                          </CardTitle>
-                          <CardDescription className="tracking-tighter text-[14px]">
-                            Danh mục: {item.categoryName}
-                          </CardDescription>
+            {!isSearching &&
+              !isError &&
+              (searchResult?.items?.length ?? 0) > 0 && (
+                <div className="space-y-4">
+                  {searchResult!.items.map((item) => (
+                    <Card key={item.itemModelId} className="border-border/60">
+                      <CardHeader className="pb-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div>
+                            <CardTitle className="text-[16px] font-semibold tracking-tighter">
+                              {item.itemModelName}
+                            </CardTitle>
+                            <CardDescription className="tracking-tighter text-[14px]">
+                              Danh mục: {item.categoryName}
+                            </CardDescription>
+                          </div>
+                          <Badge variant="info" className="w-fit">
+                            Tổng khả dụng:{" "}
+                            {item.totalAvailableAcrossWarehouses.toLocaleString(
+                              "vi-VN",
+                            )}{" "}
+                            {item.unit}
+                          </Badge>
                         </div>
-                        <Badge variant="info" className="w-fit">
-                          Tổng khả dụng: {item.totalAvailableAcrossWarehouses.toLocaleString("vi-VN")} {item.unit}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                        {item.warehouses.map((warehouse) => (
-                          (() => {
-                            const isSelected =
-                              selectedDepotByItem[item.itemModelId]?.depotId ===
-                              warehouse.depotId;
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                          {item.warehouses.map((warehouse) =>
+                            (() => {
+                              const isSelected =
+                                selectedDepotByItem[item.itemModelId]
+                                  ?.depotId === warehouse.depotId;
 
                               return (
-                          <div
-                            key={`${item.itemModelId}-${warehouse.depotId}`}
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) =>
-                              handleSelectDepotForItem(
-                                item,
-                                warehouse,
-                                event.currentTarget,
-                              )
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                handleSelectDepotForItem(
-                                  item,
-                                  warehouse,
-                                  event.currentTarget,
-                                );
-                              }
-                            }}
-                            className={`rounded-lg border p-4 transition-all duration-300 cursor-pointer bg-muted/20 hover:-translate-y-0.5 hover:shadow-sm ${
-                              isSelected
-                                ? "border-primary ring-1 ring-primary/30 bg-primary/5"
-                                : "border-border/60"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <p className="text-base font-semibold tracking-tighter">
-                                  {warehouse.depotName}
-                                </p>
-                                <p className="text-sm text-muted-foreground tracking-tighter mt-0.5 flex items-start gap-1">
-                                  <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                                  <span>{warehouse.depotAddress}</span>
-                                </p>
-                              </div>
-                              <Badge variant="outline">
-                                {DEPOT_STATUS_LABELS[warehouse.depotStatus] ??
-                                  warehouse.depotStatus}
-                              </Badge>
-                            </div>
+                                <div
+                                  key={`${item.itemModelId}-${warehouse.depotId}`}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(event) =>
+                                    handleSelectDepotForItem(
+                                      item,
+                                      warehouse,
+                                      event.currentTarget,
+                                    )
+                                  }
+                                  onKeyDown={(event) => {
+                                    if (
+                                      event.key === "Enter" ||
+                                      event.key === " "
+                                    ) {
+                                      event.preventDefault();
+                                      handleSelectDepotForItem(
+                                        item,
+                                        warehouse,
+                                        event.currentTarget,
+                                      );
+                                    }
+                                  }}
+                                  className={`rounded-lg border p-4 transition-all duration-300 cursor-pointer bg-muted/20 hover:-translate-y-0.5 hover:shadow-sm ${
+                                    isSelected
+                                      ? "border-primary ring-1 ring-primary/30 bg-primary/5"
+                                      : "border-border/60"
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="text-base font-semibold tracking-tighter">
+                                        {warehouse.depotName}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground tracking-tighter mt-0.5 flex items-start gap-1">
+                                        <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                        <span>{warehouse.depotAddress}</span>
+                                      </p>
+                                    </div>
+                                    <Badge variant="outline">
+                                      {DEPOT_STATUS_LABELS[
+                                        warehouse.depotStatus
+                                      ] ?? warehouse.depotStatus}
+                                    </Badge>
+                                  </div>
 
-                            {isSelected && (
-                              <div className="mt-3 flex w-fit items-center gap-1.5 tracking-tighter rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                                <CheckCircle size={14} weight="fill" />
-                                Đã chọn
-                              </div>
-                            )}
+                                  {isSelected && (
+                                    <div className="mt-3 flex w-fit items-center gap-1.5 tracking-tighter rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                                      <CheckCircle size={14} weight="fill" />
+                                      Đã chọn
+                                    </div>
+                                  )}
 
-                            <div className="grid grid-cols-3 gap-2 mt-3 text-sm tracking-tighter">
-                              <div>
-                                <p className="text-muted-foreground">Tổng</p>
-                                <p className="font-semibold">
-                                  {warehouse.totalQuantity.toLocaleString("vi-VN")}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Đã giữ</p>
-                                <p className="font-semibold">
-                                  {warehouse.reservedQuantity.toLocaleString("vi-VN")}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Khả dụng</p>
-                                <p className="font-semibold text-emerald-600">
-                                  {warehouse.availableQuantity.toLocaleString("vi-VN")}
-                                </p>
-                              </div>
-                            </div>
+                                  <div className="grid grid-cols-3 gap-2 mt-3 text-sm tracking-tighter">
+                                    <div>
+                                      <p className="text-muted-foreground">
+                                        Tổng
+                                      </p>
+                                      <p className="font-semibold">
+                                        {warehouse.totalQuantity.toLocaleString(
+                                          "vi-VN",
+                                        )}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">
+                                        Đã giữ
+                                      </p>
+                                      <p className="font-semibold">
+                                        {warehouse.reservedQuantity.toLocaleString(
+                                          "vi-VN",
+                                        )}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">
+                                        Khả dụng
+                                      </p>
+                                      <p className="font-semibold text-emerald-600">
+                                        {warehouse.availableQuantity.toLocaleString(
+                                          "vi-VN",
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
 
-                            <div className="mt-2 text-sm text-muted-foreground tracking-tighter flex items-center justify-between">
-                              <span>
-                                Khoảng cách: <span className="font-semibold text-primary">{warehouse.distanceKm.toFixed(2)} km</span>
-                              </span>
-                              <span>
-                                Nhập gần nhất: {new Date(warehouse.lastStockedAt).toLocaleDateString("vi-VN")}
-                              </span>
-                            </div>
-                          </div>
-                            );
-                          })()
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+                                  <div className="mt-2 text-sm text-muted-foreground tracking-tighter flex items-center justify-between">
+                                    <span>
+                                      Khoảng cách:{" "}
+                                      <span className="font-semibold text-primary">
+                                        {warehouse.distanceKm.toFixed(2)} km
+                                      </span>
+                                    </span>
+                                    <span>
+                                      Nhập gần nhất:{" "}
+                                      {new Date(
+                                        warehouse.lastStockedAt,
+                                      ).toLocaleDateString("vi-VN")}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })(),
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
           </CardContent>
         </Card>
       )}
@@ -899,9 +951,12 @@ export default function SupplyRequestSection({
                             key={`${depot.depotId}-${item.itemModelId}`}
                             className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-sm tracking-tighter flex items-center justify-between"
                           >
-                            <span className="font-medium">{item.itemModelName}</span>
+                            <span className="font-medium">
+                              {item.itemModelName}
+                            </span>
                             <span className="text-primary font-semibold">
-                              {item.quantity.toLocaleString("vi-VN")} {item.unit}
+                              {item.quantity.toLocaleString("vi-VN")}{" "}
+                              {item.unit}
                             </span>
                           </div>
                         ))}
@@ -912,7 +967,10 @@ export default function SupplyRequestSection({
                           Mức độ ưu tiên
                         </Label>
                         <Select
-                          value={depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "")}
+                          value={
+                            depotPriorities[depot.depotId] ||
+                            (priorityLevels[0]?.key ?? "")
+                          }
                           onValueChange={(value) =>
                             setDepotPriorities((prev) => ({
                               ...prev,
@@ -923,26 +981,43 @@ export default function SupplyRequestSection({
                           <SelectTrigger
                             className={cn(
                               "w-full h-9 leading-normal font-medium",
-                              (depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "URGENT")).toUpperCase() === "URGENT"
+                              (
+                                depotPriorities[depot.depotId] ||
+                                (priorityLevels[0]?.key ?? "URGENT")
+                              ).toUpperCase() === "URGENT"
                                 ? "text-red-700 bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800/60 dark:text-red-300"
-                                : (depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "URGENT")).toUpperCase() === "HIGH"
+                                : (
+                                      depotPriorities[depot.depotId] ||
+                                      (priorityLevels[0]?.key ?? "URGENT")
+                                    ).toUpperCase() === "HIGH"
                                   ? "text-amber-700 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/60 dark:text-amber-300"
-                                  : (depotPriorities[depot.depotId] || (priorityLevels[0]?.key ?? "URGENT")).toUpperCase() === "MEDIUM"
+                                  : (
+                                        depotPriorities[depot.depotId] ||
+                                        (priorityLevels[0]?.key ?? "URGENT")
+                                      ).toUpperCase() === "MEDIUM"
                                     ? "text-sky-700 bg-sky-50 border-sky-200 dark:bg-sky-950/20 dark:border-sky-800/60 dark:text-sky-300"
-                                    : ""
+                                    : "",
                             )}
                           >
                             <SelectValue placeholder="Chọn mức ưu tiên" />
                           </SelectTrigger>
-                          <SelectContent disablePortal position="popper" sideOffset={4}>
+                          <SelectContent
+                            disablePortal
+                            position="popper"
+                            sideOffset={4}
+                          >
                             {priorityLevels.map((level) => (
-                              <SelectItem 
-                                key={level.key} 
+                              <SelectItem
+                                key={level.key}
                                 value={level.key}
                                 className={
-                                  level.key.toUpperCase() === "URGENT" ? "text-red-700 focus:text-red-800 focus:bg-red-50 font-medium" :
-                                  level.key.toUpperCase() === "HIGH" ? "text-amber-700 focus:text-amber-800 focus:bg-amber-50 font-medium" :
-                                  level.key.toUpperCase() === "MEDIUM" ? "text-sky-700 focus:text-sky-800 focus:bg-sky-50 font-medium" : ""
+                                  level.key.toUpperCase() === "URGENT"
+                                    ? "text-red-700 focus:text-red-800 focus:bg-red-50 font-medium"
+                                    : level.key.toUpperCase() === "HIGH"
+                                      ? "text-amber-700 focus:text-amber-800 focus:bg-amber-50 font-medium"
+                                      : level.key.toUpperCase() === "MEDIUM"
+                                        ? "text-sky-700 focus:text-sky-800 focus:bg-sky-50 font-medium"
+                                        : ""
                                 }
                               >
                                 {level.value}
@@ -979,17 +1054,22 @@ export default function SupplyRequestSection({
                 type="button"
                 className="w-full gap-2"
                 onClick={handleSubmitSupplyRequests}
-                disabled={groupedSelectedDepots.length === 0 || isSubmittingRequest}
+                disabled={
+                  groupedSelectedDepots.length === 0 || isSubmittingRequest
+                }
               >
                 <PaperPlaneTilt size={16} />
-                {isSubmittingRequest ? "Đang gửi yêu cầu..." : "Gửi yêu cầu tiếp tế"}
+                {isSubmittingRequest
+                  ? "Đang gửi yêu cầu..."
+                  : "Gửi yêu cầu tiếp tế"}
               </Button>
             </div>
           </div>
         </SheetContent>
       </Sheet>
 
-      {flyTokens.length > 0 && typeof document !== "undefined" &&
+      {flyTokens.length > 0 &&
+        typeof document !== "undefined" &&
         createPortal(
           flyTokens.map((token) => (
             <div
@@ -1003,7 +1083,8 @@ export default function SupplyRequestSection({
                   ? `translate(${token.dx}px, ${token.dy}px) scale(0.35)`
                   : "translate(0, 0) scale(1)",
                 opacity: token.active ? 0.25 : 1,
-                transition: "transform 900ms cubic-bezier(0.16, 1, 0.3, 1), opacity 900ms ease",
+                transition:
+                  "transform 900ms cubic-bezier(0.16, 1, 0.3, 1), opacity 900ms ease",
               }}
             >
               <CheckCircle size={12} weight="fill" />
