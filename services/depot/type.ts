@@ -9,7 +9,7 @@ export type DepotStatus =
   | "Closing"
   | "UnderMaintenance";
 
-export type ChangeableDepotStatus = "Available" | "Unavailable";
+export type ChangeableDepotStatus = "Available" | "Unavailable" | "Closing";
 
 // Depot Status Metadata (from /logistics/depot/metadata/depot-statuses)
 export interface DepotStatusMetadata {
@@ -231,6 +231,31 @@ export interface GetDepotFundTransactionsParams {
   pageSize?: number;
 }
 
+// Depot Advancer (from /finance/depot-funds/my/advancers)
+export interface DepotAdvancer {
+  contributorName: string;
+  contributorPhoneNumber: string;
+  totalAdvancedAmount: number;
+  totalRepaidAmount: number;
+  outstandingAmount: number;
+  repaidPercentage: number;
+}
+
+export interface GetMyDepotAdvancersResponse {
+  items: DepotAdvancer[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface GetMyDepotAdvancersParams {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface CreateInternalAdvanceItem {
   amount: number;
   contributorName: string;
@@ -341,6 +366,38 @@ export interface DepotClosureRemainingInventoryItem {
   imageUrl?: string | null;
   receivedDate?: string | null;
   expiredDate?: string | null;
+}
+
+export interface DepotClosureTransferSuggestionTargetMetric {
+  depotId: number;
+  depotName: string;
+  capacity: number;
+  currentUtilization: number;
+  remainingVolume: number;
+  remainingWeight: number;
+}
+
+export interface DepotClosureSuggestedTransfer {
+  targetDepotId: number | null;
+  targetDepotName: string | null;
+  itemModelId: number;
+  itemName: string;
+  itemType: string;
+  unit?: string | null;
+  suggestedQuantity: number;
+  totalVolume: number;
+  totalWeight: number;
+}
+
+export interface DepotClosureTransferSuggestionsResponse {
+  sourceDepotId: number;
+  sourceDepotName: string;
+  totalVolumeToTransfer: number;
+  totalWeightToTransfer: number;
+  unallocatedVolume: number;
+  unallocatedWeight: number;
+  targetDepotMetrics: DepotClosureTransferSuggestionTargetMetric[];
+  suggestedTransfers: DepotClosureSuggestedTransfer[];
 }
 
 export interface DepotClosureTransferAssignmentItem {

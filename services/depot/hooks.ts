@@ -19,7 +19,9 @@ import {
   unassignDepotManager,
   updateDepotAdvanceLimit,
   getMyDepotFundTransactions,
+  getMyDepotAdvancers,
   initiateDepotClosure,
+  getDepotClosureTransferSuggestions,
   markDepotClosureExternal,
   submitDepotExternalResolution,
   downloadDepotClosureExportTemplate,
@@ -56,10 +58,13 @@ import {
   DepotManagerAssignmentResponse,
   GetDepotFundTransactionsResponse,
   GetDepotFundTransactionsParams,
+  GetMyDepotAdvancersResponse,
+  GetMyDepotAdvancersParams,
   CreateInternalAdvanceRequest,
   CreateInternalRepaymentRequest,
   InitiateDepotClosureRequest,
   InitiateDepotClosureResponse,
+  DepotClosureTransferSuggestionsResponse,
   MarkDepotClosureExternalRequest,
   MarkDepotClosureExternalResponse,
   SubmitDepotExternalResolutionRequest,
@@ -102,17 +107,24 @@ export const DEPOT_CLOSURE_BY_DEPOT_QUERY_KEY = [
 export const DEPOT_CLOSURE_DETAIL_BY_DEPOT_QUERY_KEY = [
   "depot-closure-detail-by-depot",
 ] as const;
+export const DEPOT_CLOSURE_TRANSFER_SUGGESTIONS_QUERY_KEY = [
+  "depot-closure-transfer-suggestions",
+] as const;
 export const DEPOT_FUNDS_QUERY_KEY = ["depot-funds"] as const;
 export const MY_DEPOT_FUND_QUERY_KEY = ["my-depot-fund"] as const;
 export const MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY = [
   "my-depot-fund-transactions",
 ] as const;
+export const MY_DEPOT_ADVANCERS_QUERY_KEY = ["my-depot-advancers"] as const;
 
 function invalidateDepotFundFinanceQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ) {
   queryClient.invalidateQueries({ queryKey: MY_DEPOT_FUND_QUERY_KEY });
-  queryClient.invalidateQueries({ queryKey: MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY });
+  queryClient.invalidateQueries({
+    queryKey: MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY,
+  });
+  queryClient.invalidateQueries({ queryKey: MY_DEPOT_ADVANCERS_QUERY_KEY });
   queryClient.invalidateQueries({ queryKey: DEPOT_FUNDS_QUERY_KEY });
   queryClient.invalidateQueries({ queryKey: ["transactions"] });
 }
@@ -272,6 +284,20 @@ export function useMyDepotFundTransactions(
 }
 
 /**
+ * [Manager] Hook to fetch my depot fund advancers (people who owe money)
+ */
+export function useMyDepotAdvancers(
+  params?: GetMyDepotAdvancersParams,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<GetMyDepotAdvancersResponse>({
+    queryKey: [...MY_DEPOT_ADVANCERS_QUERY_KEY, params],
+    queryFn: () => getMyDepotAdvancers(params),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+/**
  * [Admin] Hook to update advance limit for a depot
  */
 export function useUpdateDepotAdvanceLimit() {
@@ -306,11 +332,7 @@ export function useCreateInternalAdvance() {
 export function useCreateInternalRepayment() {
   const queryClient = useQueryClient();
 
-  return useMutation<
-    void,
-    Error,
-    CreateInternalRepaymentRequest
-  >({
+  return useMutation<void, Error, CreateInternalRepaymentRequest>({
     mutationFn: createInternalRepayment,
     onSuccess: () => {
       invalidateDepotFundFinanceQueries(queryClient);
@@ -521,7 +543,8 @@ export function useMyDepotClosureDetail(
   return useQuery<DepotClosureDetail>({
     queryKey: [...MY_DEPOT_CLOSURE_DETAIL_QUERY_KEY, closureId],
     queryFn: () => getMyDepotClosureDetail(closureId),
-    enabled: (options?.enabled ?? true) && Number.isFinite(closureId) && closureId > 0,
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(closureId) && closureId > 0,
   });
 }
 
@@ -540,7 +563,20 @@ export function useDepotClosureByDepotId(
   return useQuery<DepotClosureDetail | null>({
     queryKey: [...DEPOT_CLOSURE_BY_DEPOT_QUERY_KEY, depotId],
     queryFn: () => getDepotClosureByDepotId(depotId),
-    enabled: (options?.enabled ?? true) && Number.isFinite(depotId) && depotId > 0,
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(depotId) && depotId > 0,
+  });
+}
+
+export function useDepotClosureTransferSuggestions(
+  depotId: number,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<DepotClosureTransferSuggestionsResponse>({
+    queryKey: [...DEPOT_CLOSURE_TRANSFER_SUGGESTIONS_QUERY_KEY, depotId],
+    queryFn: () => getDepotClosureTransferSuggestions(depotId),
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(depotId) && depotId > 0,
   });
 }
 
@@ -624,7 +660,11 @@ export function usePrepareDepotTransfer() {
     onSuccess: (_, v) => {
       if (v.sourceDepotId) {
         queryClient.invalidateQueries({
-          queryKey: [...DEPOT_TRANSFER_QUERY_KEY, v.sourceDepotId, v.transferId],
+          queryKey: [
+            ...DEPOT_TRANSFER_QUERY_KEY,
+            v.sourceDepotId,
+            v.transferId,
+          ],
         });
       } else {
         queryClient.invalidateQueries({ queryKey: DEPOT_TRANSFER_QUERY_KEY });
@@ -660,7 +700,11 @@ export function useShipDepotTransfer() {
     onSuccess: (_, v) => {
       if (v.sourceDepotId) {
         queryClient.invalidateQueries({
-          queryKey: [...DEPOT_TRANSFER_QUERY_KEY, v.sourceDepotId, v.transferId],
+          queryKey: [
+            ...DEPOT_TRANSFER_QUERY_KEY,
+            v.sourceDepotId,
+            v.transferId,
+          ],
         });
       } else {
         queryClient.invalidateQueries({ queryKey: DEPOT_TRANSFER_QUERY_KEY });
@@ -696,7 +740,11 @@ export function useCompleteDepotTransfer() {
     onSuccess: (_, v) => {
       if (v.sourceDepotId) {
         queryClient.invalidateQueries({
-          queryKey: [...DEPOT_TRANSFER_QUERY_KEY, v.sourceDepotId, v.transferId],
+          queryKey: [
+            ...DEPOT_TRANSFER_QUERY_KEY,
+            v.sourceDepotId,
+            v.transferId,
+          ],
         });
       } else {
         queryClient.invalidateQueries({ queryKey: DEPOT_TRANSFER_QUERY_KEY });
@@ -732,7 +780,11 @@ export function useReceiveDepotTransfer() {
     onSuccess: (_, v) => {
       if (v.sourceDepotId) {
         queryClient.invalidateQueries({
-          queryKey: [...DEPOT_TRANSFER_QUERY_KEY, v.sourceDepotId, v.transferId],
+          queryKey: [
+            ...DEPOT_TRANSFER_QUERY_KEY,
+            v.sourceDepotId,
+            v.transferId,
+          ],
         });
       } else {
         queryClient.invalidateQueries({ queryKey: DEPOT_TRANSFER_QUERY_KEY });

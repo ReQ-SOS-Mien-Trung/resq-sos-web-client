@@ -452,8 +452,12 @@ export default function DepotClosurePage() {
         )
         .find(
           (item) =>
-            !TERMINAL_TRANSFER_STATUSES.has(normalizeTransferStatus(item.status)),
-        ) ?? transferList[0] ?? null
+            !TERMINAL_TRANSFER_STATUSES.has(
+              normalizeTransferStatus(item.status),
+            ),
+        ) ??
+      transferList[0] ??
+      null
     );
   }, [routeTransferId, transferList]);
 
@@ -487,12 +491,10 @@ export default function DepotClosurePage() {
     selectedTransfer?.closureId ??
     selectedClosureSummary?.id ??
     null;
-  const {
-    data: activeClosureDetail,
-    refetch: refetchClosureDetail,
-  } = useMyDepotClosureDetail(activeClosureId ?? 0, {
-    enabled: !!activeClosureId,
-  });
+  const { data: activeClosureDetail, refetch: refetchClosureDetail } =
+    useMyDepotClosureDetail(activeClosureId ?? 0, {
+      enabled: !!activeClosureId,
+    });
 
   const activeTransferId = selectedTransfer?.transferId ?? null;
   const activeTransfer = activeClosureDetail?.transferDetail ?? null;
@@ -504,11 +506,15 @@ export default function DepotClosurePage() {
   const sourceDepotName =
     selectedTransfer?.sourceDepotName ??
     activeClosureDetail?.depotName ??
-    (activeTransfer?.sourceDepotId ? `Kho #${activeTransfer.sourceDepotId}` : null);
+    (activeTransfer?.sourceDepotId
+      ? `Kho #${activeTransfer.sourceDepotId}`
+      : null);
   const targetDepotName =
     selectedTransfer?.targetDepotName ??
     activeClosureDetail?.targetDepotName ??
-    (activeTransfer?.targetDepotId ? `Kho #${activeTransfer.targetDepotId}` : null);
+    (activeTransfer?.targetDepotId
+      ? `Kho #${activeTransfer.targetDepotId}`
+      : null);
   const snapshotConsumableUnits =
     activeTransfer?.snapshotConsumableUnits ??
     selectedTransfer?.snapshotConsumableUnits ??
@@ -755,9 +761,7 @@ export default function DepotClosurePage() {
     );
   }
 
-  const hasActiveTransferPanel = Boolean(
-    activeTransferId && selectedTransfer,
-  );
+  const hasActiveTransferPanel = Boolean(activeTransferId && selectedTransfer);
   const effectiveClosureStatus =
     activeClosureDetail?.status ??
     selectedClosureSummary?.status ??
@@ -802,10 +806,11 @@ export default function DepotClosurePage() {
                                     ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
                                     : depot.status === "UnderMaintenance"
                                       ? "bg-purple-500/10 text-purple-700 dark:text-purple-400"
-                                      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
                       )}
                     >
-                      {statusMetadata?.find((s) => s.key === depot.status)?.value ??
+                      {statusMetadata?.find((s) => s.key === depot.status)
+                        ?.value ??
                         (depot.status === "Closing"
                           ? "Đang tiến hành đóng kho"
                           : depot.status === "Closed"
@@ -859,7 +864,8 @@ export default function DepotClosurePage() {
                   Phiên đóng kho #{activeClosureDetail.id}
                 </h2>
                 <p className="text-sm text-muted-foreground tracking-tight mt-0.5">
-                  {activeClosureDetail.closeReason || "Không có lý do chi tiết."}
+                  {activeClosureDetail.closeReason ||
+                    "Không có lý do chi tiết."}
                 </p>
               </div>
               <Badge variant="outline" className="text-sm tracking-tight">
@@ -915,44 +921,44 @@ export default function DepotClosurePage() {
             {(activeClosureDetail.externalNote ||
               activeClosureDetail.driftNote ||
               activeClosureDetail.failureReason) && (
-                <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Ghi chú bổ sung
-                  </p>
-                  <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-3">
-                    {activeClosureDetail.externalNote && (
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-muted-foreground tracking-tight">
-                          Xử lý bên ngoài
-                        </p>
-                        <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words">
-                          {activeClosureDetail.externalNote}
-                        </p>
-                      </div>
-                    )}
-                    {activeClosureDetail.driftNote && (
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-muted-foreground tracking-tight">
-                          Ghi chú chênh lệch
-                        </p>
-                        <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words">
-                          {activeClosureDetail.driftNote}
-                        </p>
-                      </div>
-                    )}
-                    {activeClosureDetail.failureReason && (
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-red-600 dark:text-red-400 tracking-tight">
-                          Nguyên nhân thất bại
-                        </p>
-                        <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words text-red-700 dark:text-red-300">
-                          {activeClosureDetail.failureReason}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+              <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Ghi chú bổ sung
+                </p>
+                <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-3">
+                  {activeClosureDetail.externalNote && (
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-muted-foreground tracking-tight">
+                        Xử lý bên ngoài
+                      </p>
+                      <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words">
+                        {activeClosureDetail.externalNote}
+                      </p>
+                    </div>
+                  )}
+                  {activeClosureDetail.driftNote && (
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-muted-foreground tracking-tight">
+                        Ghi chú chênh lệch
+                      </p>
+                      <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words">
+                        {activeClosureDetail.driftNote}
+                      </p>
+                    </div>
+                  )}
+                  {activeClosureDetail.failureReason && (
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-red-600 dark:text-red-400 tracking-tight">
+                        Nguyên nhân thất bại
+                      </p>
+                      <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap break-words text-red-700 dark:text-red-300">
+                        {activeClosureDetail.failureReason}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+            )}
 
             {activeClosureDetail.externalItems.length > 0 && (
               <div className="rounded-xl border border-border/60 overflow-hidden">
@@ -961,7 +967,10 @@ export default function DepotClosurePage() {
                     Kết quả xử lý bên ngoài
                   </p>
                   <p className="text-sm text-muted-foreground tracking-tight">
-                    {activeClosureDetail.externalItems.length.toLocaleString("vi-VN")} mục đã được ghi nhận.
+                    {activeClosureDetail.externalItems.length.toLocaleString(
+                      "vi-VN",
+                    )}{" "}
+                    mục đã được ghi nhận.
                   </p>
                 </div>
                 <div className="w-full">
@@ -972,58 +981,67 @@ export default function DepotClosurePage() {
                     <div>Tổng tiền</div>
                   </div>
                   <div className="divide-y divide-border/60">
-                    {activeClosureDetail.externalItems.slice(0, 5).map((item) => {
-                      const hm = item.handlingMethod || "";
-                      const hmBadgeCls = hm === "DonatedToOrganization"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400"
-                        : hm === "Liquidated"
-                          ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-400"
-                          : hm === "Destroyed" || hm === "Expired"
-                            ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:border-red-800 dark:text-red-400"
-                            : hm === "Disposed"
-                              ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-900/30 dark:border-zinc-700 dark:text-zinc-400"
-                              : "bg-muted border-border text-muted-foreground";
+                    {activeClosureDetail.externalItems
+                      .slice(0, 5)
+                      .map((item) => {
+                        const hm = item.handlingMethod || "";
+                        const hmBadgeCls =
+                          hm === "DonatedToOrganization"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400"
+                            : hm === "Liquidated"
+                              ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-400"
+                              : hm === "Destroyed" || hm === "Expired"
+                                ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:border-red-800 dark:text-red-400"
+                                : hm === "Disposed"
+                                  ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-900/30 dark:border-zinc-700 dark:text-zinc-400"
+                                  : "bg-muted border-border text-muted-foreground";
 
-                      return (
-                        <div
-                          key={item.id}
-                          className="px-5 py-3.5 grid grid-cols-1 md:grid-cols-[1.5fr_3fr_2fr_1fr] gap-4 items-start hover:bg-muted/30 transition-colors"
-                        >
-                          <div>
-                            <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
-                              Vật phẩm
-                            </p>
-                            <p className="text-sm font-semibold tracking-tight">
-                              {item.itemName}
-                            </p>
+                        return (
+                          <div
+                            key={item.id}
+                            className="px-5 py-3.5 grid grid-cols-1 md:grid-cols-[1.5fr_3fr_2fr_1fr] gap-4 items-start hover:bg-muted/30 transition-colors"
+                          >
+                            <div>
+                              <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
+                                Vật phẩm
+                              </p>
+                              <p className="text-sm font-semibold tracking-tight">
+                                {item.itemName}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground tracking-tight mb-1.5 md:hidden">
+                                Cách xử lý
+                              </p>
+                              <span
+                                className={cn(
+                                  "text-[11px] font-bold px-1.5 py-0.5 rounded-md border tracking-tighter",
+                                  hmBadgeCls,
+                                )}
+                              >
+                                {item.handlingMethodDisplay ||
+                                  item.handlingMethod}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
+                                Người nhận
+                              </p>
+                              <p className="text-sm font-semibold tracking-tight">
+                                {item.recipient || "—"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
+                                Tổng tiền
+                              </p>
+                              <p className="text-sm font-semibold tracking-tight">
+                                {item.totalPrice.toLocaleString("vi-VN")}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground tracking-tight mb-1.5 md:hidden">
-                              Cách xử lý
-                            </p>
-                            <span className={cn("text-[11px] font-bold px-1.5 py-0.5 rounded-md border tracking-tighter", hmBadgeCls)}>
-                              {item.handlingMethodDisplay || item.handlingMethod}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
-                              Người nhận
-                            </p>
-                            <p className="text-sm font-semibold tracking-tight">
-                              {item.recipient || "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
-                              Tổng tiền
-                            </p>
-                            <p className="text-sm font-semibold tracking-tight">
-                              {item.totalPrice.toLocaleString("vi-VN")}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 </div>
               </div>
@@ -1198,7 +1216,7 @@ export default function DepotClosurePage() {
               <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5">
                 {[
                   {
-                    label: "Vật tư tiêu thụ",
+                    label: "Vật phẩm tiêu thụ",
                     value: snapshotConsumableUnits.toLocaleString("vi-VN"),
                     icon: <Package size={16} weight="fill" />,
                     tone: "text-blue-700 dark:text-blue-300",
@@ -1484,7 +1502,7 @@ export default function DepotClosurePage() {
                   </p>
                 </div>
                 <p className="text-sm text-amber-700 dark:text-amber-300 tracking-tighter">
-                  Tải template xử lý, điền kết quả theo từng dòng vật tư, rồi
+                  Tải template xử lý, điền kết quả theo từng dòng vật phẩm, rồi
                   tải file Excel lên để gửi vào hệ thống.
                 </p>
               </div>
@@ -1762,7 +1780,6 @@ export default function DepotClosurePage() {
           </div>
         )}
       </main>
-
     </div>
   );
 }

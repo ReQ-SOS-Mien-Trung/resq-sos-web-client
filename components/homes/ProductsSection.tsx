@@ -35,7 +35,7 @@ const ProductsSection = () => {
             </button>
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-white/5 text-gray-400 text-sm font-medium transition-colors">
               <Package className="w-4 h-4 text-primary" />
-              Kho vật tư
+              Kho vật phẩm
             </button>
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-white/5 text-gray-400 text-sm font-medium transition-colors">
               <Users className="w-4 h-4 text-primary" />
@@ -322,4 +322,3 @@ const ProductsSection = () => {
 };
 
 export default ProductsSection;
-

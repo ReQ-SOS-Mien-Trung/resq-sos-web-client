@@ -66,7 +66,9 @@ import {
   useMyDepotFund,
   MY_DEPOT_FUND_QUERY_KEY,
   MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY,
+  MY_DEPOT_ADVANCERS_QUERY_KEY,
   useMyDepotFundTransactions,
+  useMyDepotAdvancers,
   useCreateInternalAdvance,
   useCreateInternalRepayment,
 } from "@/services/depot/hooks";
@@ -91,6 +93,20 @@ import type {
   CreateFundingRequestItem,
 } from "@/services/funding_request";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { Icon } from "@iconify/react";
+import { AxiosError } from "axios";
+
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  const axiosError = error as AxiosError<{ message?: string }>;
+  const apiMessage = axiosError?.response?.data?.message;
+  if (typeof apiMessage === "string" && apiMessage.trim()) {
+    return apiMessage.trim();
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return fallback;
+}
 
 /* ── Excel column mapping ─────────────────────────────────── */
 
@@ -440,7 +456,7 @@ function matchCategoryCode(
 }
 
 type TabType = "create" | "history" | "transactions" | "ledger";
-type LedgerMode = "advance" | "repayment" | "history";
+type LedgerMode = "advance" | "repayment";
 
 /* ── Import row with validation ───────────────────────────── */
 
@@ -602,74 +618,72 @@ export default function FundingRequestPage() {
   const [repaymentRows, setRepaymentRows] = useState<
     InternalRepaymentRowState[]
   >([createInternalRepaymentRow()]);
+  const [selectedRepaymentContributorKey, setSelectedRepaymentContributorKey] =
+    useState("");
 
-  const { data: ledgerTxData, isLoading: loadingLedgerTx } =
-    useMyDepotFundTransactions(
-      { pageNumber: 1, pageSize: 500 },
+  /* ── Advancers pagination state ─── */
+  const [advancersPage, setAdvancersPage] = useState(1);
+  const [advancersPageSize, setAdvancersPageSize] = useState(10);
+
+  const { data: advancersData, isLoading: loadingAdvancers } =
+    useMyDepotAdvancers(
+      { pageNumber: advancersPage, pageSize: advancersPageSize },
       { enabled: activeTab === "ledger" },
     );
-  const ledgerTransactions = useMemo(
-    () => ledgerTxData?.items ?? [],
-    [ledgerTxData],
-  );
-  const ledgerContributors = useMemo<InternalLedgerContributor[]>(() => {
-    const grouped = new Map<string, InternalLedgerContributor>();
 
-    ledgerTransactions.forEach((tx) => {
-      const contributorName = tx.contributorName?.trim() ?? "";
-      const phoneNumber = normalizePhoneNumber(tx.phoneNumber ?? "");
-      if (!contributorName && !phoneNumber) {
-        return;
-      }
-
-      const key = `${contributorName.toLowerCase()}::${phoneNumber}`;
-      const nextAmount =
-        typeof tx.amount === "number" && Number.isFinite(tx.amount)
-          ? tx.amount
-          : 0;
-
-      const current = grouped.get(key);
-      if (!current) {
-        grouped.set(key, {
+  const ledgerContributors = useMemo(() => {
+    return (advancersData?.items ?? []).map(
+      (item): InternalLedgerContributor => {
+        const key = `${item.contributorName.toLowerCase()}::${normalizePhoneNumber(item.contributorPhoneNumber ?? "")}`;
+        return {
           key,
-          contributorName: contributorName || "Chưa rõ người ứng",
-          phoneNumber,
-          outstandingAmount: 0,
-          totalAdvancedAmount: nextAmount < 0 ? Math.abs(nextAmount) : 0,
-          totalRepaidAmount: nextAmount > 0 ? nextAmount : 0,
-          lastActivityAt: tx.createdAt,
-          transactions: [tx],
-        });
-        return;
-      }
+          contributorName: item.contributorName || "Chưa rõ người ứng",
+          phoneNumber: normalizePhoneNumber(item.contributorPhoneNumber ?? ""),
+          outstandingAmount: item.outstandingAmount,
+          totalAdvancedAmount: item.totalAdvancedAmount,
+          totalRepaidAmount: item.totalRepaidAmount,
+          lastActivityAt: "",
+          transactions: [],
+        };
+      },
+    );
+  }, [advancersData]);
 
-      current.transactions.push(tx);
-      current.totalAdvancedAmount += nextAmount < 0 ? Math.abs(nextAmount) : 0;
-      current.totalRepaidAmount += nextAmount > 0 ? nextAmount : 0;
-      if (new Date(tx.createdAt) > new Date(current.lastActivityAt)) {
-        current.lastActivityAt = tx.createdAt;
-      }
-    });
+  /* ── All advancers for repayment dropdown (no pagination) ─── */
+  const { data: allAdvancersData } = useMyDepotAdvancers(
+    { pageNumber: 1, pageSize: 100 },
+    { enabled: activeTab === "ledger" },
+  );
 
-    return Array.from(grouped.values())
-      .map((item) => ({
-        ...item,
-        outstandingAmount: Math.max(
-          item.totalAdvancedAmount - item.totalRepaidAmount,
-          0,
-        ),
-        transactions: [...item.transactions].sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        ),
-      }))
+  const repaymentAdvancers = useMemo(() => {
+    return (allAdvancersData?.items ?? [])
       .filter((item) => item.outstandingAmount > 0)
-      .sort(
-        (a, b) =>
-          new Date(b.lastActivityAt).getTime() -
-          new Date(a.lastActivityAt).getTime(),
-      );
-  }, [ledgerTransactions]);
+      .map((item) => {
+        const key = `${item.contributorName.toLowerCase()}::${normalizePhoneNumber(item.contributorPhoneNumber ?? "")}`;
+        return {
+          key,
+          contributorName: item.contributorName || "Chưa rõ",
+          phoneNumber: normalizePhoneNumber(item.contributorPhoneNumber ?? ""),
+          outstandingAmount: item.outstandingAmount,
+          totalAdvancedAmount: item.totalAdvancedAmount,
+          totalRepaidAmount: item.totalRepaidAmount,
+        };
+      });
+  }, [allAdvancersData]);
+
+  const selectedRepaymentContributor = useMemo(
+    () =>
+      repaymentAdvancers.find(
+        (c) => c.key === selectedRepaymentContributorKey,
+      ) ?? null,
+    [repaymentAdvancers, selectedRepaymentContributorKey],
+  );
+
+  const { isLoading: loadingLedgerTx } = useMyDepotFundTransactions(
+    { pageNumber: 1, pageSize: 500 },
+    { enabled: activeTab === "ledger" },
+  );
+
   const filteredLedgerContributors = useMemo(() => {
     const keyword = ledgerSearch.trim().toLowerCase();
     if (!keyword) return ledgerContributors;
@@ -848,6 +862,9 @@ export default function FundingRequestPage() {
     queryClient.invalidateQueries({
       queryKey: MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY,
     });
+    queryClient.invalidateQueries({
+      queryKey: MY_DEPOT_ADVANCERS_QUERY_KEY,
+    });
   }, [queryClient]);
 
   const updateAdvanceRow = useCallback(
@@ -974,18 +991,23 @@ export default function FundingRequestPage() {
         onSuccess: () => {
           toast.success("Đã ghi nhận phiếu ứng tiền nội bộ.");
           setAdvanceRows([createInternalAdvanceRow()]);
-          setLedgerMode("history");
+          setLedgerMode("advance");
         },
-        onError: () => {
-          toast.error("Không thể ghi nhận phiếu ứng tiền. Vui lòng thử lại.");
+        onError: (error) => {
+          toast.error(
+            getApiErrorMessage(
+              error,
+              "Không thể ghi nhận phiếu ứng tiền. Vui lòng thử lại.",
+            ),
+          );
         },
       },
     );
   }, [advanceRows, effectiveAdvanceFundId, submitInternalAdvance]);
 
   const handleSubmitInternalRepayment = useCallback(() => {
-    if (!selectedLedgerContributor) {
-      toast.error("Vui lòng chọn người đang nợ để hoàn quỹ.");
+    if (!selectedRepaymentContributor) {
+      toast.error("Vui lòng chọn người chi hộ để quyết toán.");
       return;
     }
 
@@ -994,7 +1016,7 @@ export default function FundingRequestPage() {
     );
 
     if (filledRows.length === 0) {
-      toast.error("Vui lòng nhập ít nhất một khoản hoàn quỹ.");
+      toast.error("Vui lòng nhập ít nhất một khoản quyết toán.");
       return;
     }
 
@@ -1028,7 +1050,7 @@ export default function FundingRequestPage() {
       0,
     );
 
-    if (totalRepayment > selectedLedgerContributor.outstandingAmount) {
+    if (totalRepayment > selectedRepaymentContributor.outstandingAmount) {
       toast.error(
         "Tổng tiền hoàn đang vượt dư nợ hiện tại của người được chọn.",
       );
@@ -1037,8 +1059,8 @@ export default function FundingRequestPage() {
 
     submitInternalRepayment(
       {
-        contributorName: selectedLedgerContributor.contributorName,
-        phoneNumber: selectedLedgerContributor.phoneNumber,
+        contributorName: selectedRepaymentContributor.contributorName,
+        phoneNumber: selectedRepaymentContributor.phoneNumber,
         repayments: Array.from(repaymentsByFund.entries()).map(
           ([depotFundId, amount]) => ({
             depotFundId,
@@ -1048,12 +1070,18 @@ export default function FundingRequestPage() {
       },
       {
         onSuccess: () => {
-          toast.success("Đã ghi nhận hoàn quỹ nội bộ.");
+          toast.success("Đã ghi nhận quyết toán nội bộ.");
           setRepaymentRows([createInternalRepaymentRow(defaultFundSourceId)]);
-          setLedgerMode("history");
+          setSelectedRepaymentContributorKey("");
+          setLedgerMode("repayment");
         },
-        onError: () => {
-          toast.error("Không thể ghi nhận hoàn quỹ. Vui lòng thử lại.");
+        onError: (error) => {
+          toast.error(
+            getApiErrorMessage(
+              error,
+              "Không thể ghi nhận quyết toán. Vui lòng thử lại.",
+            ),
+          );
         },
       },
     );
@@ -1061,7 +1089,7 @@ export default function FundingRequestPage() {
     defaultFundSourceId,
     fundSources,
     repaymentRows,
-    selectedLedgerContributor,
+    selectedRepaymentContributor,
     submitInternalRepayment,
   ]);
 
@@ -1152,7 +1180,7 @@ export default function FundingRequestPage() {
   const deleteRow = useCallback((rowId: string) => {
     setRows((prev) => {
       if (prev.length <= 1) {
-        toast.error("Phải có ít nhất 1 vật tư");
+        toast.error("Phải có ít nhất 1 vật phẩm");
         return prev;
       }
       return prev
@@ -1250,7 +1278,7 @@ export default function FundingRequestPage() {
       return;
     }
     if (filledRows.length === 0) {
-      toast.error("Vui lòng nhập ít nhất 1 vật tư");
+      toast.error("Vui lòng nhập ít nhất 1 vật phẩm");
       return;
     }
     if (totalErrors > 0) {
@@ -1283,7 +1311,13 @@ export default function FundingRequestPage() {
           handleReset();
           setActiveTab("history");
         },
-        onError: () => toast.error("Gửi yêu cầu thất bại. Vui lòng thử lại."),
+        onError: (error) =>
+          toast.error(
+            getApiErrorMessage(
+              error,
+              "Gửi yêu cầu thất bại. Vui lòng thử lại.",
+            ),
+          ),
       },
     );
   };
@@ -1452,7 +1486,7 @@ export default function FundingRequestPage() {
               Yêu cầu cấp quỹ
             </h1>
             <p className="text-base tracking-tighter text-muted-foreground mt-1.5">
-              Gửi yêu cầu cấp quỹ mua vật tư và xem lịch sử yêu cầu
+              Gửi yêu cầu cấp quỹ mua vật phẩm và xem lịch sử yêu cầu
             </p>
           </div>
           {activeTab === "create" && (
@@ -1488,7 +1522,7 @@ export default function FundingRequestPage() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <PaperPlaneTilt size={14} />
+            <PaperPlaneTilt size={20} />
             Tạo yêu cầu
           </button>
           <button
@@ -1499,7 +1533,7 @@ export default function FundingRequestPage() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <ListBullets size={14} />
+            <ListBullets size={20} />
             Lịch sử yêu cầu cấp quỹ
             {requests.length > 0 && (
               <Badge className="h-4.5 px-1.5 text-sm rounded-full bg-primary text-primary-foreground ml-1">
@@ -1515,7 +1549,7 @@ export default function FundingRequestPage() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <ClockCounterClockwise size={14} />
+            <ClockCounterClockwise size={20} />
             Biến động quỹ kho
           </button>
           <button
@@ -1526,11 +1560,15 @@ export default function FundingRequestPage() {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Wallet size={14} />
-            Sổ nợ nội bộ
-            {ledgerContributors.length > 0 && (
+            <Icon
+              icon="healthicons:i-note-action-outline"
+              width="24"
+              height="24"
+            />
+            Sổ quản lý quyết toán
+            {(advancersData?.totalCount ?? 0) > 0 && (
               <Badge className="h-4.5 px-1.5 text-sm rounded-full bg-primary text-primary-foreground ml-1">
-                {ledgerContributors.length}
+                {advancersData?.totalCount}
               </Badge>
             )}
           </button>
@@ -1642,7 +1680,7 @@ export default function FundingRequestPage() {
                     Mô tả lý do cấp quỹ
                   </h3>
                   <Textarea
-                    placeholder="Mô tả lý do cần cấp quỹ mua vật tư..."
+                    placeholder="Mô tả lý do cần cấp quỹ mua vật phẩm..."
                     value={description}
                     onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                       setDescription(e.target.value)
@@ -1661,7 +1699,7 @@ export default function FundingRequestPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm tracking-tighter">
                         <span className="text-muted-foreground text-sm">
-                          Tổng vật tư:
+                          Tổng vật phẩm:
                         </span>
                         <span className="font-semibold text-sm">
                           {rows.length} mục
@@ -1753,7 +1791,7 @@ export default function FundingRequestPage() {
                     <div className="flex items-center gap-2 tracking-tighter">
                       <Package size={15} className="text-primary" />
                       <span className="text-sm font-semibold">
-                        Danh sách vật tư
+                        Danh sách vật phẩm
                         {inputMode === "manual" && ` (${rows.length})`}
                       </span>
                       {inputMode === "manual" && excelFileName && (
@@ -2099,7 +2137,7 @@ export default function FundingRequestPage() {
                                       className="text-muted-foreground/40"
                                     />
                                     <p className="text-sm tracking-tighter">
-                                      Chưa có vật tư
+                                      Chưa có vật phẩm
                                     </p>
                                     <Button
                                       variant="outline"
@@ -2341,7 +2379,7 @@ export default function FundingRequestPage() {
                 <div className="pointer-events-none absolute inset-[1px] rounded-[26px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.06),transparent_42%)]" />
                 <div className="relative grid grid-cols-1 xl:grid-cols-[minmax(0,0.95fr)_72px_minmax(0,1.05fr)] gap-3 items-stretch">
                   <motion.div
-                    className="relative pb-4 pl-4 pt-2 xl:min-h-[740px]"
+                    className="relative flex flex-col pb-4 pl-4 pt-2 xl:min-h-[740px]"
                     style={{
                       transformPerspective: 2400,
                       transformOrigin: "right center",
@@ -2355,7 +2393,7 @@ export default function FundingRequestPage() {
                     <div className="pointer-events-none absolute bottom-2 left-2 right-4 top-3 rounded-[22px] border border-slate-200/85 bg-white shadow-[0_16px_32px_-28px_rgba(15,23,42,0.14)]" />
                     <div className="pointer-events-none absolute bottom-3 left-4 right-2 top-1 rounded-[22px] border border-slate-200/90 bg-white shadow-[0_14px_28px_-26px_rgba(15,23,42,0.12)]" />
                     <div
-                      className="relative flex min-h-[620px] flex-col overflow-hidden rounded-[22px] border border-primary/12 bg-white/96 pb-4 pl-14 pr-4 pt-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_18px_44px_-42px_rgba(15,23,42,0.18)] md:pb-5 md:pl-14 md:pr-5 md:pt-5 xl:min-h-[700px] [&_label]:leading-[26px] [&_p]:leading-[26px] [&_span]:leading-[26px]"
+                      className="relative flex min-h-[620px] flex-1 flex-col overflow-hidden rounded-[22px] border border-primary/12 bg-white/96 pb-4 pl-14 pr-4 pt-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_18px_44px_-42px_rgba(15,23,42,0.18)] md:pb-5 md:pl-14 md:pr-5 md:pt-5 xl:min-h-[700px] [&_label]:leading-[26px] [&_p]:leading-[26px] [&_span]:leading-[26px]"
                       style={{
                         backgroundImage:
                           "linear-gradient(to right, rgba(148,163,184,0.11) 1px, transparent 1px), linear-gradient(to bottom, transparent 24px, rgba(148,163,184,0.15) 24px, rgba(148,163,184,0.15) 25px, transparent 25px)",
@@ -2365,16 +2403,16 @@ export default function FundingRequestPage() {
                     >
                       <div className="pointer-events-none absolute inset-y-0 left-[42px] w-px bg-rose-200/55" />
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                        <div className="space-y-0">
+                        <div className="space-y-0.5">
                           <p className="text-xs uppercase tracking-[0.35em] text-primary/70 font-semibold leading-[26px]">
                             Ledger Book
                           </p>
-                          <h3 className="text-[30px] font-bold tracking-tighter leading-[52px] text-slate-900">
-                            Sổ nợ nội bộ
+                          <h3 className="text-[40px] font-bold tracking-tighter leading-[52px] text-slate-900">
+                            Sổ quản lý quyết toán
                           </h3>
                           <p className="text-sm tracking-tight text-slate-600 leading-[26px]">
-                            Theo dõi người đang ứng tiền, hạn mức còn lại và
-                            lịch sử hoàn quỹ ngay trên cùng một trang sổ.
+                            Theo dõi các khoản tạm ứng, hạn mức khả dụng và tiến
+                            độ quyết toán của người chi hộ.
                           </p>
                         </div>
                         <Button
@@ -2395,47 +2433,47 @@ export default function FundingRequestPage() {
                         </Button>
                       </div>
 
-                      <div className="mt-[26px] grid grid-cols-2 gap-x-6 gap-y-[26px]">
+                      <div className="mt-6.5 grid grid-cols-2 gap-x-6 gap-y-6.5">
                         <div className="px-1 py-0">
-                          <p className="text-[11px] uppercase tracking-[0.25em] text-primary/70 leading-[26px]">
-                            Tổng quỹ
+                          <p className="text-xs font-medium uppercase tracking-widest text-primary leading-6.5">
+                            Tổng quỹ kho hiện tại
                           </p>
-                          <p className="text-[22px] font-bold tracking-tight text-slate-900 leading-[26px]">
+                          <p className="text-[22px] font-bold tracking-tight text-slate-900 leading-6.5">
                             {formatMoney(totalFundBalance)}
                           </p>
                         </div>
                         <div className="px-1 py-0">
-                          <p className="text-[11px] uppercase tracking-[0.25em] text-primary/70 leading-[26px]">
-                            Hạn mức ứng
+                          <p className="text-xs font-medium uppercase tracking-widest text-primary leading-6.5">
+                            Hạn mức
                           </p>
-                          <p className="text-[22px] font-bold tracking-tight text-slate-900 leading-[26px]">
+                          <p className="text-[22px] font-bold tracking-tight text-slate-900 leading-6.5">
                             {formatMoney(myFund?.advanceLimit)}
                           </p>
                         </div>
                         <div className="px-1 py-0">
-                          <p className="text-[11px] uppercase tracking-[0.25em] text-primary/70 leading-[26px]">
-                            Đang ứng
+                          <p className="text-xs font-medium uppercase tracking-widest text-primary leading-6.5">
+                            Đã ứng
                           </p>
-                          <p className="text-[22px] font-bold tracking-tight text-rose-600 leading-[26px]">
+                          <p className="text-[22px] font-bold tracking-tight text-rose-600 leading-6.5">
                             {formatMoney(myFund?.outstandingAdvanceAmount)}
                           </p>
                         </div>
                         <div className="px-1 py-0">
-                          <p className="text-[11px] uppercase tracking-[0.25em] text-primary/70 leading-[26px]">
-                            Room còn lại
+                          <p className="text-xs font-medium uppercase tracking-widest text-primary leading-6.5">
+                            Hạn mức còn lại có thể ứng
                           </p>
-                          <p className="text-[22px] font-bold tracking-tight text-emerald-600 leading-[26px]">
+                          <p className="text-[22px] font-bold tracking-tight text-emerald-600 leading-6.5">
                             {formatMoney(remainingAdvanceHeadroom)}
                           </p>
                         </div>
-                      </div>
-
-                      <div className="mt-[26px] px-1 py-0">
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-sm tracking-tight leading-[26px]">
-                          <span className="text-slate-600">
-                            {ledgerContributors.length} người đang còn dư nợ
+                        <div className="px-1 py-0">
+                          <span className="text-sm tracking-tighter text-slate-600 leading-6.5">
+                            {advancersData?.totalCount ?? 0} người đang cần
+                            quyết toán
                           </span>
-                          <span className="text-slate-500">
+                        </div>
+                        <div className="px-1 py-0">
+                          <span className="text-sm tracking-tighter leading-6.5">
                             Cập nhật gần nhất:{" "}
                             {latestFundUpdatedAt
                               ? new Date(latestFundUpdatedAt).toLocaleString(
@@ -2446,25 +2484,17 @@ export default function FundingRequestPage() {
                         </div>
                       </div>
 
-                      <div className="mt-[26px]">
+                      <div className="mt-6.5">
                         <Input
                           value={ledgerSearch}
                           onChange={(e) => setLedgerSearch(e.target.value)}
                           placeholder="Tìm theo tên hoặc số điện thoại..."
-                          className="h-[26px] rounded-none border-0 bg-transparent px-1 py-0 leading-[26px] shadow-none focus-visible:ring-0"
+                          className="h-[26px] rounded-none border-0 bg-transparent px-1 py-0 leading-6.5 shadow-none focus-visible:ring-0"
                         />
                       </div>
 
-                      {ledgerTxData &&
-                        ledgerTxData.totalCount > ledgerTransactions.length && (
-                          <p className="mt-3 text-xs tracking-tight text-primary/75">
-                            Đang dùng {ledgerTransactions.length} bút toán mới
-                            nhất để dựng sổ nợ.
-                          </p>
-                        )}
-
-                      <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1 xl:min-h-[180px]">
-                        {loadingLedgerTx ? (
+                      <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1 xl:min-h-45">
+                        {loadingAdvancers ? (
                           Array.from({ length: 4 }).map((_, index) => (
                             <Skeleton
                               key={index}
@@ -2474,11 +2504,11 @@ export default function FundingRequestPage() {
                         ) : filteredLedgerContributors.length === 0 ? (
                           <div className="px-2 py-10 text-center">
                             <p className="text-base font-semibold tracking-tight text-slate-800">
-                              Chưa có người nào đang còn dư nợ
+                              Chưa có người chi hộ nào đang chờ quyết toán
                             </p>
-                            <p className="mt-2 text-sm tracking-tight text-slate-500 leading-[26px]">
-                              Khi có bút toán ứng nội bộ, danh bạ nợ sẽ xuất
-                              hiện ở trang này.
+                            <p className="mt-2 text-sm tracking-tight text-slate-500 leading-6.5">
+                              Khi có phát sinh các khoản chi hộ, danh sách cần
+                              quyết toán sẽ xuất hiện tại trang này.
                             </p>
                           </div>
                         ) : (
@@ -2488,38 +2518,95 @@ export default function FundingRequestPage() {
                               onClick={() =>
                                 setSelectedLedgerContributorKey(item.key)
                               }
-                              className={`w-full border-x-0 border-t-0 border-b px-1 py-4 text-left transition-all ${
+                              className={`w-full border-x-0 border-t-0 border-b px-1 py-2.5 text-left transition-all ${
                                 selectedLedgerContributor?.key === item.key
-                                  ? "border-slate-300/70 bg-primary/[0.05]"
-                                  : "border-slate-200/70 bg-transparent hover:border-slate-300/80 hover:bg-primary/[0.03]"
+                                  ? "border-blue-200/70 bg-blue-50/60"
+                                  : "border-slate-200/70 bg-transparent hover:border-blue-200/60 hover:bg-blue-50/30"
                               }`}
                             >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="text-base font-semibold tracking-tight text-slate-900 truncate">
-                                    {item.contributorName}
-                                  </p>
-                                  <p className="mt-1 text-sm tracking-tight text-slate-500">
-                                    {item.phoneNumber ||
-                                      "Chưa có số điện thoại"}
-                                  </p>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-base font-semibold tracking-tighter text-slate-900 truncate">
+                                      {item.contributorName}
+                                    </p>
+                                    <span className="shrink-0 text-sm">
+                                      ({item.phoneNumber || "—"})
+                                    </span>
+                                  </div>
+                                  <div className="mt-0.5 flex items-center gap-2 text-sm tracking-tighter">
+                                    <span>
+                                      Tổng chi hộ:{" "}
+                                      {formatMoney(item.totalAdvancedAmount)}
+                                    </span>
+                                    <span>·</span>
+                                    <span>
+                                      Đã quyết toán{" "}
+                                      {item.totalRepaidAmount > 0
+                                        ? `${Math.round((item.totalRepaidAmount / item.totalAdvancedAmount) * 100)}%`
+                                        : "0%"}
+                                    </span>
+                                  </div>
                                 </div>
-                                <Badge className="rounded-full bg-rose-100 text-rose-700 border border-rose-200 px-2.5 py-1 shrink-0">
+                                <Badge className="rounded-full bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 text-sm shrink-0">
+                                  Đã quyết toán:{" "}
                                   {formatMoney(item.outstandingAmount)}
                                 </Badge>
-                              </div>
-                              <div className="mt-3 flex items-center justify-between gap-3 text-xs tracking-[0.18em] uppercase text-slate-500">
-                                <span>{item.transactions.length} bút toán</span>
-                                <span>
-                                  {new Date(
-                                    item.lastActivityAt,
-                                  ).toLocaleDateString("vi-VN")}
-                                </span>
                               </div>
                             </button>
                           ))
                         )}
                       </div>
+
+                      {/* ── Pagination ── */}
+                      {advancersData && advancersData.totalPages > 0 && (
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 px-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs tracking-tight text-slate-500">
+                              Hiển thị
+                            </span>
+                            <select
+                              value={advancersPageSize}
+                              onChange={(e) => {
+                                setAdvancersPageSize(Number(e.target.value));
+                                setAdvancersPage(1);
+                              }}
+                              className="h-7 rounded-md border border-slate-200 bg-white px-1.5 text-xs text-slate-700 outline-none focus:ring-1 focus:ring-primary/30"
+                            >
+                              {[5, 10, 15].map((size) => (
+                                <option key={size} value={size}>
+                                  {size}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="text-xs tracking-tight text-slate-500">
+                              / {advancersData.totalCount} người
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              disabled={!advancersData.hasPreviousPage}
+                              onClick={() =>
+                                setAdvancersPage((p) => Math.max(1, p - 1))
+                              }
+                              className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <ArrowLeft size={12} />
+                            </button>
+                            <span className="min-w-[60px] text-center text-xs tracking-tight text-slate-600">
+                              {advancersData.pageNumber} /{" "}
+                              {advancersData.totalPages}
+                            </span>
+                            <button
+                              disabled={!advancersData.hasNextPage}
+                              onClick={() => setAdvancersPage((p) => p + 1)}
+                              className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <ArrowLeft size={12} className="rotate-180" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
 
@@ -2573,7 +2660,7 @@ export default function FundingRequestPage() {
                   </motion.div>
 
                   <motion.div
-                    className="relative pb-4 pr-4 pt-2 xl:min-h-[740px]"
+                    className="relative flex flex-col pb-4 pr-4 pt-2 xl:min-h-[740px]"
                     style={{
                       transformPerspective: 2400,
                       transformOrigin: "left center",
@@ -2587,7 +2674,7 @@ export default function FundingRequestPage() {
                     <div className="pointer-events-none absolute bottom-2 left-4 right-2 top-3 rounded-[22px] border border-slate-200/85 bg-white shadow-[0_16px_32px_-28px_rgba(15,23,42,0.14)]" />
                     <div className="pointer-events-none absolute bottom-3 left-2 right-4 top-1 rounded-[22px] border border-slate-200/90 bg-white shadow-[0_14px_28px_-26px_rgba(15,23,42,0.12)]" />
                     <div
-                      className="relative flex min-h-[620px] flex-col overflow-hidden rounded-[22px] border border-primary/12 bg-white/96 pb-4 pl-14 pr-4 pt-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_18px_44px_-42px_rgba(15,23,42,0.18)] md:pb-5 md:pl-14 md:pr-5 md:pt-5 xl:min-h-[700px] [&_label]:leading-[26px] [&_p]:leading-[26px] [&_span]:leading-[26px]"
+                      className="relative flex min-h-[620px] flex-1 flex-col overflow-hidden rounded-[22px] border border-primary/12 bg-white/96 pb-4 pl-14 pr-4 pt-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_18px_44px_-42px_rgba(15,23,42,0.18)] md:pb-5 md:pl-14 md:pr-5 md:pt-5 xl:min-h-[700px] [&_label]:leading-[26px] [&_p]:leading-[26px] [&_span]:leading-[26px]"
                       style={{
                         backgroundImage:
                           "linear-gradient(to right, rgba(148,163,184,0.11) 1px, transparent 1px), linear-gradient(to bottom, transparent 24px, rgba(148,163,184,0.15) 24px, rgba(148,163,184,0.15) 25px, transparent 25px)",
@@ -2599,46 +2686,25 @@ export default function FundingRequestPage() {
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                         <div className="space-y-0">
                           <p className="text-xs uppercase tracking-[0.35em] text-primary/70 font-semibold leading-[26px]">
-                            Phiếu thao tác
+                            Phiếu quyết toán
                           </p>
-                          <h3 className="text-[30px] font-bold tracking-tighter leading-[52px] text-slate-900">
+                          <h3 className="text-[40px] font-bold tracking-tighter leading-[52px] text-slate-900">
                             {ledgerMode === "advance"
-                              ? "Ứng tiền nội bộ"
-                              : ledgerMode === "repayment"
-                                ? "Hoàn quỹ nội bộ"
-                                : "Sổ cái người ứng"}
+                              ? "Chi hộ nội bộ"
+                              : "Quyết toán nội bộ"}
                           </h3>
                           <p className="text-sm tracking-tight text-slate-600 leading-[26px]">
                             {ledgerMode === "advance"
-                              ? "Chọn một quỹ nguồn rồi nhập nhiều người ứng trong cùng một phiếu."
-                              : ledgerMode === "repayment"
-                                ? "Hoàn quỹ theo đúng người đang nợ và phân bổ về một hoặc nhiều quỹ."
-                                : "Theo dõi từng bút toán phát sinh của người đang được chọn."}
+                              ? "Chọn một nguồn quỹ và nhập thông tin người chi hộ trong cùng một phiếu."
+                              : "Chọn nguồn quỹ và nhập thông tin người chi hộ trong cùng một phiếu."}
                           </p>
                         </div>
-                        {selectedLedgerContributor && (
-                          <div className="px-1 py-0 text-right">
-                            <p className="text-sm font-semibold tracking-tight text-slate-900">
-                              {selectedLedgerContributor.contributorName}
-                            </p>
-                            <p className="text-xs tracking-tight text-slate-500">
-                              {selectedLedgerContributor.phoneNumber || "—"}
-                            </p>
-                            <p className="text-sm font-bold tracking-tight text-rose-600">
-                              Dư nợ{" "}
-                              {formatMoney(
-                                selectedLedgerContributor.outstandingAmount,
-                              )}
-                            </p>
-                          </div>
-                        )}
                       </div>
 
                       <div className="mt-[26px] flex flex-wrap gap-2">
                         {[
-                          { key: "advance", label: "Ứng tiền" },
-                          { key: "repayment", label: "Hoàn quỹ" },
-                          { key: "history", label: "Lịch sử" },
+                          { key: "advance", label: "Chi hộ" },
+                          { key: "repayment", label: "Quyết toán" },
                         ].map((mode) => (
                           <button
                             key={mode.key}
@@ -2657,17 +2723,17 @@ export default function FundingRequestPage() {
                       </div>
 
                       {ledgerMode === "advance" && (
-                        <div className="mt-[26px] space-y-[26px]">
+                        <div className="mt-6.5 space-y-6.5">
                           <div className="px-1 py-0">
-                            <label className="block translate-y-[4px] text-xs font-semibold uppercase tracking-[0.25em] text-primary/75 leading-[26px]">
-                              Quỹ nguồn để ứng
+                            <label className="block translate-y-1 text-xs font-semibold uppercase tracking-[0.25em] text-primary leading-6.5">
+                              Chọn nguồn quỹ của kho để quyết toán
                             </label>
                             <Select
                               value={effectiveAdvanceFundId}
                               onValueChange={setSelectedAdvanceFundId}
                             >
-                              <SelectTrigger className="relative top-[4px] h-[26px] items-start rounded-none border-0 bg-transparent px-0 py-0 leading-[26px] shadow-none focus:ring-0 [&_[data-slot=select-value]]:items-start [&_[data-slot=select-value]]:py-0 [&_[data-slot=select-value]]:leading-[26px]">
-                                <SelectValue placeholder="Chọn quỹ nguồn..." />
+                              <SelectTrigger className="relative top-[8px] h-[26px] items-start rounded-none border-0 bg-transparent px-0 py-0 leading-[26px] shadow-none focus:ring-0 [&_[data-slot=select-value]]:items-start [&_[data-slot=select-value]]:py-0 [&_[data-slot=select-value]]:leading-[26px]">
+                                <SelectValue placeholder="Chọn nguồn quỹ..." />
                               </SelectTrigger>
                               <SelectContent>
                                 {fundSources.map((fund) => (
@@ -2676,7 +2742,7 @@ export default function FundingRequestPage() {
                                     value={String(fund.id)}
                                   >
                                     <div className="flex items-center justify-between gap-3 w-full">
-                                      <span className="truncate">
+                                      <span className="text-sm truncate">
                                         {fund.fundSourceName}
                                       </span>
                                       <span className="text-sm font-semibold text-emerald-600 shrink-0">
@@ -2687,42 +2753,14 @@ export default function FundingRequestPage() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            {selectedAdvanceFund && (
-                              <div className="mt-[26px] grid grid-cols-1 gap-x-6 gap-y-[26px] md:grid-cols-3 text-sm tracking-tight">
-                                <div className="px-1 py-0">
-                                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500 leading-[26px]">
-                                    Quỹ chọn
-                                  </p>
-                                  <p className="font-semibold text-slate-900 leading-[26px]">
-                                    {selectedAdvanceFund.fundSourceType}
-                                  </p>
-                                </div>
-                                <div className="px-1 py-0">
-                                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500 leading-[26px]">
-                                    Số dư quỹ
-                                  </p>
-                                  <p className="font-semibold text-slate-900 leading-[26px]">
-                                    {formatMoney(selectedAdvanceFund.balance)}
-                                  </p>
-                                </div>
-                                <div className="px-1 py-0">
-                                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500 leading-[26px]">
-                                    Sức chứa tạm tính
-                                  </p>
-                                  <p className="font-semibold text-slate-900 leading-[26px]">
-                                    {formatMoney(advanceCapacity)}
-                                  </p>
-                                </div>
-                              </div>
-                            )}
                           </div>
 
-                          <div className="space-y-[26px]">
+                          <div className="space-y-6.5">
                             {advanceRows.map((row, index) => (
                               <div key={row.id} className="px-1 py-0">
                                 <div className="flex items-center justify-between gap-3 h-[26px]">
-                                  <p className="text-sm font-semibold tracking-tight text-slate-800 leading-6.5">
-                                    Người ứng #{index + 1}
+                                  <p className="text-xs font-medium uppercase tracking-widest text-primary leading-6.5">
+                                    Người chi hộ số {index + 1}
                                   </p>
                                   <Button
                                     variant="ghost"
@@ -2744,7 +2782,7 @@ export default function FundingRequestPage() {
                                         e.target.value,
                                       )
                                     }
-                                    placeholder="Họ tên người ứng"
+                                    placeholder="Họ tên người chi hộ"
                                     className="h-[26px] rounded-none border-0 bg-transparent px-0 py-0 leading-[26px] shadow-none focus-visible:ring-0"
                                   />
                                   <Input
@@ -2781,35 +2819,30 @@ export default function FundingRequestPage() {
                           <Button
                             variant="outline"
                             onClick={addAdvanceRow}
-                            className="h-[26px] rounded-full border-primary/20 bg-white px-4 text-sm hover:bg-primary/5 gap-1.5"
+                            className="h-[36px] rounded-full border-primary/20 bg-white px-4 text-sm hover:bg-primary/5 gap-1.5"
                           >
                             <Plus size={14} />
-                            Thêm người ứng
+                            Thêm người chi hộ
                           </Button>
 
                           <div className="px-1 py-0">
                             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-0">
                               <div>
-                                <p className="text-xs uppercase tracking-[0.25em] text-primary/75 leading-[26px]">
-                                  Tổng phiếu ứng
+                                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.25em] text-primary leading-6.5">
+                                  Tổng số tiền quyết toán
                                 </p>
-                                <p className="mt-[18px] text-[36px] font-bold tracking-tight leading-[52px] text-slate-900">
+                                <p className="mt-0.5 text-[36px] font-bold tracking-tight leading-13 text-slate-900">
                                   {formatMoney(advanceTotal)}
                                 </p>
-                              </div>
-                              <div className="text-sm tracking-tight text-slate-600 leading-[26px] md:mt-[52px]">
-                                Headroom còn lại của kho:{" "}
-                                <span className="font-semibold text-emerald-600">
-                                  {formatMoney(remainingAdvanceHeadroom)}
-                                </span>
                               </div>
                             </div>
                             {advanceTotal > 0 &&
                               advanceTotal > advanceCapacity && (
-                                <div className="mt-[26px] px-1 py-0 text-sm tracking-tight text-primary leading-[26px]">
-                                  Phiếu này đang lớn hơn số dư quỹ đã chọn cộng
-                                  với room ứng còn lại. Backend sẽ là nơi kiểm
-                                  tra cuối cùng khi submit.
+                                <div className="mt-6.5 px-1 py-0 text-sm tracking-tighter text-red-500 leading-6.5">
+                                  Số tiền trên phiếu đang vượt quá tổng số dư
+                                  quỹ đã chọn và hạn mức còn lại của người chi
+                                  hộ. Vui lòng điều chỉnh lại thông tin hoặc
+                                  chọn nguồn quỹ khác.
                                 </div>
                               )}
                           </div>
@@ -2824,7 +2857,7 @@ export default function FundingRequestPage() {
                             {isSubmittingInternalAdvance ? (
                               <span className="flex items-center gap-2">
                                 <Spinner size={16} className="animate-spin" />
-                                Đang ghi sổ ứng tiền...
+                                Đang ghi sổ ...
                               </span>
                             ) : (
                               "Lưu phiếu ứng tiền"
@@ -2834,58 +2867,73 @@ export default function FundingRequestPage() {
                       )}
 
                       {ledgerMode === "repayment" && (
-                        <div className="mt-[26px] space-y-[26px]">
-                          {!selectedLedgerContributor ? (
-                            <div className="px-2 py-10 text-center">
-                              <p className="text-base font-semibold tracking-tight text-slate-800">
-                                Chưa chọn người cần hoàn quỹ
-                              </p>
-                              <p className="mt-2 text-sm tracking-tight text-slate-500 leading-[26px]">
-                                Hãy chọn một người đang còn dư nợ ở trang trái
-                                để bắt đầu hoàn quỹ.
-                              </p>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="px-1 py-0">
-                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                                  <div>
-                                    <p className="text-xs uppercase tracking-[0.25em] text-primary/75 leading-[26px]">
-                                      Người hoàn quỹ
-                                    </p>
-                                    <p className="text-[22px] font-semibold tracking-tight leading-[26px] text-slate-900">
-                                      {
-                                        selectedLedgerContributor.contributorName
-                                      }
-                                    </p>
-                                    <p className="text-sm tracking-tight text-slate-500">
-                                      {selectedLedgerContributor.phoneNumber}
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-xs uppercase tracking-[0.25em] text-primary/75 leading-[26px]">
-                                      Dư nợ hiện tại
-                                    </p>
-                                    <p className="text-[22px] font-bold tracking-tight leading-[26px] text-rose-600">
-                                      {formatMoney(
-                                        selectedLedgerContributor.outstandingAmount,
-                                      )}
-                                    </p>
-                                  </div>
-                                </div>
+                        <div className="mt-8">
+                          {/* ── Người chi hộ (dropdown) ── */}
+                          <div className="px-1">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <p className="text-xs font-medium uppercase tracking-widest text-primary leading-6.5">
+                                  Người chi hộ
+                                </p>
+                                <Select
+                                  value={selectedRepaymentContributorKey}
+                                  onValueChange={
+                                    setSelectedRepaymentContributorKey
+                                  }
+                                >
+                                  <SelectTrigger className="h-[26px] w-100 items-start rounded-none border-0 bg-transparent px-0 py-0 leading-[26px] shadow-none focus:ring-0 [&_[data-slot=select-value]]:items-start [&_[data-slot=select-value]]:py-0 [&_[data-slot=select-value]]:leading-[26px] text-sm font-normal tracking-tighter text-slate-900">
+                                    <SelectValue placeholder="Chọn đối tượng quyết toán ..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {repaymentAdvancers.map((person) => (
+                                      <SelectItem
+                                        key={person.key}
+                                        value={person.key}
+                                      >
+                                        <div className="flex items-center justify-between gap-4 w-full">
+                                          <div>
+                                            <span className="font-semibold">
+                                              {person.contributorName}
+                                            </span>
+                                            <span className="ml-2 text-sm text-slate-900">
+                                              SĐT: {person.phoneNumber}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                               </div>
+                              {selectedRepaymentContributor && (
+                                <div className="text-right">
+                                  <p className="text-xs font-medium uppercase tracking-widest text-primary leading-[26px]">
+                                    Dư nợ hiện tại
+                                  </p>
+                                  <p className="text-lg font-bold tracking-tight leading-6.5 text-rose-600">
+                                    {formatMoney(
+                                      selectedRepaymentContributor.outstandingAmount,
+                                    )}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
 
-                              <div className="space-y-3">
+                          {selectedRepaymentContributor && (
+                            <>
+                              {/* ── Quỹ nhận hoàn rows ── */}
+                              <div className="mt-[20px] space-y-0">
                                 {repaymentRows.map((row, index) => (
-                                  <div key={row.id} className="px-1 py-0">
-                                    <div className="flex items-center justify-between gap-3">
-                                      <p className="text-sm font-semibold tracking-tight text-slate-800 leading-[26px]">
-                                        Quỹ nhận hoàn #{index + 1}
+                                  <div key={row.id} className="px-1">
+                                    <div className="flex items-center justify-between gap-3 h-[26px]">
+                                      <p className="text-sm font-semibold tracking-tight text-primary leading-[26px]">
+                                        Quỹ quyết toán số {index + 1}
                                       </p>
                                       <Button
                                         variant="ghost"
-                                        size="sm"
-                                        className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                        size="icon"
+                                        className="h-[26px] w-[26px] p-0 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
                                         disabled={repaymentRows.length === 1}
                                         onClick={() =>
                                           removeRepaymentRow(row.id)
@@ -2894,7 +2942,7 @@ export default function FundingRequestPage() {
                                         <Trash size={14} />
                                       </Button>
                                     </div>
-                                    <div className="mt-[26px] grid grid-cols-1 gap-x-3 gap-y-[26px] md:grid-cols-[minmax(0,1fr)_180px]">
+                                    <div className="grid grid-cols-1 gap-x-3 md:grid-cols-[minmax(0,1fr)_180px] h-[26px] overflow-hidden">
                                       <Select
                                         value={
                                           row.depotFundId &&
@@ -2914,7 +2962,7 @@ export default function FundingRequestPage() {
                                           )
                                         }
                                       >
-                                        <SelectTrigger className="h-[26px] items-start rounded-none border-0 bg-transparent px-0 py-0 leading-[26px] shadow-none focus:ring-0 [&_[data-slot=select-value]]:items-start [&_[data-slot=select-value]]:py-0 [&_[data-slot=select-value]]:leading-[26px]">
+                                        <SelectTrigger className="h-[26px] data-[size=default]:h-[26px] items-start rounded-none border-0 bg-transparent px-0 py-0 leading-[26px] shadow-none focus:ring-0 [&_[data-slot=select-value]]:items-start [&_[data-slot=select-value]]:py-0 [&_[data-slot=select-value]]:leading-[26px]">
                                           <SelectValue placeholder="Chọn quỹ nhận hoàn..." />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -2953,31 +3001,35 @@ export default function FundingRequestPage() {
                                 ))}
                               </div>
 
-                              <Button
-                                variant="outline"
-                                onClick={addRepaymentRow}
-                                className="rounded-full border-primary/20 bg-white hover:bg-primary/5 gap-1.5"
-                              >
-                                <Plus size={14} />
-                                Thêm quỹ nhận hoàn
-                              </Button>
+                              {/* ── Thêm quỹ button ── */}
+                              <div className="mt-[26px] h-[26px] flex items-center">
+                                <Button
+                                  variant="outline"
+                                  onClick={addRepaymentRow}
+                                  className="rounded-full border-primary/20 bg-white hover:bg-primary/5 gap-1.5 text-sm px-3 py-2"
+                                >
+                                  <Plus size={14} />
+                                  Thêm quỹ quyết toán
+                                </Button>
+                              </div>
 
-                              <div className="px-1 py-0">
-                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                              {/* ── Tổng quyết toán ── */}
+                              <div className="mt-12 px-1">
+                                <div className="flex items-start justify-between">
                                   <div>
-                                    <p className="text-xs uppercase tracking-[0.25em] text-primary/75 leading-[26px]">
-                                      Tổng hoàn quỹ
+                                    <p className="text-xs font-medium uppercase tracking-widest text-primary leading-6.5">
+                                      Tổng số tiền
                                     </p>
-                                    <p className="text-[30px] font-bold tracking-tight leading-[52px] text-slate-900">
+                                    <p className="text-3xl font-bold tracking-tight leading-6.5 text-slate-900">
                                       {formatMoney(repaymentTotal)}
                                     </p>
                                   </div>
-                                  <div className="text-sm tracking-tight text-slate-600 leading-[26px]">
-                                    Dư nợ còn lại sau khi hoàn:{" "}
+                                  <div className="text-sm tracking-tight text-slate-600 leading-6.5">
+                                    Số tiền quyết toán còn lại:{" "}
                                     <span className="font-semibold text-emerald-600">
                                       {formatMoney(
                                         Math.max(
-                                          (selectedLedgerContributor?.outstandingAmount ??
+                                          (selectedRepaymentContributor?.outstandingAmount ??
                                             0) - repaymentTotal,
                                           0,
                                         ),
@@ -2986,21 +3038,22 @@ export default function FundingRequestPage() {
                                   </div>
                                 </div>
                                 {repaymentTotal >
-                                  selectedLedgerContributor.outstandingAmount && (
-                                  <div className="mt-[26px] px-1 py-0 text-sm tracking-tight text-rose-600 leading-[26px]">
-                                    Tổng tiền hoàn đang lớn hơn dư nợ hiện tại
-                                    của người được chọn.
+                                  selectedRepaymentContributor.outstandingAmount && (
+                                  <div className="mt-[26px] px-1 text-sm tracking-tight text-rose-600 leading-[26px]">
+                                    Tổng tiền đang lớn hơn số dư cần quyết toán
+                                    cho người chi hộ được chọn.
                                   </div>
                                 )}
                               </div>
 
+                              {/* ── Submit button ── */}
                               <Button
                                 onClick={handleSubmitInternalRepayment}
                                 disabled={
                                   isSubmittingInternalRepayment ||
-                                  !selectedLedgerContributor
+                                  !selectedRepaymentContributor
                                 }
-                                className="h-12 w-full rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90"
+                                className="mt-[26px] h-[52px] w-full rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90"
                               >
                                 {isSubmittingInternalRepayment ? (
                                   <span className="flex items-center gap-2">
@@ -3008,82 +3061,13 @@ export default function FundingRequestPage() {
                                       size={16}
                                       className="animate-spin"
                                     />
-                                    Đang ghi sổ hoàn quỹ...
+                                    Đang ghi sổ...
                                   </span>
                                 ) : (
-                                  "Lưu phiếu hoàn quỹ"
+                                  "Lưu phiếu"
                                 )}
                               </Button>
                             </>
-                          )}
-                        </div>
-                      )}
-
-                      {ledgerMode === "history" && (
-                        <div className="mt-[26px]">
-                          {!selectedLedgerContributor ? (
-                            <div className="px-2 py-10 text-center">
-                              <p className="text-base font-semibold tracking-tight text-slate-800">
-                                Chưa có lịch sử để hiển thị
-                              </p>
-                              <p className="mt-2 text-sm tracking-tight text-slate-500 leading-[26px]">
-                                Hãy chọn một người ở trang trái để xem lại sổ
-                                cái ứng tiền của họ.
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
-                              {selectedLedgerContributor.transactions.map(
-                                (tx) => {
-                                  const isCredit = tx.amount >= 0;
-                                  const displayType =
-                                    txTypeMap[tx.transactionType] ??
-                                    tx.transactionType;
-                                  const displayRef =
-                                    refTypeMap[tx.referenceType] ??
-                                    tx.referenceType;
-
-                                  return (
-                                    <div
-                                      key={String(tx.ledgerEntryId ?? tx.id)}
-                                      className="border-b border-slate-200/55 px-1 py-4"
-                                    >
-                                      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                                        <div className="min-w-0">
-                                          <p className="text-base font-semibold tracking-tight text-slate-900">
-                                            {displayType}
-                                          </p>
-                                          <p className="mt-1 text-sm tracking-tight text-slate-500">
-                                            {displayRef}
-                                            {tx.referenceId != null
-                                              ? ` #${tx.referenceId}`
-                                              : ""}
-                                          </p>
-                                          <p className="mt-2 text-sm tracking-tight text-slate-600">
-                                            {tx.note || "Không có ghi chú"}
-                                          </p>
-                                          <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-400">
-                                            {new Date(
-                                              tx.createdAt,
-                                            ).toLocaleString("vi-VN")}
-                                          </p>
-                                        </div>
-                                        <div
-                                          className={`text-lg font-bold tracking-tight ${
-                                            isCredit
-                                              ? "text-emerald-600"
-                                              : "text-rose-600"
-                                          }`}
-                                        >
-                                          {isCredit ? "+" : "-"}
-                                          {formatMoney(Math.abs(tx.amount))}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                },
-                              )}
-                            </div>
                           )}
                         </div>
                       )}
@@ -3438,7 +3422,7 @@ export default function FundingRequestPage() {
                     <div>
                       <h4 className="text-sm font-semibold tracking-tighter mb-2 flex items-center gap-1">
                         <Package size={14} className="text-primary" />
-                        Vật tư ({detailItems.length})
+                        Vật phẩm ({detailItems.length})
                       </h4>
                       {loadingDetailItems ? (
                         <div className="space-y-2">
@@ -3452,7 +3436,7 @@ export default function FundingRequestPage() {
                       ) : detailItems.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-border/60 p-4 text-center">
                           <p className="text-sm text-muted-foreground tracking-tighter">
-                            Không có danh sách vật tư chi tiết
+                            Không có danh sách vật phẩm chi tiết
                           </p>
                         </div>
                       ) : (

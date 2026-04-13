@@ -3,11 +3,7 @@
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  CheckCircle,
-  MinusCircle,
-  Info,
-} from "@phosphor-icons/react";
+import { CheckCircle, MinusCircle, Info } from "@phosphor-icons/react";
 import {
   Popover,
   PopoverContent,
@@ -15,16 +11,13 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { ROLES, ROLE_NAMES, RoleId } from "@/lib/roles";
-import {
-  useAllPermissions,
-  useRolePermissions,
-} from "@/services/permissions";
+import { useAllPermissions, useRolePermissions } from "@/services/permissions";
 import { PermissionEntity } from "@/services/permissions/type";
 
 // ── Permission group labels ──────────────────────────────
 const PERMISSION_GROUP_LABELS: Record<string, string> = {
   system: "Hệ thống",
-  inventory: "Kho vật tư",
+  inventory: "Kho vật phẩm",
   personnel: "Nhân sự",
   mission: "Nhiệm vụ",
   activity: "Hoạt động",
@@ -55,7 +48,11 @@ function groupPermissions(
 // ── All viewable roles ────────────────────────────────────
 const ALL_ROLES: { roleId: RoleId; label: string; short: string }[] = [
   { roleId: ROLES.ADMIN, label: ROLE_NAMES[ROLES.ADMIN], short: "QTV" },
-  { roleId: ROLES.COORDINATOR, label: ROLE_NAMES[ROLES.COORDINATOR], short: "ĐPV" },
+  {
+    roleId: ROLES.COORDINATOR,
+    label: ROLE_NAMES[ROLES.COORDINATOR],
+    short: "ĐPV",
+  },
   { roleId: ROLES.RESCUER, label: ROLE_NAMES[ROLES.RESCUER], short: "CHV" },
   { roleId: ROLES.MANAGER, label: ROLE_NAMES[ROLES.MANAGER], short: "QLK" },
   { roleId: ROLES.VICTIM, label: ROLE_NAMES[ROLES.VICTIM], short: "Công dân" },
@@ -90,9 +87,7 @@ const RolePermissionPanel = () => {
     const map: Record<number, Set<number>> = {};
     for (const { roleId } of ALL_ROLES) {
       const q = roleQueries[roleId];
-      map[roleId] = new Set(
-        q.data?.permissions?.map((p) => p.id) ?? [],
-      );
+      map[roleId] = new Set(q.data?.permissions?.map((p) => p.id) ?? []);
     }
     return map;
   }, [roleQueries]);
@@ -104,8 +99,7 @@ const RolePermissionPanel = () => {
   );
 
   const isLoading =
-    loadingAll ||
-    Object.values(roleQueries).some((q) => q.isLoading);
+    loadingAll || Object.values(roleQueries).some((q) => q.isLoading);
 
   // ── Summary stats per role ───────────────────────────────
   const totalPerms = allPermissions?.length ?? 0;
@@ -200,8 +194,6 @@ const RolePermissionPanel = () => {
           </table>
         </div>
       </div>
-
-      
     </div>
   );
 };
@@ -224,10 +216,7 @@ function GroupRows({
     <>
       {/* Group header row */}
       <tr className="bg-muted/20 border-t border-border/40">
-        <td
-          colSpan={ALL_ROLES.length + 1}
-          className="px-5 py-3"
-        >
+        <td colSpan={ALL_ROLES.length + 1} className="px-5 py-3">
           <span className="text-sm font-semibold uppercase tracking-tight text-muted-foreground">
             {PERMISSION_GROUP_LABELS[domain] ?? domain}
           </span>
@@ -269,12 +258,13 @@ function GroupRows({
                       <Info size={15} />
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent
-                    side="top"
-                    className="w-72 text-sm p-4"
-                  >
-                    <p className="font-semibold tracking-tighter mb-1">{perm.name}</p>
-                    <p className="text-muted-foreground tracking-tighter">{perm.description}</p>
+                  <PopoverContent side="top" className="w-72 text-sm p-4">
+                    <p className="font-semibold tracking-tighter mb-1">
+                      {perm.name}
+                    </p>
+                    <p className="text-muted-foreground tracking-tighter">
+                      {perm.description}
+                    </p>
                   </PopoverContent>
                 </Popover>
               )}

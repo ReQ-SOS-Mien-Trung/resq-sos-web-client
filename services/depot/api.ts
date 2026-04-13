@@ -21,6 +21,8 @@ import {
   DepotManagerAssignmentResponse,
   GetDepotFundTransactionsResponse,
   GetDepotFundTransactionsParams,
+  GetMyDepotAdvancersResponse,
+  GetMyDepotAdvancersParams,
   CreateInternalAdvanceRequest,
   CreateInternalRepaymentRequest,
   InitiateDepotClosureRequest,
@@ -31,6 +33,7 @@ import {
   SubmitDepotExternalResolutionResponse,
   InitiateDepotClosureTransferRequest,
   InitiateDepotClosureTransferResponse,
+  DepotClosureTransferSuggestionsResponse,
   GetMyDepotTransfersResponse,
   GetMyDepotClosuresResponse,
   DepotClosureDetail,
@@ -326,6 +329,22 @@ export async function getMyDepotFundTransactions(
 }
 
 /**
+ * [Manager] Get my depot fund advancers (people who owe money)
+ * GET /finance/depot-funds/my/advancers
+ */
+export async function getMyDepotAdvancers(
+  params?: GetMyDepotAdvancersParams,
+): Promise<GetMyDepotAdvancersResponse> {
+  const { data } = await api.get("/finance/depot-funds/my/advancers", {
+    params: {
+      pageNumber: params?.pageNumber ?? 1,
+      pageSize: params?.pageSize ?? 10,
+    },
+  });
+  return data;
+}
+
+/**
  * [Admin] Initiate depot closure
  * Nếu kho trống → đóng ngay. Nếu còn hàng → chuyển sang Closing, chờ resolve.
  * POST /logistics/depot/{id}/close
@@ -338,6 +357,19 @@ export async function initiateDepotClosure(
     validateStatus: (status) => status === 200 || status === 409,
   });
   return normalizeDepotClosureInitiateResponse(response.data, response.status);
+}
+
+/**
+ * [Admin] Get AI suggestions for transferring remaining inventory during depot closure
+ * GET /logistics/depot/{id}/close/transfer-suggestions
+ */
+export async function getDepotClosureTransferSuggestions(
+  id: number,
+): Promise<DepotClosureTransferSuggestionsResponse> {
+  const { data } = await api.get(
+    `/logistics/depot/${id}/close/transfer-suggestions`,
+  );
+  return data;
 }
 
 /**
@@ -404,7 +436,10 @@ export async function initiateDepotClosureTransfer(
   request: InitiateDepotClosureTransferRequest,
 ): Promise<InitiateDepotClosureTransferResponse> {
   const { id, ...body } = request;
-  const { data } = await api.post(`/logistics/depot/${id}/close/transfer`, body);
+  const { data } = await api.post(
+    `/logistics/depot/${id}/close/transfer`,
+    body,
+  );
   return data;
 }
 
@@ -481,7 +516,9 @@ export async function getDepotClosureTransfer(
   id: number,
   transferId: number,
 ): Promise<DepotClosureTransfer> {
-  const { data } = await api.get(`/logistics/depot/${id}/transfer/${transferId}`);
+  const { data } = await api.get(
+    `/logistics/depot/${id}/transfer/${transferId}`,
+  );
   return data;
 }
 
