@@ -108,6 +108,16 @@ const TOOL_LABELS: Record<string, string> = {
   getSOSClusters: "dữ liệu cụm SOS",
 };
 
+const STATUS_TOKEN_LABELS: Record<string, string> = {
+  loading_context: "Đang tải ngữ cảnh hiện trường...",
+  requirements: "Đang tổng hợp nhu cầu cứu hộ...",
+  requirements_fragment: "Đang tổng hợp nhu cầu vật phẩm và nhân lực...",
+  depot_fragment: "Đang đối chiếu kho vật phẩm phù hợp...",
+  single_depot_required: "Đang xác định kho xuất phát phù hợp...",
+  eligible_depot_count: "Đang kiểm tra số kho có thể đáp ứng...",
+  nearby_team_count: "Đang rà soát đội cứu hộ lân cận...",
+};
+
 function toReadableToolLabel(toolName?: string): string {
   if (!toolName) return "dữ liệu hiện trường";
   return TOOL_LABELS[toolName] ?? "dữ liệu hiện trường";
@@ -130,8 +140,15 @@ function normalizeStatusMessage(raw: string): string {
   if (!message) return "Đang chuẩn bị phân tích...";
 
   const lower = message.toLowerCase();
+  const matchedStatusToken = Object.keys(STATUS_TOKEN_LABELS).find((token) =>
+    lower.includes(token),
+  );
   const toolName = extractToolName(message) ?? undefined;
   const toolLabel = toReadableToolLabel(toolName);
+
+  if (matchedStatusToken) {
+    return STATUS_TOKEN_LABELS[matchedStatusToken];
+  }
 
   if (lower.includes("agent") && lower.includes("công cụ")) {
     return `AI đang thu thập ${toolLabel}...`;
@@ -146,6 +163,9 @@ function normalizeStatusMessage(raw: string): string {
   }
 
   return message
+    .replace(/\bai agent\b/gi, "AI")
+    .replace(/\bSOS requests?\b/gi, "yêu cầu SOS")
+    .replace(/\brequests?\b/gi, "yêu cầu")
     .replace(/([A-Za-z_][A-Za-z0-9_]*)\([^)]*\)/g, (_, fnName: string) =>
       toReadableToolLabel(fnName),
     )
@@ -196,6 +216,8 @@ export function useAiMissionStream() {
     if (msg.includes("Đang tải") || msg.includes("thu thập"))
       return "loading-data" as const;
     if (msg.includes("Đã tải")) return "loading-data" as const;
+    if (msg.includes("Đang tổng hợp") || msg.includes("Đang rà soát"))
+      return "loading-data" as const;
     if (msg.includes("Đang gọi AI")) return "calling-ai" as const;
     if (msg.includes("Đang xử lý")) return "processing" as const;
     if (msg.includes("Đã lưu")) return "done" as const;

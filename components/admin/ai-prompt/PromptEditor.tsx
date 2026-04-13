@@ -18,6 +18,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle,
+  ClipboardText,
   FloppyDisk,
   X,
   CircleNotch,
@@ -39,7 +40,13 @@ import type {
   PromptDetailEntity,
   CreatePromptRequest,
   UpdatePromptRequest,
+  PreviewPromptRescueSuggestionRequest,
 } from "@/services/prompt/type";
+import {
+  usePromptRescuePreviewStream,
+} from "@/services/prompt/hooks";
+import { useSOSClusters } from "@/services/sos_cluster/hooks";
+import AiStreamPanel from "@/components/coordinator/AiStreamPanel";
 
 // --- Helpers ---
 
@@ -209,6 +216,8 @@ const PromptEditor = ({
 
   const systemPromptRef = useRef<HTMLTextAreaElement>(null);
   const userPromptRef = useRef<HTMLTextAreaElement>(null);
+  const customModelInputRef = useRef<HTMLInputElement>(null);
+  const hasPreviewArtifactsRef = useRef(false);
 
   const textareaRefMap: Record<
     PromptTextField,
@@ -222,6 +231,22 @@ const PromptEditor = ({
   const [currentStep, setCurrentStep] = useState<CreateStep>(1);
   const [maxUnlockedStep, setMaxUnlockedStep] = useState<CreateStep>(1);
   const [isCustomModelMode, setIsCustomModelMode] = useState(false);
+  const [previewClusterId, setPreviewClusterId] = useState<number | null>(null);
+  const [isPreviewPanelOpen, setIsPreviewPanelOpen] = useState(false);
+
+  const { data: clustersData, isLoading: clustersLoading } = useSOSClusters();
+  const {
+    status: previewStatus,
+    statusLog: previewStatusLog,
+    thinkingText: previewThinkingText,
+    result: previewResult,
+    error: previewError,
+    loading: previewLoading,
+    phase: previewPhase,
+    startPreview,
+    stopPreview,
+    resetPreview,
+  } = usePromptRescuePreviewStream();
 
   useEffect(() => {
     if (prompt) {
@@ -271,6 +296,47 @@ const PromptEditor = ({
     setIsCustomModelMode(Boolean(normalizedFallbackModel) && !matchedModel);
   }, [isEditing, prompt, formData.model, formData.provider]);
 
+  useEffect(() => {
+    if (!isCustomModelMode) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      customModelInputRef.current?.focus();
+    });
+  }, [isCustomModelMode]);
+
+  useEffect(() => {
+    const firstClusterId = clustersData?.clusters?.[0]?.id ?? null;
+
+    if (previewClusterId === null && firstClusterId !== null) {
+      setPreviewClusterId(firstClusterId);
+    }
+  }, [clustersData, previewClusterId]);
+
+  useEffect(() => {
+    hasPreviewArtifactsRef.current = Boolean(previewResult || previewError);
+  }, [previewResult, previewError]);
+
+  useEffect(() => {
+    if (!hasPreviewArtifactsRef.current) {
+      return;
+    }
+
+    resetPreview();
+    setIsPreviewPanelOpen(false);
+  }, [
+    formData.provider,
+    formData.model,
+    formData.prompt_type,
+    formData.system_prompt,
+    formData.user_prompt_template,
+    formData.api_url,
+    formData.api_key,
+    previewClusterId,
+    resetPreview,
+  ]);
+
   const updateField = <K extends keyof PromptFormData>(
     key: K,
     value: PromptFormData[K],
@@ -318,7 +384,8 @@ const PromptEditor = ({
       ? "Backend không replace biến trong trường này."
       : "Backend không replace biến trong trường này. Các prompt mission có thể được nối thêm hướng dẫn stage/tool phù hợp trước khi gọi AI.";
   const userPromptHelperText = USER_PROMPT_TEMPLATE_HINTS[effectivePromptType];
-  const providerModelOptions = selectedProvider?.models ?? [];
+  const providerModelOptions: Array<{ label: string; code: string }> =
+    selectedProvider?.models ? [...selectedProvider.models] : [];
   const matchedProviderModel = providerModelOptions.find(
     (model) =>
       normalizeModelCode(model.code) === normalizeModelCode(formData.model),
@@ -342,6 +409,197 @@ const PromptEditor = ({
   const canSubmit = isEditing
     ? isStep3Complete
     : currentStep === 3 && isStep3Complete;
+  const supportsMissionPreview = effectivePromptType !== "SosPriorityAnalysis";
+  const clusterOptions = clustersData?.clusters ?? [];
+  const canRunPreview = Boolean(
+    supportsMissionPreview &&
+      previewClusterId &&
+      formData.provider &&
+      formData.model.trim() &&
+      formData.system_prompt.trim() &&
+      formData.api_url.trim(),
+  );
+
+  const buildSubmitPayload = useCallback(() => {
+    const normalizedApiKey = formData.api_key.trim();
+
+    return {
+      ...formData,
+      prompt_type: normalizePromptType(formData.prompt_type, prompt?.promptType),
+      name: formData.name.trim(),
+      purpose: formData.purpose.trim(),
+      system_prompt: formData.system_prompt.trim(),
+      user_prompt_template: formData.user_prompt_template.trim(),
+      model: formData.model.trim(),
+      version: toVersionString(formData.version.trim()),
+      api_url: formData.api_url.trim(),
+      api_key: normalizedApiKey || undefined,
+    };
+  }, [formData, prompt?.promptType]);
+
+  const buildPreviewRequest = useCallback(() => {
+    if (!previewClusterId) {
+      return null;
+    }
+
+    const payload = buildSubmitPayload();
+
+    const request: PreviewPromptRescueSuggestionRequest = {
+      cluster_id: previewClusterId,
+      source_prompt_id: prompt?.id,
+      prompt_type: payload.prompt_type,
+      provider: payload.provider,
+      system_prompt: payload.system_prompt,
+      user_prompt_template: payload.user_prompt_template,
+      model: payload.model,
+      temperature: payload.temperature,
+      max_tokens: payload.max_tokens,
+      version: payload.version,
+      api_url: payload.api_url || undefined,
+      api_key: payload.api_key,
+    };
+
+    return request;
+  }, [buildSubmitPayload, previewClusterId, prompt?.id]);
+
+  const handleRunPreview = useCallback(() => {
+    const request = buildPreviewRequest();
+    if (!request) {
+      return;
+    }
+
+    startPreview(request);
+    setIsPreviewPanelOpen(true);
+  }, [buildPreviewRequest, startPreview]);
+
+  const handleApprovePreview = useCallback(() => {
+    const payload = buildSubmitPayload();
+
+    if (isEditing) {
+      onSave(payload as UpdatePromptRequest);
+      return;
+    }
+
+    onSave({
+      ...payload,
+      is_active: formData.is_active,
+    } as CreatePromptRequest);
+  }, [buildSubmitPayload, formData.is_active, isEditing, onSave]);
+
+  const renderModelField = (customInputId: string, helperText?: string) => (
+    <div className="space-y-1.5">
+      <Label htmlFor="model">Model *</Label>
+      <Select value={modelSelectValue} onValueChange={handleModelSelectChange}>
+        <SelectTrigger id="model">
+          <SelectValue placeholder="Chọn model" />
+        </SelectTrigger>
+        <SelectContent>
+          {providerModelOptions.map((model) => (
+            <SelectItem
+              key={`${formData.provider}-${model.code}`}
+              value={model.code}
+            >
+              {model.code}
+            </SelectItem>
+          ))}
+          <SelectItem value={CUSTOM_MODEL_OPTION_VALUE}>
+            Khác (tự nhập mã)
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      <div className="space-y-1.5 pt-1">
+        <Label htmlFor={customInputId}>Mã model custom</Label>
+        <Input
+          id={customInputId}
+          ref={customModelInputRef}
+          value={isCustomModelMode ? formData.model : ""}
+          onChange={(e) => handleCustomModelChange(e.target.value)}
+          placeholder="Chọn 'Khác (tự nhập mã)' rồi nhập mã model tại đây"
+          disabled={!isCustomModelMode}
+        />
+      </div>
+      {helperText ? (
+        <p className="text-xs text-muted-foreground">{helperText}</p>
+      ) : null}
+    </div>
+  );
+
+  const renderPreviewSection = () => (
+    <div className="space-y-4 rounded-xl border border-orange-200/70 bg-orange-50/50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">
+            Test Theo SOS Cluster
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            Dùng cấu hình draft hiện tại để preview kế hoạch AI trước khi cập
+            nhật prompt thật.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleRunPreview}
+          disabled={!canRunPreview || previewLoading}
+        >
+          {previewLoading ? (
+            <CircleNotch size={14} className="mr-1.5 animate-spin" />
+          ) : (
+            <ClipboardText size={14} className="mr-1.5" />
+          )}
+          Test
+        </Button>
+      </div>
+
+      {supportsMissionPreview ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div className="space-y-1.5">
+            <Label htmlFor="preview_cluster">SOS Cluster để test</Label>
+            <Select
+              value={previewClusterId ? String(previewClusterId) : ""}
+              onValueChange={(value) => setPreviewClusterId(Number(value))}
+            >
+              <SelectTrigger id="preview_cluster">
+                <SelectValue
+                  placeholder={
+                    clustersLoading
+                      ? "Đang tải danh sách cluster..."
+                      : "Chọn cluster để preview"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {clusterOptions.map((cluster) => (
+                  <SelectItem key={cluster.id} value={String(cluster.id)}>
+                    {`#${cluster.id} • ${cluster.severityLevel} • ${cluster.sosRequestCount} SOS`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Preview không ghi mission suggestion thật vào hệ thống. Nếu test
+              fail bạn vẫn có thể bấm lưu cấu hình như bình thường.
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsPreviewPanelOpen(true)}
+            disabled={!previewResult && !previewError}
+          >
+            Mở Review
+          </Button>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Preview theo `sos-cluster` hiện chỉ hỗ trợ các prompt Mission*.
+        </p>
+      )}
+    </div>
+  );
 
   useEffect(() => {
     if (isEditing) return;
@@ -428,19 +686,7 @@ const PromptEditor = ({
       return;
     }
 
-    const normalizedApiKey = formData.api_key.trim();
-    const payload = {
-      ...formData,
-      prompt_type: normalizePromptType(formData.prompt_type, prompt?.promptType),
-      name: formData.name.trim(),
-      purpose: formData.purpose.trim(),
-      system_prompt: formData.system_prompt.trim(),
-      user_prompt_template: formData.user_prompt_template.trim(),
-      model: formData.model.trim(),
-      version: toVersionString(formData.version.trim()),
-      api_url: formData.api_url.trim(),
-      api_key: normalizedApiKey || undefined,
-    };
+    const payload = buildSubmitPayload();
 
     if (isEditing) {
       onSave(payload as UpdatePromptRequest);
@@ -487,7 +733,8 @@ const PromptEditor = ({
   };
 
   return (
-    <Card className="border border-border/50 animate-in fade-in slide-in-from-top-2 duration-300">
+    <>
+      <Card className="border border-border/50 animate-in fade-in slide-in-from-top-2 duration-300">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -603,43 +850,7 @@ const PromptEditor = ({
                   </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="model">Model *</Label>
-                  <Select
-                    value={modelSelectValue}
-                    onValueChange={handleModelSelectChange}
-                  >
-                    <SelectTrigger id="model">
-                      <SelectValue placeholder="Chọn model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {providerModelOptions.map((model) => (
-                        <SelectItem
-                          key={`${formData.provider}-${model.code}`}
-                          value={model.code}
-                        >
-                          {model.code}
-                        </SelectItem>
-                      ))}
-                      <SelectItem value={CUSTOM_MODEL_OPTION_VALUE}>
-                        Khác (tự nhập mã)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {isCustomModelMode && (
-                    <div className="space-y-1.5 pt-1">
-                      <Label htmlFor="custom_model_code">Mã model *</Label>
-                      <Input
-                        id="custom_model_code"
-                        value={formData.model}
-                        onChange={(e) =>
-                          handleCustomModelChange(e.target.value)
-                        }
-                        placeholder="VD: gemini-3.1-flash-lite-preview"
-                      />
-                    </div>
-                  )}
-                </div>
+                {renderModelField("custom_model_code")}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -751,6 +962,8 @@ const PromptEditor = ({
                   {userPromptHelperText}
                 </p>
               </div>
+
+              {renderPreviewSection()}
 
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                 <input
@@ -866,48 +1079,10 @@ const PromptEditor = ({
                     </p>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="model">Model *</Label>
-                    <Select
-                      value={modelSelectValue}
-                      onValueChange={handleModelSelectChange}
-                    >
-                      <SelectTrigger id="model">
-                        <SelectValue placeholder="Chọn model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {providerModelOptions.map((model) => (
-                          <SelectItem
-                            key={`${formData.provider}-${model.code}`}
-                            value={model.code}
-                          >
-                            {model.code}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value={CUSTOM_MODEL_OPTION_VALUE}>
-                          Khác (tự nhập mã)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {isCustomModelMode && (
-                      <div className="space-y-1.5 pt-1">
-                        <Label htmlFor="custom_model_code_create">
-                          Mã model *
-                        </Label>
-                        <Input
-                          id="custom_model_code_create"
-                          value={formData.model}
-                          onChange={(e) =>
-                            handleCustomModelChange(e.target.value)
-                          }
-                          placeholder="VD: gemini-3.1-flash-lite-preview"
-                        />
-                      </div>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Chọn model phù hợp theo provider đã chọn.
-                    </p>
-                  </div>
+                  {renderModelField(
+                    "custom_model_code_create",
+                    "Chọn model phù hợp theo provider đã chọn.",
+                  )}
                 </div>
               </div>
 
@@ -1118,6 +1293,8 @@ const PromptEditor = ({
                       {userPromptHelperText}
                     </p>
                   </div>
+
+                  {renderPreviewSection()}
                 </div>
               )}
 
@@ -1167,7 +1344,29 @@ const PromptEditor = ({
           )}
         </form>
       </CardContent>
-    </Card>
+      </Card>
+      <AiStreamPanel
+        open={isPreviewPanelOpen}
+        onClose={() => setIsPreviewPanelOpen(false)}
+        clusterId={previewClusterId}
+        status={previewStatus}
+        statusLog={previewStatusLog}
+        thinkingText={previewThinkingText}
+        result={previewResult}
+        error={previewError}
+        loading={previewLoading}
+        phase={previewPhase}
+        onStop={stopPreview}
+        onRetry={handleRunPreview}
+        onViewPlan={() => setIsPreviewPanelOpen(false)}
+        primaryActionLabel={
+          isEditing
+            ? "Cập nhật prompt với cấu hình này"
+            : "Tạo prompt với cấu hình này"
+        }
+        onPrimaryAction={handleApprovePreview}
+      />
+    </>
   );
 };
 

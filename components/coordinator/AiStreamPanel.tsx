@@ -57,6 +57,8 @@ interface AiStreamPanelProps {
   onStop: () => void;
   onRetry: () => void;
   onViewPlan: () => void;
+  primaryActionLabel?: string;
+  onPrimaryAction?: () => void;
 }
 
 /* ═══ Activity icon map ═══ */
@@ -103,6 +105,39 @@ function normalizeAiErrorText(error: string): string {
     return "AI phân tích thất bại. Backend chưa trả chi tiết lỗi.";
   }
 
+  const isServiceUnavailable =
+    /\b503\b/.test(lower) ||
+    lower.includes("service unavailable") ||
+    lower.includes("temporarily unavailable") ||
+    lower.includes("upstream connect error") ||
+    lower.includes("backend unavailable");
+
+  const isQuotaOrTokenIssue =
+    lower.includes("insufficient_quota") ||
+    lower.includes("quota") ||
+    lower.includes("rate limit") ||
+    lower.includes("too many requests") ||
+    lower.includes("token") ||
+    lower.includes("api key") ||
+    lower.includes("billing") ||
+    lower.includes("credit");
+
+  const isAuthConfigIssue =
+    /\b401\b/.test(lower) ||
+    /\b403\b/.test(lower) ||
+    lower.includes("unauthorized") ||
+    lower.includes("forbidden") ||
+    lower.includes("invalid api key") ||
+    lower.includes("permission denied");
+
+  if (isQuotaOrTokenIssue || isAuthConfigIssue) {
+    return "AI hiện không khả dụng do token/quota đã hết hoặc cấu hình API key chưa đúng. Vui lòng báo Admin kiểm tra cấu hình AI (API key, quota, billing).";
+  }
+
+  if (isServiceUnavailable) {
+    return "Dịch vụ AI đang tạm quá tải hoặc gián đoạn (503). Vui lòng thử lại sau ít phút; nếu vẫn lỗi, hãy báo Admin kiểm tra cấu hình AI và hạn mức token/quota.";
+  }
+
   return message;
 }
 
@@ -131,6 +166,8 @@ export default function AiStreamPanel({
   onStop,
   onRetry,
   onViewPlan,
+  primaryActionLabel,
+  onPrimaryAction,
 }: AiStreamPanelProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -201,7 +238,14 @@ export default function AiStreamPanel({
           {showActionMap && <ActionMapView result={result} />}
           {showError && <ErrorView error={error} onRetry={onRetry} />}
         </div>
-        {result && <FooterBar onRetry={onRetry} onViewPlan={onViewPlan} />}
+        {result && (
+          <FooterBar
+            onRetry={onRetry}
+            onViewPlan={onViewPlan}
+            primaryActionLabel={primaryActionLabel}
+            onPrimaryAction={onPrimaryAction}
+          />
+        )}
       </div>
     </div>
   );
@@ -252,7 +296,7 @@ function TopBar({
         </div>
         <div>
           <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-            AI Mission Suggestion
+            Gợi ý nhiệm vụ AI
             {clusterId && (
               <Badge variant="outline" className="text-sm font-mono px-1.5">
                 Cụm #{clusterId}
@@ -312,17 +356,17 @@ function phaseLabel(phase: string): string {
 function phaseDescription(phase: string): string {
   switch (phase) {
     case "connecting":
-      return "Thiết lập kết nối thời gian thực với AI agent.";
+      return "Thiết lập kết nối thời gian thực với tác nhân AI.";
     case "loading-data":
       return "AI đang gom dữ liệu hiện trường, đội cứu hộ và kho gần nhất.";
     case "calling-ai":
-      return "Model đang cân nhắc phương án điều phối và thứ tự hành động.";
+      return "Mô hình đang cân nhắc phương án điều phối và thứ tự hành động.";
     case "processing":
-      return "Chuẩn hóa kết quả và dựng mission flow để hiển thị.";
+      return "Chuẩn hóa kết quả và dựng luồng nhiệm vụ để hiển thị.";
     case "done":
-      return "Mission suggestion đã sẵn sàng để xem và duyệt.";
+      return "Gợi ý nhiệm vụ đã sẵn sàng để xem và duyệt.";
     default:
-      return "Khởi tạo pipeline phân tích mission.";
+      return "Khởi tạo tiến trình phân tích nhiệm vụ.";
   }
 }
 
@@ -1521,9 +1565,13 @@ function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
 function FooterBar({
   onRetry,
   onViewPlan,
+  primaryActionLabel,
+  onPrimaryAction,
 }: {
   onRetry: () => void;
   onViewPlan: () => void;
+  primaryActionLabel?: string;
+  onPrimaryAction?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1550,14 +1598,25 @@ function FooterBar({
         Phân tích lại
       </Button>
       <div className="flex-1" />
-      <Button
-        size="sm"
-        className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
-        onClick={onViewPlan}
-      >
-        <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
-        Xem & Chỉnh sửa Kế hoạch
-      </Button>
+      {onPrimaryAction ? (
+        <Button
+          size="sm"
+          className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
+          onClick={onPrimaryAction}
+        >
+          <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
+          {primaryActionLabel ?? "Xem & Chỉnh sửa Kế hoạch"}
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
+          onClick={onViewPlan}
+        >
+          <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
+          Xem & Chỉnh sửa Kế hoạch
+        </Button>
+      )}
     </div>
   );
 }

@@ -90,3 +90,18 @@ export interface UpdatePromptRequest {
   api_key?: string;
   is_active: boolean;
 }
+
+export interface PreviewPromptRescueSuggestionRequest {
+  cluster_id: number;
+  source_prompt_id?: number;
+  prompt_type: PromptType;
+  provider: AiProvider;
+  system_prompt: string;
+  user_prompt_template: string;
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  version: string;
+  api_url?: string;
+  api_key?: string;
+}

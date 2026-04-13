@@ -2149,94 +2149,12 @@ function mergeSupplyCollections(
 function syncDeliveryActivitiesWithCollectors(
   activities: EditableActivity[],
 ): EditableActivity[] {
-  const pendingByTeam = new Map<number, ClusterSupplyCollection[]>();
-  const returnSupplyKeysByTeam = new Map<number, Set<string>>();
-
-  activities.forEach((activity) => {
-    if (activity.activityType !== "RETURN_SUPPLIES") {
-      return;
-    }
-
-    const teamId = toValidTeamId(activity.suggestedTeam?.teamId);
-    if (teamId == null) {
-      return;
-    }
-
-    const keys = returnSupplyKeysByTeam.get(teamId) ?? new Set<string>();
-
-    for (const supply of activity.suppliesToCollect ?? []) {
-      keys.add(buildSupplyComparisonKey(supply));
-    }
-
-    returnSupplyKeysByTeam.set(teamId, keys);
-  });
-
-  return activities.map((activity) => {
-    if (activity.activityType === "COLLECT_SUPPLIES") {
-      const teamId = toValidTeamId(activity.suggestedTeam?.teamId);
-      const mergedSupplies = mergeSupplyCollections(activity.suppliesToCollect);
-
-      if (teamId != null && mergedSupplies && mergedSupplies.length > 0) {
-        const returnKeys = returnSupplyKeysByTeam.get(teamId) ?? null;
-        const deliverableSupplies = mergedSupplies.filter(
-          (supply) => !returnKeys?.has(buildSupplyComparisonKey(supply)),
-        );
-
-        if (deliverableSupplies.length === 0) {
-          return activity._autoSyncedDeliveryStep
-            ? { ...activity, _autoSyncedDeliveryStep: false }
-            : activity;
-        }
-
-        const pending = pendingByTeam.get(teamId) ?? [];
-        pendingByTeam.set(
-          teamId,
-          mergeSupplyCollections([...pending, ...deliverableSupplies]) ??
-            pending,
-        );
-      }
-
-      return activity._autoSyncedDeliveryStep
-        ? { ...activity, _autoSyncedDeliveryStep: false }
-        : activity;
-    }
-
-    if (activity.activityType !== "DELIVER_SUPPLIES") {
-      return activity._autoSyncedDeliveryStep
-        ? { ...activity, _autoSyncedDeliveryStep: false }
-        : activity;
-    }
-
-    const teamId = toValidTeamId(activity.suggestedTeam?.teamId);
-    const pending = teamId != null ? (pendingByTeam.get(teamId) ?? null) : null;
-
-    if (teamId != null && pending && pending.length > 0) {
-      pendingByTeam.delete(teamId);
-
-      if (
-        activity._autoSyncedDeliveryStep &&
-        haveMatchingSupplyCollections(activity.suppliesToCollect, pending)
-      ) {
-        return activity;
-      }
-
-      return {
-        ...activity,
-        suppliesToCollect: pending,
-        _autoSyncedDeliveryStep: true,
-      };
-    }
-
-    if (!activity._autoSyncedDeliveryStep) {
-      return activity;
-    }
-
-    return {
-      ...activity,
-      suppliesToCollect: null,
-      _autoSyncedDeliveryStep: false,
-    };
-  });
+  // Keep legacy flag cleanup but do not auto-lock DELIVER_SUPPLIES edits.
+  return activities.map((activity) =>
+    activity._autoSyncedDeliveryStep
+      ? { ...activity, _autoSyncedDeliveryStep: false }
+      : activity,
+  );
 }
 
 function normalizeDepotName(value?: string | null): string {
@@ -5443,13 +5361,23 @@ const SuggestionCard = ({
               minute: "2-digit",
             })}
           </span>
-          <span>Ưu tiên: {suggestion.suggestedPriorityScore.toFixed(1)}</span>
+          <span>
+            Ưu tiên:{" "}
+            {typeof suggestion.suggestedPriorityScore === "number"
+              ? suggestion.suggestedPriorityScore.toFixed(1)
+              : "N/A"}
+          </span>
           <span>{allActivities.length} bước</span>
           <span className="flex items-center gap-1">
             <Lightning className="h-3 w-3" weight="fill" />
             {suggestion.modelName}
           </span>
-          <span>Tin cậy: {(suggestion.confidenceScore * 100).toFixed(0)}%</span>
+          <span>
+            Tin cậy:{" "}
+            {typeof suggestion.confidenceScore === "number"
+              ? `${(suggestion.confidenceScore * 100).toFixed(0)}%`
+              : "N/A"}
+          </span>
         </div>
 
         {/* Toggle activities */}
@@ -5902,14 +5830,9 @@ const RescuePlanPanel = ({
       },
     ) => {
       const targetActivity = editActivities.find((a) => a._id === activityId);
-      if (
-        targetActivity?.activityType === "RETURN_SUPPLIES" ||
-        targetActivity?._autoSyncedDeliveryStep
-      ) {
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
         toast.info(
-          targetActivity?.activityType === "RETURN_SUPPLIES"
-            ? "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể thêm thủ công."
-            : "Vật phẩm ở bước Phân phát đang tự đồng bộ từ bước Tiếp nhận nên không thể thêm thủ công.",
+          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể thêm thủ công.",
         );
         return;
       }
@@ -6007,14 +5930,9 @@ const RescuePlanPanel = ({
   const handleRemoveSupply = useCallback(
     (activityId: string, supplyIndex: number) => {
       const targetActivity = editActivities.find((a) => a._id === activityId);
-      if (
-        targetActivity?.activityType === "RETURN_SUPPLIES" ||
-        targetActivity?._autoSyncedDeliveryStep
-      ) {
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
         toast.info(
-          targetActivity?.activityType === "RETURN_SUPPLIES"
-            ? "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể xóa thủ công."
-            : "Vật phẩm ở bước Phân phát đang tự đồng bộ từ bước Tiếp nhận nên không thể xóa thủ công.",
+          "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể xóa thủ công.",
         );
         return;
       }
@@ -6041,14 +5959,9 @@ const RescuePlanPanel = ({
   const handleUpdateSupplyQuantity = useCallback(
     (activityId: string, supplyIndex: number, quantity: number) => {
       const targetActivity = editActivities.find((a) => a._id === activityId);
-      if (
-        targetActivity?.activityType === "RETURN_SUPPLIES" ||
-        targetActivity?._autoSyncedDeliveryStep
-      ) {
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
         toast.info(
-          targetActivity?.activityType === "RETURN_SUPPLIES"
-            ? "Số lượng ở bước Hoàn trả được tự động đồng bộ theo số lượng đã thu gom nên không thể sửa thủ công."
-            : "Số lượng ở bước Phân phát đang tự đồng bộ theo bước Tiếp nhận nên không thể sửa thủ công.",
+          "Số lượng ở bước Hoàn trả được tự động đồng bộ theo số lượng đã thu gom nên không thể sửa thủ công.",
         );
         return;
       }
@@ -8865,12 +8778,8 @@ const RescuePlanPanel = ({
                                         const isReturnSuppliesActivity =
                                           activity.activityType ===
                                           "RETURN_SUPPLIES";
-                                        const isAutoSyncedDeliveryStep =
-                                          activity._autoSyncedDeliveryStep ===
-                                          true;
                                         const isAutoManagedSupplyStep =
-                                          isReturnSuppliesActivity ||
-                                          isAutoSyncedDeliveryStep;
+                                          isReturnSuppliesActivity;
                                         const selectedTeamDisplayName =
                                           activity.suggestedTeam?.teamName ||
                                           (hasValidSuggestedTeamId
@@ -9365,12 +9274,6 @@ const RescuePlanPanel = ({
                                                   vật phẩm và không thể thay đổi
                                                   thủ công.
                                                 </p>
-                                              ) : isAutoSyncedDeliveryStep ? (
-                                                <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
-                                                  Bước Phân phát vật phẩm đang
-                                                  tự đồng bộ theo các bước tiếp
-                                                  nhận trước đó của cùng đội.
-                                                </p>
                                               ) : null}
                                             </div>
 
@@ -9411,9 +9314,7 @@ const RescuePlanPanel = ({
                                                   );
                                                   if (isAutoManagedSupplyStep) {
                                                     toast.info(
-                                                      isReturnSuppliesActivity
-                                                        ? "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể kéo thả thủ công."
-                                                        : "Vật phẩm ở bước Phân phát đang được đồng bộ tự động từ bước Tiếp nhận nên không thể kéo thả thủ công.",
+                                                      "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể kéo thả thủ công.",
                                                     );
                                                     return;
                                                   }

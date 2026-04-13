@@ -5,6 +5,7 @@ import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Plus, ArrowCounterClockwise } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
@@ -161,13 +162,16 @@ const AIPromptPage = () => {
             id: editingPrompt.id,
             data: data as UpdatePromptRequest,
           });
+          toast.success("Đã cập nhật prompt thành công.");
         } else {
           await createMutation.mutateAsync(data as CreatePromptRequest);
+          toast.success("Đã tạo prompt mới thành công.");
         }
         setSelectedPromptType(data.prompt_type);
         closeEditor();
       } catch (error) {
         console.error("Error saving prompt:", error);
+        toast.error("Không thể lưu prompt. Vui lòng kiểm tra lại cấu hình.");
       }
     },
     [editingPrompt, updateMutation, createMutation, closeEditor],
@@ -181,8 +185,10 @@ const AIPromptPage = () => {
         setSelectedPromptId(null);
       }
       setDeletingPrompt(null);
+      toast.success("Đã xóa prompt.");
     } catch (error) {
       console.error("Error deleting prompt:", error);
+      toast.error("Không thể xóa prompt.");
     }
   }, [deletingPrompt, deleteMutation, selectedPromptId]);
 
