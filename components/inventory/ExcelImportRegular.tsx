@@ -29,11 +29,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   UploadSimple,
   FileXls,
@@ -60,9 +56,16 @@ import {
   useImportRegularInventory,
   useDownloadPurchaseImportTemplate,
 } from "@/services/inventory/hooks";
-import type { ImportPurchaseItem, InventoryItemEntity, VatInvoice } from "@/services/inventory/type";
+import type {
+  ImportPurchaseItem,
+  InventoryItemEntity,
+  VatInvoice,
+} from "@/services/inventory/type";
 import { updateItemModel } from "@/services/inventory/api";
-import { uploadImageToCloudinary, uploadRawToCloudinary } from "@/utils/uploadFile";
+import {
+  uploadImageToCloudinary,
+  uploadRawToCloudinary,
+} from "@/utils/uploadFile";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { DateTimePickerInput } from "@/components/ui/date-time-picker-input";
 import {
@@ -130,7 +133,13 @@ function findDataSheet(workbook: XLSX.WorkBook): XLSX.WorkSheet {
     const ws = workbook.Sheets[name];
     if (!ws["!ref"]) continue;
     const a1 = ws["A1"];
-    if (a1 && String(a1.v ?? "").trim().toUpperCase() === "STT") return ws;
+    if (
+      a1 &&
+      String(a1.v ?? "")
+        .trim()
+        .toUpperCase() === "STT"
+    )
+      return ws;
   }
   return workbook.Sheets[workbook.SheetNames[0]];
 }
@@ -269,7 +278,8 @@ function parseExcelDate(val: unknown): string {
 }
 
 function parseOptionalExcelNumber(val: unknown): number | undefined {
-  if (val === null || val === undefined || String(val).trim() === "") return undefined;
+  if (val === null || val === undefined || String(val).trim() === "")
+    return undefined;
   const parsed = Number(String(val).replace(/,/g, ""));
   return Number.isFinite(parsed) ? parsed : undefined;
 }
@@ -298,7 +308,9 @@ function parseExcelDateTime(val: unknown): string {
   const str = String(val).trim();
   if (!str) return "";
   // dd/mm/yyyy HH:mm (Vietnamese with time)
-  const dmyHM = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\s+(\d{1,2}):(\d{2})/);
+  const dmyHM = str.match(
+    /^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})\s+(\d{1,2}):(\d{2})/,
+  );
   if (dmyHM) {
     const [, d, m, y, H, M] = dmyHM;
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${H.padStart(2, "0")}:${M}`;
@@ -310,7 +322,9 @@ function parseExcelDateTime(val: unknown): string {
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T00:00`;
   }
   // yyyy-mm-ddTHH:mm or yyyy-mm-dd
-  const isoLike = str.match(/^(\d{4})[\-](\d{2})[\-](\d{2})(?:T(\d{2}):(\d{2}))?/);
+  const isoLike = str.match(
+    /^(\d{4})[\-](\d{2})[\-](\d{2})(?:T(\d{2}):(\d{2}))?/,
+  );
   if (isoLike) {
     const [, y, m, d, H = "00", M = "00"] = isoLike;
     return `${y}-${m}-${d}T${H}:${M}`;
@@ -323,7 +337,10 @@ function parseExcelDateTime(val: unknown): string {
 }
 
 /** Extract trailing model ID from item name, e.g. "Mì tôm - 1" → { cleanName: "Mì tôm", itemModelId: 1 } */
-function parseItemName(raw: string): { cleanName: string; itemModelId?: number } {
+function parseItemName(raw: string): {
+  cleanName: string;
+  itemModelId?: number;
+} {
   const m = raw.trim().match(/^(.*?)\s*-\s*(\d+)$/);
   if (m) {
     return { cleanName: m[1].trim(), itemModelId: Number(m[2]) };
@@ -336,7 +353,10 @@ function cleanNumber(s: string): string {
 }
 
 function formatMoney(value: string | number): string {
-  const raw = typeof value === "string" ? value.replace(/\D/g, "") : String(Math.round(value));
+  const raw =
+    typeof value === "string"
+      ? value.replace(/\D/g, "")
+      : String(Math.round(value));
   const n = parseInt(raw, 10);
   if (!raw || isNaN(n)) return "";
   return n.toLocaleString("vi-VN");
@@ -377,7 +397,8 @@ function extractVatFields(pdfLines: PdfLine[]): Partial<VatFormState> {
   }
 
   {
-    const serialPat = /k[yý]\s*hi[eệ]u\s*[:\s]+([A-Za-z0-9][A-Za-z0-9\/\-]{1,10})/i;
+    const serialPat =
+      /k[yý]\s*hi[eệ]u\s*[:\s]+([A-Za-z0-9][A-Za-z0-9\/\-]{1,10})/i;
     const m = fullText.match(serialPat);
     if (m) result.invoiceSerial = m[1].trim();
 
@@ -397,14 +418,20 @@ function extractVatFields(pdfLines: PdfLine[]): Partial<VatFormState> {
     ];
     for (const pat of explicit) {
       const m = fullText.match(pat);
-      if (m) { result.invoiceNumber = m[1].padStart(7, "0"); break; }
+      if (m) {
+        result.invoiceNumber = m[1].padStart(7, "0");
+        break;
+      }
     }
 
     if (!result.invoiceNumber) {
       for (const line of texts) {
         if (/k[yý]\s*hi[eệ]u/i.test(line)) {
           const m = line.match(/s[oố]\s*[:\s]+0*(\d{4,7})/i);
-          if (m) { result.invoiceNumber = m[1].padStart(7, "0"); break; }
+          if (m) {
+            result.invoiceNumber = m[1].padStart(7, "0");
+            break;
+          }
         }
       }
     }
@@ -415,16 +442,23 @@ function extractVatFields(pdfLines: PdfLine[]): Partial<VatFormState> {
         if (!/\bs[oố]\b/i.test(line)) continue;
         if (/thu[eế]|[Mm][aã]|[Aa]ddress|[Đđ][iị]a/i.test(line)) continue;
         const self = line.match(/0*(\d{4,7})\s*$/);
-        if (self) { result.invoiceNumber = self[1].padStart(7, "0"); break; }
+        if (self) {
+          result.invoiceNumber = self[1].padStart(7, "0");
+          break;
+        }
         const next = texts[i + 1] ?? "";
         const nextM = next.match(/^0*(\d{4,7})$/);
-        if (nextM) { result.invoiceNumber = nextM[1].padStart(7, "0"); break; }
+        if (nextM) {
+          result.invoiceNumber = nextM[1].padStart(7, "0");
+          break;
+        }
       }
     }
   }
 
   {
-    const labelPat = /([Đđ][oơ]n\s*v[iị]\s*b[aá]n|[Tt][eê]n\s*[Đđ][oơ]n\s*v[iị]|[Nn]g[uư][oờ]i\s*b[aá]n|[Nn]h[aà]\s*cung\s*c[aấ]p)/i;
+    const labelPat =
+      /([Đđ][oơ]n\s*v[iị]\s*b[aá]n|[Tt][eê]n\s*[Đđ][oơ]n\s*v[iị]|[Nn]g[uư][oờ]i\s*b[aá]n|[Nn]h[aà]\s*cung\s*c[aấ]p)/i;
     const v = labelValue(labelPat);
     if (v && v.length >= 3) {
       const trimmed = v.split(/\s{3,}|\t/)[0].trim();
@@ -434,14 +468,17 @@ function extractVatFields(pdfLines: PdfLine[]): Partial<VatFormState> {
 
   {
     const buyerStart = texts.findIndex((l) =>
-      /ng[uư][oờ]i\s*mua|[Kk]h[aá]ch\s*h[aà]ng|[Đđ][oơ]n\s*v[iị]\s*mua/i.test(l),
+      /ng[uư][oờ]i\s*mua|[Kk]h[aá]ch\s*h[aà]ng|[Đđ][oơ]n\s*v[iị]\s*mua/i.test(
+        l,
+      ),
     );
 
     const mstRe = /m[aã]\s*s[oố]\s*thu[eế]/i;
     const sellerMstIdx = texts.findIndex(
       (l, i) => mstRe.test(l) && (buyerStart < 0 || i < buyerStart),
     );
-    const mstIdx = sellerMstIdx >= 0 ? sellerMstIdx : texts.findIndex((l) => mstRe.test(l));
+    const mstIdx =
+      sellerMstIdx >= 0 ? sellerMstIdx : texts.findIndex((l) => mstRe.test(l));
 
     if (mstIdx >= 0) {
       const mstLine = texts[mstIdx];
@@ -501,14 +538,20 @@ function extractVatFields(pdfLines: PdfLine[]): Partial<VatFormState> {
           .map((n) => cleanNumber(n))
           .filter((n) => n.length >= 3)
           .sort((a, b) => b.length - a.length || parseInt(b) - parseInt(a))[0];
-        if (raw) { result.totalAmount = raw; break; }
+        if (raw) {
+          result.totalAmount = raw;
+          break;
+        }
       }
 
       const nextLine = texts[idx + 1] ?? "";
       const nextNums = nextLine.match(/[\d][0-9,.]+/g);
       if (nextNums) {
         const raw = cleanNumber(nextNums[nextNums.length - 1]);
-        if (raw.length >= 3) { result.totalAmount = raw; break; }
+        if (raw.length >= 3) {
+          result.totalAmount = raw;
+          break;
+        }
       }
     }
   }
@@ -525,7 +568,13 @@ async function parseVatPdf(file: File): Promise<Partial<VatFormState>> {
     const buffer = await file.arrayBuffer();
     const pdf = await (pdfjs as any).getDocument({ data: buffer }).promise;
 
-    interface TItem { str: string; x: number; y: number; w: number; h: number; }
+    interface TItem {
+      str: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    }
     const allLines: PdfLine[] = [];
 
     const pageCount = Math.min(pdf.numPages, 3);
@@ -539,12 +588,16 @@ async function parseVatPdf(file: File): Promise<Partial<VatFormState>> {
           str: (item.str as string).normalize("NFC"),
           x: item.transform[4] as number,
           y: item.transform[5] as number,
-          w: (typeof item.width === "number" && item.width > 0)
-            ? item.width
-            : Math.abs(item.transform[0]) * (item.str as string).length * 0.55,
-          h: (typeof item.height === "number" && item.height > 0)
-            ? item.height
-            : Math.abs(item.transform[3]),
+          w:
+            typeof item.width === "number" && item.width > 0
+              ? item.width
+              : Math.abs(item.transform[0]) *
+                (item.str as string).length *
+                0.55,
+          h:
+            typeof item.height === "number" && item.height > 0
+              ? item.height
+              : Math.abs(item.transform[3]),
         }))
         .filter((it) => it.str.trim().length > 0);
 
@@ -558,7 +611,10 @@ async function parseVatPdf(file: File): Promise<Partial<VatFormState>> {
       let modeH = 10;
       let maxCnt = 0;
       for (const [h, c] of hBuckets) {
-        if (c > maxCnt) { maxCnt = c; modeH = h; }
+        if (c > maxCnt) {
+          maxCnt = c;
+          modeH = h;
+        }
       }
       const yTol = Math.max(5, modeH * 0.6);
 
@@ -642,12 +698,14 @@ export default function ExcelImportRegular() {
   const [groups, setGroups] = useState<PurchaseGroup[]>([createEmptyGroup()]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [advancedByName, setAdvancedByName] = useState("");
   const [previewImage, setPreviewImage] = useState<{
     src: string;
     alt: string;
   } | null>(null);
-  const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<{
+    url: string;
+    name: string;
+  } | null>(null);
   const pdfPreviewUrlRef = useRef<string | null>(null);
 
   const openPdfPreview = useCallback((file: File) => {
@@ -667,17 +725,52 @@ export default function ExcelImportRegular() {
 
   const vatInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const excelReviewInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const excelReviewInputRefs = useRef<Record<string, HTMLInputElement | null>>(
+    {},
+  );
   const imageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const previousPreviewUrlsRef = useRef<Record<string, string>>({});
 
   const GROUP_COLORS = [
-    { border: "border-l-blue-500", header: "bg-blue-50/60 dark:bg-blue-950/20", icon: "text-blue-600", badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-    { border: "border-l-purple-500", header: "bg-purple-50/60 dark:bg-purple-950/20", icon: "text-purple-600", badge: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" },
-    { border: "border-l-amber-500", header: "bg-amber-50/60 dark:bg-amber-950/20", icon: "text-amber-600", badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
-    { border: "border-l-emerald-500", header: "bg-emerald-50/60 dark:bg-emerald-950/20", icon: "text-emerald-600", badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
-    { border: "border-l-rose-500", header: "bg-rose-50/60 dark:bg-rose-950/20", icon: "text-rose-600", badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" },
-    { border: "border-l-cyan-500", header: "bg-cyan-50/60 dark:bg-cyan-950/20", icon: "text-cyan-600", badge: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300" },
+    {
+      border: "border-l-blue-500",
+      header: "bg-blue-50/60 dark:bg-blue-950/20",
+      icon: "text-blue-600",
+      badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+    },
+    {
+      border: "border-l-purple-500",
+      header: "bg-purple-50/60 dark:bg-purple-950/20",
+      icon: "text-purple-600",
+      badge:
+        "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+    },
+    {
+      border: "border-l-amber-500",
+      header: "bg-amber-50/60 dark:bg-amber-950/20",
+      icon: "text-amber-600",
+      badge:
+        "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+    },
+    {
+      border: "border-l-emerald-500",
+      header: "bg-emerald-50/60 dark:bg-emerald-950/20",
+      icon: "text-emerald-600",
+      badge:
+        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    },
+    {
+      border: "border-l-rose-500",
+      header: "bg-rose-50/60 dark:bg-rose-950/20",
+      icon: "text-rose-600",
+      badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+    },
+    {
+      border: "border-l-cyan-500",
+      header: "bg-cyan-50/60 dark:bg-cyan-950/20",
+      icon: "text-cyan-600",
+      badge: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
+    },
   ] as const;
 
   const { data: itemTypesData } = useInventoryItemTypes();
@@ -686,7 +779,10 @@ export default function ExcelImportRegular() {
   const { mutateAsync: downloadTemplate } = useDownloadPurchaseImportTemplate();
 
   const itemTypes = useMemo(() => itemTypesData ?? [], [itemTypesData]);
-  const targetGroups = useMemo(() => targetGroupsData ?? [], [targetGroupsData]);
+  const targetGroups = useMemo(
+    () => targetGroupsData ?? [],
+    [targetGroupsData],
+  );
 
   useEffect(() => {
     const nextPreviewUrls: Record<string, string> = {};
@@ -720,42 +816,57 @@ export default function ExcelImportRegular() {
   );
 
   const patchGroup = useCallback(
-    (id: string, patch: Partial<PurchaseGroup> | ((g: PurchaseGroup) => PurchaseGroup)) => {
+    (
+      id: string,
+      patch: Partial<PurchaseGroup> | ((g: PurchaseGroup) => PurchaseGroup),
+    ) => {
       setGroups((prev) =>
         prev.map((g) =>
-          g.id !== id ? g : typeof patch === "function" ? patch(g) : { ...g, ...patch },
+          g.id !== id
+            ? g
+            : typeof patch === "function"
+              ? patch(g)
+              : { ...g, ...patch },
         ),
       );
     },
     [],
   );
 
-  const validateRow = useCallback((row: Omit<ImportRow, "errors">): Record<string, string> => {
-    const errors: Record<string, string> = {};
-    if (!row.itemName) errors.itemName = "Tên vật phẩm không được trống";
-    if (!row.categoryCode) errors.categoryCode = "Danh mục không hợp lệ";
-    if (!row.quantity || row.quantity <= 0) errors.quantity = "Số lượng phải > 0";
-    if (row.unitPrice < 0) errors.unitPrice = "Đơn giá không hợp lệ";
-    if (!row.unit) errors.unit = "Đơn vị không được trống";
-    if (!row.itemType) errors.itemType = "Loại vật phẩm không được trống";
-    if (!row.targetGroups?.length) errors.targetGroups = "Đối tượng không được trống";
-    if (row.itemType === "Reusable" && !row.targetGroups?.includes("Rescuer"))
-      errors.targetGroups = "Đối với vật phẩm ‘Tái sử dụng’, đối tượng áp dụng là ‘Lực lượng cứu hộ’.";
-    if (!row.itemModelId && !row.imageFile && !row.imageUrl)
-      errors.imageUrl = "Vui lòng tải ảnh cho vật phẩm mới";
-    if (row.volumePerUnit === undefined)
-      errors.volumePerUnit = "Thể tích không được trống";
-    else if (row.volumePerUnit < 0)
-      errors.volumePerUnit = "Thể tích không được âm";
+  const validateRow = useCallback(
+    (row: Omit<ImportRow, "errors">): Record<string, string> => {
+      const errors: Record<string, string> = {};
+      if (!row.itemName) errors.itemName = "Tên vật phẩm không được trống";
+      if (!row.categoryCode) errors.categoryCode = "Danh mục không hợp lệ";
+      if (!row.quantity || row.quantity <= 0)
+        errors.quantity = "Số lượng phải > 0";
+      if (row.unitPrice < 0) errors.unitPrice = "Đơn giá không hợp lệ";
+      if (!row.unit) errors.unit = "Đơn vị không được trống";
+      if (!row.itemType) errors.itemType = "Loại vật phẩm không được trống";
+      if (!row.targetGroups?.length)
+        errors.targetGroups = "Đối tượng không được trống";
+      if (row.itemType === "Reusable" && !row.targetGroups?.includes("Rescuer"))
+        errors.targetGroups =
+          "Đối với vật phẩm ‘Tái sử dụng’, đối tượng áp dụng là ‘Lực lượng cứu hộ’.";
+      if (!row.itemModelId && !row.imageFile && !row.imageUrl)
+        errors.imageUrl = "Vui lòng tải ảnh cho vật phẩm mới";
+      if (row.volumePerUnit === undefined)
+        errors.volumePerUnit = "Thể tích không được trống";
+      else if (row.volumePerUnit < 0)
+        errors.volumePerUnit = "Thể tích không được âm";
 
-    if (row.weightPerUnit === undefined)
-      errors.weightPerUnit = "Cân nặng không được trống";
-    else if (row.weightPerUnit < 0)
-      errors.weightPerUnit = "Cân nặng không được âm";
-    if (!row.receivedDate) errors.receivedDate = "Ngày nhận không được trống";
-    else if (new Date(row.receivedDate) > new Date()) errors.receivedDate = "Ngày nhận không được là thời điểm trong tương lai";
-    return errors;
-  }, []);
+      if (row.weightPerUnit === undefined)
+        errors.weightPerUnit = "Cân nặng không được trống";
+      else if (row.weightPerUnit < 0)
+        errors.weightPerUnit = "Cân nặng không được âm";
+      if (!row.receivedDate) errors.receivedDate = "Ngày nhận không được trống";
+      else if (new Date(row.receivedDate) > new Date())
+        errors.receivedDate =
+          "Ngày nhận không được là thời điểm trong tương lai";
+      return errors;
+    },
+    [],
+  );
 
   const applyRowValidation = useCallback(
     (row: Omit<ImportRow, "errors">): ImportRow => ({
@@ -767,11 +878,18 @@ export default function ExcelImportRegular() {
 
   const handleVatFile = useCallback(
     async (groupId: string, file: File) => {
-      if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      if (
+        file.type !== "application/pdf" &&
+        !file.name.toLowerCase().endsWith(".pdf")
+      ) {
         toast.error("Chỉ chấp nhận file PDF");
         return;
       }
-      patchGroup(groupId, { vatFile: file, vatForm: { ...EMPTY_VAT_FORM }, vatParsing: true });
+      patchGroup(groupId, {
+        vatFile: file,
+        vatForm: { ...EMPTY_VAT_FORM },
+        vatParsing: true,
+      });
       try {
         const parsedFields = await parseVatPdf(file);
         patchGroup(groupId, (g) => ({
@@ -779,10 +897,13 @@ export default function ExcelImportRegular() {
           vatParsing: false,
           vatForm: {
             ...g.vatForm,
-            invoiceSerial: parsedFields.invoiceSerial ?? g.vatForm.invoiceSerial,
-            invoiceNumber: parsedFields.invoiceNumber ?? g.vatForm.invoiceNumber,
+            invoiceSerial:
+              parsedFields.invoiceSerial ?? g.vatForm.invoiceSerial,
+            invoiceNumber:
+              parsedFields.invoiceNumber ?? g.vatForm.invoiceNumber,
             supplierName: parsedFields.supplierName ?? g.vatForm.supplierName,
-            supplierTaxCode: parsedFields.supplierTaxCode ?? g.vatForm.supplierTaxCode,
+            supplierTaxCode:
+              parsedFields.supplierTaxCode ?? g.vatForm.supplierTaxCode,
             invoiceDate: parsedFields.invoiceDate ?? g.vatForm.invoiceDate,
             totalAmount: parsedFields.totalAmount ?? g.vatForm.totalAmount,
           },
@@ -791,11 +912,15 @@ export default function ExcelImportRegular() {
         if (filledCount > 0) {
           toast.success(`Đọc được ${filledCount}/6 trường từ PDF`);
         } else {
-          toast.warning("Không đọc được thông tin từ PDF. Vui lòng điền thủ công.");
+          toast.warning(
+            "Không đọc được thông tin từ PDF. Vui lòng điền thủ công.",
+          );
         }
       } catch {
         patchGroup(groupId, { vatParsing: false });
-        toast.warning("Không đọc được thông tin từ PDF. Vui lòng điền thủ công.");
+        toast.warning(
+          "Không đọc được thông tin từ PDF. Vui lòng điền thủ công.",
+        );
       }
     },
     [patchGroup],
@@ -803,14 +928,19 @@ export default function ExcelImportRegular() {
 
   const updateVatForm = useCallback(
     (groupId: string, field: keyof VatFormState, value: string) => {
-      patchGroup(groupId, (g) => ({ ...g, vatForm: { ...g.vatForm, [field]: value } }));
+      patchGroup(groupId, (g) => ({
+        ...g,
+        vatForm: { ...g.vatForm, [field]: value },
+      }));
     },
     [patchGroup],
   );
 
   const parseRowsFromSheet = useCallback(
     (jsonData: Record<string, unknown>[], offset = 0): ImportRow[] => {
-      const dataRows = jsonData.filter((raw) => String(raw[COL.TEN] ?? "").trim() !== "");
+      const dataRows = jsonData.filter(
+        (raw) => String(raw[COL.TEN] ?? "").trim() !== "",
+      );
       return dataRows.map((raw, idx) => {
         const rawCategory = String(raw[COL.DANHMUC] ?? "").trim();
         const categoryCode = matchCategoryCode(rawCategory);
@@ -821,26 +951,39 @@ export default function ExcelImportRegular() {
           .map((seg) => {
             const seg2 = seg.trim();
             if (!seg2) return null;
-            const parts = seg2.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
+            const parts = seg2
+              .split(/\s*-\s*/)
+              .map((p) => p.trim().toLowerCase());
             const matched = targetGroups.find((t) =>
-              parts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
+              parts.some(
+                (p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p,
+              ),
             );
             return matched?.key ?? seg2;
           })
           .filter((v): v is string => !!v);
 
         const rawItemType = String(raw[COL.LOAI] ?? "").trim();
-        const itParts = rawItemType.split(/\s*-\s*/).map((p) => p.trim().toLowerCase());
-        const matchedItemType = itemTypes.find(
-          (t) => itParts.some((p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p),
+        const itParts = rawItemType
+          .split(/\s*-\s*/)
+          .map((p) => p.trim().toLowerCase());
+        const matchedItemType = itemTypes.find((t) =>
+          itParts.some(
+            (p) => t.value.toLowerCase() === p || t.key.toLowerCase() === p,
+          ),
         );
         const itemType = matchedItemType?.key ?? rawItemType;
 
         // Auto-set targetGroups to ["Rescuer"] when item is Reusable
-        const targetGroupsFinal = itemType === "Reusable" ? ["Rescuer"] : targetGroupsValue;
+        const targetGroupsFinal =
+          itemType === "Reusable" ? ["Rescuer"] : targetGroupsValue;
 
-        const { cleanName: itemName, itemModelId } = parseItemName(String(raw[COL.TEN] ?? ""));
-        const imageUrl = itemModelId ? "" : extractImageUrlFromCell(raw[COL.ANH]);
+        const { cleanName: itemName, itemModelId } = parseItemName(
+          String(raw[COL.TEN] ?? ""),
+        );
+        const imageUrl = itemModelId
+          ? ""
+          : extractImageUrlFromCell(raw[COL.ANH]);
         const rowData = {
           id: `row-${offset + idx}-${Date.now()}`,
           row: offset + idx + 1,
@@ -850,8 +993,10 @@ export default function ExcelImportRegular() {
           targetGroups: targetGroupsFinal,
           itemType,
           unit: String(raw[COL.DONVI] ?? "").trim(),
-          quantity: Number(raw[COL.SOLUONG] ?? 0) > 0 ? Number(raw[COL.SOLUONG]) : 0,
-          unitPrice: Number(raw[COL.DONGIA] ?? 0) >= 0 ? Number(raw[COL.DONGIA]) : 0,
+          quantity:
+            Number(raw[COL.SOLUONG] ?? 0) > 0 ? Number(raw[COL.SOLUONG]) : 0,
+          unitPrice:
+            Number(raw[COL.DONGIA] ?? 0) >= 0 ? Number(raw[COL.DONGIA]) : 0,
           volumePerUnit: parseOptionalExcelNumber(raw[COL.THETICH]),
           weightPerUnit: parseOptionalExcelNumber(raw[COL.CANNANG]),
           expiredDate: parseExcelDate(raw[COL.HETHAN]),
@@ -885,7 +1030,10 @@ export default function ExcelImportRegular() {
             LEGACY_COLS,
             SHEET_COLS,
           );
-          if (jsonData.length === 0) { toast.error("File Excel không có dữ liệu"); return; }
+          if (jsonData.length === 0) {
+            toast.error("File Excel không có dữ liệu");
+            return;
+          }
 
           patchGroup(groupId, (g) => {
             const offset = append ? g.rows.length : 0;
@@ -897,7 +1045,11 @@ export default function ExcelImportRegular() {
           });
 
           if (!append) setStep("review");
-          toast.success(append ? `Đã thêm ${jsonData.length} dòng` : `Đọc ${jsonData.length} dòng thành công`);
+          toast.success(
+            append
+              ? `Đã thêm ${jsonData.length} dòng`
+              : `Đọc ${jsonData.length} dòng thành công`,
+          );
         } catch {
           toast.error("Không thể đọc file Excel.");
         }
@@ -908,7 +1060,12 @@ export default function ExcelImportRegular() {
   );
 
   const updateRow = useCallback(
-    (groupId: string, rowId: string, field: EditableField, value: string | number | string[] | undefined) => {
+    (
+      groupId: string,
+      rowId: string,
+      field: EditableField,
+      value: string | number | string[] | undefined,
+    ) => {
       patchGroup(groupId, (g) => ({
         ...g,
         rows: g.rows.map((r) => {
@@ -968,7 +1125,9 @@ export default function ExcelImportRegular() {
     (groupId: string, rowId: string) => {
       patchGroup(groupId, (g) => ({
         ...g,
-        rows: g.rows.filter((r) => r.id !== rowId).map((r, i) => ({ ...r, row: i + 1 })),
+        rows: g.rows
+          .filter((r) => r.id !== rowId)
+          .map((r, i) => ({ ...r, row: i + 1 })),
       }));
     },
     [patchGroup],
@@ -980,10 +1139,22 @@ export default function ExcelImportRegular() {
         const newRow: ImportRow = {
           id: `row-manual-${Date.now()}-${Math.random()}`,
           row: g.rows.length + 1,
-          itemModelId: undefined, itemName: "", categoryCode: "", targetGroups: [], itemType: "",
-          unit: "", quantity: 0, unitPrice: 0, volumePerUnit: undefined, weightPerUnit: undefined,
-          expiredDate: "", receivedDate: "", description: "",
-          imageUrl: "", imagePreviewUrl: "", imageFile: null,
+          itemModelId: undefined,
+          itemName: "",
+          categoryCode: "",
+          targetGroups: [],
+          itemType: "",
+          unit: "",
+          quantity: 0,
+          unitPrice: 0,
+          volumePerUnit: undefined,
+          weightPerUnit: undefined,
+          expiredDate: "",
+          receivedDate: "",
+          description: "",
+          imageUrl: "",
+          imagePreviewUrl: "",
+          imageFile: null,
           showErrors: false,
           errors: {},
         };
@@ -993,11 +1164,17 @@ export default function ExcelImportRegular() {
     [patchGroup, applyRowValidation],
   );
 
-  const addGroup = useCallback(() => setGroups((prev) => [...prev, createEmptyGroup()]), []);
+  const addGroup = useCallback(
+    () => setGroups((prev) => [...prev, createEmptyGroup()]),
+    [],
+  );
 
   const removeGroup = useCallback((id: string) => {
     setGroups((prev) => {
-      if (prev.length <= 1) { toast.error("Phải có ít nhất 1 hóa đơn"); return prev; }
+      if (prev.length <= 1) {
+        toast.error("Phải có ít nhất 1 hóa đơn");
+        return prev;
+      }
       return prev.filter((g) => g.id !== id);
     });
   }, []);
@@ -1005,7 +1182,6 @@ export default function ExcelImportRegular() {
   const handleReset = useCallback(() => {
     setStep("upload");
     setGroups([createEmptyGroup()]);
-    setAdvancedByName("");
   }, []);
 
   const handleDownloadTemplate = useCallback(async () => {
@@ -1025,51 +1201,82 @@ export default function ExcelImportRegular() {
     }
   }, [downloadTemplate]);
 
-  const totalRows = useMemo(() => groups.reduce((s, g) => s + g.rows.length, 0), [groups]);
+  const totalRows = useMemo(
+    () => groups.reduce((s, g) => s + g.rows.length, 0),
+    [groups],
+  );
   const totalErrors = useMemo(
-    () => groups.reduce((s, g) => s + g.rows.filter((r) => Object.keys(r.errors).length > 0).length, 0),
+    () =>
+      groups.reduce(
+        (s, g) =>
+          s + g.rows.filter((r) => Object.keys(r.errors).length > 0).length,
+        0,
+      ),
     [groups],
   );
   const isBusy = useMemo(() => groups.some((g) => g.vatParsing), [groups]);
 
   const handleSubmit = useCallback(async () => {
-    if (!advancedByName.trim()) { toast.error("Vui lòng nhập tên người ứng tiền"); return; }
-    if (totalRows === 0) { toast.error("Không có dữ liệu để nhập kho"); return; }
+    if (totalRows === 0) {
+      toast.error("Không có dữ liệu để nhập kho");
+      return;
+    }
 
     const validatedGroups = groups.map((group) => ({
       ...group,
-      rows: group.rows.map((row) => applyRowValidation({ ...row, showErrors: true })),
+      rows: group.rows.map((row) =>
+        applyRowValidation({ ...row, showErrors: true }),
+      ),
     }));
     const nextTotalErrors = validatedGroups.reduce(
       (sum, group) =>
-        sum + group.rows.filter((row) => Object.keys(row.errors).length > 0).length,
+        sum +
+        group.rows.filter((row) => Object.keys(row.errors).length > 0).length,
       0,
     );
 
     if (nextTotalErrors > 0) {
       setGroups(validatedGroups);
-      toast.error(`Còn ${nextTotalErrors} dòng lỗi. Vui lòng sửa trước khi nhập.`);
+      toast.error(
+        `Còn ${nextTotalErrors} dòng lỗi. Vui lòng sửa trước khi nhập.`,
+      );
       return;
     }
 
     for (const g of groups) {
       const idx = groups.indexOf(g) + 1;
-      if (!g.vatFile) { toast.error(`Hóa đơn #${idx} chưa chọn file PDF.`); return; }
+      if (!g.vatFile) {
+        toast.error(`Hóa đơn #${idx} chưa chọn file PDF.`);
+        return;
+      }
       const vatErrors: string[] = [];
       if (!g.vatForm.invoiceSerial.trim()) vatErrors.push("ký hiệu hóa đơn");
       if (!g.vatForm.invoiceNumber.trim()) vatErrors.push("số hóa đơn");
       if (!g.vatForm.supplierName.trim()) vatErrors.push("tên nhà cung cấp");
       if (!g.vatForm.supplierTaxCode.trim()) vatErrors.push("mã số thuế");
       if (!g.vatForm.invoiceDate.trim()) vatErrors.push("ngày hóa đơn");
-      else if (g.vatForm.invoiceDate > new Date().toISOString().slice(0, 10)) vatErrors.push("ngày hóa đơn (không được là tương lai)");
-      if (!g.vatForm.totalAmount.trim() || parseFloat(g.vatForm.totalAmount.replace(/[^\d.]/g, "")) <= 0) vatErrors.push("tổng tiền hóa đơn");
-      if (vatErrors.length > 0) { toast.error(`Hóa đơn #${idx}: Vui lòng điền đầy đủ thông tin (${vatErrors.join(", ")})`); return; }
+      else if (g.vatForm.invoiceDate > new Date().toISOString().slice(0, 10))
+        vatErrors.push("ngày hóa đơn (không được là tương lai)");
+      if (
+        !g.vatForm.totalAmount.trim() ||
+        parseFloat(g.vatForm.totalAmount.replace(/[^\d.]/g, "")) <= 0
+      )
+        vatErrors.push("tổng tiền hóa đơn");
+      if (vatErrors.length > 0) {
+        toast.error(
+          `Hóa đơn #${idx}: Vui lòng điền đầy đủ thông tin (${vatErrors.join(", ")})`,
+        );
+        return;
+      }
     }
 
     const imageUrlByRowKey = new Map<string, string>();
     groups.forEach((group) => {
       group.rows.forEach((row) => {
-        imageUrlByRowKey.set(`${group.id}:${row.id}`, row.imageUrl.trim() || "");
+        imageUrlByRowKey.set(
+          `${group.id}:${row.id}`,
+          row.imageUrl.trim() || "",
+        );
       });
     });
 
@@ -1094,7 +1301,9 @@ export default function ExcelImportRegular() {
           deferredImageCategoryCodes,
         );
       } catch {
-        toast.error("Không thể lấy dữ liệu kho trước khi nhập để đối chiếu ảnh.");
+        toast.error(
+          "Không thể lấy dữ liệu kho trước khi nhập để đối chiếu ảnh.",
+        );
         return;
       }
     }
@@ -1105,7 +1314,9 @@ export default function ExcelImportRegular() {
     );
     let fileUrls: string[];
     try {
-      fileUrls = await Promise.all(groups.map((g) => uploadRawToCloudinary(g.vatFile!)));
+      fileUrls = await Promise.all(
+        groups.map((g) => uploadRawToCloudinary(g.vatFile!)),
+      );
     } catch {
       setIsUploading(false);
       toast.dismiss(uploadToastId);
@@ -1116,7 +1327,6 @@ export default function ExcelImportRegular() {
     toast.dismiss(uploadToastId);
 
     const payload = {
-      ...(advancedByName.trim() ? { advancedByName: advancedByName.trim() } : {}),
       invoices: groups.map((g, i) => ({
         batchNote: g.batchNote.trim() || undefined,
         vatInvoice: {
@@ -1125,30 +1335,36 @@ export default function ExcelImportRegular() {
           supplierName: g.vatForm.supplierName.trim(),
           supplierTaxCode: g.vatForm.supplierTaxCode.trim(),
           invoiceDate: g.vatForm.invoiceDate,
-          totalAmount: parseFloat(g.vatForm.totalAmount.replace(/[^\d.]/g, "")) || 0,
+          totalAmount:
+            parseFloat(g.vatForm.totalAmount.replace(/[^\d.]/g, "")) || 0,
           fileUrl: fileUrls[i],
         } as VatInvoice,
-        items: g.rows.map((r) => ({
-          row: r.row,
-          ...(r.itemModelId ? { itemModelId: r.itemModelId } : {}),
-          itemName: r.itemName,
-          categoryCode: r.categoryCode,
-          imageUrl:
-            r.itemModelId || r.imageFile
-              ? null
-              : imageUrlByRowKey.get(`${g.id}:${r.id}`) || null,
-          quantity: r.quantity,
-          unitPrice: r.unitPrice,
-          unit: r.unit,
-          itemType: r.itemType,
-          targetGroups: r.targetGroups,
-          volumePerUnit: r.volumePerUnit ?? null,
-          weightPerUnit: r.weightPerUnit ?? null,
-          receivedDate: r.receivedDate ? new Date(r.receivedDate).toISOString() : r.receivedDate,
-          expiredDate: r.expiredDate || null,
-          description: r.description || null,
-        } as ImportPurchaseItem)),
-      }))
+        items: g.rows.map(
+          (r) =>
+            ({
+              row: r.row,
+              ...(r.itemModelId ? { itemModelId: r.itemModelId } : {}),
+              itemName: r.itemName,
+              categoryCode: r.categoryCode,
+              imageUrl:
+                r.itemModelId || r.imageFile
+                  ? null
+                  : imageUrlByRowKey.get(`${g.id}:${r.id}`) || null,
+              quantity: r.quantity,
+              unitPrice: r.unitPrice,
+              unit: r.unit,
+              itemType: r.itemType,
+              targetGroups: r.targetGroups,
+              volumePerUnit: r.volumePerUnit ?? null,
+              weightPerUnit: r.weightPerUnit ?? null,
+              receivedDate: r.receivedDate
+                ? new Date(r.receivedDate).toISOString()
+                : r.receivedDate,
+              expiredDate: r.expiredDate || null,
+              description: r.description || null,
+            }) as ImportPurchaseItem,
+        ),
+      })),
     };
 
     try {
@@ -1176,7 +1392,8 @@ export default function ExcelImportRegular() {
             })),
             beforeImportItems,
             afterImportItems,
-            (categoryCode) => CATEGORY_NAME_BY_CODE[categoryCode] ?? categoryCode,
+            (categoryCode) =>
+              CATEGORY_NAME_BY_CODE[categoryCode] ?? categoryCode,
           );
 
           const uploadedImages = await Promise.all(
@@ -1255,9 +1472,11 @@ export default function ExcelImportRegular() {
       }
       router.push("/dashboard/inventory");
     } catch (err: any) {
-      toast.error(`Nhập kho thất bại: ${err.response?.data?.message || err.message || "Lỗi không xác định"}`);
+      toast.error(
+        `Nhập kho thất bại: ${err.response?.data?.message || err.message || "Lỗi không xác định"}`,
+      );
     }
-  }, [advancedByName, applyRowValidation, groups, totalRows, importMutation, router]);
+  }, [applyRowValidation, groups, totalRows, importMutation, router]);
 
   const itemTypeOptions = useMemo(
     () => itemTypes.map((t) => ({ label: t.value, value: t.key })),
@@ -1277,7 +1496,7 @@ export default function ExcelImportRegular() {
   ) => {
     const error = row.errors[field];
     const rawValue = row[field];
-    const value = type === "number" ? (rawValue || "") : String(rawValue ?? "");
+    const value = type === "number" ? rawValue || "" : String(rawValue ?? "");
     return (
       <div className="space-y-1">
         <div className="relative">
@@ -1286,10 +1505,18 @@ export default function ExcelImportRegular() {
             min={type === "number" ? 0 : undefined}
             value={value}
             onChange={(e) =>
-              updateRow(groupId, row.id, field, type === "number" ? Number(e.target.value) : e.target.value)
+              updateRow(
+                groupId,
+                row.id,
+                field,
+                type === "number" ? Number(e.target.value) : e.target.value,
+              )
             }
             placeholder={placeholder}
-            className={cn("h-8 text-sm", error && "border-red-500 focus-visible:ring-red-500")}
+            className={cn(
+              "h-8 text-sm",
+              error && "border-red-500 focus-visible:ring-red-500",
+            )}
           />
           {error && (
             <WarningCircle
@@ -1298,7 +1525,11 @@ export default function ExcelImportRegular() {
             />
           )}
         </div>
-        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
+        {error && (
+          <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">
+            {error}
+          </p>
+        )}
       </div>
     );
   };
@@ -1314,17 +1545,26 @@ export default function ExcelImportRegular() {
     const currentValue = String(row[field] ?? "");
     return (
       <div className="space-y-1">
-        <Select value={currentValue} onValueChange={(val) => updateRow(groupId, row.id, field, val)}>
+        <Select
+          value={currentValue}
+          onValueChange={(val) => updateRow(groupId, row.id, field, val)}
+        >
           <SelectTrigger className={cn("text-sm", error && "border-red-500")}>
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
             {options.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
+        {error && (
+          <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">
+            {error}
+          </p>
+        )}
       </div>
     );
   };
@@ -1340,7 +1580,9 @@ export default function ExcelImportRegular() {
     const labelText =
       selected.length === 0
         ? placeholder
-        : selected.map((v) => options.find((o) => o.value === v)?.label ?? v).join(", ");
+        : selected
+            .map((v) => options.find((o) => o.value === v)?.label ?? v)
+            .join(", ");
     return (
       <div className="space-y-1">
         <Popover>
@@ -1358,7 +1600,11 @@ export default function ExcelImportRegular() {
               <CaretDown className="h-3.5 w-3.5 shrink-0 opacity-50 ml-1" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="p-1 w-48" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+          <PopoverContent
+            className="p-1 w-48"
+            align="start"
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
             {options.map((opt) => {
               const checked = selected.includes(opt.value);
               return (
@@ -1389,7 +1635,11 @@ export default function ExcelImportRegular() {
             })}
           </PopoverContent>
         </Popover>
-        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
+        {error && (
+          <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">
+            {error}
+          </p>
+        )}
       </div>
     );
   };
@@ -1409,11 +1659,21 @@ export default function ExcelImportRegular() {
             inputMode="numeric"
             value={rawValue > 0 ? formatMoney(rawValue) : ""}
             onChange={(e) => {
-              const stripped = e.target.value.replace(/\./g, "").replace(/[^\d]/g, "");
-              updateRow(groupId, row.id, field, stripped ? parseInt(stripped, 10) : 0);
+              const stripped = e.target.value
+                .replace(/\./g, "")
+                .replace(/[^\d]/g, "");
+              updateRow(
+                groupId,
+                row.id,
+                field,
+                stripped ? parseInt(stripped, 10) : 0,
+              );
             }}
             placeholder="0"
-            className={cn("h-8 text-sm", error && "border-red-500 focus-visible:ring-red-500")}
+            className={cn(
+              "h-8 text-sm",
+              error && "border-red-500 focus-visible:ring-red-500",
+            )}
           />
           {error && (
             <WarningCircle
@@ -1422,7 +1682,11 @@ export default function ExcelImportRegular() {
             />
           )}
         </div>
-        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
+        {error && (
+          <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">
+            {error}
+          </p>
+        )}
       </div>
     );
   };
@@ -1446,10 +1710,18 @@ export default function ExcelImportRegular() {
             value={rawValue ?? ""}
             onChange={(e) => {
               const val = e.target.value;
-              updateRow(groupId, row.id, field, val === "" ? undefined : parseFloat(val));
+              updateRow(
+                groupId,
+                row.id,
+                field,
+                val === "" ? undefined : parseFloat(val),
+              );
             }}
             placeholder={placeholder}
-            className={cn("h-8 text-sm", error && "border-red-500 focus-visible:ring-red-500")}
+            className={cn(
+              "h-8 text-sm",
+              error && "border-red-500 focus-visible:ring-red-500",
+            )}
           />
           {error && (
             <WarningCircle
@@ -1458,7 +1730,11 @@ export default function ExcelImportRegular() {
             />
           )}
         </div>
-        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
+        {error && (
+          <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">
+            {error}
+          </p>
+        )}
       </div>
     );
   };
@@ -1521,7 +1797,6 @@ export default function ExcelImportRegular() {
                 })
               }
             >
-
               <span className="inline-flex items-center justify-center rounded-md bg-emerald-50 p-1 text-emerald-700">
                 <Eye className="h-3.5 w-3.5" weight="bold" />
               </span>
@@ -1538,7 +1813,11 @@ export default function ExcelImportRegular() {
           </div>
         ) : null}
 
-        {error && <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{error}</p>}
+        {error && (
+          <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">
+            {error}
+          </p>
+        )}
       </div>
     );
   };
@@ -1571,17 +1850,32 @@ export default function ExcelImportRegular() {
         placeholder={placeholder}
         className={cn(
           "h-8 text-sm",
-          type === "date" && "pr-2 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer",
-          hasFile && required && !vatForm[key].trim() && "border-red-400 focus-visible:ring-red-400",
-          hasFile && type === "date" && vatForm[key] && vatForm[key] > new Date().toISOString().slice(0, 10) && "border-red-400 focus-visible:ring-red-400",
+          type === "date" &&
+            "pr-2 [&::-webkit-calendar-picker-indicator]:ml-auto [&::-webkit-calendar-picker-indicator]:cursor-pointer",
+          hasFile &&
+            required &&
+            !vatForm[key].trim() &&
+            "border-red-400 focus-visible:ring-red-400",
+          hasFile &&
+            type === "date" &&
+            vatForm[key] &&
+            vatForm[key] > new Date().toISOString().slice(0, 10) &&
+            "border-red-400 focus-visible:ring-red-400",
         )}
       />
       {hasFile && required && !vatForm[key].trim() && (
-        <p className="text-[11px] tracking-tighter text-red-500">Không được phép để trống</p>
+        <p className="text-[11px] tracking-tighter text-red-500">
+          Không được phép để trống
+        </p>
       )}
-      {hasFile && type === "date" && vatForm[key] && vatForm[key] > new Date().toISOString().slice(0, 10) && (
-        <p className="text-[11px] tracking-tighter text-red-500">Ngày không được là ngày trong tương lai</p>
-      )}
+      {hasFile &&
+        type === "date" &&
+        vatForm[key] &&
+        vatForm[key] > new Date().toISOString().slice(0, 10) && (
+          <p className="text-[11px] tracking-tighter text-red-500">
+            Ngày không được là ngày trong tương lai
+          </p>
+        )}
     </div>
   );
 
@@ -1608,7 +1902,9 @@ export default function ExcelImportRegular() {
                 <Package className="h-5 w-5 text-blue-600" weight="duotone" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold tracking-tighter">Nhập kho thường</h1>
+                <h1 className="text-xl font-semibold tracking-tighter">
+                  Nhập kho thường
+                </h1>
                 <p className="text-sm tracking-tighter text-muted-foreground">
                   Nhập hàng hóa mua sắm kèm hóa đơn đỏ VAT
                 </p>
@@ -1616,7 +1912,12 @@ export default function ExcelImportRegular() {
             </div>
           </div>
           {step === "upload" && (
-            <Button variant="outline" size="sm" className="gap-2 tracking-tighter" onClick={handleDownloadTemplate}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 tracking-tighter"
+              onClick={handleDownloadTemplate}
+            >
               <DownloadSimple className="h-4 w-4" />
               Tải file mẫu Excel
             </Button>
@@ -1626,341 +1927,63 @@ export default function ExcelImportRegular() {
 
       <div className="flex-1 overflow-auto bg-muted/30 p-6">
         <AnimatePresence mode="wait">
-        {step === "upload" && (
-          <motion.div
-            key="upload"
-            className="max-w-7xl mx-auto space-y-5"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.32, ease: "easeOut" }}
-          >
-            {groups.map((group, idx) => {
-              const color = GROUP_COLORS[idx % GROUP_COLORS.length];
-              return (
-                <motion.div
-                  key={group.id}
-                  className={cn("rounded-xl border bg-card overflow-hidden border-l-4", color.border)}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: idx * 0.07, ease: "easeOut" }}
-                >
-                  <div className={cn("flex items-center justify-between px-5 py-3 border-b", color.header)}>
-                    <div className="flex items-center gap-2 tracking-tighter">
-                      <Receipt className={cn("h-4 w-4", color.icon)} weight="duotone" />
-                      <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full tracking-tighter", color.badge)}>Hóa đơn #{idx + 1}</span>
-                      {group.vatFile && !group.vatParsing && <CheckCircle className="h-3.5 w-3.5 text-green-500" weight="fill" />}
-                      {group.rows.length > 0 && (
-                        <span className="text-xs tracking-tighter text-muted-foreground">· {group.rows.length} vật phẩm</span>
-                      )}
-                    </div>
-                    {groups.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-red-500"
-                        onClick={() => removeGroup(group.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+          {step === "upload" && (
+            <motion.div
+              key="upload"
+              className="max-w-7xl mx-auto space-y-5"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.32, ease: "easeOut" }}
+            >
+              {groups.map((group, idx) => {
+                const color = GROUP_COLORS[idx % GROUP_COLORS.length];
+                return (
+                  <motion.div
+                    key={group.id}
+                    className={cn(
+                      "rounded-xl border bg-card overflow-hidden border-l-4",
+                      color.border,
                     )}
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-5">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-1">
-                        <p className="text-sm font-medium tracking-tighter">Hóa đơn đỏ VAT</p>
-                        <span className="text-xs text-red-500 ml-0.5">*</span>
-                      </div>
-                      {!group.vatFile ? (
-                        <div
-                          onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleVatFile(group.id, f); }}
-                          onDragOver={(e) => e.preventDefault()}
-                          onClick={() => vatInputRefs.current[group.id]?.click()}
-                          className="border-2 border-dashed border-muted-foreground/25 rounded-xl py-8 flex flex-col items-center gap-3 text-muted-foreground hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-950/10 transition-all cursor-pointer"
-                        >
-                          <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center">
-                            <FilePdf className="h-7 w-7" weight="duotone" />
-                          </div>
-                          <div className="text-center">
-                            <p className="font-semibold text-sm tracking-tighter">Kéo thả hoặc nhấp để tải PDF</p>
-                            <p className="text-xs tracking-tighter mt-0.5">Chỉ chấp nhận file PDF</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted border">
-                            <FilePdf className="h-5 w-5 text-red-500 shrink-0" weight="duotone" />
-                            <p className="flex-1 text-sm tracking-tighter font-medium truncate">{group.vatFile.name}</p>
-                            {group.vatParsing ? (
-                              <SpinnerGap className="h-4 w-4 text-blue-500 animate-spin shrink-0" />
-                            ) : (
-                              <CheckCircle className="h-4 w-4 text-green-500 shrink-0" weight="fill" />
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0"
-                              onClick={() => patchGroup(group.id, { vatFile: null, vatForm: { ...EMPTY_VAT_FORM } })}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                          {group.vatParsing && (
-                            <p className="text-xs tracking-tighter text-blue-600 flex items-center gap-1.5">
-                              <SpinnerGap className="h-3.5 w-3.5 animate-spin" />
-                              Đang đọc thông tin từ PDF...
-                            </p>
-                          )}
-                          {!group.vatParsing && group.vatFile && (
-                            <p className="text-xs tracking-tighter text-green-600 flex items-center gap-1.5">
-                              <CheckCircle className="h-3.5 w-3.5" weight="fill" />
-                              PDF sẵn sàng. Kiểm tra và chỉnh sửa các trường bên dưới nếu cần.
-                            </p>
-                          )}
-                          {!group.vatParsing && (
-                            <div className="grid grid-cols-2 gap-3 tracking-tighter">
-                              {vatField(group.id, group.vatForm, !!group.vatFile, "Ký hiệu", "invoiceSerial", "VD: AA/26E", "text", true)}
-                              {vatField(group.id, group.vatForm, !!group.vatFile, "Số hóa đơn", "invoiceNumber", "VD: 0000123", "text", true)}
-                              <div className="col-span-2">
-                                {vatField(group.id, group.vatForm, !!group.vatFile, "Tên nhà cung cấp", "supplierName", "Tên đơn vị bán hàng", "text", true)}
-                              </div>
-                              {vatField(group.id, group.vatForm, !!group.vatFile, "Mã số thuế", "supplierTaxCode", "VD: 0123456789", "text", true)}
-                              {vatField(group.id, group.vatForm, !!group.vatFile, "Ngày hóa đơn", "invoiceDate", "", "date", true)}
-                              {vatField(group.id, group.vatForm, !!group.vatFile, "Tổng tiền (VNĐ)", "totalAmount", "VD: 5.000.000", "number", true, true)}
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="gap-1.5 text-muted-foreground tracking-tighter flex-1 justify-center"
-                              onClick={() => openPdfPreview(group.vatFile!)}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Xem PDF
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="gap-1.5 text-muted-foreground tracking-tighter flex-1 justify-center"
-                              onClick={() => vatInputRefs.current[group.id]?.click()}
-                            >
-                              <UploadSimple className="h-3.5 w-3.5" />
-                              Đổi file PDF
-                            </Button>
-                          </div>
-                        </div>
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: idx * 0.07,
+                      ease: "easeOut",
+                    }}
+                  >
+                    <div
+                      className={cn(
+                        "flex items-center justify-between px-5 py-3 border-b",
+                        color.header,
                       )}
-                      <input
-                        ref={(el) => { vatInputRefs.current[group.id] = el; }}
-                        type="file"
-                        accept="application/pdf,.pdf"
-                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVatFile(group.id, f); e.target.value = ""; }}
-                        className="hidden"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-4">
-                      {group.fileName ? (
-                        <div className="flex-1 border rounded-xl p-4 bg-muted/30 flex flex-col gap-3">
-                          <div className="flex items-center gap-2">
-                            <FileXls className="h-5 w-5 text-green-600 shrink-0" weight="duotone" />
-                            <span className="text-sm font-medium tracking-tighter flex-1 truncate">{group.fileName}</span>
-                            <span className="text-xs text-muted-foreground shrink-0">{group.rows.length} dòng</span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-red-500"
-                              onClick={() => patchGroup(group.id, { rows: [], fileName: "" })}
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 w-full tracking-tighter"
-                            onClick={() => fileInputRefs.current[group.id]?.click()}
-                          >
-                            <UploadSimple className="h-3.5 w-3.5" />
-                            Đổi file Excel
-                          </Button>
-                        </div>
-                      ) : (
-                        <div
-                          onDrop={(e) => { e.preventDefault(); setDraggingId(null); const f = e.dataTransfer.files[0]; if (f) parseExcelForGroup(group.id, f); }}
-                          onDragOver={(e) => { e.preventDefault(); setDraggingId(group.id); }}
-                          onDragLeave={() => setDraggingId(null)}
-                          onClick={() => fileInputRefs.current[group.id]?.click()}
+                    >
+                      <div className="flex items-center gap-2 tracking-tighter">
+                        <Receipt
+                          className={cn("h-4 w-4", color.icon)}
+                          weight="duotone"
+                        />
+                        <span
                           className={cn(
-                            "flex-1 border-2 border-dashed rounded-xl p-10 flex items-center justify-center cursor-pointer transition-all duration-200 min-h-48",
-                            draggingId === group.id
-                              ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
-                              : "border-muted-foreground/25 hover:border-blue-400/60 hover:bg-muted/50",
+                            "text-xs font-semibold px-2 py-0.5 rounded-full tracking-tighter",
+                            color.badge,
                           )}
                         >
-                          <div className="flex flex-col items-center gap-3 text-center">
-                            <div className={cn(
-                              "h-16 w-16 rounded-2xl flex items-center justify-center transition-colors",
-                              draggingId === group.id ? "bg-blue-500/15 text-blue-600" : "bg-muted text-muted-foreground",
-                            )}>
-                              <UploadSimple className="h-8 w-8" weight="duotone" />
-                            </div>
-                            <div className="text-muted-foreground">
-                              <p className="font-semibold text-sm tracking-tighter">Kéo thả file Excel</p>
-                              <p className="text-xs tracking-tighter mt-0.5">hoặc <span className="text-blue-600 font-medium underline underline-offset-2">nhấp để chọn</span></p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      <input
-                        ref={(el) => { fileInputRefs.current[group.id] = el; }}
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={(e) => { const f = e.target.files?.[0]; if (f) parseExcelForGroup(group.id, f); e.target.value = ""; }}
-                        className="hidden"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => { patchGroup(group.id, { rows: [], fileName: "" }); setStep("review"); }}
-                        className="rounded-xl border-2 border-dashed border-muted-foreground/25 py-4 flex items-center justify-center gap-2 text-muted-foreground hover:border-blue-400/60 hover:text-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-950/10 transition-all"
-                      >
-                        <PencilSimple className="h-5 w-5" weight="duotone" />
-                        <span className="text-sm font-medium tracking-tighter">Nhập thủ công</span>
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-full flex items-center gap-1 rounded-xl border bg-card px-5 py-3">
-                <label className="shrink-0 text-sm font-medium tracking-tighter text-foreground">
-                  Người ứng tiền
-                </label>
-                <span className="text-red-500 text-sm leading-none">*</span>
-                <div className="relative group shrink-0">
-                  <WarningCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" weight="fill" />
-                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 rounded-lg border bg-popover px-3 py-2 text-xs tracking-tighter text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50">
-                    Nhiều người dùng dấu phẩy (,) để phân cách. <br />vd: Nguyễn Văn A, Trần Thị B
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  value={advancedByName}
-                  onChange={(e) => setAdvancedByName(e.target.value)}
-                  placeholder="Nguyễn Văn A, Trần Thị B..."
-                  className="flex-1 bg-transparent text-sm tracking-tighter outline-none placeholder:text-muted-foreground"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={addGroup}
-                className="w-full rounded-xl border-2 border-dashed border-muted-foreground/25 py-4 flex items-center justify-center gap-2 text-muted-foreground hover:border-blue-400/60 hover:text-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-950/10 transition-all"
-              >
-                <Plus className="h-5 w-5" />
-                <span className="text-sm font-medium tracking-tighter">Thêm hóa đơn</span>
-              </button>
-              {totalRows > 0 && (
-                <Button
-                  size="sm"
-                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6"
-                  onClick={() => setStep("review")}
-                >
-                  Xem lại & Xác nhận
-                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/20 text-xs">{totalRows}</span>
-                </Button>
-              )}
-            </div>
-
-            <div className="rounded-xl border bg-card px-5 py-4">
-              <p className="text-sm font-medium mb-3 tracking-tighter text-muted-foreground">Các cột trong file Excel:</p>
-              <div className="flex flex-wrap gap-2">
-                {Object.values(COL).map((col) => (
-                  <span key={col} className="px-2.5 py-1 rounded-md bg-muted border text-xs font-mono">{col}</span>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {step === "review" && (
-          <motion.div
-            key="review"
-            className="space-y-5 flex flex-col"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.32, ease: "easeOut" }}
-          >
-            <div className="flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs tracking-tighter font-medium">
-                  <CheckCircle className="h-3.5 w-3.5" weight="fill" />
-                  {totalRows - totalErrors} hợp lệ
-                </div>
-                {totalErrors > 0 && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 text-xs tracking-tighter font-medium">
-                    <WarningCircle className="h-3.5 w-3.5" weight="fill" />
-                    {totalErrors} lỗi
-                  </div>
-                )}
-                <span className="text-xs tracking-tighter text-muted-foreground">{groups.length} hóa đơn · {totalRows} vật phẩm</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5 tracking-tighter" onClick={addGroup}>
-                  <Plus className="h-4 w-4" />
-                  Thêm hóa đơn
-                </Button>
-                <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground tracking-tighter" onClick={handleReset}>
-                  <ArrowCounterClockwise className="h-4 w-4" />
-                  Nhập lại
-                </Button>
-              </div>
-            </div>
-
-            {groups.map((group, idx) => {
-              const color = GROUP_COLORS[idx % GROUP_COLORS.length];
-              const groupErrors = group.rows.filter((r) => Object.keys(r.errors).length > 0).length;
-              const groupValid = group.rows.length - groupErrors;
-              return (
-                <div key={group.id} className={cn("rounded-xl border bg-card overflow-hidden border-l-4", color.border)}>
-                  <div className={cn("flex items-center justify-between px-5 py-3 border-b", color.header)}>
-                    <div className="flex items-center tracking-tighter gap-2">
-                      <Receipt className={cn("h-4 w-4", color.icon)} weight="duotone" />
-                      <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full tracking-tighter", color.badge)}>Hóa đơn #{idx + 1}</span>
-                      {group.fileName && <span className="text-xs tracking-tighter text-muted-foreground">· {group.fileName}</span>}
-                      <span className="text-xs tracking-tighter text-green-600 font-medium ml-1">{groupValid} hợp lệ</span>
-                      {groupErrors > 0 && <span className="text-xs tracking-tighter text-red-500 font-medium">· {groupErrors} lỗi</span>}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1 text-xs h-7 px-2 text-muted-foreground tracking-tighter"
-                        onClick={() => excelReviewInputRefs.current[group.id]?.click()}
-                      >
-                        <FileXls className="h-3.5 w-3.5" />
-                        Nhập từ Excel
-                      </Button>
-                      <input
-                        ref={(el) => { excelReviewInputRefs.current[group.id] = el; }}
-                        type="file"
-                        accept=".xlsx,.xls"
-                        onChange={(e) => { const f = e.target.files?.[0]; if (f) parseExcelForGroup(group.id, f, true); e.target.value = ""; }}
-                        className="hidden"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1 text-xs h-7 px-2 text-muted-foreground tracking-tighter"
-                        onClick={() => addRow(group.id)}
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        Thêm dòng
-                      </Button>
+                          Hóa đơn #{idx + 1}
+                        </span>
+                        {group.vatFile && !group.vatParsing && (
+                          <CheckCircle
+                            className="h-3.5 w-3.5 text-green-500"
+                            weight="fill"
+                          />
+                        )}
+                        {group.rows.length > 0 && (
+                          <span className="text-xs tracking-tighter text-muted-foreground">
+                            · {group.rows.length} vật phẩm
+                          </span>
+                        )}
+                      </div>
                       {groups.length > 1 && (
                         <Button
                           variant="ghost"
@@ -1972,241 +1995,973 @@ export default function ExcelImportRegular() {
                         </Button>
                       )}
                     </div>
-                  </div>
 
-                  <div className="px-5 py-4 border-b space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Receipt className={cn("h-4 w-4", color.icon)} weight="duotone" />
-                      <p className="text-sm tracking-tighter font-medium">Thông tin hóa đơn VAT</p>
-                      {!group.vatFile && <span className="text-xs tracking-tighter text-red-500">(chưa chọn PDF)</span>}
-                      {group.vatFile && <CheckCircle className="h-3.5 w-3.5 text-green-500" weight="fill" />}
-                      {group.vatFile && (
-                        <span className="text-xs tracking-tighter text-muted-foreground truncate max-w-48 ml-1">{group.vatFile.name}</span>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-5">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-1">
+                          <p className="text-sm font-medium tracking-tighter">
+                            Hóa đơn đỏ VAT
+                          </p>
+                          <span className="text-xs text-red-500 ml-0.5">*</span>
+                        </div>
+                        {!group.vatFile ? (
+                          <div
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              const f = e.dataTransfer.files[0];
+                              if (f) handleVatFile(group.id, f);
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onClick={() =>
+                              vatInputRefs.current[group.id]?.click()
+                            }
+                            className="border-2 border-dashed border-muted-foreground/25 rounded-xl py-8 flex flex-col items-center gap-3 text-muted-foreground hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-950/10 transition-all cursor-pointer"
+                          >
+                            <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center">
+                              <FilePdf className="h-7 w-7" weight="duotone" />
+                            </div>
+                            <div className="text-center">
+                              <p className="font-semibold text-sm tracking-tighter">
+                                Kéo thả hoặc nhấp để tải PDF
+                              </p>
+                              <p className="text-xs tracking-tighter mt-0.5">
+                                Chỉ chấp nhận file PDF
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted border">
+                              <FilePdf
+                                className="h-5 w-5 text-red-500 shrink-0"
+                                weight="duotone"
+                              />
+                              <p className="flex-1 text-sm tracking-tighter font-medium truncate">
+                                {group.vatFile.name}
+                              </p>
+                              {group.vatParsing ? (
+                                <SpinnerGap className="h-4 w-4 text-blue-500 animate-spin shrink-0" />
+                              ) : (
+                                <CheckCircle
+                                  className="h-4 w-4 text-green-500 shrink-0"
+                                  weight="fill"
+                                />
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0"
+                                onClick={() =>
+                                  patchGroup(group.id, {
+                                    vatFile: null,
+                                    vatForm: { ...EMPTY_VAT_FORM },
+                                  })
+                                }
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                            {group.vatParsing && (
+                              <p className="text-xs tracking-tighter text-blue-600 flex items-center gap-1.5">
+                                <SpinnerGap className="h-3.5 w-3.5 animate-spin" />
+                                Đang đọc thông tin từ PDF...
+                              </p>
+                            )}
+                            {!group.vatParsing && group.vatFile && (
+                              <p className="text-xs tracking-tighter text-green-600 flex items-center gap-1.5">
+                                <CheckCircle
+                                  className="h-3.5 w-3.5"
+                                  weight="fill"
+                                />
+                                PDF sẵn sàng. Kiểm tra và chỉnh sửa các trường
+                                bên dưới nếu cần.
+                              </p>
+                            )}
+                            {!group.vatParsing && (
+                              <div className="grid grid-cols-2 gap-3 tracking-tighter">
+                                {vatField(
+                                  group.id,
+                                  group.vatForm,
+                                  !!group.vatFile,
+                                  "Ký hiệu",
+                                  "invoiceSerial",
+                                  "VD: AA/26E",
+                                  "text",
+                                  true,
+                                )}
+                                {vatField(
+                                  group.id,
+                                  group.vatForm,
+                                  !!group.vatFile,
+                                  "Số hóa đơn",
+                                  "invoiceNumber",
+                                  "VD: 0000123",
+                                  "text",
+                                  true,
+                                )}
+                                <div className="col-span-2">
+                                  {vatField(
+                                    group.id,
+                                    group.vatForm,
+                                    !!group.vatFile,
+                                    "Tên nhà cung cấp",
+                                    "supplierName",
+                                    "Tên đơn vị bán hàng",
+                                    "text",
+                                    true,
+                                  )}
+                                </div>
+                                {vatField(
+                                  group.id,
+                                  group.vatForm,
+                                  !!group.vatFile,
+                                  "Mã số thuế",
+                                  "supplierTaxCode",
+                                  "VD: 0123456789",
+                                  "text",
+                                  true,
+                                )}
+                                {vatField(
+                                  group.id,
+                                  group.vatForm,
+                                  !!group.vatFile,
+                                  "Ngày hóa đơn",
+                                  "invoiceDate",
+                                  "",
+                                  "date",
+                                  true,
+                                )}
+                                {vatField(
+                                  group.id,
+                                  group.vatForm,
+                                  !!group.vatFile,
+                                  "Tổng tiền (VNĐ)",
+                                  "totalAmount",
+                                  "VD: 5.000.000",
+                                  "number",
+                                  true,
+                                  true,
+                                )}
+                              </div>
+                            )}
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-muted-foreground tracking-tighter flex-1 justify-center"
+                                onClick={() => openPdfPreview(group.vatFile!)}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                Xem PDF
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-muted-foreground tracking-tighter flex-1 justify-center"
+                                onClick={() =>
+                                  vatInputRefs.current[group.id]?.click()
+                                }
+                              >
+                                <UploadSimple className="h-3.5 w-3.5" />
+                                Đổi file PDF
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        <input
+                          ref={(el) => {
+                            vatInputRefs.current[group.id] = el;
+                          }}
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleVatFile(group.id, f);
+                            e.target.value = "";
+                          }}
+                          className="hidden"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-4">
+                        {group.fileName ? (
+                          <div className="flex-1 border rounded-xl p-4 bg-muted/30 flex flex-col gap-3">
+                            <div className="flex items-center gap-2">
+                              <FileXls
+                                className="h-5 w-5 text-green-600 shrink-0"
+                                weight="duotone"
+                              />
+                              <span className="text-sm font-medium tracking-tighter flex-1 truncate">
+                                {group.fileName}
+                              </span>
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                {group.rows.length} dòng
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-red-500"
+                                onClick={() =>
+                                  patchGroup(group.id, {
+                                    rows: [],
+                                    fileName: "",
+                                  })
+                                }
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 w-full tracking-tighter"
+                              onClick={() =>
+                                fileInputRefs.current[group.id]?.click()
+                              }
+                            >
+                              <UploadSimple className="h-3.5 w-3.5" />
+                              Đổi file Excel
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setDraggingId(null);
+                              const f = e.dataTransfer.files[0];
+                              if (f) parseExcelForGroup(group.id, f);
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setDraggingId(group.id);
+                            }}
+                            onDragLeave={() => setDraggingId(null)}
+                            onClick={() =>
+                              fileInputRefs.current[group.id]?.click()
+                            }
+                            className={cn(
+                              "flex-1 border-2 border-dashed rounded-xl p-10 flex items-center justify-center cursor-pointer transition-all duration-200 min-h-48",
+                              draggingId === group.id
+                                ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+                                : "border-muted-foreground/25 hover:border-blue-400/60 hover:bg-muted/50",
+                            )}
+                          >
+                            <div className="flex flex-col items-center gap-3 text-center">
+                              <div
+                                className={cn(
+                                  "h-16 w-16 rounded-2xl flex items-center justify-center transition-colors",
+                                  draggingId === group.id
+                                    ? "bg-blue-500/15 text-blue-600"
+                                    : "bg-muted text-muted-foreground",
+                                )}
+                              >
+                                <UploadSimple
+                                  className="h-8 w-8"
+                                  weight="duotone"
+                                />
+                              </div>
+                              <div className="text-muted-foreground">
+                                <p className="font-semibold text-sm tracking-tighter">
+                                  Kéo thả file Excel
+                                </p>
+                                <p className="text-xs tracking-tighter mt-0.5">
+                                  hoặc{" "}
+                                  <span className="text-blue-600 font-medium underline underline-offset-2">
+                                    nhấp để chọn
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <input
+                          ref={(el) => {
+                            fileInputRefs.current[group.id] = el;
+                          }}
+                          type="file"
+                          accept=".xlsx,.xls"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) parseExcelForGroup(group.id, f);
+                            e.target.value = "";
+                          }}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            patchGroup(group.id, { rows: [], fileName: "" });
+                            setStep("review");
+                          }}
+                          className="rounded-xl border-2 border-dashed border-muted-foreground/25 py-4 flex items-center justify-center gap-2 text-muted-foreground hover:border-blue-400/60 hover:text-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-950/10 transition-all"
+                        >
+                          <PencilSimple className="h-5 w-5" weight="duotone" />
+                          <span className="text-sm font-medium tracking-tighter">
+                            Nhập thủ công
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+
+              <div className="flex flex-col items-center gap-4">
+                <button
+                  type="button"
+                  onClick={addGroup}
+                  className="w-full rounded-xl border-2 border-dashed border-muted-foreground/25 py-4 flex items-center justify-center gap-2 text-muted-foreground hover:border-blue-400/60 hover:text-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-950/10 transition-all"
+                >
+                  <Plus className="h-5 w-5" />
+                  <span className="text-sm font-medium tracking-tighter">
+                    Thêm hóa đơn
+                  </span>
+                </button>
+                {totalRows > 0 && (
+                  <Button
+                    size="sm"
+                    className="gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6"
+                    onClick={() => setStep("review")}
+                  >
+                    Xem lại & Xác nhận
+                    <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/20 text-xs">
+                      {totalRows}
+                    </span>
+                  </Button>
+                )}
+              </div>
+
+              <div className="rounded-xl border bg-card px-5 py-4">
+                <p className="text-sm font-medium mb-3 tracking-tighter text-muted-foreground">
+                  Các cột trong file Excel:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.values(COL).map((col) => (
+                    <span
+                      key={col}
+                      className="px-2.5 py-1 rounded-md bg-muted border text-xs font-mono"
+                    >
+                      {col}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {step === "review" && (
+            <motion.div
+              key="review"
+              className="space-y-5 flex flex-col"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.32, ease: "easeOut" }}
+            >
+              <div className="flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs tracking-tighter font-medium">
+                    <CheckCircle className="h-3.5 w-3.5" weight="fill" />
+                    {totalRows - totalErrors} hợp lệ
+                  </div>
+                  {totalErrors > 0 && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 text-xs tracking-tighter font-medium">
+                      <WarningCircle className="h-3.5 w-3.5" weight="fill" />
+                      {totalErrors} lỗi
+                    </div>
+                  )}
+                  <span className="text-xs tracking-tighter text-muted-foreground">
+                    {groups.length} hóa đơn · {totalRows} vật phẩm
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 tracking-tighter"
+                    onClick={addGroup}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Thêm hóa đơn
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-muted-foreground tracking-tighter"
+                    onClick={handleReset}
+                  >
+                    <ArrowCounterClockwise className="h-4 w-4" />
+                    Nhập lại
+                  </Button>
+                </div>
+              </div>
+
+              {groups.map((group, idx) => {
+                const color = GROUP_COLORS[idx % GROUP_COLORS.length];
+                const groupErrors = group.rows.filter(
+                  (r) => Object.keys(r.errors).length > 0,
+                ).length;
+                const groupValid = group.rows.length - groupErrors;
+                return (
+                  <div
+                    key={group.id}
+                    className={cn(
+                      "rounded-xl border bg-card overflow-hidden border-l-4",
+                      color.border,
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "flex items-center justify-between px-5 py-3 border-b",
+                        color.header,
                       )}
-                      {group.vatFile && (
+                    >
+                      <div className="flex items-center tracking-tighter gap-2">
+                        <Receipt
+                          className={cn("h-4 w-4", color.icon)}
+                          weight="duotone"
+                        />
+                        <span
+                          className={cn(
+                            "text-xs font-semibold px-2 py-0.5 rounded-full tracking-tighter",
+                            color.badge,
+                          )}
+                        >
+                          Hóa đơn #{idx + 1}
+                        </span>
+                        {group.fileName && (
+                          <span className="text-xs tracking-tighter text-muted-foreground">
+                            · {group.fileName}
+                          </span>
+                        )}
+                        <span className="text-xs tracking-tighter text-green-600 font-medium ml-1">
+                          {groupValid} hợp lệ
+                        </span>
+                        {groupErrors > 0 && (
+                          <span className="text-xs tracking-tighter text-red-500 font-medium">
+                            · {groupErrors} lỗi
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="gap-1 text-xs ml-auto h-6 px-2 text-muted-foreground tracking-tighter"
-                          onClick={() => openPdfPreview(group.vatFile!)}
+                          className="gap-1 text-xs h-7 px-2 text-muted-foreground tracking-tighter"
+                          onClick={() =>
+                            excelReviewInputRefs.current[group.id]?.click()
+                          }
                         >
-                          <Eye className="h-3 w-3" />
-                          Xem PDF
+                          <FileXls className="h-3.5 w-3.5" />
+                          Nhập từ Excel
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn("gap-1 text-xs h-6 px-2 text-muted-foreground tracking-tighter", !group.vatFile && "ml-auto")}
-                        onClick={() => vatInputRefs.current[group.id]?.click()}
-                      >
-                        <UploadSimple className="h-3 w-3" />
-                        {group.vatFile ? "Đổi PDF" : "Tải PDF lên"}
-                      </Button>
-                      <input
-                        ref={(el) => { vatInputRefs.current[group.id] = el; }}
-                        type="file"
-                        accept="application/pdf,.pdf"
-                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVatFile(group.id, f); e.target.value = ""; }}
-                        className="hidden"
-                      />
+                        <input
+                          ref={(el) => {
+                            excelReviewInputRefs.current[group.id] = el;
+                          }}
+                          type="file"
+                          accept=".xlsx,.xls"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) parseExcelForGroup(group.id, f, true);
+                            e.target.value = "";
+                          }}
+                          className="hidden"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1 text-xs h-7 px-2 text-muted-foreground tracking-tighter"
+                          onClick={() => addRow(group.id)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Thêm dòng
+                        </Button>
+                        {groups.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                            onClick={() => removeGroup(group.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 tracking-tighter">
-                      {vatField(group.id, group.vatForm, !!group.vatFile, "Ký hiệu", "invoiceSerial", "AA/26E", "text", true)}
-                      {vatField(group.id, group.vatForm, !!group.vatFile, "Số hóa đơn", "invoiceNumber", "0000123", "text", true)}
-                      {vatField(group.id, group.vatForm, !!group.vatFile, "Tên nhà cung cấp", "supplierName", "Tên đơn vị bán...", "text", true)}
-                      {vatField(group.id, group.vatForm, !!group.vatFile, "Mã số thuế", "supplierTaxCode", "0123456789", "text", true)}
-                      {vatField(group.id, group.vatForm, !!group.vatFile, "Ngày hóa đơn", "invoiceDate", "", "date", true)}
-                      {vatField(group.id, group.vatForm, !!group.vatFile, "Tổng tiền (VNĐ)", "totalAmount", "5.000.000", "number", true, true)}
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium tracking-tighter mb-1 text-muted-foreground">Ghi chú lần nhập</label>
-                      <Input
-                        value={group.batchNote}
-                        onChange={(e) => patchGroup(group.id, { batchNote: e.target.value })}
-                        placeholder="Ghi chú cho lần nhập này..."
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                  </div>
 
-                  <div className="overflow-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="w-12 text-center">STT</TableHead>
-                          <TableHead className="min-w-48">Tên vật phẩm</TableHead>
-                          <TableHead className="min-w-24 text-center">ID Vật phẩm</TableHead>
-                          <TableHead className="min-w-40">Danh mục</TableHead>
-                          <TableHead className="min-w-36">Đối tượng</TableHead>
-                          <TableHead className="min-w-36">Loại vật phẩm</TableHead>
-                          <TableHead className="min-w-24">Đơn vị</TableHead>
-                          <TableHead className="min-w-40">Mô tả vật phẩm</TableHead>
-                          <TableHead className="min-w-32 w-32">Ảnh</TableHead>
-                          <TableHead className="min-w-28">Đơn giá</TableHead>
-                          <TableHead className="min-w-24">Số lượng</TableHead>
-                          <TableHead className="min-w-28">Thể tích / đơn vị</TableHead>
-                          <TableHead className="min-w-28">Cân nặng / đơn vị</TableHead>
-                          <TableHead className="min-w-36">Ngày hết hạn</TableHead>
-                          <TableHead className="min-w-36">Ngày nhận</TableHead>
-                          <TableHead className="w-10" />
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {group.rows.map((row) => {
-                          const hasErrors = Object.keys(row.errors).length > 0;
-                          return (
-                            <TableRow key={row.id} className={cn(hasErrors && "bg-red-50/50 dark:bg-red-950/10")}>
-                              <TableCell className="text-center text-xs text-muted-foreground font-mono">{row.row}</TableCell>
-                              <TableCell>{renderInputCell(group.id, row, "itemName", "Tên vật phẩm")}</TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  value={row.itemModelId ?? ""}
-                                  onChange={(e) => updateRow(group.id, row.id, "itemModelId", e.target.value ? Number(e.target.value) : undefined)}
-                                  placeholder="X"
-                                  disabled={!row.itemModelId}
-                                  className="h-8 text-sm w-20 disabled:cursor-not-allowed disabled:opacity-60"
-                                />
-                              </TableCell>
-                              <TableCell>
-                                {renderSelectCell(group.id, row, "categoryCode", SYSTEM_CATEGORIES.map((c) => ({ label: c.label, value: c.value })), "Chọn danh mục")}
-                              </TableCell>
-                              <TableCell>
-                                {renderMultiSelectCell(group.id, row, targetGroupOptions, "Chọn đối tượng")}
-                                {row.itemType === "Reusable" && row.targetGroups?.includes("Rescuer") && !row.errors.targetGroups && (
-                                  <p className="text-[11px] text-blue-500 mt-0.5">Mặc định chọn với loại Tái sử dụng</p>
+                    <div className="px-5 py-4 border-b space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Receipt
+                          className={cn("h-4 w-4", color.icon)}
+                          weight="duotone"
+                        />
+                        <p className="text-sm tracking-tighter font-medium">
+                          Thông tin hóa đơn VAT
+                        </p>
+                        {!group.vatFile && (
+                          <span className="text-xs tracking-tighter text-red-500">
+                            (chưa chọn PDF)
+                          </span>
+                        )}
+                        {group.vatFile && (
+                          <CheckCircle
+                            className="h-3.5 w-3.5 text-green-500"
+                            weight="fill"
+                          />
+                        )}
+                        {group.vatFile && (
+                          <span className="text-xs tracking-tighter text-muted-foreground truncate max-w-48 ml-1">
+                            {group.vatFile.name}
+                          </span>
+                        )}
+                        {group.vatFile && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 text-xs ml-auto h-6 px-2 text-muted-foreground tracking-tighter"
+                            onClick={() => openPdfPreview(group.vatFile!)}
+                          >
+                            <Eye className="h-3 w-3" />
+                            Xem PDF
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "gap-1 text-xs h-6 px-2 text-muted-foreground tracking-tighter",
+                            !group.vatFile && "ml-auto",
+                          )}
+                          onClick={() =>
+                            vatInputRefs.current[group.id]?.click()
+                          }
+                        >
+                          <UploadSimple className="h-3 w-3" />
+                          {group.vatFile ? "Đổi PDF" : "Tải PDF lên"}
+                        </Button>
+                        <input
+                          ref={(el) => {
+                            vatInputRefs.current[group.id] = el;
+                          }}
+                          type="file"
+                          accept="application/pdf,.pdf"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleVatFile(group.id, f);
+                            e.target.value = "";
+                          }}
+                          className="hidden"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 tracking-tighter">
+                        {vatField(
+                          group.id,
+                          group.vatForm,
+                          !!group.vatFile,
+                          "Ký hiệu",
+                          "invoiceSerial",
+                          "AA/26E",
+                          "text",
+                          true,
+                        )}
+                        {vatField(
+                          group.id,
+                          group.vatForm,
+                          !!group.vatFile,
+                          "Số hóa đơn",
+                          "invoiceNumber",
+                          "0000123",
+                          "text",
+                          true,
+                        )}
+                        {vatField(
+                          group.id,
+                          group.vatForm,
+                          !!group.vatFile,
+                          "Tên nhà cung cấp",
+                          "supplierName",
+                          "Tên đơn vị bán...",
+                          "text",
+                          true,
+                        )}
+                        {vatField(
+                          group.id,
+                          group.vatForm,
+                          !!group.vatFile,
+                          "Mã số thuế",
+                          "supplierTaxCode",
+                          "0123456789",
+                          "text",
+                          true,
+                        )}
+                        {vatField(
+                          group.id,
+                          group.vatForm,
+                          !!group.vatFile,
+                          "Ngày hóa đơn",
+                          "invoiceDate",
+                          "",
+                          "date",
+                          true,
+                        )}
+                        {vatField(
+                          group.id,
+                          group.vatForm,
+                          !!group.vatFile,
+                          "Tổng tiền (VNĐ)",
+                          "totalAmount",
+                          "5.000.000",
+                          "number",
+                          true,
+                          true,
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium tracking-tighter mb-1 text-muted-foreground">
+                          Ghi chú lần nhập
+                        </label>
+                        <Input
+                          value={group.batchNote}
+                          onChange={(e) =>
+                            patchGroup(group.id, { batchNote: e.target.value })
+                          }
+                          placeholder="Ghi chú cho lần nhập này..."
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="w-12 text-center">
+                              STT
+                            </TableHead>
+                            <TableHead className="min-w-48">
+                              Tên vật phẩm
+                            </TableHead>
+                            <TableHead className="min-w-24 text-center">
+                              ID Vật phẩm
+                            </TableHead>
+                            <TableHead className="min-w-40">Danh mục</TableHead>
+                            <TableHead className="min-w-36">
+                              Đối tượng
+                            </TableHead>
+                            <TableHead className="min-w-36">
+                              Loại vật phẩm
+                            </TableHead>
+                            <TableHead className="min-w-24">Đơn vị</TableHead>
+                            <TableHead className="min-w-40">
+                              Mô tả vật phẩm
+                            </TableHead>
+                            <TableHead className="min-w-32 w-32">Ảnh</TableHead>
+                            <TableHead className="min-w-28">Đơn giá</TableHead>
+                            <TableHead className="min-w-24">Số lượng</TableHead>
+                            <TableHead className="min-w-28">
+                              Thể tích / đơn vị
+                            </TableHead>
+                            <TableHead className="min-w-28">
+                              Cân nặng / đơn vị
+                            </TableHead>
+                            <TableHead className="min-w-36">
+                              Ngày hết hạn
+                            </TableHead>
+                            <TableHead className="min-w-36">
+                              Ngày nhận
+                            </TableHead>
+                            <TableHead className="w-10" />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {group.rows.map((row) => {
+                            const hasErrors =
+                              Object.keys(row.errors).length > 0;
+                            return (
+                              <TableRow
+                                key={row.id}
+                                className={cn(
+                                  hasErrors &&
+                                    "bg-red-50/50 dark:bg-red-950/10",
                                 )}
-                              </TableCell>
-                              <TableCell>
-                                {itemTypeOptions.length > 0
-                                  ? renderSelectCell(group.id, row, "itemType", itemTypeOptions, "Chọn loại")
-                                  : renderInputCell(group.id, row, "itemType", "Loại vật phẩm")}
-                              </TableCell>
-                              <TableCell>{renderInputCell(group.id, row, "unit", "Đơn vị")}</TableCell>
-                              <TableCell>
-                                <Input
-                                  value={row.description}
-                                  onChange={(e) => updateRow(group.id, row.id, "description", e.target.value)}
-                                  placeholder="Mô tả vật phẩm..."
-                                  className="h-8 text-sm"
-                                />
-                              </TableCell>
-                              <TableCell>{renderImageCell(group.id, row)}</TableCell>
-                              <TableCell>{renderCurrencyCell(group.id, row, "unitPrice")}</TableCell>
-                              <TableCell>{renderInputCell(group.id, row, "quantity", "0", "number")}</TableCell>
-                              <TableCell>
-                                {renderOptionalDecimalCell(group.id, row, "volumePerUnit", "dm3")}
-                              </TableCell>
-                              <TableCell>
-                                {renderOptionalDecimalCell(group.id, row, "weightPerUnit", "kg")}
-                              </TableCell>
-                              <TableCell>
-                                <DatePickerInput
-                                  value={row.expiredDate}
-                                  onChange={(v) => updateRow(group.id, row.id, "expiredDate", v)}
-                                  placeholder="Chọn ngày..."
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <DateTimePickerInput
-                                    value={row.receivedDate}
-                                    onChange={(v) => updateRow(group.id, row.id, "receivedDate", v)}
-                                    placeholder="Chọn ngày giờ..."
-                                    hasError={!!row.errors.receivedDate}
-                                  />
-                                  {row.errors.receivedDate && (
-                                    <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">{row.errors.receivedDate}</p>
+                              >
+                                <TableCell className="text-center text-xs text-muted-foreground font-mono">
+                                  {row.row}
+                                </TableCell>
+                                <TableCell>
+                                  {renderInputCell(
+                                    group.id,
+                                    row,
+                                    "itemName",
+                                    "Tên vật phẩm",
                                   )}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    min={1}
+                                    value={row.itemModelId ?? ""}
+                                    onChange={(e) =>
+                                      updateRow(
+                                        group.id,
+                                        row.id,
+                                        "itemModelId",
+                                        e.target.value
+                                          ? Number(e.target.value)
+                                          : undefined,
+                                      )
+                                    }
+                                    placeholder="X"
+                                    disabled={!row.itemModelId}
+                                    className="h-8 text-sm w-20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {renderSelectCell(
+                                    group.id,
+                                    row,
+                                    "categoryCode",
+                                    SYSTEM_CATEGORIES.map((c) => ({
+                                      label: c.label,
+                                      value: c.value,
+                                    })),
+                                    "Chọn danh mục",
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {renderMultiSelectCell(
+                                    group.id,
+                                    row,
+                                    targetGroupOptions,
+                                    "Chọn đối tượng",
+                                  )}
+                                  {row.itemType === "Reusable" &&
+                                    row.targetGroups?.includes("Rescuer") &&
+                                    !row.errors.targetGroups && (
+                                      <p className="text-[11px] text-blue-500 mt-0.5">
+                                        Mặc định chọn với loại Tái sử dụng
+                                      </p>
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                  {itemTypeOptions.length > 0
+                                    ? renderSelectCell(
+                                        group.id,
+                                        row,
+                                        "itemType",
+                                        itemTypeOptions,
+                                        "Chọn loại",
+                                      )
+                                    : renderInputCell(
+                                        group.id,
+                                        row,
+                                        "itemType",
+                                        "Loại vật phẩm",
+                                      )}
+                                </TableCell>
+                                <TableCell>
+                                  {renderInputCell(
+                                    group.id,
+                                    row,
+                                    "unit",
+                                    "Đơn vị",
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    value={row.description}
+                                    onChange={(e) =>
+                                      updateRow(
+                                        group.id,
+                                        row.id,
+                                        "description",
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder="Mô tả vật phẩm..."
+                                    className="h-8 text-sm"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  {renderImageCell(group.id, row)}
+                                </TableCell>
+                                <TableCell>
+                                  {renderCurrencyCell(
+                                    group.id,
+                                    row,
+                                    "unitPrice",
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {renderInputCell(
+                                    group.id,
+                                    row,
+                                    "quantity",
+                                    "0",
+                                    "number",
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {renderOptionalDecimalCell(
+                                    group.id,
+                                    row,
+                                    "volumePerUnit",
+                                    "dm3",
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {renderOptionalDecimalCell(
+                                    group.id,
+                                    row,
+                                    "weightPerUnit",
+                                    "kg",
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <DatePickerInput
+                                    value={row.expiredDate}
+                                    onChange={(v) =>
+                                      updateRow(
+                                        group.id,
+                                        row.id,
+                                        "expiredDate",
+                                        v,
+                                      )
+                                    }
+                                    placeholder="Chọn ngày..."
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <div className="space-y-1">
+                                    <DateTimePickerInput
+                                      value={row.receivedDate}
+                                      onChange={(v) =>
+                                        updateRow(
+                                          group.id,
+                                          row.id,
+                                          "receivedDate",
+                                          v,
+                                        )
+                                      }
+                                      placeholder="Chọn ngày giờ..."
+                                      hasError={!!row.errors.receivedDate}
+                                    />
+                                    {row.errors.receivedDate && (
+                                      <p className="text-[10px] text-red-500 leading-tight text-wrap break-words">
+                                        {row.errors.receivedDate}
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                                    onClick={() => deleteRow(group.id, row.id)}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          {group.rows.length === 0 && (
+                            <TableRow>
+                              <TableCell
+                                colSpan={16}
+                                className="h-24 text-center text-muted-foreground"
+                              >
+                                <div className="flex flex-col items-center gap-2">
+                                  <Trash className="h-7 w-7" weight="duotone" />
+                                  <p className="text-sm tracking-tighter">
+                                    Chưa có vật phẩm
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1.5"
+                                      onClick={() => addRow(group.id)}
+                                    >
+                                      <Plus className="h-3.5 w-3.5" /> Thêm dòng
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1.5"
+                                      onClick={() =>
+                                        excelReviewInputRefs.current[
+                                          group.id
+                                        ]?.click()
+                                      }
+                                    >
+                                      <FileXls className="h-3.5 w-3.5" /> Nhập
+                                      từ Excel
+                                    </Button>
+                                  </div>
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 text-muted-foreground hover:text-red-500"
-                                  onClick={() => deleteRow(group.id, row.id)}
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </Button>
                               </TableCell>
                             </TableRow>
-                          );
-                        })}
-                        {group.rows.length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={16} className="h-24 text-center text-muted-foreground">
-                              <div className="flex flex-col items-center gap-2">
-                                <Trash className="h-7 w-7" weight="duotone" />
-                                <p className="text-sm tracking-tighter">Chưa có vật phẩm</p>
-                                <div className="flex gap-2">
-                                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => addRow(group.id)}>
-                                    <Plus className="h-3.5 w-3.5" /> Thêm dòng
-                                  </Button>
-                                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => excelReviewInputRefs.current[group.id]?.click()}>
-                                    <FileXls className="h-3.5 w-3.5" /> Nhập từ Excel
-                                  </Button>
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
 
-            <div className="flex items-center gap-3 rounded-xl border bg-card px-5 py-3">
-              <label className="shrink-0 text-sm font-medium tracking-tighter text-foreground">
-                Người ứng tiền
-              </label>
-              <span className="text-red-500 text-sm leading-none">*</span>
-              <div className="relative group shrink-0">
-                <WarningCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" weight="fill" />
-                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 rounded-lg border bg-popover px-3 py-2 text-[11px] tracking-tighter text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50">
-                  Nhiều người dùng dấu phẩy (,) để phân cách. VD: Nguyễn Văn A, Trần Thị B
-                </div>
+              <div className="flex items-center justify-between pt-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                  className="gap-2"
+                >
+                  <ArrowCounterClockwise className="h-4 w-4" />
+                  Hủy
+                </Button>
+                <Button
+                  size="sm"
+                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={handleSubmit}
+                  disabled={
+                    totalRows === 0 ||
+                    importMutation.isPending ||
+                    isUploading ||
+                    isBusy
+                  }
+                >
+                  {importMutation.isPending || isUploading ? (
+                    <SpinnerGap className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FloppyDisk className="h-4 w-4" weight="fill" />
+                  )}
+                  {isUploading
+                    ? "Đang tải tệp..."
+                    : importMutation.isPending
+                      ? "Đang nhập kho..."
+                      : "Xác nhận nhập kho"}
+                  {totalRows > 0 &&
+                    !importMutation.isPending &&
+                    !isUploading && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/20 text-xs">
+                        {totalRows}
+                      </span>
+                    )}
+                </Button>
               </div>
-              <input
-                type="text"
-                value={advancedByName}
-                onChange={(e) => setAdvancedByName(e.target.value)}
-                placeholder="Nguyễn Văn A, Trần Thị B..."
-                className="flex-1 bg-transparent text-sm tracking-tighter outline-none placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="flex items-center justify-between pt-2 shrink-0">
-              <Button variant="outline" size="sm" onClick={handleReset} className="gap-2">
-                <ArrowCounterClockwise className="h-4 w-4" />
-                Hủy
-              </Button>
-              <Button
-                size="sm"
-                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={handleSubmit}
-                disabled={totalRows === 0 || importMutation.isPending || isUploading || isBusy}
-              >
-                {(importMutation.isPending || isUploading) ? (
-                  <SpinnerGap className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FloppyDisk className="h-4 w-4" weight="fill" />
-                )}
-                {isUploading ? "Đang tải tệp..." : importMutation.isPending ? "Đang nhập kho..." : "Xác nhận nhập kho"}
-                {totalRows > 0 && !importMutation.isPending && !isUploading && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/20 text-xs">{totalRows}</span>
-                )}
-              </Button>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
-      <Dialog open={!!pdfPreview} onOpenChange={(open) => { if (!open) closePdfPreview(); }}>
+      <Dialog
+        open={!!pdfPreview}
+        onOpenChange={(open) => {
+          if (!open) closePdfPreview();
+        }}
+      >
         <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
           <DialogTitle className="px-4 py-3 border-b flex items-center gap-2 text-sm font-medium tracking-tighter shrink-0">
             <FilePdf className="h-4 w-4 text-red-500" weight="duotone" />

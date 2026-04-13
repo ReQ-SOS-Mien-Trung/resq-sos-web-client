@@ -848,7 +848,7 @@ const InventoryDashboardPage = () => {
                                 Trạng thái
                               </th>
                               <th className="px-4 py-3 font-semibold">
-                                Vật tư
+                                Vật phẩm
                               </th>
                               <th className="px-4 py-3 font-semibold">
                                 Thời gian tạo

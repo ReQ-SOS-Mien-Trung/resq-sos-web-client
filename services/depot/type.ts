@@ -9,7 +9,7 @@ export type DepotStatus =
   | "Closing"
   | "UnderMaintenance";
 
-export type ChangeableDepotStatus = "Available" | "Unavailable";
+export type ChangeableDepotStatus = "Available" | "Unavailable" | "Closing";
 
 // Depot Status Metadata (from /logistics/depot/metadata/depot-statuses)
 export interface DepotStatusMetadata {
@@ -166,24 +166,51 @@ export interface DepotManagerAssignmentResponse {
   unassignedAt?: string;
 }
 
-// Depot Fund (from /logistics/depot/funds & /logistics/depot/my-fund)
-export interface DepotFund {
+export interface DepotFundSource {
+  id: number;
   depotId: number;
   depotName: string;
   balance: number;
-  /** Giới hạn ứng trước tối đa (số dư có thể xuống đến −maxAdvanceLimit) */
-  maxAdvanceLimit: number;
+  fundSourceType: string;
+  fundSourceName: string;
   lastUpdatedAt: string;
+}
+
+export interface AdminDepotFundSource {
+  id: number;
+  balance: number;
+  fundSourceType: string;
+  fundSourceName: string;
+  lastUpdatedAt: string;
+}
+
+// Depot Fund Summary (from /logistics/depot/funds)
+export interface DepotFund {
+  depotId: number;
+  depotName: string;
+  advanceLimit: number;
+  outstandingAdvanceAmount: number;
+  funds: AdminDepotFundSource[];
+}
+
+// My Depot Fund Ledger (from /finance/depot-funds/my)
+export interface MyDepotFund {
+  advanceLimit: number;
+  outstandingAdvanceAmount: number;
+  funds: DepotFundSource[];
 }
 
 // Depot Fund Transaction (from /finance/depot-funds/my/transactions)
 export interface DepotFundTransaction {
   id: number;
   depotFundId: number;
+  ledgerEntryId?: number | string | null;
   transactionType: string;
   amount: number;
   referenceType: string;
   referenceId: number | null;
+  contributorName?: string | null;
+  phoneNumber?: string | null;
   note: string;
   createdBy: string;
   createdAt: string;
@@ -202,6 +229,50 @@ export interface GetDepotFundTransactionsResponse {
 export interface GetDepotFundTransactionsParams {
   pageNumber?: number;
   pageSize?: number;
+}
+
+// Depot Advancer (from /finance/depot-funds/my/advancers)
+export interface DepotAdvancer {
+  contributorName: string;
+  contributorPhoneNumber: string;
+  totalAdvancedAmount: number;
+  totalRepaidAmount: number;
+  outstandingAmount: number;
+  repaidPercentage: number;
+}
+
+export interface GetMyDepotAdvancersResponse {
+  items: DepotAdvancer[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface GetMyDepotAdvancersParams {
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface CreateInternalAdvanceItem {
+  amount: number;
+  contributorName: string;
+  phoneNumber: string;
+}
+
+export type CreateInternalAdvanceRequest = CreateInternalAdvanceItem[];
+
+export interface CreateInternalRepaymentItem {
+  depotFundId: number;
+  amount: number;
+}
+
+export interface CreateInternalRepaymentRequest {
+  contributorName: string;
+  phoneNumber: string;
+  repayments: CreateInternalRepaymentItem[];
 }
 
 export type DepotClosureStatus =
@@ -231,7 +302,8 @@ export interface InitiateDepotClosureResponse {
     reusableAvailableCount: number;
     reusableInUseCount: number;
   } | null;
-  remainingInventoryItems?: unknown[] | null;
+  remainingItems?: DepotClosureRemainingInventoryItem[] | null;
+  remainingInventoryItems?: DepotClosureRemainingInventoryItem[] | null;
   closingTimeoutAt?: string | null;
   timeoutAt?: string | null;
   message: string;
@@ -279,18 +351,80 @@ export interface SubmitDepotExternalResolutionResponse {
   message: string;
 }
 
+export interface DepotClosureRemainingInventoryItem {
+  itemModelId: number;
+  itemName: string;
+  categoryName?: string | null;
+  itemType: string;
+  unit?: string | null;
+  quantity: number;
+  blockedQuantity?: number | null;
+  transferableQuantity?: number | null;
+  volumePerUnit?: number | null;
+  weightPerUnit?: number | null;
+  WeightPerUnit?: number | null;
+  imageUrl?: string | null;
+  receivedDate?: string | null;
+  expiredDate?: string | null;
+}
+
+export interface DepotClosureTransferSuggestionTargetMetric {
+  depotId: number;
+  depotName: string;
+  capacity: number;
+  currentUtilization: number;
+  remainingVolume: number;
+  remainingWeight: number;
+}
+
+export interface DepotClosureSuggestedTransfer {
+  targetDepotId: number | null;
+  targetDepotName: string | null;
+  itemModelId: number;
+  itemName: string;
+  itemType: string;
+  unit?: string | null;
+  suggestedQuantity: number;
+  totalVolume: number;
+  totalWeight: number;
+}
+
+export interface DepotClosureTransferSuggestionsResponse {
+  sourceDepotId: number;
+  sourceDepotName: string;
+  totalVolumeToTransfer: number;
+  totalWeightToTransfer: number;
+  unallocatedVolume: number;
+  unallocatedWeight: number;
+  targetDepotMetrics: DepotClosureTransferSuggestionTargetMetric[];
+  suggestedTransfers: DepotClosureSuggestedTransfer[];
+}
+
+export interface DepotClosureTransferAssignmentItem {
+  itemModelId: number;
+  itemType: string;
+  quantity: number;
+}
+
+export interface DepotClosureTransferAssignment {
+  targetDepotId: number;
+  items: DepotClosureTransferAssignmentItem[];
+}
+
 export interface InitiateDepotClosureTransferRequest {
   id: number;
-  targetDepotId: number;
   reason: string;
+  assignments: DepotClosureTransferAssignment[];
 }
 
 export interface InitiateDepotClosureTransferResponse {
   closureId?: number;
   depotId?: number;
-  transferId: number;
+  transferId?: number;
+  transferIds?: number[];
   targetDepotId?: number;
   targetDepotName?: string;
+  assignmentsCount?: number;
   transferStatus?: string;
   message: string;
 }
@@ -384,6 +518,7 @@ export interface DepotClosureListItem {
   completedAt: string | null;
   cancelledAt: string | null;
   transfer: DepotClosureTransferSummary | null;
+  remainingInventoryItems?: DepotClosureRemainingInventoryItem[] | null;
 }
 
 export type GetMyDepotClosuresResponse = DepotClosureListItem[];
@@ -417,6 +552,7 @@ export interface DepotClosureDetail {
   cancelledAt: string | null;
   transferDetail: DepotClosureDetailTransfer | null;
   externalItems: DepotExternalResolvedItem[];
+  remainingInventoryItems?: DepotClosureRemainingInventoryItem[] | null;
 }
 
 // ── Depot Closure Transfer ─────────────────────────────────────

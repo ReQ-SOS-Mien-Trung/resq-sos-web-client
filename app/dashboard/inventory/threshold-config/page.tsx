@@ -130,10 +130,7 @@ function formatThresholdDisplay(config: ThresholdConfig): string {
     return `${formatNumber(config.minimumThreshold)} đơn vị`;
   }
 
-  if (
-    config.dangerPercent != null ||
-    config.warningPercent != null
-  ) {
+  if (config.dangerPercent != null || config.warningPercent != null) {
     return `Danger ${config.dangerPercent ?? "—"}% · Warning ${config.warningPercent ?? "—"}%`;
   }
 
@@ -312,9 +309,7 @@ export default function ThresholdConfigPage() {
 
   const [tab, setTab] = useState(() => {
     const current = searchParams.get("tab");
-    return current === "history" || current === "lowstock"
-      ? current
-      : "config";
+    return current === "history" || current === "lowstock" ? current : "config";
   });
 
   const {
@@ -331,12 +326,11 @@ export default function ThresholdConfigPage() {
     return map;
   }, [categories]);
 
-  const [historyParams, setHistoryParams] = useState<GetThresholdsHistoryParams>(
-    {
+  const [historyParams, setHistoryParams] =
+    useState<GetThresholdsHistoryParams>({
       pageNumber: 1,
       pageSize: 10,
-    },
-  );
+    });
   const { data: historyData, isLoading: loadingHistory } =
     useMyDepotThresholdsHistory(historyParams);
 
@@ -372,14 +366,10 @@ export default function ThresholdConfigPage() {
     setEditConfig(config);
     setForm({
       scopeType: config.scopeType,
-      categoryId:
-        config.categoryId != null ? String(config.categoryId) : "",
-      itemModelId:
-        config.itemModelId != null ? String(config.itemModelId) : "",
+      categoryId: config.categoryId != null ? String(config.categoryId) : "",
+      itemModelId: config.itemModelId != null ? String(config.itemModelId) : "",
       minimumThreshold:
-        config.minimumThreshold != null
-          ? String(config.minimumThreshold)
-          : "",
+        config.minimumThreshold != null ? String(config.minimumThreshold) : "",
       reason: "",
     });
     setEditOpen(true);
@@ -452,7 +442,9 @@ export default function ThresholdConfigPage() {
   }, [editConfig, form, refetchThresholds, updateMutation]);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<ThresholdConfig | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ThresholdConfig | null>(
+    null,
+  );
   const [deleteReason, setDeleteReason] = useState("");
 
   const openDelete = useCallback((config: ThresholdConfig) => {
@@ -669,22 +661,26 @@ export default function ThresholdConfigPage() {
             ) : allConfigs.length === 0 ? (
               <EmptyState
                 icon={Gear}
-                text={'Chưa có cấu hình ngưỡng nào. Nhấn "Thêm ngưỡng" để bắt đầu.'}
+                text={
+                  'Chưa có cấu hình ngưỡng nào. Nhấn "Thêm ngưỡng" để bắt đầu.'
+                }
               />
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {allConfigs.map(({ config, label, sublabel, canEdit, canDelete }) => (
-                  <ThresholdConfigCard
-                    key={`${config.scopeType}-${config.itemModelId ?? config.categoryId ?? "base"}`}
-                    config={config}
-                    label={label}
-                    sublabel={sublabel}
-                    canEdit={canEdit}
-                    canDelete={canDelete}
-                    onEdit={() => openEdit(config)}
-                    onDelete={() => openDelete(config)}
-                  />
-                ))}
+                {allConfigs.map(
+                  ({ config, label, sublabel, canEdit, canDelete }) => (
+                    <ThresholdConfigCard
+                      key={`${config.scopeType}-${config.itemModelId ?? config.categoryId ?? "base"}`}
+                      config={config}
+                      label={label}
+                      sublabel={sublabel}
+                      canEdit={canEdit}
+                      canDelete={canDelete}
+                      onEdit={() => openEdit(config)}
+                      onDelete={() => openDelete(config)}
+                    />
+                  ),
+                )}
               </div>
             )}
           </TabsContent>
@@ -819,8 +815,9 @@ export default function ThresholdConfigPage() {
                                 SCOPE_COLORS[item.scopeType] ?? "",
                               )}
                             >
-                              {SCOPE_LABELS[item.scopeType as ThresholdScopeType] ??
-                                item.scopeType}
+                              {SCOPE_LABELS[
+                                item.scopeType as ThresholdScopeType
+                              ] ?? item.scopeType}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
@@ -977,7 +974,9 @@ export default function ThresholdConfigPage() {
                       <TableHead>Danh mục</TableHead>
                       <TableHead>Kho</TableHead>
                       <TableHead className="text-right">Khả dụng</TableHead>
-                      <TableHead className="text-right">Ngưỡng tối thiểu</TableHead>
+                      <TableHead className="text-right">
+                        Ngưỡng tối thiểu
+                      </TableHead>
                       <TableHead className="text-right">Severity</TableHead>
                       <TableHead>Mức cảnh báo</TableHead>
                       <TableHead>Phạm vi áp dụng</TableHead>
@@ -1000,7 +999,9 @@ export default function ThresholdConfigPage() {
                             {item.itemModelName}
                           </TableCell>
                           <TableCell>{item.categoryName ?? "—"}</TableCell>
-                          <TableCell>{item.depotName ?? "Kho hiện tại"}</TableCell>
+                          <TableCell>
+                            {item.depotName ?? "Kho hiện tại"}
+                          </TableCell>
                           <TableCell className="text-right font-mono">
                             {formatNumber(item.availableQuantity)}
                           </TableCell>
@@ -1177,7 +1178,7 @@ export default function ThresholdConfigPage() {
             <div className="space-y-1.5">
               <Label>Lý do (tùy chọn)</Label>
               <Textarea
-                placeholder="VD: Vật tư y tế cần dự trữ cao hơn"
+                placeholder="VD: Vật phẩm y tế cần dự trữ cao hơn"
                 value={form.reason}
                 onChange={(event) =>
                   setForm((previous) => ({

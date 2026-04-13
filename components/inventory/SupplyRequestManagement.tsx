@@ -12,9 +12,7 @@ import {
   ArrowUp,
   Package,
 } from "@phosphor-icons/react";
-import {
-  useSupplyRequests,
-} from "@/services/inventory/hooks";
+import { useSupplyRequests } from "@/services/inventory/hooks";
 import IncomingRequestsSection from "./IncomingRequestsSection";
 import { SupplyRequestTracker } from "./SupplyRequestTracker";
 
@@ -128,12 +126,7 @@ function OutgoingRequestsPanel() {
   const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
   const [trackerOpen, setTrackerOpen] = useState(false);
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    refetch,
-  } = useSupplyRequests(
+  const { data, isLoading, isFetching, refetch } = useSupplyRequests(
     { pageNumber, pageSize },
     { refetchInterval: 10_000, refetchOnWindowFocus: true },
   );
@@ -143,13 +136,18 @@ function OutgoingRequestsPanel() {
     () =>
       [...(data?.items ?? [])]
         .filter((r) => r.role === "Requester")
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ),
     [data],
   );
 
   // Stats
   const pendingCount = allItems.filter(
-    (r) => r.requestingStatus === "WaitingForApproval" || r.requestingStatus === "Approved",
+    (r) =>
+      r.requestingStatus === "WaitingForApproval" ||
+      r.requestingStatus === "Approved",
   ).length;
   const inTransitCount = allItems.filter(
     (r) => r.requestingStatus === "InTransit",
@@ -166,7 +164,9 @@ function OutgoingRequestsPanel() {
     switch (filter) {
       case "pending":
         return allItems.filter(
-          (r) => r.requestingStatus === "WaitingForApproval" || r.requestingStatus === "Approved",
+          (r) =>
+            r.requestingStatus === "WaitingForApproval" ||
+            r.requestingStatus === "Approved",
         );
       case "in_transit":
         return allItems.filter((r) => r.requestingStatus === "InTransit");
@@ -182,7 +182,7 @@ function OutgoingRequestsPanel() {
   const trackerRequest = useMemo(
     () =>
       trackerRequestId !== null
-        ? (data?.items ?? []).find((r) => r.id === trackerRequestId) ?? null
+        ? ((data?.items ?? []).find((r) => r.id === trackerRequestId) ?? null)
         : null,
     [data, trackerRequestId],
   );
@@ -213,7 +213,9 @@ function OutgoingRequestsPanel() {
           colorClass="border-blue-200 bg-blue-50 dark:bg-blue-950/20"
           valueClass="text-blue-600"
           active={filter === "in_transit"}
-          onClick={() => setFilter(filter === "in_transit" ? "all" : "in_transit")}
+          onClick={() =>
+            setFilter(filter === "in_transit" ? "all" : "in_transit")
+          }
         />
         <OutgoingStatCard
           label="Đã nhận hàng"
@@ -271,7 +273,9 @@ function OutgoingRequestsPanel() {
           onClick={() => refetch()}
           disabled={isFetching}
         >
-          <ArrowsClockwise className={cn("h-4 w-4", isFetching && "animate-spin")} />
+          <ArrowsClockwise
+            className={cn("h-4 w-4", isFetching && "animate-spin")}
+          />
           Làm mới
         </Button>
       </motion.div>
@@ -280,7 +284,10 @@ function OutgoingRequestsPanel() {
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-xl border bg-card animate-pulse" />
+            <div
+              key={i}
+              className="h-20 rounded-xl border bg-card animate-pulse"
+            />
           ))}
         </div>
       ) : filteredItems.length === 0 ? (
@@ -295,73 +302,81 @@ function OutgoingRequestsPanel() {
           transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
         >
           <Card className="border-border/60">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-200 text-sm tracking-tighter">
-                <thead className="bg-muted/40">
-                  <tr className="border-b border-border/60 text-left">
-                    <th className="px-4 py-3 font-semibold">Mã yêu cầu</th>
-                    <th className="px-4 py-3 font-semibold">Kho nguồn</th>
-                    <th className="px-4 py-3 font-semibold">Trạng thái</th>
-                    <th className="px-4 py-3 font-semibold">Vật tư</th>
-                    <th className="px-4 py-3 font-semibold">Thời gian tạo</th>
-                    <th className="px-4 py-3 font-semibold w-44">Ghi chú</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredItems.map((request, idx) => (
-                    <motion.tr
-                      key={request.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, ease: "easeOut", delay: 0.2 + idx * 0.05 }}
-                      className="border-b border-border/50 align-top cursor-pointer hover:bg-muted/40 transition-colors"
-                      onClick={() => {
-                        setTrackerRequestId(request.id);
-                        setTrackerOpen(true);
-                      }}
-                    >
-                      <td className="px-4 py-3 font-semibold">#{request.id}</td>
-                      <td className="px-4 py-3">{request.sourceDepotName}</td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          variant="outline"
-                          className={
-                            requestingStatusColors[request.requestingStatus] ??
-                            "bg-gray-100 text-gray-700 border-gray-200"
-                          }
-                        >
-                          {requestingStatusLabels[request.requestingStatus] ??
-                            request.requestingStatus}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="space-y-1.5">
-                          {request.items.map((item) => (
-                            <div
-                              key={`${request.id}-${item.itemModelId}`}
-                              className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5"
-                            >
-                              <span>{item.itemModelName}</span>
-                              <span className="font-semibold text-primary whitespace-nowrap">
-                                {item.quantity.toLocaleString("vi-VN")} {item.unit}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {new Date(request.createdAt).toLocaleString("vi-VN")}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground w-44 max-w-44 whitespace-normal wrap-break-word leading-snug">
-                        {request.note || "—"}
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-200 text-sm tracking-tighter">
+                  <thead className="bg-muted/40">
+                    <tr className="border-b border-border/60 text-left">
+                      <th className="px-4 py-3 font-semibold">Mã yêu cầu</th>
+                      <th className="px-4 py-3 font-semibold">Kho nguồn</th>
+                      <th className="px-4 py-3 font-semibold">Trạng thái</th>
+                      <th className="px-4 py-3 font-semibold">Vật phẩm</th>
+                      <th className="px-4 py-3 font-semibold">Thời gian tạo</th>
+                      <th className="px-4 py-3 font-semibold w-44">Ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredItems.map((request, idx) => (
+                      <motion.tr
+                        key={request.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{
+                          duration: 0.25,
+                          ease: "easeOut",
+                          delay: 0.2 + idx * 0.05,
+                        }}
+                        className="border-b border-border/50 align-top cursor-pointer hover:bg-muted/40 transition-colors"
+                        onClick={() => {
+                          setTrackerRequestId(request.id);
+                          setTrackerOpen(true);
+                        }}
+                      >
+                        <td className="px-4 py-3 font-semibold">
+                          #{request.id}
+                        </td>
+                        <td className="px-4 py-3">{request.sourceDepotName}</td>
+                        <td className="px-4 py-3">
+                          <Badge
+                            variant="outline"
+                            className={
+                              requestingStatusColors[
+                                request.requestingStatus
+                              ] ?? "bg-gray-100 text-gray-700 border-gray-200"
+                            }
+                          >
+                            {requestingStatusLabels[request.requestingStatus] ??
+                              request.requestingStatus}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="space-y-1.5">
+                            {request.items.map((item) => (
+                              <div
+                                key={`${request.id}-${item.itemModelId}`}
+                                className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5"
+                              >
+                                <span>{item.itemModelName}</span>
+                                <span className="font-semibold text-primary whitespace-nowrap">
+                                  {item.quantity.toLocaleString("vi-VN")}{" "}
+                                  {item.unit}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {new Date(request.createdAt).toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground w-44 max-w-44 whitespace-normal wrap-break-word leading-snug">
+                          {request.note || "—"}
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
           </Card>
         </motion.div>
       )}
@@ -376,7 +391,9 @@ function OutgoingRequestsPanel() {
         <p className="text-xs text-muted-foreground tracking-tighter">
           Trang {pageNumber}
           {data?.totalPages ? ` / ${data.totalPages}` : ""}
-          {data?.totalCount !== undefined ? ` • ${data.totalCount} yêu cầu` : ""}
+          {data?.totalCount !== undefined
+            ? ` • ${data.totalCount} yêu cầu`
+            : ""}
         </p>
         <div className="flex items-center gap-2">
           <Button

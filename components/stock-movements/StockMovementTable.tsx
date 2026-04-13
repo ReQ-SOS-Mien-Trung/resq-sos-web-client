@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -48,10 +48,10 @@ import {
   useInventoryActionTypes,
   useInventorySourceTypes,
   type GetDepotStockMovementsParams,
-} from '@/services/inventory';
-import { type StockMovementEntity } from '@/services/inventory/type';
-import { StockMovementDetailSheet } from './StockMovementDetailSheet';
-import { motion } from 'framer-motion';
+} from "@/services/inventory";
+import { type StockMovementEntity } from "@/services/inventory/type";
+import { StockMovementDetailSheet } from "./StockMovementDetailSheet";
+import { motion } from "framer-motion";
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
@@ -59,16 +59,17 @@ const StockMovementTable: React.FC = () => {
   // State for filters
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [selectedActionTypes, setSelectedActionTypes] = useState<string[]>([]);
   const [selectedSourceTypes, setSelectedSourceTypes] = useState<string[]>([]);
   const [selectedSourceNames, setSelectedSourceNames] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [selectedMovement, setSelectedMovement] = useState<StockMovementEntity | null>(null);
+  const [selectedMovement, setSelectedMovement] =
+    useState<StockMovementEntity | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   // Debounced search
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -82,20 +83,37 @@ const StockMovementTable: React.FC = () => {
       setPage(0);
     }, 0);
     return () => clearTimeout(timer);
-  }, [debouncedSearch, selectedActionTypes, selectedSourceTypes, selectedSourceNames, dateRange]);
+  }, [
+    debouncedSearch,
+    selectedActionTypes,
+    selectedSourceTypes,
+    selectedSourceNames,
+    dateRange,
+  ]);
 
   // Query filters
-  const queryFilters = useMemo((): GetDepotStockMovementsParams => ({
-    pageNumber: page + 1,
-    pageSize: pageSize,
-    actionTypes: selectedActionTypes.length > 0 ? selectedActionTypes : undefined,
-    sourceTypes: selectedSourceTypes.length > 0 ? selectedSourceTypes : undefined,
-    fromDate: dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined,
-    toDate: dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
-  }), [page, pageSize, selectedActionTypes, selectedSourceTypes, dateRange]);
+  const queryFilters = useMemo(
+    (): GetDepotStockMovementsParams => ({
+      pageNumber: page + 1,
+      pageSize: pageSize,
+      actionTypes:
+        selectedActionTypes.length > 0 ? selectedActionTypes : undefined,
+      sourceTypes:
+        selectedSourceTypes.length > 0 ? selectedSourceTypes : undefined,
+      fromDate: dateRange?.from
+        ? format(dateRange.from, "yyyy-MM-dd")
+        : undefined,
+      toDate: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
+    }),
+    [page, pageSize, selectedActionTypes, selectedSourceTypes, dateRange],
+  );
 
   // Fetch data
-  const { data: stockMovementsData, isLoading: loadingStockMovements, error: stockMovementsError } = useDepotStockMovements(queryFilters);
+  const {
+    data: stockMovementsData,
+    isLoading: loadingStockMovements,
+    error: stockMovementsError,
+  } = useDepotStockMovements(queryFilters);
 
   const { data: actionTypes = [] } = useInventoryActionTypes();
 
@@ -112,7 +130,7 @@ const StockMovementTable: React.FC = () => {
         actionType: movement.actionType,
         sourceType: movement.sourceType,
         sourceName: movement.sourceName,
-        sourceId: movement.sourceId?.toString() || '',
+        sourceId: movement.sourceId?.toString() || "",
         notes: movement.note,
         createdAt: movement.createdAt,
         createdByName: movement.performedByName,
@@ -131,39 +149,42 @@ const StockMovementTable: React.FC = () => {
   // Get unique source names from stock movements for filter
   const uniqueSourceNames = useMemo(() => {
     if (!stockMovementsData?.items) return [];
-    const names = new Set(stockMovementsData.items.map(t => t.sourceName));
+    const names = new Set(stockMovementsData.items.map((t) => t.sourceName));
     return Array.from(names).sort();
   }, [stockMovementsData]);
 
   // Filter stock movements by source name and search
   const filteredStockMovements = useMemo(() => {
     if (!stockMovements) return null;
-    
+
     let filtered = stockMovements.content;
-    
+
     // Filter by search term
     if (debouncedSearch.trim()) {
       const term = debouncedSearch.toLowerCase();
-      filtered = filtered.filter(t =>
-        t.sourceName.toLowerCase().includes(term) ||
-        t.items.some(i => i.itemName.toLowerCase().includes(term))
+      filtered = filtered.filter(
+        (t) =>
+          t.sourceName.toLowerCase().includes(term) ||
+          t.items.some((i) => i.itemName.toLowerCase().includes(term)),
       );
     }
-    
+
     // Filter by selected source names
     if (selectedSourceNames.length > 0) {
-      filtered = filtered.filter(t => selectedSourceNames.includes(t.sourceName));
+      filtered = filtered.filter((t) =>
+        selectedSourceNames.includes(t.sourceName),
+      );
     }
-    
+
     return {
       ...stockMovements,
-      content: filtered
+      content: filtered,
     };
   }, [stockMovements, debouncedSearch, selectedSourceNames]);
 
   // Clear filters
   const clearFilters = () => {
-    setSearch('');
+    setSearch("");
     setSelectedActionTypes([]);
     setSelectedSourceTypes([]);
     setSelectedSourceNames([]);
@@ -171,35 +192,62 @@ const StockMovementTable: React.FC = () => {
   };
 
   const hasActiveFilters = useMemo(() => {
-    return search.trim() !== '' ||
+    return (
+      search.trim() !== "" ||
       selectedActionTypes.length > 0 ||
       selectedSourceTypes.length > 0 ||
       selectedSourceNames.length > 0 ||
-        dateRange?.from ||
-        dateRange?.to;
-  }, [search, selectedActionTypes, selectedSourceTypes, selectedSourceNames, dateRange]);
+      dateRange?.from ||
+      dateRange?.to
+    );
+  }, [
+    search,
+    selectedActionTypes,
+    selectedSourceTypes,
+    selectedSourceNames,
+    dateRange,
+  ]);
 
-  const ACTION_TYPE_MAP: Record<string, { label: string; className: string }> = {
-    Import:      { label: "Nhập kho",    className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-    Export:      { label: "Xuất kho",    className: "bg-red-100 text-red-700 border-red-200" },
-    Adjust:      { label: "Điều chỉnh",  className: "bg-orange-100 text-orange-700 border-orange-200" },
-    Return:      { label: "Hoàn trả",    className: "bg-blue-100 text-blue-700 border-blue-200" },
-    TransferIn:  { label: "Chuyển nhập", className: "bg-teal-100 text-teal-700 border-teal-200" },
-    TransferOut: { label: "Chuyển xuất", className: "bg-purple-100 text-purple-700 border-purple-200" },
-  };
+  const ACTION_TYPE_MAP: Record<string, { label: string; className: string }> =
+    {
+      Import: {
+        label: "Nhập kho",
+        className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+      },
+      Export: {
+        label: "Xuất kho",
+        className: "bg-red-100 text-red-700 border-red-200",
+      },
+      Adjust: {
+        label: "Điều chỉnh",
+        className: "bg-orange-100 text-orange-700 border-orange-200",
+      },
+      Return: {
+        label: "Hoàn trả",
+        className: "bg-blue-100 text-blue-700 border-blue-200",
+      },
+      TransferIn: {
+        label: "Chuyển nhập",
+        className: "bg-teal-100 text-teal-700 border-teal-200",
+      },
+      TransferOut: {
+        label: "Chuyển xuất",
+        className: "bg-purple-100 text-purple-700 border-purple-200",
+      },
+    };
 
   const SOURCE_TYPE_MAP: Record<string, string> = {
-    Donation:   "Quyên góp",
-    Mission:    "Nhiệm vụ",
-    Purchase:   "Mua sắm",
+    Donation: "Quyên góp",
+    Mission: "Nhiệm vụ",
+    Purchase: "Mua sắm",
     Adjustment: "Điều chỉnh",
-    Transfer:   "Chuyển kho",
-    Manual:     "Thủ công",
+    Transfer: "Chuyển kho",
+    Manual: "Thủ công",
   };
 
   // Format date for display
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd/MM/yyyy HH:mm', { locale: vi });
+    return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: vi });
   };
 
   // Get action type badge with Vietnamese label + proper color
@@ -230,192 +278,245 @@ const StockMovementTable: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
       >
-      <Card className="mx-6 mt-4 mb-4">
-        <CardHeader className="pb-0.5">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Bộ lọc
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Search and Clear */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1">
-              <Input
-                placeholder="Tìm kiếm theo tên nguồn hoặc vật tư..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
-               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            </div>
-            {hasActiveFilters && (
-              <Button
-                variant="outline"
-                onClick={clearFilters}
-                className="shrink-0"
-              >
-                <X className="h-4 w-4 mr-2" />
-                Xóa bộ lọc
-              </Button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Action Types Filter */}
-            <div className="space-y-2">
-              <Label className="text-sm tracking-tighter font-mono">Loại hành động</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    {selectedActionTypes.length === 0 
-                      ? "Chọn loại hành động..." 
-                      : `${selectedActionTypes.length} đã chọn`
-                    }
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80" align="start">
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {actionTypes.map((actionType) => (
-                      <div key={actionType.key} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`action-${actionType.key}`}
-                          checked={selectedActionTypes.includes(actionType.key)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedActionTypes([...selectedActionTypes, actionType.key]);
-                            } else {
-                              setSelectedActionTypes(selectedActionTypes.filter(key => key !== actionType.key));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`action-${actionType.key}`} className="text-sm tracking-tighter">
-                          {ACTION_TYPE_MAP[actionType.key]?.label ?? actionType.value}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
+        <Card className="mx-6 mt-4 mb-4">
+          <CardHeader className="pb-0.5">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Bộ lọc
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Search and Clear */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Input
+                  placeholder="Tìm kiếm theo tên nguồn hoặc vật phẩm..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              </div>
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  onClick={clearFilters}
+                  className="shrink-0"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Xóa bộ lọc
+                </Button>
+              )}
             </div>
 
-            {/* Source Types Filter */}
-            <div className="space-y-2">
-              <Label className="text-sm tracking-tighter font-mono">Loại nguồn</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    {selectedSourceTypes.length === 0 
-                      ? "Chọn loại nguồn..." 
-                      : `${selectedSourceTypes.length} đã chọn`
-                    }
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80" align="start">
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {sourceTypes.map((sourceType) => (
-                      <div key={sourceType.key} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`source-${sourceType.key}`}
-                          checked={selectedSourceTypes.includes(sourceType.key)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedSourceTypes([...selectedSourceTypes, sourceType.key]);
-                            } else {
-                              setSelectedSourceTypes(selectedSourceTypes.filter(key => key !== sourceType.key));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`source-${sourceType.key}`} className="text-sm tracking-tighter">
-                          {SOURCE_TYPE_MAP[sourceType.key] ?? sourceType.value}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Action Types Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm tracking-tighter font-mono">
+                  Loại hành động
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
+                      {selectedActionTypes.length === 0
+                        ? "Chọn loại hành động..."
+                        : `${selectedActionTypes.length} đã chọn`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80" align="start">
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {actionTypes.map((actionType) => (
+                        <div
+                          key={actionType.key}
+                          className="flex items-center space-x-2"
+                        >
+                          <Checkbox
+                            id={`action-${actionType.key}`}
+                            checked={selectedActionTypes.includes(
+                              actionType.key,
+                            )}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedActionTypes([
+                                  ...selectedActionTypes,
+                                  actionType.key,
+                                ]);
+                              } else {
+                                setSelectedActionTypes(
+                                  selectedActionTypes.filter(
+                                    (key) => key !== actionType.key,
+                                  ),
+                                );
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`action-${actionType.key}`}
+                            className="text-sm tracking-tighter"
+                          >
+                            {ACTION_TYPE_MAP[actionType.key]?.label ??
+                              actionType.value}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            {/* Source Names Filter */}
-            <div className="space-y-2">
-              <Label className="text-sm tracking-tighter font-mono">Tên nguồn</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start">
-                    {selectedSourceNames.length === 0 
-                      ? "Chọn tên nguồn..." 
-                      : `${selectedSourceNames.length} đã chọn`
-                    }
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80" align="start">
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {uniqueSourceNames.map((sourceName) => (
-                      <div key={sourceName} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`source-name-${sourceName}`}
-                          checked={selectedSourceNames.includes(sourceName)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedSourceNames([...selectedSourceNames, sourceName]);
-                            } else {
-                              setSelectedSourceNames(selectedSourceNames.filter(name => name !== sourceName));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`source-name-${sourceName}`} className="text-sm tracking-tighter">
-                          {sourceName || "Không có"}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
+              {/* Source Types Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm tracking-tighter font-mono">
+                  Loại nguồn
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
+                      {selectedSourceTypes.length === 0
+                        ? "Chọn loại nguồn..."
+                        : `${selectedSourceTypes.length} đã chọn`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80" align="start">
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {sourceTypes.map((sourceType) => (
+                        <div
+                          key={sourceType.key}
+                          className="flex items-center space-x-2"
+                        >
+                          <Checkbox
+                            id={`source-${sourceType.key}`}
+                            checked={selectedSourceTypes.includes(
+                              sourceType.key,
+                            )}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedSourceTypes([
+                                  ...selectedSourceTypes,
+                                  sourceType.key,
+                                ]);
+                              } else {
+                                setSelectedSourceTypes(
+                                  selectedSourceTypes.filter(
+                                    (key) => key !== sourceType.key,
+                                  ),
+                                );
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`source-${sourceType.key}`}
+                            className="text-sm tracking-tighter"
+                          >
+                            {SOURCE_TYPE_MAP[sourceType.key] ??
+                              sourceType.value}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            {/* Date Range Filter */}
-            <div className="space-y-2">
-              <Label className="text-sm tracking-tighter font-mono">Khoảng thời gian</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dateRange?.from && "font-medium"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange?.from ? (
-                      dateRange?.to ? (
-                        <>
-                          {format(dateRange.from, "dd/MM/yyyy", { locale: vi })} -{" "}
-                          {format(dateRange.to, "dd/MM/yyyy", { locale: vi })}
-                        </>
+              {/* Source Names Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm tracking-tighter font-mono">
+                  Tên nguồn
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
+                      {selectedSourceNames.length === 0
+                        ? "Chọn tên nguồn..."
+                        : `${selectedSourceNames.length} đã chọn`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80" align="start">
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {uniqueSourceNames.map((sourceName) => (
+                        <div
+                          key={sourceName}
+                          className="flex items-center space-x-2"
+                        >
+                          <Checkbox
+                            id={`source-name-${sourceName}`}
+                            checked={selectedSourceNames.includes(sourceName)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedSourceNames([
+                                  ...selectedSourceNames,
+                                  sourceName,
+                                ]);
+                              } else {
+                                setSelectedSourceNames(
+                                  selectedSourceNames.filter(
+                                    (name) => name !== sourceName,
+                                  ),
+                                );
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`source-name-${sourceName}`}
+                            className="text-sm tracking-tighter"
+                          >
+                            {sourceName || "Không có"}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Date Range Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm tracking-tighter font-mono">
+                  Khoảng thời gian
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateRange?.from && "font-medium",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange?.from ? (
+                        dateRange?.to ? (
+                          <>
+                            {format(dateRange.from, "dd/MM/yyyy", {
+                              locale: vi,
+                            })}{" "}
+                            -{" "}
+                            {format(dateRange.to, "dd/MM/yyyy", { locale: vi })}
+                          </>
+                        ) : (
+                          format(dateRange.from, "dd/MM/yyyy", { locale: vi })
+                        )
                       ) : (
-                        format(dateRange.from, "dd/MM/yyyy", { locale: vi })
-                      )
-                    ) : (
-                      "Chọn khoảng thời gian"
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    initialFocus
-                    mode="range"
-                    defaultMonth={dateRange?.from}
-                    selected={dateRange}
-                    onSelect={setDateRange}
-                    numberOfMonths={2}
-                    locale={vi}
-                  />
-                </PopoverContent>
-              </Popover>
+                        "Chọn khoảng thời gian"
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange?.from}
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      numberOfMonths={2}
+                      locale={vi}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
       </motion.div>
 
       {/* Table */}
@@ -440,7 +541,11 @@ const StockMovementTable: React.FC = () => {
                     </span>
                     <Separator orientation="vertical" className="h-4" />
                     <span>
-                      Tổng {displayStockMovements.totalElements.toLocaleString('vi-VN')} lần
+                      Tổng{" "}
+                      {displayStockMovements.totalElements.toLocaleString(
+                        "vi-VN",
+                      )}{" "}
+                      lần
                     </span>
                   </>
                 )}
@@ -457,22 +562,38 @@ const StockMovementTable: React.FC = () => {
                       <TableHead className="pl-6">Mã</TableHead>
                       <TableHead>Loại hành động</TableHead>
                       <TableHead>Nguồn</TableHead>
-                      <TableHead>Vật tư</TableHead>
-                      <TableHead>Thời gian</TableHead>                   
+                      <TableHead>Vật phẩm</TableHead>
+                      <TableHead>Thời gian</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loadingStockMovements ? (
                       Array.from({ length: pageSize }, (_, i) => (
                         <TableRow key={i}>
-                          <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                          <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                          <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                          <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                          <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                          <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                          <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
-                          <TableCell><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
+                          <TableCell>
+                            <div className="h-4 bg-muted animate-pulse rounded" />
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 bg-muted animate-pulse rounded" />
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 bg-muted animate-pulse rounded" />
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 bg-muted animate-pulse rounded" />
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 bg-muted animate-pulse rounded" />
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 bg-muted animate-pulse rounded" />
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 bg-muted animate-pulse rounded" />
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-4 bg-muted animate-pulse rounded" />
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : stockMovementsError ? (
@@ -503,12 +624,18 @@ const StockMovementTable: React.FC = () => {
                           key={movement.id}
                           className="hover:bg-muted/50 cursor-pointer border-b border-border/50"
                           onClick={() => {
-                            setSelectedMovement(movement.rawMovement as StockMovementEntity);
+                            setSelectedMovement(
+                              movement.rawMovement as StockMovementEntity,
+                            );
                             setSheetOpen(true);
                           }}
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.25, delay: idx * 0.04, ease: "easeOut" }}
+                          transition={{
+                            duration: 0.25,
+                            delay: idx * 0.04,
+                            ease: "easeOut",
+                          }}
                         >
                           <TableCell className="font-regular text-sm pl-6">
                             {movement.transactionId}
@@ -516,30 +643,61 @@ const StockMovementTable: React.FC = () => {
                           <TableCell>
                             {getActionTypeBadge(movement.actionType)}
                           </TableCell>
-                          <TableCell>
-                            {movement.sourceName || "—"}
-                          </TableCell>
+                          <TableCell>{movement.sourceName || "—"}</TableCell>
                           <TableCell>
                             {movement.items.length === 1 ? (
                               <div>
-                                <p className="font-medium text-sm">{movement.items[0].itemName}</p>
-                                <p className="text-xs text-muted-foreground">{movement.items[0].categoryName}</p>
+                                <p className="font-medium text-sm">
+                                  {movement.items[0].itemName}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {movement.items[0].categoryName}
+                                </p>
                                 {movement.items[0].receivedDate && (
                                   <p className="text-xs text-muted-foreground mt-0.5">
-                                    Nhập: {format(new Date(movement.items[0].receivedDate), "dd/MM/yyyy", { locale: vi })}
+                                    Nhập:{" "}
+                                    {format(
+                                      new Date(movement.items[0].receivedDate),
+                                      "dd/MM/yyyy",
+                                      { locale: vi },
+                                    )}
                                     {movement.items[0].expiredDate && (
-                                      <> • Hết hạn: <span className={new Date(movement.items[0].expiredDate) < new Date() ? "text-red-500 font-medium" : ""}>
-                                        {format(new Date(movement.items[0].expiredDate), "dd/MM/yyyy", { locale: vi })}
-                                      </span></>
+                                      <>
+                                        {" "}
+                                        • Hết hạn:{" "}
+                                        <span
+                                          className={
+                                            new Date(
+                                              movement.items[0].expiredDate,
+                                            ) < new Date()
+                                              ? "text-red-500 font-medium"
+                                              : ""
+                                          }
+                                        >
+                                          {format(
+                                            new Date(
+                                              movement.items[0].expiredDate,
+                                            ),
+                                            "dd/MM/yyyy",
+                                            { locale: vi },
+                                          )}
+                                        </span>
+                                      </>
                                     )}
                                   </p>
                                 )}
                               </div>
                             ) : (
                               <div>
-                                <p className="font-medium text-sm">{movement.items[0].itemName}</p>
-                                <p className="text-xs text-muted-foreground">{movement.items[0].categoryName}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5 italic">+{movement.items.length - 1} mặt hàng khác</p>
+                                <p className="font-medium text-sm">
+                                  {movement.items[0].itemName}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {movement.items[0].categoryName}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5 italic">
+                                  +{movement.items.length - 1} mặt hàng khác
+                                </p>
                               </div>
                             )}
                           </TableCell>
@@ -554,57 +712,64 @@ const StockMovementTable: React.FC = () => {
               </div>
 
               {/* Pagination */}
-              {displayStockMovements && displayStockMovements.totalPages > 0 && (
-                <div className="border-t bg-background px-6 py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm tracking-tighter text-muted-foreground">
-                      <span>Hiển thị</span>
-                      <Select
-                        value={pageSize.toString()}
-                        onValueChange={(value) => {
-                          setPageSize(Number(value));
-                          setPage(0);
-                        }}
-                      >
-                        <SelectTrigger className="w-20 h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PAGE_SIZES.map((size) => (
-                            <SelectItem key={size} value={size.toString()}>
-                              {size}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <span>/ {displayStockMovements.totalElements} kết quả</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage(page - 1)}
-                        disabled={displayStockMovements.first || loadingStockMovements}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                        Trước
-                      </Button>
-                      <span className="text-sm text-muted-foreground">
-                        {page + 1} / {displayStockMovements.totalPages}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage(page + 1)}
-                        disabled={displayStockMovements.last || loadingStockMovements}
-                      >
-                        Sau
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+              {displayStockMovements &&
+                displayStockMovements.totalPages > 0 && (
+                  <div className="border-t bg-background px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm tracking-tighter text-muted-foreground">
+                        <span>Hiển thị</span>
+                        <Select
+                          value={pageSize.toString()}
+                          onValueChange={(value) => {
+                            setPageSize(Number(value));
+                            setPage(0);
+                          }}
+                        >
+                          <SelectTrigger className="w-20 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PAGE_SIZES.map((size) => (
+                              <SelectItem key={size} value={size.toString()}>
+                                {size}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span>
+                          / {displayStockMovements.totalElements} kết quả
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage(page - 1)}
+                          disabled={
+                            displayStockMovements.first || loadingStockMovements
+                          }
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                          Trước
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                          {page + 1} / {displayStockMovements.totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage(page + 1)}
+                          disabled={
+                            displayStockMovements.last || loadingStockMovements
+                          }
+                        >
+                          Sau
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           </CardContent>
         </Card>

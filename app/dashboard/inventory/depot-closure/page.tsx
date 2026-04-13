@@ -452,8 +452,12 @@ export default function DepotClosurePage() {
         )
         .find(
           (item) =>
-            !TERMINAL_TRANSFER_STATUSES.has(normalizeTransferStatus(item.status)),
-        ) ?? transferList[0] ?? null
+            !TERMINAL_TRANSFER_STATUSES.has(
+              normalizeTransferStatus(item.status),
+            ),
+        ) ??
+      transferList[0] ??
+      null
     );
   }, [routeTransferId, transferList]);
 
@@ -487,12 +491,10 @@ export default function DepotClosurePage() {
     selectedTransfer?.closureId ??
     selectedClosureSummary?.id ??
     null;
-  const {
-    data: activeClosureDetail,
-    refetch: refetchClosureDetail,
-  } = useMyDepotClosureDetail(activeClosureId ?? 0, {
-    enabled: !!activeClosureId,
-  });
+  const { data: activeClosureDetail, refetch: refetchClosureDetail } =
+    useMyDepotClosureDetail(activeClosureId ?? 0, {
+      enabled: !!activeClosureId,
+    });
 
   const activeTransferId = selectedTransfer?.transferId ?? null;
   const activeTransfer = activeClosureDetail?.transferDetail ?? null;
@@ -504,11 +506,15 @@ export default function DepotClosurePage() {
   const sourceDepotName =
     selectedTransfer?.sourceDepotName ??
     activeClosureDetail?.depotName ??
-    (activeTransfer?.sourceDepotId ? `Kho #${activeTransfer.sourceDepotId}` : null);
+    (activeTransfer?.sourceDepotId
+      ? `Kho #${activeTransfer.sourceDepotId}`
+      : null);
   const targetDepotName =
     selectedTransfer?.targetDepotName ??
     activeClosureDetail?.targetDepotName ??
-    (activeTransfer?.targetDepotId ? `Kho #${activeTransfer.targetDepotId}` : null);
+    (activeTransfer?.targetDepotId
+      ? `Kho #${activeTransfer.targetDepotId}`
+      : null);
   const snapshotConsumableUnits =
     activeTransfer?.snapshotConsumableUnits ??
     selectedTransfer?.snapshotConsumableUnits ??
@@ -755,9 +761,7 @@ export default function DepotClosurePage() {
     );
   }
 
-  const hasActiveTransferPanel = Boolean(
-    activeTransferId && selectedTransfer,
-  );
+  const hasActiveTransferPanel = Boolean(activeTransferId && selectedTransfer);
   const effectiveClosureStatus =
     activeClosureDetail?.status ??
     selectedClosureSummary?.status ??
@@ -802,10 +806,11 @@ export default function DepotClosurePage() {
                                     ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
                                     : depot.status === "UnderMaintenance"
                                       ? "bg-purple-500/10 text-purple-700 dark:text-purple-400"
-                                      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
                       )}
                     >
-                      {statusMetadata?.find((s) => s.key === depot.status)?.value ??
+                      {statusMetadata?.find((s) => s.key === depot.status)
+                        ?.value ??
                         (depot.status === "Closing"
                           ? "Đang tiến hành đóng kho"
                           : depot.status === "Closed"
@@ -859,7 +864,8 @@ export default function DepotClosurePage() {
                   Phiên đóng kho #{activeClosureDetail.id}
                 </h2>
                 <p className="text-sm text-muted-foreground tracking-tight mt-0.5">
-                  {activeClosureDetail.closeReason || "Không có lý do chi tiết."}
+                  {activeClosureDetail.closeReason ||
+                    "Không có lý do chi tiết."}
                 </p>
               </div>
               <Badge variant="outline" className="text-sm tracking-tight">
@@ -961,7 +967,10 @@ export default function DepotClosurePage() {
                     Kết quả xử lý bên ngoài
                   </p>
                   <p className="text-sm text-muted-foreground tracking-tight">
-                    {activeClosureDetail.externalItems.length.toLocaleString("vi-VN")} mục đã được ghi nhận.
+                    {activeClosureDetail.externalItems.length.toLocaleString(
+                      "vi-VN",
+                    )}{" "}
+                    mục đã được ghi nhận.
                   </p>
                 </div>
                 <div className="w-full">
@@ -972,58 +981,67 @@ export default function DepotClosurePage() {
                     <div>Tổng tiền</div>
                   </div>
                   <div className="divide-y divide-border/60">
-                    {activeClosureDetail.externalItems.slice(0, 5).map((item) => {
-                      const hm = item.handlingMethod || "";
-                      const hmBadgeCls = hm === "DonatedToOrganization"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400"
-                        : hm === "Liquidated"
-                        ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-400"
-                        : hm === "Destroyed" || hm === "Expired"
-                        ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:border-red-800 dark:text-red-400"
-                        : hm === "Disposed"
-                        ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-900/30 dark:border-zinc-700 dark:text-zinc-400"
-                        : "bg-muted border-border text-muted-foreground";
+                    {activeClosureDetail.externalItems
+                      .slice(0, 5)
+                      .map((item) => {
+                        const hm = item.handlingMethod || "";
+                        const hmBadgeCls =
+                          hm === "DonatedToOrganization"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400"
+                            : hm === "Liquidated"
+                              ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800 dark:text-blue-400"
+                              : hm === "Destroyed" || hm === "Expired"
+                                ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:border-red-800 dark:text-red-400"
+                                : hm === "Disposed"
+                                  ? "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-900/30 dark:border-zinc-700 dark:text-zinc-400"
+                                  : "bg-muted border-border text-muted-foreground";
 
-                      return (
-                        <div
-                          key={item.id}
-                          className="px-5 py-3.5 grid grid-cols-1 md:grid-cols-[1.5fr_3fr_2fr_1fr] gap-4 items-start hover:bg-muted/30 transition-colors"
-                        >
-                          <div>
-                            <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
-                              Vật phẩm
-                            </p>
-                            <p className="text-sm font-semibold tracking-tight">
-                              {item.itemName}
-                            </p>
+                        return (
+                          <div
+                            key={item.id}
+                            className="px-5 py-3.5 grid grid-cols-1 md:grid-cols-[1.5fr_3fr_2fr_1fr] gap-4 items-start hover:bg-muted/30 transition-colors"
+                          >
+                            <div>
+                              <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
+                                Vật phẩm
+                              </p>
+                              <p className="text-sm font-semibold tracking-tight">
+                                {item.itemName}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground tracking-tight mb-1.5 md:hidden">
+                                Cách xử lý
+                              </p>
+                              <span
+                                className={cn(
+                                  "text-[11px] font-bold px-1.5 py-0.5 rounded-md border tracking-tighter",
+                                  hmBadgeCls,
+                                )}
+                              >
+                                {item.handlingMethodDisplay ||
+                                  item.handlingMethod}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
+                                Người nhận
+                              </p>
+                              <p className="text-sm font-semibold tracking-tight">
+                                {item.recipient || "—"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
+                                Tổng tiền
+                              </p>
+                              <p className="text-sm font-semibold tracking-tight">
+                                {item.totalPrice.toLocaleString("vi-VN")}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground tracking-tight mb-1.5 md:hidden">
-                              Cách xử lý
-                            </p>
-                            <span className={cn("text-[11px] font-bold px-1.5 py-0.5 rounded-md border tracking-tighter", hmBadgeCls)}>
-                              {item.handlingMethodDisplay || item.handlingMethod}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
-                              Người nhận
-                            </p>
-                            <p className="text-sm font-semibold tracking-tight">
-                              {item.recipient || "—"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground tracking-tight mb-1 md:hidden">
-                              Tổng tiền
-                            </p>
-                            <p className="text-sm font-semibold tracking-tight">
-                              {item.totalPrice.toLocaleString("vi-VN")}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 </div>
               </div>
@@ -1130,67 +1148,67 @@ export default function DepotClosurePage() {
               {/* Step Progress */}
               <div className="rounded-[24px] border border-white/70 dark:border-blue-900/60 bg-white/75 dark:bg-slate-950/25 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
                 <div className="flex items-start">
-                {TRANSFER_STEPS.map((step, i) => {
-                  const cur = STEP_ORDER.indexOf(currentTransferStatus);
-                  const me = STEP_ORDER.indexOf(step.key);
-                  const done = me < cur;
-                  const active = me === cur;
-                  return (
-                    <React.Fragment key={step.key}>
-                      {i > 0 && (
-                        <div
-                          className={cn(
-                            "h-1 flex-1 mt-3.5 mx-1 rounded-full transition-colors",
-                            done || active
-                              ? "bg-blue-400 dark:bg-blue-500"
-                              : "bg-blue-100 dark:bg-blue-950/70",
-                          )}
-                        />
-                      )}
-                      <div className="flex flex-col items-center gap-1.5 shrink-0 w-24">
-                        <div
-                          className={cn(
-                            "relative h-9 w-9 rounded-full border-2 flex items-center justify-center transition-all shadow-sm",
-                            done
-                              ? "bg-blue-500 border-blue-500 text-white shadow-[0_16px_24px_-16px_rgba(59,130,246,0.9)]"
-                              : active
-                                ? "bg-white border-blue-500 text-blue-600 dark:bg-blue-950 ring-4 ring-blue-100 dark:ring-blue-900/80 shadow-[0_12px_24px_-18px_rgba(59,130,246,0.9)]"
-                                : "bg-white/80 border-blue-100 text-blue-300 dark:bg-blue-950/50 dark:border-blue-900",
-                          )}
-                        >
-                          {active && (
-                            <>
-                              <span className="absolute inset-[-8px] rounded-full border border-blue-300/80 dark:border-blue-500/50 animate-ping" />
-                              <span
-                                className="absolute inset-[-14px] rounded-full border border-blue-200/60 dark:border-blue-400/30 animate-ping"
-                                style={{ animationDelay: "250ms" }}
-                              />
-                            </>
-                          )}
-                          {done ? (
-                            <CheckFat size={13} weight="fill" />
-                          ) : (
-                            <span className="text-xs font-black leading-none">
-                              {i + 1}
-                            </span>
-                          )}
+                  {TRANSFER_STEPS.map((step, i) => {
+                    const cur = STEP_ORDER.indexOf(currentTransferStatus);
+                    const me = STEP_ORDER.indexOf(step.key);
+                    const done = me < cur;
+                    const active = me === cur;
+                    return (
+                      <React.Fragment key={step.key}>
+                        {i > 0 && (
+                          <div
+                            className={cn(
+                              "h-1 flex-1 mt-3.5 mx-1 rounded-full transition-colors",
+                              done || active
+                                ? "bg-blue-400 dark:bg-blue-500"
+                                : "bg-blue-100 dark:bg-blue-950/70",
+                            )}
+                          />
+                        )}
+                        <div className="flex flex-col items-center gap-1.5 shrink-0 w-24">
+                          <div
+                            className={cn(
+                              "relative h-9 w-9 rounded-full border-2 flex items-center justify-center transition-all shadow-sm",
+                              done
+                                ? "bg-blue-500 border-blue-500 text-white shadow-[0_16px_24px_-16px_rgba(59,130,246,0.9)]"
+                                : active
+                                  ? "bg-white border-blue-500 text-blue-600 dark:bg-blue-950 ring-4 ring-blue-100 dark:ring-blue-900/80 shadow-[0_12px_24px_-18px_rgba(59,130,246,0.9)]"
+                                  : "bg-white/80 border-blue-100 text-blue-300 dark:bg-blue-950/50 dark:border-blue-900",
+                            )}
+                          >
+                            {active && (
+                              <>
+                                <span className="absolute inset-[-8px] rounded-full border border-blue-300/80 dark:border-blue-500/50 animate-ping" />
+                                <span
+                                  className="absolute inset-[-14px] rounded-full border border-blue-200/60 dark:border-blue-400/30 animate-ping"
+                                  style={{ animationDelay: "250ms" }}
+                                />
+                              </>
+                            )}
+                            {done ? (
+                              <CheckFat size={13} weight="fill" />
+                            ) : (
+                              <span className="text-xs font-black leading-none">
+                                {i + 1}
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            className={cn(
+                              "text-sm font-medium text-center leading-tight tracking-tighter whitespace-nowrap",
+                              done
+                                ? "text-blue-600 dark:text-blue-300 font-semibold"
+                                : active
+                                  ? "text-blue-800 dark:text-blue-200 font-bold"
+                                  : "text-muted-foreground",
+                            )}
+                          >
+                            {step.label}
+                          </span>
                         </div>
-                        <span
-                          className={cn(
-                            "text-sm font-medium text-center leading-tight tracking-tighter whitespace-nowrap",
-                            done
-                              ? "text-blue-600 dark:text-blue-300 font-semibold"
-                              : active
-                                ? "text-blue-800 dark:text-blue-200 font-bold"
-                                : "text-muted-foreground",
-                          )}
-                        >
-                          {step.label}
-                        </span>
-                      </div>
-                    </React.Fragment>
-                  );
-                })}
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1198,7 +1216,7 @@ export default function DepotClosurePage() {
               <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5">
                 {[
                   {
-                    label: "Vật tư tiêu thụ",
+                    label: "Vật phẩm tiêu thụ",
                     value: snapshotConsumableUnits.toLocaleString("vi-VN"),
                     icon: <Package size={16} weight="fill" />,
                     tone: "text-blue-700 dark:text-blue-300",
@@ -1225,8 +1243,8 @@ export default function DepotClosurePage() {
                         : currentTransferStatus === "Shipping"
                           ? "Đang đi đường"
                           : currentTransferStatus === "Preparing"
-                          ? "Đang soạn hàng"
-                          : "Sẵn sàng thao tác",
+                            ? "Đang soạn hàng"
+                            : "Sẵn sàng thao tác",
                     icon: <Truck size={16} weight="fill" />,
                     tone: "text-cyan-700 dark:text-cyan-300",
                   },
@@ -1484,7 +1502,7 @@ export default function DepotClosurePage() {
                   </p>
                 </div>
                 <p className="text-sm text-amber-700 dark:text-amber-300 tracking-tighter">
-                  Tải template xử lý, điền kết quả theo từng dòng vật tư, rồi
+                  Tải template xử lý, điền kết quả theo từng dòng vật phẩm, rồi
                   tải file Excel lên để gửi vào hệ thống.
                 </p>
               </div>
@@ -1762,7 +1780,6 @@ export default function DepotClosurePage() {
           </div>
         )}
       </main>
-
     </div>
   );
 }

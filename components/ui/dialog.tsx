@@ -111,7 +111,7 @@ function DialogContent({
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
           onClick={() => onOpenChange(false)}
         >
-          <X className="h-4 w-4" />
+          <X className="h-5 w-5" />
           <span className="sr-only">Close</span>
         </button>
       </div>

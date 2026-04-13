@@ -1,9 +1,20 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useMyDepotInventory, useInventoryCategories, useInventoryItemTypes, useInventoryTargetGroups } from "@/services/inventory/hooks";
+import {
+  useMyDepotInventory,
+  useInventoryCategories,
+  useInventoryItemTypes,
+  useInventoryTargetGroups,
+} from "@/services/inventory/hooks";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { MagnifyingGlass, Package, ArrowDown, ArrowUp, Warning } from "@phosphor-icons/react";
+import {
+  MagnifyingGlass,
+  Package,
+  ArrowDown,
+  ArrowUp,
+  Warning,
+} from "@phosphor-icons/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InventoryItemEntity } from "@/services/inventory/type";
 
@@ -13,9 +24,13 @@ interface VatTuSectionProps {
 
 export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
   const [page, setPage] = useState(1);
-  const [selectedCategoryCodes, setSelectedCategoryCodes] = useState<string[]>([]);
+  const [selectedCategoryCodes, setSelectedCategoryCodes] = useState<string[]>(
+    [],
+  );
   const [selectedItemTypes, setSelectedItemTypes] = useState<string[]>([]);
-  const [selectedTargetGroups, setSelectedTargetGroups] = useState<string | null>(null);
+  const [selectedTargetGroups, setSelectedTargetGroups] = useState<
+    string | null
+  >(null);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<string>("name_asc");
 
@@ -23,7 +38,11 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
   const { data: itemTypesData } = useInventoryItemTypes();
   const { data: targetGroupsData } = useInventoryTargetGroups();
 
-  const { data: inventoryData, isLoading, isError } = useMyDepotInventory({
+  const {
+    data: inventoryData,
+    isLoading,
+    isError,
+  } = useMyDepotInventory({
     pageNumber: page,
     pageSize: 10,
     categoryCode:
@@ -40,14 +59,14 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
   };
 
   const toggleItemType = (type: string) => {
-    setSelectedItemTypes(prev =>
-      prev.includes(type) ? prev.filter(x => x !== type) : [...prev, type]
+    setSelectedItemTypes((prev) =>
+      prev.includes(type) ? prev.filter((x) => x !== type) : [...prev, type],
     );
     setPage(1);
   };
 
   const toggleTargetGroup = (group: string) => {
-    setSelectedTargetGroups(prev => prev === group ? null : group);
+    setSelectedTargetGroups((prev) => (prev === group ? null : group));
     setPage(1);
   };
 
@@ -69,7 +88,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
         <div className="relative">
           <MagnifyingGlass className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Tìm kiếm vật tư theo tên..."
+            placeholder="Tìm kiếm vật phẩm theo tên..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9 rounded-none border-x-0 border-t-0 border-b border-black/20 dark:border-white/20 bg-transparent focus-visible:ring-0 focus-visible:border-black dark:focus-visible:border-white transition-all text-sm"
@@ -80,17 +99,20 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
         <div className="space-y-2">
           {/* Category chips */}
           <div className="flex flex-wrap gap-0">
-            <span className="text-[14px] text-primary tracking-tighter font-semibold mr-2 self-center">Danh mục:</span>
+            <span className="text-[14px] text-primary tracking-tighter font-semibold mr-2 self-center">
+              Danh mục:
+            </span>
             {categories?.map((cat) => {
               const isActive = selectedCategoryCodes.includes(cat.key);
               return (
                 <button
                   key={cat.key}
                   onClick={() => toggleCategory(cat.key)}
-                  className={`px-3 py-2 text-sm tracking-tighter border transition-all ${isActive
-                    ? "bg-[#FF5722] text-white border-[#FF5722]"
-                    : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
-                    }`}
+                  className={`px-3 py-2 text-sm tracking-tighter border transition-all ${
+                    isActive
+                      ? "bg-[#FF5722] text-white border-[#FF5722]"
+                      : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
+                  }`}
                 >
                   {cat.value}
                 </button>
@@ -100,17 +122,20 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
           {/* Item type chips */}
           <div className="flex flex-wrap gap-0">
-            <span className="text-[14px] text-primary tracking-tighter font-semibold mr-2 self-center">Loại:</span>
+            <span className="text-[14px] text-primary tracking-tighter font-semibold mr-2 self-center">
+              Loại:
+            </span>
             {itemTypesData?.map((type) => {
               const isActive = selectedItemTypes.includes(type.key);
               return (
                 <button
                   key={type.key}
                   onClick={() => toggleItemType(type.key)}
-                  className={`px-3 py-2 text-sm tracking-tighter border transition-all ${isActive
-                    ? "bg-[#FF5722] text-white border-[#FF5722]"
-                    : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
-                    }`}
+                  className={`px-3 py-2 text-sm tracking-tighter border transition-all ${
+                    isActive
+                      ? "bg-[#FF5722] text-white border-[#FF5722]"
+                      : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
+                  }`}
                 >
                   {type.value}
                 </button>
@@ -120,17 +145,20 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
 
           {/* Target group chips */}
           <div className="flex flex-wrap gap-0">
-            <span className="text-[14px] text-primary tracking-tighter font-semibold mr-2 self-center">Đối tượng:</span>
+            <span className="text-[14px] text-primary tracking-tighter font-semibold mr-2 self-center">
+              Đối tượng:
+            </span>
             {targetGroupsData?.map((group) => {
               const isActive = selectedTargetGroups === group.key;
               return (
                 <button
                   key={group.key}
                   onClick={() => toggleTargetGroup(group.key)}
-                  className={`px-3 py-2 tracking-tighter text-sm border transition-all ${isActive
-                    ? "bg-[#FF5722] text-white border-[#FF5722]"
-                    : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
-                    }`}
+                  className={`px-3 py-2 tracking-tighter text-sm border transition-all ${
+                    isActive
+                      ? "bg-[#FF5722] text-white border-[#FF5722]"
+                      : "bg-transparent border-black/10 dark:border-white/10 text-foreground hover:bg-[#FF5722]/10 hover:border-[#FF5722]/40 hover:text-[#FF5722]"
+                  }`}
                 >
                   {group.value}
                 </button>
@@ -168,7 +196,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
             </Button>
           </div>
         </div>
-        </motion.div>
+      </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -179,7 +207,10 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
           {isLoading ? (
             <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="aspect-[4/5] border border-border/40 p-3 flex flex-col justify-between">
+                <div
+                  key={i}
+                  className="aspect-[4/5] border border-border/40 p-3 flex flex-col justify-between"
+                >
                   <Skeleton className="h-3 w-3/4 mb-2" />
                   <Skeleton className="h-8 w-1/2" />
                 </div>
@@ -192,12 +223,18 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
           ) : inventoryData?.items.length === 0 ? (
             <div className="text-center text-muted-foreground py-10 space-y-2">
               <Package className="h-8 w-8 mx-auto opacity-20" weight="thin" />
-              <p className="text-sm tracking-tighter font-regular opacity-50">Không có dữ liệu</p>
+              <p className="text-sm tracking-tighter font-regular opacity-50">
+                Không có dữ liệu
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {inventoryData?.items
-                .filter(item => item.itemModelName.toLowerCase().includes(search.toLowerCase()))
+                .filter((item) =>
+                  item.itemModelName
+                    .toLowerCase()
+                    .includes(search.toLowerCase()),
+                )
                 .sort((a, b) => {
                   const nameA = a.itemModelName;
                   const nameB = b.itemModelName;
@@ -207,7 +244,10 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                 })
                 .map((item, idx) => {
                   // Determine stock status for border/color accents
-                  const availQty = item.itemType === "Reusable" ? item.availableUnit : item.availableQuantity;
+                  const availQty =
+                    item.itemType === "Reusable"
+                      ? item.availableUnit
+                      : item.availableQuantity;
                   const isOutOfStock = availQty <= 0;
                   const isLowStock = availQty > 0 && availQty < 50; // Mock threshold
 
@@ -216,7 +256,11 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                       key={item.itemModelId}
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, ease: "easeOut", delay: 0.15 + idx * 0.04 }}
+                      transition={{
+                        duration: 0.25,
+                        ease: "easeOut",
+                        delay: 0.15 + idx * 0.04,
+                      }}
                       onClick={() => onItemSelect?.(item)}
                       className="group relative flex aspect-4/5 cursor-pointer flex-col justify-between border border-black/10 bg-card px-3 pt-3 shadow-sm transition-all hover:-translate-y-1 hover:border-[#FF5722] hover:shadow-md dark:border-white/10"
                     >
@@ -225,7 +269,9 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                         <span className="text-[12px] font-medium tracking-tighter uppercase text-muted-foreground truncate max-w-[70%]">
                           {item.categoryName}
                         </span>
-                        <div className={`h-1.5 w-1.5 rounded-full ${isOutOfStock ? "bg-red-500" : isLowStock ? "bg-[#FF5722]" : "bg-black dark:bg-white"}`} />
+                        <div
+                          className={`h-1.5 w-1.5 rounded-full ${isOutOfStock ? "bg-red-500" : isLowStock ? "bg-[#FF5722]" : "bg-black dark:bg-white"}`}
+                        />
                       </div>
 
                       {/* Item Name */}
@@ -244,7 +290,10 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                           />
                         ) : (
                           <div className="flex h-40 items-center justify-center gap-2 px-3 text-[11px] tracking-tighter text-muted-foreground">
-                            <Package className="h-4 w-4 opacity-50" weight="duotone" />
+                            <Package
+                              className="h-4 w-4 opacity-50"
+                              weight="duotone"
+                            />
                             Chưa có ảnh
                           </div>
                         )}
@@ -253,22 +302,32 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                       {/* Bottom Quantity Section */}
                       <div className="mt-auto flex min-h-[5.5rem] flex-col border-t border-black/5 pt-2 dark:border-white/5">
                         <span className="text-[12px] tracking-tighter text-muted-foreground uppercase mb-0.5 max-w-full truncate">
-                          {itemTypesData?.find((t) => t.key === item.itemType)?.value ?? item.itemType}
+                          {itemTypesData?.find((t) => t.key === item.itemType)
+                            ?.value ?? item.itemType}
                         </span>
                         {item.itemType === "Reusable" ? (
                           <div className="flex items-end justify-between gap-1">
                             <div className="flex flex-col">
                               <span className="text-base font-black tracking-tighter">
                                 {item.reusableBreakdown?.availableUnits ?? 0}
-                                <span className="text-[11px] font-normal text-muted-foreground ml-0.5">/ {item.reusableBreakdown?.totalUnits ?? 0}</span>
+                                <span className="text-[11px] font-normal text-muted-foreground ml-0.5">
+                                  / {item.reusableBreakdown?.totalUnits ?? 0}
+                                </span>
                               </span>
                             </div>
                             <div className="flex gap-0.5 items-center">
-                              {(item.reusableBreakdown?.inUseUnits ?? 0) > 0 && (
-                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded tracking-tighter">{item.reusableBreakdown?.inUseUnits} đang dùng</span>
+                              {(item.reusableBreakdown?.inUseUnits ?? 0) >
+                                0 && (
+                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded tracking-tighter">
+                                  {item.reusableBreakdown?.inUseUnits} đang dùng
+                                </span>
                               )}
-                              {(item.reusableBreakdown?.maintenanceUnits ?? 0) > 0 && (
-                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded tracking-tighter">{item.reusableBreakdown?.maintenanceUnits} bảo trì</span>
+                              {(item.reusableBreakdown?.maintenanceUnits ?? 0) >
+                                0 && (
+                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded tracking-tighter">
+                                  {item.reusableBreakdown?.maintenanceUnits} bảo
+                                  trì
+                                </span>
                               )}
                             </div>
                           </div>
@@ -276,23 +335,38 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                           <div className="flex flex-col gap-0.5">
                             <div className="flex items-end justify-between">
                               <span className="text-base font-black tracking-tighter">
-                                {item.availableQuantity.toLocaleString()} <span className="text-[14px] font-normal text-muted-foreground uppercase">SL</span>
+                                {item.availableQuantity.toLocaleString()}{" "}
+                                <span className="text-[14px] font-normal text-muted-foreground uppercase">
+                                  SL
+                                </span>
                               </span>
                               {item.itemType === "Consumable" && (
-                                <span className="text-sm text-muted-foreground tracking-tighter">{item.lotCount ?? 0} lô</span>
+                                <span className="text-sm text-muted-foreground tracking-tighter">
+                                  {item.lotCount ?? 0} lô
+                                </span>
                               )}
                             </div>
-                            {item.itemType === "Consumable" && item.isExpiringSoon && (
-                              <span className="flex items-center gap-1 text-xs font-medium text-amber-600 tracking-tighter">
-                                <Warning size={10} weight="fill" />
-                                Sắp hết hạn
-                              </span>
-                            )}
-                            {item.itemType === "Consumable" && item.nearestExpiryDate && !item.isExpiringSoon && (
-                              <span className="text-xs font-medium text-blue-600 tracking-tighter">
-                                Hết hạn: {new Date(item.nearestExpiryDate).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}
-                              </span>
-                            )}
+                            {item.itemType === "Consumable" &&
+                              item.isExpiringSoon && (
+                                <span className="flex items-center gap-1 text-xs font-medium text-amber-600 tracking-tighter">
+                                  <Warning size={10} weight="fill" />
+                                  Sắp hết hạn
+                                </span>
+                              )}
+                            {item.itemType === "Consumable" &&
+                              item.nearestExpiryDate &&
+                              !item.isExpiringSoon && (
+                                <span className="text-xs font-medium text-blue-600 tracking-tighter">
+                                  Hết hạn:{" "}
+                                  {new Date(
+                                    item.nearestExpiryDate,
+                                  ).toLocaleDateString("vi-VN", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                  })}
+                                </span>
+                              )}
                           </div>
                         )}
                       </div>
@@ -318,7 +392,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                 size="sm"
                 className="h-8 px-4 rounded-none text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black border-black/20"
                 disabled={!inventoryData.hasPreviousPage}
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
                 TRƯỚC
               </Button>
@@ -326,7 +400,9 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                 <span className="text-[10px] font-black tracking-widest text-[#FF5722]">
                   {page}
                 </span>
-                <span className="mx-1 text-[10px] text-muted-foreground">/</span>
+                <span className="mx-1 text-[10px] text-muted-foreground">
+                  /
+                </span>
                 <span className="text-[10px] font-bold text-muted-foreground">
                   {inventoryData.totalPages}
                 </span>
@@ -336,7 +412,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                 size="sm"
                 className="h-8 px-4 rounded-none text-[10px] font-bold uppercase tracking-widest hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black border-black/20"
                 disabled={!inventoryData.hasNextPage}
-                onClick={() => setPage(p => p + 1)}
+                onClick={() => setPage((p) => p + 1)}
               >
                 SAU
               </Button>
