@@ -2,7 +2,6 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { AxiosError } from "axios";
-import { Icon } from "@iconify/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -75,21 +74,6 @@ import type {
 
 const ITEMS_PER_PAGE = 12;
 
-function MaintenanceTriangleIcon({
-  className,
-}: {
-  className?: string;
-}) {
-  return (
-    <Icon
-      icon="ix:maintenance-triangle-filled"
-      width="24"
-      height="24"
-      className={className}
-    />
-  );
-}
-
 type AssemblyPointActionType =
   | "activate"
   | "startMaintenance"
@@ -118,9 +102,7 @@ function getAvailableAssemblyPointActions(
       return ["activate"];
     case "Active":
       return ["startMaintenance", "close"];
-    case "Overloaded":
-      return ["startMaintenance"];
-    case "UnderMaintenance":
+    case "Unavailable":
       return ["completeMaintenance"];
     default:
       return [];
@@ -132,9 +114,9 @@ function getAssemblyPointActionLabel(action: AssemblyPointActionType): string {
     case "activate":
       return "Kích hoạt";
     case "startMaintenance":
-      return "Bắt đầu bảo trì";
+      return "Đánh dấu không khả dụng";
     case "completeMaintenance":
-      return "Hoàn tất bảo trì";
+      return "Đánh dấu hoạt động lại";
     case "close":
       return "Đóng vĩnh viễn";
   }
@@ -147,9 +129,9 @@ function getAssemblyPointActionDialogTitle(
     case "activate":
       return "Kích hoạt điểm tập kết";
     case "startMaintenance":
-      return "Đưa vào bảo trì";
+      return "Đánh dấu điểm tập kết không khả dụng";
     case "completeMaintenance":
-      return "Hoàn tất bảo trì";
+      return "Khôi phục điểm tập kết hoạt động";
     case "close":
       return "Đóng điểm tập kết";
   }
@@ -163,11 +145,11 @@ function getAssemblyPointActionDialogDescription(
     case "activate":
       return `Kích hoạt "${pointName}" để chuyển từ trạng thái Mới tạo sang Đang hoạt động.`;
     case "startMaintenance":
-      return `Đưa "${pointName}" vào trạng thái bảo trì. Thao tác này áp dụng cho điểm tập kết đang hoạt động hoặc đang quá tải.`;
+      return `Chuyển "${pointName}" sang trạng thái Không khả dụng để tạm ngưng sử dụng điểm tập kết này.`;
     case "completeMaintenance":
-      return `Hoàn tất bảo trì để đưa "${pointName}" quay lại trạng thái Đang hoạt động.`;
+      return `Đánh dấu "${pointName}" hoạt động trở lại từ trạng thái Không khả dụng.`;
     case "close":
-      return `Đóng vĩnh viễn "${pointName}". Sau khi đóng sẽ không thể chỉnh sửa hay thực hiện thao tác trạng thái khác. API cũng yêu cầu điểm tập kết không còn rescuer hoặc đội cứu hộ nào.`;
+      return `Đóng vĩnh viễn "${pointName}". Sau khi đóng sẽ không thể chỉnh sửa hay thực hiện thao tác trạng thái khác. API cũng yêu cầu điểm tập kết không còn người cứu hộ hoặc đội cứu hộ nào.`;
   }
 }
 
@@ -178,9 +160,9 @@ function getAssemblyPointActionSuccessMessage(
     case "activate":
       return "Kích hoạt điểm tập kết thành công!";
     case "startMaintenance":
-      return "Đã chuyển điểm tập kết sang trạng thái bảo trì!";
+      return "Đã chuyển điểm tập kết sang trạng thái không khả dụng!";
     case "completeMaintenance":
-      return "Hoàn tất bảo trì thành công!";
+      return "Điểm tập kết đã hoạt động trở lại!";
     case "close":
       return "Đóng điểm tập kết thành công!";
   }
@@ -193,9 +175,9 @@ function getAssemblyPointActionErrorMessage(
     case "activate":
       return "Không thể kích hoạt điểm tập kết.";
     case "startMaintenance":
-      return "Không thể đưa điểm tập kết vào bảo trì.";
+      return "Không thể chuyển điểm tập kết sang trạng thái không khả dụng.";
     case "completeMaintenance":
-      return "Không thể hoàn tất bảo trì.";
+      return "Không thể khôi phục điểm tập kết hoạt động.";
     case "close":
       return "Không thể đóng điểm tập kết.";
   }
@@ -280,10 +262,9 @@ export default function AssemblyPointsPage() {
   );
 
   const activeCount = items.filter((i) => i.status === "Active").length;
-  const overloadedCount = items.filter((i) => i.status === "Overloaded").length;
   const createdCount = items.filter((i) => i.status === "Created").length;
-  const maintenanceCount = items.filter(
-    (i) => i.status === "UnderMaintenance",
+  const unavailableCount = items.filter(
+    (i) => i.status === "Unavailable",
   ).length;
   const closedCount = items.filter((i) => i.status === "Closed").length;
 
@@ -306,9 +287,7 @@ export default function AssemblyPointsPage() {
           break;
       }
 
-      toast.success(
-        getAssemblyPointActionSuccessMessage(actionDialog.action),
-      );
+      toast.success(getAssemblyPointActionSuccessMessage(actionDialog.action));
       setActionDialog({ open: false, action: null, item: null });
     } catch (err) {
       toast.error(
@@ -388,7 +367,7 @@ export default function AssemblyPointsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
           {[
             {
               label: "Tổng điểm",
@@ -412,18 +391,11 @@ export default function AssemblyPointsPage() {
               bgColor: "bg-sky-50 dark:bg-sky-950/30",
             },
             {
-              label: assemblyPointStatusConfig.Overloaded.label,
-              value: overloadedCount,
+              label: assemblyPointStatusConfig.Unavailable.label,
+              value: unavailableCount,
               icon: WarningCircle,
               color: "text-amber-600 dark:text-amber-400",
               bgColor: "bg-amber-50 dark:bg-amber-950/30",
-            },
-            {
-              label: assemblyPointStatusConfig.UnderMaintenance.label,
-              value: maintenanceCount,
-              icon: MaintenanceTriangleIcon,
-              color: "text-violet-600 dark:text-violet-400",
-              bgColor: "bg-violet-50 dark:bg-violet-950/30",
             },
             {
               label: assemblyPointStatusConfig.Closed.label,
@@ -597,8 +569,7 @@ export default function AssemblyPointsPage() {
                 point.status,
               );
               const canEdit =
-                point.status !== "Closed" &&
-                point.status !== "UnderMaintenance";
+                point.status !== "Closed" && point.status !== "Unavailable";
 
               return (
                 <Card
@@ -690,14 +661,17 @@ export default function AssemblyPointsPage() {
                             variant="outline"
                             size="sm"
                             disabled={
-                              availableActions.length === 0 || isStatusActionPending
+                              availableActions.length === 0 ||
+                              isStatusActionPending
                             }
                             className="gap-1 h-8 px-2 text-sm tracking-tight"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <ArrowClockwise
                               size={13}
-                              className={isStatusActionPending ? "animate-spin" : ""}
+                              className={
+                                isStatusActionPending ? "animate-spin" : ""
+                              }
                             />
                             <CaretDown size={12} />
                           </Button>
@@ -815,7 +789,9 @@ export default function AssemblyPointsPage() {
               Hủy
             </Button>
             <Button
-              variant={actionDialog.action === "close" ? "destructive" : "default"}
+              variant={
+                actionDialog.action === "close" ? "destructive" : "default"
+              }
               onClick={handleStatusAction}
               disabled={isStatusActionPending}
               className="gap-2 tracking-tight"

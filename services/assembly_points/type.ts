@@ -4,8 +4,7 @@ import type { RescuerType } from "../rescuers/type";
 export type AssemblyPointStatus =
   | "Created"
   | "Active"
-  | "Overloaded"
-  | "UnderMaintenance"
+  | "Unavailable"
   | "Closed";
 
 // Assembly Point Status Metadata (from /personnel/assembly-point/status-metadata)

@@ -51,23 +51,6 @@ import { Icon as IconifyIcon } from "@iconify/react";
 import { PROMPT_TYPE_LABELS } from "@/services/prompt/constants";
 import type { PromptType } from "@/services/prompt/type";
 
-function MaintenanceTriangleIcon({
-  className,
-  size = 20,
-}: {
-  className?: string;
-  size?: number | string;
-}) {
-  return (
-    <IconifyIcon
-      icon="ix:maintenance-triangle-filled"
-      width={size}
-      height={size}
-      className={className}
-    />
-  );
-}
-
 export const navLinks = [
   { href: "#features", label: "Tính năng" },
   { href: "#demo", label: "Demo" },
@@ -286,8 +269,7 @@ export const PROMPT_TYPE_OPTIONS = [
   {
     label: PROMPT_TYPE_LABELS.MissionPlanValidation,
     value: "MissionPlanValidation",
-    description:
-      "Stage pipeline chuẩn hóa draft thành JSON mission cuối cùng.",
+    description: "Stage pipeline chuẩn hóa draft thành JSON mission cuối cùng.",
   },
 ] as const satisfies readonly {
   label: string;
@@ -804,19 +786,12 @@ export const assemblyPointStatusConfig = {
     bgColor: "bg-green-50 dark:bg-green-950/30",
     icon: CheckCircle,
   },
-  Overloaded: {
-    label: "Quá tải",
+  Unavailable: {
+    label: "Không khả dụng",
     color: "bg-orange-500",
     textColor: "text-orange-700 dark:text-orange-400",
     bgColor: "bg-orange-50 dark:bg-orange-950/30",
     icon: WarningCircle,
-  },
-  UnderMaintenance: {
-    label: "Đang bảo trì",
-    color: "bg-violet-500",
-    textColor: "text-violet-700 dark:text-violet-400",
-    bgColor: "bg-violet-50 dark:bg-violet-950/30",
-    icon: MaintenanceTriangleIcon,
   },
   Closed: {
     label: "Đã đóng",
@@ -859,6 +834,21 @@ export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
     label: "Hoàn trả vật phẩm",
     color: "text-cyan-700 dark:text-cyan-400",
     bgColor: "bg-cyan-100 dark:bg-cyan-900/30",
+  },
+  RETURN_ASSEMBLY_POINT: {
+    label: "Quay về điểm tập kết",
+    color: "text-slate-700 dark:text-slate-300",
+    bgColor: "bg-slate-100 dark:bg-slate-900/30",
+  },
+  RETURN_TO_ASSEMBLY_POINT: {
+    label: "Quay về điểm tập kết",
+    color: "text-slate-700 dark:text-slate-300",
+    bgColor: "bg-slate-100 dark:bg-slate-900/30",
+  },
+  RETURN_ASSEMBLY: {
+    label: "Quay về điểm tập kết",
+    color: "text-slate-700 dark:text-slate-300",
+    bgColor: "bg-slate-100 dark:bg-slate-900/30",
   },
   COLLECT_SUPPLIES: {
     label: "Tiếp nhận vật phẩm",

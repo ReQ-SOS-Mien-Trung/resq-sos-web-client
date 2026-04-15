@@ -182,6 +182,43 @@ export interface ClusterRescueSuggestionResponse {
   multiDepotRecommended: boolean;
 }
 
+// ---- Alternative Depots ----
+
+export interface AlternativeDepotItemCoverage {
+  itemId: number | null;
+  itemName: string;
+  unit: string | null;
+  neededQuantity: number;
+  availableQuantity: number;
+  coveredQuantity: number;
+  remainingQuantity: number;
+  coverageStatus: "Full" | "Partial" | "None" | string;
+}
+
+export interface AlternativeDepot {
+  depotId: number;
+  depotName: string;
+  depotAddress: string;
+  latitude: number | null;
+  longitude: number | null;
+  distanceKm: number;
+  coversAllShortages: boolean;
+  coveredQuantity: number;
+  totalMissingQuantity: number;
+  coveragePercent: number;
+  reason: string;
+  itemCoverageDetails: AlternativeDepotItemCoverage[];
+}
+
+export interface AlternativeDepotsResponse {
+  clusterId: number;
+  selectedDepotId: number;
+  sourceSuggestionId: number;
+  totalShortageItems: number;
+  totalMissingQuantity: number;
+  alternativeDepots: AlternativeDepot[];
+}
+
 // ---- SSE Stream types ----
 
 export type SseEventType = "status" | "chunk" | "result" | "error";

@@ -79,7 +79,8 @@ export function AssemblyPointFormDialog({
     if (latNum < -90 || latNum > 90) return false;
     if (lngNum < -180 || lngNum > 180) return false;
     const capNum = Number(capacity);
-    if (!capacity || isNaN(capNum) || capNum < 1 || capNum > 10000) return false;
+    if (!capacity || isNaN(capNum) || capNum < 1 || capNum > 10000)
+      return false;
     return true;
   })();
 
@@ -99,9 +100,9 @@ export function AssemblyPointFormDialog({
   };
 
   const handleSubmit = () => {
-    if (isEdit && editItem?.status === "UnderMaintenance") {
+    if (isEdit && editItem?.status === "Unavailable") {
       toast.error(
-        "Điểm tập kết đang bảo trì hoặc chưa kích hoạt và không thể thực hiện thao tác này.",
+        "Điểm tập kết đang không khả dụng và không thể thực hiện thao tác này.",
       );
       return;
     }
@@ -211,7 +212,10 @@ export function AssemblyPointFormDialog({
             {/* Lat / Lng manual input */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="ap-lat" className="text-sm font-medium text-muted-foreground tracking-tight flex items-center gap-1">
+                <Label
+                  htmlFor="ap-lat"
+                  className="text-sm font-medium text-muted-foreground tracking-tight flex items-center gap-1"
+                >
                   <NavigationArrow size={12} />
                   Vĩ độ (Latitude)
                 </Label>
@@ -226,7 +230,10 @@ export function AssemblyPointFormDialog({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ap-lng" className="text-sm font-medium text-muted-foreground tracking-tight flex items-center gap-1">
+                <Label
+                  htmlFor="ap-lng"
+                  className="text-sm font-medium text-muted-foreground tracking-tight flex items-center gap-1"
+                >
                   <NavigationArrow size={12} className="rotate-90" />
                   Kinh độ (Longitude)
                 </Label>
@@ -247,7 +254,10 @@ export function AssemblyPointFormDialog({
           <div className="flex flex-col space-y-5 h-full">
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="ap-name" className="text-base font-medium tracking-tight">
+              <Label
+                htmlFor="ap-name"
+                className="text-base font-medium tracking-tight"
+              >
                 Tên điểm tập kết <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -262,17 +272,24 @@ export function AssemblyPointFormDialog({
 
             {/* Capacity */}
             <div className="space-y-2">
-              <Label htmlFor="ap-capacity" className="text-base font-medium tracking-tight flex items-center gap-1.5">
+              <Label
+                htmlFor="ap-capacity"
+                className="text-base font-medium tracking-tight flex items-center gap-1.5"
+              >
                 <UsersThree size={14} className="text-blue-500" />
                 Sức chứa người <span className="text-red-500">*</span>
-                <span className="text-sm text-muted-foreground font-normal">(tối đa 10.000)</span>
+                <span className="text-sm text-muted-foreground font-normal">
+                  (tối đa 10.000)
+                </span>
               </Label>
               <div className="flex gap-2 flex-wrap">
                 {CAPACITY_PRESETS.map((preset) => (
                   <Button
                     key={preset}
                     type="button"
-                    variant={capacity === String(preset) ? "default" : "outline"}
+                    variant={
+                      capacity === String(preset) ? "default" : "outline"
+                    }
                     size="sm"
                     className="h-8 text-sm tracking-tight"
                     onClick={() => setCapacity(String(preset))}
@@ -290,7 +307,10 @@ export function AssemblyPointFormDialog({
                 value={capacity}
                 onChange={(e) => {
                   const val = e.target.value;
-                  if (val === "" || (Number(val) >= 0 && Number(val) <= 10000)) {
+                  if (
+                    val === "" ||
+                    (Number(val) >= 0 && Number(val) <= 10000)
+                  ) {
                     setCapacity(val);
                   }
                 }}
