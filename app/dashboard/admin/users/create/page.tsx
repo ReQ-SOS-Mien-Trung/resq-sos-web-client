@@ -67,6 +67,13 @@ function extractCreatedUserId(
   return null;
 }
 
+const ALLOWED_AVATAR_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+];
+
 export default function CreateUserPage() {
   const router = useRouter();
   const createUserMutation = useAdminCreateUser();
@@ -175,6 +182,14 @@ export default function CreateUserPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (avatarPreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
+
   const handleClearLocation = () => {
     setFormData((prev) => ({
       ...prev,
@@ -220,14 +235,29 @@ export default function CreateUserPage() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setAvatarFile(file);
-      setAvatarPreview(URL.createObjectURL(file));
+    if (!e.target.files || !e.target.files[0]) return;
+
+    const file = e.target.files[0];
+
+    if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+      toast.error("Ảnh không hợp lệ. Vui lòng chọn JPG, JPEG, PNG hoặc WEBP.");
+      e.currentTarget.value = "";
+      return;
     }
+
+    if (avatarPreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarFile(file);
+    setAvatarPreview(previewUrl);
   };
 
   const handleRemoveFile = () => {
+    if (avatarPreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarPreview);
+    }
     setAvatarFile(null);
     setAvatarPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -726,6 +756,18 @@ export default function CreateUserPage() {
                           src={avatarPreview}
                           alt="Avatar Preview"
                           className="h-full w-full object-cover"
+                          onError={() => {
+                            if (avatarPreview?.startsWith("blob:")) {
+                              URL.revokeObjectURL(avatarPreview);
+                            }
+                            setAvatarFile(null);
+                            setAvatarPreview(null);
+                            if (fileInputRef.current)
+                              fileInputRef.current.value = "";
+                            toast.error(
+                              "Không thể hiển thị ảnh xem trước. Hãy chọn ảnh JPG/PNG/WEBP khác.",
+                            );
+                          }}
                         />
                       ) : (
                         <div className="text-center flex flex-col items-center">

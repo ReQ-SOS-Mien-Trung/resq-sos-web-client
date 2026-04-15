@@ -731,8 +731,10 @@ const InventoryDashboardPage = () => {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span className="font-semibold">{displayName}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="font-semibold tracking-tighter text-sm">
+                    {displayName}
+                  </span>
+                  <span className="text-xs tracking-tighter text-neutral-500">
                     {selectedDepot?.depotName ?? "Quản lý kho"}
                   </span>
                 </div>
@@ -741,10 +743,6 @@ const InventoryDashboardPage = () => {
               <DropdownMenuItem className="gap-2 cursor-pointer">
                 <User className="h-4 w-4" />
                 Hồ sơ
-              </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2 cursor-pointer">
-                <Gear className="h-4 w-4" />
-                Cài đặt
               </DropdownMenuItem>
               {hasMultipleDepots ? (
                 <DropdownMenuItem
@@ -768,7 +766,7 @@ const InventoryDashboardPage = () => {
                   </>
                 ) : (
                   <>
-                    <SignOut className="h-4 w-4" />
+                    <SignOut className="h-4 w-4 text-red-500" />
                     Đăng xuất
                   </>
                 )}
