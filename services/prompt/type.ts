@@ -113,6 +113,19 @@ export interface PreviewPromptRescueSuggestionRequest {
 
 export interface TestPromptRescueSuggestionRequest {
   clusterId: number;
+  name: string;
+  prompt_type: PromptType;
+  provider: AiProvider;
+  purpose: string;
+  system_prompt: string;
+  user_prompt_template: string;
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  version: string;
+  api_url?: string;
+  api_key?: string;
+  is_active: boolean;
 }
 
 export interface PromptTestSupplyItem {

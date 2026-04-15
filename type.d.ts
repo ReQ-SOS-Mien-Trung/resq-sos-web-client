@@ -322,7 +322,9 @@ export interface PromptFormData {
 export interface PromptEditorProps {
   prompt?: PromptDetailEntity | null;
   isSubmitting?: boolean;
-  onSave: (data: CreatePromptRequest | UpdatePromptRequest) => void;
+  onSave: (
+    data: CreatePromptRequest | UpdatePromptRequest,
+  ) => void | Promise<void>;
   onCancel: () => void;
   hideHeaderClose?: boolean;
 }

@@ -110,7 +110,7 @@ export function useDeletePrompt() {
 }
 
 /**
- * Hook to test a saved prompt with SOS cluster data
+ * Hook to test a prompt draft payload with SOS cluster data
  */
 export function useTestPromptRescueSuggestion() {
   return useMutation<
@@ -156,6 +156,58 @@ function normalizePreviewStatusMessage(raw: string): string {
   }
 
   return message.replace(/\s+/g, " ").trim();
+}
+
+function normalizePreviewErrorMessage(raw: string): string {
+  const message = raw.trim();
+  const lower = message.toLowerCase();
+
+  const isRateLimitError =
+    /429|rate\s*limit|too\s*many\s*requests|quota|resource\s*has\s*been\s*exhausted|token|exhausted/i.test(
+      lower,
+    );
+
+  if (isRateLimitError) {
+    return "AI đang tạm hết token/quota hoặc quá tải. Vui lòng thử lại sau vài phút.";
+  }
+
+  const isAuthorizationError =
+    /401|403|unauthorized|forbidden|api\s*key|permission denied|access denied/i.test(
+      lower,
+    );
+
+  if (isAuthorizationError) {
+    return "Không thể gọi AI do thiếu quyền hoặc API key chưa hợp lệ. Vui lòng kiểm tra lại cấu hình.";
+  }
+
+  const isTimeoutError =
+    /408|504|timeout|timed\s*out|deadline\s*exceeded|gateway\s*timeout/i.test(
+      lower,
+    );
+
+  if (isTimeoutError) {
+    return "AI phản hồi quá chậm nên test bị timeout. Vui lòng thử lại.";
+  }
+
+  const isServerError =
+    /5\d\d|internal\s*server\s*error|bad\s*gateway|service\s*unavailable/i.test(
+      lower,
+    );
+
+  if (isServerError) {
+    return "Dịch vụ AI đang gián đoạn tạm thời. Vui lòng thử lại sau.";
+  }
+
+  const isNetworkError =
+    /network|failed\s*to\s*fetch|connection|socket|econn|enotfound/i.test(
+      lower,
+    );
+
+  if (isNetworkError) {
+    return "Không kết nối được tới dịch vụ AI. Vui lòng kiểm tra mạng rồi thử lại.";
+  }
+
+  return "AI chưa thể xử lý yêu cầu lúc này. Vui lòng thử lại sau.";
 }
 
 export function usePromptRescuePreviewStream() {
@@ -231,8 +283,9 @@ export function usePromptRescuePreviewStream() {
           setPhase("done");
         },
         onError: (previewError) => {
-          setError(previewError);
-          addLog(previewError, "error");
+          const readableError = normalizePreviewErrorMessage(previewError);
+          setError(readableError);
+          addLog(readableError, "error");
           setLoading(false);
           setPhase("error");
         },

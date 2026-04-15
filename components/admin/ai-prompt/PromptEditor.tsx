@@ -41,6 +41,7 @@ import type {
   CreatePromptRequest,
   UpdatePromptRequest,
   PreviewPromptRescueSuggestionRequest,
+  TestPromptRescueSuggestionRequest,
   TestPromptRescueSuggestionResponse,
 } from "@/services/prompt/type";
 import {
@@ -182,7 +183,7 @@ const VariableChips = ({
         key={`user_prompt_template-${v.value}`}
         type="button"
         onClick={() => onInsert("user_prompt_template", v.value)}
-        className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1 text-sm font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
       >
         <Plus size={10} weight="bold" />
         {v.label}
@@ -363,34 +364,123 @@ function mapPromptTestResponseToReviewResult(
   };
 }
 
+function parseStatusCodeFromText(raw?: string | null): number | null {
+  if (!raw) {
+    return null;
+  }
+
+  const statusMatch = raw.match(/\b([1-5]\d{2})\b/);
+  if (!statusMatch) {
+    return null;
+  }
+
+  const code = Number(statusMatch[1]);
+  return Number.isFinite(code) ? code : null;
+}
+
+function toUserFriendlyAiErrorMessage(options: {
+  rawMessage?: string | null;
+  statusCode?: number | null;
+}): string {
+  const rawMessage = options.rawMessage?.trim() ?? "";
+  const normalizedMessage = rawMessage.toLowerCase();
+  const statusCode =
+    options.statusCode ?? parseStatusCodeFromText(options.rawMessage);
+
+  const isRateLimitError =
+    statusCode === 429 ||
+    /(429|rate\s*limit|too\s*many\s*requests|quota|resource\s*has\s*been\s*exhausted|exhausted|token)/i.test(
+      normalizedMessage,
+    );
+
+  if (isRateLimitError) {
+    return "AI đang tạm hết token/quota hoặc quá tải. Vui lòng thử lại sau vài phút.";
+  }
+
+  const isAuthorizationError =
+    statusCode === 401 ||
+    statusCode === 403 ||
+    /(unauthorized|forbidden|api\s*key|permission denied|access denied)/i.test(
+      normalizedMessage,
+    );
+
+  if (isAuthorizationError) {
+    return "Không thể gọi AI do thiếu quyền hoặc API key chưa hợp lệ. Vui lòng kiểm tra lại cấu hình.";
+  }
+
+  const isTimeoutError =
+    statusCode === 408 ||
+    statusCode === 504 ||
+    /(timeout|timed\s*out|deadline\s*exceeded|gateway\s*timeout)/i.test(
+      normalizedMessage,
+    );
+
+  if (isTimeoutError) {
+    return "AI phản hồi quá chậm nên test bị timeout. Vui lòng thử lại.";
+  }
+
+  const isServerError =
+    (typeof statusCode === "number" && statusCode >= 500) ||
+    /(internal\s*server\s*error|bad\s*gateway|service\s*unavailable)/i.test(
+      normalizedMessage,
+    );
+
+  if (isServerError) {
+    return "Dịch vụ AI đang gián đoạn tạm thời. Vui lòng thử lại sau.";
+  }
+
+  const isNetworkError =
+    /(network|failed\s*to\s*fetch|connection|socket|econn|enotfound)/i.test(
+      normalizedMessage,
+    );
+
+  if (isNetworkError) {
+    return "Không kết nối được tới dịch vụ AI. Vui lòng kiểm tra mạng rồi thử lại.";
+  }
+
+  return "AI chưa thể xử lý yêu cầu lúc này. Vui lòng thử lại sau.";
+}
+
 function extractPromptTestErrorMessage(error: unknown): string {
   if (typeof error === "string" && error.trim()) {
-    return error.trim();
+    return toUserFriendlyAiErrorMessage({ rawMessage: error });
   }
 
   if (error && typeof error === "object") {
     const maybeError = error as {
       message?: unknown;
       response?: {
+        status?: unknown;
         data?: {
           message?: unknown;
         };
       };
     };
 
+    const statusCode =
+      typeof maybeError.response?.status === "number"
+        ? maybeError.response.status
+        : null;
+
     if (
       typeof maybeError.response?.data?.message === "string" &&
       maybeError.response.data.message.trim()
     ) {
-      return maybeError.response.data.message.trim();
+      return toUserFriendlyAiErrorMessage({
+        rawMessage: maybeError.response.data.message,
+        statusCode,
+      });
     }
 
     if (typeof maybeError.message === "string" && maybeError.message.trim()) {
-      return maybeError.message.trim();
+      return toUserFriendlyAiErrorMessage({
+        rawMessage: maybeError.message,
+        statusCode,
+      });
     }
   }
 
-  return "Test prompt thất bại. Vui lòng thử lại.";
+  return "AI chưa thể xử lý yêu cầu lúc này. Vui lòng thử lại sau.";
 }
 
 const PromptEditor = ({
@@ -693,6 +783,7 @@ const PromptEditor = ({
     reviewMode === "saved-test" ? savedTestLoading : previewLoading;
   const activeReviewPhase =
     reviewMode === "saved-test" ? savedTestPhase : previewPhase;
+  const showReviewStatus = Boolean(activeReviewStatus) && !activeReviewError;
   const hasReviewArtifact = Boolean(
     activeReviewLoading ||
     activeReviewResult ||
@@ -700,25 +791,45 @@ const PromptEditor = ({
     activeReviewStatusLog.length > 0,
   );
 
-  const buildSubmitPayload = useCallback(() => {
+  const buildSubmitPayload = useCallback((): UpdatePromptRequest => {
     const normalizedApiKey = formData.api_key.trim();
+    const normalizedApiUrl = formData.api_url.trim();
 
     return {
-      ...formData,
+      name: formData.name.trim(),
       prompt_type: normalizePromptType(
         formData.prompt_type,
         prompt?.promptType,
       ),
-      name: formData.name.trim(),
+      provider: formData.provider,
       purpose: formData.purpose.trim(),
       system_prompt: formData.system_prompt.trim(),
       user_prompt_template: formData.user_prompt_template.trim(),
       model: formData.model.trim(),
+      temperature: formData.temperature,
+      max_tokens: formData.max_tokens,
       version: toVersionString(formData.version.trim()),
-      api_url: formData.api_url.trim(),
+      api_url: normalizedApiUrl || undefined,
       api_key: normalizedApiKey || undefined,
+      is_active: formData.is_active,
     };
   }, [formData, prompt?.promptType]);
+
+  const buildSavedPromptTestRequest = useCallback(
+    (
+      payload: UpdatePromptRequest,
+    ): TestPromptRescueSuggestionRequest | null => {
+      if (!previewClusterId) {
+        return null;
+      }
+
+      return {
+        clusterId: previewClusterId,
+        ...payload,
+      };
+    },
+    [previewClusterId],
+  );
 
   const buildPreviewRequest = useCallback(() => {
     if (!previewClusterId) {
@@ -738,82 +849,100 @@ const PromptEditor = ({
       temperature: payload.temperature,
       max_tokens: payload.max_tokens,
       version: payload.version,
-      api_url: payload.api_url || undefined,
+      api_url: payload.api_url,
       api_key: payload.api_key,
     };
 
     return request;
   }, [buildSubmitPayload, previewClusterId, prompt?.id]);
 
-  const runSavedPromptTest = useCallback(async () => {
-    if (!prompt?.id || !previewClusterId) {
-      return;
-    }
-
-    const currentRunId = savedTestRunIdRef.current + 1;
-    savedTestRunIdRef.current = currentRunId;
-
-    resetPreview();
-    resetSavedPromptTest();
-    setReviewMode("saved-test");
-    setSavedTestLoading(true);
-    setSavedTestPhase("calling-ai");
-
-    const startMessage = `Đang test prompt đã lưu #${prompt.id} với cụm SOS #${previewClusterId}...`;
-    setSavedTestStatus(startMessage);
-    addSavedTestLog(startMessage, "status");
-
-    try {
-      const response = await testSavedPromptMutation.mutateAsync({
-        id: prompt.id,
-        data: { clusterId: previewClusterId },
-      });
-
-      if (currentRunId !== savedTestRunIdRef.current) {
-        return;
+  const runSavedPromptTest = useCallback(
+    async (payload: UpdatePromptRequest): Promise<boolean> => {
+      if (!prompt?.id) {
+        return false;
       }
 
-      if (!response.isSuccess) {
-        const failedMessage =
-          response.errorMessage?.trim() ||
-          `Test prompt thất bại (HTTP ${response.httpStatusCode ?? "N/A"}).`;
-
-        setSavedTestError(failedMessage);
-        setSavedTestStatus(failedMessage);
+      const requestPayload = buildSavedPromptTestRequest(payload);
+      if (!requestPayload) {
+        const missingClusterMessage =
+          "Vui lòng chọn SOS cluster để test trước khi cập nhật.";
+        setReviewMode("saved-test");
+        setSavedTestError(missingClusterMessage);
+        setSavedTestStatus(missingClusterMessage);
         setSavedTestPhase("error");
-        addSavedTestLog(failedMessage, "error");
+        addSavedTestLog(missingClusterMessage, "error");
+        return false;
+      }
+
+      const currentRunId = savedTestRunIdRef.current + 1;
+      savedTestRunIdRef.current = currentRunId;
+
+      resetPreview();
+      resetSavedPromptTest();
+      setReviewMode("saved-test");
+      setSavedTestLoading(true);
+      setSavedTestPhase("calling-ai");
+
+      const startMessage = `Đang test bản nháp mới nhất của prompt #${prompt.id} với cụm SOS #${requestPayload.clusterId}...`;
+      setSavedTestStatus(startMessage);
+      addSavedTestLog(startMessage, "status");
+
+      try {
+        const response = await testSavedPromptMutation.mutateAsync({
+          id: prompt.id,
+          data: requestPayload,
+        });
+
+        if (currentRunId !== savedTestRunIdRef.current) {
+          return false;
+        }
+
+        if (!response.isSuccess) {
+          const failedMessage = toUserFriendlyAiErrorMessage({
+            rawMessage: response.errorMessage,
+            statusCode: response.httpStatusCode,
+          });
+
+          setSavedTestError(failedMessage);
+          setSavedTestStatus("Không thể lấy phản hồi từ AI.");
+          setSavedTestPhase("error");
+          addSavedTestLog(failedMessage, "error");
+          setSavedTestLoading(false);
+          return false;
+        }
+
+        const mappedResult = mapPromptTestResponseToReviewResult(response);
+        const doneMessage = `Test hoàn tất. Đã tạo ${mappedResult.suggestedActivities.length} activity đề xuất.`;
+
+        setSavedTestResult(mappedResult);
+        setSavedTestStatus(doneMessage);
+        setSavedTestPhase("done");
+        addSavedTestLog(doneMessage, "result");
         setSavedTestLoading(false);
-        return;
+        return true;
+      } catch (error) {
+        if (currentRunId !== savedTestRunIdRef.current) {
+          return false;
+        }
+
+        const errorMessage = extractPromptTestErrorMessage(error);
+        setSavedTestError(errorMessage);
+        setSavedTestStatus(errorMessage);
+        setSavedTestPhase("error");
+        addSavedTestLog(errorMessage, "error");
+        setSavedTestLoading(false);
+        return false;
       }
-
-      const mappedResult = mapPromptTestResponseToReviewResult(response);
-      const doneMessage = `Test hoàn tất. Đã tạo ${mappedResult.suggestedActivities.length} activity đề xuất.`;
-
-      setSavedTestResult(mappedResult);
-      setSavedTestStatus(doneMessage);
-      setSavedTestPhase("done");
-      addSavedTestLog(doneMessage, "result");
-      setSavedTestLoading(false);
-    } catch (error) {
-      if (currentRunId !== savedTestRunIdRef.current) {
-        return;
-      }
-
-      const errorMessage = extractPromptTestErrorMessage(error);
-      setSavedTestError(errorMessage);
-      setSavedTestStatus(errorMessage);
-      setSavedTestPhase("error");
-      addSavedTestLog(errorMessage, "error");
-      setSavedTestLoading(false);
-    }
-  }, [
-    prompt?.id,
-    previewClusterId,
-    resetPreview,
-    resetSavedPromptTest,
-    addSavedTestLog,
-    testSavedPromptMutation,
-  ]);
+    },
+    [
+      prompt?.id,
+      buildSavedPromptTestRequest,
+      resetPreview,
+      resetSavedPromptTest,
+      addSavedTestLog,
+      testSavedPromptMutation,
+    ],
+  );
 
   const handleRunPreview = useCallback(() => {
     if (!supportsMissionPreview || !previewClusterId) {
@@ -821,7 +950,8 @@ const PromptEditor = ({
     }
 
     if (canUseSavedPromptTest) {
-      void runSavedPromptTest();
+      const payload = buildSubmitPayload();
+      void runSavedPromptTest(payload);
       return;
     }
 
@@ -838,6 +968,7 @@ const PromptEditor = ({
     supportsMissionPreview,
     previewClusterId,
     canUseSavedPromptTest,
+    buildSubmitPayload,
     runSavedPromptTest,
     buildPreviewRequest,
     resetSavedPromptTest,
@@ -888,15 +1019,17 @@ const PromptEditor = ({
         </div>
       ) : null}
       {helperText ? (
-        <p className="text-xs text-muted-foreground">{helperText}</p>
+        <p className="text-sm text-muted-foreground">{helperText}</p>
       ) : null}
     </div>
   );
 
   const renderPreviewSection = () => {
-    const testModeLabel = canUseSavedPromptTest ? "Prompt Đã Lưu" : "Bản Nháp";
+    const testModeLabel = canUseSavedPromptTest
+      ? "Bản Nháp Cập Nhật"
+      : "Bản Nháp";
     const testModeDescription = canUseSavedPromptTest
-      ? "Chế độ edit sẽ gọi API test trực tiếp theo prompt đã lưu trên server."
+      ? "Bấm Test để kiểm tra bản nháp mới nhất trước khi lưu vào hệ thống."
       : "Chế độ create dùng stream preview theo draft hiện tại (chưa lưu).";
 
     return (
@@ -907,11 +1040,11 @@ const PromptEditor = ({
               <h3 className="text-sm font-semibold text-foreground">
                 Test Theo SOS Cluster
               </h3>
-              <span className="inline-flex items-center rounded-full border border-orange-300/80 bg-orange-100/80 px-2 py-0.5 text-xs font-semibold text-orange-700">
+              <span className="inline-flex items-center rounded-full border border-orange-300/80 bg-orange-100/80 px-2 py-0.5 text-sm font-semibold text-orange-700">
                 {testModeLabel}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {testModeDescription}
             </p>
           </div>
@@ -960,20 +1093,20 @@ const PromptEditor = ({
             </div>
 
             <div className="rounded-lg border border-orange-200/70 bg-white/80 p-3">
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 {canUseSavedPromptTest
-                  ? "Lưu ý: API test dùng cấu hình prompt đã lưu. Nếu bạn vừa sửa nội dung, hãy bấm Cập nhật trước khi test lại."
+                  ? "Lưu ý: Test sẽ gửi toàn bộ bản nháp mới nhất. Sau khi test ổn, bấm Cập nhật để lưu vào hệ thống."
                   : "Preview không ghi mission suggestion thật vào hệ thống. Bạn có thể test draft nhiều lần trước khi lưu."}
               </p>
 
-              {activeReviewStatus ? (
-                <p className="mt-2 text-xs font-medium text-foreground/80">
+              {showReviewStatus ? (
+                <p className="mt-2 text-sm font-medium text-foreground/80">
                   Trạng thái: {activeReviewStatus}
                 </p>
               ) : null}
 
               {!activeReviewStatus && !activeReviewLoading ? (
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Chưa có review chi tiết. Bấm{" "}
                   <span className="font-medium text-foreground">Test</span> để
                   tạo kế hoạch hiển thị ngay bên dưới.
@@ -981,7 +1114,7 @@ const PromptEditor = ({
               ) : null}
 
               {activeReviewResult ? (
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                   <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
                     {activeReviewResult.suggestedActivities.length} hoạt động
                   </span>
@@ -996,11 +1129,10 @@ const PromptEditor = ({
               ) : null}
 
               {activeReviewError ? (
-                <p className="mt-2 text-xs font-medium text-red-600">
+                <p className="mt-2 text-sm font-medium text-red-600">
                   Lỗi test: {activeReviewError}
                 </p>
               ) : null}
-
             </div>
 
             <AiStreamPanel
@@ -1022,7 +1154,7 @@ const PromptEditor = ({
             />
           </>
         ) : (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Preview theo sos-cluster hiện chỉ hỗ trợ các prompt Mission*.
           </p>
         )}
@@ -1108,7 +1240,7 @@ const PromptEditor = ({
     updateField("model", sanitizedValue);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!canSubmit) {
@@ -1118,15 +1250,11 @@ const PromptEditor = ({
     const payload = buildSubmitPayload();
 
     if (isEditing) {
-      onSave(payload as UpdatePromptRequest);
+      await Promise.resolve(onSave(payload as UpdatePromptRequest));
       return;
     }
 
-    const createData: CreatePromptRequest = {
-      ...payload,
-      is_active: formData.is_active,
-    };
-    onSave(createData as CreatePromptRequest);
+    await Promise.resolve(onSave(payload as CreatePromptRequest));
   };
 
   const getNextStepEnabled = () => {
@@ -1234,7 +1362,7 @@ const PromptEditor = ({
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       {selectedPromptType?.description}
                     </p>
                   </div>
@@ -1275,7 +1403,7 @@ const PromptEditor = ({
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       {selectedProvider?.description}
                     </p>
                   </div>
@@ -1343,7 +1471,7 @@ const PromptEditor = ({
                     }
                     autoComplete="new-password"
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {prompt?.hasApiKey
                       ? "Để trống sẽ giữ key hiện có. Backend hiện chưa hỗ trợ xóa prompt-level key chỉ bằng cách gửi rỗng."
                       : "Dán key riêng cho prompt này nếu muốn test nhanh mà không sửa config mặc định ở server."}
@@ -1366,7 +1494,7 @@ const PromptEditor = ({
                     className="font-mono text-base"
                     placeholder="Nhập system prompt..."
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {systemPromptHelperText}
                   </p>
                 </div>
@@ -1390,7 +1518,7 @@ const PromptEditor = ({
                     className="font-mono text-base"
                     placeholder="Nhập user prompt template với biến {{placeholder}}..."
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {userPromptHelperText}
                   </p>
                 </div>
@@ -1428,7 +1556,7 @@ const PromptEditor = ({
                     ) : (
                       <FloppyDisk size={16} className="mr-2" />
                     )}
-                    Cập nhật
+                    {isSubmitting ? "Đang cập nhật..." : "Cập nhật"}
                   </Button>
                 </div>
               </>
@@ -1465,7 +1593,7 @@ const PromptEditor = ({
                               className="text-emerald-600"
                             />
                           ) : (
-                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold">
+                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-sm font-semibold">
                               {item.step}
                             </span>
                           )}
@@ -1484,7 +1612,7 @@ const PromptEditor = ({
                       Bước 1: AI Provider & Model
                     </h3>
                     {isStep1Complete && (
-                      <span className="text-xs font-medium text-emerald-700">
+                      <span className="text-sm font-medium text-emerald-700">
                         Đã hoàn tất
                       </span>
                     )}
@@ -1512,7 +1640,7 @@ const PromptEditor = ({
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {selectedProvider?.description}
                       </p>
                     </div>
@@ -1531,7 +1659,7 @@ const PromptEditor = ({
                         Bước 2: Thông tin API
                       </h3>
                       {isStep2Complete && (
-                        <span className="text-xs font-medium text-emerald-700">
+                        <span className="text-sm font-medium text-emerald-700">
                           Đã hoàn tất
                         </span>
                       )}
@@ -1598,7 +1726,7 @@ const PromptEditor = ({
                       />
                     </div>
 
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       Cần nhập đủ API URL và API Key để mở bước 3.
                     </p>
                   </div>
@@ -1611,7 +1739,7 @@ const PromptEditor = ({
                         Bước 3: Setup Prompt
                       </h3>
                       {isStep3Complete && (
-                        <span className="text-xs font-medium text-emerald-700">
+                        <span className="text-sm font-medium text-emerald-700">
                           Đã hoàn tất
                         </span>
                       )}
@@ -1676,7 +1804,7 @@ const PromptEditor = ({
                             ))}
                           </SelectContent>
                         </Select>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                           {selectedPromptType?.description}
                         </p>
                       </div>
@@ -1709,7 +1837,7 @@ const PromptEditor = ({
                         className="font-mono text-base"
                         placeholder="Nhập system prompt..."
                       />
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {systemPromptHelperText}
                       </p>
                     </div>
@@ -1733,7 +1861,7 @@ const PromptEditor = ({
                         className="font-mono text-base"
                         placeholder="Nhập user prompt template với biến {{placeholder}}..."
                       />
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         {userPromptHelperText}
                       </p>
                     </div>
@@ -1789,7 +1917,6 @@ const PromptEditor = ({
           </form>
         </CardContent>
       </Card>
-
     </>
   );
 };

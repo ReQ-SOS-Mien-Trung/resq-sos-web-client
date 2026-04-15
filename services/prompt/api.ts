@@ -72,7 +72,7 @@ export async function deletePrompt(id: number): Promise<void> {
 }
 
 /**
- * Test a saved prompt with a SOS cluster
+ * Test a prompt draft payload with a SOS cluster
  * POST /system/prompts/{id}/test
  */
 export async function testPromptRescueSuggestion(

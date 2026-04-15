@@ -101,21 +101,21 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
             <Robot size={18} className="text-blue-500 shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground">Model</p>
+              <p className="text-sm text-muted-foreground">Model</p>
               <p className="text-sm font-medium">{prompt.model || "Default"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
             <ThermometerHot size={18} className="text-orange-500 shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground">Temperature</p>
+              <p className="text-sm text-muted-foreground">Temperature</p>
               <p className="text-sm font-medium">{prompt.temperature ?? "—"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
             <Lightning size={18} className="text-amber-500 shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground">Max Tokens</p>
+              <p className="text-sm text-muted-foreground">Max Tokens</p>
               <p className="text-sm font-medium">
                 {prompt.maxTokens?.toLocaleString() ?? "—"}
               </p>
@@ -124,7 +124,7 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
             <Hash size={18} className="text-purple-500 shrink-0" />
             <div>
-              <p className="text-xs text-muted-foreground">Version</p>
+              <p className="text-sm text-muted-foreground">Version</p>
               <p className="text-sm font-medium">{prompt.version || "—"}</p>
             </div>
           </div>
@@ -134,7 +134,7 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
         <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
           <Globe size={18} className="text-emerald-500 shrink-0" />
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">API URL</p>
+            <p className="text-sm text-muted-foreground">API URL</p>
             <p className="text-sm font-mono truncate">
               {prompt.apiUrl || "Dùng API URL mặc định của provider"}
             </p>
@@ -172,7 +172,7 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
         <Separator />
 
         {/* Timestamps */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span className="flex items-center gap-1">
             <Clock size={14} />
             Tạo: {formatDate(prompt.createdAt)}

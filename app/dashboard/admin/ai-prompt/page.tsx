@@ -419,13 +419,13 @@ const AIPromptPage = () => {
                         onPointerDown={handleEditorPointerDown}
                       >
                         <div className="h-1.5 w-14 rounded-full bg-border group-hover:bg-primary/50 group-active:bg-primary/70 transition-colors duration-150" />
-                        <span className="text-xs text-muted-foreground/80 mt-1 group-hover:text-muted-foreground/70 transition-colors flex items-center gap-0.5 tracking-tighter">
+                        <span className="text-sm text-muted-foreground/80 mt-1 group-hover:text-muted-foreground/70 transition-colors flex items-center gap-0.5 tracking-tighter">
                           <DotsSixVertical className="h-3 w-3" />
                           Kéo để xem nhiều nội dung hơn
                         </span>
                       </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground tracking-tighter">
+                      <span className="text-sm text-muted-foreground tracking-tighter">
                         Đang ở chế độ xem đầy đủ
                       </span>
                     )}
