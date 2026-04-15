@@ -108,8 +108,10 @@ export interface GetMyDepotInventoryParams {
 export interface GetDepotInventoryParams {
   depotId: number;
   categoryIds?: number[];
+  categoryCode?: string[];
   itemTypes?: string[];
   targetGroups?: string[];
+  itemName?: string;
   pageNumber?: number;
   pageSize?: number;
 }

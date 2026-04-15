@@ -322,8 +322,11 @@ export interface PromptFormData {
 export interface PromptEditorProps {
   prompt?: PromptDetailEntity | null;
   isSubmitting?: boolean;
-  onSave: (data: CreatePromptRequest | UpdatePromptRequest) => void;
+  onSave: (
+    data: CreatePromptRequest | UpdatePromptRequest,
+  ) => void | Promise<void>;
   onCancel: () => void;
+  hideHeaderClose?: boolean;
 }
 
 export interface PromptListProps {
@@ -948,7 +951,7 @@ export interface AssemblyPoint {
   latitude: number;
   longitude: number;
   maxCapacity: number;
-  status: "Created" | "Active" | "Overloaded" | "UnderMaintenance" | "Closed";
+  status: "Created" | "Active" | "Unavailable" | "Closed";
   lastUpdatedAt: string | null;
   hasActiveEvent?: boolean;
 }

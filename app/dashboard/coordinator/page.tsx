@@ -353,8 +353,6 @@ const CoordinatorDashboardContent = () => {
   const {
     urlState,
     hasInitialView,
-    initialCenter,
-    initialZoom,
     handleMapViewChange,
     handleEntitySelect,
     clearSelection,
@@ -481,7 +479,6 @@ const CoordinatorDashboardContent = () => {
   const { mutate: createCluster, isPending: isCreatingCluster } =
     useCreateSOSCluster();
   const {
-    mutate: fetchClusterRescueSuggestion,
     isPending: isFetchingSuggestion,
   } = useClusterRescueSuggestion();
   const isProcessingSOS = isCreatingCluster || isFetchingSuggestion;
@@ -568,11 +565,17 @@ const CoordinatorDashboardContent = () => {
     const shouldOpenClusterPlan = searchParams.get("openPlan") === "1";
     const focusSosId = searchParams.get("focusSosId") ?? "";
     const openAt = searchParams.get("openAt") ?? "";
+    const planTabParam = searchParams.get("planTab");
+    const planTab =
+      planTabParam === "plan" || planTabParam === "missions"
+        ? planTabParam
+        : "missions";
     const selectionSignature = JSON.stringify({
       selected: sel,
       shouldOpenClusterPlan,
       focusSosId,
       openAt,
+      planTab,
     });
 
     if (sel.type === "sos" && sosRequests.length > 0) {
@@ -608,7 +611,7 @@ const CoordinatorDashboardContent = () => {
           setActiveClusterId(cluster.id);
           const cachedSuggestion = suggestionCacheRef.current.get(cluster.id);
           setRescueSuggestion(cachedSuggestion ?? null);
-          setRescuePlanDefaultTab("missions");
+          setRescuePlanDefaultTab(planTab);
           setRescuePlanOpen(true);
           setSOSDetailOpen(false);
           setLocationPanelOpen(false);
@@ -675,6 +678,50 @@ const CoordinatorDashboardContent = () => {
     }
   }, [isWeatherMode, router]);
 
+  const syncRescuePlanUrlState = useCallback(
+    (
+      nextOpen: boolean,
+      clusterId: number | null,
+      tab?: "plan" | "missions",
+    ) => {
+      const params = new URLSearchParams(searchParams.toString());
+
+      if (nextOpen && clusterId != null) {
+        params.set("sel", "cluster");
+        params.set("id", String(clusterId));
+        params.set("openPlan", "1");
+        params.set("openAt", String(Date.now()));
+        if (tab) {
+          params.set("planTab", tab);
+        } else {
+          params.delete("planTab");
+        }
+      } else {
+        params.delete("openPlan");
+        params.delete("openAt");
+        params.delete("focusSosId");
+        params.delete("planTab");
+      }
+
+      const nextQuery = params.toString();
+      router.replace(
+        nextQuery
+          ? `/dashboard/coordinator?${nextQuery}`
+          : "/dashboard/coordinator",
+        { scroll: false },
+      );
+    },
+    [router, searchParams],
+  );
+
+  const handleRescuePlanOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setRescuePlanOpen(nextOpen);
+      syncRescuePlanUrlState(nextOpen, activeClusterId, rescuePlanDefaultTab);
+    },
+    [activeClusterId, rescuePlanDefaultTab, syncRescuePlanUrlState],
+  );
+
   const handleSOSSelect = useCallback(
     (sos: SOSRequest) => {
       setTeamIncidentDetailOpen(false);
@@ -702,12 +749,13 @@ const CoordinatorDashboardContent = () => {
       setSelectedRescuer(null);
       setSOSDetailOpen(false);
       setRescuePlanOpen(false);
+      syncRescuePlanUrlState(false, activeClusterId);
       setSelectedTeamIncident(incident);
       setTeamIncidentDetailOpen(true);
       setFlyToZoom(16);
       setFlyToLocation({ lat: incident.latitude, lng: incident.longitude });
     },
-    [],
+    [activeClusterId, syncRescuePlanUrlState],
   );
 
   const handleDepotSelect = useCallback(
@@ -769,10 +817,11 @@ const CoordinatorDashboardContent = () => {
       setRescueSuggestion(cached ?? null);
       setRescuePlanDefaultTab(undefined);
       setRescuePlanOpen(true);
+      syncRescuePlanUrlState(true, clusterId);
       setSOSDetailOpen(false);
       setLocationPanelOpen(false);
     },
-    [clusters],
+    [clusters, syncRescuePlanUrlState],
   );
 
   const handleClusterOnly = useCallback(
@@ -857,7 +906,7 @@ const CoordinatorDashboardContent = () => {
         },
       );
     },
-    [sosRequests, autoClusters, createCluster, fetchClusterRescueSuggestion],
+    [sosRequests, autoClusters, createCluster, aiStream],
   );
 
   const handleAnalyzeCluster = useCallback(
@@ -895,7 +944,6 @@ const CoordinatorDashboardContent = () => {
   }, [aiStream.loading, aiStreamClusterId]);
 
   const handleApproveDecision = useCallback(() => {
-    toast.success("Đã gửi nhiệm vụ thành công");
     setRescuePlanOpen(false);
     setSOSDetailOpen(false);
     setSelectedSOS(null);
@@ -910,8 +958,9 @@ const CoordinatorDashboardContent = () => {
     setManualMissionOpen(true);
     setSOSDetailOpen(false);
     setRescuePlanOpen(false);
+    syncRescuePlanUrlState(false, activeClusterId);
     setLocationPanelOpen(false);
-  }, []);
+  }, [activeClusterId, syncRescuePlanUrlState]);
 
   const handleViewMission = useCallback(
     (clusterId: number | null, missionId: number) => {
@@ -920,9 +969,10 @@ const CoordinatorDashboardContent = () => {
       setManualMissionOpen(true);
       setSOSDetailOpen(false);
       setRescuePlanOpen(false);
+      syncRescuePlanUrlState(false, activeClusterId);
       setLocationPanelOpen(false);
     },
-    [],
+    [activeClusterId, syncRescuePlanUrlState],
   );
 
   const handleManualMissionCreated = useCallback(() => {
@@ -936,8 +986,9 @@ const CoordinatorDashboardContent = () => {
     setAiStreamClusterId(activeClusterId);
     setAiStreamOpen(true);
     setRescuePlanOpen(false);
+    syncRescuePlanUrlState(false, activeClusterId);
     aiStream.startStream(activeClusterId);
-  }, [activeClusterId, aiStream]);
+  }, [activeClusterId, aiStream, syncRescuePlanUrlState]);
 
   // ─── Derived data for panels ───
 
@@ -1287,7 +1338,7 @@ const CoordinatorDashboardContent = () => {
               {/* Rescue Plan Panel */}
               <RescuePlanPanel
                 open={rescuePlanOpen}
-                onOpenChange={setRescuePlanOpen}
+                onOpenChange={handleRescuePlanOpenChange}
                 clusterSOSRequests={rescuePlanSOSRequests}
                 clusterId={activeClusterId}
                 rescueSuggestion={rescueSuggestion}
@@ -1323,6 +1374,11 @@ const CoordinatorDashboardContent = () => {
                   setAiStreamOpen(false);
                   setRescuePlanDefaultTab("plan");
                   setRescuePlanOpen(true);
+                  syncRescuePlanUrlState(
+                    true,
+                    activeClusterId ?? aiStreamClusterId,
+                    "plan",
+                  );
                 }}
               />
 

@@ -162,7 +162,7 @@ const PromptList = ({
                     </h3>
                     <Badge
                       variant={prompt.isActive ? "success" : "secondary"}
-                      className="shrink-0 text-xs px-1.5 py-0"
+                      className="shrink-0 text-sm px-1.5 py-0"
                     >
                       {prompt.isActive ? "Hoạt động" : "Tắt"}
                     </Badge>
@@ -186,7 +186,7 @@ const PromptList = ({
                       {prompt.hasApiKey ? "Có key riêng" : "Dùng key mặc định"}
                     </Badge>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground/80">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground/80">
                     <span className="flex items-center gap-1">
                       <Robot size={14} />
                       {prompt.model || "Default"}
@@ -270,7 +270,7 @@ const PromptTypeFilter = ({
             <span className="truncate text-sm font-medium">{option.label}</span>
             <span
               className={cn(
-                "ml-2 inline-flex min-w-6 items-center justify-center rounded-full border px-1.5 py-0.5 text-xs font-semibold",
+                "ml-2 inline-flex min-w-6 items-center justify-center rounded-full border px-1.5 py-0.5 text-sm font-semibold",
                 isSelected
                   ? "border-white/30 bg-white/20 text-white"
                   : theme.badge,

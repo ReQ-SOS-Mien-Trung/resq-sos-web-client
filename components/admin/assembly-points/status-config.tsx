@@ -9,13 +9,11 @@ import type {
   AssemblyPointStatus,
   AssemblyPointStatusMetadata,
 } from "@/services/assembly_points/type";
-import { Icon } from "@iconify/react";
 
 export const ASSEMBLY_POINT_STATUS_ORDER: AssemblyPointStatus[] = [
   "Created",
   "Active",
-  "Overloaded",
-  "UnderMaintenance",
+  "Unavailable",
   "Closed",
 ];
 
@@ -52,24 +50,11 @@ const STATUS_STYLE: Record<AssemblyPointStatus, AssemblyPointStatusStyle> = {
     bg: "bg-emerald-500/10 border-emerald-200",
     icon: <CheckCircle size={20} weight="fill" className="text-emerald-500" />,
   },
-  Overloaded: {
-    fallbackLabel: "Quá tải",
+  Unavailable: {
+    fallbackLabel: "Không khả dụng",
     color: "text-amber-700",
     bg: "bg-amber-500/10 border-amber-200",
     icon: <WarningCircle size={20} weight="fill" className="text-amber-500" />,
-  },
-  UnderMaintenance: {
-    fallbackLabel: "Đang bảo trì",
-    color: "text-violet-700",
-    bg: "bg-violet-500/10 border-violet-200",
-    icon: (
-      <Icon
-        icon="ix:maintenance-triangle-filled"
-        width="20"
-        height="20"
-        className="text-violet-500"
-      />
-    ),
   },
   Closed: {
     fallbackLabel: "Đã đóng",

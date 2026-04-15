@@ -74,11 +74,16 @@ export function useUpdateMission() {
     { missionId: number; request: UpdateMissionRequest }
   >({
     mutationFn: ({ missionId, request }) => updateMission(missionId, request),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
+      const missionId = data?.missionId ?? variables.missionId;
       queryClient.invalidateQueries({ queryKey: MISSIONS_QUERY_KEY });
       queryClient.invalidateQueries({
-        queryKey: [...MISSIONS_QUERY_KEY, data.missionId],
+        queryKey: [...MISSIONS_QUERY_KEY, missionId],
       });
+      queryClient.invalidateQueries({
+        queryKey: [...MISSION_ACTIVITIES_QUERY_KEY, missionId],
+      });
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
     },
   });
 }

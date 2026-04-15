@@ -6,6 +6,7 @@ import {
   CreateSOSClusterResponse,
   GetMissionSuggestionsResponse,
   ClusterRescueSuggestionResponse,
+  AlternativeDepotsResponse,
   SseMissionEvent,
 } from "./type";
 
@@ -209,6 +210,23 @@ export async function getMissionSuggestions(
 ): Promise<GetMissionSuggestionsResponse> {
   const { data } = await api.get(
     `/emergency/sos-clusters/${clusterId}/mission-suggestions`,
+  );
+  return data;
+}
+
+/**
+ * Get top alternative depots for shortage items in the latest AI suggestion.
+ * GET /emergency/sos-clusters/{clusterId}/alternative-depots?selectedDepotId=...
+ */
+export async function getAlternativeDepots(
+  clusterId: number,
+  selectedDepotId: number,
+): Promise<AlternativeDepotsResponse> {
+  const { data } = await api.get(
+    `/emergency/sos-clusters/${clusterId}/alternative-depots`,
+    {
+      params: { selectedDepotId },
+    },
   );
   return data;
 }

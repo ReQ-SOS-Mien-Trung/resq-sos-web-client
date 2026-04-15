@@ -100,7 +100,13 @@ export function useMapUrlSync() {
       selected?: SelectedEntity,
       mode?: "sos" | "weather",
     ): URLSearchParams => {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("mode");
+      params.delete("lat");
+      params.delete("lng");
+      params.delete("zoom");
+      params.delete("sel");
+      params.delete("id");
 
       // Mode
       const effectiveMode = mode ?? urlState.mode;
@@ -127,9 +133,16 @@ export function useMapUrlSync() {
         params.set("id", String(effectiveSelected.id));
       }
 
+      if (effectiveSelected?.type !== "cluster") {
+        params.delete("openPlan");
+        params.delete("focusSosId");
+        params.delete("openAt");
+        params.delete("planTab");
+      }
+
       return params;
     },
-    [urlState],
+    [searchParams, urlState],
   );
 
   // ── Push URL (debounced for map moves) ──
