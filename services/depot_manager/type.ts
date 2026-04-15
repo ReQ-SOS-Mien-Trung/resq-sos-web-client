@@ -1,7 +1,9 @@
 // Depot Manager Entity
 export interface DepotManagerEntity {
   userId: string;
-  fullName: string;
+  fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string | null;
   phone: string;
   assignedAt: string;

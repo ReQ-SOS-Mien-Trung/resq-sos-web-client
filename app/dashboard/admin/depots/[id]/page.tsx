@@ -32,10 +32,7 @@ import {
   MapPin,
   Package,
   ArrowClockwise,
-  UserCircle,
   ArrowsLeftRight,
-  Phone,
-  EnvelopeSimple,
   ArrowRight,
   CheckFat,
   HourglassHigh,
@@ -57,6 +54,7 @@ import {
   useDepots,
   useDepotChangeableStatuses,
   useDepotAvailableManagers,
+  useDepotActiveManagers,
   useDepotClosureResolutionMetadata,
   useDepotMetadata,
   useDepotStatuses,
@@ -426,7 +424,19 @@ export default function DepotDetailPage() {
   const canManageDepotManager =
     depot?.status !== "Closed" && depot?.status !== "Closing";
   const { data: changeableStatusMetadata } = useDepotChangeableStatuses();
-  const { data: availableManagers = [] } = useDepotAvailableManagers();
+  const [managerDialogOpen, setManagerDialogOpen] = useState(false);
+  const [removeManagerDialogOpen, setRemoveManagerDialogOpen] = useState(false);
+  const { data: availableManagers = [] } = useDepotAvailableManagers({
+    depotId,
+    enabled: managerDialogOpen && Number.isFinite(depotId) && depotId > 0,
+  });
+  const {
+    data: activeManagers = [],
+    isLoading: activeManagersLoading,
+    refetch: refetchActiveManagers,
+  } = useDepotActiveManagers(depotId, {
+    enabled: removeManagerDialogOpen && Number.isFinite(depotId) && depotId > 0,
+  });
   const [managerHistoryPage, setManagerHistoryPage] = useState(1);
   const [managerHistoryPageSize, setManagerHistoryPageSize] = useState(10);
   const { data: itemTypes = [] } = useInventoryItemTypes();
@@ -443,6 +453,21 @@ export default function DepotDetailPage() {
     enabled: Number.isFinite(depotId) && depotId > 0,
   });
   const managerHistory = managerHistoryData?.items ?? [];
+  const managerHistoryCurrentPage =
+    managerHistoryData?.pageNumber ?? managerHistoryPage;
+  const managerHistoryTotalPages = Math.max(
+    managerHistoryData?.totalPages ?? 0,
+    managerHistoryData?.totalCount
+      ? Math.ceil(managerHistoryData.totalCount / managerHistoryPageSize)
+      : 0,
+  );
+  const managerHistoryHasPrevious =
+    (managerHistoryData?.hasPreviousPage ?? false) ||
+    managerHistoryCurrentPage > 1;
+  const managerHistoryHasNext =
+    (managerHistoryData?.hasNextPage ?? false) ||
+    (managerHistoryTotalPages > 0 &&
+      managerHistoryCurrentPage < managerHistoryTotalPages);
   const changeableStatusOptions = useMemo<
     Array<{ key: "Available" | "Unavailable" | "Closing"; value: string }>
   >(() => {
@@ -479,10 +504,6 @@ export default function DepotDetailPage() {
   const statusCfg = buildStatusCfg(statusMetadata);
   const listDepot = allDepotsData?.items.find((d) => d.id === depotId);
   const requests = listDepot?.requests ?? depot?.requests ?? [];
-  const activeChangeableStatusOption = depot
-    ? changeableStatusOptions.find((option) => option.key === depot.status)
-    : undefined;
-  const isCloseOptionSelected = activeChangeableStatusOption?.key === "Closing";
 
   /* ── State ── */
   const [selectedStatus, setSelectedStatus] = useState<string>("");
@@ -516,8 +537,11 @@ export default function DepotDetailPage() {
   const [hasAppliedTransferSuggestions, setHasAppliedTransferSuggestions] =
     useState(false);
   const [externalNote, setExternalNote] = useState("");
-  const [managerDialogOpen, setManagerDialogOpen] = useState(false);
   const [selectedManagerId, setSelectedManagerId] = useState("");
+  const [unassignSelectionId, setUnassignSelectionId] = useState("");
+  const [selectedUnassignManagerIds, setSelectedUnassignManagerIds] = useState<
+    string[]
+  >([]);
   const [isSwitchingManager, setIsSwitchingManager] = useState(false);
   const initiateMutation = useInitiateDepotClosure();
   const markExternalMutation = useMarkDepotClosureExternal();
@@ -545,6 +569,15 @@ export default function DepotDetailPage() {
   const activeClosureStatus = activeClosure?.status ?? null;
   const activeTransfer = activeClosure?.transferDetail ?? null;
   const activeTransferId = activeTransfer?.id ?? null;
+  const selectedUnassignManagers = useMemo(
+    () =>
+      selectedUnassignManagerIds
+        .map((userId) =>
+          activeManagers.find((manager) => manager.userId === userId),
+        )
+        .filter((manager): manager is NonNullable<typeof manager> => !!manager),
+    [activeManagers, selectedUnassignManagerIds],
+  );
 
   const closingTimeoutCountdown = useCountdown(null);
 
@@ -971,7 +1004,7 @@ export default function DepotDetailPage() {
                 {transferSuggestionsFetching && (
                   <Badge variant="outline" className="gap-1.5 tracking-tighter">
                     <Spinner size={12} className="animate-spin" />
-                    Đang lấy gợi ý AI
+                    Đang lấy gợi ý
                   </Badge>
                 )}
                 <Badge variant="outline" className="tracking-tighter">
@@ -991,10 +1024,10 @@ export default function DepotDetailPage() {
                       applyTransferSuggestionsToAssignments(
                         result.data.suggestedTransfers,
                       );
-                      toast.success("Đã lấy lại gợi ý phân bổ AI.");
+                      toast.success("Đã lấy lại gợi ý phân bổ từ hệ thống.");
                     } else {
                       toast.error(
-                        "Chưa lấy được gợi ý AI. Bạn vẫn có thể phân bổ thủ công.",
+                        "Chưa lấy được gợi ý. Bạn vẫn có thể phân bổ thủ công.",
                       );
                     }
                   }}
@@ -1004,7 +1037,7 @@ export default function DepotDetailPage() {
                   ) : (
                     <ArrowClockwise size={13} />
                   )}
-                  Lấy gợi ý AI
+                  Lấy gợi ý từ hệ thống
                 </Button>
               </div>
             </div>
@@ -1018,8 +1051,8 @@ export default function DepotDetailPage() {
                     Gợi ý sức chứa kho đích
                   </p>
                   <p className="text-xs text-muted-foreground tracking-tighter mt-0.5">
-                    AI quét phần trống còn lại theo thể tích và cân nặng để đề
-                    xuất phương án chuyển kho.
+                    Hệ thống quét phần trống còn lại theo thể tích và cân nặng
+                    để đề xuất phương án chuyển kho.
                   </p>
                 </div>
                 <Badge variant="outline" className="tracking-tighter">
@@ -1028,39 +1061,109 @@ export default function DepotDetailPage() {
                 </Badge>
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {transferSuggestions?.targetDepotMetrics.map((metric) => (
-                  <div
-                    key={metric.depotId}
-                    className="rounded-xl border border-border/60 bg-muted/20 px-3.5 py-3"
-                  >
-                    <p className="truncate text-sm font-semibold tracking-tighter">
-                      {metric.depotName}
-                    </p>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-                          Còn trống thể tích
+                {transferSuggestions?.targetDepotMetrics.map((metric, idx) => {
+                  const usedPct =
+                    metric.capacity > 0
+                      ? Math.round(
+                          (metric.currentUtilization / metric.capacity) * 100,
+                        )
+                      : 0;
+                  const freePct = 100 - usedPct;
+                  const rankColors = [
+                    "border-emerald-300 bg-emerald-50/60 dark:bg-emerald-950/20",
+                    "border-sky-300 bg-sky-50/60 dark:bg-sky-950/20",
+                    "border-violet-300 bg-violet-50/60 dark:bg-violet-950/20",
+                  ];
+                  const rankBadgeColors = [
+                    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+                    "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+                    "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+                  ];
+                  const barColors = [
+                    "bg-emerald-500",
+                    "bg-sky-500",
+                    "bg-violet-500",
+                  ];
+                  const colorIdx = idx < 3 ? idx : -1;
+                  const cardClass =
+                    colorIdx >= 0
+                      ? rankColors[colorIdx]
+                      : "border-border/60 bg-muted/20";
+                  const badgeClass =
+                    colorIdx >= 0
+                      ? rankBadgeColors[colorIdx]
+                      : "bg-muted text-muted-foreground";
+                  const barClass =
+                    colorIdx >= 0
+                      ? barColors[colorIdx]
+                      : "bg-muted-foreground/40";
+
+                  return (
+                    <div
+                      key={metric.depotId}
+                      className={cn(
+                        "rounded-xl border px-3.5 py-3 transition-shadow hover:shadow-md",
+                        cardClass,
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <p className="truncate text-sm font-semibold tracking-tighter">
+                          {metric.depotName}
                         </p>
-                        <p className="mt-1 text-base font-semibold tracking-tighter tabular-nums">
-                          {metric.remainingVolume.toLocaleString("vi-VN")}
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                            badgeClass,
+                          )}
+                        >
+                          #{idx + 1}
+                        </span>
+                      </div>
+
+                      {/* Utilization bar */}
+                      <div className="mb-2.5">
+                        <div className="flex items-center justify-between text-[10px] tracking-wider text-muted-foreground mb-1">
+                          <span>Đang dùng {usedPct}%</span>
+                          <span className="font-semibold text-foreground">
+                            Trống {freePct}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all",
+                              barClass,
+                            )}
+                            style={{ width: `${freePct}%` }}
+                          />
+                        </div>
+                        <p className="mt-1 text-[10px] tracking-tighter text-muted-foreground tabular-nums">
+                          {metric.currentUtilization.toLocaleString("vi-VN")} /{" "}
+                          {metric.capacity.toLocaleString("vi-VN")}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-                          Còn trống cân nặng
-                        </p>
-                        <p className="mt-1 text-base font-semibold tracking-tighter tabular-nums">
-                          {metric.remainingWeight.toLocaleString("vi-VN")}
-                        </p>
+
+                      <div className="grid gap-2 grid-cols-2">
+                        <div className="rounded-lg bg-background/70 px-2.5 py-1.5">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                            Trống thể tích
+                          </p>
+                          <p className="mt-0.5 text-sm font-bold tracking-tighter tabular-nums">
+                            {metric.remainingVolume.toLocaleString("vi-VN")}
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-background/70 px-2.5 py-1.5">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                            Trống cân nặng
+                          </p>
+                          <p className="mt-0.5 text-sm font-bold tracking-tighter tabular-nums">
+                            {metric.remainingWeight.toLocaleString("vi-VN")}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    <p className="mt-2 text-xs tracking-tighter text-muted-foreground">
-                      Đang dùng{" "}
-                      {metric.currentUtilization.toLocaleString("vi-VN")} /{" "}
-                      {metric.capacity.toLocaleString("vi-VN")}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1078,7 +1181,7 @@ export default function DepotDetailPage() {
                     Hệ thống chưa đủ không gian để phân bổ hết hàng tồn kho
                   </p>
                   <p className="text-xs tracking-tighter leading-5 text-red-800/90">
-                    Quản trị viên cần giảm số lượng, chỉnh lại đề xuất AI hoặc
+                    Quản trị viên cần giảm số lượng, chỉnh lại đề xuất hoặc
                     chuyển sang phương án xử lý bên ngoài cho phần hàng chưa có
                     chỗ chứa phù hợp.
                   </p>
@@ -1115,15 +1218,15 @@ export default function DepotDetailPage() {
 
           {transferSuggestionsError && (
             <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-3 text-sm tracking-tighter text-amber-800">
-              Không lấy được gợi ý AI từ hệ thống. Bạn vẫn có thể phân bổ thủ
-              công bằng form bên dưới.
+              Không lấy được gợi ý từ hệ thống. Bạn vẫn có thể phân bổ thủ công
+              bằng form bên dưới.
             </div>
           )}
 
           {!closureInventoryItems.length ? (
             <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50/60 p-3 text-sm tracking-tighter text-amber-700">
-              Backend chưa trả danh sách vật phẩm tồn có thể điều phối, nên hiện
-              chưa thể chia vật phẩm sang nhiều kho đích từ màn hình này.
+              Hệ thống chưa trả danh sách vật phẩm tồn có thể điều phối, nên
+              hiện chưa thể chia vật phẩm sang nhiều kho đích từ màn hình này.
             </div>
           ) : (
             <>
@@ -1501,6 +1604,7 @@ export default function DepotDetailPage() {
       refetch(),
       refetchAllDepots(),
       refetchManagerHistory(),
+      refetchActiveManagers(),
       refetchActiveClosureSummary(),
       ...(activeClosureId ? [refetchActiveClosureDetail()] : []),
     ]).finally(() => setIsRefreshing(false));
@@ -1514,14 +1618,6 @@ export default function DepotDetailPage() {
 
     try {
       setIsSwitchingManager(true);
-
-      const sourceDepot = (allDepotsData?.items ?? []).find(
-        (d) => d.manager?.id === selectedManagerId && d.id !== depot.id,
-      );
-
-      if (sourceDepot) {
-        await unassignManagerMutation.mutateAsync({ id: sourceDepot.id });
-      }
 
       await assignManagerMutation.mutateAsync({
         id: depot.id,
@@ -1539,12 +1635,38 @@ export default function DepotDetailPage() {
     }
   }
 
-  async function handleUnassignCurrentManager() {
+  function handleAddManagerToUnassignList(userId: string) {
+    if (!userId || userId === "__none") {
+      setUnassignSelectionId("");
+      return;
+    }
+
+    setSelectedUnassignManagerIds((prev) =>
+      prev.includes(userId) ? prev : [...prev, userId],
+    );
+    setUnassignSelectionId("");
+  }
+
+  function handleRemoveSelectedUnassignManager(userId: string) {
+    setSelectedUnassignManagerIds((prev) => prev.filter((id) => id !== userId));
+  }
+
+  async function handleUnassignManagers() {
     if (!depot) return;
+    if (selectedUnassignManagerIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 quản kho để gỡ.");
+      return;
+    }
 
     try {
-      await unassignManagerMutation.mutateAsync({ id: depot.id });
-      toast.success("Đã gỡ quản kho khỏi kho này.");
+      await unassignManagerMutation.mutateAsync({
+        id: depot.id,
+        userIds: selectedUnassignManagerIds,
+      });
+      toast.success("Đã gỡ quản kho đã chọn khỏi kho này.");
+      setRemoveManagerDialogOpen(false);
+      setSelectedUnassignManagerIds([]);
+      setUnassignSelectionId("");
       handleRefresh();
     } catch (err) {
       toast.error(getApiError(err, "Gỡ quản kho thất bại."));
@@ -1802,9 +1924,6 @@ export default function DepotDetailPage() {
     0,
     depot.capacity - depot.currentUtilization,
   );
-  const managerDisplayName = depot.manager
-    ? `${depot.manager.lastName} ${depot.manager.firstName}`
-    : "Chưa phân công quản lý";
   const closingBannerTheme =
     activeClosureStatus === "Processing" ||
     activeClosureStatus === "TransferPending"
@@ -1998,7 +2117,7 @@ export default function DepotDetailPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">
                         Tồn kho hiện tại
                       </p>
-                      <p className="mt-2 text-2xl font-semibold tracking-tight">
+                      <p className="mt-2 text-2xl font-semibold tracking-tighter">
                         {depot.currentUtilization.toLocaleString("vi-VN")}
                         <span className="ml-2 text-sm font-medium text-white/65">
                           / {depot.capacity.toLocaleString("vi-VN")}
@@ -2009,7 +2128,7 @@ export default function DepotDetailPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">
                         Dung lượng còn trống
                       </p>
-                      <p className="mt-2 text-2xl font-semibold tracking-tight">
+                      <p className="mt-2 text-2xl font-semibold tracking-tighter">
                         {availableCapacity.toLocaleString("vi-VN")}
                       </p>
                     </div>
@@ -2017,7 +2136,7 @@ export default function DepotDetailPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">
                         Người phụ trách
                       </p>
-                      <p className="mt-2 text-xl font-semibold tracking-tight">
+                      <p className="mt-2 text-xl font-semibold tracking-tighter">
                         {managerDisplayName}
                       </p>
                     </div>
@@ -2039,10 +2158,10 @@ export default function DepotDetailPage() {
               <div className="p-5 xl:mt-auto">
                 {depot.status !== "Closed" && (
                   <div>
-                    <p className="px-3 pb-2 font-semibold text-sm uppercase tracking-tighter text-muted-foreground">
+                    <p className="pb-2 font-semibold text-sm uppercase tracking-tighter text-muted-foreground">
                       Chuyển trạng thái kho
                     </p>
-                    <div className="flex items-center gap-2 px-3">
+                    <div className="flex items-center gap-2">
                       <Select
                         value={selectedStatus || depot.status}
                         onValueChange={setSelectedStatus}
@@ -2051,7 +2170,11 @@ export default function DepotDetailPage() {
                         <SelectTrigger className="h-11! flex-1 rounded-md shadow-none font-medium bg-background border-border/60 py-0">
                           <SelectValue placeholder="Chọn trạng thái" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent
+                          position="popper"
+                          side="bottom"
+                          avoidCollisions={false}
+                        >
                           {changeableStatusOptions.map((option) => (
                             <SelectItem
                               key={option.key}
@@ -2107,34 +2230,38 @@ export default function DepotDetailPage() {
                 )}
 
                 <div className="mt-4 space-y-3">
-                  <p className="px-3 font-semibold text-sm uppercase tracking-tighter text-muted-foreground">
-                    THAY ĐỔI QUẢN KHO
-                  </p>
                   {canManageDepotManager && (
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-11 flex-1 rounded-md border-slate-300 bg-background px-4 font-medium text-slate-700 hover:bg-slate-50"
-                        onClick={() => {
-                          setSelectedManagerId(depot.manager?.id ?? "");
-                          setManagerDialogOpen(true);
-                        }}
-                      >
-                        <Icon
-                          icon="line-md:account-small"
-                          width="24"
-                          height="24"
-                        />
-                        Thay quản kho
-                      </Button>
-                      {depot.manager && (
+                    <>
+                      <p className="px-3 font-semibold text-sm uppercase tracking-tighter text-muted-foreground">
+                        THAY ĐỔI QUẢN KHO
+                      </p>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-11 flex-1 rounded-md border-slate-300 bg-background px-4 font-medium text-slate-700 hover:bg-slate-50"
+                          onClick={() => {
+                            setSelectedManagerId("");
+                            setManagerDialogOpen(true);
+                          }}
+                        >
+                          <Icon
+                            icon="line-md:account-small"
+                            width="24"
+                            height="24"
+                          />
+                          Thêm quản kho
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           className="h-11 flex-1 rounded-md border-red-300 bg-background px-4 font-medium text-red-600 hover:bg-red-50"
                           disabled={unassignManagerMutation.isPending}
-                          onClick={handleUnassignCurrentManager}
+                          onClick={() => {
+                            setSelectedUnassignManagerIds([]);
+                            setUnassignSelectionId("");
+                            setRemoveManagerDialogOpen(true);
+                          }}
                         >
                           <Icon
                             icon="line-md:account-delete"
@@ -2143,11 +2270,12 @@ export default function DepotDetailPage() {
                           />
                           Gỡ quản kho
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    </>
                   )}
 
-                  {depot.status === "Unavailable" && !isCloseOptionSelected && (
+                  {(depot.status === "Unavailable" ||
+                    depot.status === "Closing") && (
                     <Button
                       className="h-12 w-full rounded-md border border-red-700 bg-red-600 px-5 text-base font-bold text-white transition-colors hover:border-red-800 hover:bg-red-700 hover:text-white shadow-none"
                       variant="outline"
@@ -2201,7 +2329,7 @@ export default function DepotDetailPage() {
           </div>
         </section>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Card className="overflow-hidden rounded-2xl border border-border/60 bg-background py-0">
             <CardContent className="space-y-3 px-5 py-3">
               <div className="flex items-center justify-between gap-3">
@@ -2281,42 +2409,6 @@ export default function DepotDetailPage() {
               </p>
             </CardContent>
           </Card>
-
-          <Card className="overflow-hidden rounded-2xl border border-border/60 bg-background py-0">
-            <CardContent className="space-y-4 px-5 py-3">
-              <div className="flex items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-4xl bg-sky-50 text-sky-600">
-                  <UserCircle size={28} weight="fill" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
-                    Quản lý kho
-                  </p>
-                  <p className="mt-2 text-lg font-semibold tracking-tighter text-slate-950">
-                    {managerDisplayName}
-                  </p>
-                  <div className="mt-2 space-y-1.5 text-sm text-slate-600">
-                    {depot.manager?.email && (
-                      <p className="flex items-center gap-2">
-                        <EnvelopeSimple size={15} className="shrink-0" />
-                        <span className="truncate tracking-tighter">
-                          {depot.manager.email}
-                        </span>
-                      </p>
-                    )}
-                    {depot.manager?.phone && (
-                      <p className="flex items-center gap-2">
-                        <Phone size={15} className="shrink-0" />
-                        <span className="tracking-tighter">
-                          {depot.manager.phone}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         <Card className="border border-border/50">
@@ -2376,14 +2468,15 @@ export default function DepotDetailPage() {
                       </td>
                     </tr>
                   ) : (
-                    managerHistory.map((record) => (
+                    managerHistory.map((record, index) => (
                       <tr
-                        key={`${record.userId}-${record.assignedAt}`}
+                        key={`${record.userId}-${record.assignedAt}-${record.unassignedAt ?? "current"}-${index}`}
                         className="border-b border-border/30 transition-colors hover:bg-muted/30"
                       >
                         <td className="p-3">
-                          <div className="text-sm font-medium text-foreground">
-                            {record.fullName ||
+                          <div className="text-sm font-medium tracking-tighter text-foreground">
+                            {`${record.lastName ?? ""} ${record.firstName ?? ""}`.trim() ||
+                              record.fullName ||
                               record.email?.split("@")[0] ||
                               "Không rõ tên"}
                           </div>
@@ -2423,9 +2516,9 @@ export default function DepotDetailPage() {
             <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-4">
               <div className="flex items-center gap-3">
                 <div className="text-sm tracking-tighter text-muted-foreground">
-                  Trang {managerHistoryData?.pageNumber ?? managerHistoryPage}
-                  {managerHistoryData?.totalPages
-                    ? ` / ${managerHistoryData.totalPages}`
+                  Trang {managerHistoryCurrentPage}
+                  {managerHistoryTotalPages
+                    ? ` / ${managerHistoryTotalPages}`
                     : ""}
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -2457,7 +2550,7 @@ export default function DepotDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={!managerHistoryData?.hasPreviousPage}
+                  disabled={!managerHistoryHasPrevious}
                   onClick={() =>
                     setManagerHistoryPage((prev) => Math.max(1, prev - 1))
                   }
@@ -2467,7 +2560,7 @@ export default function DepotDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={!managerHistoryData?.hasNextPage}
+                  disabled={!managerHistoryHasNext}
                   onClick={() => setManagerHistoryPage((prev) => prev + 1)}
                 >
                   Sau
@@ -3158,7 +3251,7 @@ export default function DepotDetailPage() {
                     {depot.capacity.toLocaleString("vi-VN")}
                   </span>
                 </div>
-                {depot.currentUtilization > 0 && (
+                {/* {depot.currentUtilization > 0 && (
                   <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                     <WarningCircle
                       size={15}
@@ -3170,7 +3263,7 @@ export default function DepotDetailPage() {
                       <strong>Đang đóng</strong>.
                     </p>
                   </div>
-                )}
+                )} */}
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="initiate-reason"
@@ -3465,7 +3558,7 @@ export default function DepotDetailPage() {
                   <WarehouseIcon size={18} className="text-blue-500" />
                   Xử lý tồn kho
                 </DialogTitle>
-                <DialogDescription className="mt-1 tracking-tight">
+                <DialogDescription className="mt-1 tracking-tighter">
                   Kho: <strong>{depot.name}</strong> — chọn phương án xử lý hàng
                   trước khi đóng kho chính thức.
                 </DialogDescription>
@@ -3474,7 +3567,7 @@ export default function DepotDetailPage() {
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 sm:px-7">
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold tracking-tight">
+                  <Label className="text-sm font-semibold tracking-tighter">
                     Phương án xử lý <span className="text-red-500">*</span>
                   </Label>
                   <div className="grid gap-2">
@@ -3525,7 +3618,7 @@ export default function DepotDetailPage() {
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold tracking-tight">
+                          <p className="text-sm font-semibold tracking-tighter">
                             {opt.value}
                           </p>
                           <p className="text-sm text-muted-foreground tracking-tight mt-0.5">
@@ -3544,7 +3637,7 @@ export default function DepotDetailPage() {
                   <div className="space-y-1.5">
                     <Label
                       htmlFor="ext-note"
-                      className="text-sm font-semibold tracking-tight"
+                      className="text-sm font-semibold tracking-tighter"
                     >
                       Ghi chú cách xử lý <span className="text-red-500">*</span>
                     </Label>
@@ -3563,7 +3656,7 @@ export default function DepotDetailPage() {
             <DialogFooter className="border-t border-border/60 px-6 py-4 sm:px-7">
               <Button
                 variant="outline"
-                className="tracking-tight"
+                className="tracking-tighter"
                 onClick={() => {
                   setResolveOpen(false);
                   setIsTransferDialogExpanded(false);
@@ -3602,31 +3695,31 @@ export default function DepotDetailPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="tracking-tighter">
-              Thay quản kho
+              Thêm quản kho
             </DialogTitle>
-            <DialogDescription className="tracking-tight">
-              Nếu quản kho đã thuộc kho khác, hệ thống sẽ gỡ khỏi kho cũ trước,
-              rồi gán vào kho này.
+            <DialogDescription className="tracking-tighter">
+              Nếu quản kho đang được gán ở kho khác, hệ thống sẽ giữ nguyên kho
+              cũ và thêm quản kho này vào kho hiện tại.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-1">
             <div className="space-y-1.5">
-              <Label className="tracking-tight">Kho hiện tại</Label>
+              <Label className="tracking-tighter">Kho hiện tại</Label>
               <div className="text-sm tracking-tight rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5">
                 {depot.name}
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="tracking-tight">Chọn quản kho</Label>
+              <Label className="tracking-tighter">Chọn quản kho</Label>
               <Select
                 value={selectedManagerId || "__none"}
                 onValueChange={(value) =>
                   setSelectedManagerId(value === "__none" ? "" : value)
                 }
               >
-                <SelectTrigger className="w-full tracking-tight">
+                <SelectTrigger className="w-full tracking-tighter">
                   <SelectValue placeholder="Chọn quản kho" />
                 </SelectTrigger>
                 <SelectContent
@@ -3638,24 +3731,9 @@ export default function DepotDetailPage() {
                   className="z-[10000] w-(--radix-select-trigger-width)"
                 >
                   <SelectItem value="__none">Chọn quản kho</SelectItem>
-                  {Array.from(
-                    new Map(
-                      [
-                        ...availableManagers.map((m) => ({
-                          id: m.id,
-                          label: `${m.fullName} (${m.phone})`,
-                        })),
-                        ...(allDepotsData?.items ?? [])
-                          .filter((d) => !!d.manager)
-                          .map((d) => ({
-                            id: d.manager!.id,
-                            label: `${d.manager!.fullName ?? `${d.manager!.lastName} ${d.manager!.firstName}`} (${d.manager!.phone ?? "—"})`,
-                          })),
-                      ].map((x) => [x.id, x] as const),
-                    ).values(),
-                  ).map((m) => (
+                  {availableManagers.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.label}
+                      {`${m.fullName} (${m.phone}) - ${m.assignedDepotsCount} kho`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -3666,17 +3744,130 @@ export default function DepotDetailPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              className="tracking-tight"
+              className="tracking-tighter"
               onClick={() => setManagerDialogOpen(false)}
             >
               Hủy
             </Button>
             <Button
-              className="tracking-tight"
+              className="tracking-tighter"
               disabled={!selectedManagerId || isSwitchingManager}
               onClick={handleSwitchManager}
             >
               {isSwitchingManager ? "Đang cập nhật..." : "Xác nhận"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={removeManagerDialogOpen}
+        onOpenChange={(open) => {
+          setRemoveManagerDialogOpen(open);
+          if (!open) {
+            setSelectedUnassignManagerIds([]);
+            setUnassignSelectionId("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="tracking-tighter">Gỡ quản kho</DialogTitle>
+            <DialogDescription className="tracking-tighter">
+              Chọn một hoặc nhiều quản kho đang active trong kho để gỡ phân
+              công.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-1">
+            <div className="space-y-1.5">
+              <Label className="tracking-tighter">Kho hiện tại</Label>
+              <div className="text-sm tracking-tight rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5">
+                {depot.name}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="tracking-tighter">Chọn quản kho cần gỡ</Label>
+              <Select
+                value={unassignSelectionId || "__none"}
+                onValueChange={handleAddManagerToUnassignList}
+                disabled={activeManagersLoading || activeManagers.length === 0}
+              >
+                <SelectTrigger className="w-full tracking-tighter">
+                  <SelectValue placeholder="Chọn quản kho cần gỡ" />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  sideOffset={4}
+                  avoidCollisions={false}
+                  className="z-[10000] w-(--radix-select-trigger-width)"
+                >
+                  <SelectItem value="__none">Chọn quản kho cần gỡ</SelectItem>
+                  {activeManagers.map((manager) => (
+                    <SelectItem key={manager.userId} value={manager.userId}>
+                      {`${manager.fullName} (${manager.phone || "—"})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="tracking-tighter">Danh sách sẽ gỡ</Label>
+              <div className="min-h-16 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                {selectedUnassignManagers.length === 0 ? (
+                  <p className="text-sm tracking-tight text-muted-foreground">
+                    Chưa chọn quản kho nào.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedUnassignManagers.map((manager) => (
+                      <div
+                        key={manager.userId}
+                        className="flex items-center justify-between gap-2 rounded-md border border-border/50 bg-background px-2.5 py-1.5"
+                      >
+                        <span className="text-sm tracking-tight text-foreground">
+                          {manager.fullName} ({manager.phone || "—"})
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() =>
+                            handleRemoveSelectedUnassignManager(manager.userId)
+                          }
+                        >
+                          Bỏ
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="tracking-tighter"
+              onClick={() => setRemoveManagerDialogOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              className="tracking-tighter"
+              disabled={
+                selectedUnassignManagerIds.length === 0 ||
+                unassignManagerMutation.isPending
+              }
+              onClick={handleUnassignManagers}
+            >
+              {unassignManagerMutation.isPending ? "Đang gỡ..." : "Xác nhận gỡ"}
             </Button>
           </DialogFooter>
         </DialogContent>

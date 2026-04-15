@@ -35,6 +35,7 @@ import {
   useConfirmSupplyRequest,
   useRejectSupplyRequest,
 } from "@/services/inventory/hooks";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { toast } from "sonner";
 import { ResponseCountdown } from "./ResponseCountdown";
 
@@ -136,6 +137,7 @@ export function SupplyRequestTracker({
   onOpenChange,
   onActionSuccess,
 }: Props) {
+  const { selectedDepotId } = useManagerDepot();
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
@@ -176,16 +178,28 @@ export function SupplyRequestTracker({
   });
 
   const handleAccept = () =>
-    acceptMutation(request.id, makeOpts("Đã chấp nhận yêu cầu tiếp tế"));
+    acceptMutation(
+      { id: request.id, depotId: selectedDepotId ?? 0 },
+      makeOpts("Đã chấp nhận yêu cầu tiếp tế"),
+    );
   const handlePrepare = () =>
-    prepareMutation(request.id, makeOpts("Đã bắt đầu đóng gói hàng hóa"));
+    prepareMutation(
+      { id: request.id, depotId: selectedDepotId ?? 0 },
+      makeOpts("Đã bắt đầu đóng gói hàng hóa"),
+    );
   const handleShip = () =>
-    shipMutation(request.id, makeOpts("Đã xuất kho — đang vận chuyển"));
+    shipMutation(
+      { id: request.id, depotId: selectedDepotId ?? 0 },
+      makeOpts("Đã xuất kho — đang vận chuyển"),
+    );
   const handleComplete = () =>
-    completeMutation(request.id, makeOpts("Đã xác nhận giao hàng thành công"));
+    completeMutation(
+      { id: request.id, depotId: selectedDepotId ?? 0 },
+      makeOpts("Đã xác nhận giao hàng thành công"),
+    );
   const handleConfirm = () =>
     confirmMutation(
-      request.id,
+      { id: request.id, depotId: selectedDepotId ?? 0 },
       makeOpts("Đã xác nhận nhận hàng — tồn kho đã cập nhật"),
     );
   const handleReject = () => {
@@ -194,7 +208,10 @@ export function SupplyRequestTracker({
       return;
     }
     rejectMutation(
-      { id: request.id, payload: { reason: rejectReason.trim() } },
+      {
+        params: { id: request.id, depotId: selectedDepotId ?? 0 },
+        payload: { reason: rejectReason.trim() },
+      },
       {
         onSuccess: () => {
           toast.success("Đã từ chối yêu cầu");

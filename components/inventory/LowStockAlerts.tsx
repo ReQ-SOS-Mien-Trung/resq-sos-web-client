@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { useMyDepotLowStock } from "@/services/inventory/hooks";
 import {
   compareLowStockItems,
@@ -54,7 +55,10 @@ function getContainerTone(level: string): string {
 
 const LowStockAlerts = () => {
   const router = useRouter();
-  const { data: lowStock, isLoading } = useMyDepotLowStock();
+  const { selectedDepotId } = useManagerDepot();
+  const { data: lowStock, isLoading } = useMyDepotLowStock(
+    selectedDepotId ? { depotId: selectedDepotId } : undefined,
+  );
 
   const items = (lowStock?.items ?? [])
     .filter((item) => getLowStockWarningLevel(item) !== "OK")

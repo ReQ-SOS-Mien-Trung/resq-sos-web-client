@@ -11,6 +11,9 @@ import {
   DepotMetadataItem,
   DepotClosureResolutionMetadataItem,
   AvailableDepotManager,
+  GetAvailableDepotManagersParams,
+  DepotActiveManager,
+  ManagedDepotSummary,
   DepotFund,
   MyDepotFund,
   UpdateDepotRequest,
@@ -183,15 +186,41 @@ export async function getDepotClosureResolutionMetadata(): Promise<
 }
 
 /**
- * Get available managers for depot assignment
- * GET /logistics/depot/metadata/available-managers
+ * Get available managers for a specific depot assignment context
+ * GET /logistics/depot/metadata/available-managers?depotId={id}
  */
-export async function getAvailableDepotManagers(): Promise<
-  AvailableDepotManager[]
-> {
+export async function getAvailableDepotManagers(
+  params?: GetAvailableDepotManagersParams,
+): Promise<AvailableDepotManager[]> {
   const { data } = await api.get(
     "/logistics/depot/metadata/available-managers",
+    {
+      params:
+        Number.isFinite(params?.depotId) && (params?.depotId ?? 0) > 0
+          ? { depotId: params?.depotId }
+          : undefined,
+    },
   );
+  return data;
+}
+
+/**
+ * Get active managers of a depot
+ * GET /logistics/depot/{id}/managers
+ */
+export async function getDepotActiveManagers(
+  id: number,
+): Promise<DepotActiveManager[]> {
+  const { data } = await api.get(`/logistics/depot/${id}/managers`);
+  return data;
+}
+
+/**
+ * Get depots managed by the current manager
+ * GET /logistics/depot/metadata/my-managed-depots
+ */
+export async function getMyManagedDepots(): Promise<ManagedDepotSummary[]> {
+  const { data } = await api.get("/logistics/depot/metadata/my-managed-depots");
   return data;
 }
 
@@ -256,7 +285,12 @@ export async function assignDepotManager(
 export async function unassignDepotManager(
   request: UnassignDepotManagerRequest,
 ): Promise<DepotManagerAssignmentResponse> {
-  const { data } = await api.delete(`/logistics/depot/${request.id}/manager`);
+  const { data } = await api.delete(`/logistics/depot-manager/${request.id}`, {
+    data:
+      request.userIds && request.userIds.length > 0
+        ? { userIds: request.userIds }
+        : undefined,
+  });
   return data;
 }
 
@@ -273,8 +307,10 @@ export async function getDepotFunds(): Promise<DepotFund[]> {
  * [Manager] Get my depot fund
  * GET /finance/depot-funds/my
  */
-export async function getMyDepotFund(): Promise<MyDepotFund> {
-  const { data } = await api.get("/finance/depot-funds/my");
+export async function getMyDepotFund(depotId: number): Promise<MyDepotFund> {
+  const { data } = await api.get("/finance/depot-funds/my", {
+    params: { depotId },
+  });
   return data;
 }
 
@@ -317,10 +353,11 @@ export async function createInternalRepayment(
  * GET /finance/depot-funds/my/transactions
  */
 export async function getMyDepotFundTransactions(
-  params?: GetDepotFundTransactionsParams,
+  params: GetDepotFundTransactionsParams,
 ): Promise<GetDepotFundTransactionsResponse> {
   const { data } = await api.get("/finance/depot-funds/my/transactions", {
     params: {
+      depotId: params.depotId,
       pageNumber: params?.pageNumber ?? 1,
       pageSize: params?.pageSize ?? 20,
     },
@@ -333,10 +370,11 @@ export async function getMyDepotFundTransactions(
  * GET /finance/depot-funds/my/advancers
  */
 export async function getMyDepotAdvancers(
-  params?: GetMyDepotAdvancersParams,
+  params: GetMyDepotAdvancersParams,
 ): Promise<GetMyDepotAdvancersResponse> {
   const { data } = await api.get("/finance/depot-funds/my/advancers", {
     params: {
+      depotId: params.depotId,
       pageNumber: params?.pageNumber ?? 1,
       pageSize: params?.pageSize ?? 10,
     },
@@ -394,9 +432,13 @@ export async function markDepotClosureExternal(
 export async function submitDepotExternalResolution(
   request: SubmitDepotExternalResolutionRequest,
 ): Promise<SubmitDepotExternalResolutionResponse> {
+  const { depotId, ...body } = request;
   const { data } = await api.post(
     "/logistics/depot/close/external-resolution",
-    request,
+    body,
+    {
+      params: { depotId },
+    },
   );
   return data;
 }
@@ -447,8 +489,12 @@ export async function initiateDepotClosureTransfer(
  * [Manager] Get transfers where current depot participates
  * GET /logistics/depot/transfer
  */
-export async function getMyDepotTransfers(): Promise<GetMyDepotTransfersResponse> {
-  const { data } = await api.get("/logistics/depot/transfer");
+export async function getMyDepotTransfers(
+  depotId: number,
+): Promise<GetMyDepotTransfersResponse> {
+  const { data } = await api.get("/logistics/depot/transfer", {
+    params: { depotId },
+  });
   return data;
 }
 
@@ -456,8 +502,12 @@ export async function getMyDepotTransfers(): Promise<GetMyDepotTransfersResponse
  * [Manager] Get closure history/list for current depot
  * GET /logistics/depot/closures
  */
-export async function getMyDepotClosures(): Promise<GetMyDepotClosuresResponse> {
-  const { data } = await api.get("/logistics/depot/closures");
+export async function getMyDepotClosures(
+  depotId: number,
+): Promise<GetMyDepotClosuresResponse> {
+  const { data } = await api.get("/logistics/depot/closures", {
+    params: { depotId },
+  });
   return data;
 }
 
@@ -467,8 +517,11 @@ export async function getMyDepotClosures(): Promise<GetMyDepotClosuresResponse> 
  */
 export async function getMyDepotClosureDetail(
   closureId: number,
+  depotId: number,
 ): Promise<DepotClosureDetail> {
-  const { data } = await api.get(`/logistics/depot/closures/${closureId}`);
+  const { data } = await api.get(`/logistics/depot/closures/${closureId}`, {
+    params: { depotId },
+  });
   return data;
 }
 
@@ -529,10 +582,13 @@ export async function getDepotClosureTransfer(
 export async function prepareDepotTransfer(
   request: DepotTransferActionRequest,
 ): Promise<DepotTransferActionResponse> {
-  const { transferId, note } = request;
+  const { transferId, depotId, note } = request;
   const { data } = await api.post(
     `/logistics/depot/transfer/${transferId}/prepare`,
     note ? { note } : {},
+    {
+      params: { depotId },
+    },
   );
   return data;
 }
@@ -544,10 +600,13 @@ export async function prepareDepotTransfer(
 export async function shipDepotTransfer(
   request: DepotTransferActionRequest,
 ): Promise<DepotTransferActionResponse> {
-  const { transferId, note } = request;
+  const { transferId, depotId, note } = request;
   const { data } = await api.post(
     `/logistics/depot/transfer/${transferId}/ship`,
     note ? { note } : {},
+    {
+      params: { depotId },
+    },
   );
   return data;
 }
@@ -559,10 +618,13 @@ export async function shipDepotTransfer(
 export async function completeDepotTransfer(
   request: DepotTransferActionRequest,
 ): Promise<DepotTransferActionResponse> {
-  const { transferId, note } = request;
+  const { transferId, depotId, note } = request;
   const { data } = await api.post(
     `/logistics/depot/transfer/${transferId}/complete`,
     note ? { note } : {},
+    {
+      params: { depotId },
+    },
   );
   return data;
 }
@@ -574,10 +636,13 @@ export async function completeDepotTransfer(
 export async function receiveDepotTransfer(
   request: DepotTransferActionRequest,
 ): Promise<DepotReceiveTransferResponse> {
-  const { transferId, note } = request;
+  const { transferId, depotId, note } = request;
   const { data } = await api.post(
     `/logistics/depot/transfer/${transferId}/receive`,
     note ? { note } : {},
+    {
+      params: { depotId },
+    },
   );
   return data;
 }

@@ -160,3 +160,24 @@ export interface RescuerScoreVisibilityConfigEntity {
 export interface UpdateRescuerScoreVisibilityConfigRequest {
   minimumEvaluationCount: number;
 }
+
+export interface SosClusterGroupingConfigEntity {
+  maximumDistanceKm: number;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface UpdateSosClusterGroupingConfigRequest {
+  maximumDistanceKm: number;
+}
+
+export interface RescueTeamRadiusConfigEntity {
+  maxRadiusKm: number;
+  updatedBy?: string | null;
+  updatedAt?: string | null;
+  isDefaultValue?: boolean;
+}
+
+export interface UpdateRescueTeamRadiusConfigRequest {
+  maxRadiusKm: number;
+}

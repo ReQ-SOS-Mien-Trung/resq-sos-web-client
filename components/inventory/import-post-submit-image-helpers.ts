@@ -106,6 +106,7 @@ function shiftMatchingItem(
 
 export async function fetchInventorySnapshotByCategoryCodes(
   categoryCodes: string[],
+  depotId: number,
 ): Promise<InventoryItemEntity[]> {
   const uniqueCategoryCodes = Array.from(
     new Set(categoryCodes.map((code) => code.trim()).filter(Boolean)),
@@ -115,6 +116,7 @@ export async function fetchInventorySnapshotByCategoryCodes(
 
   const pageSize = 200;
   const firstPage = await getMyDepotInventory({
+    depotId,
     categoryCode: uniqueCategoryCodes,
     pageNumber: 1,
     pageSize,
@@ -126,6 +128,7 @@ export async function fetchInventorySnapshotByCategoryCodes(
       ? await Promise.all(
           Array.from({ length: totalPages - 1 }, (_, index) =>
             getMyDepotInventory({
+              depotId,
               categoryCode: uniqueCategoryCodes,
               pageNumber: index + 2,
               pageSize,
