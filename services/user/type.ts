@@ -1,3 +1,5 @@
+import { ManagedDepotSummary } from "@/services/auth/type";
+
 // User Me Response
 export interface UserMeResponse {
   id: string;
@@ -19,6 +21,9 @@ export interface UserMeResponse {
   approvedBy: string | null;
   approvedAt: string | null;
   rescuerApplicationDocuments: unknown[];
+  managedDepots?: ManagedDepotSummary[];
+  depotId?: number | null;
+  depotName?: string | null;
 }
 
 // User Entity

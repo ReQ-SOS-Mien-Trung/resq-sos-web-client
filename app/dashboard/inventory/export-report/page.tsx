@@ -66,6 +66,7 @@ import { useItemCategories } from "@/services/item_categories/hooks";
 import { useExportInventoryMovements } from "@/services/inventory/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,7 @@ export default function ExportReportPage() {
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
   const { data: userMe } = useUserMe();
+  const { selectedDepot, selectedDepotId } = useManagerDepot();
   const displayName = useMemo(
     () =>
       userMe
@@ -174,12 +176,30 @@ export default function ExportReportPage() {
     useItemCategories({
       params: { pageNumber: 1, pageSize: 50 },
     });
-  const currentDepot = depotsData?.items?.[0] ?? null;
+  const currentDepot =
+    depotsData?.items?.find((depot) => depot.id === selectedDepotId) ?? null;
   const totalCategories = categoriesData?.totalCount ?? 0;
   const depotInfo = useMemo<DepotInfo | null>(() => {
-    if (!currentDepot) return null;
-    return mapDepotEntityToInfo(currentDepot, displayName, totalCategories);
-  }, [currentDepot, displayName, totalCategories]);
+    if (currentDepot) {
+      return mapDepotEntityToInfo(currentDepot, displayName, totalCategories);
+    }
+
+    if (!selectedDepot) return null;
+
+    return {
+      id: String(selectedDepot.depotId),
+      name: selectedDepot.depotName,
+      address: selectedDepot.address,
+      phone: "—",
+      manager: displayName,
+      totalItems: 0,
+      totalCategories,
+      criticalAlerts: 0,
+      lowStockAlerts: 0,
+      pendingRequests: 0,
+      activeShipments: 0,
+    };
+  }, [currentDepot, displayName, selectedDepot, totalCategories]);
   // ── Form state ──
   const [leftFromDate, setLeftFromDate] = useState(toInputDate(thirtyDaysAgo));
   const [leftToDate, setLeftToDate] = useState(toInputDate(today));
@@ -205,11 +225,13 @@ export default function ExportReportPage() {
     const params =
       panel === "range"
         ? {
+            depotId: selectedDepotId ?? 0,
             periodType: "ByDateRange" as const,
             fromDate: leftFromDate,
             toDate: leftToDate,
           }
         : {
+            depotId: selectedDepotId ?? 0,
             periodType: "ByMonth" as const,
             month: Number(rightMonth),
             year: Number(rightYear),

@@ -8,6 +8,8 @@ import {
   getDepotMetadata,
   getDepotClosureResolutionMetadata,
   getAvailableDepotManagers,
+  getDepotActiveManagers,
+  getMyManagedDepots,
   getDepotFunds,
   getMyDepotFund,
   createInternalAdvance,
@@ -48,6 +50,8 @@ import {
   DepotMetadataItem,
   DepotClosureResolutionMetadataItem,
   AvailableDepotManager,
+  DepotActiveManager,
+  ManagedDepotSummary,
   DepotFund,
   MyDepotFund,
   UpdateDepotRequest,
@@ -96,6 +100,10 @@ export const DEPOT_CLOSURE_RESOLUTION_METADATA_QUERY_KEY = [
 export const DEPOT_AVAILABLE_MANAGERS_QUERY_KEY = [
   "depot-available-managers",
 ] as const;
+export const DEPOT_ACTIVE_MANAGERS_QUERY_KEY = [
+  "depot-active-managers",
+] as const;
+export const MY_MANAGED_DEPOTS_QUERY_KEY = ["my-managed-depots"] as const;
 export const MY_DEPOT_CLOSURES_QUERY_KEY = ["my-depot-closures"] as const;
 export const MY_DEPOT_CLOSURE_DETAIL_QUERY_KEY = [
   "my-depot-closure-detail",
@@ -151,6 +159,11 @@ export interface UseDepotMetadataOptions {
 }
 
 export interface UseDepotAvailableManagersOptions {
+  enabled?: boolean;
+  depotId?: number;
+}
+
+export interface UseDepotActiveManagersOptions {
   enabled?: boolean;
 }
 
@@ -241,8 +254,28 @@ export function useDepotAvailableManagers(
   options?: UseDepotAvailableManagersOptions,
 ) {
   return useQuery<AvailableDepotManager[]>({
-    queryKey: DEPOT_AVAILABLE_MANAGERS_QUERY_KEY,
-    queryFn: getAvailableDepotManagers,
+    queryKey: [...DEPOT_AVAILABLE_MANAGERS_QUERY_KEY, options?.depotId],
+    queryFn: () => getAvailableDepotManagers({ depotId: options?.depotId }),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useDepotActiveManagers(
+  depotId: number,
+  options?: UseDepotActiveManagersOptions,
+) {
+  return useQuery<DepotActiveManager[]>({
+    queryKey: [...DEPOT_ACTIVE_MANAGERS_QUERY_KEY, depotId],
+    queryFn: () => getDepotActiveManagers(depotId),
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(depotId) && depotId > 0,
+  });
+}
+
+export function useMyManagedDepots(options?: { enabled?: boolean }) {
+  return useQuery<ManagedDepotSummary[]>({
+    queryKey: MY_MANAGED_DEPOTS_QUERY_KEY,
+    queryFn: getMyManagedDepots,
     enabled: options?.enabled ?? true,
   });
 }
@@ -261,11 +294,15 @@ export function useDepotFunds(options?: { enabled?: boolean }) {
 /**
  * [Manager] Hook to fetch my depot fund
  */
-export function useMyDepotFund(options?: { enabled?: boolean }) {
+export function useMyDepotFund(
+  depotId: number,
+  options?: { enabled?: boolean },
+) {
   return useQuery<MyDepotFund>({
-    queryKey: MY_DEPOT_FUND_QUERY_KEY,
-    queryFn: getMyDepotFund,
-    enabled: options?.enabled ?? true,
+    queryKey: [...MY_DEPOT_FUND_QUERY_KEY, depotId],
+    queryFn: () => getMyDepotFund(depotId),
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(depotId) && depotId > 0,
   });
 }
 
@@ -273,13 +310,16 @@ export function useMyDepotFund(options?: { enabled?: boolean }) {
  * [Manager] Hook to fetch my depot fund transaction history
  */
 export function useMyDepotFundTransactions(
-  params?: GetDepotFundTransactionsParams,
+  params: GetDepotFundTransactionsParams,
   options?: { enabled?: boolean },
 ) {
   return useQuery<GetDepotFundTransactionsResponse>({
     queryKey: [...MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY, params],
     queryFn: () => getMyDepotFundTransactions(params),
-    enabled: options?.enabled ?? true,
+    enabled:
+      (options?.enabled ?? true) &&
+      Number.isFinite(params.depotId) &&
+      params.depotId > 0,
   });
 }
 
@@ -287,13 +327,16 @@ export function useMyDepotFundTransactions(
  * [Manager] Hook to fetch my depot fund advancers (people who owe money)
  */
 export function useMyDepotAdvancers(
-  params?: GetMyDepotAdvancersParams,
+  params: GetMyDepotAdvancersParams,
   options?: { enabled?: boolean },
 ) {
   return useQuery<GetMyDepotAdvancersResponse>({
     queryKey: [...MY_DEPOT_ADVANCERS_QUERY_KEY, params],
     queryFn: () => getMyDepotAdvancers(params),
-    enabled: options?.enabled ?? true,
+    enabled:
+      (options?.enabled ?? true) &&
+      Number.isFinite(params.depotId) &&
+      params.depotId > 0,
   });
 }
 
@@ -415,6 +458,9 @@ export function useAssignDepotManager() {
       queryClient.invalidateQueries({
         queryKey: DEPOT_AVAILABLE_MANAGERS_QUERY_KEY,
       });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_ACTIVE_MANAGERS_QUERY_KEY, variables.id],
+      });
     },
   });
 }
@@ -438,6 +484,9 @@ export function useUnassignDepotManager() {
       });
       queryClient.invalidateQueries({
         queryKey: DEPOT_AVAILABLE_MANAGERS_QUERY_KEY,
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_ACTIVE_MANAGERS_QUERY_KEY, variables.id],
       });
     },
   });
@@ -528,31 +577,44 @@ export function useDownloadDepotClosureExportTemplate() {
   });
 }
 
-export function useMyDepotClosures(options?: { enabled?: boolean }) {
+export function useMyDepotClosures(
+  depotId: number,
+  options?: { enabled?: boolean },
+) {
   return useQuery<GetMyDepotClosuresResponse>({
-    queryKey: MY_DEPOT_CLOSURES_QUERY_KEY,
-    queryFn: getMyDepotClosures,
-    enabled: options?.enabled ?? true,
+    queryKey: [...MY_DEPOT_CLOSURES_QUERY_KEY, depotId],
+    queryFn: () => getMyDepotClosures(depotId),
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(depotId) && depotId > 0,
   });
 }
 
 export function useMyDepotClosureDetail(
   closureId: number,
+  depotId: number,
   options?: { enabled?: boolean },
 ) {
   return useQuery<DepotClosureDetail>({
-    queryKey: [...MY_DEPOT_CLOSURE_DETAIL_QUERY_KEY, closureId],
-    queryFn: () => getMyDepotClosureDetail(closureId),
+    queryKey: [...MY_DEPOT_CLOSURE_DETAIL_QUERY_KEY, depotId, closureId],
+    queryFn: () => getMyDepotClosureDetail(closureId, depotId),
     enabled:
-      (options?.enabled ?? true) && Number.isFinite(closureId) && closureId > 0,
+      (options?.enabled ?? true) &&
+      Number.isFinite(depotId) &&
+      depotId > 0 &&
+      Number.isFinite(closureId) &&
+      closureId > 0,
   });
 }
 
-export function useMyDepotTransfers(options?: { enabled?: boolean }) {
+export function useMyDepotTransfers(
+  depotId: number,
+  options?: { enabled?: boolean },
+) {
   return useQuery<GetMyDepotTransfersResponse>({
-    queryKey: MY_DEPOT_TRANSFERS_QUERY_KEY,
-    queryFn: getMyDepotTransfers,
-    enabled: options?.enabled ?? true,
+    queryKey: [...MY_DEPOT_TRANSFERS_QUERY_KEY, depotId],
+    queryFn: () => getMyDepotTransfers(depotId),
+    enabled:
+      (options?.enabled ?? true) && Number.isFinite(depotId) && depotId > 0,
   });
 }
 

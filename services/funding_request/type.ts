@@ -98,6 +98,7 @@ export interface CreateFundingRequestItem {
 }
 
 export interface CreateFundingRequestPayload {
+  depotId: number;
   description: string;
   attachmentUrl?: string;
   items: CreateFundingRequestItem[];

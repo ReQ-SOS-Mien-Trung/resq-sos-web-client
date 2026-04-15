@@ -53,6 +53,7 @@ import {
   SearchDepotItemEntity,
   SearchDepotWarehouseEntity,
 } from "@/services/inventory/type";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { toast } from "sonner";
 
 type RequestLine = {
@@ -216,6 +217,7 @@ export default function SupplyRequestSection({
   onSelectionSidebarChange,
   onPanelWidthChange,
 }: SupplyRequestSectionProps) {
+  const { selectedDepotId } = useManagerDepot();
   const { data: categories = [], isLoading: isCategoriesLoading } =
     useInventoryCategories();
   const { mutateAsync: createSupplyRequests, isPending: isSubmittingRequest } =
@@ -587,7 +589,10 @@ export default function SupplyRequestSection({
     }
 
     try {
-      await createSupplyRequests({ requests });
+      await createSupplyRequests({
+        depotId: selectedDepotId ?? 0,
+        requests,
+      });
       toast.success("Đã gửi yêu cầu tiếp tế thành công");
 
       // Clear searched/request-building data after successful submit
@@ -610,15 +615,6 @@ export default function SupplyRequestSection({
       toast.error("Gửi yêu cầu thất bại. Vui lòng thử lại");
     }
   };
-
-  const totalWarehouses = useMemo(
-    () =>
-      (searchResult?.items ?? []).reduce(
-        (acc, item) => acc + (item.warehouses?.length ?? 0),
-        0,
-      ),
-    [searchResult],
-  );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

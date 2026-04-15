@@ -6,6 +6,7 @@ import {
   useInventoryItemTypes,
   useInventoryTargetGroups,
 } from "@/services/inventory/hooks";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ interface VatTuSectionProps {
 }
 
 export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
+  const { selectedDepotId } = useManagerDepot();
   const [page, setPage] = useState(1);
   const [selectedCategoryCodes, setSelectedCategoryCodes] = useState<string[]>(
     [],
@@ -43,12 +45,15 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
     isLoading,
     isError,
   } = useMyDepotInventory({
+    depotId: selectedDepotId ?? 0,
     pageNumber: page,
     pageSize: 10,
     categoryCode:
       selectedCategoryCodes.length > 0 ? selectedCategoryCodes : undefined,
     itemTypes: selectedItemTypes.length > 0 ? selectedItemTypes : undefined,
     targetGroups: selectedTargetGroups ? [selectedTargetGroups] : undefined,
+  }, {
+    enabled: Boolean(selectedDepotId),
   });
 
   const toggleCategory = (code: string) => {

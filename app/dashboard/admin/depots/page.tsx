@@ -259,9 +259,6 @@ function DepotTable({
             <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter hidden lg:table-cell">
               Tồn kho
             </th>
-            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter hidden xl:table-cell">
-              Quản lý kho
-            </th>
             <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter">
               Trạng thái
             </th>
@@ -273,7 +270,7 @@ function DepotTable({
             <TableSkeleton rows={skeletonRows} />
           ) : items.length === 0 ? (
             <tr>
-              <td colSpan={6} className="py-16 text-center">
+              <td colSpan={5} className="py-16 text-center">
                 <Warehouse
                   size={36}
                   className="mx-auto text-muted-foreground/30 mb-3"
@@ -327,20 +324,6 @@ function DepotTable({
                         {depot.currentUtilization}/{depot.capacity}
                       </p> */}
                     </div>
-                  </td>
-
-                  <td className="py-3.5 px-4 hidden xl:table-cell">
-                    {depot.manager ? (
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium tracking-tighter truncate max-w-44">
-                          {depot.manager.lastName} {depot.manager.firstName}
-                        </p>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground/60 tracking-tighter">
-                        Chưa phân công
-                      </span>
-                    )}
                   </td>
 
                   <td className="py-3.5 px-4">
@@ -718,7 +701,7 @@ export default function DepotsPage() {
         </div>
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           {statsList.map(({ key, label, value, color, bg, Icon }) => (
             <Card key={key} className="border border-border/50">
               <CardContent className="px-4 py-2">
@@ -790,9 +773,9 @@ export default function DepotsPage() {
             <PopoverContent
               className="w-48 p-1"
               align="start"
+              side="bottom"
               sideOffset={4}
-              avoidCollisions
-              collisionPadding={16}
+              avoidCollisions={false}
             >
               {statusFilterKeys.map((s) => {
                 const checked = selectedStatuses.includes(s);
@@ -1070,7 +1053,8 @@ export default function DepotsPage() {
                     <SelectItem value="__none">Chọn quản kho</SelectItem>
                     {availableManagers.map((manager) => (
                       <SelectItem key={manager.id} value={manager.id}>
-                        {manager.fullName} - {manager.phone}
+                        {manager.fullName} - {manager.phone} - Đang quản lý{" "}
+                        {manager.assignedDepotsCount} kho
                       </SelectItem>
                     ))}
                   </SelectContent>

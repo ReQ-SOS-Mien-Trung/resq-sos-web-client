@@ -56,7 +56,6 @@ import {
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useAuthStore } from "@/stores/auth.store";
 import {
   useInventoryCategories,
   useInventoryItemTypes,
@@ -95,6 +94,7 @@ import type {
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Icon } from "@iconify/react";
 import { AxiosError } from "axios";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 
 function getApiErrorMessage(error: unknown, fallback: string): string {
   const axiosError = error as AxiosError<{ message?: string }>;
@@ -516,9 +516,9 @@ function createEmptyRow(rowNum: number): ImportRow {
 
 export default function FundingRequestPage() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const depotId = user?.depotId ?? 0;
-  const depotName = user?.depotName ?? "Kho";
+  const { selectedDepot, selectedDepotId } = useManagerDepot();
+  const depotId = selectedDepotId ?? 0;
+  const depotName = selectedDepot?.depotName ?? "Kho";
 
   // ── Categories from API ──
   const { data: categoriesData } = useInventoryCategories();
@@ -564,13 +564,15 @@ export default function FundingRequestPage() {
   );
 
   // ── My fund balance ──
-  const { data: myFund, isLoading: loadingFund } = useMyDepotFund();
+  const { data: myFund, isLoading: loadingFund } = useMyDepotFund(depotId, {
+    enabled: Boolean(depotId),
+  });
   const queryClient = useQueryClient();
   const [txPage, setTxPage] = useState(1);
   const [txPageSize, setTxPageSize] = useState(10);
   const { data: txData, isLoading: loadingTx } = useMyDepotFundTransactions(
-    { pageNumber: txPage, pageSize: txPageSize },
-    { enabled: true },
+    { depotId, pageNumber: txPage, pageSize: txPageSize },
+    { enabled: Boolean(depotId) },
   );
   const { data: txTypesMeta = [] } = useDepotFundTransactionTypes();
   const { data: refTypesMeta = [] } = useDepotFundReferenceTypes();
@@ -627,8 +629,8 @@ export default function FundingRequestPage() {
 
   const { data: advancersData, isLoading: loadingAdvancers } =
     useMyDepotAdvancers(
-      { pageNumber: advancersPage, pageSize: advancersPageSize },
-      { enabled: activeTab === "ledger" },
+      { depotId, pageNumber: advancersPage, pageSize: advancersPageSize },
+      { enabled: activeTab === "ledger" && Boolean(depotId) },
     );
 
   const ledgerContributors = useMemo(() => {
@@ -651,8 +653,8 @@ export default function FundingRequestPage() {
 
   /* ── All advancers for repayment dropdown (no pagination) ─── */
   const { data: allAdvancersData } = useMyDepotAdvancers(
-    { pageNumber: 1, pageSize: 100 },
-    { enabled: activeTab === "ledger" },
+    { depotId, pageNumber: 1, pageSize: 100 },
+    { enabled: activeTab === "ledger" && Boolean(depotId) },
   );
 
   const repaymentAdvancers = useMemo(() => {
@@ -680,8 +682,8 @@ export default function FundingRequestPage() {
   );
 
   const { isLoading: loadingLedgerTx } = useMyDepotFundTransactions(
-    { pageNumber: 1, pageSize: 500 },
-    { enabled: activeTab === "ledger" },
+    { depotId, pageNumber: 1, pageSize: 500 },
+    { enabled: activeTab === "ledger" && Boolean(depotId) },
   );
 
   const filteredLedgerContributors = useMemo(() => {
@@ -1303,7 +1305,7 @@ export default function FundingRequestPage() {
       weightPerUnit: r.weightPerUnit,
     }));
     createRequest(
-      { description: description.trim(), items },
+      { depotId, description: description.trim(), items },
       {
         onSuccess: () => {
           toast.success("Gửi yêu cầu cấp quỹ thành công!");

@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,6 +102,8 @@ const WARNING_LEVEL_COLORS: Record<string, string> = {
   OK: "bg-emerald-100 text-emerald-700",
   UNCONFIGURED: "bg-slate-100 text-slate-700",
 };
+
+type ThresholdHistoryFilters = Omit<GetThresholdsHistoryParams, "depotId">;
 
 function formatDate(iso?: string | null): string {
   if (!iso) {
@@ -306,6 +309,7 @@ function ThresholdConfigCard({
 export default function ThresholdConfigPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { selectedDepotId } = useManagerDepot();
 
   const [tab, setTab] = useState(() => {
     const current = searchParams.get("tab");
@@ -316,7 +320,10 @@ export default function ThresholdConfigPage() {
     data: thresholds,
     isLoading: loadingThresholds,
     refetch: refetchThresholds,
-  } = useMyDepotThresholds();
+  } = useMyDepotThresholds(
+    { depotId: selectedDepotId ?? 0 },
+    { enabled: Boolean(selectedDepotId) },
+  );
   const { data: categories } = useInventoryCategories();
   const categoryMap = useMemo(() => {
     const map: Record<number, string> = {};
@@ -326,16 +333,24 @@ export default function ThresholdConfigPage() {
     return map;
   }, [categories]);
 
-  const [historyParams, setHistoryParams] =
-    useState<GetThresholdsHistoryParams>({
-      pageNumber: 1,
-      pageSize: 10,
-    });
+  const [historyParams, setHistoryParams] = useState<ThresholdHistoryFilters>({
+    pageNumber: 1,
+    pageSize: 10,
+  });
+
   const { data: historyData, isLoading: loadingHistory } =
-    useMyDepotThresholdsHistory(historyParams);
+    useMyDepotThresholdsHistory(
+      {
+        ...historyParams,
+        depotId: selectedDepotId ?? 0,
+      },
+      { enabled: Boolean(selectedDepotId) },
+    );
 
   const [selectedWarningLevel, setSelectedWarningLevel] = useState("all");
-  const { data: lowStock, isLoading: loadingLowStock } = useMyDepotLowStock();
+  const { data: lowStock, isLoading: loadingLowStock } = useMyDepotLowStock(
+    selectedDepotId ? { depotId: selectedDepotId } : undefined,
+  );
 
   const updateMutation = useUpdateMyDepotThreshold();
   const deleteMutation = useDeleteMyDepotThreshold();
@@ -399,6 +414,7 @@ export default function ThresholdConfigPage() {
     }
 
     const payload: UpdateThresholdPayload = {
+      depotId: selectedDepotId ?? 0,
       scopeType: form.scopeType,
       minimumThreshold: parsedThreshold,
       ...(form.scopeType === "DepotCategory"
@@ -439,7 +455,7 @@ export default function ThresholdConfigPage() {
 
       toast.error("Không thể lưu cấu hình ngưỡng.");
     }
-  }, [editConfig, form, refetchThresholds, updateMutation]);
+  }, [editConfig, form, refetchThresholds, selectedDepotId, updateMutation]);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ThresholdConfig | null>(
@@ -459,6 +475,7 @@ export default function ThresholdConfigPage() {
     }
 
     const payload: DeleteThresholdPayload = {
+      depotId: selectedDepotId ?? 0,
       scopeType: deleteTarget.scopeType,
       ...(deleteTarget.categoryId != null
         ? { categoryId: deleteTarget.categoryId }
@@ -480,7 +497,13 @@ export default function ThresholdConfigPage() {
     } catch {
       toast.error("Không thể reset cấu hình ngưỡng.");
     }
-  }, [deleteMutation, deleteReason, deleteTarget, refetchThresholds]);
+  }, [
+    deleteMutation,
+    deleteReason,
+    deleteTarget,
+    refetchThresholds,
+    selectedDepotId,
+  ]);
 
   const allConfigs = useMemo(() => {
     if (!thresholds) {
@@ -764,7 +787,10 @@ export default function ThresholdConfigPage() {
                 size="sm"
                 className="gap-1.5"
                 onClick={() =>
-                  setHistoryParams({ pageNumber: 1, pageSize: 10 })
+                  setHistoryParams({
+                    pageNumber: 1,
+                    pageSize: 10,
+                  })
                 }
               >
                 <ArrowCounterClockwise className="h-3.5 w-3.5" />

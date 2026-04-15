@@ -77,6 +77,7 @@ import {
   assignCreatedInventoryItemsToRows,
   fetchInventorySnapshotByCategoryCodes,
 } from "@/components/inventory/import-post-submit-image-helpers";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 
 const SYSTEM_CATEGORIES = [
   { label: "Thực phẩm", value: "Food" },
@@ -281,17 +282,6 @@ function parseOptionalExcelNumber(val: unknown): number | undefined {
   if (val === null || val === undefined || String(val).trim() === "")
     return undefined;
   const parsed = Number(String(val).replace(/,/g, ""));
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function parseOptionalDecimalInput(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const normalized = trimmed
-    .replace(/\s/g, "")
-    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
-    .replace(",", ".");
-  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
@@ -694,6 +684,7 @@ function createEmptyGroup(): PurchaseGroup {
 
 export default function ExcelImportRegular() {
   const router = useRouter();
+  const { selectedDepotId } = useManagerDepot();
   const [step, setStep] = useState<Step>("upload");
   const [groups, setGroups] = useState<PurchaseGroup[]>([createEmptyGroup()]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -1299,6 +1290,7 @@ export default function ExcelImportRegular() {
       try {
         beforeImportItems = await fetchInventorySnapshotByCategoryCodes(
           deferredImageCategoryCodes,
+          selectedDepotId ?? 0,
         );
       } catch {
         toast.error(
@@ -1327,6 +1319,7 @@ export default function ExcelImportRegular() {
     toast.dismiss(uploadToastId);
 
     const payload = {
+      depotId: selectedDepotId ?? 0,
       invoices: groups.map((g, i) => ({
         batchNote: g.batchNote.trim() || undefined,
         vatInvoice: {
@@ -1381,6 +1374,7 @@ export default function ExcelImportRegular() {
         try {
           const afterImportItems = await fetchInventorySnapshotByCategoryCodes(
             deferredImageCategoryCodes,
+            selectedDepotId ?? 0,
           );
           const assignments = assignCreatedInventoryItemsToRows(
             rowsNeedingImageUpload.map(({ groupId, row }) => ({
@@ -1476,7 +1470,14 @@ export default function ExcelImportRegular() {
         `Nhập kho thất bại: ${err.response?.data?.message || err.message || "Lỗi không xác định"}`,
       );
     }
-  }, [applyRowValidation, groups, totalRows, importMutation, router]);
+  }, [
+    applyRowValidation,
+    groups,
+    totalRows,
+    selectedDepotId,
+    importMutation,
+    router,
+  ]);
 
   const itemTypeOptions = useMemo(
     () => itemTypes.map((t) => ({ label: t.value, value: t.key })),

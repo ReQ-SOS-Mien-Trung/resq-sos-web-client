@@ -79,6 +79,10 @@ import { DepotEntity } from "@/services/depot/type";
 import { useItemCategories } from "@/services/item_categories/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileTextIcon } from "lucide-react";
+import {
+  MANAGER_DEPOT_SELECT_ROUTE,
+  useManagerDepot,
+} from "@/hooks/use-manager-depot";
 
 // --- Helpers ---
 
@@ -293,6 +297,8 @@ const InventoryDashboardPage = () => {
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
   const { data: userMe } = useUserMe();
+  const { hasMultipleDepots, selectedDepot, selectedDepotId } =
+    useManagerDepot();
 
   const displayName = useMemo(
     () =>
@@ -340,7 +346,10 @@ const InventoryDashboardPage = () => {
   } = useItemCategories({ params: { pageNumber: 1, pageSize: 50 } });
 
   const { data: quantityByCategoryData, refetch: refetchQuantityByCategory } =
-    useMyDepotQuantityByCategory();
+    useMyDepotQuantityByCategory(
+      { depotId: selectedDepotId ?? 0 },
+      { enabled: Boolean(selectedDepotId) },
+    );
 
   const {
     data: supplyRequestsData,
@@ -348,8 +357,12 @@ const InventoryDashboardPage = () => {
     isFetching: isSupplyRequestsFetching,
     refetch: refetchSupplyRequests,
   } = useSupplyRequests(
-    { pageNumber: 1, pageSize: 10 },
-    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+    { depotId: selectedDepotId ?? 0, pageNumber: 1, pageSize: 10 },
+    {
+      refetchInterval: 10_000,
+      refetchOnWindowFocus: true,
+      enabled: Boolean(selectedDepotId),
+    },
   );
 
   const {
@@ -358,8 +371,16 @@ const InventoryDashboardPage = () => {
     isFetching: isAllRequestsFetching,
     refetch: refetchAllRequests,
   } = useSupplyRequests(
-    { pageNumber: requestsPageNumber, pageSize: 10 },
-    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+    {
+      depotId: selectedDepotId ?? 0,
+      pageNumber: requestsPageNumber,
+      pageSize: 10,
+    },
+    {
+      refetchInterval: 10_000,
+      refetchOnWindowFocus: true,
+      enabled: Boolean(selectedDepotId),
+    },
   );
 
   const canPrevRequestsPage = requestsPageNumber > 1;
@@ -376,14 +397,15 @@ const InventoryDashboardPage = () => {
   );
 
   // Use the first depot as the current managed depot
-  const currentDepot = depotsData?.items?.[0] ?? null;
+  const currentDepot =
+    depotsData?.items?.find((depot) => depot.id === selectedDepotId) ?? null;
 
   // Real category count from API
   const totalCategories = categoriesData?.totalCount ?? 0;
 
   // Map API depot to DepotInfo for sidebar
   const depotInfo = useMemo<DepotInfo | null>(() => {
-    if (!currentDepot && !user?.depotName) return null;
+    if (!currentDepot && !selectedDepot) return null;
 
     const pendingCount = (supplyRequestsData?.items ?? []).filter(
       (request) =>
@@ -391,8 +413,7 @@ const InventoryDashboardPage = () => {
         request.requestingStatus === "WaitingForApproval",
     ).length;
 
-    // Use auth store depotName as primary, fallback to depot API
-    const resolvedName = user?.depotName ?? currentDepot?.name ?? "—";
+    const resolvedName = selectedDepot?.depotName ?? currentDepot?.name ?? "—";
 
     if (currentDepot) {
       const info = mapDepotEntityToInfo(
@@ -406,9 +427,9 @@ const InventoryDashboardPage = () => {
 
     // Minimal depotInfo built only from auth store data (no depot API yet)
     return {
-      id: String(user?.depotId ?? ""),
+      id: String(selectedDepot?.depotId ?? ""),
       name: resolvedName,
-      address: "",
+      address: selectedDepot?.address ?? "",
       phone: "—",
       manager: displayName,
       totalItems: 0,
@@ -418,7 +439,13 @@ const InventoryDashboardPage = () => {
       pendingRequests: pendingCount,
       activeShipments: 0,
     };
-  }, [currentDepot, user, displayName, totalCategories, supplyRequestsData]);
+  }, [
+    currentDepot,
+    selectedDepot,
+    displayName,
+    totalCategories,
+    supplyRequestsData,
+  ]);
 
   const sidebarSupplyRequests = useMemo(
     () => (supplyRequestsData?.items ?? []).map(mapApiSupplyRequestToSidebar),
@@ -706,7 +733,7 @@ const InventoryDashboardPage = () => {
                 <div className="flex flex-col">
                   <span className="font-semibold">{displayName}</span>
                   <span className="text-xs text-muted-foreground">
-                    Quản lý kho
+                    {selectedDepot?.depotName ?? "Quản lý kho"}
                   </span>
                 </div>
               </DropdownMenuLabel>
@@ -719,6 +746,15 @@ const InventoryDashboardPage = () => {
                 <Gear className="h-4 w-4" />
                 Cài đặt
               </DropdownMenuItem>
+              {hasMultipleDepots ? (
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onClick={() => router.push(MANAGER_DEPOT_SELECT_ROUTE)}
+                >
+                  <BuildingsIcon className="h-4 w-4" />
+                  Chuyển đổi kho
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="gap-2 cursor-pointer text-red-500 focus:text-red-500"
@@ -791,8 +827,10 @@ const InventoryDashboardPage = () => {
                     Dashboard Kho Hàng
                   </h1>
                   <p className="text-muted-foreground tracking-tighter">
-                    {user?.depotName ?? depotInfo?.name ?? "Đang tải..."} • Quản
-                    lý bởi {displayName}
+                    {selectedDepot?.depotName ??
+                      depotInfo?.name ??
+                      "Đang tải..."}{" "}
+                    • Quản lý bởi {displayName}
                   </p>
                 </div>
                 <Button

@@ -53,6 +53,27 @@ export interface AvailableDepotManager {
   fullName: string;
   email: string;
   phone: string;
+  assignedDepotsCount: number;
+}
+
+export interface GetAvailableDepotManagersParams {
+  depotId?: number;
+}
+
+export interface DepotActiveManager {
+  userId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  assignedAt: string;
+}
+
+export interface ManagedDepotSummary {
+  depotId: number;
+  depotName: string;
+  status: DepotStatus | string;
+  address: string;
+  imageUrl?: string | null;
 }
 
 // Depot Manager
@@ -156,6 +177,7 @@ export interface AssignDepotManagerRequest {
 
 export interface UnassignDepotManagerRequest {
   id: number;
+  userIds?: string[];
 }
 
 export interface DepotManagerAssignmentResponse {
@@ -227,6 +249,7 @@ export interface GetDepotFundTransactionsResponse {
 }
 
 export interface GetDepotFundTransactionsParams {
+  depotId: number;
   pageNumber?: number;
   pageSize?: number;
 }
@@ -252,6 +275,7 @@ export interface GetMyDepotAdvancersResponse {
 }
 
 export interface GetMyDepotAdvancersParams {
+  depotId: number;
   pageNumber?: number;
   pageSize?: number;
 }
@@ -341,6 +365,7 @@ export interface DepotExternalResolutionItem {
 }
 
 export interface SubmitDepotExternalResolutionRequest {
+  depotId: number;
   items: DepotExternalResolutionItem[];
 }
 
@@ -581,6 +606,7 @@ export interface DepotClosureTransfer {
 // POST prepare / ship / complete / receive — shared request & response
 export interface DepotTransferActionRequest {
   transferId: number;
+  depotId: number;
   sourceDepotId?: number;
   note?: string;
 }

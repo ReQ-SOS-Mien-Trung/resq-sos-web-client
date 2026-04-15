@@ -16,6 +16,10 @@ export interface MyDepotCategoryQuantityItem {
 export type GetMyDepotCategoryQuantitiesResponse =
   MyDepotCategoryQuantityItem[];
 
+export interface GetMyDepotCategoryQuantitiesParams {
+  depotId: number;
+}
+
 export type InventoryItemType = InventoryCategory;
 
 export type InventoryTargetGroup = InventoryCategory;
@@ -93,6 +97,7 @@ export interface ReusableItemEntity extends InventoryItemEntityBase {
 export type InventoryItemEntity = ConsumableItemEntity | ReusableItemEntity;
 
 export interface GetMyDepotInventoryParams {
+  depotId: number;
   categoryCode?: string[];
   itemTypes?: string[];
   targetGroups?: string[];
@@ -155,6 +160,7 @@ export interface ImportInventoryItem {
 }
 
 export interface ImportInventoryRequest {
+  depotId: number;
   organizationId?: number;
   organizationName?: string;
   batchNote?: string;
@@ -192,6 +198,7 @@ export interface ImportPurchaseItem {
 }
 
 export type ImportRegularRequest = {
+  depotId: number;
   invoices: Array<{
     batchNote?: string;
     vatInvoice: VatInvoice;
@@ -244,6 +251,7 @@ export interface StockMovementEntity {
 }
 
 export interface GetDepotStockMovementsParams {
+  depotId: number;
   actionTypes?: string[];
   sourceTypes?: string[];
   fromDate?: string;
@@ -257,6 +265,7 @@ export interface GetDepotStockMovementsParams {
 export type ExportPeriodType = "ByDateRange" | "ByMonth";
 
 export interface ExportMovementsParams {
+  depotId: number;
   periodType: ExportPeriodType;
   /** Required when periodType = ByMonth */
   month?: number;
@@ -294,6 +303,11 @@ export interface InventoryLotItem {
 
 export interface GetInventoryLotsResponse {
   items: InventoryLotItem[];
+}
+
+export interface GetInventoryLotsParams {
+  itemModelId: number;
+  depotId: number;
 }
 
 // ─── Search Depots by Relief Items ───
@@ -353,6 +367,7 @@ export interface CreateSupplyRequestEntry {
 }
 
 export interface CreateSupplyRequestsPayload {
+  depotId: number;
   requests: CreateSupplyRequestEntry[];
 }
 
@@ -376,6 +391,7 @@ export type RequestingSupplyRequestStatus =
 export type SupplyRequestRole = "Requester" | "Source";
 
 export interface GetSupplyRequestsParams {
+  depotId: number;
   sourceStatus?: SourceSupplyRequestStatus;
   requestingStatus?: RequestingSupplyRequestStatus;
   pageNumber?: number;
@@ -424,6 +440,12 @@ export interface GetSupplyRequestsResponse {
 export interface RejectSupplyRequestPayload {
   reason: string;
 }
+
+export interface SupplyRequestActionParams {
+  id: number;
+  depotId: number;
+}
+
 export type GetDepotInventoryResponse = GetMyDepotInventoryResponse;
 
 // ─── Upcoming Pickups (My Depot) ───
@@ -461,6 +483,7 @@ export interface UpcomingPickupEntity {
 }
 
 export interface GetUpcomingPickupsParams {
+  depotId: number;
   pageNumber?: number;
   pageSize?: number;
 }
@@ -514,6 +537,7 @@ export interface PickupHistoryEntity {
 }
 
 export interface GetPickupHistoryParams {
+  depotId: number;
   fromDate?: string;
   toDate?: string;
   pageNumber?: number;
@@ -578,6 +602,7 @@ interface ReturnActivityEntityBase {
 export type UpcomingReturnEntity = ReturnActivityEntityBase;
 
 export interface GetUpcomingReturnsParams {
+  depotId: number;
   status?: string;
   pageNumber?: number;
   pageSize?: number;
@@ -603,6 +628,7 @@ export interface ReturnHistoryEntity extends ReturnActivityEntityBase {
 }
 
 export interface GetReturnHistoryParams {
+  depotId: number;
   fromDate?: string;
   toDate?: string;
   pageNumber?: number;
@@ -672,6 +698,7 @@ export interface GetThresholdsParams {
 }
 
 export interface GetThresholdsHistoryParams {
+  depotId: number;
   scopeType?: ThresholdScopeType;
   categoryId?: number;
   itemModelId?: number;
@@ -710,6 +737,7 @@ export interface GetThresholdsHistoryResponse {
 }
 
 export interface UpdateThresholdPayload {
+  depotId: number;
   scopeType: ThresholdScopeType;
   categoryId?: number;
   itemModelId?: number;
@@ -721,6 +749,7 @@ export interface UpdateThresholdPayload {
 export type UpdateThresholdResponse = ThresholdConfig;
 
 export interface DeleteThresholdPayload {
+  depotId: number;
   scopeType: ThresholdScopeType;
   categoryId?: number;
   itemModelId?: number;
@@ -776,6 +805,7 @@ export interface GetLowStockResponse {
 }
 
 export interface GetLowStockParams {
+  depotId: number;
   warningLevel?: LowStockLevel;
   pageNumber?: number;
   pageSize?: number;
