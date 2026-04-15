@@ -66,6 +66,10 @@ import {
   useRescueTeamStatuses,
   useRescueTeamsByCluster,
 } from "@/services/rescue_teams/hooks";
+import {
+  useAssemblyPointMetadata,
+  useAssemblyPoints,
+} from "@/services/assembly_points/hooks";
 import { useDepotInventoryRealtime } from "@/hooks/useDepotInventoryRealtime";
 import { getActivityRoute } from "@/services/mission/api";
 import type {
@@ -140,6 +144,7 @@ const BACKEND_ERROR_DEPOT_ID_REGEX = /\bkho\s*#?\s*(\d+)\b/i;
 type EditableActivity = ClusterSuggestedActivity & {
   _id: string;
   _missionActivityId?: number | null;
+  _missionStatus?: string | null;
   _autoSyncedDeliveryStep?: boolean;
 };
 
@@ -167,6 +172,13 @@ type SidebarDepotEntry = {
   depotAddress: string | null;
   kind: "primary" | "alternative";
   sourceReason?: string | null;
+};
+
+type AssemblyPointOptionEntry = {
+  id: number;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 type BackendActivityErrorClues = {
@@ -222,6 +234,55 @@ function normalizeErrorLookupValue(value?: string | null): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+function normalizeActivityReportImageUrl(
+  imageUrl?: string | null,
+): string | null {
+  const trimmed = imageUrl?.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith("/")) {
+    return trimmed;
+  }
+
+  return null;
+}
+
+function normalizeMissionActivityStatusKey(status?: string | null): string {
+  return (status ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "")
+    .replaceAll(" ", "");
+}
+
+function isPendingMissionActivityStatus(status?: string | null): boolean {
+  const normalizedStatus = normalizeMissionActivityStatusKey(status);
+  return (
+    normalizedStatus === "pending" || normalizedStatus === "pendingconfirmation"
+  );
+}
+
+function normalizeActivityTypeKey(activityType?: string | null): string {
+  return (activityType ?? "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "")
+    .replaceAll(" ", "");
+}
+
+function isReturnAssemblyPointActivityType(
+  activityType?: string | null,
+): boolean {
+  const normalizedType = normalizeActivityTypeKey(activityType);
+  return (
+    normalizedType === "returnassemblypoint" ||
+    normalizedType === "returntoassemblypoint" ||
+    normalizedType === "returnassembly"
+  );
 }
 
 function extractBackendActivityErrorClues(
@@ -386,6 +447,9 @@ const MISSION_TYPE_LABELS: Record<string, string> = {
   MEDICAL: "Y tế",
   SUPPLY: "Cứu trợ",
   MIXED: "Tổng hợp",
+  RETURN_ASSEMBLY_POINT: "Quay về điểm tập kết",
+  RETURN_TO_ASSEMBLY_POINT: "Quay về điểm tập kết",
+  RETURN_ASSEMBLY: "Quay về điểm tập kết",
 };
 
 const MISSION_TYPE_BADGE_CLASSNAMES: Record<string, string> = {
@@ -405,6 +469,12 @@ const MISSION_TYPE_BADGE_CLASSNAMES: Record<string, string> = {
     "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
   MIXED:
     "border-teal-300 bg-teal-50 text-teal-700 dark:border-teal-700 dark:bg-teal-900/30 dark:text-teal-300",
+  RETURN_ASSEMBLY_POINT:
+    "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300",
+  RETURN_TO_ASSEMBLY_POINT:
+    "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300",
+  RETURN_ASSEMBLY:
+    "border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-300",
 };
 
 const normalizeMissionTypeKey = (missionType?: string | null) =>
@@ -1947,6 +2017,63 @@ function toValidTeamId(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function toValidSosRequestId(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function resolveReturnAssemblyPointTeamFromPrevious(
+  returnActivity: Pick<
+    ClusterSuggestedActivity,
+    "activityType" | "sosRequestId"
+  >,
+  previousActivities: Array<
+    Pick<
+      ClusterSuggestedActivity,
+      "activityType" | "sosRequestId" | "suggestedTeam"
+    >
+  >,
+): NonNullable<ClusterSuggestedActivity["suggestedTeam"]> | null {
+  if (!isReturnAssemblyPointActivityType(returnActivity.activityType)) {
+    return null;
+  }
+
+  const returnSosRequestId = toValidSosRequestId(returnActivity.sosRequestId);
+
+  const findLatestTeam = (strictSosMatch: boolean) => {
+    for (let index = previousActivities.length - 1; index >= 0; index -= 1) {
+      const activity = previousActivities[index];
+      if (isReturnAssemblyPointActivityType(activity.activityType)) {
+        continue;
+      }
+
+      const teamId = toValidTeamId(activity.suggestedTeam?.teamId);
+      if (teamId == null || !activity.suggestedTeam) {
+        continue;
+      }
+
+      if (strictSosMatch && returnSosRequestId != null) {
+        const candidateSosRequestId = toValidSosRequestId(
+          activity.sosRequestId,
+        );
+        if (candidateSosRequestId !== returnSosRequestId) {
+          continue;
+        }
+      }
+
+      return activity.suggestedTeam as NonNullable<
+        ClusterSuggestedActivity["suggestedTeam"]
+      >;
+    }
+
+    return null;
+  };
+
+  return (
+    findLatestTeam(returnSosRequestId != null) ?? findLatestTeam(false) ?? null
+  );
+}
+
 function getSupplyItemIdSet(activity: {
   suppliesToCollect?:
     | ClusterSupplyCollection[]
@@ -2097,9 +2224,17 @@ function hasValidReturnSupplySelections(
   returnSupplies: ClusterSupplyCollection[] | null | undefined,
   collectorSupplies: ClusterSupplyCollection[] | null | undefined,
 ): boolean {
-  const normalizedReturnSupplies = cloneSupplyCollections(returnSupplies);
+  const normalizedReturnSupplies = mergeSupplyCollections(returnSupplies);
   if (!normalizedReturnSupplies || normalizedReturnSupplies.length === 0) {
     return true;
+  }
+
+  const normalizedCollectorSupplies = mergeSupplyCollections(collectorSupplies);
+  const collectorQuantityByKey = new Map<string, number>();
+
+  for (const collectorSupply of normalizedCollectorSupplies ?? []) {
+    const key = buildSupplyComparisonKey(collectorSupply);
+    collectorQuantityByKey.set(key, collectorSupply.quantity);
   }
 
   return normalizedReturnSupplies.every((returnSupply) => {
@@ -2107,10 +2242,13 @@ function hasValidReturnSupplySelections(
       returnSupply,
       collectorSupplies,
     );
+    const key = buildSupplyComparisonKey(returnSupply);
+    const collectorQuantity = collectorQuantityByKey.get(key) ?? 0;
 
     return (
       !!matchedCollectorSupply &&
-      matchedCollectorSupply.quantity === returnSupply.quantity
+      returnSupply.quantity > 0 &&
+      returnSupply.quantity <= collectorQuantity
     );
   });
 }
@@ -2155,6 +2293,91 @@ function syncDeliveryActivitiesWithCollectors(
       ? { ...activity, _autoSyncedDeliveryStep: false }
       : activity,
   );
+}
+
+function buildTeamSupplyRemainingBalance(
+  activities: EditableActivity[],
+  teamId: number,
+  preservedDeliverySupplyKeys?: Set<string>,
+): Map<string, number> {
+  const balanceByKey = new Map<string, number>();
+
+  for (const activity of activities) {
+    const activityTeamId = toValidTeamId(activity.suggestedTeam?.teamId);
+    if (activityTeamId !== teamId) {
+      continue;
+    }
+
+    const normalizedType = normalizeActivityTypeKey(activity.activityType);
+    const isInflow = normalizedType === "collectsupplies";
+    const isOutflow =
+      normalizedType === "deliversupplies" ||
+      normalizedType === "returnsupplies";
+
+    if (!isInflow && !isOutflow) {
+      continue;
+    }
+
+    const mergedSupplies = mergeSupplyCollections(activity.suppliesToCollect);
+    for (const supply of mergedSupplies ?? []) {
+      const key = buildSupplyComparisonKey(supply);
+      const quantity = Math.max(1, Number(supply.quantity) || 1);
+      const current = balanceByKey.get(key) ?? 0;
+
+      if (
+        normalizedType === "deliversupplies" &&
+        preservedDeliverySupplyKeys?.has(key)
+      ) {
+        continue;
+      }
+
+      if (isInflow) {
+        balanceByKey.set(key, current + quantity);
+      } else {
+        balanceByKey.set(key, Math.max(0, current - quantity));
+      }
+    }
+  }
+
+  return balanceByKey;
+}
+
+function capReturnSuppliesByRemainingBalance(
+  returnSupplies: ClusterSupplyCollection[] | null | undefined,
+  remainingBalanceByKey: Map<string, number>,
+): ClusterSupplyCollection[] | null {
+  const mergedReturnSupplies = mergeSupplyCollections(returnSupplies);
+  if (!mergedReturnSupplies || mergedReturnSupplies.length === 0) {
+    return null;
+  }
+
+  const cappedSupplies: ClusterSupplyCollection[] = [];
+
+  for (const supply of mergedReturnSupplies) {
+    const key = buildSupplyComparisonKey(supply);
+    const remaining = remainingBalanceByKey.get(key) ?? 0;
+    if (remaining <= 0) {
+      continue;
+    }
+
+    const desiredQuantity = Math.min(
+      Math.max(1, Number(supply.quantity) || 1),
+      remaining,
+    );
+
+    if (desiredQuantity <= 0) {
+      continue;
+    }
+
+    cappedSupplies.push({
+      ...supply,
+      quantity: desiredQuantity,
+    });
+
+    remainingBalanceByKey.set(key, Math.max(0, remaining - desiredQuantity));
+  }
+
+  return cappedSupplies.length > 0 ? cappedSupplies : null;
 }
 
 function normalizeDepotName(value?: string | null): string {
@@ -5623,15 +5846,61 @@ const RescuePlanPanel = ({
   const isSubmittingMissionEdit = isCreatingMission || isUpdatingMission;
 
   const syncReturnActivitiesWithCollectors = useCallback(
-    (activities: EditableActivity[]): EditableActivity[] =>
-      syncDeliveryActivitiesWithCollectors(activities).map((activity) => {
+    (activities: EditableActivity[]): EditableActivity[] => {
+      const normalizedActivities =
+        syncDeliveryActivitiesWithCollectors(activities);
+      const nextActivities: EditableActivity[] = [];
+
+      for (const activity of normalizedActivities) {
+        if (isReturnAssemblyPointActivityType(activity.activityType)) {
+          const matchedTeam = resolveReturnAssemblyPointTeamFromPrevious(
+            activity,
+            nextActivities,
+          );
+          const currentTeamId = toValidTeamId(activity.suggestedTeam?.teamId);
+          const matchedTeamId = toValidTeamId(matchedTeam?.teamId);
+          const expectedReason =
+            "Tự động gán cùng đội thực thi bước trước để quay về điểm tập kết.";
+
+          if (matchedTeamId == null) {
+            if (activity.suggestedTeam == null) {
+              nextActivities.push(activity);
+              continue;
+            }
+
+            nextActivities.push({
+              ...activity,
+              suggestedTeam: null,
+            });
+            continue;
+          }
+
+          if (
+            currentTeamId === matchedTeamId &&
+            activity.suggestedTeam?.reason === expectedReason
+          ) {
+            nextActivities.push(activity);
+            continue;
+          }
+
+          nextActivities.push({
+            ...activity,
+            suggestedTeam: {
+              ...matchedTeam,
+              reason: expectedReason,
+            },
+          });
+          continue;
+        }
+
         if (activity.activityType !== "RETURN_SUPPLIES") {
-          return activity;
+          nextActivities.push(activity);
+          continue;
         }
 
         const collectorActivity = findCollectorActivityForReturn(
           activity,
-          activities,
+          normalizedActivities,
         );
         const collectorTeamId = toValidTeamId(
           collectorActivity?.suggestedTeam?.teamId,
@@ -5647,26 +5916,43 @@ const RescuePlanPanel = ({
           currentSupplies,
           collectorSupplies,
         );
+        const preservedDeliverySupplyKeys = new Set(
+          (syncedReturnSupplies ?? []).map((supply) =>
+            buildSupplyComparisonKey(supply),
+          ),
+        );
 
         if (!collectorActivity || collectorTeamId == null) {
           if (
             activity.suggestedTeam == null &&
             haveMatchingSupplyCollections(currentSupplies, null)
           ) {
-            return activity;
+            nextActivities.push(activity);
+            continue;
           }
 
-          return {
+          nextActivities.push({
             ...activity,
             suggestedTeam: null,
             suppliesToCollect: null,
-          };
+          });
+          continue;
         }
+
+        const remainingBalanceByKey = buildTeamSupplyRemainingBalance(
+          nextActivities,
+          collectorTeamId,
+          preservedDeliverySupplyKeys,
+        );
+        const cappedReturnSupplies = capReturnSuppliesByRemainingBalance(
+          syncedReturnSupplies,
+          remainingBalanceByKey,
+        );
 
         const expectedReason = `Tự động gán theo đội thu gom Vật phẩm ở Bước ${collectorActivity.step}.`;
         const hasMatchingSupplies = haveMatchingSupplyCollections(
           currentSupplies,
-          syncedReturnSupplies,
+          cappedReturnSupplies,
         );
 
         if (
@@ -5674,18 +5960,22 @@ const RescuePlanPanel = ({
           activity.suggestedTeam?.reason === expectedReason &&
           hasMatchingSupplies
         ) {
-          return activity;
+          nextActivities.push(activity);
+          continue;
         }
 
-        return {
+        nextActivities.push({
           ...activity,
           suggestedTeam: {
             ...collectorActivity.suggestedTeam,
             reason: expectedReason,
           },
-          suppliesToCollect: syncedReturnSupplies,
-        };
-      }),
+          suppliesToCollect: cappedReturnSupplies,
+        });
+      }
+
+      return nextActivities;
+    },
     [],
   );
 
@@ -6101,6 +6391,31 @@ const RescuePlanPanel = ({
           return false;
         }
       }
+
+      if (isReturnAssemblyPointActivityType(editActivities[i].activityType)) {
+        const matchedTeam = resolveReturnAssemblyPointTeamFromPrevious(
+          editActivities[i],
+          editActivities.slice(0, i),
+        );
+        const matchedTeamId = toValidTeamId(matchedTeam?.teamId);
+        const returnTeamId = toValidTeamId(
+          editActivities[i].suggestedTeam?.teamId,
+        );
+
+        if (matchedTeamId == null) {
+          toast.error(
+            `Bước ${i + 1}: Chưa xác định được đội thực thi trước đó để gán cho bước quay về điểm tập kết.`,
+          );
+          return false;
+        }
+
+        if (returnTeamId !== matchedTeamId) {
+          toast.error(
+            `Bước ${i + 1}: Đội quay về điểm tập kết phải trùng với đội thực thi ở bước trước đó.`,
+          );
+          return false;
+        }
+      }
     }
 
     if (editSupplyBalanceAnalysis.firstIssue) {
@@ -6203,10 +6518,37 @@ const RescuePlanPanel = ({
           activity.activityType === "RETURN_SUPPLIES"
             ? findCollectorActivityForReturn(activity, editActivities)
             : null;
+        const isReturnAssemblyPointActivity = isReturnAssemblyPointActivityType(
+          activity.activityType,
+        );
+        const forcedReturnAssemblyTeam = isReturnAssemblyPointActivity
+          ? resolveReturnAssemblyPointTeamFromPrevious(
+              activity,
+              editActivities.slice(0, index),
+            )
+          : null;
         const rescueTeamId =
           activity.activityType === "RETURN_SUPPLIES"
             ? toValidTeamId(forcedCollectorActivity?.suggestedTeam?.teamId)
-            : toValidTeamId(activity.suggestedTeam?.teamId);
+            : isReturnAssemblyPointActivity
+              ? toValidTeamId(forcedReturnAssemblyTeam?.teamId)
+              : toValidTeamId(activity.suggestedTeam?.teamId);
+        const descriptionCoordinates =
+          extractCoordsFromDescription(syncedDescription);
+        const fallbackTargetLatitude =
+          descriptionCoordinates?.lat ??
+          (sosRequestId
+            ? (selectedSos?.location?.lat ?? sos?.location?.lat ?? 0)
+            : (sos?.location?.lat ?? 0));
+        const fallbackTargetLongitude =
+          descriptionCoordinates?.lng ??
+          (sosRequestId
+            ? (selectedSos?.location?.lng ?? sos?.location?.lng ?? 0)
+            : (sos?.location?.lng ?? 0));
+        const returnAssemblyPointCoordinates = resolveCoordinatePair(
+          assemblyPointLatitude,
+          assemblyPointLongitude,
+        );
 
         const createRequest = {
           step: index + 1,
@@ -6233,17 +6575,16 @@ const RescuePlanPanel = ({
             quantity: s.quantity,
             unit: s.unit,
           })),
-          target: depotName || `SOS ${sosRequestId || sos?.id || "unknown"}`,
-          targetLatitude:
-            extractCoordsFromDescription(syncedDescription)?.lat ??
-            (sosRequestId
-              ? (selectedSos?.location?.lat ?? sos?.location?.lat ?? 0)
-              : (sos?.location?.lat ?? 0)),
-          targetLongitude:
-            extractCoordsFromDescription(syncedDescription)?.lng ??
-            (sosRequestId
-              ? (selectedSos?.location?.lng ?? sos?.location?.lng ?? 0)
-              : (sos?.location?.lng ?? 0)),
+          target: isReturnAssemblyPointActivity
+            ? (assemblyPointName ??
+              `Điểm tập kết #${assemblyPointId ?? "unknown"}`)
+            : depotName || `SOS ${sosRequestId || sos?.id || "unknown"}`,
+          targetLatitude: isReturnAssemblyPointActivity
+            ? (returnAssemblyPointCoordinates?.[0] ?? fallbackTargetLatitude)
+            : fallbackTargetLatitude,
+          targetLongitude: isReturnAssemblyPointActivity
+            ? (returnAssemblyPointCoordinates?.[1] ?? fallbackTargetLongitude)
+            : fallbackTargetLongitude,
           rescueTeamId,
         };
 
@@ -6271,6 +6612,7 @@ const RescuePlanPanel = ({
                   step: createRequest.step,
                   description: createRequest.description,
                   target: createRequest.target,
+                  assemblyPointId: createRequest.assemblyPointId ?? null,
                   targetLatitude: createRequest.targetLatitude,
                   targetLongitude: createRequest.targetLongitude,
                   items: createRequest.suppliesToCollect.map((supply) => ({
@@ -6386,6 +6728,22 @@ const RescuePlanPanel = ({
     enabled: open,
   });
 
+  const { data: assemblyPointsData, isLoading: isAssemblyPointsLoading } =
+    useAssemblyPoints({
+      params: {
+        pageNumber: 1,
+        pageSize: 300,
+      },
+      enabled: open && isEditMode,
+    });
+
+  const {
+    data: assemblyPointMetadataOptions,
+    isLoading: isAssemblyPointMetadataLoading,
+  } = useAssemblyPointMetadata({
+    enabled: open && isEditMode,
+  });
+
   const rescueTeamStatusLabelsByKey = useMemo(() => {
     const labels = new Map<string, string>();
 
@@ -6410,6 +6768,60 @@ const RescuePlanPanel = ({
 
     return labels;
   }, [rescueTeamStatusOptions]);
+
+  const assemblyPointOptions = useMemo<AssemblyPointOptionEntry[]>(() => {
+    const byId = new Map<number, AssemblyPointOptionEntry>();
+
+    for (const point of assemblyPointsData?.items ?? []) {
+      if (!Number.isFinite(point.id) || point.id <= 0) {
+        continue;
+      }
+
+      const pointName =
+        typeof point.name === "string" && point.name.trim()
+          ? point.name.trim()
+          : `Điểm tập kết #${point.id}`;
+
+      byId.set(point.id, {
+        id: point.id,
+        name: pointName,
+        latitude: Number.isFinite(point.latitude) ? point.latitude : null,
+        longitude: Number.isFinite(point.longitude) ? point.longitude : null,
+      });
+    }
+
+    for (const option of assemblyPointMetadataOptions ?? []) {
+      const parsedId = Number(option.key);
+      if (!Number.isFinite(parsedId) || parsedId <= 0) {
+        continue;
+      }
+
+      const optionName =
+        typeof option.value === "string" && option.value.trim()
+          ? option.value.trim()
+          : `Điểm tập kết #${parsedId}`;
+
+      if (byId.has(parsedId)) {
+        continue;
+      }
+
+      byId.set(parsedId, {
+        id: parsedId,
+        name: optionName,
+        latitude: null,
+        longitude: null,
+      });
+    }
+
+    return Array.from(byId.values()).sort((a, b) =>
+      a.name.localeCompare(b.name, "vi"),
+    );
+  }, [assemblyPointsData?.items, assemblyPointMetadataOptions]);
+
+  const assemblyPointOptionById = useMemo(
+    () => new Map(assemblyPointOptions.map((point) => [point.id, point])),
+    [assemblyPointOptions],
+  );
 
   const nearbyRescueTeams = useMemo(() => {
     const sourceTeams = nearbyTeamsByClusterData ?? [];
@@ -6451,7 +6863,14 @@ const RescuePlanPanel = ({
               return activity;
             }
 
-            if (activity.activityType === "RETURN_SUPPLIES") {
+            if (editingMissionId) {
+              return activity;
+            }
+
+            if (
+              activity.activityType === "RETURN_SUPPLIES" ||
+              isReturnAssemblyPointActivityType(activity.activityType)
+            ) {
               return activity;
             }
 
@@ -6476,15 +6895,33 @@ const RescuePlanPanel = ({
         ),
       );
     },
-    [clearEditActivityErrors, syncReturnActivitiesWithCollectors],
+    [
+      clearEditActivityErrors,
+      editingMissionId,
+      syncReturnActivitiesWithCollectors,
+    ],
   );
 
   const handleSelectNearbyTeamForActivity = useCallback(
     (activityId: string, value: string) => {
+      if (editingMissionId) {
+        toast.info(
+          "Cập nhật nhiệm vụ đã tạo không cho phép đổi đội cứu hộ ở bước này.",
+        );
+        return;
+      }
+
       const targetActivity = editActivities.find((a) => a._id === activityId);
       if (targetActivity?.activityType === "RETURN_SUPPLIES") {
         toast.info(
           "Bước Hoàn trả vật phẩm được tự động gán theo đội đã thu gom vật phẩm và không thể thay đổi thủ công.",
+        );
+        return;
+      }
+
+      if (isReturnAssemblyPointActivityType(targetActivity?.activityType)) {
+        toast.info(
+          "Bước quay về điểm tập kết được tự động gán theo đội thực thi trước đó và không thể thay đổi thủ công.",
         );
         return;
       }
@@ -6506,7 +6943,55 @@ const RescuePlanPanel = ({
 
       updateEditActivitySuggestedTeam(activityId, team);
     },
-    [editActivities, nearbyRescueTeamById, updateEditActivitySuggestedTeam],
+    [
+      editActivities,
+      editingMissionId,
+      nearbyRescueTeamById,
+      updateEditActivitySuggestedTeam,
+    ],
+  );
+
+  const updateEditActivityAssemblyPoint = useCallback(
+    (activityId: string, selectedAssemblyPointId: string) => {
+      const parsedAssemblyPointId = Number(selectedAssemblyPointId);
+      if (
+        !Number.isFinite(parsedAssemblyPointId) ||
+        parsedAssemblyPointId <= 0
+      ) {
+        return;
+      }
+
+      const selectedAssemblyPoint = assemblyPointOptionById.get(
+        parsedAssemblyPointId,
+      );
+      if (!selectedAssemblyPoint) {
+        return;
+      }
+
+      clearEditActivityErrors();
+      setEditActivities((previous) =>
+        syncReturnActivitiesWithCollectors(
+          previous.map((activity) => {
+            if (activity._id !== activityId) {
+              return activity;
+            }
+
+            return {
+              ...activity,
+              assemblyPointId: selectedAssemblyPoint.id,
+              assemblyPointName: selectedAssemblyPoint.name,
+              assemblyPointLatitude: selectedAssemblyPoint.latitude,
+              assemblyPointLongitude: selectedAssemblyPoint.longitude,
+            };
+          }),
+        ),
+      );
+    },
+    [
+      assemblyPointOptionById,
+      clearEditActivityErrors,
+      syncReturnActivitiesWithCollectors,
+    ],
   );
 
   const getNearbyTeamsForActivity = useCallback(
@@ -6551,6 +7036,13 @@ const RescuePlanPanel = ({
   const [expandedMissionSupplyKeys, setExpandedMissionSupplyKeys] = useState<
     Record<string, boolean>
   >({});
+  const [expandedMissionReportImageKeys, setExpandedMissionReportImageKeys] =
+    useState<Record<string, boolean>>({});
+  const [activeMissionReportImage, setActiveMissionReportImage] = useState<{
+    src: string;
+    step: number;
+    activityLabel: string;
+  } | null>(null);
 
   useEffect(() => {
     if (open && defaultTab) setActiveTab(defaultTab);
@@ -6567,9 +7059,31 @@ const RescuePlanPanel = ({
     [],
   );
 
+  const toggleMissionReportImageExpansion = useCallback(
+    (missionId: number, activityId: number) => {
+      const key = `${missionId}:report:${activityId}`;
+      setExpandedMissionReportImageKeys((previous) => ({
+        ...previous,
+        [key]: !previous[key],
+      }));
+    },
+    [],
+  );
+
+  const handleMissionReportImageViewerOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        setActiveMissionReportImage(null);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!open) {
       setExpandedMissionSupplyKeys({});
+      setExpandedMissionReportImageKeys({});
+      setActiveMissionReportImage(null);
     }
   }, [open]);
 
@@ -6870,6 +7384,7 @@ const RescuePlanPanel = ({
             estimatedTime: normalizeEstimatedTimeInputValue(a.estimatedTime),
             _id: `edit-${i}-${Date.now()}`,
             _missionActivityId: null,
+            _missionStatus: null,
           })),
         ),
       );
@@ -6921,6 +7436,7 @@ const RescuePlanPanel = ({
             return {
               _id: `edit-m-${i}-${Date.now()}`,
               _missionActivityId: a.id,
+              _missionStatus: a.status ?? null,
               step: a.step,
               activityType: a.activityType as ClusterActivityType,
               description: a.description,
@@ -7986,6 +8502,13 @@ const RescuePlanPanel = ({
                                                           supplyExpandKey
                                                         ],
                                                       );
+                                                    const reportImageExpandKey = `${mission.id}:report:${activity.id}`;
+                                                    const isReportImageExpanded =
+                                                      Boolean(
+                                                        expandedMissionReportImageKeys[
+                                                          reportImageExpandKey
+                                                        ],
+                                                      );
                                                     const displayDescription =
                                                       supplyItems.length > 0
                                                         ? stripSupplyDetailsFromDescription(
@@ -7995,6 +8518,10 @@ const RescuePlanPanel = ({
                                                     const stepStatus =
                                                       getActivityStatusMeta(
                                                         activity.status,
+                                                      );
+                                                    const activityReportImageUrl =
+                                                      normalizeActivityReportImageUrl(
+                                                        activity.imageUrl,
                                                       );
 
                                                     return (
@@ -8120,36 +8647,87 @@ const RescuePlanPanel = ({
                                                               </div>
                                                             )}
 
-                                                            {(activity.completedBy ||
-                                                              activity.completedAt) && (
-                                                              <div className="mt-2 p-2 rounded-md border border-slate-200/80 dark:border-slate-700/60 bg-slate-50/70 dark:bg-slate-900/20">
-                                                                <p className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                                                                  <CheckCircle
-                                                                    className="h-3 w-3"
-                                                                    weight="fill"
-                                                                  />
-                                                                  Thông tin hoàn
-                                                                  tất bước
-                                                                </p>
-                                                                {activity.completedBy && (
-                                                                  <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
-                                                                    Người hoàn
-                                                                    tất:{" "}
-                                                                    {
-                                                                      activity.completedBy
-                                                                    }
-                                                                  </p>
-                                                                )}
-                                                                {activity.completedAt && (
-                                                                  <p className="text-sm text-slate-700/85 dark:text-slate-300/85">
-                                                                    Thời điểm:{" "}
-                                                                    {new Date(
-                                                                      activity.completedAt,
-                                                                    ).toLocaleString(
-                                                                      "vi-VN",
+                                                            {activityReportImageUrl && (
+                                                              <div className="mt-2.5 rounded-lg border border-cyan-200/80 bg-cyan-50/70 p-2.5 dark:border-cyan-700/60 dark:bg-cyan-900/20">
+                                                                <button
+                                                                  type="button"
+                                                                  className="flex w-full items-center justify-between gap-2 text-left"
+                                                                  aria-expanded={
+                                                                    isReportImageExpanded
+                                                                  }
+                                                                  onClick={() =>
+                                                                    toggleMissionReportImageExpansion(
+                                                                      mission.id,
+                                                                      activity.id,
+                                                                    )
+                                                                  }
+                                                                >
+                                                                  <span className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-300">
+                                                                    <Info
+                                                                      className="h-3 w-3"
+                                                                      weight="fill"
+                                                                    />
+                                                                    Ảnh báo cáo
+                                                                    từ đội cứu
+                                                                    hộ
+                                                                  </span>
+                                                                  <span className="inline-flex items-center gap-1 rounded-md border border-cyan-200 bg-cyan-100/70 px-1.5 py-0.5 text-sm font-semibold text-cyan-700 dark:border-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
+                                                                    <span>
+                                                                      1 ảnh
+                                                                    </span>
+                                                                    {isReportImageExpanded ? (
+                                                                      <CaretUp className="h-3 w-3" />
+                                                                    ) : (
+                                                                      <CaretDown className="h-3 w-3" />
                                                                     )}
-                                                                  </p>
-                                                                )}
+                                                                  </span>
+                                                                </button>
+
+                                                                {isReportImageExpanded ? (
+                                                                  <div className="mt-2 space-y-2">
+                                                                    <button
+                                                                      type="button"
+                                                                      className="group block w-full overflow-hidden rounded-md border border-cyan-200/80 bg-slate-50 p-1 dark:border-cyan-700/60 dark:bg-slate-950/40"
+                                                                      onClick={() =>
+                                                                        setActiveMissionReportImage(
+                                                                          {
+                                                                            src: activityReportImageUrl,
+                                                                            step: activity.step,
+                                                                            activityLabel:
+                                                                              config.label,
+                                                                          },
+                                                                        )
+                                                                      }
+                                                                    >
+                                                                      <img
+                                                                        src={
+                                                                          activityReportImageUrl
+                                                                        }
+                                                                        alt={`Ảnh báo cáo bước ${activity.step}`}
+                                                                        loading="lazy"
+                                                                        className="max-h-72 w-full rounded-md object-contain transition-transform duration-300 group-hover:scale-[1.01]"
+                                                                      />
+                                                                    </button>
+                                                                    <Button
+                                                                      type="button"
+                                                                      variant="outline"
+                                                                      className="h-8 border-cyan-300 text-sm font-semibold text-cyan-700 hover:bg-cyan-100 dark:border-cyan-700 dark:text-cyan-300 dark:hover:bg-cyan-900/30"
+                                                                      onClick={() =>
+                                                                        setActiveMissionReportImage(
+                                                                          {
+                                                                            src: activityReportImageUrl,
+                                                                            step: activity.step,
+                                                                            activityLabel:
+                                                                              config.label,
+                                                                          },
+                                                                        )
+                                                                      }
+                                                                    >
+                                                                      Xem ảnh
+                                                                      chi tiết
+                                                                    </Button>
+                                                                  </div>
+                                                                ) : null}
                                                               </div>
                                                             )}
 
@@ -8775,18 +9353,73 @@ const RescuePlanPanel = ({
                                             (team) =>
                                               team.id === parsedSuggestedTeamId,
                                           );
+                                        const isReturnAssemblyPointActivity =
+                                          isReturnAssemblyPointActivityType(
+                                            activity.activityType,
+                                          );
+                                        const isExistingMissionActivity =
+                                          Boolean(
+                                            editingMissionId &&
+                                            typeof activity._missionActivityId ===
+                                              "number" &&
+                                            activity._missionActivityId > 0,
+                                          );
+                                        const isPendingMissionActivity =
+                                          isExistingMissionActivity &&
+                                          isPendingMissionActivityStatus(
+                                            activity._missionStatus,
+                                          );
+                                        const isPendingReturnAssemblyPointActivity =
+                                          isPendingMissionActivity &&
+                                          isReturnAssemblyPointActivity;
+                                        const lockGeneralActivityEdits =
+                                          isPendingMissionActivity;
+                                        const isTeamEditingLocked =
+                                          Boolean(editingMissionId);
+                                        const canEditReturnAssemblyPoint =
+                                          isExistingMissionActivity &&
+                                          isReturnAssemblyPointActivity;
+                                        const parsedAssemblyPointId = Number(
+                                          activity.assemblyPointId,
+                                        );
+                                        const hasValidAssemblyPointId =
+                                          Number.isFinite(
+                                            parsedAssemblyPointId,
+                                          ) && parsedAssemblyPointId > 0;
+                                        const selectedAssemblyPointValue =
+                                          hasValidAssemblyPointId
+                                            ? String(parsedAssemblyPointId)
+                                            : "";
+                                        const selectedAssemblyPointInOptions =
+                                          hasValidAssemblyPointId &&
+                                          assemblyPointOptionById.has(
+                                            parsedAssemblyPointId,
+                                          );
+                                        const selectedAssemblyPointLabel =
+                                          hasValidAssemblyPointId
+                                            ? (assemblyPointOptionById.get(
+                                                parsedAssemblyPointId,
+                                              )?.name ??
+                                              activity.assemblyPointName ??
+                                              `Điểm tập kết #${parsedAssemblyPointId}`)
+                                            : null;
                                         const isReturnSuppliesActivity =
                                           activity.activityType ===
                                           "RETURN_SUPPLIES";
                                         const isAutoManagedSupplyStep =
                                           isReturnSuppliesActivity;
+                                        const isAutoManagedTeamStep =
+                                          isReturnSuppliesActivity ||
+                                          isReturnAssemblyPointActivity;
                                         const selectedTeamDisplayName =
                                           activity.suggestedTeam?.teamName ||
                                           (hasValidSuggestedTeamId
                                             ? `Đội #${parsedSuggestedTeamId}`
                                             : isReturnSuppliesActivity
                                               ? "Chưa xác định đội thu gom vật phẩm"
-                                              : "Chưa chọn đội");
+                                              : isReturnAssemblyPointActivity
+                                                ? "Chưa xác định đội thực thi trước đó"
+                                                : "Chưa chọn đội");
                                         const defaultSupplyExpanded = false;
                                         const isSupplyExpanded =
                                           expandedEditSupplyKeys[
@@ -8805,10 +9438,17 @@ const RescuePlanPanel = ({
                                           <div
                                             key={activity._id}
                                             data-edit-activity-id={activity._id}
-                                            onDragOver={(event) =>
-                                              handleDragOver(event, idx)
+                                            onDragOver={
+                                              lockGeneralActivityEdits
+                                                ? undefined
+                                                : (event) =>
+                                                    handleDragOver(event, idx)
                                             }
-                                            onDrop={() => handleDrop(idx)}
+                                            onDrop={
+                                              lockGeneralActivityEdits
+                                                ? undefined
+                                                : () => handleDrop(idx)
+                                            }
                                             onDragEnd={handleDragEnd}
                                             className={cn(
                                               "space-y-2.5 rounded-xl border bg-background p-3 transition-all",
@@ -8828,25 +9468,43 @@ const RescuePlanPanel = ({
                                             <div className="flex items-center gap-2">
                                               <div
                                                 draggable={
+                                                  !lockGeneralActivityEdits &&
                                                   stepDragHandleId ===
-                                                  activity._id
+                                                    activity._id
                                                 }
-                                                onPointerDown={() =>
+                                                onPointerDown={() => {
+                                                  if (
+                                                    lockGeneralActivityEdits
+                                                  ) {
+                                                    return;
+                                                  }
+
                                                   armStepDragHandle(
                                                     activity._id,
-                                                  )
-                                                }
+                                                  );
+                                                }}
                                                 onPointerUp={
                                                   releaseStepDragHandle
                                                 }
                                                 onPointerCancel={
                                                   releaseStepDragHandle
                                                 }
-                                                onDragStart={() =>
-                                                  handleDragStart(idx)
-                                                }
+                                                onDragStart={() => {
+                                                  if (
+                                                    lockGeneralActivityEdits
+                                                  ) {
+                                                    return;
+                                                  }
+
+                                                  handleDragStart(idx);
+                                                }}
                                                 onDragEnd={handleDragEnd}
-                                                className="cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
+                                                className={cn(
+                                                  "text-muted-foreground",
+                                                  lockGeneralActivityEdits
+                                                    ? "cursor-not-allowed opacity-45"
+                                                    : "cursor-grab hover:text-foreground active:cursor-grabbing",
+                                                )}
                                               >
                                                 <DotsSixVertical
                                                   className="h-4 w-4"
@@ -8875,6 +9533,9 @@ const RescuePlanPanel = ({
                                                       "activityType",
                                                       value,
                                                     )
+                                                  }
+                                                  disabled={
+                                                    lockGeneralActivityEdits
                                                   }
                                                 >
                                                   <SelectTrigger className="h-7 w-35 text-sm font-semibold">
@@ -8944,7 +9605,10 @@ const RescuePlanPanel = ({
                                                   onClick={() =>
                                                     moveEditActivity(idx, -1)
                                                   }
-                                                  disabled={idx === 0}
+                                                  disabled={
+                                                    idx === 0 ||
+                                                    lockGeneralActivityEdits
+                                                  }
                                                 >
                                                   <CaretUp className="h-3 w-3" />
                                                 </Button>
@@ -8957,7 +9621,9 @@ const RescuePlanPanel = ({
                                                   }
                                                   disabled={
                                                     idx ===
-                                                    editActivities.length - 1
+                                                      editActivities.length -
+                                                        1 ||
+                                                    lockGeneralActivityEdits
                                                   }
                                                 >
                                                   <CaretDown className="h-3 w-3" />
@@ -8971,6 +9637,9 @@ const RescuePlanPanel = ({
                                                       activity,
                                                       idx + 1,
                                                     )
+                                                  }
+                                                  disabled={
+                                                    lockGeneralActivityEdits
                                                   }
                                                 >
                                                   <Trash className="h-3 w-3" />
@@ -8991,6 +9660,16 @@ const RescuePlanPanel = ({
                                               </div>
                                             ) : null}
 
+                                            {lockGeneralActivityEdits ? (
+                                              <div className="rounded-lg border border-amber-300/80 bg-amber-50/80 px-3 py-2 dark:border-amber-700/60 dark:bg-amber-950/20">
+                                                <p className="text-sm leading-relaxed text-amber-800 dark:text-amber-300">
+                                                  {isPendingReturnAssemblyPointActivity
+                                                    ? "Bước này đang ở trạng thái chờ, chỉ cho phép cập nhật điểm tập kết quay về."
+                                                    : "Bước đang ở trạng thái chờ xử lý/chờ xác nhận nên không thể chỉnh sửa nội dung."}
+                                                </p>
+                                              </div>
+                                            ) : null}
+
                                             <div>
                                               <Label className="text-sm uppercase tracking-wider text-muted-foreground">
                                                 Mô tả
@@ -9004,6 +9683,9 @@ const RescuePlanPanel = ({
                                                       "description",
                                                       event.target.value,
                                                     )
+                                                  }
+                                                  disabled={
+                                                    lockGeneralActivityEdits
                                                   }
                                                   placeholder="Mô tả hoạt động..."
                                                   rows={2}
@@ -9041,10 +9723,100 @@ const RescuePlanPanel = ({
                                                     event.target.value,
                                                   )
                                                 }
+                                                disabled={
+                                                  lockGeneralActivityEdits
+                                                }
                                                 placeholder="VD: 30 phút"
                                                 className="h-10 w-full text-sm"
                                               />
                                             </div>
+
+                                            {canEditReturnAssemblyPoint ? (
+                                              <div className="space-y-1 rounded-lg border border-sky-200/80 bg-sky-50/70 p-2.5 dark:border-sky-700/60 dark:bg-sky-900/20">
+                                                <Label className="block min-h-5 text-sm font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">
+                                                  Điểm tập kết quay về
+                                                </Label>
+                                                <Select
+                                                  value={
+                                                    selectedAssemblyPointValue ||
+                                                    undefined
+                                                  }
+                                                  onValueChange={(value) =>
+                                                    updateEditActivityAssemblyPoint(
+                                                      activity._id,
+                                                      value,
+                                                    )
+                                                  }
+                                                >
+                                                  <SelectTrigger className="h-9 bg-white/90 text-sm dark:bg-sky-950/25">
+                                                    <SelectValue
+                                                      placeholder={
+                                                        isAssemblyPointsLoading ||
+                                                        isAssemblyPointMetadataLoading
+                                                          ? "Đang tải điểm tập kết..."
+                                                          : "Chọn điểm tập kết quay về"
+                                                      }
+                                                    />
+                                                  </SelectTrigger>
+                                                  <SelectContent className="z-1200">
+                                                    {hasValidAssemblyPointId &&
+                                                    !selectedAssemblyPointInOptions ? (
+                                                      <SelectItem
+                                                        value={
+                                                          selectedAssemblyPointValue
+                                                        }
+                                                        className="text-sm"
+                                                      >
+                                                        {
+                                                          selectedAssemblyPointLabel
+                                                        }{" "}
+                                                        (đang chọn)
+                                                      </SelectItem>
+                                                    ) : null}
+
+                                                    {assemblyPointOptions.map(
+                                                      (point) => (
+                                                        <SelectItem
+                                                          key={point.id}
+                                                          value={String(
+                                                            point.id,
+                                                          )}
+                                                          className="text-sm"
+                                                        >
+                                                          {point.name}
+                                                        </SelectItem>
+                                                      ),
+                                                    )}
+                                                  </SelectContent>
+                                                </Select>
+                                                {activity.assemblyPointName ? (
+                                                  <p className="text-sm text-sky-700/80 dark:text-sky-300/80">
+                                                    Hiện tại:{" "}
+                                                    {activity.assemblyPointName}
+                                                  </p>
+                                                ) : null}
+                                                {formatCoordinateLabel(
+                                                  activity.assemblyPointLatitude,
+                                                  activity.assemblyPointLongitude,
+                                                ) ? (
+                                                  <p className="text-sm text-sky-700/70 dark:text-sky-300/70">
+                                                    Tọa độ:{" "}
+                                                    {formatCoordinateLabel(
+                                                      activity.assemblyPointLatitude,
+                                                      activity.assemblyPointLongitude,
+                                                    )}
+                                                  </p>
+                                                ) : null}
+                                                {isPendingReturnAssemblyPointActivity ? (
+                                                  <p className="text-sm leading-relaxed text-sky-700/80 dark:text-sky-300/80">
+                                                    Bước đang chờ xác nhận, bạn
+                                                    chỉ có thể đổi điểm tập kết
+                                                    quay về để đội cứu hộ trở về
+                                                    vị trí an toàn hơn.
+                                                  </p>
+                                                ) : null}
+                                              </div>
+                                            ) : null}
 
                                             <div
                                               className={cn(
@@ -9103,13 +9875,15 @@ const RescuePlanPanel = ({
                                                     )
                                                   }
                                                   disabled={
-                                                    isReturnSuppliesActivity
+                                                    isAutoManagedTeamStep ||
+                                                    isTeamEditingLocked
                                                   }
                                                 >
                                                   <SelectTrigger
                                                     className={cn(
                                                       "h-9 bg-white/90 text-sm dark:bg-emerald-950/25",
-                                                      isReturnSuppliesActivity &&
+                                                      (isAutoManagedTeamStep ||
+                                                        isTeamEditingLocked) &&
                                                         "cursor-not-allowed opacity-80",
                                                     )}
                                                   >
@@ -9117,7 +9891,13 @@ const RescuePlanPanel = ({
                                                       placeholder={
                                                         isNearbyTeamsByClusterLoading
                                                           ? "Đang tải đội gần cụm SOS..."
-                                                          : "Chọn đội gần điểm tập kết để thay thế"
+                                                          : isAutoManagedTeamStep
+                                                            ? isReturnSuppliesActivity
+                                                              ? "Bước này tự động theo đội thu gom vật phẩm"
+                                                              : "Bước này tự động theo đội thực thi ở bước trước"
+                                                            : isTeamEditingLocked
+                                                              ? "Khóa đổi đội khi cập nhật nhiệm vụ đã tạo"
+                                                              : "Chọn đội gần điểm tập kết để thay thế"
                                                       }
                                                     />
                                                   </SelectTrigger>
@@ -9154,7 +9934,8 @@ const RescuePlanPanel = ({
                                                       ),
                                                     )}
 
-                                                    {!isReturnSuppliesActivity ? (
+                                                    {!isAutoManagedTeamStep &&
+                                                    !isTeamEditingLocked ? (
                                                       <SelectItem
                                                         value={
                                                           CLEAR_ACTIVITY_TEAM_VALUE
@@ -9180,7 +9961,8 @@ const RescuePlanPanel = ({
                                                   }
                                                   disabled={
                                                     !activity.suggestedTeam ||
-                                                    isReturnSuppliesActivity
+                                                    isAutoManagedTeamStep ||
+                                                    isTeamEditingLocked
                                                   }
                                                 >
                                                   Bỏ đội
@@ -9217,7 +9999,8 @@ const RescuePlanPanel = ({
                                                             )
                                                           }
                                                           disabled={
-                                                            isReturnSuppliesActivity
+                                                            isAutoManagedTeamStep ||
+                                                            isTeamEditingLocked
                                                           }
                                                         >
                                                           <span className="max-w-30 truncate">
@@ -9275,6 +10058,23 @@ const RescuePlanPanel = ({
                                                   thủ công.
                                                 </p>
                                               ) : null}
+
+                                              {isReturnAssemblyPointActivity ? (
+                                                <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
+                                                  Bước quay về điểm tập kết được
+                                                  tự động gán cùng đội thực thi
+                                                  trước đó và không thể thay đổi
+                                                  thủ công.
+                                                </p>
+                                              ) : null}
+
+                                              {isTeamEditingLocked ? (
+                                                <p className="mt-2 text-sm leading-relaxed text-emerald-700/80 dark:text-emerald-300/80">
+                                                  Cập nhật nhiệm vụ đã tạo không
+                                                  cho phép đổi đội cứu hộ ở bước
+                                                  này.
+                                                </p>
+                                              ) : null}
                                             </div>
 
                                             {isSupplyStep(
@@ -9283,7 +10083,10 @@ const RescuePlanPanel = ({
                                               <div
                                                 className="mt-1"
                                                 onDragOver={(event) => {
-                                                  if (isAutoManagedSupplyStep) {
+                                                  if (
+                                                    isAutoManagedSupplyStep ||
+                                                    lockGeneralActivityEdits
+                                                  ) {
                                                     return;
                                                   }
                                                   if (
@@ -9312,6 +10115,14 @@ const RescuePlanPanel = ({
                                                     "border-blue-400",
                                                     "bg-blue-100/50",
                                                   );
+                                                  if (
+                                                    lockGeneralActivityEdits
+                                                  ) {
+                                                    toast.info(
+                                                      "Bước đang chờ xác nhận nên chưa thể chỉnh sửa vật phẩm.",
+                                                    );
+                                                    return;
+                                                  }
                                                   if (isAutoManagedSupplyStep) {
                                                     toast.info(
                                                       "Vật phẩm ở bước Hoàn trả được tự động đồng bộ từ bước Thu gom vật phẩm nên không thể kéo thả thủ công.",
@@ -9407,9 +10218,12 @@ const RescuePlanPanel = ({
                                                         Hệ thống chỉ đồng bộ số
                                                         lượng cho những vật phẩm
                                                         AI đã chọn hoàn trả ở
-                                                        bước này, không tự thêm
-                                                        toàn bộ vật phẩm đã thu
-                                                        gom.
+                                                        bước này. Với vật phẩm
+                                                        có kế hoạch hoàn trả, hệ
+                                                        thống không xem là đã
+                                                        tiêu hao ở bước phân
+                                                        phát, không tự thêm toàn
+                                                        bộ vật phẩm đã thu gom.
                                                       </p>
                                                     ) : null}
 
@@ -9478,7 +10292,8 @@ const RescuePlanPanel = ({
                                                                     )
                                                                   }
                                                                   disabled={
-                                                                    isAutoManagedSupplyStep
+                                                                    isAutoManagedSupplyStep ||
+                                                                    lockGeneralActivityEdits
                                                                   }
                                                                   className="h-6 w-full px-1 text-center text-sm"
                                                                 />
@@ -9499,7 +10314,8 @@ const RescuePlanPanel = ({
                                                                     )
                                                                   }
                                                                   disabled={
-                                                                    isAutoManagedSupplyStep
+                                                                    isAutoManagedSupplyStep ||
+                                                                    lockGeneralActivityEdits
                                                                   }
                                                                 >
                                                                   <X className="h-3 w-3" />
@@ -10591,6 +11407,33 @@ const RescuePlanPanel = ({
             ) : null}
           </div>
         </div>
+
+        <Dialog
+          open={Boolean(activeMissionReportImage)}
+          onOpenChange={handleMissionReportImageViewerOpenChange}
+        >
+          <DialogContent className="overflow-hidden border-cyan-200/80 bg-background p-0 sm:max-w-4xl">
+            <DialogHeader className="border-b border-cyan-100/80 px-4 py-3 dark:border-cyan-900/40">
+              <DialogTitle>
+                Ảnh báo cáo bước {activeMissionReportImage?.step ?? "-"}
+              </DialogTitle>
+              <DialogDescription>
+                {activeMissionReportImage
+                  ? `Hoạt động: ${activeMissionReportImage.activityLabel}`
+                  : "Ảnh báo cáo từ đội cứu hộ"}
+              </DialogDescription>
+            </DialogHeader>
+            {activeMissionReportImage ? (
+              <div className="flex max-h-[80vh] items-center justify-center bg-slate-100/80 p-3 dark:bg-slate-950/70">
+                <img
+                  src={activeMissionReportImage.src}
+                  alt={`Ảnh báo cáo bước ${activeMissionReportImage.step}`}
+                  className="max-h-[74vh] w-full rounded-md object-contain"
+                />
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
 
         <Dialog
           open={removeConfirmOpen}

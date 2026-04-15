@@ -42,6 +42,10 @@ export type SupplyBalanceAnalysis<Id extends string | number> = {
 const SUPPLY_INFLOW_TYPES = new Set(["COLLECT_SUPPLIES"]);
 const SUPPLY_OUTFLOW_TYPES = new Set(["DELIVER_SUPPLIES", "RETURN_SUPPLIES"]);
 
+function normalizeSupplyActivityType(value?: string | null): string {
+  return (value ?? "").trim().toUpperCase().replaceAll(" ", "_");
+}
+
 function normalizeText(value?: string | null): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
@@ -84,6 +88,30 @@ export function analyzeMissionSupplyBalance<Id extends string | number>(
       return stepDelta !== 0 ? stepDelta : left.index - right.index;
     });
 
+  const returnDesignatedKeysByTeam = new Map<number, Set<string>>();
+
+  for (const { activity } of orderedActivities) {
+    const teamId = toValidNumber(activity.teamId);
+    if (teamId == null) {
+      continue;
+    }
+
+    const normalizedActivityType = normalizeSupplyActivityType(
+      activity.activityType,
+    );
+    if (normalizedActivityType !== "RETURN_SUPPLIES") {
+      continue;
+    }
+
+    const existing =
+      returnDesignatedKeysByTeam.get(teamId) ?? new Set<string>();
+    for (const supply of activity.supplies ?? []) {
+      const { itemKey } = getSupplyIdentity(supply);
+      existing.add(itemKey);
+    }
+    returnDesignatedKeysByTeam.set(teamId, existing);
+  }
+
   const issues: SupplyBalanceIssue<Id>[] = [];
   const balanceByKey = new Map<
     string,
@@ -104,8 +132,11 @@ export function analyzeMissionSupplyBalance<Id extends string | number>(
       continue;
     }
 
-    const isInflow = SUPPLY_INFLOW_TYPES.has(activity.activityType);
-    const isOutflow = SUPPLY_OUTFLOW_TYPES.has(activity.activityType);
+    const normalizedActivityType = normalizeSupplyActivityType(
+      activity.activityType,
+    );
+    const isInflow = SUPPLY_INFLOW_TYPES.has(normalizedActivityType);
+    const isOutflow = SUPPLY_OUTFLOW_TYPES.has(normalizedActivityType);
     if (!isInflow && !isOutflow) {
       continue;
     }
@@ -113,6 +144,16 @@ export function analyzeMissionSupplyBalance<Id extends string | number>(
     for (const supply of activity.supplies ?? []) {
       const quantity = Math.max(1, Number(supply.quantity) || 1);
       const { itemKey, itemName, unit } = getSupplyIdentity(supply);
+
+      if (
+        normalizedActivityType === "DELIVER_SUPPLIES" &&
+        returnDesignatedKeysByTeam.get(teamId)?.has(itemKey)
+      ) {
+        // Items explicitly planned to be returned are treated as reusable,
+        // so DELIVER does not consume them from balance.
+        continue;
+      }
+
       const balanceKey = `${teamId}:${itemKey}`;
       const previous =
         balanceByKey.get(balanceKey) ??

@@ -207,7 +207,7 @@ function TypeCard({
         {label}
       </div>
       {description && (
-        <div className="line-clamp-1 text-xs text-black/70">{description}</div>
+        <div className="line-clamp-1 text-sm text-black/70">{description}</div>
       )}
     </button>
   );
@@ -281,20 +281,20 @@ function RescuerCard({
 
         <Avatar className="h-8 w-8 border border-background shadow-sm">
           <AvatarImage src={avatarSrc} />
-          <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-xs font-bold">
+          <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-sm font-bold">
             {initials}
           </AvatarFallback>
         </Avatar>
 
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-[13px] truncate flex items-center gap-2">
+          <div className="font-medium text-sm truncate flex items-center gap-2">
             {user.firstName} {user.lastName}
           </div>
-          <div className="text-xs text-muted-foreground flex items-center gap-1.5 truncate mt-0.5">
+          <div className="text-sm text-muted-foreground flex items-center gap-1.5 truncate mt-0.5">
             {user.rescuerType && (
               <Badge
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
-                className="text-xs font-medium h-4 px-1"
+                className="text-sm font-medium h-5 px-1.5"
               >
                 {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
               </Badge>
@@ -308,7 +308,7 @@ function RescuerCard({
             type="button"
             variant={isLeader ? "default" : "outline"}
             size="sm"
-            className={`h-7 shrink-0 gap-1 border-black px-2.5 text-xs shadow-none transition-colors ${isLeader ? "border-transparent bg-[#FF5722] text-white hover:bg-[#e64a19]" : "text-black/70 hover:bg-black/5 hover:text-black"}`}
+            className={`h-7 shrink-0 gap-1 border-black px-2.5 text-sm shadow-none transition-colors ${isLeader ? "border-transparent bg-[#FF5722] text-white hover:bg-[#e64a19]" : "text-black/70 hover:bg-black/5 hover:text-black"}`}
             onClick={(e) => {
               e.stopPropagation();
               onToggleLeader();
@@ -331,7 +331,7 @@ function RescuerCard({
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border border-background shadow-sm">
               <AvatarImage src={avatarSrc} />
-              <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-[12px] font-bold">
+              <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-sm font-bold">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -341,13 +341,13 @@ function RescuerCard({
               </div>
               <Badge
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
-                className="mt-1 h-5 border border-black px-1.5 text-xs font-medium"
+                className="mt-1 h-6 border border-black px-1.5 text-sm font-medium"
               >
                 {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
               </Badge>
             </div>
           </div>
-          <div className="mt-2 space-y-1.5 border-t border-black/40 pt-2 text-xs">
+          <div className="mt-2 space-y-1.5 border-t border-black/40 pt-2 text-sm">
             <div className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">SĐT:</span>
               <span className="font-medium text-foreground">
@@ -378,7 +378,7 @@ function RescuerCard({
                     <Badge
                       key={idx}
                       variant="outline"
-                      className="h-auto border-black bg-white px-1.5 py-0.5 text-xs leading-none"
+                      className="h-auto border-black bg-white px-1.5 py-0.5 text-sm leading-none"
                     >
                       {getAbilityLabelVi(ability)}
                     </Badge>
@@ -495,11 +495,7 @@ function CreateRescueTeamForm({
     }
 
     return filters;
-  }, [
-    rescuerTypeFilter,
-    teamType,
-    debouncedSearchQuery,
-  ]);
+  }, [rescuerTypeFilter, teamType, debouncedSearchQuery]);
 
   const {
     data: usersData,
@@ -627,22 +623,19 @@ function CreateRescueTeamForm({
     ? isLoadingCheckedInRescuers
     : isLoadingFreeRescuers;
 
-  const selectedAssemblyPoint = useMemo(
-    () => {
-      if (
-        lockedAssemblyPoint &&
-        String(lockedAssemblyPoint.id) === assemblyPointId
-      ) {
-        return lockedAssemblyPoint;
-      }
+  const selectedAssemblyPoint = useMemo(() => {
+    if (
+      lockedAssemblyPoint &&
+      String(lockedAssemblyPoint.id) === assemblyPointId
+    ) {
+      return lockedAssemblyPoint;
+    }
 
-      return (
-        assemblyPoints.find((point) => String(point.id) === assemblyPointId) ??
-        null
-      );
-    },
-    [assemblyPoints, assemblyPointId, lockedAssemblyPoint],
-  );
+    return (
+      assemblyPoints.find((point) => String(point.id) === assemblyPointId) ??
+      null
+    );
+  }, [assemblyPoints, assemblyPointId, lockedAssemblyPoint]);
 
   // ─── Member Selection Helpers ───
   const isMemberSelected = (userId: string) =>
@@ -783,7 +776,7 @@ function CreateRescueTeamForm({
             </h1>
             <Badge
               variant="secondary"
-              className="h-5 rounded-none border border-black bg-black px-2 font-normal text-xs text-white"
+              className="h-6 rounded-none border border-black bg-black px-2 font-normal text-sm text-white"
             >
               Thiết lập nhanh
             </Badge>
@@ -793,7 +786,7 @@ function CreateRescueTeamForm({
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 rounded-none border-black text-xs"
+              className="h-8 rounded-none border-black text-sm"
               onClick={() => router.push("/dashboard/coordinator")}
               disabled={isCreating}
             >
@@ -803,7 +796,7 @@ function CreateRescueTeamForm({
               type="submit"
               size="sm"
               disabled={isCreating}
-              className="h-8 gap-1.5 rounded-none bg-[#FF5722] text-xs text-white hover:bg-[#e64a19]"
+              className="h-8 gap-1.5 rounded-none bg-[#FF5722] text-sm text-white hover:bg-[#e64a19]"
               onClick={(e) => {
                 e.preventDefault();
                 const form = document.querySelector("form");
@@ -846,7 +839,7 @@ function CreateRescueTeamForm({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5 col-span-2">
-                    <Label className="text-xs text-muted-foreground">
+                    <Label className="text-sm text-muted-foreground">
                       Tên đội cứu hộ <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -858,7 +851,7 @@ function CreateRescueTeamForm({
                     />
                   </div>
                   <div className="space-y-1.5 col-span-2">
-                    <Label className="text-xs text-muted-foreground">
+                    <Label className="text-sm text-muted-foreground">
                       Số thành viên tối đa
                     </Label>
                     <Input
@@ -881,7 +874,7 @@ function CreateRescueTeamForm({
                         setMaxMembers(String(clamped));
                       }}
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       Hệ thống yêu cầu từ 6 đến 8 thành viên.
                     </p>
                   </div>
@@ -912,7 +905,7 @@ function CreateRescueTeamForm({
                     </SelectTrigger>
                     <SelectContent>
                       {assemblyPoints.length === 0 && (
-                        <div className="px-2 py-2 text-xs text-muted-foreground">
+                        <div className="px-2 py-2 text-sm text-muted-foreground">
                           Không có điểm tập kết đang hoạt động
                         </div>
                       )}
@@ -928,7 +921,7 @@ function CreateRescueTeamForm({
                                     ? "secondary"
                                     : "destructive"
                               }
-                              className="text-xs font-medium h-4 px-1"
+                              className="text-sm font-medium h-5 px-1.5"
                             >
                               {point.status === "Active"
                                 ? "Hoạt động"
@@ -954,7 +947,7 @@ function CreateRescueTeamForm({
                       className="h-3.5 w-3.5 text-[#FF5722]"
                       weight="fill"
                     />
-                    <span className="text-[12px] text-[#c2410c]">
+                    <span className="text-sm text-[#c2410c]">
                       {selectedAssemblyPoint
                         ? `Sức chứa khả dụng: ${selectedAssemblyPoint.maxCapacity} người`
                         : null}
@@ -1016,13 +1009,13 @@ function CreateRescueTeamForm({
                   Thành viên đội{" "}
                   <span className="text-red-500 ml-[-4px]">*</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-2 text-sm">
                   <span className="text-muted-foreground">Đã chọn:</span>
                   <Badge
                     variant={
                       selectedMembers.length > 0 ? "secondary" : "outline"
                     }
-                    className="h-5 border border-black px-2 font-medium"
+                    className="h-6 border border-black px-2 font-medium text-sm"
                   >
                     {selectedMembers.length} / {maxMembers}
                   </Badge>
@@ -1065,7 +1058,7 @@ function CreateRescueTeamForm({
                     className="h-3.5 w-3.5 text-[#FF5722]"
                     weight="fill"
                   />
-                  <p className="text-[12px] text-[#C2410C]">
+                  <p className="text-sm text-[#C2410C]">
                     Đang lọc thành viên theo chuyên môn đội:{" "}
                     <strong>{selectedTeamTypeLabel}</strong>
                   </p>
@@ -1084,7 +1077,7 @@ function CreateRescueTeamForm({
                       <Badge
                         key={member.userId}
                         variant={member.isLeader ? "default" : "secondary"}
-                        className={`text-xs py-0.5 px-2 gap-1.5 ${
+                        className={`text-sm py-0.5 px-2 gap-1.5 ${
                           member.isLeader
                             ? "bg-[#FF5722] hover:bg-[#e64a19] text-white"
                             : ""
@@ -1115,7 +1108,7 @@ function CreateRescueTeamForm({
                       className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5722]"
                       weight="fill"
                     />
-                    <p className="text-[12px] leading-snug text-[#c2410c]">
+                    <p className="text-sm leading-snug text-[#c2410c]">
                       Vui lòng <strong>Chọn làm đội trưởng</strong> cho một
                       thành viên <strong>cốt cán</strong> trong nhóm.
                     </p>
@@ -1162,12 +1155,12 @@ function CreateRescueTeamForm({
                   <div className="bg-background p-4 rounded-full border border-dashed mb-3 shadow-sm">
                     <UserCirclePlus className="h-8 w-8 text-muted-foreground/40" />
                   </div>
-                  <p className="text-[13px] font-medium text-foreground">
+                  <p className="text-sm font-medium text-foreground">
                     {searchQuery
                       ? "Không tìm thấy kết quả"
                       : "Chưa có người cứu hộ phù hợp"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-[250px]">
+                  <p className="text-sm text-muted-foreground mt-1 max-w-[250px]">
                     {searchQuery
                       ? "Liên hệ hoặc tìm kiếm với từ khóa khác."
                       : isBackendAbilityFilterActive

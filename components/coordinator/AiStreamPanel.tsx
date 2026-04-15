@@ -59,6 +59,8 @@ interface AiStreamPanelProps {
   onViewPlan: () => void;
   primaryActionLabel?: string;
   onPrimaryAction?: () => void;
+  hidePlanAction?: boolean;
+  inline?: boolean;
 }
 
 /* ═══ Activity icon map ═══ */
@@ -75,6 +77,9 @@ const activityIconMap: Record<
   ASSESS: Eye,
   COORDINATE: TreeStructure,
   RETURN_SUPPLIES: ArrowsClockwise,
+  RETURN_ASSEMBLY_POINT: MapPin,
+  RETURN_TO_ASSEMBLY_POINT: MapPin,
+  RETURN_ASSEMBLY: MapPin,
   MIXED: Sparkle,
 };
 
@@ -168,6 +173,8 @@ export default function AiStreamPanel({
   onViewPlan,
   primaryActionLabel,
   onPrimaryAction,
+  hidePlanAction = false,
+  inline = false,
 }: AiStreamPanelProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -202,7 +209,54 @@ export default function AiStreamPanel({
   const showActionMap = result !== null;
   const showError = error !== null && !result;
 
-  return (
+  const panelShell = (
+    <div
+      ref={panelRef}
+      className={cn(
+        "relative w-full overflow-hidden flex flex-col bg-background border text-[14px] shadow-2xl",
+        inline ? "rounded-2xl" : "max-w-5xl max-h-[92vh] mx-4 rounded-2xl",
+      )}
+      style={{ opacity: 0 }}
+    >
+      <TopBar
+        clusterId={clusterId}
+        loading={loading}
+        result={result}
+        error={error}
+        phase={phase}
+        onStop={onStop}
+        onClose={onClose}
+        inline={inline}
+      />
+      <div className="relative flex-1 min-h-0 overflow-auto bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_34%),linear-gradient(180deg,_rgba(255,255,255,0.82)_0%,_rgba(255,255,255,0.96)_24%,_rgba(255,255,255,1)_100%)]">
+        {showProgress && (
+          <LoadingStreamView
+            status={status}
+            statusLog={statusLog}
+            thinkingText={thinkingText}
+            phase={phase}
+          />
+        )}
+        {showActionMap && <ActionMapView result={result} />}
+        {showError && <ErrorView error={error} onRetry={onRetry} />}
+      </div>
+      {result && (
+        <FooterBar
+          onRetry={onRetry}
+          onViewPlan={onViewPlan}
+          primaryActionLabel={primaryActionLabel}
+          onPrimaryAction={onPrimaryAction}
+          hidePlanAction={hidePlanAction}
+        />
+      )}
+    </div>
+  );
+
+  return inline ? (
+    <div ref={overlayRef} className="w-full" style={{ opacity: 0 }}>
+      {panelShell}
+    </div>
+  ) : (
     <div
       ref={overlayRef}
       className="absolute inset-0 z-50 flex items-center justify-center"
@@ -212,41 +266,7 @@ export default function AiStreamPanel({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div
-        ref={panelRef}
-        className="relative w-full max-w-5xl max-h-[92vh] mx-4 rounded-2xl overflow-hidden flex flex-col bg-background border text-[14px] shadow-2xl"
-        style={{ opacity: 0 }}
-      >
-        <TopBar
-          clusterId={clusterId}
-          loading={loading}
-          result={result}
-          error={error}
-          phase={phase}
-          onStop={onStop}
-          onClose={onClose}
-        />
-        <div className="relative flex-1 min-h-0 overflow-auto bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_34%),linear-gradient(180deg,_rgba(255,255,255,0.82)_0%,_rgba(255,255,255,0.96)_24%,_rgba(255,255,255,1)_100%)]">
-          {showProgress && (
-            <LoadingStreamView
-              status={status}
-              statusLog={statusLog}
-              thinkingText={thinkingText}
-              phase={phase}
-            />
-          )}
-          {showActionMap && <ActionMapView result={result} />}
-          {showError && <ErrorView error={error} onRetry={onRetry} />}
-        </div>
-        {result && (
-          <FooterBar
-            onRetry={onRetry}
-            onViewPlan={onViewPlan}
-            primaryActionLabel={primaryActionLabel}
-            onPrimaryAction={onPrimaryAction}
-          />
-        )}
-      </div>
+      {panelShell}
     </div>
   );
 }
@@ -261,6 +281,7 @@ function TopBar({
   phase,
   onStop,
   onClose,
+  inline = false,
 }: {
   clusterId: number | null;
   loading: boolean;
@@ -269,6 +290,7 @@ function TopBar({
   phase: string;
   onStop: () => void;
   onClose: () => void;
+  inline?: boolean;
 }) {
   const statusLabel = loading
     ? phaseLabel(phase)
@@ -323,14 +345,16 @@ function TopBar({
             Dừng
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 rounded-md"
-          onClick={onClose}
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        {!inline && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 rounded-md"
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -1078,19 +1102,27 @@ function ActivityFlowNode({
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const lineRef = useRef<SVGSVGElement>(null);
+  const normalizedActivityType = (activity.activityType ?? "")
+    .trim()
+    .toUpperCase();
 
-  const config = activityTypeConfig[activity.activityType] || {
-    label: activity.activityType,
-    color: "text-zinc-400",
-    bgColor: "bg-zinc-800",
-  };
-  const Icon = activityIconMap[activity.activityType] || Sparkle;
+  const config = activityTypeConfig[activity.activityType] ||
+    activityTypeConfig[normalizedActivityType] || {
+      label: normalizedActivityType || activity.activityType,
+      color: "text-zinc-400",
+      bgColor: "bg-zinc-800",
+    };
+  const Icon =
+    activityIconMap[activity.activityType] ||
+    activityIconMap[normalizedActivityType] ||
+    Sparkle;
   const isDepotStep =
-    activity.activityType === "COLLECT_SUPPLIES" || activity.depotName !== null;
+    normalizedActivityType === "COLLECT_SUPPLIES" ||
+    activity.depotName !== null;
   const isSosStep =
-    activity.activityType === "RESCUE" ||
-    activity.activityType === "MEDICAL_AID" ||
-    activity.activityType === "EVACUATE";
+    normalizedActivityType === "RESCUE" ||
+    normalizedActivityType === "MEDICAL_AID" ||
+    normalizedActivityType === "EVACUATE";
 
   useEffect(() => {
     if (!nodeRef.current) return;
@@ -1567,11 +1599,13 @@ function FooterBar({
   onViewPlan,
   primaryActionLabel,
   onPrimaryAction,
+  hidePlanAction,
 }: {
   onRetry: () => void;
   onViewPlan: () => void;
   primaryActionLabel?: string;
   onPrimaryAction?: () => void;
+  hidePlanAction?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1598,25 +1632,27 @@ function FooterBar({
         Phân tích lại
       </Button>
       <div className="flex-1" />
-      {onPrimaryAction ? (
-        <Button
-          size="sm"
-          className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
-          onClick={onPrimaryAction}
-        >
-          <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
-          {primaryActionLabel ?? "Xem & Chỉnh sửa Kế hoạch"}
-        </Button>
-      ) : (
-        <Button
-          size="sm"
-          className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
-          onClick={onViewPlan}
-        >
-          <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
-          Xem & Chỉnh sửa Kế hoạch
-        </Button>
-      )}
+      {!hidePlanAction ? (
+        onPrimaryAction ? (
+          <Button
+            size="sm"
+            className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
+            onClick={onPrimaryAction}
+          >
+            <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
+            {primaryActionLabel ?? "Xem & Chỉnh sửa Kế hoạch"}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
+            onClick={onViewPlan}
+          >
+            <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
+            Xem & Chỉnh sửa Kế hoạch
+          </Button>
+        )
+      ) : null}
     </div>
   );
 }

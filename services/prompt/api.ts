@@ -12,6 +12,8 @@ import {
   CreatePromptResponse,
   UpdatePromptRequest,
   PreviewPromptRescueSuggestionRequest,
+  TestPromptRescueSuggestionRequest,
+  TestPromptRescueSuggestionResponse,
 } from "./type";
 
 /**
@@ -70,6 +72,20 @@ export async function deletePrompt(id: number): Promise<void> {
 }
 
 /**
+ * Test a saved prompt with a SOS cluster
+ * POST /system/prompts/{id}/test
+ */
+export async function testPromptRescueSuggestion(
+  id: number,
+  request: TestPromptRescueSuggestionRequest,
+): Promise<TestPromptRescueSuggestionResponse> {
+  const { data } = await api.post(`/system/prompts/${id}/test`, request, {
+    timeout: 120000,
+  });
+  return data;
+}
+
+/**
  * Stream rescue suggestion preview for an unsaved prompt draft
  * POST /system/prompts/preview-rescue-suggestion/stream
  */
@@ -105,7 +121,9 @@ export function streamPromptRescueSuggestionPreview(
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => "");
-        callbacks.onError(errorBody || response.statusText || "Preview thất bại.");
+        callbacks.onError(
+          errorBody || response.statusText || "Preview thất bại.",
+        );
         return;
       }
 

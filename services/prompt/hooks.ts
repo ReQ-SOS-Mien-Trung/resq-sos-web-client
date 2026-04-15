@@ -6,6 +6,7 @@ import {
   createPrompt,
   updatePrompt,
   deletePrompt,
+  testPromptRescueSuggestion,
   streamPromptRescueSuggestionPreview,
 } from "./api";
 import {
@@ -16,6 +17,8 @@ import {
   CreatePromptResponse,
   UpdatePromptRequest,
   PreviewPromptRescueSuggestionRequest,
+  TestPromptRescueSuggestionRequest,
+  TestPromptRescueSuggestionResponse,
 } from "./type";
 import { AxiosError } from "axios";
 import type { ClusterRescueSuggestionResponse } from "@/services/sos_cluster/type";
@@ -106,6 +109,19 @@ export function useDeletePrompt() {
   });
 }
 
+/**
+ * Hook to test a saved prompt with SOS cluster data
+ */
+export function useTestPromptRescueSuggestion() {
+  return useMutation<
+    TestPromptRescueSuggestionResponse,
+    AxiosError<{ message: string }>,
+    { id: number; data: TestPromptRescueSuggestionRequest }
+  >({
+    mutationFn: ({ id, data }) => testPromptRescueSuggestion(id, data),
+  });
+}
+
 export interface PromptPreviewLogEntry {
   id: number;
   timestamp: number;
@@ -164,10 +180,7 @@ export function usePromptRescuePreviewStream() {
   const logIdRef = useRef(0);
 
   const addLog = useCallback(
-    (
-      message: string,
-      type: PromptPreviewLogEntry["type"] = "status",
-    ) => {
+    (message: string, type: PromptPreviewLogEntry["type"] = "status") => {
       const nextLog: PromptPreviewLogEntry = {
         id: ++logIdRef.current,
         timestamp: Date.now(),

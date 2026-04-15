@@ -68,6 +68,7 @@ export interface MissionActivity {
   activityCode: string;
   activityType: string;
   description: string;
+  imageUrl?: string | null;
   priority: string | null;
   estimatedTime: number | null;
   sosRequestId: number | null;
@@ -172,6 +173,7 @@ export interface UpdateMissionActivityRequest {
   step: number;
   description: string;
   target: string;
+  assemblyPointId?: number | null;
   targetLatitude: number;
   targetLongitude: number;
   items: UpdateMissionActivityItemRequest[];

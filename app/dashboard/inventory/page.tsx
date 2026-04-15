@@ -583,17 +583,33 @@ const InventoryDashboardPage = () => {
               ResQ-SOS | Quản Lý Kho
             </span>
           </div>
-          <Badge
-            variant={currentDepot ? "success" : "destructive"}
-            className="hidden sm:flex items-center gap-1"
+          <div
+            className={cn(
+              "relative hidden h-9 w-9 items-center justify-center rounded-full border sm:flex",
+              currentDepot
+                ? "border-green-200 bg-green-100 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-400"
+                : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
+            )}
+            title={currentDepot ? "Đang kết nối" : "Mất kết nối"}
+            aria-label={currentDepot ? "Đang kết nối" : "Mất kết nối"}
           >
             {currentDepot ? (
-              <WifiHigh className="h-3 w-3" weight="bold" />
+              <>
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-green-500 opacity-75 animate-ping" />
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-green-500 dark:border-zinc-900/70" />
+              </>
             ) : (
-              <WifiSlash className="h-3 w-3" weight="bold" />
+              <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-red-500 dark:border-zinc-900/70" />
             )}
-            {currentDepot ? "Đang kết nối" : "Mất kết nối"}
-          </Badge>
+            {currentDepot ? (
+              <WifiHigh className="h-4 w-4" weight="bold" />
+            ) : (
+              <WifiSlash className="h-4 w-4" weight="bold" />
+            )}
+            <span className="sr-only">
+              {currentDepot ? "Đang kết nối" : "Mất kết nối"}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">

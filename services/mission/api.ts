@@ -332,6 +332,7 @@ function normalizeUpdateMissionRequest(
         step: toNumberOrZero(activity?.step) || index + 1,
         description: String(activity?.description ?? "").trim(),
         target: String(activity?.target ?? "").trim(),
+        assemblyPointId: toNumberOrNull(activity?.assemblyPointId),
         targetLatitude: toNumberOrZero(activity?.targetLatitude),
         targetLongitude: toNumberOrZero(activity?.targetLongitude),
         items: Array.isArray(activity?.items)
