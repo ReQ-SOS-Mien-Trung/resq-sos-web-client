@@ -51,23 +51,6 @@ import { Icon as IconifyIcon } from "@iconify/react";
 import { PROMPT_TYPE_LABELS } from "@/services/prompt/constants";
 import type { PromptType } from "@/services/prompt/type";
 
-function MaintenanceTriangleIcon({
-  className,
-  size = 20,
-}: {
-  className?: string;
-  size?: number | string;
-}) {
-  return (
-    <IconifyIcon
-      icon="ix:maintenance-triangle-filled"
-      width={size}
-      height={size}
-      className={className}
-    />
-  );
-}
-
 export const navLinks = [
   { href: "#features", label: "Tính năng" },
   { href: "#demo", label: "Demo" },
@@ -803,19 +786,12 @@ export const assemblyPointStatusConfig = {
     bgColor: "bg-green-50 dark:bg-green-950/30",
     icon: CheckCircle,
   },
-  Overloaded: {
-    label: "Quá tải",
+  Unavailable: {
+    label: "Không khả dụng",
     color: "bg-orange-500",
     textColor: "text-orange-700 dark:text-orange-400",
     bgColor: "bg-orange-50 dark:bg-orange-950/30",
     icon: WarningCircle,
-  },
-  UnderMaintenance: {
-    label: "Đang bảo trì",
-    color: "bg-violet-500",
-    textColor: "text-violet-700 dark:text-violet-400",
-    bgColor: "bg-violet-50 dark:bg-violet-950/30",
-    icon: MaintenanceTriangleIcon,
   },
   Closed: {
     label: "Đã đóng",

@@ -177,6 +177,7 @@ type SidebarDepotEntry = {
 type AssemblyPointOptionEntry = {
   id: number;
   name: string;
+  status: string | null;
   latitude: number | null;
   longitude: number | null;
 };
@@ -6785,6 +6786,7 @@ const RescuePlanPanel = ({
       byId.set(point.id, {
         id: point.id,
         name: pointName,
+        status: typeof point.status === "string" ? point.status : null,
         latitude: Number.isFinite(point.latitude) ? point.latitude : null,
         longitude: Number.isFinite(point.longitude) ? point.longitude : null,
       });
@@ -6808,6 +6810,7 @@ const RescuePlanPanel = ({
       byId.set(parsedId, {
         id: parsedId,
         name: optionName,
+        status: null,
         latitude: null,
         longitude: null,
       });
@@ -9395,6 +9398,28 @@ const RescuePlanPanel = ({
                                           assemblyPointOptionById.has(
                                             parsedAssemblyPointId,
                                           );
+                                        const selectedAssemblyPointOption =
+                                          hasValidAssemblyPointId
+                                            ? assemblyPointOptionById.get(
+                                                parsedAssemblyPointId,
+                                              )
+                                            : undefined;
+                                        const selectedAssemblyPointStatus =
+                                          selectedAssemblyPointOption?.status ??
+                                          null;
+                                        const selectedAssemblyPointStatusLabel =
+                                          selectedAssemblyPointStatus ===
+                                          "Unavailable"
+                                            ? "Không khả dụng"
+                                            : selectedAssemblyPointStatus ===
+                                                "Closed"
+                                              ? "Đã đóng"
+                                              : selectedAssemblyPointStatus;
+                                        const isSelectedAssemblyPointRestricted =
+                                          selectedAssemblyPointStatus ===
+                                            "Unavailable" ||
+                                          selectedAssemblyPointStatus ===
+                                            "Closed";
                                         const selectedAssemblyPointLabel =
                                           hasValidAssemblyPointId
                                             ? (assemblyPointOptionById.get(
@@ -9805,6 +9830,19 @@ const RescuePlanPanel = ({
                                                       activity.assemblyPointLatitude,
                                                       activity.assemblyPointLongitude,
                                                     )}
+                                                  </p>
+                                                ) : null}
+                                                {isSelectedAssemblyPointRestricted ? (
+                                                  <p className="rounded-md border border-red-300 bg-red-50 px-2.5 py-2 text-sm leading-relaxed text-red-700 dark:border-red-800/60 dark:bg-red-950/20 dark:text-red-300">
+                                                    Cảnh báo: Điểm tập kết đang
+                                                    ở trạng thái{" "}
+                                                    {
+                                                      selectedAssemblyPointStatusLabel
+                                                    }
+                                                    . Điều phối viên nên chọn
+                                                    điểm tập kết khác hoặc điều
+                                                    chỉnh đội quay về để đảm bảo
+                                                    an toàn.
                                                   </p>
                                                 ) : null}
                                                 {isPendingReturnAssemblyPointActivity ? (

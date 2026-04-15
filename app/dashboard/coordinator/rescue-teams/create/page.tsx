@@ -455,9 +455,7 @@ function CreateRescueTeamForm({
 
   const assemblyPoints = useMemo(() => {
     const allPoints = pointsData?.pages.flatMap((page) => page.items) || [];
-    const activePoints = allPoints.filter(
-      (point) => point.status === "Active" || point.status === "Overloaded",
-    );
+    const activePoints = allPoints.filter((point) => point.status === "Active");
 
     if (
       lockedAssemblyPoint &&
@@ -917,7 +915,7 @@ function CreateRescueTeamForm({
                               variant={
                                 point.status === "Active"
                                   ? "default"
-                                  : point.status === "Overloaded"
+                                  : point.status === "Created"
                                     ? "secondary"
                                     : "destructive"
                               }
@@ -925,9 +923,11 @@ function CreateRescueTeamForm({
                             >
                               {point.status === "Active"
                                 ? "Hoạt động"
-                                : point.status === "Overloaded"
-                                  ? "Quá tải"
-                                  : "Đóng"}
+                                : point.status === "Created"
+                                  ? "Mới tạo"
+                                  : point.status === "Unavailable"
+                                    ? "Không khả dụng"
+                                    : "Đóng"}
                             </Badge>
                           </div>
                         </SelectItem>

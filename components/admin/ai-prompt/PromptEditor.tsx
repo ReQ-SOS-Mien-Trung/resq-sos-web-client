@@ -18,7 +18,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle,
-  ClipboardText,
+  TestTubeIcon,
   FloppyDisk,
   X,
   CircleNotch,
@@ -398,6 +398,7 @@ const PromptEditor = ({
   isSubmitting,
   onSave,
   onCancel,
+  hideHeaderClose = false,
 }: PromptEditorProps) => {
   const isEditing = Boolean(prompt);
 
@@ -423,7 +424,6 @@ const PromptEditor = ({
   const [previewClusterId, setPreviewClusterId] = useState<number | null>(null);
   const [reviewMode, setReviewMode] =
     useState<PromptReviewMode>("draft-stream");
-  const [isPreviewPanelOpen, setIsPreviewPanelOpen] = useState(false);
   const [savedTestStatus, setSavedTestStatus] = useState("");
   const [savedTestStatusLog, setSavedTestStatusLog] = useState<
     Array<{
@@ -580,7 +580,6 @@ const PromptEditor = ({
     resetPreview();
     resetSavedPromptTest();
     setReviewMode("draft-stream");
-    setIsPreviewPanelOpen(false);
   }, [
     formData.provider,
     formData.model,
@@ -694,8 +693,7 @@ const PromptEditor = ({
     reviewMode === "saved-test" ? savedTestLoading : previewLoading;
   const activeReviewPhase =
     reviewMode === "saved-test" ? savedTestPhase : previewPhase;
-  const shouldShowInlineReview = Boolean(
-    isPreviewPanelOpen ||
+  const hasReviewArtifact = Boolean(
     activeReviewLoading ||
     activeReviewResult ||
     activeReviewError ||
@@ -764,7 +762,6 @@ const PromptEditor = ({
     const startMessage = `Đang test prompt đã lưu #${prompt.id} với cụm SOS #${previewClusterId}...`;
     setSavedTestStatus(startMessage);
     addSavedTestLog(startMessage, "status");
-    setIsPreviewPanelOpen(true);
 
     try {
       const response = await testSavedPromptMutation.mutateAsync({
@@ -837,7 +834,6 @@ const PromptEditor = ({
     resetSavedPromptTest();
     setReviewMode("draft-stream");
     startPreview(request);
-    setIsPreviewPanelOpen(true);
   }, [
     supportsMissionPreview,
     previewClusterId,
@@ -849,8 +845,6 @@ const PromptEditor = ({
   ]);
 
   const handleStopReview = useCallback(() => {
-    setIsPreviewPanelOpen(false);
-
     if (reviewMode === "saved-test") {
       savedTestRunIdRef.current += 1;
       resetSavedPromptTest();
@@ -932,7 +926,7 @@ const PromptEditor = ({
             {activeReviewLoading ? (
               <CircleNotch size={14} className="mr-1.5 animate-spin" />
             ) : (
-              <ClipboardText size={14} className="mr-1.5" />
+              <TestTubeIcon size={14} className="mr-1.5" />
             )}
             {activeReviewLoading ? "Đang test..." : "Test"}
           </Button>
@@ -1006,12 +1000,13 @@ const PromptEditor = ({
                   Lỗi test: {activeReviewError}
                 </p>
               ) : null}
+
             </div>
 
             <AiStreamPanel
-              open={shouldShowInlineReview}
+              open={hasReviewArtifact}
               inline
-              onClose={() => setIsPreviewPanelOpen(false)}
+              onClose={handleStopReview}
               clusterId={previewClusterId}
               status={activeReviewStatus}
               statusLog={activeReviewStatusLog}
@@ -1022,7 +1017,7 @@ const PromptEditor = ({
               phase={activeReviewPhase}
               onStop={handleStopReview}
               onRetry={handleRunPreview}
-              onViewPlan={() => setIsPreviewPanelOpen(false)}
+              onViewPlan={handleStopReview}
               hidePlanAction
             />
           </>
@@ -1175,14 +1170,16 @@ const PromptEditor = ({
               <Gear size={20} weight="duotone" />
               {isEditing ? "Chỉnh sửa Prompt" : "Tạo Prompt mới"}
             </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={onCancel}
-            >
-              <X size={16} />
-            </Button>
+            {!hideHeaderClose ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={onCancel}
+              >
+                <X size={16} />
+              </Button>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent>
@@ -1792,6 +1789,7 @@ const PromptEditor = ({
           </form>
         </CardContent>
       </Card>
+
     </>
   );
 };
