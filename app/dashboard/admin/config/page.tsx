@@ -79,22 +79,31 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import {
+  useRescueTeamRadiusConfig,
   useActivateSosPriorityRuleConfig,
   useCreateSosPriorityRuleConfigDraft,
   useDeleteSosPriorityRuleConfigDraft,
   useRescuerScoreVisibilityConfig,
+  useSosClusterGroupingConfig,
   useSosPriorityRuleConfig,
   useSosPriorityRuleConfigById,
   useSosPriorityRuleConfigVersions,
+  useUpdateRescueTeamRadiusConfig,
   useUpdateRescuerScoreVisibilityConfig,
+  useUpdateSosClusterGroupingConfig,
   useUpdateSosPriorityRuleConfigDraft,
   useValidateSosPriorityRuleConfig,
 } from "@/services/config";
 import type {
+  RescuerScoreVisibilityConfigEntity,
+  RescueTeamRadiusConfigEntity,
   SosExpressionNode,
+  SosClusterGroupingConfigEntity,
   SosPriorityRuleConfigDocument,
   SosPriorityRuleConfigEntity,
+  UpdateRescueTeamRadiusConfigRequest,
   UpdateRescuerScoreVisibilityConfigRequest,
+  UpdateSosClusterGroupingConfigRequest,
 } from "@/services/config/type";
 
 type AdminDashboardData = Awaited<ReturnType<typeof getDashboardData>>;
@@ -2549,71 +2558,330 @@ function FormulaCanvas({
   );
 }
 
-function RescuerScoreVisibilityConfigCard() {
-  const { data, isLoading, isFetching, refetch } =
-    useRescuerScoreVisibilityConfig();
-  const updateMutation = useUpdateRescuerScoreVisibilityConfig();
+type SystemConfigCardTone = {
+  border: string;
+  card: string;
+  chip: string;
+  chipActive: string;
+};
 
-  const [draft, setDraft] = useState<string | null>(null);
-  const currentValue = draft ?? String(data?.minimumEvaluationCount ?? 0);
+const SYSTEM_CONFIG_CARD_TONES: Record<
+  "rescuer" | "cluster" | "radius",
+  SystemConfigCardTone
+> = {
+  rescuer: {
+    border: "border-l-violet-400",
+    card: "bg-[radial-gradient(circle_at_top_left,rgba(167,139,250,0.18),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,245,255,0.92))]",
+    chip: "border-violet-200 bg-violet-50/80 text-violet-700 hover:bg-violet-100",
+    chipActive:
+      "border-violet-500 bg-violet-500 text-white hover:bg-violet-500",
+  },
+  cluster: {
+    border: "border-l-amber-400",
+    card: "bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(255,249,235,0.94))]",
+    chip: "border-amber-200 bg-amber-50/85 text-amber-700 hover:bg-amber-100",
+    chipActive:
+      "border-amber-500 bg-amber-500 text-white hover:bg-amber-500",
+  },
+  radius: {
+    border: "border-l-sky-400",
+    card: "bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(240,249,255,0.94))]",
+    chip: "border-sky-200 bg-sky-50/85 text-sky-700 hover:bg-sky-100",
+    chipActive:
+      "border-sky-500 bg-sky-500 text-white hover:bg-sky-500",
+  },
+};
 
-  const parsedValue = Number(currentValue);
-  const isInvalid =
-    !Number.isFinite(parsedValue) ||
-    !Number.isInteger(parsedValue) ||
-    parsedValue < 0;
+function formatSystemConfigUpdatedAt(
+  entity:
+    | RescuerScoreVisibilityConfigEntity
+    | SosClusterGroupingConfigEntity
+    | RescueTeamRadiusConfigEntity
+    | undefined,
+) {
+  if (!entity?.updatedAt) {
+    return "—";
+  }
 
-  const handleSave = () => {
-    if (isInvalid) {
-      toast.error("Ngưỡng phải là số nguyên không âm");
+  return new Date(entity.updatedAt).toLocaleString("vi-VN");
+}
+
+function formatQuickPresetValue(value: number, unit?: string) {
+  const label = Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return unit ? `${label}${unit}` : label;
+}
+
+function SystemParameterCard({
+  tone,
+  eyebrow,
+  title,
+  description,
+  unitSuffix,
+  value,
+  onValueChange,
+  suggestions,
+  isActiveSuggestion,
+  onSuggestionSelect,
+  updatedAtLabel,
+  invalidMessage,
+  helper,
+  footer,
+  disabled,
+}: {
+  tone: SystemConfigCardTone;
+  eyebrow: string;
+  title: string;
+  description: string;
+  unitSuffix?: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  suggestions: number[];
+  isActiveSuggestion: (value: number) => boolean;
+  onSuggestionSelect: (value: number) => void;
+  updatedAtLabel: string;
+  invalidMessage?: string | null;
+  helper?: ReactNode;
+  footer?: ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <Card
+      className={cn(
+        "border-l-4 border-border/60 shadow-sm",
+        tone.border,
+        tone.card,
+      )}
+    >
+      <CardHeader className="space-y-2">
+        <div className="space-y-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            {eyebrow}
+          </p>
+          <CardTitle className="text-lg tracking-tight">{title}</CardTitle>
+          <CardDescription className="text-sm tracking-tight text-muted-foreground">
+            {description}
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm tracking-tighter text-muted-foreground">
+            Giá trị hiện hành
+          </Label>
+          <div className="flex items-center gap-3">
+            <Input
+              type="number"
+              min={0}
+              step={unitSuffix === " km" ? 0.5 : 1}
+              value={value}
+              onChange={(event) => onValueChange(event.target.value)}
+              disabled={disabled}
+              className="h-10 max-w-44 bg-background/85"
+            />
+            {unitSuffix ? (
+              <span className="text-sm font-medium tracking-tight text-muted-foreground">
+                {unitSuffix.trim()}
+              </span>
+            ) : null}
+          </div>
+          {invalidMessage ? (
+            <p className="text-xs tracking-tight text-red-500">
+              {invalidMessage}
+            </p>
+          ) : null}
+          <p className="text-xs tracking-tight text-muted-foreground">
+            Cập nhật: {updatedAtLabel}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Chọn nhanh
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {suggestions.map((suggestion) => {
+              const isActive = isActiveSuggestion(suggestion);
+              return (
+                <Button
+                  key={`${title}-${suggestion}`}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "h-8 rounded-full px-3 text-xs font-semibold tracking-tight",
+                    isActive ? tone.chipActive : tone.chip,
+                  )}
+                  onClick={() => onSuggestionSelect(suggestion)}
+                  disabled={disabled}
+                >
+                  {formatQuickPresetValue(suggestion, unitSuffix)}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+
+        {helper}
+        {footer}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SystemParameterConfigCard() {
+  const rescuerQuery = useRescuerScoreVisibilityConfig();
+  const clusterQuery = useSosClusterGroupingConfig();
+  const radiusQuery = useRescueTeamRadiusConfig();
+
+  const rescuerMutation = useUpdateRescuerScoreVisibilityConfig();
+  const clusterMutation = useUpdateSosClusterGroupingConfig();
+  const radiusMutation = useUpdateRescueTeamRadiusConfig();
+
+  const [rescuerDraft, setRescuerDraft] = useState<string | null>(null);
+  const [clusterDraft, setClusterDraft] = useState<string | null>(null);
+  const [radiusDraft, setRadiusDraft] = useState<string | null>(null);
+
+  const rescuerBaseValue = rescuerQuery.data?.minimumEvaluationCount ?? 0;
+  const clusterBaseValue = clusterQuery.data?.maximumDistanceKm ?? 0;
+  const radiusBaseValue = radiusQuery.data?.maxRadiusKm ?? 10;
+
+  const rescuerValue = rescuerDraft ?? String(rescuerBaseValue);
+  const clusterValue = clusterDraft ?? String(clusterBaseValue);
+  const radiusValue = radiusDraft ?? String(radiusBaseValue);
+
+  const parsedRescuerValue = Number(rescuerValue);
+  const parsedClusterValue = Number(clusterValue);
+  const parsedRadiusValue = Number(radiusValue);
+
+  const rescuerInvalid =
+    !Number.isFinite(parsedRescuerValue) ||
+    !Number.isInteger(parsedRescuerValue) ||
+    parsedRescuerValue < 0;
+  const clusterInvalid =
+    !Number.isFinite(parsedClusterValue) || parsedClusterValue <= 0;
+  const radiusInvalid =
+    !Number.isFinite(parsedRadiusValue) || parsedRadiusValue <= 0;
+
+  const isBusy =
+    rescuerQuery.isLoading ||
+    rescuerQuery.isFetching ||
+    clusterQuery.isLoading ||
+    clusterQuery.isFetching ||
+    radiusQuery.isLoading ||
+    radiusQuery.isFetching ||
+    rescuerMutation.isPending ||
+    clusterMutation.isPending ||
+    radiusMutation.isPending;
+
+  const handleRefresh = async () => {
+    setRescuerDraft(null);
+    setClusterDraft(null);
+    setRadiusDraft(null);
+    await Promise.all([
+      rescuerQuery.refetch(),
+      clusterQuery.refetch(),
+      radiusQuery.refetch(),
+    ]);
+  };
+
+  const handleSave = async () => {
+    if (rescuerInvalid) {
+      toast.error("Ngưỡng điểm cứu hộ viên phải là số nguyên không âm.");
+      return;
+    }
+    if (clusterInvalid) {
+      toast.error("Khoảng cách gom SOS phải là số dương hợp lệ.");
+      return;
+    }
+    if (radiusInvalid) {
+      toast.error("Bán kính tìm kiếm đội cứu hộ phải là số dương hợp lệ.");
       return;
     }
 
-    const payload: UpdateRescuerScoreVisibilityConfigRequest = {
-      minimumEvaluationCount: parsedValue,
-    };
+    const requests: Array<Promise<unknown>> = [];
 
-    const toastId = toast.loading("Đang cập nhật ngưỡng hiển thị...");
-    updateMutation.mutate(payload, {
-      onSuccess: async () => {
-        toast.dismiss(toastId);
-        toast.success("Cập nhật ngưỡng hiển thị thành công");
-        setDraft(null);
-        await refetch();
-      },
-      onError: () => {
-        toast.dismiss(toastId);
-        toast.error("Không thể cập nhật ngưỡng hiển thị");
-      },
-    });
+    if (parsedRescuerValue !== rescuerBaseValue) {
+      const payload: UpdateRescuerScoreVisibilityConfigRequest = {
+        minimumEvaluationCount: parsedRescuerValue,
+      };
+      requests.push(rescuerMutation.mutateAsync(payload));
+    }
+
+    if (parsedClusterValue !== clusterBaseValue) {
+      const payload: UpdateSosClusterGroupingConfigRequest = {
+        maximumDistanceKm: parsedClusterValue,
+      };
+      requests.push(clusterMutation.mutateAsync(payload));
+    }
+
+    if (parsedRadiusValue !== radiusBaseValue) {
+      const payload: UpdateRescueTeamRadiusConfigRequest = {
+        maxRadiusKm: parsedRadiusValue,
+      };
+      requests.push(radiusMutation.mutateAsync(payload));
+    }
+
+    if (requests.length === 0) {
+      toast.info("Chưa có thay đổi để lưu.");
+      return;
+    }
+
+    const toastId = toast.loading("Đang cập nhật cấu hình thông số hệ thống...");
+
+    try {
+      await Promise.all(requests);
+      toast.dismiss(toastId);
+      toast.success("Đã cập nhật cấu hình thông số hệ thống");
+      setRescuerDraft(null);
+      setClusterDraft(null);
+      setRadiusDraft(null);
+      await Promise.all([
+        rescuerQuery.refetch(),
+        clusterQuery.refetch(),
+        radiusQuery.refetch(),
+      ]);
+    } catch {
+      toast.dismiss(toastId);
+      toast.error("Không thể cập nhật đầy đủ cấu hình hệ thống.");
+    }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm tracking-tighter text-muted-foreground">
-          Thiết lập ngưỡng hiển thị điểm cứu hộ viên.
-        </p>
+        <div>
+          <p className="text-sm tracking-tighter text-muted-foreground">
+            Thiết lập các thông số nền cho gom cụm SOS, bán kính tìm đội cứu hộ
+            và hiển thị điểm đánh giá.
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
-              setDraft(null);
-              refetch();
+              void handleRefresh();
             }}
-            disabled={isLoading || isFetching || updateMutation.isPending}
+            disabled={isBusy}
           >
             <ArrowCounterClockwise
               size={14}
-              className={cn("mr-1.5", isFetching && "animate-spin")}
+              className={cn(
+                "mr-1.5",
+                (rescuerQuery.isFetching ||
+                  clusterQuery.isFetching ||
+                  radiusQuery.isFetching) &&
+                  "animate-spin",
+              )}
             />
             Làm mới
           </Button>
           <Button
             size="sm"
-            onClick={handleSave}
-            disabled={isLoading || isInvalid || updateMutation.isPending}
+            onClick={() => {
+              void handleSave();
+            }}
+            disabled={isBusy || rescuerInvalid || clusterInvalid || radiusInvalid}
           >
             <FloppyDisk size={14} className="mr-1.5" />
             Lưu cấu hình
@@ -2621,45 +2889,86 @@ function RescuerScoreVisibilityConfigCard() {
         </div>
       </div>
 
-      <Card className="max-w-xl border-l-4 border-l-violet-400 border-border/60">
-        <CardHeader>
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <CardTitle className="text-base tracking-tighter">
-              Ngưỡng hiển thị điểm
-            </CardTitle>
-            <CardDescription className="text-base tracking-tighter">
-              (Chỉ hiển thị điểm khi số lượt đánh giá đạt ngưỡng)
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-2">
-            <Label className="mb-1.5 block text-sm tracking-tighter text-muted-foreground">
-              Số lượt đánh giá tối thiểu
-            </Label>
-            <Input
-              type="number"
-              min={0}
-              step={1}
-              value={currentValue}
-              onChange={(event) => setDraft(event.target.value)}
-              disabled={isLoading || updateMutation.isPending}
-              className="h-9 max-w-65"
-            />
-            {isInvalid && (
-              <p className="mt-1 text-xs tracking-tighter text-red-500">
-                Giá trị không hợp lệ. Vui lòng nhập số nguyên không âm.
-              </p>
-            )}
-            <p className="text-xs tracking-tighter text-muted-foreground">
-              Cập nhật:{" "}
-              {data?.updatedAt
-                ? new Date(data.updatedAt).toLocaleString("vi-VN")
-                : "—"}
+      <div className="grid gap-4 xl:grid-cols-3">
+        <SystemParameterCard
+          tone={SYSTEM_CONFIG_CARD_TONES.rescuer}
+          eyebrow="Rescuer score visibility"
+          title="Ngưỡng hiển thị điểm cứu hộ viên"
+          description="Chỉ hiển thị điểm khi số lượt đánh giá của cứu hộ viên đạt đến ngưỡng này."
+          value={rescuerValue}
+          onValueChange={setRescuerDraft}
+          suggestions={[0, 3, 5, 10]}
+          isActiveSuggestion={(value) => parsedRescuerValue === value}
+          onSuggestionSelect={(value) => setRescuerDraft(String(value))}
+          updatedAtLabel={formatSystemConfigUpdatedAt(rescuerQuery.data)}
+          invalidMessage={
+            rescuerInvalid
+              ? "Vui lòng nhập số nguyên không âm."
+              : null
+          }
+          disabled={isBusy}
+          footer={
+            <p className="text-xs tracking-tight text-muted-foreground">
+              Dùng cho màn hiển thị điểm tổng hợp của cứu hộ viên trên hệ
+              thống.
             </p>
-          </div>
-        </CardContent>
-      </Card>
+          }
+        />
+
+        <SystemParameterCard
+          tone={SYSTEM_CONFIG_CARD_TONES.cluster}
+          eyebrow="SOS cluster grouping"
+          title="Khoảng cách gom SOS vào cùng cluster"
+          description="Khoảng cách tối đa để nhiều SOS request được gom vào cùng một SOS cluster."
+          unitSuffix=" km"
+          value={clusterValue}
+          onValueChange={setClusterDraft}
+          suggestions={[0.5, 1, 2, 3, 5]}
+          isActiveSuggestion={(value) => parsedClusterValue === value}
+          onSuggestionSelect={(value) => setClusterDraft(String(value))}
+          updatedAtLabel={formatSystemConfigUpdatedAt(clusterQuery.data)}
+          invalidMessage={
+            clusterInvalid ? "Vui lòng nhập số dương lớn hơn 0." : null
+          }
+          disabled={isBusy}
+          helper={
+            <div className="rounded-2xl border border-amber-200/70 bg-white/70 px-3 py-2 text-xs tracking-tight text-amber-800">
+              Gợi ý: 1km phù hợp khu dân cư dày, 3-5km phù hợp vùng trải rộng
+              hoặc nhiều xã lân cận.
+            </div>
+          }
+        />
+
+        <SystemParameterCard
+          tone={SYSTEM_CONFIG_CARD_TONES.radius}
+          eyebrow="Rescue team search radius"
+          title="Bán kính tìm kiếm đội cứu hộ theo cluster"
+          description="Bán kính hệ thống dùng để tìm các đội cứu hộ quanh SOS cluster khi lập phương án."
+          unitSuffix=" km"
+          value={radiusValue}
+          onValueChange={setRadiusDraft}
+          suggestions={[5, 10, 15, 20]}
+          isActiveSuggestion={(value) => parsedRadiusValue === value}
+          onSuggestionSelect={(value) => setRadiusDraft(String(value))}
+          updatedAtLabel={formatSystemConfigUpdatedAt(radiusQuery.data)}
+          invalidMessage={
+            radiusInvalid ? "Vui lòng nhập số dương lớn hơn 0." : null
+          }
+          disabled={isBusy}
+          helper={
+            radiusQuery.data?.isDefaultValue ? (
+              <div className="rounded-2xl border border-sky-200/70 bg-white/70 px-3 py-2 text-xs tracking-tight text-sky-800">
+                Chưa có record trong database, hệ thống đang dùng mặc định 10km.
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-sky-200/70 bg-white/70 px-3 py-2 text-xs tracking-tight text-sky-800">
+                Thông số này ảnh hưởng trực tiếp đến danh sách đội cứu hộ được
+                gợi ý quanh cluster.
+              </div>
+            )
+          }
+        />
+      </div>
     </div>
   );
 }
@@ -3187,7 +3496,7 @@ const AdminConfigPage = () => {
               className="flex items-center gap-1.5 rounded-none border-b-2 border-transparent px-4 py-2.5 text-sm font-medium tracking-tight data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               <Info size={14} className="text-violet-500" />
-              Ngưỡng điểm cứu hộ viên
+              Cấu hình thông số hệ thống
             </TabsTrigger>
           </TabsList>
 
@@ -4933,7 +5242,7 @@ const AdminConfigPage = () => {
             value="rescuer-score-visibility"
             className="mt-5 space-y-4"
           >
-            <RescuerScoreVisibilityConfigCard />
+            <SystemParameterConfigCard />
           </TabsContent>
         </Tabs>
         <Dialog

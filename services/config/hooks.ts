@@ -4,20 +4,28 @@ import {
   activateSosPriorityRuleConfig,
   createSosPriorityRuleConfigDraft,
   deleteSosPriorityRuleConfigDraft,
+  getRescueTeamRadiusConfig,
   getRescuerScoreVisibilityConfig,
+  getSosClusterGroupingConfig,
   getSosPriorityRuleConfig,
   getSosPriorityRuleConfigById,
   getSosPriorityRuleConfigVersions,
+  updateRescueTeamRadiusConfig,
   updateRescuerScoreVisibilityConfig,
+  updateSosClusterGroupingConfig,
   updateSosPriorityRuleConfigDraft,
   validateSosPriorityRuleConfig,
 } from "./api";
 import {
   RescuerScoreVisibilityConfigEntity,
+  RescueTeamRadiusConfigEntity,
+  SosClusterGroupingConfigEntity,
   SosPriorityRuleConfigEntity,
   SosPriorityRuleConfigValidationResponse,
   SosPriorityRuleConfigVersionSummary,
+  UpdateRescueTeamRadiusConfigRequest,
   UpdateRescuerScoreVisibilityConfigRequest,
+  UpdateSosClusterGroupingConfigRequest,
   UpdateSosPriorityRuleConfigRequest,
   ValidateSosPriorityRuleConfigRequest,
 } from "./type";
@@ -32,6 +40,14 @@ export const SOS_PRIORITY_RULE_CONFIG_VERSIONS_QUERY_KEY = [
 
 export const RESCUER_SCORE_VISIBILITY_CONFIG_QUERY_KEY = [
   "rescuer-score-visibility-config",
+] as const;
+
+export const SOS_CLUSTER_GROUPING_CONFIG_QUERY_KEY = [
+  "sos-cluster-grouping-config",
+] as const;
+
+export const RESCUE_TEAM_RADIUS_CONFIG_QUERY_KEY = [
+  "rescue-team-radius-config",
 ] as const;
 
 export function useSosPriorityRuleConfig(enabled = true) {
@@ -166,6 +182,56 @@ export function useUpdateRescuerScoreVisibilityConfig() {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: RESCUER_SCORE_VISIBILITY_CONFIG_QUERY_KEY,
+      });
+    },
+  });
+}
+
+export function useSosClusterGroupingConfig(enabled = true) {
+  return useQuery<SosClusterGroupingConfigEntity>({
+    queryKey: SOS_CLUSTER_GROUPING_CONFIG_QUERY_KEY,
+    queryFn: getSosClusterGroupingConfig,
+    enabled,
+  });
+}
+
+export function useUpdateSosClusterGroupingConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    AxiosError<{ message: string }>,
+    UpdateSosClusterGroupingConfigRequest
+  >({
+    mutationFn: (data) => updateSosClusterGroupingConfig(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: SOS_CLUSTER_GROUPING_CONFIG_QUERY_KEY,
+      });
+    },
+  });
+}
+
+export function useRescueTeamRadiusConfig(enabled = true) {
+  return useQuery<RescueTeamRadiusConfigEntity>({
+    queryKey: RESCUE_TEAM_RADIUS_CONFIG_QUERY_KEY,
+    queryFn: getRescueTeamRadiusConfig,
+    enabled,
+  });
+}
+
+export function useUpdateRescueTeamRadiusConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    AxiosError<{ message: string }>,
+    UpdateRescueTeamRadiusConfigRequest
+  >({
+    mutationFn: (data) => updateRescueTeamRadiusConfig(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: RESCUE_TEAM_RADIUS_CONFIG_QUERY_KEY,
       });
     },
   });

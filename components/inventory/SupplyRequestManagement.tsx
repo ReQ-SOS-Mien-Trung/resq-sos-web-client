@@ -13,6 +13,7 @@ import {
   Package,
 } from "@phosphor-icons/react";
 import { useSupplyRequests } from "@/services/inventory/hooks";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import IncomingRequestsSection from "./IncomingRequestsSection";
 import { SupplyRequestTracker } from "./SupplyRequestTracker";
 
@@ -120,6 +121,7 @@ export default function SupplyRequestManagement() {
 type OutgoingFilter = "all" | "pending" | "in_transit" | "done" | "rejected";
 
 function OutgoingRequestsPanel() {
+  const { selectedDepotId } = useManagerDepot();
   const [filter, setFilter] = useState<OutgoingFilter>("all");
   const [pageNumber, setPageNumber] = useState(1);
   const pageSize = 10;
@@ -127,8 +129,12 @@ function OutgoingRequestsPanel() {
   const [trackerOpen, setTrackerOpen] = useState(false);
 
   const { data, isLoading, isFetching, refetch } = useSupplyRequests(
-    { pageNumber, pageSize },
-    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+    { depotId: selectedDepotId ?? 0, pageNumber, pageSize },
+    {
+      refetchInterval: 10_000,
+      refetchOnWindowFocus: true,
+      enabled: Boolean(selectedDepotId),
+    },
   );
 
   // Only show Requester-role requests (requests we sent out)

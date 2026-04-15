@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { RoleGuard } from "@/components/auth";
+import { ManagerDepotGuard } from "@/components/auth/ManagerDepotGuard";
 
 export default function InventoryLayout({
   children,
@@ -10,7 +11,9 @@ export default function InventoryLayout({
   // No need to pass allowedRoles manually
   return (
     <Suspense fallback={<div className="min-h-screen bg-background" />}>
-      <RoleGuard>{children}</RoleGuard>
+      <RoleGuard>
+        <ManagerDepotGuard>{children}</ManagerDepotGuard>
+      </RoleGuard>
     </Suspense>
   );
 }

@@ -43,6 +43,7 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import {
   useDepotStockMovements,
   useInventoryActionTypes,
@@ -56,6 +57,7 @@ import { motion } from "framer-motion";
 const PAGE_SIZES = [10, 25, 50, 100];
 
 const StockMovementTable: React.FC = () => {
+  const { selectedDepotId } = useManagerDepot();
   // State for filters
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -94,6 +96,7 @@ const StockMovementTable: React.FC = () => {
   // Query filters
   const queryFilters = useMemo(
     (): GetDepotStockMovementsParams => ({
+      depotId: selectedDepotId ?? 0,
       pageNumber: page + 1,
       pageSize: pageSize,
       actionTypes:
@@ -105,7 +108,14 @@ const StockMovementTable: React.FC = () => {
         : undefined,
       toDate: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
     }),
-    [page, pageSize, selectedActionTypes, selectedSourceTypes, dateRange],
+    [
+      dateRange,
+      page,
+      pageSize,
+      selectedActionTypes,
+      selectedDepotId,
+      selectedSourceTypes,
+    ],
   );
 
   // Fetch data
@@ -113,7 +123,9 @@ const StockMovementTable: React.FC = () => {
     data: stockMovementsData,
     isLoading: loadingStockMovements,
     error: stockMovementsError,
-  } = useDepotStockMovements(queryFilters);
+  } = useDepotStockMovements(queryFilters, {
+    enabled: Boolean(selectedDepotId),
+  });
 
   const { data: actionTypes = [] } = useInventoryActionTypes();
 

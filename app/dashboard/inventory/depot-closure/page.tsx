@@ -33,7 +33,6 @@ import {
   Trash,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { useAuthStore } from "@/stores/auth.store";
 import {
   useDepotById,
   useMyDepotClosures,
@@ -50,6 +49,7 @@ import {
 import type { DepotExternalResolutionItem } from "@/services/depot/type";
 import { AxiosError } from "axios";
 import { Icon } from "@iconify/react";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 
 const TERMINAL_TRANSFER_STATUSES = new Set(["Received", "Cancelled"]);
 const TERMINAL_CLOSURE_STATUSES = new Set(["Completed", "Cancelled"]);
@@ -416,8 +416,8 @@ const STEP_ORDER: string[] = TRANSFER_STEPS.map((s) => s.key);
 export default function DepotClosurePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const user = useAuthStore((s) => s.user);
-  const depotId = user?.depotId ?? 0;
+  const { selectedDepotId } = useManagerDepot();
+  const depotId = selectedDepotId ?? 0;
 
   /* ── Data ── */
   const {
@@ -428,11 +428,11 @@ export default function DepotClosurePage() {
   const routeClosureId = parsePositiveInt(searchParams.get("closureId"));
   const routeTransferId = parsePositiveInt(searchParams.get("transferId"));
   const { data: closureList = [], refetch: refetchClosures } =
-    useMyDepotClosures({
+    useMyDepotClosures(depotId, {
       enabled: !!depotId,
     });
   const { data: transferList = [], refetch: refetchTransfers } =
-    useMyDepotTransfers({
+    useMyDepotTransfers(depotId, {
       enabled: !!depotId,
     });
   const { data: statusMetadata } = useDepotStatuses();
@@ -492,7 +492,7 @@ export default function DepotClosurePage() {
     selectedClosureSummary?.id ??
     null;
   const { data: activeClosureDetail, refetch: refetchClosureDetail } =
-    useMyDepotClosureDetail(activeClosureId ?? 0, {
+    useMyDepotClosureDetail(activeClosureId ?? 0, depotId, {
       enabled: !!activeClosureId,
     });
 
@@ -593,6 +593,7 @@ export default function DepotClosurePage() {
     const action = transferAction;
     const payload = {
       transferId: activeTransferId,
+      depotId,
       ...(selectedTransfer?.sourceDepotId
         ? { sourceDepotId: selectedTransfer.sourceDepotId }
         : {}),
@@ -691,7 +692,7 @@ export default function DepotClosurePage() {
     }
 
     submitExternalResolutionMutation.mutate(
-      { items: externalResolutionItems },
+      { depotId, items: externalResolutionItems },
       {
         onSuccess: (res) => {
           toast.success(
@@ -706,6 +707,7 @@ export default function DepotClosurePage() {
       },
     );
   }, [
+    depotId,
     externalResolutionItems,
     handleRefresh,
     resetExternalResolutionState,

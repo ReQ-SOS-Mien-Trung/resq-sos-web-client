@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -12,12 +12,10 @@ import {
   ArrowsClockwise,
   Package,
   ClipboardText,
-  MapPin,
   SealCheck,
   Note,
   Spinner,
   X,
-  Clock,
   Funnel,
   ArrowRight,
 } from "@phosphor-icons/react";
@@ -31,6 +29,7 @@ import {
   useRejectSupplyRequest,
 } from "@/services/inventory/hooks";
 import type { SupplyRequestListItem } from "@/services/inventory/type";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { SupplyRequestTracker } from "./SupplyRequestTracker";
 import { ResponseCountdown } from "./ResponseCountdown";
 import { toast } from "sonner";
@@ -121,6 +120,7 @@ function getRoleInfo(role: "Source" | "Requester"): {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function IncomingRequestsSection() {
+  const { selectedDepotId } = useManagerDepot();
   const [filter, setFilter] = useState<FilterTab>("all");
   const [trackerOpen, setTrackerOpen] = useState(false);
   const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
@@ -131,8 +131,12 @@ export default function IncomingRequestsSection() {
     isFetching,
     refetch,
   } = useSupplyRequests(
-    { pageNumber: 1, pageSize: 100 },
-    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+    { depotId: selectedDepotId ?? 0, pageNumber: 1, pageSize: 100 },
+    {
+      refetchInterval: 10_000,
+      refetchOnWindowFocus: true,
+      enabled: Boolean(selectedDepotId),
+    },
   );
 
   // Hiển thị:
@@ -205,16 +209,15 @@ export default function IncomingRequestsSection() {
   // ── Card pagination ──
   const CARDS_PER_PAGE = 6;
   const [cardPage, setCardPage] = useState(1);
-  const totalCardPages = Math.ceil(filteredItems.length / CARDS_PER_PAGE);
-  const pagedItems = filteredItems.slice(
-    (cardPage - 1) * CARDS_PER_PAGE,
-    cardPage * CARDS_PER_PAGE,
+  const totalCardPages = Math.max(
+    1,
+    Math.ceil(filteredItems.length / CARDS_PER_PAGE),
   );
-
-  // Reset về trang 1 khi đổi filter
-  useEffect(() => {
-    setCardPage(1);
-  }, [filter]);
+  const currentCardPage = Math.min(cardPage, totalCardPages);
+  const pagedItems = filteredItems.slice(
+    (currentCardPage - 1) * CARDS_PER_PAGE,
+    currentCardPage * CARDS_PER_PAGE,
+  );
 
   // ── Render ──
   return (
@@ -359,6 +362,7 @@ export default function IncomingRequestsSection() {
             <RequestCard
               key={request.id}
               request={request}
+              depotId={selectedDepotId ?? 0}
               onViewDetail={() => openTracker(request.id)}
               onActionSuccess={() => refetch()}
             />
@@ -370,14 +374,14 @@ export default function IncomingRequestsSection() {
       {totalCardPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground tracking-tighter order-2 sm:order-1">
-            {filteredItems.length} yêu cầu • Trang {cardPage} / {totalCardPages}
+            {filteredItems.length} yêu cầu • Trang {currentCardPage} / {totalCardPages}
           </p>
           <div className="flex items-center gap-1 order-1 sm:order-2">
             <Button
               variant="outline"
               size="sm"
               className="h-8 w-8 p-0"
-              disabled={cardPage === 1}
+              disabled={currentCardPage === 1}
               onClick={() => setCardPage(1)}
             >
               «
@@ -386,7 +390,7 @@ export default function IncomingRequestsSection() {
               variant="outline"
               size="sm"
               className="h-8 px-3"
-              disabled={cardPage === 1}
+              disabled={currentCardPage === 1}
               onClick={() => setCardPage((p) => Math.max(1, p - 1))}
             >
               ‹ Trước
@@ -397,11 +401,11 @@ export default function IncomingRequestsSection() {
                 for (let i = 1; i <= totalCardPages; i++) pages.push(i);
               } else {
                 pages.push(1);
-                if (cardPage > 3) pages.push("...");
-                for (let i = Math.max(2, cardPage - 1); i <= Math.min(totalCardPages - 1, cardPage + 1); i++) {
+                if (currentCardPage > 3) pages.push("...");
+                for (let i = Math.max(2, currentCardPage - 1); i <= Math.min(totalCardPages - 1, currentCardPage + 1); i++) {
                   pages.push(i);
                 }
-                if (cardPage < totalCardPages - 2) pages.push("...");
+                if (currentCardPage < totalCardPages - 2) pages.push("...");
                 pages.push(totalCardPages);
               }
               return pages.map((p, i) =>
@@ -412,7 +416,7 @@ export default function IncomingRequestsSection() {
                 ) : (
                   <Button
                     key={p}
-                    variant={cardPage === p ? "default" : "outline"}
+                    variant={currentCardPage === p ? "default" : "outline"}
                     size="sm"
                     className="h-8 w-8 p-0 text-xs"
                     onClick={() => setCardPage(p as number)}
@@ -426,7 +430,7 @@ export default function IncomingRequestsSection() {
               variant="outline"
               size="sm"
               className="h-8 px-3"
-              disabled={cardPage === totalCardPages}
+              disabled={currentCardPage === totalCardPages}
               onClick={() => setCardPage((p) => Math.min(totalCardPages, p + 1))}
             >
               Sau ›
@@ -435,7 +439,7 @@ export default function IncomingRequestsSection() {
               variant="outline"
               size="sm"
               className="h-8 w-8 p-0"
-              disabled={cardPage === totalCardPages}
+              disabled={currentCardPage === totalCardPages}
               onClick={() => setCardPage(totalCardPages)}
             >
               »
@@ -586,10 +590,12 @@ function FilterChip({
 
 function RequestCard({
   request,
+  depotId,
   onViewDetail,
   onActionSuccess,
 }: {
   request: SupplyRequestListItem;
+  depotId: number;
   onViewDetail: () => void;
   onActionSuccess: () => void;
 }) {
@@ -616,7 +622,7 @@ function RequestCard({
 
   const handleAccept = async () => {
     try {
-      await acceptMutation.mutateAsync(request.id);
+      await acceptMutation.mutateAsync({ id: request.id, depotId });
       toast.success(`Đã chấp nhận yêu cầu #${request.id}`);
       onActionSuccess();
     } catch {
@@ -630,7 +636,10 @@ function RequestCard({
       return;
     }
     try {
-      await rejectMutation.mutateAsync({ id: request.id, payload: { reason: rejectReason } });
+      await rejectMutation.mutateAsync({
+        params: { id: request.id, depotId },
+        payload: { reason: rejectReason },
+      });
       toast.success(`Đã từ chối yêu cầu #${request.id}`);
       setShowRejectForm(false);
       setRejectReason("");
@@ -642,7 +651,7 @@ function RequestCard({
 
   const handlePrepare = async () => {
     try {
-      await prepareMutation.mutateAsync(request.id);
+      await prepareMutation.mutateAsync({ id: request.id, depotId });
       toast.success("Đã bắt đầu đóng gói");
       onActionSuccess();
     } catch {
@@ -652,7 +661,7 @@ function RequestCard({
 
   const handleShip = async () => {
     try {
-      await shipMutation.mutateAsync(request.id);
+      await shipMutation.mutateAsync({ id: request.id, depotId });
       toast.success("Đã xuất kho — hàng đang trên đường");
       onActionSuccess();
     } catch {
@@ -662,7 +671,7 @@ function RequestCard({
 
   const handleComplete = async () => {
     try {
-      await completeMutation.mutateAsync(request.id);
+      await completeMutation.mutateAsync({ id: request.id, depotId });
       toast.success("Đã xác nhận giao hàng thành công");
       onActionSuccess();
     } catch {
@@ -672,7 +681,7 @@ function RequestCard({
 
   const handleConfirm = async () => {
     try {
-      await confirmMutation.mutateAsync(request.id);
+      await confirmMutation.mutateAsync({ id: request.id, depotId });
       toast.success("Đã xác nhận nhận hàng thành công");
       onActionSuccess();
     } catch {

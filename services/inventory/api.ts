@@ -3,6 +3,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import {
   GetDepotInventoryParams,
   GetDepotInventoryResponse,
+  GetMyDepotCategoryQuantitiesParams,
   GetMyDepotInventoryParams,
   GetMyDepotInventoryResponse,
   InventoryItemEntity,
@@ -24,10 +25,12 @@ import {
   GetSupplyRequestsParams,
   GetSupplyRequestsResponse,
   RejectSupplyRequestPayload,
+  SupplyRequestActionParams,
   GetDepotStockMovementsParams,
   GetDepotStockMovementsResponse,
   ExportMovementsParams,
   GetInventoryLotsResponse,
+  GetInventoryLotsParams,
   GetThresholdsParams,
   GetThresholdsResponse,
   GetThresholdsHistoryParams,
@@ -169,8 +172,12 @@ export async function getDepotInventory(
 export async function getMyDepotInventory(
   params: GetMyDepotInventoryParams,
 ): Promise<GetMyDepotInventoryResponse> {
+  const { depotId, ...query } = params;
   const { data } = await api.get("/logistics/inventory/my-depot", {
-    params,
+    params: {
+      depotId,
+      ...query,
+    },
     paramsSerializer: {
       indexes: null,
     },
@@ -191,9 +198,16 @@ export async function getInventoryCategories(): Promise<InventoryCategory[]> {
  * Get quantity summary by category for current depot
  * GET /logistics/inventory/my-depot/quantity-by-category
  */
-export async function getMyDepotQuantityByCategory(): Promise<GetMyDepotCategoryQuantitiesResponse> {
+export async function getMyDepotQuantityByCategory(
+  params: GetMyDepotCategoryQuantitiesParams,
+): Promise<GetMyDepotCategoryQuantitiesResponse> {
   const { data } = await api.get(
     "/logistics/inventory/my-depot/quantity-by-category",
+    {
+      params: {
+        depotId: params.depotId,
+      },
+    },
   );
   return data;
 }
@@ -375,6 +389,7 @@ export async function getMyDepotUpcomingReturns(
 const UPCOMING_RETURNS_BATCH_SIZE = 100;
 
 export async function getMyDepotUpcomingReturnsByStatuses(
+  depotId: number,
   statuses: string[],
 ): Promise<UpcomingReturnEntity[]> {
   const uniqueStatuses = Array.from(
@@ -388,6 +403,7 @@ export async function getMyDepotUpcomingReturnsByStatuses(
   const groups = await Promise.all(
     uniqueStatuses.map(async (status) => {
       const firstPage = await getMyDepotUpcomingReturns({
+        depotId,
         status,
         pageNumber: 1,
         pageSize: UPCOMING_RETURNS_BATCH_SIZE,
@@ -402,6 +418,7 @@ export async function getMyDepotUpcomingReturnsByStatuses(
       const remainingPages = await Promise.all(
         Array.from({ length: totalPages - 1 }, (_, index) =>
           getMyDepotUpcomingReturns({
+            depotId,
             status,
             pageNumber: index + 2,
             pageSize: UPCOMING_RETURNS_BATCH_SIZE,
@@ -436,40 +453,65 @@ export async function getMyDepotReturnHistory(
  * Accept a supply request (Source Manager)
  * PUT /logistics/inventory/supply-requests/{id}/accept
  */
-export async function acceptSupplyRequest(id: number): Promise<void> {
-  await api.put(`/logistics/inventory/supply-requests/${id}/accept`);
+export async function acceptSupplyRequest({
+  id,
+  depotId,
+}: SupplyRequestActionParams): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/accept`, null, {
+    params: { depotId },
+  });
 }
 
 /**
  * Start preparing a supply request (Source Manager)
  * PUT /logistics/inventory/supply-requests/{id}/prepare
  */
-export async function prepareSupplyRequest(id: number): Promise<void> {
-  await api.put(`/logistics/inventory/supply-requests/${id}/prepare`);
+export async function prepareSupplyRequest({
+  id,
+  depotId,
+}: SupplyRequestActionParams): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/prepare`, null, {
+    params: { depotId },
+  });
 }
 
 /**
  * Ship a supply request — decreases source depot inventory (Source Manager)
  * PUT /logistics/inventory/supply-requests/{id}/ship
  */
-export async function shipSupplyRequest(id: number): Promise<void> {
-  await api.put(`/logistics/inventory/supply-requests/${id}/ship`);
+export async function shipSupplyRequest({
+  id,
+  depotId,
+}: SupplyRequestActionParams): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/ship`, null, {
+    params: { depotId },
+  });
 }
 
 /**
  * Mark supply request as completed/delivered (Source Manager)
  * PUT /logistics/inventory/supply-requests/{id}/complete
  */
-export async function completeSupplyRequest(id: number): Promise<void> {
-  await api.put(`/logistics/inventory/supply-requests/${id}/complete`);
+export async function completeSupplyRequest({
+  id,
+  depotId,
+}: SupplyRequestActionParams): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/complete`, null, {
+    params: { depotId },
+  });
 }
 
 /**
  * Confirm receipt of supply request — increases requesting depot inventory (Requesting Manager)
  * PUT /logistics/inventory/supply-requests/{id}/confirm
  */
-export async function confirmSupplyRequest(id: number): Promise<void> {
-  await api.put(`/logistics/inventory/supply-requests/${id}/confirm`);
+export async function confirmSupplyRequest({
+  id,
+  depotId,
+}: SupplyRequestActionParams): Promise<void> {
+  await api.put(`/logistics/inventory/supply-requests/${id}/confirm`, null, {
+    params: { depotId },
+  });
 }
 
 /**
@@ -477,10 +519,16 @@ export async function confirmSupplyRequest(id: number): Promise<void> {
  * PUT /logistics/inventory/supply-requests/{id}/reject
  */
 export async function rejectSupplyRequest(
-  id: number,
+  params: SupplyRequestActionParams,
   payload: RejectSupplyRequestPayload,
 ): Promise<void> {
-  await api.put(`/logistics/inventory/supply-requests/${id}/reject`, payload);
+  await api.put(
+    `/logistics/inventory/supply-requests/${params.id}/reject`,
+    payload,
+    {
+      params: { depotId: params.depotId },
+    },
+  );
 }
 
 /**
@@ -521,10 +569,14 @@ export async function updateItemModel(
 export async function getDepotStockMovements(
   params: GetDepotStockMovementsParams,
 ): Promise<GetDepotStockMovementsResponse> {
+  const { depotId, ...query } = params;
   const { data } = await api.get(
     "/logistics/inventory/stock-movements/my-depot",
     {
-      params,
+      params: {
+        depotId,
+        ...query,
+      },
       paramsSerializer: {
         indexes: null,
       },
@@ -538,9 +590,13 @@ export async function getDepotStockMovements(
  * GET /logistics/inventory/{itemModelId}/lots
  */
 export async function getInventoryLots(
-  itemModelId: number,
+  params: GetInventoryLotsParams,
 ): Promise<GetInventoryLotsResponse> {
-  const { data } = await api.get(`/logistics/inventory/${itemModelId}/lots`);
+  const { data } = await api.get(`/logistics/inventory/${params.itemModelId}/lots`, {
+    params: {
+      depotId: params.depotId,
+    },
+  });
   return data;
 }
 
@@ -613,6 +669,7 @@ export async function exportInventoryMovements(
   params: ExportMovementsParams,
 ): Promise<{ blob: Blob; filename: string }> {
   const searchParams = new URLSearchParams();
+  searchParams.set("depotId", String(params.depotId));
   searchParams.set("periodType", params.periodType);
   if (params.fromDate) searchParams.set("fromDate", params.fromDate);
   if (params.toDate) searchParams.set("toDate", params.toDate);
@@ -698,8 +755,12 @@ export async function getThresholds(
  * Get current threshold configs (global + overrides) for my depot
  * GET /logistics/inventory/my-depot/thresholds
  */
-export async function getMyDepotThresholds(): Promise<GetThresholdsResponse> {
-  const { data } = await api.get("/logistics/inventory/my-depot/thresholds");
+export async function getMyDepotThresholds(
+  depotId: number,
+): Promise<GetThresholdsResponse> {
+  const { data } = await api.get("/logistics/inventory/my-depot/thresholds", {
+    params: { depotId },
+  });
   return data;
 }
 
@@ -724,9 +785,13 @@ export async function getMyDepotThresholdsHistory(
 export async function updateMyDepotThreshold(
   payload: UpdateThresholdPayload,
 ): Promise<UpdateThresholdResponse> {
+  const { depotId, ...body } = payload;
   const { data } = await api.put(
     "/logistics/inventory/my-depot/thresholds",
-    payload,
+    body,
+    {
+      params: { depotId },
+    },
   );
   return data;
 }
@@ -738,9 +803,13 @@ export async function updateMyDepotThreshold(
 export async function deleteMyDepotThreshold(
   payload: DeleteThresholdPayload,
 ): Promise<DeleteThresholdResponse> {
+  const { depotId, ...body } = payload;
   const { data } = await api.delete(
     "/logistics/inventory/my-depot/thresholds",
-    { data: payload },
+    {
+      params: { depotId },
+      data: body,
+    },
   );
   return data;
 }
@@ -767,8 +836,12 @@ export async function getLowStock(
 export async function getMyDepotLowStock(
   params?: GetLowStockParams,
 ): Promise<GetLowStockResponse> {
+  const { depotId, ...query } = params ?? { depotId: 0 };
   const { data } = await api.get("/logistics/inventory/my-depot/low-stock", {
-    params,
+    params: {
+      depotId,
+      ...query,
+    },
   });
   return data;
 }

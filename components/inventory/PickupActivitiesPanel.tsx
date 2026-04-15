@@ -65,6 +65,7 @@ import type {
   ReusableItemCondition,
 } from "@/services/inventory/type";
 import { toast } from "sonner";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -2168,6 +2169,7 @@ interface ActivityOperationsPanelProps {
 function ActivityOperationsPanel({
   activityKind,
 }: ActivityOperationsPanelProps) {
+  const { selectedDepotId } = useManagerDepot();
   const isReturnActivity = activityKind === "return";
   const copy = ACTIVITY_COPY[activityKind];
   const [activeTab, setActiveTab] = useState<TabType>("upcoming");
@@ -2192,10 +2194,10 @@ function ActivityOperationsPanel({
     isFetching: isPickupUpcomingFetching,
     refetch: refetchPickupUpcoming,
   } = useMyDepotUpcomingPickups(
-    { pageNumber: upcomingPage, pageSize },
+    { depotId: selectedDepotId ?? 0, pageNumber: upcomingPage, pageSize },
     {
       refetchInterval: isReturnActivity ? false : 30_000,
-      enabled: !isReturnActivity,
+      enabled: !isReturnActivity && Boolean(selectedDepotId),
     },
   );
 
@@ -2206,6 +2208,7 @@ function ActivityOperationsPanel({
     refetch: refetchPickupHistory,
   } = useMyDepotPickupHistory(
     {
+      depotId: selectedDepotId ?? 0,
       pageNumber: historyPage,
       pageSize,
       fromDate: appliedFrom || undefined,
@@ -2213,7 +2216,7 @@ function ActivityOperationsPanel({
     },
     {
       refetchInterval: isReturnActivity ? false : 60_000,
-      enabled: !isReturnActivity,
+      enabled: !isReturnActivity && Boolean(selectedDepotId),
     },
   );
 
@@ -2224,13 +2227,14 @@ function ActivityOperationsPanel({
     refetch: refetchReturnUpcoming,
   } = useMyDepotUpcomingReturns(
     {
+      depotId: selectedDepotId ?? 0,
       pageNumber: upcomingPage,
       pageSize,
       status: returnStatus,
     },
     {
       refetchInterval: isReturnActivity ? 30_000 : false,
-      enabled: isReturnActivity,
+      enabled: isReturnActivity && Boolean(selectedDepotId),
     },
   );
 
@@ -2241,6 +2245,7 @@ function ActivityOperationsPanel({
     refetch: refetchReturnHistory,
   } = useMyDepotReturnHistory(
     {
+      depotId: selectedDepotId ?? 0,
       pageNumber: historyPage,
       pageSize,
       fromDate: appliedFrom || undefined,
@@ -2248,7 +2253,7 @@ function ActivityOperationsPanel({
     },
     {
       refetchInterval: isReturnActivity ? 60_000 : false,
-      enabled: isReturnActivity,
+      enabled: isReturnActivity && Boolean(selectedDepotId),
     },
   );
 

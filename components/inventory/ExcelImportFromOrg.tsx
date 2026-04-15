@@ -74,6 +74,7 @@ import {
   assignCreatedInventoryItemsToRows,
   fetchInventorySnapshotByCategoryCodes,
 } from "@/components/inventory/import-post-submit-image-helpers";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 
 // ─── System categories (seed) ───
 const SYSTEM_CATEGORIES = [
@@ -274,17 +275,6 @@ function parseOptionalExcelNumber(val: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function parseOptionalDecimalInput(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const normalized = trimmed
-    .replace(/\s/g, "")
-    .replace(/\.(?=\d{3}(?:\D|$))/g, "")
-    .replace(",", ".");
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
 /** Parse datetime from Excel cell — returns "yyyy-MM-ddTHH:mm" */
 function parseExcelDateTime(val: unknown): string {
   if (!val) return "";
@@ -343,6 +333,7 @@ function parseItemName(raw: string): {
 // ─── Component ───
 export default function ExcelImportFromOrg() {
   const router = useRouter();
+  const { selectedDepotId } = useManagerDepot();
   const [step, setStep] = useState<Step>("upload");
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [fileName, setFileName] = useState("");
@@ -886,6 +877,7 @@ export default function ExcelImportFromOrg() {
       try {
         beforeImportItems = await fetchInventorySnapshotByCategoryCodes(
           deferredImageCategoryCodes,
+          selectedDepotId ?? 0,
         );
       } catch {
         toast.error(
@@ -919,7 +911,10 @@ export default function ExcelImportFromOrg() {
       description: r.description || null,
     }));
 
-    const payload: ImportInventoryRequest = { items };
+    const payload: ImportInventoryRequest = {
+      depotId: selectedDepotId ?? 0,
+      items,
+    };
     if (selectedOrgId) {
       payload.organizationId = Number(selectedOrgId);
     }
@@ -944,6 +939,7 @@ export default function ExcelImportFromOrg() {
         try {
           const afterImportItems = await fetchInventorySnapshotByCategoryCodes(
             deferredImageCategoryCodes,
+            selectedDepotId ?? 0,
           );
           const assignments = assignCreatedInventoryItemsToRows(
             rowsNeedingImageUpload.map((row) => ({
@@ -1044,6 +1040,7 @@ export default function ExcelImportFromOrg() {
     selectedOrgId,
     orgSearchValue,
     batchNote,
+    selectedDepotId,
     importMutation,
     router,
   ]);
