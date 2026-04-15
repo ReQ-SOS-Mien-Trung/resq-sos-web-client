@@ -26,7 +26,13 @@ export const NOTIFICATION_HUB_CONFIG = {
 
 export const ROLE_NOTIFICATION_TYPES: Record<number, readonly string[]> = {
   1: [],
-  2: ["chat_message"],
+  2: [
+    "chat_message",
+    "assembly_checkin",
+    "assembly_checkout",
+    "assembly_gathering",
+    "assembly_point_assignment",
+  ],
   4: [
     "fund_allocation",
     "supply_request",
@@ -54,7 +60,11 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   supply_preparing: "Đơn hàng đang được chuẩn bị",
   supply_shipped: "Đơn hàng đã được vận chuyển",
   supply_completed: "Đơn hàng đã hoàn tất",
-  chat_message: "Tin nhắn mới",
+  chat_message: "Tin nhắn chat",
+  assembly_checkin: "Thành viên đến điểm tập kết",
+  assembly_checkout: "Thành viên rời điểm tập kết",
+  assembly_gathering: "Lịch tập kết",
+  assembly_point_assignment: "Phân công điểm tập kết",
   flood_alert: "Cảnh báo lũ",
   flood_warning: "Cảnh báo lũ",
   flood_emergency: "Cảnh báo lũ khẩn cấp",
@@ -81,6 +91,10 @@ const NOTIFICATION_TYPE_TONES: Record<string, NotificationTone> = {
   supply_shipped: "info",
   supply_completed: "success",
   chat_message: "info",
+  assembly_checkin: "success",
+  assembly_checkout: "warning",
+  assembly_gathering: "info",
+  assembly_point_assignment: "info",
   flood_alert: "warning",
   flood_warning: "warning",
   flood_emergency: "danger",

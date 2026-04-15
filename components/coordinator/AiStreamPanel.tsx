@@ -427,9 +427,9 @@ function phaseToneClasses(phase: string) {
       };
     case "calling-ai":
       return {
-        pill: "border-fuchsia-500/25 bg-fuchsia-500/10 text-fuchsia-600",
-        dot: "bg-fuchsia-500 shadow-fuchsia-500/50",
-        glow: "from-fuchsia-500/24 via-fuchsia-500/8 to-transparent",
+        pill: "border-primary/30 bg-primary/12 text-primary",
+        dot: "bg-primary shadow-primary/50",
+        glow: "from-primary/24 via-primary/10 to-transparent",
       };
     default:
       return {
@@ -634,7 +634,7 @@ function SonarRadar({
                     phase === "done"
                       ? "from-emerald-500 to-emerald-400"
                       : phase === "calling-ai"
-                        ? "from-fuchsia-500 via-primary to-orange-400"
+                        ? "from-primary via-orange-500 to-amber-400"
                         : "from-primary to-orange-400",
                   )}
                   style={{ width: `${progressValue}%` }}
@@ -1038,7 +1038,7 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
       icon: Rocket,
       label: "Hoạt động",
       value: `${result.suggestedActivities.length}`,
-      color: "text-violet-400",
+      color: "text-primary",
     },
   ];
 
@@ -1401,14 +1401,11 @@ function AssessmentBlock({ text }: { text: string }) {
   return (
     <div
       ref={ref}
-      className="rounded-xl border border-violet-500/15 overflow-hidden"
+      className="rounded-xl border border-primary/15 overflow-hidden"
     >
-      <div className="px-3 py-2 bg-violet-50 dark:bg-violet-500/[0.06] border-b border-violet-500/10 flex items-center gap-2">
-        <Brain
-          className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400"
-          weight="fill"
-        />
-        <span className="text-sm font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+      <div className="px-3 py-2 bg-primary/6 dark:bg-primary/12 border-b border-primary/10 flex items-center gap-2">
+        <Brain className="h-3.5 w-3.5 text-primary" weight="fill" />
+        <span className="text-sm font-bold text-primary uppercase tracking-wider">
           Đánh giá tổng thể
         </span>
       </div>

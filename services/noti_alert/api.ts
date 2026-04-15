@@ -7,46 +7,7 @@ import {
   UserNotificationItem,
 } from "./type";
 import { NOTIFICATION_DEFAULT_QUERY, NOTIFICATION_ENDPOINTS } from "./config";
-
-function toFiniteNumber(value: unknown, fallback: number): number {
-  const parsed =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number(value)
-        : Number.NaN;
-
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function normalizeNotificationItem(raw: unknown): UserNotificationItem | null {
-  const record = (raw ?? {}) as Partial<UserNotificationItem> & {
-    id?: number;
-    message?: string;
-  };
-
-  const userNotificationId = toFiniteNumber(
-    record.userNotificationId ?? record.id,
-    0,
-  );
-
-  if (!userNotificationId) {
-    return null;
-  }
-
-  return {
-    userNotificationId,
-    title: String(record.title ?? "Thông báo"),
-    type: String(record.type ?? "general"),
-    body: String(record.body ?? record.message ?? ""),
-    isRead: Boolean(record.isRead),
-    createdAt: String(record.createdAt ?? new Date().toISOString()),
-    data:
-      record.data && typeof record.data === "object"
-        ? record.data
-        : null,
-  };
-}
+import { normalizeNotificationItem, toFiniteNumber } from "./normalize";
 
 function normalizeNotificationList(
   raw: unknown,

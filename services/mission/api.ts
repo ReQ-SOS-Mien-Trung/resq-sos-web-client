@@ -327,18 +327,30 @@ function normalizeUpdateMissionRequest(
   request: UpdateMissionRequest,
 ): UpdateMissionRequest {
   const normalizedActivities = Array.isArray(request.activities)
-    ? request.activities.map((activity, index) => ({
-        activityId: toNumberOrZero(activity?.activityId),
-        step: toNumberOrZero(activity?.step) || index + 1,
-        description: String(activity?.description ?? "").trim(),
-        target: String(activity?.target ?? "").trim(),
-        assemblyPointId: toNumberOrNull(activity?.assemblyPointId),
-        targetLatitude: toNumberOrZero(activity?.targetLatitude),
-        targetLongitude: toNumberOrZero(activity?.targetLongitude),
-        items: Array.isArray(activity?.items)
-          ? activity.items.map(normalizeUpdateMissionActivityItem)
-          : [],
-      }))
+    ? request.activities.map((activity, index) => {
+        const parsedAssemblyPointId = toNumberOrNull(activity?.assemblyPointId);
+        const assemblyPointId =
+          parsedAssemblyPointId != null && parsedAssemblyPointId > 0
+            ? parsedAssemblyPointId
+            : null;
+
+        return {
+          activityId: toNumberOrZero(activity?.activityId),
+          step: toNumberOrZero(activity?.step) || index + 1,
+          description: String(activity?.description ?? "").trim(),
+          target: String(activity?.target ?? "").trim(),
+          assemblyPointId,
+          ...(assemblyPointId == null
+            ? {
+                targetLatitude: toNumberOrZero(activity?.targetLatitude),
+                targetLongitude: toNumberOrZero(activity?.targetLongitude),
+              }
+            : {}),
+          items: Array.isArray(activity?.items)
+            ? activity.items.map(normalizeUpdateMissionActivityItem)
+            : [],
+        };
+      })
     : undefined;
 
   return {
