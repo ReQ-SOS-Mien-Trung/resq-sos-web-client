@@ -682,9 +682,6 @@ export interface ThresholdConfig {
   rowVersion?: number | null;
   updatedAt?: string | null;
   message?: string;
-  // Legacy fields kept optional during backend rollout.
-  dangerPercent?: number;
-  warningPercent?: number;
 }
 
 export interface GetThresholdsResponse {
@@ -697,45 +694,6 @@ export interface GetThresholdsResponse {
 
 export interface GetThresholdsParams {
   depotId?: number;
-}
-
-export interface GetThresholdsHistoryParams {
-  depotId: number;
-  scopeType?: ThresholdScopeType;
-  categoryId?: number;
-  itemModelId?: number;
-  pageNumber?: number;
-  pageSize?: number;
-}
-
-export interface ThresholdHistoryItem {
-  id: number;
-  configId?: number;
-  scopeType: string;
-  depotId?: number | null;
-  categoryId?: number | null;
-  itemModelId?: number | null;
-  oldMinimumThreshold?: number | null;
-  newMinimumThreshold?: number | null;
-  oldDangerPercent?: number | null;
-  oldWarningPercent?: number | null;
-  newDangerPercent?: number | null;
-  newWarningPercent?: number | null;
-  changedBy?: string;
-  changedAt: string;
-  changeReason?: string | null;
-  reason?: string | null;
-  action: string;
-}
-
-export interface GetThresholdsHistoryResponse {
-  items: ThresholdHistoryItem[];
-  pageNumber: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-  hasPreviousPage: boolean;
-  hasNextPage: boolean;
 }
 
 export interface UpdateThresholdPayload {

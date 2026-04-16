@@ -48,6 +48,7 @@ export interface FundingRequestEntity {
 export interface GetFundingRequestsParams {
   pageNumber?: number;
   pageSize?: number;
+  depotId?: number;
   depotIds?: number[];
   statuses?: string[];
 }

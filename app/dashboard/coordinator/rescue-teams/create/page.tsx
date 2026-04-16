@@ -455,16 +455,18 @@ function CreateRescueTeamForm({
 
   const assemblyPoints = useMemo(() => {
     const allPoints = pointsData?.pages.flatMap((page) => page.items) || [];
-    const activePoints = allPoints.filter((point) => point.status === "Active");
+    const availablePoints = allPoints.filter(
+      (point) => point.status === "Available",
+    );
 
     if (
       lockedAssemblyPoint &&
-      !activePoints.some((point) => point.id === lockedAssemblyPoint.id)
+      !availablePoints.some((point) => point.id === lockedAssemblyPoint.id)
     ) {
-      return [lockedAssemblyPoint, ...activePoints];
+      return [lockedAssemblyPoint, ...availablePoints];
     }
 
-    return activePoints;
+    return availablePoints;
   }, [pointsData, lockedAssemblyPoint]);
 
   const rescuerFilters = useMemo(() => {
@@ -904,7 +906,7 @@ function CreateRescueTeamForm({
                     <SelectContent>
                       {assemblyPoints.length === 0 && (
                         <div className="px-2 py-2 text-sm text-muted-foreground">
-                          Không có điểm tập kết đang hoạt động
+                          Không có điểm tập kết khả dụng
                         </div>
                       )}
                       {assemblyPoints.map((point) => (
@@ -913,7 +915,7 @@ function CreateRescueTeamForm({
                             <span>{point.name}</span>
                             <Badge
                               variant={
-                                point.status === "Active"
+                                point.status === "Available"
                                   ? "default"
                                   : point.status === "Created"
                                     ? "secondary"
@@ -921,8 +923,8 @@ function CreateRescueTeamForm({
                               }
                               className="text-sm font-medium h-5 px-1.5"
                             >
-                              {point.status === "Active"
-                                ? "Hoạt động"
+                              {point.status === "Available"
+                                ? "Khả dụng"
                                 : point.status === "Created"
                                   ? "Mới tạo"
                                   : point.status === "Unavailable"

@@ -55,38 +55,13 @@ const AdminDashboardPage = () => {
       cloudStorage={data.cloudStorage}
     >
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* Header Actions Row */}
-        <div className="flex items-center justify-between">
-          {/* Last Updated Indicator */}
-          <div className="flex items-center gap-2 text-sm">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-300 dark:border-emerald-700 shadow-sm">
-              <div className="relative">
-                <Check
-                  size={16}
-                  className="text-emerald-700 dark:text-emerald-400"
-                />
-                <div className="absolute inset-0 h-4 w-4 animate-ping opacity-30">
-                  <Check
-                    size={16}
-                    className="text-emerald-700 dark:text-emerald-400"
-                  />
-                </div>
-              </div>
-              <span className="text-emerald-800 dark:text-emerald-300 font-semibold">
-                Cập nhật lúc: vừa xong
-              </span>
-            </div>
-          </div>
-        </div>
-
         {/* Summary Cards */}
         <div
           className="animate-in fade-in slide-in-from-bottom-4 duration-500"
           style={{ animationDelay: "100ms" }}
         >
-          <SummaryCards metrics={data.summaryMetrics} />
+          <SummaryCards />
         </div>
-
         {/* SOS Overview - Full Width */}
         <div
           id="sos-overview"
@@ -95,7 +70,6 @@ const AdminDashboardPage = () => {
         >
           <SOSOverview />
         </div>
-
         {/* Rescuer Overview - Full Width */}
         <div
           id="rescuer-overview"
@@ -104,7 +78,6 @@ const AdminDashboardPage = () => {
         >
           <RescuerOverview />
         </div>
-
         {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Victims Bar Chart */}
@@ -123,7 +96,6 @@ const AdminDashboardPage = () => {
             <CalendarWidget data={data.calendar} />
           </div>
         </div>
-
         {/* Second Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Leads Management */}

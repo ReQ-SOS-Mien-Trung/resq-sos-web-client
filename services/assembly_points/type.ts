@@ -3,7 +3,7 @@ import type { RescuerType } from "../rescuers/type";
 // Assembly Point Status
 export type AssemblyPointStatus =
   | "Created"
-  | "Active"
+  | "Available"
   | "Unavailable"
   | "Closed";
 
@@ -19,8 +19,14 @@ export interface AssemblyPointMetadataOption {
   value: string;
 }
 
+export interface AssemblyPointStatusAuditFields {
+  statusReason: string | null;
+  statusChangedAt: string | null;
+  statusChangedBy: string | null;
+}
+
 // Assembly Point Entity
-export interface AssemblyPointEntity {
+export interface AssemblyPointEntity extends AssemblyPointStatusAuditFields {
   id: number;
   code: string;
   name: string;
@@ -85,6 +91,7 @@ export interface GetAssemblyPointsResponse {
 export interface GetAssemblyPointsParams {
   pageNumber?: number;
   pageSize?: number;
+  status?: AssemblyPointStatus;
 }
 
 // Create Assembly Point Request
@@ -125,6 +132,17 @@ export interface UpdateAssemblyPointResponse {
   status: AssemblyPointStatus;
   imageUrl?: string | null;
   lastUpdatedAt: string | null;
+}
+
+export interface AssemblyPointStatusTransitionRequest {
+  id: number;
+  reason?: string | null;
+}
+
+export interface AssemblyPointStatusTransitionResponse {
+  id: number;
+  status: AssemblyPointStatus;
+  message: string;
 }
 
 // Assign or unassign one or many rescuers to an assembly point request

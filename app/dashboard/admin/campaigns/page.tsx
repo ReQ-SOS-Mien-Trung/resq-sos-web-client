@@ -56,6 +56,7 @@ import {
   ArrowDown,
   ArrowsLeftRight,
   Plus,
+  PiggyBankIcon,
 } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -467,7 +468,7 @@ export default function CampaignsPage() {
               {
                 label: "Tổng quyên góp",
                 value: isLoading ? "—" : formatMoney(stats.totalRaised),
-                icon: Wallet,
+                icon: PiggyBankIcon,
                 color: "text-amber-600 dark:text-amber-400",
                 bgColor: "bg-amber-50 dark:bg-amber-950/30",
                 isText: true,
@@ -543,7 +544,12 @@ export default function CampaignsPage() {
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-52 p-1.5" align="start">
+              <PopoverContent
+                className="w-56 max-h-72 overflow-y-auto p-1.5"
+                align="end"
+                side="bottom"
+                sideOffset={4}
+              >
                 {campaignStatuses.map((s) => {
                   const checked = selectedStatuses.includes(s.key);
                   return (

@@ -537,7 +537,10 @@ export default function DepotDetailPage() {
   const [hasAppliedTransferSuggestions, setHasAppliedTransferSuggestions] =
     useState(false);
   const [externalNote, setExternalNote] = useState("");
-  const [selectedManagerId, setSelectedManagerId] = useState("");
+  const [assignSelectionId, setAssignSelectionId] = useState("");
+  const [selectedAssignManagerIds, setSelectedAssignManagerIds] = useState<
+    string[]
+  >([]);
   const [unassignSelectionId, setUnassignSelectionId] = useState("");
   const [selectedUnassignManagerIds, setSelectedUnassignManagerIds] = useState<
     string[]
@@ -569,6 +572,13 @@ export default function DepotDetailPage() {
   const activeClosureStatus = activeClosure?.status ?? null;
   const activeTransfer = activeClosure?.transferDetail ?? null;
   const activeTransferId = activeTransfer?.id ?? null;
+  const selectedAssignManagers = useMemo(
+    () =>
+      selectedAssignManagerIds
+        .map((id) => availableManagers.find((manager) => manager.id === id))
+        .filter((manager): manager is NonNullable<typeof manager> => !!manager),
+    [availableManagers, selectedAssignManagerIds],
+  );
   const selectedUnassignManagers = useMemo(
     () =>
       selectedUnassignManagerIds
@@ -1610,9 +1620,27 @@ export default function DepotDetailPage() {
     ]).finally(() => setIsRefreshing(false));
   }
 
-  async function handleSwitchManager() {
-    if (!depot || !selectedManagerId) {
-      toast.error("Vui lòng chọn quản kho.");
+  function handleAddManagerToAssignList(managerId: string) {
+    if (!managerId || managerId === "__none") {
+      setAssignSelectionId("");
+      return;
+    }
+
+    setSelectedAssignManagerIds((prev) =>
+      prev.includes(managerId) ? prev : [...prev, managerId],
+    );
+    setAssignSelectionId("");
+  }
+
+  function handleRemoveSelectedAssignManager(managerId: string) {
+    setSelectedAssignManagerIds((prev) =>
+      prev.filter((id) => id !== managerId),
+    );
+  }
+
+  async function handleAssignManagers() {
+    if (!depot || selectedAssignManagerIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất 1 quản kho.");
       return;
     }
 
@@ -1621,12 +1649,13 @@ export default function DepotDetailPage() {
 
       await assignManagerMutation.mutateAsync({
         id: depot.id,
-        managerId: selectedManagerId,
+        managerIds: selectedAssignManagerIds,
       });
 
       toast.success("Đã cập nhật quản kho thành công.");
       setManagerDialogOpen(false);
-      setSelectedManagerId("");
+      setSelectedAssignManagerIds([]);
+      setAssignSelectionId("");
       handleRefresh();
     } catch (err) {
       toast.error(getApiError(err, "Cập nhật quản kho thất bại."));
@@ -2241,7 +2270,8 @@ export default function DepotDetailPage() {
                           variant="outline"
                           className="h-11 flex-1 rounded-md border-slate-300 bg-background px-4 font-medium text-slate-700 hover:bg-slate-50"
                           onClick={() => {
-                            setSelectedManagerId("");
+                            setSelectedAssignManagerIds([]);
+                            setAssignSelectionId("");
                             setManagerDialogOpen(true);
                           }}
                         >
@@ -3689,7 +3719,10 @@ export default function DepotDetailPage() {
         open={managerDialogOpen}
         onOpenChange={(open) => {
           setManagerDialogOpen(open);
-          if (!open) setSelectedManagerId("");
+          if (!open) {
+            setSelectedAssignManagerIds([]);
+            setAssignSelectionId("");
+          }
         }}
       >
         <DialogContent className="sm:max-w-md">
@@ -3712,15 +3745,14 @@ export default function DepotDetailPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="tracking-tighter">Chọn quản kho</Label>
+              <Label className="tracking-tighter">Chọn quản kho cần thêm</Label>
               <Select
-                value={selectedManagerId || "__none"}
-                onValueChange={(value) =>
-                  setSelectedManagerId(value === "__none" ? "" : value)
-                }
+                value={assignSelectionId || "__none"}
+                onValueChange={handleAddManagerToAssignList}
+                disabled={availableManagers.length === 0}
               >
                 <SelectTrigger className="w-full tracking-tighter">
-                  <SelectValue placeholder="Chọn quản kho" />
+                  <SelectValue placeholder="Chọn quản kho cần thêm" />
                 </SelectTrigger>
                 <SelectContent
                   position="popper"
@@ -3730,14 +3762,49 @@ export default function DepotDetailPage() {
                   avoidCollisions={false}
                   className="z-[10000] w-(--radix-select-trigger-width)"
                 >
-                  <SelectItem value="__none">Chọn quản kho</SelectItem>
+                  <SelectItem value="__none">Chọn quản kho cần thêm</SelectItem>
                   {availableManagers.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {`${m.fullName} (${m.phone}) - ${m.assignedDepotsCount} kho`}
+                      {`${m.fullName} (${m.phone}) - Hiện quản lý ${m.assignedDepotsCount} kho`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="tracking-tighter">Danh sách sẽ thêm</Label>
+              <div className="min-h-16 py-1">
+                {selectedAssignManagers.length === 0 ? (
+                  <p className="text-sm tracking-tight text-muted-foreground">
+                    Chưa chọn quản kho nào.
+                  </p>
+                ) : (
+                  <div className="overflow-hidden rounded-md border border-border/50 bg-background divide-y divide-border/50">
+                    {selectedAssignManagers.map((manager) => (
+                      <div
+                        key={manager.id}
+                        className="flex items-center justify-between gap-2 px-2.5 py-2"
+                      >
+                        <span className="text-sm tracking-tight text-foreground">
+                          {manager.fullName} ({manager.phone || "—"})
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() =>
+                            handleRemoveSelectedAssignManager(manager.id)
+                          }
+                        >
+                          <Trash size={14} />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -3751,8 +3818,10 @@ export default function DepotDetailPage() {
             </Button>
             <Button
               className="tracking-tighter"
-              disabled={!selectedManagerId || isSwitchingManager}
-              onClick={handleSwitchManager}
+              disabled={
+                selectedAssignManagerIds.length === 0 || isSwitchingManager
+              }
+              onClick={handleAssignManagers}
             >
               {isSwitchingManager ? "Đang cập nhật..." : "Xác nhận"}
             </Button>
@@ -3817,17 +3886,17 @@ export default function DepotDetailPage() {
 
             <div className="space-y-1.5">
               <Label className="tracking-tighter">Danh sách sẽ gỡ</Label>
-              <div className="min-h-16 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+              <div className="min-h-16 py-1">
                 {selectedUnassignManagers.length === 0 ? (
                   <p className="text-sm tracking-tight text-muted-foreground">
                     Chưa chọn quản kho nào.
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="overflow-hidden rounded-md border border-border/50 bg-background divide-y divide-border/50">
                     {selectedUnassignManagers.map((manager) => (
                       <div
                         key={manager.userId}
-                        className="flex items-center justify-between gap-2 rounded-md border border-border/50 bg-background px-2.5 py-1.5"
+                        className="flex items-center justify-between gap-2 px-2.5 py-2"
                       >
                         <span className="text-sm tracking-tight text-foreground">
                           {manager.fullName} ({manager.phone || "—"})
@@ -3836,12 +3905,12 @@ export default function DepotDetailPage() {
                           type="button"
                           size="sm"
                           variant="ghost"
-                          className="h-7 px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
+                          className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
                           onClick={() =>
                             handleRemoveSelectedUnassignManager(manager.userId)
                           }
                         >
-                          Bỏ
+                          <Trash size={14} />
                         </Button>
                       </div>
                     ))}

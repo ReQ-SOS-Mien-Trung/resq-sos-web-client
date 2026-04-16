@@ -14,8 +14,8 @@ import {
   createAssemblyPoint,
   updateAssemblyPoint,
   activateAssemblyPoint,
-  startAssemblyPointMaintenance,
-  completeAssemblyPointMaintenance,
+  setAssemblyPointUnavailable,
+  setAssemblyPointAvailable,
   closeAssemblyPoint,
   updateRescuerAssemblyPointAssignment,
   scheduleAssemblyPointGathering,
@@ -32,6 +32,8 @@ import {
   UpdateAssemblyPointRequest,
   UpdateAssemblyPointResponse,
   UpdateRescuerAssemblyPointAssignmentRequest,
+  AssemblyPointStatusTransitionRequest,
+  AssemblyPointStatusTransitionResponse,
   ScheduleAssemblyPointGatheringRequest,
   ScheduleAssemblyPointGatheringResponse,
   ScheduleAssemblyPointGatheringErrorResponse,
@@ -110,13 +112,7 @@ export function useInfiniteAssemblyPoints(options?: UseAssemblyPointsOptions) {
       }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) => {
-      // Assuming paginated response shape typically contains `currentPage` and `totalPages` directly
-      // Adjust according to actual response shape
-      const { currentPage, totalPages } = lastPage as any;
-      if (typeof currentPage === "number" && typeof totalPages === "number") {
-        return currentPage < totalPages ? currentPage + 1 : undefined;
-      }
-      return undefined;
+      return lastPage.hasNextPage ? lastPage.pageNumber + 1 : undefined;
     },
     enabled: options?.enabled ?? true,
   });
@@ -258,7 +254,7 @@ function invalidateAssemblyPointQueries(
 export function useActivateAssemblyPoint() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, number>({
+  return useMutation<AssemblyPointStatusTransitionResponse, Error, number>({
     mutationFn: activateAssemblyPoint,
     onSuccess: (_data, id) => {
       invalidateAssemblyPointQueries(queryClient, id);
@@ -267,29 +263,37 @@ export function useActivateAssemblyPoint() {
 }
 
 /**
- * Hook to start maintenance for an assembly point
+ * Hook to set an assembly point unavailable
  */
-export function useStartAssemblyPointMaintenance() {
+export function useSetAssemblyPointUnavailable() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, number>({
-    mutationFn: startAssemblyPointMaintenance,
-    onSuccess: (_data, id) => {
-      invalidateAssemblyPointQueries(queryClient, id);
+  return useMutation<
+    AssemblyPointStatusTransitionResponse,
+    Error,
+    AssemblyPointStatusTransitionRequest
+  >({
+    mutationFn: setAssemblyPointUnavailable,
+    onSuccess: (_data, variables) => {
+      invalidateAssemblyPointQueries(queryClient, variables.id);
     },
   });
 }
 
 /**
- * Hook to complete maintenance for an assembly point
+ * Hook to set an assembly point available
  */
-export function useCompleteAssemblyPointMaintenance() {
+export function useSetAssemblyPointAvailable() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, number>({
-    mutationFn: completeAssemblyPointMaintenance,
-    onSuccess: (_data, id) => {
-      invalidateAssemblyPointQueries(queryClient, id);
+  return useMutation<
+    AssemblyPointStatusTransitionResponse,
+    Error,
+    AssemblyPointStatusTransitionRequest
+  >({
+    mutationFn: setAssemblyPointAvailable,
+    onSuccess: (_data, variables) => {
+      invalidateAssemblyPointQueries(queryClient, variables.id);
     },
   });
 }
@@ -300,10 +304,14 @@ export function useCompleteAssemblyPointMaintenance() {
 export function useCloseAssemblyPoint() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, number>({
+  return useMutation<
+    AssemblyPointStatusTransitionResponse,
+    Error,
+    AssemblyPointStatusTransitionRequest
+  >({
     mutationFn: closeAssemblyPoint,
-    onSuccess: (_data, id) => {
-      invalidateAssemblyPointQueries(queryClient, id);
+    onSuccess: (_data, variables) => {
+      invalidateAssemblyPointQueries(queryClient, variables.id);
     },
   });
 }

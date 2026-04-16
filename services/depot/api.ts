@@ -265,15 +265,15 @@ export async function updateDepotStatus(
 }
 
 /**
- * Assign or replace manager for a depot
+ * Assign one or many managers for a depot
  * PATCH /logistics/depot/{id}/manager
  */
 export async function assignDepotManager(
   request: AssignDepotManagerRequest,
 ): Promise<DepotManagerAssignmentResponse> {
-  const { id, managerId } = request;
+  const { id, managerIds } = request;
   const { data } = await api.patch(`/logistics/depot/${id}/manager`, {
-    managerId,
+    managerIds,
   });
   return data;
 }
@@ -295,11 +295,13 @@ export async function unassignDepotManager(
 }
 
 /**
- * [Admin] Get all depot funds
+ * [Admin] Get all depot funds (paginated)
  * GET /logistics/depot/funds
  */
-export async function getDepotFunds(): Promise<DepotFund[]> {
-  const { data } = await api.get("/logistics/depot/funds");
+export async function getDepotFunds(
+  params?: import("./type").GetDepotFundsParams,
+): Promise<import("./type").GetDepotFundsResponse> {
+  const { data } = await api.get("/logistics/depot/funds", { params });
   return data;
 }
 

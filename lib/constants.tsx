@@ -16,7 +16,6 @@ import {
   CheckCircle,
   Clock,
   Cloud,
-  CloudSun,
   Drop,
   FirstAid,
   ForkKnife,
@@ -579,34 +578,16 @@ export const navigationItems = [
     href: "/dashboard/admin/map-zone",
   },
   {
-    icon: CloudSun,
-    label: "Thời tiết",
-    children: [
-      {
-        icon: ({ className }: { size?: number; className?: string }) => (
-          <IconifyIcon
-            icon="fluent-mdl2:news"
-            width={18}
-            height={18}
-            className={className}
-          />
-        ),
-        label: "Bài đăng thời tiết",
-        href: "/dashboard/admin/weather-posts",
-      },
-      {
-        icon: ({ className }: { size?: number; className?: string }) => (
-          <IconifyIcon
-            icon="wi:forecast-io-hail"
-            width={24}
-            height={24}
-            className={className}
-          />
-        ),
-        label: "Thời tiết & Lũ lụt",
-        href: "/dashboard/admin/weather-flood",
-      },
-    ],
+    icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon
+        icon="wi:forecast-io-hail"
+        width={24}
+        height={24}
+        className={className}
+      />
+    ),
+    label: "Thời tiết & Lũ lụt",
+    href: "/dashboard/admin/weather-flood",
   },
 ];
 
@@ -779,8 +760,8 @@ export const assemblyPointStatusConfig = {
     bgColor: "bg-sky-50 dark:bg-sky-950/30",
     icon: Clock,
   },
-  Active: {
-    label: "Hoạt động",
+  Available: {
+    label: "Khả dụng",
     color: "bg-green-500",
     textColor: "text-green-700 dark:text-green-400",
     bgColor: "bg-green-50 dark:bg-green-950/30",

@@ -281,12 +281,15 @@ export function useMyManagedDepots(options?: { enabled?: boolean }) {
 }
 
 /**
- * [Admin] Hook to fetch all depot funds
+ * [Admin] Hook to fetch all depot funds (paginated)
  */
-export function useDepotFunds(options?: { enabled?: boolean }) {
-  return useQuery<DepotFund[]>({
-    queryKey: DEPOT_FUNDS_QUERY_KEY,
-    queryFn: getDepotFunds,
+export function useDepotFunds(
+  params?: import("./type").GetDepotFundsParams,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<import("./type").GetDepotFundsResponse>({
+    queryKey: [...DEPOT_FUNDS_QUERY_KEY, params],
+    queryFn: () => getDepotFunds(params),
     enabled: options?.enabled ?? true,
   });
 }

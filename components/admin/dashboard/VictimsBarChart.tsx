@@ -73,7 +73,7 @@ const CustomTooltip = ({
 
     return (
       <div className="bg-white dark:bg-zinc-800 border border-border/60 rounded-xl px-4 py-3 shadow-xl backdrop-blur-sm">
-        <p className="text-xs font-medium text-muted-foreground mb-0.5">
+        <p className="text-sm tracking-tighter font-medium text-muted-foreground mb-0.5">
           {granLabel}
         </p>
         <p className="text-sm font-semibold text-foreground">{data.label}</p>
@@ -81,7 +81,9 @@ const CustomTooltip = ({
           <span className="text-xl font-bold text-rose-500">
             {data.totalVictims.toLocaleString("vi-VN")}
           </span>
-          <span className="text-xs text-muted-foreground">nạn nhân</span>
+          <span className="text-sm tracking-tighter text-muted-foreground">
+            nạn nhân
+          </span>
         </div>
       </div>
     );
@@ -150,7 +152,7 @@ const VictimsBarChart = () => {
               )}
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold tracking-tight text-foreground">
+              <span className="text-2xl font-bold tracking-tighter text-foreground">
                 {totalVictims.toLocaleString("vi-VN")}
               </span>
               <span className="text-sm text-muted-foreground">nạn nhân</span>
@@ -167,7 +169,7 @@ const VictimsBarChart = () => {
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "h-7 px-2.5 text-xs font-medium rounded transition-all duration-200",
+                    "h-7 px-2.5 text-sm tracking-tighter font-medium rounded transition-all duration-200",
                     granularity === opt.value
                       ? "bg-background text-foreground shadow-sm font-semibold"
                       : "text-muted-foreground hover:text-foreground",
@@ -183,7 +185,7 @@ const VictimsBarChart = () => {
 
         {/* Date Range Filter */}
         <div className="flex items-center gap-2 mt-3 flex-wrap">
-          <span className="text-xs text-muted-foreground shrink-0">
+          <span className="text-sm tracking-tighter text-muted-foreground shrink-0">
             Từ
           </span>
           <DatePickerInput
@@ -193,7 +195,7 @@ const VictimsBarChart = () => {
             className="w-[160px]"
           />
           <ArrowRight size={14} className="text-muted-foreground shrink-0" />
-          <span className="text-xs text-muted-foreground shrink-0">
+          <span className="text-sm tracking-tighter text-muted-foreground shrink-0">
             Đến
           </span>
           <DatePickerInput
@@ -208,10 +210,7 @@ const VictimsBarChart = () => {
       <CardContent className="pt-4">
         {chartLoading ? (
           <div className="flex items-center justify-center h-[380px]">
-            <Spinner
-              size={32}
-              className="animate-spin text-muted-foreground"
-            />
+            <Spinner size={32} className="animate-spin text-muted-foreground" />
           </div>
         ) : formattedData.length === 0 ? (
           <div className="flex items-center justify-center h-[380px] text-muted-foreground text-sm">

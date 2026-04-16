@@ -302,13 +302,26 @@ function createInternalRepaymentRow(
 
 /** Auto-detects the real header row (skips title/note rows) and returns parsed data rows. */
 function normalizeExcelText(value: unknown): string {
-  return String(value ?? "")
-    .replace(/[Đđ]/g, "d")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+  return (
+    String(value ?? "")
+      .replace(/[Đđ]/g, "d")
+      // normalize superscript digits (dm³ → dm3, m² → m2, etc.)
+      .replace(/\u00B9/g, "1")
+      .replace(/\u00B2/g, "2")
+      .replace(/\u00B3/g, "3")
+      .replace(/\u2070/g, "0")
+      .replace(/\u2074/g, "4")
+      .replace(/\u2075/g, "5")
+      .replace(/\u2076/g, "6")
+      .replace(/\u2077/g, "7")
+      .replace(/\u2078/g, "8")
+      .replace(/\u2079/g, "9")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+  );
 }
 
 function parseExcelNumber(value: unknown): number {
@@ -837,6 +850,7 @@ export default function FundingRequestPage() {
       params: {
         pageNumber: histPage,
         pageSize: histPageSize,
+        depotId: depotId || undefined,
         depotIds: depotId ? [depotId] : undefined,
       },
     },
@@ -1594,7 +1608,7 @@ export default function FundingRequestPage() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
               >
-                {/* Fund balance */}
+                {/* Fund balance
                 <Card className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
                   <CardContent className="">
                     <div className="flex items-center justify-between mb-1">
@@ -1673,7 +1687,7 @@ export default function FundingRequestPage() {
                       </p>
                     )}
                   </CardContent>
-                </Card>
+                </Card> */}
 
                 {/* Description */}
                 <div className="space-y-2">

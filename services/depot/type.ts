@@ -172,7 +172,7 @@ export interface UpdateDepotStatusResponse {
 
 export interface AssignDepotManagerRequest {
   id: number;
-  managerId: string;
+  managerIds: string[];
 }
 
 export interface UnassignDepotManagerRequest {
@@ -213,6 +213,22 @@ export interface DepotFund {
   advanceLimit: number;
   outstandingAdvanceAmount: number;
   funds: AdminDepotFundSource[];
+}
+
+export interface GetDepotFundsParams {
+  pageNumber?: number;
+  pageSize?: number;
+  search?: string;
+}
+
+export interface GetDepotFundsResponse {
+  items: DepotFund[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 }
 
 // My Depot Fund Ledger (from /finance/depot-funds/my)

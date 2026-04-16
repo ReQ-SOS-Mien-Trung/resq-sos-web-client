@@ -41,6 +41,7 @@ import {
   SunIcon,
   MoonIcon,
   LockIcon,
+  WarehouseIcon,
 } from "@phosphor-icons/react";
 import {
   CategoryOverview,
@@ -765,7 +766,7 @@ const InventoryDashboardPage = () => {
                   className="gap-2 cursor-pointer"
                   onClick={() => router.push(MANAGER_DEPOT_SELECT_ROUTE)}
                 >
-                  <BuildingsIcon className="h-4 w-4" />
+                  <WarehouseIcon className="h-4 w-4" />
                   Chuyển đổi kho
                 </DropdownMenuItem>
               ) : null}

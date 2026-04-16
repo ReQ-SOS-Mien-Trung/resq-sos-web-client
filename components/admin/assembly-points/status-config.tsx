@@ -12,7 +12,7 @@ import type {
 
 export const ASSEMBLY_POINT_STATUS_ORDER: AssemblyPointStatus[] = [
   "Created",
-  "Active",
+  "Available",
   "Unavailable",
   "Closed",
 ];
@@ -44,8 +44,8 @@ const STATUS_STYLE: Record<AssemblyPointStatus, AssemblyPointStatusStyle> = {
     bg: "bg-sky-500/10 border-sky-200",
     icon: <Clock size={20} weight="fill" className="text-sky-500" />,
   },
-  Active: {
-    fallbackLabel: "Đang hoạt động",
+  Available: {
+    fallbackLabel: "Khả dụng",
     color: "text-emerald-700",
     bg: "bg-emerald-500/10 border-emerald-200",
     icon: <CheckCircle size={20} weight="fill" className="text-emerald-500" />,

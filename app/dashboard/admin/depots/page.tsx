@@ -47,6 +47,7 @@ import {
   Users,
   ImageSquare,
 } from "@phosphor-icons/react";
+import { Icon as IconifyIcon } from "@iconify/react";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
 import {
@@ -445,17 +446,20 @@ export default function DepotsPage() {
   const totalPages = tableData?.totalPages ?? 1;
 
   const STATUS_CARD_STYLE: Partial<
-    Record<DepotStatus, { color: string; bg: string; Icon: typeof CheckCircle }>
+    Record<
+      DepotStatus,
+      { color: string; bg: string; Icon: typeof CheckCircle | string }
+    >
   > = {
     Created: {
       color: "text-sky-600 dark:text-sky-400",
       bg: "bg-sky-50 dark:bg-sky-950/30",
-      Icon: Plus,
+      Icon: "tabler:plus",
     },
     PendingAssignment: {
       color: "text-blue-600 dark:text-blue-400",
       bg: "bg-blue-50 dark:bg-blue-950/30",
-      Icon: WarningCircle,
+      Icon: "fa7-solid:user-clock",
     },
     Available: {
       color: "text-emerald-600 dark:text-emerald-400",
@@ -463,14 +467,19 @@ export default function DepotsPage() {
       Icon: CheckCircle,
     },
     Unavailable: {
-      color: "text-orange-600 dark:text-orange-400",
-      bg: "bg-orange-50 dark:bg-orange-950/30",
-      Icon: WarningCircle,
+      color: "text-yellow-600 dark:text-yellow-400",
+      bg: "bg-yellow-50 dark:bg-yellow-950/30",
+      Icon: "uiw:stop",
     },
     Closed: {
       color: "text-zinc-500 dark:text-zinc-400",
       bg: "bg-zinc-50 dark:bg-zinc-950/30",
-      Icon: X,
+      Icon: "mingcute:lock-fill",
+    },
+    Closing: {
+      color: "text-red-600 dark:text-red-400",
+      bg: "bg-red-50 dark:bg-red-950/30",
+      Icon: "ic:round-close",
     },
   };
 
@@ -702,7 +711,7 @@ export default function DepotsPage() {
 
         {/* ── Stats ── */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {statsList.map(({ key, label, value, color, bg, Icon }) => (
+          {statsList.map(({ key, label, value, color, bg, Icon: StatIcon }) => (
             <Card key={key} className="border border-border/50">
               <CardContent className="px-4 py-2">
                 <div className="flex items-center justify-between gap-2">
@@ -710,17 +719,26 @@ export default function DepotsPage() {
                     <p className="text-sm tracking-tighter text-muted-foreground font-medium mb-0.5 truncate">
                       {label}
                     </p>
-                    <p className="text-xl tracking-tighter font-bold text-foreground">
+                    <p className="text-2xl tracking-tighter font-bold text-foreground">
                       {!allData ? "—" : value}
                     </p>
                   </div>
                   <div
                     className={cn(
-                      "h-9 w-9 rounded-lg flex items-center justify-center shrink-0",
+                      "h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
                       bg,
                     )}
                   >
-                    <Icon size={17} weight="fill" className={color} />
+                    {typeof StatIcon === "string" ? (
+                      <IconifyIcon
+                        icon={StatIcon}
+                        width={17}
+                        height={17}
+                        className={color}
+                      />
+                    ) : (
+                      <StatIcon size={17} weight="fill" className={color} />
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -771,11 +789,10 @@ export default function DepotsPage() {
               </Button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-48 p-1"
-              align="start"
+              className="w-56 max-h-72 overflow-y-auto p-1"
+              align="end"
               side="bottom"
               sideOffset={4}
-              avoidCollisions={false}
             >
               {statusFilterKeys.map((s) => {
                 const checked = selectedStatuses.includes(s);

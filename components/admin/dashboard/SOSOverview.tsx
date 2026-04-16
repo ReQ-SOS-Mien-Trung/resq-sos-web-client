@@ -141,7 +141,9 @@ function buildSOSHeadline(sos: SOSRequestEntity) {
   }
 
   if (sos.structuredData?.situation) {
-    parts.push(`Tình trạng: ${getSituationLabel(sos.structuredData.situation)}`);
+    parts.push(
+      `Tình trạng: ${getSituationLabel(sos.structuredData.situation)}`,
+    );
   }
 
   const totalPeople = getPeopleCount(sos);
@@ -214,7 +216,9 @@ function StatCard({
         )}
       </div>
       <div className="text-2xl font-bold leading-none">{value}</div>
-      <div className="mt-1 text-[11px] text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm tracking-tighter text-muted-foreground">
+        {label}
+      </div>
     </div>
   );
 }
@@ -231,7 +235,7 @@ function NeedChip({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium",
+        "inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm tracking-tighter font-medium",
         className,
       )}
     >
@@ -260,14 +264,17 @@ function SOSRow({ sos }: { sos: SOSRequestEntity }) {
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
               <span
-                className={cn("h-2.5 w-2.5 rounded-full", priority.dotClassName)}
+                className={cn(
+                  "h-2.5 w-2.5 rounded-full",
+                  priority.dotClassName,
+                )}
               />
               <span className="text-sm font-semibold">SOS #{sos.id}</span>
             </div>
 
             <Badge
               variant={priority.badgeVariant}
-              className="h-5 px-1.5 py-0 text-[10px] leading-none"
+              className="h-5 px-1.5 py-0 text-sm tracking-tighter leading-none"
             >
               {priority.label}
             </Badge>
@@ -275,7 +282,7 @@ function SOSRow({ sos }: { sos: SOSRequestEntity }) {
             <Badge
               variant={status.badgeVariant}
               className={cn(
-                "h-5 gap-1 px-1.5 py-0 text-[10px] leading-none",
+                "h-5 gap-1 px-1.5 py-0 text-sm tracking-tighter leading-none",
                 status.badgeClassName,
               )}
             >
@@ -289,7 +296,7 @@ function SOSRow({ sos }: { sos: SOSRequestEntity }) {
           )}
 
           {supportingText && (
-            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+            <p className="mt-1 text-sm tracking-tighter text-muted-foreground line-clamp-2">
               {supportingText}
             </p>
           )}
@@ -330,7 +337,7 @@ function SOSRow({ sos }: { sos: SOSRequestEntity }) {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1 self-end text-xs text-muted-foreground lg:self-start">
+        <div className="flex shrink-0 items-center gap-1 self-end text-sm tracking-tighter text-muted-foreground lg:self-start">
           <Clock className="h-3 w-3" />
           {timeAgo(sos.createdAt)}
         </div>
@@ -442,12 +449,15 @@ const SOSOverview = () => {
               <CardTitle className="text-base font-semibold">
                 Tổng quan SOS
               </CardTitle>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
+              <p className="mt-0.5 text-sm tracking-tighter text-muted-foreground">
                 Theo dõi yêu cầu cứu hộ khẩn cấp
               </p>
             </div>
           </div>
-          <Badge variant="outline" className="h-6 gap-1 text-[11px]">
+          <Badge
+            variant="outline"
+            className="h-6 gap-1 text-sm tracking-tighter"
+          >
             <Pulse className="h-3.5 w-3.5 text-emerald-500" weight="bold" />
             Realtime
           </Badge>
@@ -489,10 +499,10 @@ const SOSOverview = () => {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">
+            <span className="text-sm tracking-tighter font-medium text-muted-foreground">
               Phân bổ theo mức độ ưu tiên
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-sm tracking-tighter text-muted-foreground">
               Tổng: {stats.total}
             </span>
           </div>
@@ -534,7 +544,7 @@ const SOSOverview = () => {
                 return (
                   <div
                     key={level}
-                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                    className="flex items-center gap-1.5 text-sm tracking-tighter text-muted-foreground"
                   >
                     <span
                       className={cn(
@@ -554,11 +564,14 @@ const SOSOverview = () => {
 
         <div>
           <div className="mb-2 flex items-center justify-between gap-2">
-            <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <h4 className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
               <Siren className="h-3.5 w-3.5" weight="bold" />
               Yêu cầu đang hoạt động
             </h4>
-            <Badge variant="secondary" className="h-5 px-2 text-[10px]">
+            <Badge
+              variant="secondary"
+              className="h-5 px-2 text-sm tracking-tighter"
+            >
               {activeRequests.length} yêu cầu
             </Badge>
           </div>
@@ -572,7 +585,7 @@ const SOSOverview = () => {
               <p className="text-sm font-medium text-foreground/70">
                 Tất cả yêu cầu đã được xử lý
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-0.5 text-sm tracking-tighter text-muted-foreground">
                 Không có SOS nào đang chờ hoặc đang thực thi
               </p>
             </div>
