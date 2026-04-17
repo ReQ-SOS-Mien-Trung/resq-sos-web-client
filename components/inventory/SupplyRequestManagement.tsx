@@ -7,15 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowsClockwise,
   ArrowDown,
   ArrowUp,
   Package,
+  ClipboardText,
 } from "@phosphor-icons/react";
 import { useSupplyRequests } from "@/services/inventory/hooks";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
 import IncomingRequestsSection from "./IncomingRequestsSection";
 import { SupplyRequestTracker } from "./SupplyRequestTracker";
+import SupplyRequestSection from "./SupplyRequestSection";
 
 // ── Status labels & colors ───────────────────────────────────────────────────
 
@@ -37,10 +46,14 @@ const requestingStatusColors: Record<string, string> = {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-type SubTab = "incoming" | "outgoing";
+type SubTab = "incoming" | "outgoing" | "create";
 
-export default function SupplyRequestManagement() {
-  const [subTab, setSubTab] = useState<SubTab>("incoming");
+export default function SupplyRequestManagement({
+  onPanelOpenChange,
+}: {
+  onPanelOpenChange?: (open: boolean) => void;
+}) {
+  const [subTab, setSubTab] = useState<SubTab>("create");
 
   return (
     <div className="space-y-5">
@@ -62,17 +75,18 @@ export default function SupplyRequestManagement() {
 
         <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/50 p-1 lg:self-start">
           <button
-            onClick={() => setSubTab("incoming")}
+            onClick={() => setSubTab("create")}
             className={cn(
               "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium tracking-tighter transition-all",
-              subTab === "incoming"
+              subTab === "create"
                 ? "border border-border/60 bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <ArrowDown className="h-4 w-4" weight="bold" />
-            Đơn đến
+            <ClipboardText className="h-4 w-4" weight="bold" />
+            Tạo yêu cầu
           </button>
+
           <button
             onClick={() => setSubTab("outgoing")}
             className={cn(
@@ -84,6 +98,18 @@ export default function SupplyRequestManagement() {
           >
             <ArrowUp className="h-4 w-4" weight="bold" />
             Đơn đã gửi
+          </button>
+          <button
+            onClick={() => setSubTab("incoming")}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium tracking-tighter transition-all",
+              subTab === "incoming"
+                ? "border border-border/60 bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <ArrowDown className="h-4 w-4" weight="bold" />
+            Đơn đến
           </button>
         </div>
       </motion.div>
@@ -99,6 +125,18 @@ export default function SupplyRequestManagement() {
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
             <IncomingRequestsSection />
+          </motion.div>
+        ) : subTab === "create" ? (
+          <motion.div
+            key="create"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            <SupplyRequestSection
+              onSelectionSidebarChange={onPanelOpenChange}
+            />
           </motion.div>
         ) : (
           <motion.div
@@ -124,7 +162,7 @@ function OutgoingRequestsPanel() {
   const { selectedDepotId } = useManagerDepot();
   const [filter, setFilter] = useState<OutgoingFilter>("all");
   const [pageNumber, setPageNumber] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
   const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
   const [trackerOpen, setTrackerOpen] = useState(false);
 
@@ -307,7 +345,7 @@ function OutgoingRequestsPanel() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
         >
-          <Card className="border-border/60">
+          <Card className="border-border/60 py-0">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-200 text-sm tracking-tighter">
@@ -357,18 +395,22 @@ function OutgoingRequestsPanel() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="space-y-1.5">
-                            {request.items.map((item) => (
-                              <div
-                                key={`${request.id}-${item.itemModelId}`}
-                                className="flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5"
-                              >
-                                <span>{item.itemModelName}</span>
+                            {request.items[0] && (
+                              <div className="flex items-center justify-between gap-3">
+                                <span>{request.items[0].itemModelName}</span>
                                 <span className="font-semibold text-primary whitespace-nowrap">
-                                  {item.quantity.toLocaleString("vi-VN")}{" "}
-                                  {item.unit}
+                                  {request.items[0].quantity.toLocaleString(
+                                    "vi-VN",
+                                  )}{" "}
+                                  {request.items[0].unit}
                                 </span>
                               </div>
-                            ))}
+                            )}
+                            {request.items.length >= 2 && (
+                              <p className="text-xs italic text-muted-foreground tracking-tighter">
+                                Có {request.items.length} vật phẩm khác...
+                              </p>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -392,7 +434,7 @@ function OutgoingRequestsPanel() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.4, delay: 0.25 }}
-        className="flex items-center justify-between"
+        className="flex items-center justify-between gap-3 flex-wrap"
       >
         <p className="text-xs text-muted-foreground tracking-tighter">
           Trang {pageNumber}
@@ -402,6 +444,29 @@ function OutgoingRequestsPanel() {
             : ""}
         </p>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground tracking-tighter whitespace-nowrap">
+              Hiển thị
+            </span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => {
+                setPageSize(Number(value));
+                setPageNumber(1);
+              }}
+            >
+              <SelectTrigger className="h-8 w-20 text-xs tracking-tighter">
+                <SelectValue placeholder="10" />
+              </SelectTrigger>
+              <SelectContent>
+                {[5, 10, 20, 50, 100].map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             variant="outline"
             size="sm"

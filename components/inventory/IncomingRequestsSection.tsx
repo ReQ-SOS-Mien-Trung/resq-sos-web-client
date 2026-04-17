@@ -3,6 +3,13 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
   Lightning,
@@ -40,62 +47,96 @@ type FilterTab = "all" | "needs_action" | "in_transit" | "done" | "rejected";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function getNeedsAction(r: SupplyRequestListItem): boolean {
+function getRequestBucket(
+  r: SupplyRequestListItem,
+): Exclude<FilterTab, "all"> | "other" {
+  if (r.sourceStatus === "Rejected" || r.requestingStatus === "Rejected") {
+    return "rejected";
+  }
+
+  if (r.requestingStatus === "Received") {
+    return "done";
+  }
+
+  if (r.sourceStatus === "Shipping" || r.requestingStatus === "InTransit") {
+    // Requester chỉ thực sự cần thao tác sau khi bên gửi đã hoàn tất giao.
+    if (
+      r.role === "Requester" &&
+      r.sourceStatus === "Completed" &&
+      r.requestingStatus === "InTransit"
+    ) {
+      return "needs_action";
+    }
+
+    return "in_transit";
+  }
+
   if (r.role === "Source") {
-    return (
+    if (
       r.sourceStatus === "Pending" ||
+      r.requestingStatus === "WaitingForApproval" ||
       r.sourceStatus === "Accepted" ||
       r.sourceStatus === "Preparing"
-    );
+    ) {
+      return "needs_action";
+    }
+
+    if (r.sourceStatus === "Completed") {
+      return "done";
+    }
   }
-  if (r.role === "Requester") {
-    // Source phải bấm "Xác nhận đã giao" (Completed) trước
-    // thì Requester mới cần action
-    return r.sourceStatus === "Completed" && r.requestingStatus === "InTransit";
-  }
-  return false;
+
+  return "other";
 }
 
 function getStatusInfo(r: SupplyRequestListItem): {
   label: string;
   className: string;
 } {
-  if (r.sourceStatus === "Rejected" || r.requestingStatus === "Rejected") {
+  const bucket = getRequestBucket(r);
+
+  if (bucket === "rejected") {
     return {
       label: "Từ chối",
       className: "bg-red-100 text-red-700 border-red-200",
     };
   }
-  if (r.requestingStatus === "Received") {
+
+  if (bucket === "done") {
+    if (r.requestingStatus === "Received") {
+      return {
+        label: "Hoàn thành",
+        className: "bg-green-100 text-green-700 border-green-200",
+      };
+    }
+
     return {
-      label: "Hoàn thành",
-      className: "bg-green-100 text-green-700 border-green-200",
+      label: "Đã giao hàng",
+      className: "bg-teal-100 text-teal-700 border-teal-200",
     };
   }
-  if (r.sourceStatus === "Shipping" || r.requestingStatus === "InTransit") {
+
+  if (bucket === "in_transit") {
     return {
       label: "Đang vận chuyển",
       className: "bg-blue-100 text-blue-700 border-blue-200",
     };
   }
+
   if (r.sourceStatus === "Preparing") {
     return {
       label: "Đang đóng gói",
       className: "bg-purple-100 text-purple-700 border-purple-200",
     };
   }
+
   if (r.sourceStatus === "Accepted" || r.requestingStatus === "Approved") {
     return {
       label: "Đã chấp nhận",
       className: "bg-emerald-100 text-emerald-700 border-emerald-200",
     };
   }
-  if (r.sourceStatus === "Completed") {
-    return {
-      label: "Đã giao hàng",
-      className: "bg-teal-100 text-teal-700 border-teal-200",
-    };
-  }
+
   return {
     label: "Chờ duyệt",
     className: "bg-amber-100 text-amber-700 border-amber-200",
@@ -154,42 +195,28 @@ export default function IncomingRequestsSection() {
   );
 
   // ── Stats ──
-  const needsActionCount = allItems.filter(getNeedsAction).length;
+  const needsActionCount = allItems.filter(
+    (r) => getRequestBucket(r) === "needs_action",
+  ).length;
   const inTransitCount = allItems.filter(
-    (r) =>
-      r.sourceStatus === "Shipping" || r.requestingStatus === "InTransit",
+    (r) => getRequestBucket(r) === "in_transit",
   ).length;
-  const doneCount = allItems.filter(
-    (r) =>
-      r.requestingStatus === "Received" || r.sourceStatus === "Completed",
-  ).length;
+  const doneCount = allItems.filter((r) => getRequestBucket(r) === "done").length;
   const rejectedCount = allItems.filter(
-    (r) =>
-      r.sourceStatus === "Rejected" || r.requestingStatus === "Rejected",
+    (r) => getRequestBucket(r) === "rejected",
   ).length;
 
   // ── Filtered list ──
   const filteredItems = useMemo(() => {
     switch (filter) {
       case "needs_action":
-        return allItems.filter(getNeedsAction);
+        return allItems.filter((r) => getRequestBucket(r) === "needs_action");
       case "in_transit":
-        return allItems.filter(
-          (r) =>
-            r.sourceStatus === "Shipping" || r.requestingStatus === "InTransit",
-        );
+        return allItems.filter((r) => getRequestBucket(r) === "in_transit");
       case "done":
-        return allItems.filter(
-          (r) =>
-            r.requestingStatus === "Received" ||
-            r.sourceStatus === "Completed",
-        );
+        return allItems.filter((r) => getRequestBucket(r) === "done");
       case "rejected":
-        return allItems.filter(
-          (r) =>
-            r.sourceStatus === "Rejected" ||
-            r.requestingStatus === "Rejected",
-        );
+        return allItems.filter((r) => getRequestBucket(r) === "rejected");
       default:
         return allItems;
     }
@@ -207,16 +234,16 @@ export default function IncomingRequestsSection() {
   };
 
   // ── Card pagination ──
-  const CARDS_PER_PAGE = 6;
+  const [cardsPerPage, setCardsPerPage] = useState(10);
   const [cardPage, setCardPage] = useState(1);
   const totalCardPages = Math.max(
     1,
-    Math.ceil(filteredItems.length / CARDS_PER_PAGE),
+    Math.ceil(filteredItems.length / cardsPerPage),
   );
   const currentCardPage = Math.min(cardPage, totalCardPages);
   const pagedItems = filteredItems.slice(
-    (currentCardPage - 1) * CARDS_PER_PAGE,
-    currentCardPage * CARDS_PER_PAGE,
+    (currentCardPage - 1) * cardsPerPage,
+    currentCardPage * cardsPerPage,
   );
 
   // ── Render ──
@@ -371,12 +398,36 @@ export default function IncomingRequestsSection() {
       )}
 
       {/* ── Cards Pagination ── */}
-      {totalCardPages > 1 && (
+      {filteredItems.length > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground tracking-tighter order-2 sm:order-1">
             {filteredItems.length} yêu cầu • Trang {currentCardPage} / {totalCardPages}
           </p>
-          <div className="flex items-center gap-1 order-1 sm:order-2">
+          <div className="flex items-center gap-2 order-1 sm:order-2 flex-wrap justify-end">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground tracking-tighter whitespace-nowrap">
+                Hiển thị
+              </span>
+              <Select
+                value={String(cardsPerPage)}
+                onValueChange={(value) => {
+                  setCardsPerPage(Number(value));
+                  setCardPage(1);
+                }}
+              >
+                <SelectTrigger className="h-8 w-20 text-xs tracking-tighter">
+                  <SelectValue placeholder="10" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[5, 10, 20, 50, 100].map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-1">
             <Button
               variant="outline"
               size="sm"
@@ -444,6 +495,7 @@ export default function IncomingRequestsSection() {
             >
               »
             </Button>
+            </div>
           </div>
         </div>
       )}
@@ -619,6 +671,7 @@ function RequestCard({
 
   const statusInfo = getStatusInfo(request);
   const roleInfo = getRoleInfo(request.role);
+  const requestBucket = getRequestBucket(request);
 
   const handleAccept = async () => {
     try {
@@ -690,10 +743,10 @@ function RequestCard({
   };
 
   // Determine accent color based on status
-  const isRejected = request.sourceStatus === "Rejected" || request.requestingStatus === "Rejected";
-  const isDone = request.requestingStatus === "Received";
-  const needsAction = getNeedsAction(request);
-  const isInTransit = request.sourceStatus === "Shipping" || request.requestingStatus === "InTransit";
+  const isRejected = requestBucket === "rejected";
+  const isDone = requestBucket === "done";
+  const needsAction = requestBucket === "needs_action";
+  const isInTransit = requestBucket === "in_transit";
 
   const topStrip = isRejected
     ? "bg-slate-300"
@@ -778,22 +831,24 @@ function RequestCard({
             <Package className="h-3 w-3" />
             {request.items.length} mặt hàng
           </p>
-          <div className="divide-y divide-dashed divide-border/50">
-            {request.items.slice(0, 3).map((item) => (
-              <div key={item.itemModelId} className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0">
+          {request.items[0] && (
+            <div className="divide-y divide-dashed divide-border/50">
+              <div className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0">
                 <span className="text-sm font-medium tracking-tighter text-foreground/90 truncate flex-1 min-w-0">
-                  {item.itemModelName}
+                  {request.items[0].itemModelName}
                 </span>
                 <span className="text-sm font-bold text-primary tabular-nums tracking-tighter whitespace-nowrap shrink-0">
-                  {item.quantity.toLocaleString("vi-VN")}
-                  <span className="font-normal text-muted-foreground text-xs ml-1">{item.unit}</span>
+                  {request.items[0].quantity.toLocaleString("vi-VN")}
+                  <span className="font-normal text-muted-foreground text-xs ml-1">
+                    {request.items[0].unit}
+                  </span>
                 </span>
               </div>
-            ))}
-          </div>
-          {request.items.length > 3 && (
-            <p className="text-xs text-muted-foreground tracking-tighter pt-1.5">
-              +{request.items.length - 3} mặt hàng khác…
+            </div>
+          )}
+          {request.items.length >= 2 && (
+            <p className="text-xs italic text-muted-foreground tracking-tighter pt-1.5">
+              Có {request.items.length} mặt hàng
             </p>
           )}
         </div>

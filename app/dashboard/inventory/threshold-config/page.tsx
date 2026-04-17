@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
@@ -48,7 +48,17 @@ import {
   SpinnerGap,
   Trash,
   WarningCircle,
+  Folders,
+  Package,
+  Scales,
+  ListDashes,
 } from "@phosphor-icons/react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   useDeleteMyDepotThreshold,
   useInventoryCategories,
@@ -86,6 +96,13 @@ const SCOPE_COLORS: Record<string, string> = {
   Depot: "bg-blue-100 text-blue-700",
   DepotCategory: "bg-amber-100 text-amber-700",
   DepotItem: "bg-emerald-100 text-emerald-700",
+};
+
+const SCOPE_ACCENT: Record<string, string> = {
+  Global: "border-l-purple-400",
+  Depot: "border-l-blue-400",
+  DepotCategory: "border-l-amber-400",
+  DepotItem: "border-l-emerald-400",
 };
 
 const WARNING_LEVEL_COLORS: Record<string, string> = {
@@ -188,12 +205,27 @@ function EmptyState({
   );
 }
 
-function ThresholdConfigCard({
+const SCOPE_DOT: Record<string, string> = {
+  Global: "bg-purple-400",
+  Depot: "bg-blue-400",
+  DepotCategory: "bg-amber-400",
+  DepotItem: "bg-emerald-400",
+};
+
+const SCOPE_SECTION_BG: Record<string, string> = {
+  Global: "bg-purple-50/60 dark:bg-purple-950/20",
+  Depot: "bg-blue-50/60 dark:bg-blue-950/20",
+  DepotCategory: "bg-amber-50/60 dark:bg-amber-950/20",
+  DepotItem: "bg-emerald-50/60 dark:bg-emerald-950/20",
+};
+
+function ThresholdConfigRow({
   config,
   label,
   sublabel,
   canEdit,
   canDelete,
+  isLast,
   onEdit,
   onDelete,
 }: {
@@ -202,74 +234,134 @@ function ThresholdConfigCard({
   sublabel?: string;
   canEdit: boolean;
   canDelete: boolean;
+  isLast: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
-    <Card className="group relative py-0 border border-border/60 bg-card transition-shadow hover:shadow-sm">
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 flex items-center gap-2">
-              <Badge
-                className={cn(
-                  "text-sm tracking-tighter font-medium",
-                  SCOPE_COLORS[config.scopeType] ?? "",
-                )}
-              >
-                {SCOPE_LABELS[config.scopeType] ?? config.scopeType}
-              </Badge>
-              {sublabel ? (
-                <span className="truncate text-sm tracking-tighter text-muted-foreground">
-                  {sublabel}
-                </span>
-              ) : null}
-            </div>
-
-            <p className="text-sm font-semibold text-foreground">{label}</p>
-            <p className="mt-2 text-xl font-semibold tracking-tighter text-foreground">
-              {config.minimumThreshold != null
-                ? formatNumber(config.minimumThreshold)
-                : "—"}
-            </p>
-            <p className="mt-1 text-sm tracking-tighter text-muted-foreground">
-              {config.minimumThreshold != null
-                ? "Ngưỡng tối thiểu"
-                : formatThresholdDisplay(config)}
-            </p>
-            <p className="mt-1.5 text-sm tracking-tighter text-muted-foreground">
-              {formatDate(config.updatedAt)}
-              {config.rowVersion != null ? ` · v${config.rowVersion}` : ""}
-            </p>
-          </div>
-
-          {canEdit || canDelete ? (
-            <div className="flex shrink-0 gap-1">
-              {canEdit ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={onEdit}
-                >
-                  <PencilSimple className="h-4 w-4" />
-                </Button>
-              ) : null}
-              {canDelete ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive hover:text-destructive"
-                  onClick={onDelete}
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
-              ) : null}
-            </div>
+    <div
+      className={cn(
+        "group flex flex-col gap-1.5 px-3 py-3 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors",
+        !isLast && "border-b border-border/50",
+      )}
+    >
+      {/* Top: label + actions */}
+      <div className="flex items-start justify-between gap-1">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold tracking-tighter text-foreground leading-snug">
+            {label}
+          </p>
+          {sublabel ? (
+            <p className="text-sm tracking-tighter text-muted-foreground">{sublabel}</p>
           ) : null}
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {canEdit ? (
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onEdit}>
+              <PencilSimple className="h-3 w-3" />
+            </Button>
+          ) : null}
+          {canDelete ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive hover:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash className="h-3 w-3" />
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Bottom: threshold chip + date */}
+      <div className="flex items-center justify-between gap-2">
+        <div
+          className={cn(
+            "inline-flex items-baseline gap-1 rounded-md px-2 py-0.5",
+            SCOPE_SECTION_BG[config.scopeType] ?? "bg-muted/40",
+          )}
+        >
+          <span className="text-sm font-bold tabular-nums tracking-tighter text-foreground">
+            <span className="text-sm tracking-tighter font-normal">Ngưỡng tối thiểu: </span>
+            {config.minimumThreshold != null
+              ? formatNumber(config.minimumThreshold)
+              : "—"}
+          </span>
+
+        </div>
+        <div className="text-right">
+          <p className="text-xs tabular-nums tracking-tighter text-muted-foreground whitespace-nowrap">
+            Tạo lúc: {formatDate(config.updatedAt)}
+          </p>
+          {config.rowVersion != null ? (
+            <p className="text-xs tracking-tighter text-muted-foreground">Version: <span className="text-black font-medium">v{config.rowVersion}</span></p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ThresholdScopeSection({
+  scopeType,
+  items,
+  onEdit,
+  onDelete,
+}: {
+  scopeType: string;
+  items: Array<{
+    config: ThresholdConfig;
+    label: string;
+    sublabel?: string;
+    canEdit: boolean;
+    canDelete: boolean;
+  }>;
+  onEdit: (config: ThresholdConfig) => void;
+  onDelete: (config: ThresholdConfig) => void;
+}) {
+  const dot = SCOPE_DOT[scopeType] ?? "bg-slate-400";
+  return (
+    <div className="flex flex-col">
+      {/* Column header */}
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-t-xl border border-b-0 border-border/60 px-3 py-2.5",
+          SCOPE_SECTION_BG[scopeType] ?? "bg-muted/30",
+        )}
+      >
+        <span className={cn("h-2 w-2 shrink-0 rounded-full", dot)} />
+        <p className="text-sm font-semibold tracking-tighter text-foreground">
+          {SCOPE_LABELS[scopeType as ThresholdScopeType] ?? scopeType}
+        </p>
+        <span className="ml-auto text-sm tracking-tighter">
+          {items.length > 0 ? `${items.length} cấu hình` : "—"}
+        </span>
+      </div>
+
+      {/* Items panel */}
+      <div className="overflow-hidden rounded-b-xl border border-border/60 bg-card shadow-sm flex-1">
+        {items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            <p className="text-sm tracking-tighter">Chưa cấu hình</p>
+          </div>
+        ) : (
+          items.map(({ config, label, sublabel, canEdit, canDelete }, idx) => (
+            <ThresholdConfigRow
+              key={`${config.scopeType}-${config.itemModelId ?? config.categoryId ?? "base"}`}
+              config={config}
+              label={label}
+              sublabel={sublabel}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              isLast={idx === items.length - 1}
+              onEdit={() => onEdit(config)}
+              onDelete={() => onDelete(config)}
+            />
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -329,8 +421,7 @@ export default function ThresholdConfigPage() {
       minimumThreshold: "",
       reason: "",
     });
-    setEditOpen(false);
-    setCreateInlineOpen(true);
+    setEditOpen(true);
   }, []);
 
   const openEdit = useCallback((config: ThresholdConfig) => {
@@ -490,7 +581,7 @@ export default function ThresholdConfigPage() {
     if (thresholds.depot) {
       result.push({
         config: thresholds.depot,
-        label: "Ngưỡng mức kho",
+        label: "Ngưỡng theo kho",
         canEdit: true,
         canDelete: true,
       });
@@ -501,9 +592,9 @@ export default function ThresholdConfigPage() {
         config,
         label:
           categoryMap[config.categoryId ?? -1] ??
-          `Danh mục #${config.categoryId}`,
+          `Ngưỡng theo danh mục số ${config.categoryId}`,
         sublabel:
-          config.categoryId != null ? `ID: ${config.categoryId}` : undefined,
+          config.categoryId != null ? `Mã số ${config.categoryId}` : undefined,
         canEdit: true,
         canDelete: true,
       });
@@ -512,9 +603,9 @@ export default function ThresholdConfigPage() {
     thresholds.depotItems?.forEach((config) => {
       result.push({
         config,
-        label: `Vật phẩm #${config.itemModelId}`,
+        label: `Ngưỡng theo vật phẩm số ${config.itemModelId}`,
         sublabel:
-          config.itemModelId != null ? `ID: ${config.itemModelId}` : undefined,
+          config.itemModelId != null ? `Mã số ${config.itemModelId}` : undefined,
         canEdit: true,
         canDelete: true,
       });
@@ -586,9 +677,26 @@ export default function ThresholdConfigPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold tracking-tighter text-foreground">
-                Cấu hình ngưỡng tồn kho
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold tracking-tighter text-foreground">
+                  Cấu hình ngưỡng tồn kho
+                </h1>
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="text-blue-500 hover:text-blue-600 transition-colors">
+                        <WarningCircle className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      className="text-sm tracking-tighter bg-blue-600 text-white border-blue-600"
+                    >
+                      Thứ tự áp dụng: Vật phẩm → Danh mục → Kho → Toàn hệ thống
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <p className="text-sm tracking-tighter text-muted-foreground">
                 Quản lý ngưỡng theo hệ thống, kho, danh mục và vật phẩm
               </p>
@@ -646,180 +754,36 @@ export default function ThresholdConfigPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={tabTransition}
             >
-              <div className="mb-4 flex items-center justify-between">
-                <p className="text-sm tracking-tighter text-muted-foreground">
-                  Thứ tự áp dụng: Vật phẩm → Danh mục → Kho → Toàn hệ thống
-                </p>
-              </div>
 
-              {createInlineOpen ? (
-                <Card className="mb-4 border border-border/60">
-                  <CardContent className="p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <h3 className="text-sm font-semibold tracking-tighter">
-                        Thêm ngưỡng mới
-                      </h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setCreateInlineOpen(false)}
-                        className="h-8 px-2 text-sm tracking-tighter"
-                      >
-                        Đóng
-                      </Button>
-                    </div>
-
-                    <div className="space-y-4 py-1">
-                      <div className="space-y-1.5">
-                        <Label>Phạm vi áp dụng</Label>
-                        <Select
-                          value={form.scopeType}
-                          onValueChange={(value) =>
-                            setForm((previous) => ({
-                              ...previous,
-                              scopeType: value as ThresholdScopeType,
-                              categoryId:
-                                value === "DepotCategory"
-                                  ? previous.categoryId
-                                  : "",
-                              itemModelId:
-                                value === "DepotItem"
-                                  ? previous.itemModelId
-                                  : "",
-                            }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Depot">Kho (Depot)</SelectItem>
-                            <SelectItem value="DepotCategory">
-                              Theo danh mục (DepotCategory)
-                            </SelectItem>
-                            <SelectItem value="DepotItem">
-                              Theo vật phẩm (DepotItem)
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {form.scopeType === "DepotCategory" ? (
-                        <div className="space-y-1.5">
-                          <Label>Danh mục</Label>
-                          <Select
-                            value={form.categoryId || undefined}
-                            onValueChange={(value) =>
-                              setForm((previous) => ({
-                                ...previous,
-                                categoryId: value,
-                              }))
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Chọn danh mục" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {categories?.map((category) => (
-                                <SelectItem
-                                  key={category.key}
-                                  value={String(Number(category.key))}
-                                >
-                                  {category.value}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      ) : null}
-
-                      {form.scopeType === "DepotItem" ? (
-                        <div className="space-y-1.5">
-                          <Label>Vật phẩm (Item Model ID)</Label>
-                          <Input
-                            type="number"
-                            placeholder="VD: 101"
-                            value={form.itemModelId}
-                            onChange={(event) =>
-                              setForm((previous) => ({
-                                ...previous,
-                                itemModelId: event.target.value,
-                              }))
-                            }
-                          />
-                        </div>
-                      ) : null}
-
-                      <div className="space-y-1.5">
-                        <Label>
-                          Ngưỡng tối thiểu
-                          <span className="ml-1 text-sm tracking-tighter text-muted-foreground">
-                            số nguyên &gt; 0
-                          </span>
-                        </Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          step={1}
-                          placeholder="VD: 80"
-                          value={form.minimumThreshold}
-                          onChange={(event) =>
-                            setForm((previous) => ({
-                              ...previous,
-                              minimumThreshold: event.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label>Lý do (tùy chọn)</Label>
-                        <Textarea
-                          placeholder="VD: Vật phẩm y tế cần dự trữ cao hơn"
-                          value={form.reason}
-                          onChange={(event) =>
-                            setForm((previous) => ({
-                              ...previous,
-                              reason: event.target.value,
-                            }))
-                          }
-                          rows={2}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setCreateInlineOpen(false)}
-                      >
-                        Hủy
-                      </Button>
-                      <Button
-                        onClick={handleSave}
-                        disabled={updateMutation.isPending}
-                        className="gap-1.5"
-                      >
-                        {updateMutation.isPending ? (
-                          <SpinnerGap className="h-4 w-4 animate-spin" />
-                        ) : null}
-                        Tạo mới
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
 
               {loadingThresholds ? (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {Array.from({ length: 4 }).map((_, index) => (
-                    <Card key={index}>
-                      <CardContent className="space-y-2 p-3">
-                        <Skeleton className="h-5 w-24" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-7 w-24" />
-                      </CardContent>
-                    </Card>
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                  {(["Global", "Depot", "DepotCategory", "DepotItem"] as const).map((scope) => (
+                    <div key={scope} className="flex flex-col">
+                      <div
+                        className={cn(
+                          "flex items-center gap-2 rounded-t-xl border border-b-0 border-border/60 px-3 py-2.5",
+                          SCOPE_SECTION_BG[scope] ?? "bg-muted/30",
+                        )}
+                      >
+                        <Skeleton className="h-2 w-2 rounded-full" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                      <div className="overflow-hidden rounded-b-xl border border-border/60 bg-card">
+                        {Array.from({ length: 2 }).map((_, i, arr) => (
+                          <div
+                            key={i}
+                            className={cn(
+                              "flex flex-col gap-2 px-3 py-3",
+                              i < arr.length - 1 && "border-b border-border/50",
+                            )}
+                          >
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-16" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : allConfigs.length === 0 ? (
@@ -830,34 +794,24 @@ export default function ThresholdConfigPage() {
                   }
                 />
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {allConfigs.map(
-                    (
-                      { config, label, sublabel, canEdit, canDelete },
-                      index,
-                    ) => (
-                      <motion.div
-                        key={`${config.scopeType}-${config.itemModelId ?? config.categoryId ?? "base"}`}
-                        initial={{ opacity: 0, y: 18 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{
-                          ...cardTransition,
-                          delay: prefersReducedMotion ? 0 : index * 0.04,
-                        }}
-                      >
-                        <ThresholdConfigCard
-                          config={config}
-                          label={label}
-                          sublabel={sublabel}
-                          canEdit={canEdit}
-                          canDelete={canDelete}
-                          onEdit={() => openEdit(config)}
-                          onDelete={() => openDelete(config)}
-                        />
-                      </motion.div>
+                <motion.div
+                  className="grid gap-3 grid-cols-2 lg:grid-cols-4"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={cardTransition}
+                >
+                  {(["Global", "Depot", "DepotCategory", "DepotItem"] as const).map(
+                    (scope) => (
+                      <ThresholdScopeSection
+                        key={scope}
+                        scopeType={scope}
+                        items={allConfigs.filter((c) => c.config.scopeType === scope)}
+                        onEdit={openEdit}
+                        onDelete={openDelete}
+                      />
                     ),
                   )}
-                </div>
+                </motion.div>
               )}
             </motion.div>
           </TabsContent>
@@ -900,7 +854,7 @@ export default function ThresholdConfigPage() {
                       className={cn(
                         "border-0 shadow-none",
                         WARNING_LEVEL_COLORS[level] ??
-                          "bg-slate-100 text-slate-700",
+                        "bg-slate-100 text-slate-700",
                       )}
                     >
                       {getLowStockWarningLabel(level)}:{" "}
@@ -999,102 +953,133 @@ export default function ThresholdConfigPage() {
       </motion.div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-120">
-          <DialogHeader>
-            <DialogTitle>
-              {editConfig ? "Chỉnh sửa ngưỡng" : "Thêm ngưỡng mới"}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Phạm vi áp dụng</Label>
-              <Select
-                value={form.scopeType}
-                onValueChange={(value) =>
-                  setForm((previous) => ({
-                    ...previous,
-                    scopeType: value as ThresholdScopeType,
-                    categoryId:
-                      value === "DepotCategory" ? previous.categoryId : "",
-                    itemModelId:
-                      value === "DepotItem" ? previous.itemModelId : "",
-                  }))
-                }
-                disabled={!!editConfig}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Depot">Kho (Depot)</SelectItem>
-                  <SelectItem value="DepotCategory">
-                    Theo danh mục (DepotCategory)
-                  </SelectItem>
-                  <SelectItem value="DepotItem">
-                    Theo vật phẩm (DepotItem)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+        <DialogContent className="sm:max-w-lg gap-0 p-0 overflow-hidden">
+          {/* Header with accent */}
+          <div className="flex items-center gap-3 border-b px-5 py-4">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+              <Gear className="h-5 w-5" weight="fill" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-base font-bold tracking-tighter">
+                {editConfig ? "Chỉnh sửa ngưỡng" : "Thêm ngưỡng mới"}
+              </DialogTitle>
               <p className="text-sm tracking-tighter text-muted-foreground">
-                Global threshold và warning band do admin quản lý.
+                {editConfig
+                  ? `Hiện tại: ${formatNumber(editConfig.minimumThreshold)}`
+                  : "Thiết lập ngưỡng tồn kho tối thiểu"}
               </p>
             </div>
+            <Select
+              value={form.scopeType}
+              onValueChange={(value) =>
+                setForm((previous) => ({
+                  ...previous,
+                  scopeType: value as ThresholdScopeType,
+                  categoryId:
+                    value === "DepotCategory" ? previous.categoryId : "",
+                  itemModelId:
+                    value === "DepotItem" ? previous.itemModelId : "",
+                }))
+              }
+              disabled={!!editConfig}
+            >
+              <SelectTrigger className="mr-8 w-auto shrink-0 gap-1.5 text-sm tracking-tighter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Depot">Kho (Depot)</SelectItem>
+                <SelectItem value="DepotCategory">
+                  Theo danh mục
+                </SelectItem>
+                <SelectItem value="DepotItem">
+                  Theo vật phẩm
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            {form.scopeType === "DepotCategory" ? (
-              <div className="space-y-1.5">
-                <Label>Danh mục</Label>
-                <Select
-                  value={form.categoryId || undefined}
-                  onValueChange={(value) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      categoryId: value,
-                    }))
-                  }
-                  disabled={!!editConfig}
+          {/* Body */}
+          <div className="flex flex-col gap-4 px-5 py-4">
+            <AnimatePresence initial={false}>
+              {!editConfig && form.scopeType === "DepotCategory" ? (
+                <motion.div
+                  key="modal-depot-category"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="overflow-hidden"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn danh mục" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories?.map((category) => (
-                      <SelectItem
-                        key={category.key}
-                        value={String(Number(category.key))}
-                      >
-                        {category.value}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
+                  <div className="space-y-1.5 pb-1">
+                    <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-semibold text-amber-600">
+                      <Folders className="h-4 w-4" weight="fill" />
+                      Danh mục áp dụng
+                    </Label>
+                    <Select
+                      value={form.categoryId || undefined}
+                      onValueChange={(value) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          categoryId: value,
+                        }))
+                      }
+                      disabled={!!editConfig}
+                    >
+                      <SelectTrigger className="mt-1.5">
+                        <SelectValue placeholder="Chọn danh mục" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories?.map((category) => (
+                          <SelectItem
+                            key={category.key}
+                            value={String(Number(category.key))}
+                          >
+                            {category.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </motion.div>
+              ) : null}
 
-            {form.scopeType === "DepotItem" ? (
-              <div className="space-y-1.5">
-                <Label>Vật phẩm (Item Model ID)</Label>
-                <Input
-                  type="number"
-                  placeholder="VD: 101"
-                  value={form.itemModelId}
-                  onChange={(event) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      itemModelId: event.target.value,
-                    }))
-                  }
-                  disabled={!!editConfig}
-                />
-              </div>
-            ) : null}
-
-            <Separator />
+              {!editConfig && form.scopeType === "DepotItem" ? (
+                <motion.div
+                  key="modal-depot-item"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-1.5 pb-1">
+                    <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-semibold text-emerald-600">
+                      <Package className="h-4 w-4" weight="fill" />
+                      Vật phẩm áp dụng (Mã ID)
+                    </Label>
+                    <Input
+                      type="number"
+                      className="mt-1.5"
+                      placeholder="VD: 101"
+                      value={form.itemModelId}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          itemModelId: event.target.value,
+                        }))
+                      }
+                      disabled={!!editConfig}
+                    />
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
 
             <div className="space-y-1.5">
-              <Label>
+              <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-medium text-slate-800">
+                <Scales className="h-4 w-4 text-blue-500" weight="fill" />
                 Ngưỡng tối thiểu
-                <span className="ml-1 text-sm tracking-tighter text-muted-foreground">
+                <span className="ml-auto font-normal text-muted-foreground text-[10px] uppercase tracking-widest">
                   số nguyên &gt; 0
                 </span>
               </Label>
@@ -1114,27 +1099,27 @@ export default function ThresholdConfigPage() {
             </div>
 
             {form.minimumThreshold ? (
-              <Card className="bg-muted/30">
-                <CardContent className="space-y-2 p-3 text-sm">
+              <div className="flex gap-2.5 rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                <ChartBar className="h-4 w-4 shrink-0 text-blue-500 mt-0.5" weight="fill" />
+                <div className="space-y-1 text-sm tracking-tighter">
                   <p className="font-medium text-foreground">
-                    Minh họa tính severity ratio
-                  </p>
-                  <p className="text-muted-foreground">
-                    Severity ratio = Số lượng khả dụng /{" "}
-                    <span className="font-medium text-foreground">
+                    Severity ratio = Khả dụng /{" "}
+                    <span className="font-bold text-blue-600">
                       {formatNumber(Number(form.minimumThreshold))}
                     </span>
                   </p>
                   <p className="text-muted-foreground">
-                    Backend sẽ so sánh ratio này với warning band hiện hành để
-                    xác định mức cảnh báo.
+                    Hệ thống sẽ so sánh ratio với warning band mặc định để xác định cảnh báo.
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ) : null}
 
             <div className="space-y-1.5">
-              <Label>Lý do (tùy chọn)</Label>
+              <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-medium text-slate-800">
+                <ListDashes className="h-4 w-4 text-slate-400" />
+                Lý do (tùy chọn)
+              </Label>
               <Textarea
                 placeholder="VD: Vật phẩm y tế cần dự trữ cao hơn"
                 value={form.reason}
@@ -1149,60 +1134,70 @@ export default function ThresholdConfigPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 border-t px-5 py-3 bg-muted/30">
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(false)}>
               Hủy
             </Button>
             <Button
+              size="sm"
               onClick={handleSave}
               disabled={updateMutation.isPending}
               className="gap-1.5"
             >
               {updateMutation.isPending ? (
                 <SpinnerGap className="h-4 w-4 animate-spin" />
-              ) : null}
+              ) : (
+                <CheckCircle className="h-4 w-4" weight="fill" />
+              )}
               {editConfig ? "Cập nhật" : "Tạo mới"}
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="sm:max-w-105">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <WarningCircle className="h-5 w-5" />
-              Reset cấu hình ngưỡng
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-md gap-0 p-0 overflow-hidden">
+          {/* Header with red accent */}
+          <div className="flex flex-col items-center gap-3 border-b px-5 pt-6 pb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
+              <Trash className="h-6 w-6" weight="fill" />
+            </div>
+            <div className="text-center">
+              <DialogTitle className="text-base font-bold tracking-tighter">
+                Reset cấu hình ngưỡng
+              </DialogTitle>
+              <p className="mt-1 text-sm tracking-tighter text-muted-foreground">
+                Fallback về scope cao hơn trong chuỗi ưu tiên
+              </p>
+            </div>
+          </div>
 
-          <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">
-              Hành động này sẽ gỡ override hiện tại và fallback về scope cao hơn
-              trong chuỗi DepotItem → DepotCategory → Depot → Global.
-            </p>
-
+          {/* Body */}
+          <div className="space-y-3 px-5 py-4">
             {deleteTarget ? (
-              <Card>
-                <CardContent className="p-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      className={cn(
-                        "text-sm tracking-tighter",
-                        SCOPE_COLORS[deleteTarget.scopeType] ?? "",
-                      )}
-                    >
-                      {SCOPE_LABELS[deleteTarget.scopeType] ??
-                        deleteTarget.scopeType}
-                    </Badge>
-                    <span>{formatThresholdDisplay(deleteTarget)}</span>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5">
+                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", SCOPE_DOT[deleteTarget.scopeType] ?? "bg-slate-400")} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium tracking-tighter text-foreground">
+                    {SCOPE_LABELS[deleteTarget.scopeType] ?? deleteTarget.scopeType}
+                  </p>
+                  <p className="text-sm tracking-tighter text-muted-foreground">
+                    {formatThresholdDisplay(deleteTarget)}
+                  </p>
+                </div>
+              </div>
             ) : null}
 
+            <div className="flex gap-2.5 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+              <WarningCircle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" weight="fill" />
+              <p className="text-sm tracking-tighter text-muted-foreground">
+                Hành động này không thể hoàn tác. Ngưỡng sẽ fallback về DepotItem → DepotCategory → Depot → Global.
+              </p>
+            </div>
+
             <div className="space-y-1.5">
-              <Label>Lý do reset (tùy chọn)</Label>
+              <Label className="text-sm tracking-tighter font-medium">Lý do reset (tùy chọn)</Label>
               <Textarea
                 placeholder="VD: Không cần override riêng nữa"
                 value={deleteReason}
@@ -1212,22 +1207,26 @@ export default function ThresholdConfigPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 border-t px-5 py-3 bg-muted/30">
+            <Button variant="outline" size="sm" onClick={() => setDeleteOpen(false)}>
               Hủy
             </Button>
             <Button
               variant="destructive"
+              size="sm"
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
               className="gap-1.5"
             >
               {deleteMutation.isPending ? (
                 <SpinnerGap className="h-4 w-4 animate-spin" />
-              ) : null}
+              ) : (
+                <Trash className="h-4 w-4" />
+              )}
               Reset
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -644,3 +644,59 @@ export interface DepotReceiveTransferResponse {
   completedAt: string;
   message: string;
 }
+
+// ─── Chart: Capacity ───────────────────────────────────────────────────────
+// GET /logistics/depot/{id}/chart/capacity
+export interface DepotCapacityChartResponse {
+  depotId: number;
+  depotName: string;
+  currentVolume: number;
+  maxVolume: number;
+  volumeUsagePercent: number;
+  currentWeight: number;
+  maxWeight: number;
+  weightUsagePercent: number;
+}
+
+// ─── Chart: Inventory Movement ────────────────────────────────────────────
+// GET /logistics/depot/{id}/chart/inventory-movement
+export interface InventoryMovementDataPoint {
+  date: string;
+  totalIn: number;
+  totalOut: number;
+  totalAdjust: number;
+}
+
+export interface DepotInventoryMovementChartResponse {
+  depotId: number;
+  depotName: string;
+  from: string;
+  to: string;
+  dataPoints: InventoryMovementDataPoint[];
+}
+
+export interface GetDepotInventoryMovementParams {
+  from?: string;
+  to?: string;
+}
+
+// ─── Chart: Fund Movement ─────────────────────────────────────────────────
+// GET /finance/depot-funds/{depotId}/chart/fund-movement
+export interface FundMovementDataPoint {
+  date: string;
+  totalIn: number;
+  totalOut: number;
+}
+
+export interface DepotFundMovementChartResponse {
+  depotId: number;
+  depotName: string;
+  from: string;
+  to: string;
+  dataPoints: FundMovementDataPoint[];
+}
+
+export interface GetDepotFundMovementParams {
+  from?: string;
+  to?: string;
+}

@@ -648,3 +648,34 @@ export async function receiveDepotTransfer(
   );
   return data;
 }
+
+// ─── Chart API ────────────────────────────────────────────────────────────────
+
+export async function getDepotCapacityChart(
+  depotId: number,
+): Promise<import("./type").DepotCapacityChartResponse> {
+  const { data } = await api.get(`/logistics/depot/${depotId}/chart/capacity`);
+  return data;
+}
+
+export async function getDepotInventoryMovementChart(
+  depotId: number,
+  params?: import("./type").GetDepotInventoryMovementParams,
+): Promise<import("./type").DepotInventoryMovementChartResponse> {
+  const { data } = await api.get(
+    `/logistics/depot/${depotId}/chart/inventory-movement`,
+    { params },
+  );
+  return data;
+}
+
+export async function getDepotFundMovementChart(
+  depotId: number,
+  params?: import("./type").GetDepotFundMovementParams,
+): Promise<import("./type").DepotFundMovementChartResponse> {
+  const { data } = await api.get(
+    `/finance/depot-funds/${depotId}/chart/fund-movement`,
+    { params },
+  );
+  return data;
+}

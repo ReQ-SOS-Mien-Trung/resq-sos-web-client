@@ -4,7 +4,6 @@ import { useState, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   mockInventoryItems,
-  mockSupplyRequests,
   mockShipments,
   mockActivityLogs,
 } from "@/lib/mock-data";
@@ -46,16 +45,15 @@ import {
 import {
   CategoryOverview,
   DepotSidebar,
-  InventoryStats,
   ItemDetailsSheet,
   LowStockAlerts,
   RecentActivity,
-  SupplyRequestSection,
 } from "@/components/inventory";
 import SupplyRequestManagement from "@/components/inventory/SupplyRequestManagement";
 import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
 import SupplyRequestTracker from "@/components/inventory/SupplyRequestTracker";
+import DepotChartsSection from "@/components/inventory/DepotChartsSection";
 import {
   InventoryItemEntity,
   SupplyRequestListItem,
@@ -64,13 +62,7 @@ import {
   useMyDepotQuantityByCategory,
   useSupplyRequests,
 } from "@/services/inventory/hooks";
-import {
-  DepotInfo,
-  InventoryItem,
-  IInventoryStats,
-  Shipment,
-  SupplyRequest,
-} from "@/type";
+import { DepotInfo, InventoryItem, SupplyRequest } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { useThemeStore } from "@/stores/theme.store";
@@ -110,41 +102,6 @@ const mapDepotEntityToInfo = (
     (s) => s.status === "PREPARING" || s.status === "IN_TRANSIT",
   ).length,
 });
-
-/** Compute dashboard stats from inventory & supply data */
-const computeStats = (
-  items: InventoryItem[],
-  requests: SupplyRequest[],
-  shipments: Shipment[],
-  totalCategories: number,
-): IInventoryStats => {
-  const now = new Date();
-  return {
-    totalItems: items.length,
-    totalCategories,
-    criticalStock: items.filter((i) => i.stockLevel === "CRITICAL").length,
-    lowStock: items.filter((i) => i.stockLevel === "LOW").length,
-    normalStock: items.filter(
-      (i) => i.stockLevel === "NORMAL" || i.stockLevel === "OVERSTOCKED",
-    ).length,
-    pendingInbound: requests.filter(
-      (r) => r.type === "INBOUND" && r.status === "PENDING",
-    ).length,
-    pendingOutbound: requests.filter(
-      (r) => r.type === "OUTBOUND" && r.status === "PENDING",
-    ).length,
-    activeShipments: shipments.filter(
-      (s) => s.status === "PREPARING" || s.status === "IN_TRANSIT",
-    ).length,
-    itemsExpiringSoon: items.filter((i) => {
-      if (!i.expiryDate) return false;
-      const days = Math.ceil(
-        (new Date(i.expiryDate).getTime() - now.getTime()) / 86_400_000,
-      );
-      return days > 0 && days <= 30;
-    }).length,
-  };
-};
 
 const mapApiSupplyRequestToSidebar = (
   request: SupplyRequestListItem,
@@ -228,7 +185,6 @@ const INVENTORY_TABS = new Set([
   "incoming",
   "vattu",
   "shipments",
-  "requests",
   "supply-management",
 ]);
 
@@ -262,7 +218,6 @@ const InventoryDashboardPage = () => {
   const mainRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
-  const panelWidthRef = useRef(480);
 
   const router = useRouter();
 
@@ -474,18 +429,6 @@ const InventoryDashboardPage = () => {
         description: "",
       })),
     [quantityByCategoryData],
-  );
-
-  // ── Compute stats (will use real item APIs when available) ──
-  const stats = useMemo<IInventoryStats>(
-    () =>
-      computeStats(
-        mockInventoryItems,
-        mockSupplyRequests,
-        mockShipments,
-        totalCategories,
-      ),
-    [totalCategories],
   );
 
   // ── Handlers ──
@@ -868,7 +811,9 @@ const InventoryDashboardPage = () => {
             )}
 
             {activeTab === "supply-management" ? (
-              <SupplyRequestManagement />
+              <SupplyRequestManagement
+                onPanelOpenChange={(open) => setSidebarOpen(!open)}
+              />
             ) : activeTab === "vattu" ? (
               <VatTuSection
                 onItemSelect={(item) => {
@@ -1029,36 +974,19 @@ const InventoryDashboardPage = () => {
                   </div>
                 </div>
               </div>
-            ) : activeTab === "requests" ? (
-              <SupplyRequestSection
-                onSelectionSidebarOpen={() => {
-                  if (sidebarOpen) setSidebarOpen(false);
-                }}
-                onSelectionSidebarChange={(open) => {
-                  if (mainRef.current) {
-                    mainRef.current.style.marginRight = open
-                      ? `${panelWidthRef.current}px`
-                      : "0px";
-                  }
-                }}
-                onPanelWidthChange={(w) => {
-                  panelWidthRef.current = w;
-                  if (mainRef.current) {
-                    mainRef.current.style.marginRight = `${w}px`;
-                  }
-                }}
-              />
             ) : (
               <>
-                {/* Stats Overview */}
-                <InventoryStats stats={stats} />
-
                 {/* Category Overview */}
                 <CategoryOverview
                   apiCategories={categoryOverviewData}
                   onCategorySelect={handleCategorySelect}
                   selectedCategory={selectedCategory}
                 />
+
+                {/* Charts Section */}
+                {selectedDepotId && (
+                  <DepotChartsSection depotId={selectedDepotId} />
+                )}
 
                 {/* Two Column Layout: Alerts + Activity */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

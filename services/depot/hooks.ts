@@ -38,6 +38,9 @@ import {
   shipDepotTransfer,
   completeDepotTransfer,
   receiveDepotTransfer,
+  getDepotCapacityChart,
+  getDepotInventoryMovementChart,
+  getDepotFundMovementChart,
 } from "./api";
 import {
   GetDepotsResponse,
@@ -867,5 +870,42 @@ export function useReceiveDepotTransfer() {
         queryKey: DEPOT_CLOSURE_DETAIL_BY_DEPOT_QUERY_KEY,
       });
     },
+  });
+}
+
+// ─── Chart hooks ──────────────────────────────────────────────────────────────
+
+export function useDepotCapacityChart(
+  depotId: number | undefined,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ["depot-capacity-chart", depotId],
+    queryFn: () => getDepotCapacityChart(depotId!),
+    enabled: (options?.enabled ?? true) && !!depotId,
+  });
+}
+
+export function useDepotInventoryMovementChart(
+  depotId: number | undefined,
+  params?: import("./type").GetDepotInventoryMovementParams,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ["depot-inventory-movement-chart", depotId, params],
+    queryFn: () => getDepotInventoryMovementChart(depotId!, params),
+    enabled: (options?.enabled ?? true) && !!depotId,
+  });
+}
+
+export function useDepotFundMovementChart(
+  depotId: number | undefined,
+  params?: import("./type").GetDepotFundMovementParams,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ["depot-fund-movement-chart", depotId, params],
+    queryFn: () => getDepotFundMovementChart(depotId!, params),
+    enabled: (options?.enabled ?? true) && !!depotId,
   });
 }

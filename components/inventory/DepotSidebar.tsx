@@ -104,7 +104,6 @@ const DepotSidebar = ({
     .slice(0, 2);
 
   const hasUrgent = urgentItems.length > 0;
-  const hasPendingReqs = pendingRequestsAll.length > 0;
 
   return (
     <div className="h-full flex flex-col bg-sidebar border-r border-sidebar-border overflow-hidden">
@@ -178,12 +177,6 @@ const DepotSidebar = ({
             dot={false}
             label="Vật phẩm"
             icon={<Cube className="h-4 w-4" />}
-          />
-          <TabTriggerWithDot
-            value="requests"
-            dot={hasPendingReqs}
-            label="Tạo yêu cầu"
-            icon={<ClipboardText className="h-4 w-4" />}
           />
           <TabTriggerWithDot
             value="supply-management"
