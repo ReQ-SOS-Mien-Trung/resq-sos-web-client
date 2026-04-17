@@ -249,7 +249,7 @@ function RescuerCard({
   onToggleLeader: () => void;
 }) {
   const initials =
-    `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() ||
+    `${user.lastName?.[0] || ""}${user.firstName?.[0] || ""}`.toUpperCase() ||
     "?";
   const avatarSrc = user.avatarUrl || DEFAULT_RESCUER_AVATAR;
   const [isHovering, setIsHovering] = useState(false);
@@ -316,7 +316,7 @@ function RescuerCard({
 
         <div className="flex-1 min-w-0">
           <div className="font-medium text-sm truncate flex items-center gap-2">
-            {user.firstName} {user.lastName}
+            {user.lastName} {user.firstName}
             {disabled ? (
               <Badge
                 variant="outline"
@@ -332,7 +332,9 @@ function RescuerCard({
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
                 className="text-sm font-medium h-5 px-1.5"
               >
-                {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
+                {user.rescuerType === "Core"
+                  ? "Nhân viên cố định"
+                  : "Tình nguyện"}
               </Badge>
             )}
             {user.phone && <span>· {user.phone}</span>}
@@ -373,13 +375,15 @@ function RescuerCard({
             </Avatar>
             <div>
               <div className="font-semibold text-sm">
-                {user.firstName} {user.lastName}
+                {user.lastName} {user.firstName}
               </div>
               <Badge
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
                 className="mt-1 h-6 border border-black px-1.5 text-sm font-medium"
               >
-                {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
+                {user.rescuerType === "Core"
+                  ? "Nhân viên cố định"
+                  : "Tình nguyện"}
               </Badge>
             </div>
           </div>
@@ -784,7 +788,7 @@ function CreateRescueTeamForm({
   const toggleLeader = (userId: string) => {
     const user = eligibleRescuers.find((u) => u.id === userId);
     if (user?.rescuerType !== "Core") {
-      toast.error("Chỉ thành viên cốt cán mới có thể làm đội trưởng.");
+      toast.error("Chỉ  Nhân viên cố định mới có thể làm đội trưởng.");
       return;
     }
 
@@ -1159,7 +1163,7 @@ function CreateRescueTeamForm({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Tất cả vai trò</SelectItem>
-                      <SelectItem value="Core">Cốt cán</SelectItem>
+                      <SelectItem value="Core">Nhân viên cố định</SelectItem>
                       <SelectItem value="Volunteer">Tình nguyện</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1230,7 +1234,7 @@ function CreateRescueTeamForm({
                         {member.isLeader && (
                           <Crown className="h-3 w-3" weight="fill" />
                         )}
-                        {user.firstName} {user.lastName}
+                        {user.lastName} {user.firstName}
                         <button
                           type="button"
                           className="ml-1 hover:text-red-500 focus:outline-none"
@@ -1254,7 +1258,7 @@ function CreateRescueTeamForm({
                     />
                     <p className="text-sm leading-snug text-[#c2410c]">
                       Vui lòng <strong>Chọn làm đội trưởng</strong> cho một
-                      thành viên <strong>cốt cán</strong> trong nhóm.
+                      thành viên <strong>nhân viên cố định</strong> trong nhóm.
                     </p>
                   </div>
                 )}

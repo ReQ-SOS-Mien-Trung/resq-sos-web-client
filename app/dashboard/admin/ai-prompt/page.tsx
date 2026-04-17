@@ -60,7 +60,6 @@ import {
   useCreatePromptDraft,
   useDeletePrompt,
   usePrompts,
-  useRollbackPrompt,
   usePromptVersions,
   useUpdatePrompt,
 } from "@/services/prompt/hooks";
@@ -84,13 +83,17 @@ import {
 } from "@/services/ai-config/hooks";
 import type {
   AiProvider,
-  AiConfigSummaryEntity,
   CreateAiConfigRequest,
   UpdateAiConfigRequest,
 } from "@/services/ai-config/type";
 
 type EditorMode = "closed" | "creating" | "editing";
 type AiConfigDialogMode = "closed" | "create" | "edit";
+
+type EditorSourcePromptState = Pick<
+  PromptEntity,
+  "id" | "name" | "status" | "version"
+>;
 
 type AiConfigFormState = {
   name: string;
@@ -142,19 +145,19 @@ function validateAiConfigForm(
   const errors: AiConfigFormErrors = {};
   const trimmedName = form.name.trim();
   const trimmedModel = form.model.trim();
-  const trimmedApiUrl = form.api_url.trim();
+  const trimmedApiUrl = getDefaultAiConfigApiUrl(form.provider).trim();
   const normalizedVersion = normalizeAiConfigVersion(form.version);
 
   if (!trimmedName) {
-    errors.name = "Tên AI config không được để trống.";
+    errors.name = "Tên cấu hình AI không được để trống.";
   } else if (trimmedName.length > 255) {
-    errors.name = "Tên AI config không được vượt quá 255 ký tự.";
+    errors.name = "Tên cấu hình AI không được vượt quá 255 ký tự.";
   }
 
   if (!trimmedModel) {
-    errors.model = "Model không được để trống.";
+    errors.model = "Mô hình không được để trống.";
   } else if (trimmedModel.length > 100) {
-    errors.model = "Model không được vượt quá 100 ký tự.";
+    errors.model = "Mô hình không được vượt quá 100 ký tự.";
   }
 
   if (
@@ -162,7 +165,7 @@ function validateAiConfigForm(
     form.temperature < 0 ||
     form.temperature > 2
   ) {
-    errors.temperature = "Temperature phải nằm trong khoảng từ 0 đến 2.";
+    errors.temperature = "Nhiệt độ phải nằm trong khoảng từ 0 đến 2.";
   }
 
   if (
@@ -170,27 +173,25 @@ function validateAiConfigForm(
     !Number.isFinite(form.max_tokens) ||
     form.max_tokens <= 0
   ) {
-    errors.max_tokens = "MaxTokens phải lớn hơn 0.";
+    errors.max_tokens = "Số token tối đa phải lớn hơn 0.";
   }
 
-  if (!trimmedApiUrl) {
-    errors.api_url = "ApiUrl không được để trống.";
-  } else if (trimmedApiUrl.length > 500) {
-    errors.api_url = "ApiUrl không được vượt quá 500 ký tự.";
+  if (trimmedApiUrl.length > 500) {
+    errors.api_url = "Địa chỉ API không được vượt quá 500 ký tự.";
   } else if (!isAbsoluteUrl(trimmedApiUrl)) {
-    errors.api_url = "ApiUrl phải là URL tuyệt đối hợp lệ.";
+    errors.api_url = "Địa chỉ API phải là URL tuyệt đối hợp lệ.";
   } else if (
     form.provider === "Gemini" &&
     (!trimmedApiUrl.includes("{0}") || !trimmedApiUrl.includes("{1}"))
   ) {
     errors.api_url =
-      "Gemini backend hiện tại yêu cầu URL dạng .../models/{0}:generateContent?key={1}.";
+      "Máy chủ Gemini hiện tại yêu cầu địa chỉ dạng .../models/{0}:generateContent?key={1}.";
   } else if (
     form.provider === "OpenRouter" &&
     (trimmedApiUrl.includes("{0}") || trimmedApiUrl.includes("{1}"))
   ) {
     errors.api_url =
-      "OpenRouter dùng URL cố định, không cần placeholder {0} hoặc {1}.";
+      "OpenRouter dùng URL cố định, không cần ký hiệu {0} hoặc {1}.";
   }
 
   if (!normalizedVersion) {
@@ -199,39 +200,16 @@ function validateAiConfigForm(
     errors.version = "Phiên bản không được vượt quá 20 ký tự.";
   } else if (mode === "create" && normalizedVersion.includes("-D")) {
     errors.version =
-      "Version tạo mới không được dùng định dạng draft '-D'. Hãy dùng Clone draft.";
+      "Phiên bản tạo mới không được dùng định dạng bản nháp '-D'. Hãy dùng tạo bản nháp.";
   } else if (mode === "edit" && !normalizedVersion.includes("-D")) {
-    errors.version = "Version của draft phải chứa dấu hiệu '-D'.";
+    errors.version = "Phiên bản của bản nháp phải chứa hậu tố '-D'.";
   }
 
   if (mode === "create" && !form.api_key.trim()) {
-    errors.api_key = "API key không được để trống khi tạo AI config mới.";
+    errors.api_key = "Khóa API không được để trống khi tạo cấu hình AI mới.";
   }
 
   return errors;
-}
-
-function getAiConfigWorkflowHint(
-  selectedAiConfig: AiConfigSummaryEntity | null,
-  activeAiConfig: AiConfigSummaryEntity | null,
-) {
-  if (!selectedAiConfig) {
-    return "Tạo AI config đầu tiên rồi chọn version để test prompt. Khi đã ổn, activate version đó để chạy thật trên hệ thống.";
-  }
-
-  if (selectedAiConfig.status === "Draft") {
-    return "Bạn đang chọn bản Draft. Có thể sửa draft, test prompt với draft này, activate để đưa lên hệ thống, hoặc xóa draft nếu muốn làm lại.";
-  }
-
-  if (selectedAiConfig.status === "Active") {
-    return "Bạn đang xem bản Active đang chạy thật. Nếu muốn chỉnh sửa, hãy bấm Clone draft để tạo bản nháp riêng rồi sửa trên draft đó.";
-  }
-
-  if (activeAiConfig && selectedAiConfig.id !== activeAiConfig.id) {
-    return "Bạn đang xem một bản Archived. Có thể rollback để active lại ngay, hoặc clone draft từ bản này nếu muốn chỉnh tiếp mà chưa đổi bản đang chạy.";
-  }
-
-  return "Chọn một version rồi dùng các nút thao tác ở phía trên để clone draft, activate hoặc rollback.";
 }
 
 function getStatusWeight(status: string) {
@@ -302,6 +280,22 @@ function shouldShowPromptVersion(status: string) {
   return status !== "Draft";
 }
 
+function getStatusLabel(status: string) {
+  if (status === "Active") {
+    return "Đang chạy";
+  }
+
+  if (status === "Draft") {
+    return "Bản nháp";
+  }
+
+  if (status === "Archived") {
+    return "Lưu trữ";
+  }
+
+  return status;
+}
+
 function getDefaultAiConfigForm(
   seed?: Partial<AiConfigFormState>,
 ): AiConfigFormState {
@@ -317,7 +311,7 @@ function getDefaultAiConfigForm(
     model: seed?.model ?? defaultModel,
     temperature: seed?.temperature ?? 0.3,
     max_tokens: seed?.max_tokens ?? 2048,
-    api_url: seed?.api_url ?? getDefaultAiConfigApiUrl(provider),
+    api_url: getDefaultAiConfigApiUrl(provider),
     api_key: seed?.api_key ?? "",
     version: seed?.version ?? "1.0",
     is_active: seed?.is_active ?? true,
@@ -358,9 +352,13 @@ const AIPromptPage = () => {
   const [activatingPromptId, setActivatingPromptId] = useState<number | null>(
     null,
   );
-  const [editorSourcePromptId, setEditorSourcePromptId] = useState<
-    number | null
-  >(null);
+  const [editorSourcePrompt, setEditorSourcePrompt] =
+    useState<EditorSourcePromptState | null>(null);
+  const [editorDraftPromptId, setEditorDraftPromptId] = useState<number | null>(
+    null,
+  );
+  const [editorRollbackTargetPromptId, setEditorRollbackTargetPromptId] =
+    useState<number | null>(null);
   const [aiConfigDialogMode, setAiConfigDialogMode] =
     useState<AiConfigDialogMode>("closed");
   const [aiConfigForm, setAiConfigForm] = useState<AiConfigFormState>(
@@ -505,6 +503,43 @@ const AIPromptPage = () => {
     prompts,
   ]);
 
+  const recommendedRollbackPromptId = useMemo(
+    () =>
+      promptVersions.find(
+        (promptVersion) => promptVersion.status === "Archived",
+      )?.id ?? null,
+    [promptVersions],
+  );
+
+  const editorRollbackTargetPrompt = useMemo(
+    () =>
+      promptVersions.find(
+        (promptVersion) => promptVersion.id === editorRollbackTargetPromptId,
+      ) ?? null,
+    [editorRollbackTargetPromptId, promptVersions],
+  );
+
+  const editorSourcePromptIndex = useMemo(() => {
+    if (!editorSourcePrompt) {
+      return -1;
+    }
+
+    return promptVersions.findIndex(
+      (promptVersion) => promptVersion.id === editorSourcePrompt.id,
+    );
+  }, [editorSourcePrompt, promptVersions]);
+
+  const previousEditorSourcePrompt =
+    editorSourcePromptIndex > 0
+      ? (promptVersions[editorSourcePromptIndex - 1] ?? null)
+      : null;
+
+  const nextEditorSourcePrompt =
+    editorSourcePromptIndex >= 0 &&
+    editorSourcePromptIndex < promptVersions.length - 1
+      ? (promptVersions[editorSourcePromptIndex + 1] ?? null)
+      : null;
+
   const { data: selectedAiConfigDetail } = useAiConfigById(
     effectiveSelectedAiConfigId,
     Boolean(effectiveSelectedAiConfigId),
@@ -519,11 +554,6 @@ const AIPromptPage = () => {
     aiConfigs.find((item) => item.id === effectiveSelectedAiConfigId) ??
     null;
   const promptAiConfig = selectedAiConfig ?? activeAiConfig ?? null;
-  const isSelectedAiConfigActive = selectedAiConfig?.id === activeAiConfig?.id;
-  const aiConfigWorkflowHint = useMemo(
-    () => getAiConfigWorkflowHint(selectedAiConfig, activeAiConfig),
-    [activeAiConfig, selectedAiConfig],
-  );
   const aiConfigVersions = useMemo(
     () => sortByLifecycle(aiConfigVersionsData?.items ?? aiConfigs),
     [aiConfigVersionsData?.items, aiConfigs],
@@ -554,7 +584,6 @@ const AIPromptPage = () => {
   const updatePromptMutation = useUpdatePrompt();
   const deletePromptMutation = useDeletePrompt();
   const activatePromptMutation = useActivatePrompt();
-  const rollbackPromptMutation = useRollbackPrompt();
   const createPromptDraftMutation = useCreatePromptDraft();
 
   const createAiConfigMutation = useCreateAiConfig();
@@ -567,13 +596,17 @@ const AIPromptPage = () => {
   const closeEditor = useCallback(() => {
     setEditorMode("closed");
     setEditingPrompt(null);
-    setEditorSourcePromptId(null);
+    setEditorSourcePrompt(null);
+    setEditorDraftPromptId(null);
+    setEditorRollbackTargetPromptId(null);
     setIsEditorFullscreen(false);
   }, []);
 
   const openCreatePromptEditor = useCallback(() => {
     setEditingPrompt(null);
-    setEditorSourcePromptId(null);
+    setEditorSourcePrompt(null);
+    setEditorDraftPromptId(null);
+    setEditorRollbackTargetPromptId(null);
     setEditorMode("creating");
   }, []);
 
@@ -583,13 +616,24 @@ const AIPromptPage = () => {
         return;
       }
 
-      setEditorSourcePromptId(prompt.id);
+      setEditorSourcePrompt({
+        id: prompt.id,
+        name: prompt.name,
+        status: prompt.status,
+        version: prompt.version,
+      });
       setSelectedPromptId(prompt.id);
+      setEditorRollbackTargetPromptId(
+        prompt.status === "Archived"
+          ? prompt.id
+          : (promptVersions.find((item) => item.status === "Archived")?.id ??
+              null),
+      );
 
       const toastId = toast.loading(
         prompt.status === "Draft"
-          ? "Đang mở draft prompt..."
-          : "Đang tạo draft prompt...",
+          ? "Đang mở bản nháp mẫu lệnh..."
+          : "Đang tạo bản nháp mẫu lệnh...",
       );
 
       try {
@@ -601,6 +645,8 @@ const AIPromptPage = () => {
           setSelectedPromptId(draft.id);
         }
 
+        setEditorDraftPromptId(targetId);
+
         const detail = await getPromptById(targetId);
         setEditingPrompt(detail);
         setEditorMode("editing");
@@ -608,20 +654,22 @@ const AIPromptPage = () => {
         toast.dismiss(toastId);
         toast.success(
           prompt.status === "Draft"
-            ? "Đã mở draft prompt."
-            : "Đã tạo draft từ version đang chọn.",
+            ? "Đã mở bản nháp mẫu lệnh."
+            : "Đã tạo bản nháp từ phiên bản đang chọn.",
         );
       } catch (error) {
         toast.dismiss(toastId);
-        setEditorSourcePromptId(null);
+        setEditorSourcePrompt(null);
+        setEditorDraftPromptId(null);
+        setEditorRollbackTargetPromptId(null);
         const message =
           error instanceof Error
             ? error.message
-            : "Không thể mở prompt editor.";
+            : "Không thể mở trình chỉnh sửa mẫu lệnh.";
         toast.error(message);
       }
     },
-    [createPromptDraftMutation],
+    [createPromptDraftMutation, promptVersions],
   );
 
   useEffect(() => {
@@ -680,28 +728,28 @@ const AIPromptPage = () => {
             id: editingPrompt.id,
             data: payload as UpdatePromptRequest,
           });
-          toast.success("Đã lưu draft prompt.");
+          toast.success("Đã lưu bản nháp mẫu lệnh.");
         } else {
           const createdPrompt = await createPromptMutation.mutateAsync(
             payload as CreatePromptRequest,
           );
-          toast.success("Đã tạo prompt mới.");
+          toast.success("Đã tạo mẫu lệnh mới.");
           setSelectedPromptType(createdPrompt.promptType);
           setSelectedPromptId(createdPrompt.id);
         }
 
-        setEditorMode("closed");
-        setEditingPrompt(null);
+        closeEditor();
         await Promise.all([refetchPrompts(), refetchAiConfigs()]);
       } catch (error) {
         const message =
           error instanceof AxiosError
-            ? (error.response?.data?.message ?? "Không thể lưu prompt.")
-            : "Không thể lưu prompt.";
+            ? (error.response?.data?.message ?? "Không thể lưu mẫu lệnh.")
+            : "Không thể lưu mẫu lệnh.";
         toast.error(message);
       }
     },
     [
+      closeEditor,
       createPromptMutation,
       editingPrompt,
       refetchAiConfigs,
@@ -717,7 +765,7 @@ const AIPromptPage = () => {
 
     try {
       await deletePromptMutation.mutateAsync(deletingPrompt.id);
-      toast.success("Đã xóa draft prompt.");
+      toast.success("Đã xóa bản nháp mẫu lệnh.");
       setDeletingPrompt(null);
       if (selectedPromptId === deletingPrompt.id) {
         setSelectedPromptId(null);
@@ -726,8 +774,9 @@ const AIPromptPage = () => {
     } catch (error) {
       const message =
         error instanceof AxiosError
-          ? (error.response?.data?.message ?? "Không thể xóa draft prompt.")
-          : "Không thể xóa draft prompt.";
+          ? (error.response?.data?.message ??
+            "Không thể xóa bản nháp mẫu lệnh.")
+          : "Không thể xóa bản nháp mẫu lệnh.";
       toast.error(message);
     }
   }, [deletePromptMutation, deletingPrompt, refetchPrompts, selectedPromptId]);
@@ -746,14 +795,14 @@ const AIPromptPage = () => {
 
       try {
         await activatePromptMutation.mutateAsync(prompt.id);
-        toast.success("Đã kích hoạt prompt.");
+        toast.success("Đã kích hoạt mẫu lệnh.");
         setSelectedPromptId(prompt.id);
         await refetchPrompts();
       } catch (error) {
         const message =
           error instanceof AxiosError
-            ? (error.response?.data?.message ?? "Không thể kích hoạt prompt.")
-            : "Không thể kích hoạt prompt.";
+            ? (error.response?.data?.message ?? "Không thể kích hoạt mẫu lệnh.")
+            : "Không thể kích hoạt mẫu lệnh.";
         toast.error(message);
       } finally {
         setActivatingPromptId(null);
@@ -762,30 +811,84 @@ const AIPromptPage = () => {
     [activatePromptMutation, refetchPrompts],
   );
 
-  const handleRollbackPromptFromEditor = useCallback(async () => {
-    if (!editorSourcePromptId) {
-      toast.info("Không có version để rollback.");
+  const handleDiscardPromptDraftFromEditor = useCallback(async () => {
+    if (!editingPrompt || editingPrompt.status !== "Draft") {
+      toast.info("Bản nháp mẫu lệnh không còn khả dụng để hủy.");
       return;
     }
 
     try {
-      await rollbackPromptMutation.mutateAsync(editorSourcePromptId);
-      toast.success("Đã rollback về version trước.");
-      setSelectedPromptId(editorSourcePromptId);
+      await deletePromptMutation.mutateAsync(editingPrompt.id);
+      toast.success("Đã hủy bản nháp mẫu lệnh đang chỉnh sửa.");
+      setSelectedPromptId(
+        editorSourcePrompt?.id ?? recommendedRollbackPromptId,
+      );
       closeEditor();
       await refetchPrompts();
     } catch (error) {
       const message =
         error instanceof AxiosError
-          ? (error.response?.data?.message ?? "Không thể rollback prompt.")
-          : "Không thể rollback prompt.";
+          ? (error.response?.data?.message ??
+            "Không thể hủy bản nháp mẫu lệnh.")
+          : "Không thể hủy bản nháp mẫu lệnh.";
       toast.error(message);
     }
   }, [
     closeEditor,
-    editorSourcePromptId,
+    deletePromptMutation,
+    editingPrompt,
+    editorSourcePrompt?.id,
+    recommendedRollbackPromptId,
     refetchPrompts,
-    rollbackPromptMutation,
+  ]);
+
+  const handleRollbackPromptProductionFromEditor = useCallback(async () => {
+    if (!editorRollbackTargetPromptId) {
+      toast.info("Không có phiên bản ổn định để khôi phục hệ thống.");
+      return;
+    }
+
+    const rollbackTarget =
+      promptVersions.find(
+        (prompt) => prompt.id === editorRollbackTargetPromptId,
+      ) ?? null;
+
+    if (!rollbackTarget) {
+      toast.error("Không tìm thấy phiên bản khôi phục đã chọn.");
+      return;
+    }
+
+    if (rollbackTarget.status === "Active") {
+      toast.info("Phiên bản này đang chạy trên hệ thống.");
+      return;
+    }
+
+    setActivatingPromptId(rollbackTarget.id);
+
+    try {
+      await activatePromptMutation.mutateAsync(rollbackTarget.id);
+      toast.success(
+        `Đã khôi phục hệ thống về ${rollbackTarget.version || `#${rollbackTarget.id}`}.`,
+      );
+      setSelectedPromptId(rollbackTarget.id);
+      closeEditor();
+      await refetchPrompts();
+    } catch (error) {
+      const message =
+        error instanceof AxiosError
+          ? (error.response?.data?.message ??
+            "Không thể khôi phục hệ thống về phiên bản đã chọn.")
+          : "Không thể khôi phục hệ thống về phiên bản đã chọn.";
+      toast.error(message);
+    } finally {
+      setActivatingPromptId(null);
+    }
+  }, [
+    activatePromptMutation,
+    closeEditor,
+    editorRollbackTargetPromptId,
+    promptVersions,
+    refetchPrompts,
   ]);
 
   const openCreateAiConfigDialog = useCallback(() => {
@@ -804,7 +907,7 @@ const AIPromptPage = () => {
     }
 
     if (selectedAiConfig.status !== "Draft") {
-      toast.error("Chỉ draft AI config mới có thể chỉnh sửa trực tiếp.");
+      toast.error("Chỉ bản nháp cấu hình AI mới có thể chỉnh sửa trực tiếp.");
       return;
     }
 
@@ -817,7 +920,6 @@ const AIPromptPage = () => {
         model: selectedAiConfig.model,
         temperature: selectedAiConfig.temperature,
         max_tokens: selectedAiConfig.maxTokens,
-        api_url: selectedAiConfig.apiUrl ?? "",
         api_key: "",
         version: (selectedAiConfig.version ?? "1.0").replace(/^v/i, ""),
         is_active: selectedAiConfig.isActive,
@@ -827,7 +929,7 @@ const AIPromptPage = () => {
 
   const handleSaveAiConfig = useCallback(async () => {
     if (!canSaveAiConfig) {
-      toast.error("Vui lòng kiểm tra lại các trường AI config đang báo lỗi.");
+      toast.error("Vui lòng kiểm tra lại các trường cấu hình AI đang báo lỗi.");
       return;
     }
 
@@ -838,7 +940,7 @@ const AIPromptPage = () => {
       model: aiConfigForm.model.trim(),
       temperature: aiConfigForm.temperature,
       max_tokens: aiConfigForm.max_tokens,
-      api_url: aiConfigForm.api_url.trim(),
+      api_url: getDefaultAiConfigApiUrl(aiConfigForm.provider),
       version: normalizedVersion.startsWith("v")
         ? normalizedVersion
         : `v${normalizedVersion}`,
@@ -851,7 +953,7 @@ const AIPromptPage = () => {
           ...payloadBase,
           api_key: aiConfigForm.api_key.trim() || undefined,
         } satisfies CreateAiConfigRequest);
-        toast.success("Đã tạo AI config.");
+        toast.success("Đã tạo cấu hình AI.");
         setSelectedAiConfigId(createdConfig.id);
       } else if (aiConfigFormTargetId) {
         await updateAiConfigDraftMutation.mutateAsync({
@@ -861,7 +963,7 @@ const AIPromptPage = () => {
             api_key: aiConfigForm.api_key.trim() || undefined,
           } satisfies UpdateAiConfigRequest,
         });
-        toast.success("Đã lưu draft AI config.");
+        toast.success("Đã lưu bản nháp cấu hình AI.");
       }
 
       setAiConfigDialogMode("closed");
@@ -870,8 +972,8 @@ const AIPromptPage = () => {
     } catch (error) {
       const message =
         error instanceof AxiosError
-          ? (error.response?.data?.message ?? "Không thể lưu AI config.")
-          : "Không thể lưu AI config.";
+          ? (error.response?.data?.message ?? "Không thể lưu cấu hình AI.")
+          : "Không thể lưu cấu hình AI.";
       toast.error(message);
     }
   }, [
@@ -893,14 +995,15 @@ const AIPromptPage = () => {
       const createdDraft = await createAiConfigDraftMutation.mutateAsync(
         selectedAiConfig.id,
       );
-      toast.success("Đã tạo draft AI config.");
+      toast.success("Đã tạo bản nháp cấu hình AI.");
       setSelectedAiConfigId(createdDraft.id);
       await refetchAiConfigs();
     } catch (error) {
       const message =
         error instanceof AxiosError
-          ? (error.response?.data?.message ?? "Không thể tạo draft AI config.")
-          : "Không thể tạo draft AI config.";
+          ? (error.response?.data?.message ??
+            "Không thể tạo bản nháp cấu hình AI.")
+          : "Không thể tạo bản nháp cấu hình AI.";
       toast.error(message);
     }
   }, [createAiConfigDraftMutation, refetchAiConfigs, selectedAiConfig]);
@@ -912,13 +1015,14 @@ const AIPromptPage = () => {
 
     try {
       await activateAiConfigMutation.mutateAsync(selectedAiConfig.id);
-      toast.success("Đã activate AI config.");
+      toast.success("Đã kích hoạt cấu hình AI.");
       await refetchAiConfigs();
     } catch (error) {
       const message =
         error instanceof AxiosError
-          ? (error.response?.data?.message ?? "Không thể activate AI config.")
-          : "Không thể activate AI config.";
+          ? (error.response?.data?.message ??
+            "Không thể kích hoạt cấu hình AI.")
+          : "Không thể kích hoạt cấu hình AI.";
       toast.error(message);
     }
   }, [activateAiConfigMutation, refetchAiConfigs, selectedAiConfig]);
@@ -930,13 +1034,14 @@ const AIPromptPage = () => {
 
     try {
       await rollbackAiConfigMutation.mutateAsync(selectedAiConfig.id);
-      toast.success("Rollback AI config thành công.");
+      toast.success("Khôi phục cấu hình AI thành công.");
       await refetchAiConfigs();
     } catch (error) {
       const message =
         error instanceof AxiosError
-          ? (error.response?.data?.message ?? "Không thể rollback AI config.")
-          : "Không thể rollback AI config.";
+          ? (error.response?.data?.message ??
+            "Không thể khôi phục cấu hình AI.")
+          : "Không thể khôi phục cấu hình AI.";
       toast.error(message);
     }
   }, [refetchAiConfigs, rollbackAiConfigMutation, selectedAiConfig]);
@@ -948,14 +1053,15 @@ const AIPromptPage = () => {
 
     try {
       await deleteAiConfigDraftMutation.mutateAsync(selectedAiConfig.id);
-      toast.success("Đã xóa draft AI config.");
+      toast.success("Đã xóa bản nháp cấu hình AI.");
       setSelectedAiConfigId(activeAiConfig?.id ?? null);
       await refetchAiConfigs();
     } catch (error) {
       const message =
         error instanceof AxiosError
-          ? (error.response?.data?.message ?? "Không thể xóa draft AI config.")
-          : "Không thể xóa draft AI config.";
+          ? (error.response?.data?.message ??
+            "Không thể xóa bản nháp cấu hình AI.")
+          : "Không thể xóa bản nháp cấu hình AI.";
       toast.error(message);
     }
   };
@@ -984,9 +1090,45 @@ const AIPromptPage = () => {
     }
 
     toast.info(
-      "Chọn 'Clone draft' ở khu AI config phía trên để chỉnh cấu hình.",
+      "Chọn 'Tạo bản nháp để chỉnh sửa' ở khu cấu hình AI phía trên để chỉnh sửa.",
     );
   };
+
+  const canDiscardPromptDraft =
+    Boolean(editingPrompt) &&
+    editingPrompt?.status === "Draft" &&
+    editingPrompt?.id === editorDraftPromptId;
+
+  const handleOpenPreviousPromptVersionFromEditor = () => {
+    if (!previousEditorSourcePrompt) {
+      return;
+    }
+
+    void openEditPromptEditor(previousEditorSourcePrompt);
+  };
+
+  const handleOpenNextPromptVersionFromEditor = () => {
+    if (!nextEditorSourcePrompt) {
+      return;
+    }
+
+    void openEditPromptEditor(nextEditorSourcePrompt);
+  };
+
+  const canRollbackPromptProduction =
+    Boolean(editorRollbackTargetPrompt) &&
+    editorRollbackTargetPrompt?.status !== "Active";
+
+  const previousPromptVersionLabel = previousEditorSourcePrompt
+    ? `${previousEditorSourcePrompt.version || `#${previousEditorSourcePrompt.id}`}`
+    : null;
+  const nextPromptVersionLabel = nextEditorSourcePrompt
+    ? `${nextEditorSourcePrompt.version || `#${nextEditorSourcePrompt.id}`}`
+    : null;
+
+  const rollbackProductionLabel = editorRollbackTargetPrompt
+    ? `${editorRollbackTargetPrompt.name} ${editorRollbackTargetPrompt.version || `#${editorRollbackTargetPrompt.id}`}`
+    : null;
 
   return (
     <DashboardLayout
@@ -998,10 +1140,10 @@ const AIPromptPage = () => {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">
-              Cấu hình AI Prompt
+              Cấu hình mẫu lệnh AI
             </h1>
             <p className="mt-1 text-base text-muted-foreground">
-              Đồng bộ prompt lifecycle với AI config versioning ở backend.
+              Đồng bộ vòng đời mẫu lệnh với phiên bản cấu hình AI trên máy chủ.
             </p>
           </div>
 
@@ -1024,7 +1166,7 @@ const AIPromptPage = () => {
             </Button>
             <Button onClick={openCreatePromptEditor}>
               <Plus size={16} className="mr-2" />
-              Tạo prompt mới
+              Tạo mẫu lệnh mới
             </Button>
           </div>
         </div>
@@ -1035,11 +1177,11 @@ const AIPromptPage = () => {
               <div>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Code size={18} />
-                  AI config dùng chung toàn hệ thống
+                  Cấu hình AI dùng chung toàn hệ thống
                 </CardTitle>
                 <CardDescription className="mt-1 text-sm">
-                  Mỗi prompt sẽ dùng AI config đang chọn hoặc đang active để
-                  test và chạy thực tế.
+                  Mỗi mẫu lệnh sẽ dùng cấu hình AI đang chọn hoặc đang chạy để
+                  chạy thử và vận hành thực tế.
                 </CardDescription>
               </div>
 
@@ -1047,7 +1189,7 @@ const AIPromptPage = () => {
                 {aiConfigs.length === 0 ? (
                   <Button onClick={openCreateAiConfigDialog}>
                     <Plus size={16} className="mr-2" />
-                    Tạo AI config đầu tiên
+                    Tạo cấu hình AI đầu tiên
                   </Button>
                 ) : (
                   <>
@@ -1057,7 +1199,7 @@ const AIPromptPage = () => {
                       disabled={!selectedAiConfig}
                     >
                       <Plus size={16} className="mr-2" />
-                      Clone draft để sửa
+                      Tạo bản nháp để chỉnh sửa
                     </Button>
                     <Button
                       variant="outline"
@@ -1065,7 +1207,7 @@ const AIPromptPage = () => {
                       disabled={selectedAiConfig?.status !== "Draft"}
                     >
                       <PencilSimple size={16} className="mr-2" />
-                      Mở draft
+                      Mở bản nháp
                     </Button>
                     <Button
                       variant="outline"
@@ -1077,7 +1219,7 @@ const AIPromptPage = () => {
                       }
                     >
                       <CheckCircle size={16} className="mr-2" />
-                      Activate bản chọn
+                      Kích hoạt bản đã chọn
                     </Button>
                     <Button
                       variant="outline"
@@ -1088,7 +1230,7 @@ const AIPromptPage = () => {
                       }
                     >
                       <ClockCounterClockwise size={16} className="mr-2" />
-                      Rollback bản chọn
+                      Khôi phục bản đã chọn
                     </Button>
                     <Button
                       variant="destructive"
@@ -1096,7 +1238,7 @@ const AIPromptPage = () => {
                       disabled={selectedAiConfig?.status !== "Draft"}
                     >
                       <Trash size={16} className="mr-2" />
-                      Xóa draft
+                      Xóa bản nháp
                     </Button>
                   </>
                 )}
@@ -1115,8 +1257,8 @@ const AIPromptPage = () => {
                     Bước 1
                   </p>
                   <p className="mt-1 text-sm text-foreground">
-                    Chọn một version AI config ở danh sách bên dưới để review và
-                    dùng version đó khi test prompt.
+                    Chọn một phiên bản cấu hình AI ở danh sách bên dưới để xem
+                    lại và dùng phiên bản đó khi chạy thử mẫu lệnh.
                   </p>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-background px-3 py-3">
@@ -1124,7 +1266,7 @@ const AIPromptPage = () => {
                     Bước 2
                   </p>
                   <p className="mt-1 text-sm text-foreground">
-                    Muốn chỉnh sửa thì clone draft. Chỉ bản Draft mới sửa hoặc
+                    Muốn chỉnh sửa thì tạo bản nháp. Chỉ bản nháp mới sửa hoặc
                     xóa trực tiếp được.
                   </p>
                 </div>
@@ -1133,8 +1275,8 @@ const AIPromptPage = () => {
                     Bước 3
                   </p>
                   <p className="mt-1 text-sm text-foreground">
-                    Activate để chạy thật. Rollback để quay về version cũ khi
-                    version mới có vấn đề.
+                    Kích hoạt để chạy thật. Khôi phục để quay về phiên bản cũ
+                    khi phiên bản mới có vấn đề.
                   </p>
                 </div>
               </div>
@@ -1143,33 +1285,33 @@ const AIPromptPage = () => {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
                 <p className="text-sm text-muted-foreground">
-                  Đang chọn để test prompt
+                  Đang chọn để chạy thử mẫu lệnh
                 </p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
                   {selectedAiConfig?.name ?? "Chưa có cấu hình"}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {selectedAiConfig
-                    ? `${selectedAiConfig.status} • ${selectedAiConfig.version || "—"}`
+                    ? `${getStatusLabel(selectedAiConfig.status)} • ${selectedAiConfig.version || "—"}`
                     : "—"}
                 </p>
               </div>
               <div className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
                 <p className="text-sm text-muted-foreground">
-                  Đang active trên hệ thống
+                  Đang chạy trên hệ thống
                 </p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
-                  {activeAiConfig?.name ?? "Chưa có bản active"}
+                  {activeAiConfig?.name ?? "Chưa có bản đang chạy"}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {activeAiConfig
                     ? `${activeAiConfig.version || "—"} • ${activeAiConfig.provider} • ${activeAiConfig.model}`
-                    : "Các prompt sẽ chưa có config để chạy thật."}
+                    : "Các mẫu lệnh chưa có cấu hình để vận hành thực tế."}
                 </p>
               </div>
               <div className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
                 <p className="text-sm text-muted-foreground">
-                  Model của bản đang chọn
+                  Mô hình của bản đang chọn
                 </p>
                 <p className="mt-1 break-all text-sm font-semibold text-foreground">
                   {selectedAiConfig
@@ -1177,16 +1319,17 @@ const AIPromptPage = () => {
                     : "—"}
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Temp {selectedAiConfig?.temperature ?? "—"} • Max tokens{" "}
-                  {selectedAiConfig?.maxTokens?.toLocaleString() ?? "—"}
+                  Nhiệt độ {selectedAiConfig?.temperature ?? "—"} • Số token tối
+                  đa {selectedAiConfig?.maxTokens?.toLocaleString() ?? "—"}
                 </p>
               </div>
               <div className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
                 <p className="text-sm text-muted-foreground">
-                  API URL / API key
+                  Địa chỉ API / Khóa API
                 </p>
                 <p className="mt-1 break-all text-sm font-semibold text-foreground">
-                  {selectedAiConfig?.apiUrl || "Dùng endpoint mặc định backend"}
+                  {selectedAiConfig?.apiUrl ||
+                    "Dùng điểm cuối mặc định của máy chủ"}
                 </p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
                   {selectedAiConfig?.hasApiKey
@@ -1199,29 +1342,15 @@ const AIPromptPage = () => {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-              <p className="text-sm font-semibold text-foreground">
-                Gợi ý thao tác cho version đang chọn
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {aiConfigWorkflowHint}
-              </p>
-              {selectedAiConfig && !isSelectedAiConfigActive ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Prompt sẽ test bằng version đang chọn, còn chạy thực tế vẫn
-                  dùng bản Active cho đến khi bạn Activate version khác.
-                </p>
-              ) : null}
-            </div>
-
             {aiConfigVersions.length > 0 ? (
               <div className="space-y-3">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                   <p className="text-sm font-medium text-foreground">
-                    Version rail AI config
+                    Dải phiên bản cấu hình AI
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Bấm một card để chọn version dùng khi review và test prompt.
+                    Bấm một thẻ để chọn phiên bản dùng khi xem lại và chạy thử
+                    mẫu lệnh.
                   </p>
                 </div>
                 <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
@@ -1252,7 +1381,7 @@ const AIPromptPage = () => {
                               config.status === "Active" ? "success" : "outline"
                             }
                           >
-                            {config.status}
+                            {getStatusLabel(config.status)}
                           </Badge>
                           {effectiveSelectedAiConfigId === config.id ? (
                             <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
@@ -1262,9 +1391,9 @@ const AIPromptPage = () => {
                         </div>
                       </div>
                       <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-muted-foreground">
-                        <span>Version: {config.version || "—"}</span>
+                        <span>Phiên bản: {config.version || "—"}</span>
                         <span>
-                          API key:{" "}
+                          Khóa API:{" "}
                           {config.hasApiKey ? "Đã cấu hình" : "Chưa cấu hình"}
                         </span>
                         <span>Cập nhật: {formatDate(config.updatedAt)}</span>
@@ -1273,8 +1402,8 @@ const AIPromptPage = () => {
                         {config.id === activeAiConfig?.id
                           ? "Đây là bản đang chạy thật trên hệ thống."
                           : effectiveSelectedAiConfigId === config.id
-                            ? "Prompt sẽ test bằng version này."
-                            : "Bấm để chọn version này khi test prompt."}
+                            ? "Mẫu lệnh sẽ chạy thử bằng phiên bản này."
+                            : "Bấm để chọn phiên bản này khi chạy thử mẫu lệnh."}
                       </p>
                     </button>
                   ))}
@@ -1289,11 +1418,17 @@ const AIPromptPage = () => {
           isLoading={promptsLoading}
           selectedId={effectiveSelectedPromptId}
           activatingPromptId={activatingPromptId}
+          recommendedRollbackId={recommendedRollbackPromptId}
           selectedPromptType={effectiveSelectedPromptType}
           promptTypeCounts={promptTypeCounts}
           aiConfig={promptAiConfig}
           onSelectPromptType={setSelectedPromptType}
-          onSelect={(prompt) => setSelectedPromptId(prompt.id)}
+          onSelect={(prompt) => {
+            setSelectedPromptId(prompt.id);
+            if (prompt.status === "Archived") {
+              setEditorRollbackTargetPromptId(prompt.id);
+            }
+          }}
           onToggleActive={(prompt, nextActive) => {
             void handleTogglePromptActive(prompt, nextActive);
           }}
@@ -1304,7 +1439,7 @@ const AIPromptPage = () => {
             setSelectedPromptId(prompt.id);
 
             if (prompt.status !== "Draft") {
-              toast.info("Chỉ có thể xóa bản draft.");
+              toast.info("Chỉ có thể xóa bản nháp.");
               return;
             }
 
@@ -1409,15 +1544,33 @@ const AIPromptPage = () => {
                     forcedPromptType={effectiveSelectedPromptType}
                     aiConfig={promptAiConfig}
                     aiConfigId={promptAiConfig?.id ?? null}
-                    canRollback={Boolean(editorSourcePromptId)}
-                    isRollingBack={rollbackPromptMutation.isPending}
+                    canDiscardDraft={canDiscardPromptDraft}
+                    isDiscardingDraft={deletePromptMutation.isPending}
+                    onDiscardDraft={() => {
+                      void handleDiscardPromptDraftFromEditor();
+                    }}
+                    canRollbackProduction={canRollbackPromptProduction}
+                    isRollingBackProduction={
+                      activatePromptMutation.isPending &&
+                      Boolean(editorRollbackTargetPromptId)
+                    }
+                    rollbackProductionLabel={rollbackProductionLabel}
                     isSubmitting={
                       createPromptMutation.isPending ||
                       updatePromptMutation.isPending
                     }
                     onSave={handleSavePrompt}
-                    onRollback={() => {
-                      void handleRollbackPromptFromEditor();
+                    onOpenPreviousVersion={
+                      handleOpenPreviousPromptVersionFromEditor
+                    }
+                    onOpenNextVersion={handleOpenNextPromptVersionFromEditor}
+                    canOpenPreviousVersion={Boolean(previousEditorSourcePrompt)}
+                    canOpenNextVersion={Boolean(nextEditorSourcePrompt)}
+                    previousVersionLabel={previousPromptVersionLabel}
+                    nextVersionLabel={nextPromptVersionLabel}
+                    isOpeningVersion={createPromptDraftMutation.isPending}
+                    onRollbackProduction={() => {
+                      void handleRollbackPromptProductionFromEditor();
                     }}
                     onCancel={closeEditor}
                     hideHeaderClose
@@ -1443,14 +1596,14 @@ const AIPromptPage = () => {
           <DialogHeader>
             <DialogTitle>
               {aiConfigDialogMode === "create"
-                ? "Tạo AI config"
-                : "Chỉnh sửa draft AI config"}
+                ? "Tạo cấu hình AI"
+                : "Chỉnh sửa bản nháp cấu hình AI"}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="ai_config_name">Tên AI config</Label>
+              <Label htmlFor="ai_config_name">Tên cấu hình AI</Label>
               <Input
                 id="ai_config_name"
                 value={aiConfigForm.name}
@@ -1473,7 +1626,7 @@ const AIPromptPage = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="ai_config_provider">Provider</Label>
+              <Label htmlFor="ai_config_provider">Nhà cung cấp</Label>
               <Select
                 value={aiConfigForm.provider}
                 onValueChange={(value) => {
@@ -1482,9 +1635,6 @@ const AIPromptPage = () => {
                     (option) => option.value === nextProvider,
                   );
                   setAiConfigForm((previous) => {
-                    const previousDefaultUrl = getDefaultAiConfigApiUrl(
-                      previous.provider,
-                    );
                     const nextDefaultUrl =
                       getDefaultAiConfigApiUrl(nextProvider);
 
@@ -1492,11 +1642,7 @@ const AIPromptPage = () => {
                       ...previous,
                       provider: nextProvider,
                       model: providerOption?.models[0]?.code ?? previous.model,
-                      api_url:
-                        !previous.api_url.trim() ||
-                        previous.api_url === previousDefaultUrl
-                          ? nextDefaultUrl
-                          : previous.api_url,
+                      api_url: nextDefaultUrl,
                     };
                   });
                 }}
@@ -1505,7 +1651,7 @@ const AIPromptPage = () => {
                   id="ai_config_provider"
                   className={FORM_SELECT_TRIGGER_CLASSNAME}
                 >
-                  <SelectValue placeholder="Chọn provider" />
+                  <SelectValue placeholder="Chọn nhà cung cấp" />
                 </SelectTrigger>
                 <SelectContent>
                   {AI_PROVIDER_OPTIONS.map((option) => (
@@ -1518,7 +1664,7 @@ const AIPromptPage = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="ai_config_model">Model</Label>
+              <Label htmlFor="ai_config_model">Mô hình</Label>
               <Select
                 value={aiConfigModelSelectValue}
                 onValueChange={(value) => {
@@ -1543,7 +1689,7 @@ const AIPromptPage = () => {
                     aiConfigFormErrors.model && INVALID_FIELD_CLASSNAME,
                   )}
                 >
-                  <SelectValue placeholder="Chọn model" />
+                  <SelectValue placeholder="Chọn mô hình" />
                 </SelectTrigger>
                 <SelectContent>
                   {aiProviderModelOptions.map((modelOption) => (
@@ -1570,7 +1716,7 @@ const AIPromptPage = () => {
                       model: event.target.value,
                     }))
                   }
-                  placeholder="Nhập model tùy chỉnh"
+                  placeholder="Nhập mô hình tùy chỉnh"
                 />
               ) : null}
               {aiConfigFormErrors.model ? (
@@ -1582,7 +1728,7 @@ const AIPromptPage = () => {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="ai_config_temperature">Temperature</Label>
+                <Label htmlFor="ai_config_temperature">Nhiệt độ</Label>
                 <Input
                   id="ai_config_temperature"
                   type="number"
@@ -1607,7 +1753,7 @@ const AIPromptPage = () => {
                 ) : null}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ai_config_max_tokens">Max tokens</Label>
+                <Label htmlFor="ai_config_max_tokens">Số token tối đa</Label>
                 <Input
                   id="ai_config_max_tokens"
                   type="number"
@@ -1632,7 +1778,7 @@ const AIPromptPage = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="ai_config_version">Version</Label>
+              <Label htmlFor="ai_config_version">Phiên bản</Label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-muted-foreground/70">
                   v
@@ -1664,22 +1810,18 @@ const AIPromptPage = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="ai_config_api_url">API URL</Label>
+              <Label htmlFor="ai_config_api_url">Địa chỉ API</Label>
               <Input
                 id="ai_config_api_url"
                 value={aiConfigForm.api_url}
                 maxLength={500}
+                disabled
                 className={cn(
                   aiConfigFormErrors.api_url && INVALID_FIELD_CLASSNAME,
                 )}
-                onChange={(event) =>
-                  setAiConfigForm((previous) => ({
-                    ...previous,
-                    api_url: event.target.value,
-                  }))
-                }
                 placeholder={getDefaultAiConfigApiUrl(aiConfigForm.provider)}
               />
+
               {aiConfigFormErrors.api_url ? (
                 <p className="text-sm text-destructive">
                   {aiConfigFormErrors.api_url}
@@ -1688,7 +1830,7 @@ const AIPromptPage = () => {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="ai_config_api_key">API key</Label>
+              <Label htmlFor="ai_config_api_key">Khóa API</Label>
               <Input
                 id="ai_config_api_key"
                 type="password"
@@ -1702,7 +1844,7 @@ const AIPromptPage = () => {
                     api_key: event.target.value,
                   }))
                 }
-                placeholder="Nhập API key"
+                placeholder="Nhập khóa API"
                 autoComplete="new-password"
               />
               {aiConfigFormErrors.api_key ? (
@@ -1736,7 +1878,7 @@ const AIPromptPage = () => {
               updateAiConfigDraftMutation.isPending ? (
                 <ArrowClockwise size={16} className="mr-2 animate-spin" />
               ) : null}
-              Lưu AI config
+              Lưu cấu hình AI
             </Button>
           </DialogFooter>
         </DialogContent>

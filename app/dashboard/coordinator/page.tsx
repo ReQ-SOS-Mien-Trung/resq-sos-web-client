@@ -58,6 +58,7 @@ import {
   SidebarSimple,
   Gear,
   User,
+  ArrowsClockwise,
   WifiHigh,
   WifiSlash,
   Sun,
@@ -84,6 +85,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import { useThemeStore } from "@/stores/theme.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
+import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
 import { deriveSOSNeeds } from "@/lib/sos";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 
@@ -126,7 +128,22 @@ function toPriority(level: string): "P1" | "P2" | "P3" | "P4" {
 /** Map backend status to frontend status */
 function toStatus(status: string): "PENDING" | "ASSIGNED" | "RESCUED" {
   if (status === "Pending") return "PENDING";
-  if (status === "InProgress" || status === "Assigned") return "ASSIGNED";
+  if (
+    status === "InProgress" ||
+    status === "Assigned" ||
+    status === "Incident"
+  ) {
+    return "ASSIGNED";
+  }
+
+  if (
+    status === "Resolved" ||
+    status === "Completed" ||
+    status === "Cancelled"
+  ) {
+    return "RESCUED";
+  }
+
   return "RESCUED";
 }
 
@@ -370,7 +387,6 @@ const CoordinatorDashboardContent = () => {
     useState<TeamIncidentEntity | null>(null);
   const [flyToLocation, setFlyToLocation] = useState<Location | null>(null);
   const [flyToZoom, setFlyToZoom] = useState<number | undefined>(undefined);
-  const [isConnected] = useState(true);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
@@ -419,7 +435,8 @@ const CoordinatorDashboardContent = () => {
 
   // ─── Data Fetching ───
   const { data: sosData } = useSOSRequests({
-    params: { pageSize: 200 },
+    // Keep enough rows in-memory so cluster cards can resolve sosRequestIds.
+    params: { pageSize: 1000 },
   });
   const { data: depotsData } = useDepots({ params: { pageSize: 100 } });
   const { data: assemblyPointsData } = useAssemblyPoints({
@@ -463,6 +480,45 @@ const CoordinatorDashboardContent = () => {
     () => clustersData?.clusters ?? [],
     [clustersData],
   );
+  const activeRealtimeDepotId = useMemo(() => {
+    if (!locationPanelOpen || locationPanelData?.type !== "depot") {
+      return null;
+    }
+
+    return locationPanelData.data.id;
+  }, [locationPanelData, locationPanelOpen]);
+  const activeRealtimeAssemblyPointId = useMemo(() => {
+    if (!locationPanelOpen || locationPanelData?.type !== "assemblyPoint") {
+      return null;
+    }
+
+    return locationPanelData.data.id;
+  }, [locationPanelData, locationPanelOpen]);
+  const activeRealtimeClusterIds = useMemo(
+    () =>
+      [
+        rescuePlanOpen ? activeClusterId : null,
+        manualMissionOpen ? manualMissionClusterId : null,
+      ].filter((clusterId): clusterId is number => Number.isFinite(clusterId)),
+    [
+      activeClusterId,
+      manualMissionClusterId,
+      manualMissionOpen,
+      rescuePlanOpen,
+    ],
+  );
+  const operationalConnectionState = useOperationalRealtime({
+    depotId: activeRealtimeDepotId,
+    assemblyPointId: activeRealtimeAssemblyPointId,
+    clusterIds: activeRealtimeClusterIds,
+  });
+  const isConnected = operationalConnectionState === "connected";
+  const isReconnecting = operationalConnectionState === "reconnecting";
+  const connectionLabel = isConnected
+    ? "Đang kết nối"
+    : isReconnecting
+      ? "Đang kết nối lại"
+      : "Mất kết nối";
 
   const autoClusters = useMemo(
     () => buildAutoClusters(sosRequests, clusters),
@@ -478,9 +534,7 @@ const CoordinatorDashboardContent = () => {
   // ─── Mutations ───
   const { mutate: createCluster, isPending: isCreatingCluster } =
     useCreateSOSCluster();
-  const {
-    isPending: isFetchingSuggestion,
-  } = useClusterRescueSuggestion();
+  const { isPending: isFetchingSuggestion } = useClusterRescueSuggestion();
   const isProcessingSOS = isCreatingCluster || isFetchingSuggestion;
 
   // ─── AI Stream ───
@@ -952,15 +1006,18 @@ const CoordinatorDashboardContent = () => {
     clearSelection();
   }, [clearSelection]);
 
-  const handleOpenManualMission = useCallback((clusterId: number) => {
-    setManualMissionClusterId(clusterId);
-    setExistingMissionId(null);
-    setManualMissionOpen(true);
-    setSOSDetailOpen(false);
-    setRescuePlanOpen(false);
-    syncRescuePlanUrlState(false, activeClusterId);
-    setLocationPanelOpen(false);
-  }, [activeClusterId, syncRescuePlanUrlState]);
+  const handleOpenManualMission = useCallback(
+    (clusterId: number) => {
+      setManualMissionClusterId(clusterId);
+      setExistingMissionId(null);
+      setManualMissionOpen(true);
+      setSOSDetailOpen(false);
+      setRescuePlanOpen(false);
+      syncRescuePlanUrlState(false, activeClusterId);
+      setLocationPanelOpen(false);
+    },
+    [activeClusterId, syncRescuePlanUrlState],
+  );
 
   const handleViewMission = useCallback(
     (clusterId: number | null, missionId: number) => {
@@ -1112,27 +1169,34 @@ const CoordinatorDashboardContent = () => {
               "relative flex h-9 w-9 items-center justify-center rounded-full border",
               isConnected
                 ? "border-green-200 bg-green-100 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-400"
-                : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
+                : isReconnecting
+                  ? "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/30 dark:text-amber-400"
+                  : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
             )}
-            title={isConnected ? "Đang kết nối" : "Mất kết nối"}
-            aria-label={isConnected ? "Đang kết nối" : "Mất kết nối"}
+            title={connectionLabel}
+            aria-label={connectionLabel}
           >
             {isConnected ? (
               <>
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-green-500 opacity-75 animate-ping" />
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-green-500 dark:border-zinc-900/70" />
               </>
+            ) : isReconnecting ? (
+              <>
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-amber-500 opacity-75 animate-ping" />
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-amber-500 dark:border-zinc-900/70" />
+              </>
             ) : (
               <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-red-500 dark:border-zinc-900/70" />
             )}
             {isConnected ? (
               <WifiHigh className="h-4 w-4" weight="bold" />
+            ) : isReconnecting ? (
+              <ArrowsClockwise className="h-4 w-4 animate-spin" weight="bold" />
             ) : (
               <WifiSlash className="h-4 w-4" weight="bold" />
             )}
-            <span className="sr-only">
-              {isConnected ? "Đang kết nối" : "Mất kết nối"}
-            </span>
+            <span className="sr-only">{connectionLabel}</span>
           </div>
 
           {/* Weather Map Toggle */}

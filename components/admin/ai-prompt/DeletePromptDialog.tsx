@@ -37,10 +37,10 @@ const DeletePromptDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <Warning size={20} weight="fill" />
-            Xóa draft prompt
+            Xóa bản nháp mẫu lệnh
           </DialogTitle>
           <DialogDescription>
-            Bạn sắp xóa draft{" "}
+            Bạn sắp xóa bản nháp{" "}
             <strong className="text-foreground">
               &quot;{prompt.name}&quot;
             </strong>{" "}
@@ -59,7 +59,7 @@ const DeletePromptDialog = ({
             {isDeleting ? (
               <CircleNotch size={16} className="mr-2 animate-spin" />
             ) : null}
-            Xóa draft
+            Xóa bản nháp
           </Button>
         </DialogFooter>
       </DialogContent>

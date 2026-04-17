@@ -4,14 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Clock,
-  Eye,
-  Hash,
-  Key,
-  Robot,
-  Sparkle,
-} from "@phosphor-icons/react";
+import { Clock, Eye, Hash, Key, Robot, Sparkle } from "@phosphor-icons/react";
 import { PROMPT_TYPE_LABELS } from "@/services/prompt/constants";
 import type { PromptDetailEntity } from "@/services/prompt/type";
 import type { AiConfigSummaryEntity } from "@/services/ai-config/type";
@@ -34,6 +27,22 @@ function formatDate(date: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function getStatusLabel(status: string) {
+  if (status === "Active") {
+    return "Đang chạy";
+  }
+
+  if (status === "Draft") {
+    return "Bản nháp";
+  }
+
+  if (status === "Archived") {
+    return "Lưu trữ";
+  }
+
+  return status;
 }
 
 const PromptDetailPanel = ({
@@ -66,7 +75,7 @@ const PromptDetailPanel = ({
             weight="duotone"
           />
           <p className="text-base font-medium text-muted-foreground">
-            Chọn một prompt để xem chi tiết
+            Chọn một mẫu lệnh để xem chi tiết
           </p>
         </CardContent>
       </Card>
@@ -86,8 +95,10 @@ const PromptDetailPanel = ({
               <Badge variant="outline">
                 {PROMPT_TYPE_LABELS[prompt.promptType] ?? prompt.promptType}
               </Badge>
-              <Badge variant={prompt.status === "Active" ? "success" : "outline"}>
-                {prompt.status}
+              <Badge
+                variant={prompt.status === "Active" ? "success" : "outline"}
+              >
+                {getStatusLabel(prompt.status)}
               </Badge>
               <Badge variant="outline">{prompt.version || "—"}</Badge>
             </div>
@@ -98,7 +109,7 @@ const PromptDetailPanel = ({
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="rounded-lg bg-muted/50 p-3">
-            <p className="text-sm text-muted-foreground">Version</p>
+            <p className="text-sm text-muted-foreground">Phiên bản</p>
             <p className="mt-1 text-sm font-medium">{prompt.version || "—"}</p>
           </div>
           <div className="rounded-lg bg-muted/50 p-3">
@@ -121,43 +132,48 @@ const PromptDetailPanel = ({
             <div className="min-w-0 space-y-2">
               <div>
                 <p className="text-sm font-semibold text-foreground">
-                  AI config dùng chung
+                  Cấu hình AI dùng chung
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Prompt này sẽ dùng AI config hệ thống đang chọn hoặc đang active.
+                  Mẫu lệnh này sẽ dùng cấu hình AI hệ thống đang chọn hoặc đang
+                  chạy.
                 </p>
               </div>
 
               {aiConfig ? (
                 <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                   <div className="rounded-lg border border-border/60 bg-background p-3">
-                    <p className="text-muted-foreground">Tên config</p>
+                    <p className="text-muted-foreground">Tên cấu hình</p>
                     <p className="mt-1 font-medium">{aiConfig.name}</p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-background p-3">
-                    <p className="text-muted-foreground">Provider / Model</p>
+                    <p className="text-muted-foreground">
+                      Nhà cung cấp / Mô hình
+                    </p>
                     <p className="mt-1 font-medium break-all">
                       {aiConfig.provider} • {aiConfig.model}
                     </p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-background p-3">
-                    <p className="text-muted-foreground">Version</p>
+                    <p className="text-muted-foreground">Phiên bản</p>
                     <p className="mt-1 font-medium">
-                      {aiConfig.version || "—"} • {aiConfig.status}
+                      {aiConfig.version || "—"} •{" "}
+                      {getStatusLabel(aiConfig.status)}
                     </p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-background p-3">
-                    <p className="text-muted-foreground">API key</p>
+                    <p className="text-muted-foreground">Khóa API</p>
                     <p className="mt-1 font-medium">
                       {aiConfig.hasApiKey
                         ? aiConfig.apiKeyMasked || "Đã cấu hình"
-                        : "Chưa có key riêng"}
+                        : "Chưa có khóa riêng"}
                     </p>
                   </div>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Chưa có AI config để gắn vào phần test hoặc hiển thị tóm tắt.
+                  Chưa có cấu hình AI để gắn vào phần chạy thử hoặc hiển thị tóm
+                  tắt.
                 </p>
               )}
             </div>
@@ -169,7 +185,7 @@ const PromptDetailPanel = ({
         <div>
           <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
             <Sparkle size={14} />
-            System Prompt
+            Lệnh hệ thống
           </h4>
           <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-border/30 bg-muted/70 p-3 font-mono text-sm leading-relaxed">
             {prompt.systemPrompt || "—"}
@@ -179,7 +195,7 @@ const PromptDetailPanel = ({
         <div>
           <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
             <Hash size={14} />
-            User Prompt Template
+            Mẫu lệnh người dùng
           </h4>
           <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-border/30 bg-muted/70 p-3 font-mono text-sm leading-relaxed">
             {prompt.userPromptTemplate || "—"}
@@ -195,7 +211,7 @@ const PromptDetailPanel = ({
           </span>
           <span className="flex items-center gap-2">
             <Key size={14} />
-            AI config: {aiConfig?.name ?? "Chưa chọn"}
+            Cấu hình AI: {aiConfig?.name ?? "Chưa chọn"}
           </span>
         </div>
       </CardContent>

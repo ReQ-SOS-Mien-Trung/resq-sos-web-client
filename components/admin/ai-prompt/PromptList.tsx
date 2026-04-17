@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo, useState } from "react";
+
 import {
   Card,
   CardContent,
@@ -22,6 +24,7 @@ type PromptListProps = {
   isLoading: boolean;
   selectedId: number | null;
   activatingPromptId?: number | null;
+  recommendedRollbackId?: number | null;
   selectedPromptType: PromptType | null;
   promptTypeCounts: Record<PromptType, number>;
   aiConfig?: AiConfigSummaryEntity | null;
@@ -130,11 +133,28 @@ function formatDate(date: string | null) {
   });
 }
 
+function getStatusLabel(status: string) {
+  if (status === "Active") {
+    return "Đang chạy";
+  }
+
+  if (status === "Draft") {
+    return "Bản nháp";
+  }
+
+  if (status === "Archived") {
+    return "Lưu trữ";
+  }
+
+  return status;
+}
+
 const PromptList = ({
   prompts,
   isLoading,
   selectedId,
   activatingPromptId = null,
+  recommendedRollbackId = null,
   selectedPromptType,
   promptTypeCounts,
   aiConfig = null,
@@ -144,6 +164,33 @@ const PromptList = ({
   onDelete,
   onToggleActive,
 }: PromptListProps) => {
+  const [showAllVersions, setShowAllVersions] = useState(false);
+
+  const archivedCount = useMemo(
+    () => prompts.filter((prompt) => prompt.status === "Archived").length,
+    [prompts],
+  );
+
+  const visiblePrompts = useMemo(() => {
+    if (showAllVersions) {
+      return prompts;
+    }
+
+    const compactPrompts = prompts.slice(0, 6);
+
+    if (
+      selectedId !== null &&
+      !compactPrompts.some((prompt) => prompt.id === selectedId)
+    ) {
+      const selectedPrompt = prompts.find((prompt) => prompt.id === selectedId);
+      if (selectedPrompt) {
+        compactPrompts.push(selectedPrompt);
+      }
+    }
+
+    return compactPrompts;
+  }, [prompts, selectedId, showAllVersions]);
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -165,15 +212,8 @@ const PromptList = ({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Robot size={22} weight="duotone" />
-          Danh sách Prompt Version
+          Danh sách phiên bản mẫu lệnh
         </CardTitle>
-        <CardDescription className="text-sm">
-          1. Chọn loại prompt. 2. Chọn version cần xem. 3. Bấm{" "}
-          <span className="font-medium text-foreground">
-            {`"Tạo draft"`} hoặc {`"Sửa draft"`}
-          </span>{" "}
-          để chỉnh phiên bản đó.
-        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -183,29 +223,44 @@ const PromptList = ({
           onSelectPromptType={onSelectPromptType}
         />
 
-        {aiConfig ? (
-          <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-            Prompt sẽ test với AI config{" "}
-            <span className="font-medium text-foreground">{aiConfig.name}</span>
-            {` • ${aiConfig.provider} • ${aiConfig.model}`}
+        {prompts.length > 0 ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/95 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Đang hiển thị {visiblePrompts.length}/{prompts.length} phiên bản.
+              {archivedCount > 0
+                ? ` Có ${archivedCount} bản lưu trữ để khôi phục khi cần.`
+                : ""}
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setShowAllVersions((previous) => !previous)}
+            >
+              {showAllVersions ? "Thu gọn danh sách" : "Xem tất cả phiên bản"}
+            </Button>
           </div>
         ) : null}
 
         {!selectedPromptType ? (
           <div className="rounded-lg border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
-            Chọn một loại prompt để xem các version tương ứng.
+            Chọn một loại mẫu lệnh để xem các phiên bản tương ứng.
           </div>
         ) : prompts.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
-            Chưa có prompt nào thuộc loại này.
+            Chưa có mẫu lệnh nào thuộc loại này.
           </div>
         ) : (
           <div className="space-y-2">
-            {prompts.map((prompt) => {
+            {visiblePrompts.map((prompt) => {
               const isDraft = prompt.status === "Draft";
               const isActive = prompt.status === "Active";
               const isActivating = activatingPromptId === prompt.id;
               const isSwitchOn = isActive || isActivating;
+              const isRecommendedRollback =
+                recommendedRollbackId !== null &&
+                prompt.id === recommendedRollbackId &&
+                prompt.status === "Archived";
 
               return (
                 <div
@@ -241,8 +296,11 @@ const PromptList = ({
                               prompt.status === "Active" ? "success" : "outline"
                             }
                           >
-                            {prompt.status}
+                            {getStatusLabel(prompt.status)}
                           </Badge>
+                        ) : null}
+                        {isRecommendedRollback ? (
+                          <Badge variant="outline">Gợi ý khôi phục</Badge>
                         ) : null}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -266,10 +324,10 @@ const PromptList = ({
                       >
                         <span className="text-xs font-medium text-muted-foreground">
                           {isActive
-                            ? "Đang active"
+                            ? "Đang chạy"
                             : isActivating
-                              ? "Đang activate..."
-                              : "Activate"}
+                              ? "Đang kích hoạt..."
+                              : "Kích hoạt"}
                         </span>
                         <button
                           type="button"
@@ -311,7 +369,7 @@ const PromptList = ({
                         }}
                       >
                         <PencilSimple size={14} className="mr-1.5" />
-                        {isDraft ? "Sửa draft" : "Tạo draft"}
+                        {isDraft ? "Sửa bản nháp" : "Tạo bản nháp"}
                       </Button>
 
                       <Button
@@ -325,7 +383,7 @@ const PromptList = ({
                         }}
                       >
                         <Trash size={14} className="mr-1.5" />
-                        Xóa draft
+                        Xóa bản nháp
                       </Button>
                     </div>
                   </div>

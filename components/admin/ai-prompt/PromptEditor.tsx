@@ -4,10 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowCounterClockwise,
   ArrowClockwise,
+  CaretLeft,
+  CaretRight,
   CircleNotch,
   FloppyDisk,
   Gear,
   TestTube,
+  Trash,
   X,
 } from "@phosphor-icons/react";
 import AiStreamPanel from "@/components/coordinator/AiStreamPanel";
@@ -67,9 +70,20 @@ type PromptEditorProps = {
   onSave: (
     data: CreatePromptRequest | UpdatePromptRequest,
   ) => void | Promise<void>;
-  onRollback?: () => void;
-  canRollback?: boolean;
-  isRollingBack?: boolean;
+  onDiscardDraft?: () => void;
+  canDiscardDraft?: boolean;
+  isDiscardingDraft?: boolean;
+  onRollbackProduction?: () => void;
+  canRollbackProduction?: boolean;
+  isRollingBackProduction?: boolean;
+  rollbackProductionLabel?: string | null;
+  onOpenPreviousVersion?: () => void;
+  onOpenNextVersion?: () => void;
+  canOpenPreviousVersion?: boolean;
+  canOpenNextVersion?: boolean;
+  previousVersionLabel?: string | null;
+  nextVersionLabel?: string | null;
+  isOpeningVersion?: boolean;
   onCancel: () => void;
   hideHeaderClose?: boolean;
   onOpenAiConfig?: () => void;
@@ -151,6 +165,22 @@ const stripVersionPrefix = (version: string): string =>
 const toVersionString = (version: string): string =>
   `v${stripVersionPrefix(version)}`;
 
+function getStatusLabel(status: string) {
+  if (status === "Active") {
+    return "Đang chạy";
+  }
+
+  if (status === "Draft") {
+    return "Bản nháp";
+  }
+
+  if (status === "Archived") {
+    return "Lưu trữ";
+  }
+
+  return status;
+}
+
 type PromptFormErrors = Partial<Record<keyof PromptFormData, string>>;
 
 function validatePromptForm(
@@ -165,9 +195,9 @@ function validatePromptForm(
   const normalizedVersion = toVersionString(formData.version.trim());
 
   if (!trimmedName) {
-    errors.name = "Tên prompt không được để trống.";
+    errors.name = "Tên mẫu lệnh không được để trống.";
   } else if (trimmedName.length > 255) {
-    errors.name = "Tên prompt không được vượt quá 255 ký tự.";
+    errors.name = "Tên mẫu lệnh không được vượt quá 255 ký tự.";
   }
 
   if (!trimmedPurpose) {
@@ -175,11 +205,11 @@ function validatePromptForm(
   }
 
   if (!trimmedSystemPrompt) {
-    errors.system_prompt = "System prompt không được để trống.";
+    errors.system_prompt = "Lệnh hệ thống không được để trống.";
   }
 
   if (!trimmedUserPromptTemplate) {
-    errors.user_prompt_template = "User prompt template không được để trống.";
+    errors.user_prompt_template = "Mẫu lệnh người dùng không được để trống.";
   }
 
   if (!formData.version.trim()) {
@@ -187,10 +217,10 @@ function validatePromptForm(
   } else if (normalizedVersion.length > 20) {
     errors.version = "Phiên bản không được vượt quá 20 ký tự.";
   } else if (isEditing && !normalizedVersion.includes("-D")) {
-    errors.version = "Version của draft phải chứa dấu hiệu '-D'.";
+    errors.version = "Phiên bản của bản nháp phải chứa hậu tố '-D'.";
   } else if (!isEditing && normalizedVersion.includes("-D")) {
     errors.version =
-      "Version tạo mới không được dùng định dạng draft '-D'. Hãy tạo xong rồi clone draft khi cần sửa.";
+      "Phiên bản tạo mới không được dùng định dạng bản nháp '-D'. Hãy tạo xong rồi tạo bản nháp khi cần sửa.";
   }
 
   return errors;
@@ -429,7 +459,8 @@ function mapPromptTestResponseToReviewResult(
     suggestionId: response.suggestionId ?? 0,
     isSuccess: response.isSuccess,
     errorMessage: response.errorMessage,
-    modelName: response.modelName?.trim() || response.model?.trim() || "N/A",
+    modelName:
+      response.modelName?.trim() || response.model?.trim() || "Không có",
     responseTimeMs: response.responseTimeMs ?? 0,
     sosRequestCount: response.sosRequestCount ?? 0,
     suggestedMissionTitle:
@@ -446,7 +477,7 @@ function mapPromptTestResponseToReviewResult(
     ),
     overallAssessment:
       response.overallAssessment?.trim() ||
-      "Chưa có đánh giá tổng quan từ backend.",
+      "Chưa có đánh giá tổng quan từ máy chủ.",
     suggestedActivities: activities,
     suggestedResources:
       response.suggestedResources?.map((resource) => ({
@@ -506,7 +537,7 @@ function toUserFriendlyAiErrorMessage(options: {
     );
 
   if (isAuthorizationError) {
-    return "Không thể gọi AI do thiếu quyền hoặc API key chưa hợp lệ. Vui lòng kiểm tra lại cấu hình.";
+    return "Không thể gọi AI do thiếu quyền hoặc khóa API chưa hợp lệ. Vui lòng kiểm tra lại cấu hình.";
   }
 
   const isTimeoutError =
@@ -517,7 +548,7 @@ function toUserFriendlyAiErrorMessage(options: {
     );
 
   if (isTimeoutError) {
-    return "AI phản hồi quá chậm nên test bị timeout. Vui lòng thử lại.";
+    return "AI phản hồi quá chậm nên phiên chạy thử đã quá thời gian. Vui lòng thử lại.";
   }
 
   const isServerError =
@@ -592,9 +623,20 @@ const PromptEditor = ({
   aiConfigId = null,
   isSubmitting = false,
   onSave,
-  onRollback,
-  canRollback = false,
-  isRollingBack = false,
+  onDiscardDraft,
+  canDiscardDraft = false,
+  isDiscardingDraft = false,
+  onRollbackProduction,
+  canRollbackProduction = false,
+  isRollingBackProduction = false,
+  rollbackProductionLabel = null,
+  onOpenPreviousVersion,
+  onOpenNextVersion,
+  canOpenPreviousVersion = false,
+  canOpenNextVersion = false,
+  previousVersionLabel = null,
+  nextVersionLabel = null,
+  isOpeningVersion = false,
   onCancel,
   hideHeaderClose = false,
   onOpenAiConfig,
@@ -614,6 +656,10 @@ const PromptEditor = ({
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewPhase, setReviewPhase] = useState<PromptReviewPhase>("idle");
   const reviewLogIdRef = useRef(0);
+  const [testSnapshots, setTestSnapshots] = useState<PromptFormData[]>([]);
+  const [testSnapshotIndex, setTestSnapshotIndex] = useState(-1);
+  const testSnapshotsRef = useRef<PromptFormData[]>([]);
+  const testSnapshotIndexRef = useRef(-1);
 
   const textareaRefMap = useMemo<
     Record<PromptTextField, React.RefObject<HTMLTextAreaElement | null>>
@@ -629,17 +675,120 @@ const PromptEditor = ({
   const testExistingPromptMutation = useTestPromptRescueSuggestion();
   const testNewPromptMutation = useTestNewPromptRescueSuggestion();
 
+  const clearTestSnapshots = useCallback(() => {
+    setTestSnapshots([]);
+    setTestSnapshotIndex(-1);
+    testSnapshotsRef.current = [];
+    testSnapshotIndexRef.current = -1;
+  }, []);
+
+  const pushTestSnapshot = useCallback((snapshot: PromptFormData) => {
+    const currentSnapshots = testSnapshotsRef.current;
+    const currentIndex = testSnapshotIndexRef.current;
+    const nextSnapshots = [
+      ...currentSnapshots.slice(0, currentIndex + 1),
+      { ...snapshot },
+    ];
+
+    const nextIndex = nextSnapshots.length - 1;
+    testSnapshotsRef.current = nextSnapshots;
+    testSnapshotIndexRef.current = nextIndex;
+    setTestSnapshots(nextSnapshots);
+    setTestSnapshotIndex(nextIndex);
+  }, []);
+
+  const restoreTestSnapshot = useCallback((snapshot: PromptFormData) => {
+    setFormData({ ...snapshot });
+    setReviewStatus("Đã khôi phục bản lưu nhanh trước khi chạy thử.");
+    setReviewError(null);
+    setReviewPhase("idle");
+  }, []);
+
+  const undoTestSnapshot = useCallback(() => {
+    const currentIndex = testSnapshotIndexRef.current;
+    if (currentIndex < 0) {
+      return false;
+    }
+
+    const snapshot = testSnapshotsRef.current[currentIndex];
+    if (!snapshot) {
+      return false;
+    }
+
+    const nextIndex = currentIndex - 1;
+    testSnapshotIndexRef.current = nextIndex;
+    setTestSnapshotIndex(nextIndex);
+    restoreTestSnapshot(snapshot);
+    return true;
+  }, [restoreTestSnapshot]);
+
+  const redoTestSnapshot = useCallback(() => {
+    const nextIndex = testSnapshotIndexRef.current + 1;
+    const snapshot = testSnapshotsRef.current[nextIndex];
+    if (!snapshot) {
+      return false;
+    }
+
+    testSnapshotIndexRef.current = nextIndex;
+    setTestSnapshotIndex(nextIndex);
+    restoreTestSnapshot(snapshot);
+    return true;
+  }, [restoreTestSnapshot]);
+
+  const canUndoTestSnapshot = testSnapshotIndex >= 0;
+  const canRedoTestSnapshot = testSnapshotIndex + 1 < testSnapshots.length;
+
+  useEffect(() => {
+    testSnapshotsRef.current = testSnapshots;
+  }, [testSnapshots]);
+
+  useEffect(() => {
+    testSnapshotIndexRef.current = testSnapshotIndex;
+  }, [testSnapshotIndex]);
+
   useEffect(() => {
     if (prompt) {
+      clearTestSnapshots();
       setFormData(mapDetailToForm(prompt));
       return;
     }
 
+    clearTestSnapshots();
     setFormData({
       ...INITIAL_FORM_DATA,
       prompt_type: forcedPromptType ?? INITIAL_FORM_DATA.prompt_type,
     });
-  }, [forcedPromptType, prompt]);
+  }, [clearTestSnapshots, forcedPromptType, prompt]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const hasModifier = event.metaKey || event.ctrlKey;
+      if (!hasModifier || event.altKey) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      const isUndo = key === "z" && !event.shiftKey;
+      const isRedo = key === "y" || (key === "z" && event.shiftKey);
+
+      if (!isUndo && !isRedo) {
+        return;
+      }
+
+      const restored = isUndo ? undoTestSnapshot() : redoTestSnapshot();
+      if (!restored) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [redoTestSnapshot, undoTestSnapshot]);
 
   useEffect(() => {
     const firstClusterId = clustersData?.clusters?.[0]?.id ?? null;
@@ -780,6 +929,8 @@ const PromptEditor = ({
       return;
     }
 
+    pushTestSnapshot(formData);
+
     const payload = buildPayload();
     const requestBase = {
       clusterId: previewClusterId,
@@ -791,9 +942,9 @@ const PromptEditor = ({
     setReviewError(null);
     setReviewResult(null);
     setReviewPhase("calling-ai");
-    setReviewStatus("Đang gửi bản nháp để test...");
+    setReviewStatus("Đang gửi bản nháp để chạy thử...");
     setReviewStatusLog([]);
-    addReviewLog("Đang gửi bản nháp để test...", "status");
+    addReviewLog("Đang gửi bản nháp để chạy thử...", "status");
 
     try {
       const response =
@@ -812,7 +963,7 @@ const PromptEditor = ({
           statusCode: response.httpStatusCode,
         });
         setReviewError(failureMessage);
-        setReviewStatus("AI trả về lỗi khi test prompt.");
+        setReviewStatus("AI trả về lỗi khi chạy thử mẫu lệnh.");
         setReviewPhase("error");
         addReviewLog(failureMessage, "error");
         setReviewLoading(false);
@@ -820,7 +971,7 @@ const PromptEditor = ({
       }
 
       const mappedResult = mapPromptTestResponseToReviewResult(response);
-      const completedMessage = `Test hoàn tất. Đã tạo ${mappedResult.suggestedActivities.length} activity đề xuất.`;
+      const completedMessage = `Chạy thử hoàn tất. Đã tạo ${mappedResult.suggestedActivities.length} hoạt động đề xuất.`;
 
       setReviewResult(mappedResult);
       setReviewStatus(completedMessage);
@@ -839,9 +990,11 @@ const PromptEditor = ({
     addReviewLog,
     aiConfigId,
     buildPayload,
+    formData,
     isEditing,
     previewClusterId,
     prompt,
+    pushTestSnapshot,
     testExistingPromptMutation,
     testNewPromptMutation,
   ]);
@@ -869,7 +1022,7 @@ const PromptEditor = ({
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2">
             <Gear size={20} weight="duotone" />
-            {isEditing ? "Chỉnh sửa draft prompt" : "Tạo prompt mới"}
+            {isEditing ? "Chỉnh sửa bản nháp mẫu lệnh" : "Tạo mẫu lệnh mới"}
           </CardTitle>
           {!hideHeaderClose ? (
             <Button
@@ -893,17 +1046,55 @@ const PromptEditor = ({
                 Loại: {selectedPromptType?.label || effectivePromptType}
               </span>
               <span className="rounded-full border border-border bg-background px-2.5 py-0.5 font-medium">
-                Version: {toVersionString(formData.version || "1.0")}
+                Phiên bản: {toVersionString(formData.version || "1.0")}
               </span>
               <span className="rounded-full border border-border bg-background px-2.5 py-0.5 font-medium">
-                Trạng thái: {prompt?.status ?? "New"}
+                Trạng thái: {getStatusLabel(prompt?.status ?? "Mới")}
               </span>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {isEditing
-                ? "Prompt hiện được chỉnh trên draft phía server. Sau khi lưu bạn có thể test tiếp hoặc activate từ màn hình chính."
-                : "Tạo prompt mới rồi test nhanh với AI config đang chọn trước khi đưa vào hệ thống."}
+                ? "Mẫu lệnh hiện được chỉnh trên bản nháp phía máy chủ. Sau khi lưu bạn có thể chạy thử tiếp hoặc kích hoạt từ màn hình chính."
+                : "Tạo mẫu lệnh mới rồi chạy thử nhanh với cấu hình AI đang chọn trước khi đưa vào hệ thống."}
             </p>
+            {isEditing ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={onOpenPreviousVersion}
+                  disabled={
+                    isSubmitting ||
+                    isOpeningVersion ||
+                    !canOpenPreviousVersion ||
+                    !onOpenPreviousVersion
+                  }
+                >
+                  <CaretLeft size={14} className="mr-1.5" />
+                  {previousVersionLabel
+                    ? `Phiên bản trước: ${previousVersionLabel}`
+                    : "Phiên bản trước"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={onOpenNextVersion}
+                  disabled={
+                    isSubmitting ||
+                    isOpeningVersion ||
+                    !canOpenNextVersion ||
+                    !onOpenNextVersion
+                  }
+                >
+                  <CaretRight size={14} className="mr-1.5" />
+                  {nextVersionLabel
+                    ? `Phiên bản sau: ${nextVersionLabel}`
+                    : "Phiên bản sau"}
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
@@ -914,7 +1105,7 @@ const PromptEditor = ({
                 </h3>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="prompt_name">Tên Prompt *</Label>
+                  <Label htmlFor="prompt_name">Tên mẫu lệnh *</Label>
                   <Input
                     id="prompt_name"
                     value={formData.name}
@@ -927,7 +1118,7 @@ const PromptEditor = ({
                       updateField("name", event.target.value)
                     }
                     required
-                    placeholder="VD: Mission Planning Stage"
+                    placeholder="Ví dụ: Lập kế hoạch nhiệm vụ"
                   />
                   {promptFormErrors.name ? (
                     <p className="text-sm text-destructive">
@@ -969,13 +1160,13 @@ const PromptEditor = ({
                     >
                       {promptFormErrors.version ??
                         (isEditing
-                          ? "Draft version phải giữ hậu tố -D để đúng rule backend."
-                          : "Prompt tạo mới không dùng hậu tố -D. Backend sẽ tạo draft riêng khi cần chỉnh sửa.")}
+                          ? "Phiên bản bản nháp phải giữ hậu tố -D theo quy tắc máy chủ."
+                          : "Mẫu lệnh tạo mới không dùng hậu tố -D. Máy chủ sẽ tạo bản nháp riêng khi cần chỉnh sửa.")}
                     </p>
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="prompt_type">Loại Prompt *</Label>
+                    <Label htmlFor="prompt_type">Loại mẫu lệnh *</Label>
                     <Select
                       value={effectivePromptType}
                       onValueChange={(value) =>
@@ -990,7 +1181,7 @@ const PromptEditor = ({
                           "border-input",
                         )}
                       >
-                        <SelectValue placeholder="Chọn loại prompt" />
+                        <SelectValue placeholder="Chọn loại mẫu lệnh" />
                       </SelectTrigger>
                       <SelectContent>
                         {PROMPT_TYPE_OPTIONS.map((option) => (
@@ -1020,7 +1211,7 @@ const PromptEditor = ({
                       updateField("purpose", event.target.value)
                     }
                     required
-                    placeholder="Mô tả ngắn gọn mục đích prompt"
+                    placeholder="Mô tả ngắn gọn mục đích mẫu lệnh"
                   />
                   {promptFormErrors.purpose ? (
                     <p className="text-sm text-destructive">
@@ -1044,12 +1235,12 @@ const PromptEditor = ({
                       htmlFor="prompt_is_active"
                       className="cursor-pointer text-sm font-medium"
                     >
-                      Đánh dấu active khi tạo mới
+                      Đánh dấu đang chạy khi tạo mới
                     </Label>
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Với draft đang chỉnh, backend sẽ không cho activate qua
-                    endpoint update.
+                    Với bản nháp đang chỉnh, máy chủ sẽ không cho kích hoạt qua
+                    điểm cuối cập nhật.
                   </p>
                 </div>
               </section>
@@ -1058,11 +1249,11 @@ const PromptEditor = ({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">
-                      AI config dùng chung
+                      Cấu hình AI dùng chung
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Prompt không còn giữ model/provider riêng. Toàn bộ phần AI
-                      lấy từ AI config hệ thống đang chọn.
+                      Mẫu lệnh không còn giữ mô hình hoặc nhà cung cấp riêng.
+                      Toàn bộ phần AI lấy từ cấu hình AI hệ thống đang chọn.
                     </p>
                   </div>
                   <Button
@@ -1072,31 +1263,35 @@ const PromptEditor = ({
                     onClick={onOpenAiConfig}
                     disabled={!onOpenAiConfig}
                   >
-                    Mở AI config
+                    Mở cấu hình AI
                   </Button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
-                    <p className="text-sm text-muted-foreground">Provider</p>
+                    <p className="text-sm text-muted-foreground">
+                      Nhà cung cấp
+                    </p>
                     <p className="mt-1 font-medium">
                       {aiConfig?.provider ?? "—"}
                     </p>
                   </div>
                   <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
-                    <p className="text-sm text-muted-foreground">Model</p>
+                    <p className="text-sm text-muted-foreground">Mô hình</p>
                     <p className="mt-1 font-medium break-all">
-                      {aiConfig?.model ?? "Chưa có AI config"}
+                      {aiConfig?.model ?? "Chưa có cấu hình AI"}
                     </p>
                   </div>
                   <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
-                    <p className="text-sm text-muted-foreground">Temperature</p>
+                    <p className="text-sm text-muted-foreground">Nhiệt độ</p>
                     <p className="mt-1 font-medium">
                       {aiConfig?.temperature ?? "—"}
                     </p>
                   </div>
                   <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
-                    <p className="text-sm text-muted-foreground">Max tokens</p>
+                    <p className="text-sm text-muted-foreground">
+                      Số token tối đa
+                    </p>
                     <p className="mt-1 font-medium">
                       {aiConfig?.maxTokens?.toLocaleString() ?? "—"}
                     </p>
@@ -1104,18 +1299,18 @@ const PromptEditor = ({
                 </div>
 
                 <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
-                  <p className="text-sm text-muted-foreground">API URL</p>
+                  <p className="text-sm text-muted-foreground">Địa chỉ API</p>
                   <p className="mt-1 break-all font-medium">
-                    {aiConfig?.apiUrl || "Dùng endpoint mặc định phía backend"}
+                    {aiConfig?.apiUrl || "Dùng địa chỉ mặc định phía máy chủ"}
                   </p>
                 </div>
 
                 <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
-                  <p className="text-sm text-muted-foreground">API Key</p>
+                  <p className="text-sm text-muted-foreground">Khóa API</p>
                   <p className="mt-1 font-medium">
                     {aiConfig?.hasApiKey
                       ? aiConfig.apiKeyMasked || "Đã cấu hình"
-                      : "Chưa cấu hình key riêng"}
+                      : "Chưa cấu hình khóa riêng"}
                   </p>
                 </div>
               </section>
@@ -1124,11 +1319,11 @@ const PromptEditor = ({
             <div className="space-y-4 xl:col-span-8">
               <section className="space-y-4 rounded-xl border border-border/70 bg-card p-4 shadow-xs">
                 <h3 className="text-sm font-semibold text-foreground">
-                  Nội dung Prompt
+                  Nội dung mẫu lệnh
                 </h3>
 
                 <div className="space-y-2">
-                  <Label htmlFor="system_prompt">System Prompt *</Label>
+                  <Label htmlFor="system_prompt">Lệnh hệ thống *</Label>
                   <Textarea
                     id="system_prompt"
                     ref={systemPromptRef}
@@ -1142,7 +1337,7 @@ const PromptEditor = ({
                     }
                     required
                     rows={12}
-                    placeholder="Nhập system prompt..."
+                    placeholder="Nhập lệnh hệ thống..."
                   />
                   <p
                     className={cn(
@@ -1153,14 +1348,14 @@ const PromptEditor = ({
                     )}
                   >
                     {promptFormErrors.system_prompt ??
-                      "Backend không replace biến ở trường này. Nếu prompt có JSON output schema phía cuối, phần schema sẽ được khóa riêng để tránh sửa sai."}
+                      "Máy chủ không thay thế biến ở trường này. Nếu mẫu lệnh có lược đồ JSON đầu ra ở cuối, phần lược đồ sẽ được khóa riêng để tránh sửa sai."}
                   </p>
                 </div>
 
                 {hasLockedSystemPromptJson ? (
                   <div className="space-y-2 rounded-lg border border-border/70 bg-muted/25 p-3">
                     <Label htmlFor="system_prompt_locked_json">
-                      JSON Output Schema (khóa chỉnh sửa)
+                      Lược đồ JSON đầu ra (khóa chỉnh sửa)
                     </Label>
                     <Textarea
                       id="system_prompt_locked_json"
@@ -1175,7 +1370,7 @@ const PromptEditor = ({
 
                 <div className="space-y-2">
                   <Label htmlFor="user_prompt_template">
-                    User Prompt Template *
+                    Mẫu lệnh người dùng *
                   </Label>
                   <VariableChips
                     variables={promptTypeVariables}
@@ -1194,7 +1389,7 @@ const PromptEditor = ({
                       updateField("user_prompt_template", event.target.value)
                     }
                     rows={8}
-                    placeholder="Nhập user prompt template..."
+                    placeholder="Nhập mẫu lệnh người dùng..."
                   />
                   <p
                     className={cn(
@@ -1205,7 +1400,7 @@ const PromptEditor = ({
                     )}
                   >
                     {promptFormErrors.user_prompt_template ??
-                      "Backend yêu cầu trường này không được để trống để có đủ dữ liệu dựng request test và chạy thật."}
+                      "Máy chủ yêu cầu trường này không được để trống để có đủ dữ liệu dựng yêu cầu chạy thử và vận hành thực tế."}
                   </p>
                 </div>
               </section>
@@ -1216,11 +1411,11 @@ const PromptEditor = ({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">
-                  Test theo SOS cluster
+                  Chạy thử theo cụm SOS
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Dùng AI config đang chọn để test nội dung prompt trước khi lưu
-                  hoặc activate.
+                  Dùng cấu hình AI đang chọn để chạy thử nội dung mẫu lệnh trước
+                  khi lưu hoặc kích hoạt.
                 </p>
               </div>
               <Button
@@ -1234,18 +1429,18 @@ const PromptEditor = ({
                 ) : (
                   <TestTube size={16} className="mr-2" />
                 )}
-                {reviewLoading ? "Đang test..." : "Test"}
+                {reviewLoading ? "Đang chạy thử..." : "Chạy thử"}
               </Button>
             </div>
 
             {!aiConfigId ? (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                Cần chọn hoặc tạo AI config trước khi test prompt.
+                Cần chọn hoặc tạo cấu hình AI trước khi chạy thử mẫu lệnh.
               </p>
             ) : null}
 
             <div className="space-y-1.5">
-              <Label htmlFor="preview_cluster">SOS Cluster để test</Label>
+              <Label htmlFor="preview_cluster">Cụm SOS để chạy thử</Label>
               <Select
                 value={previewClusterId ? String(previewClusterId) : ""}
                 onValueChange={(value) => setPreviewClusterId(Number(value))}
@@ -1257,8 +1452,8 @@ const PromptEditor = ({
                   <SelectValue
                     placeholder={
                       clustersLoading
-                        ? "Đang tải danh sách cluster..."
-                        : "Chọn cluster để test"
+                        ? "Đang tải danh sách cụm..."
+                        : "Chọn cụm để chạy thử"
                     }
                   />
                 </SelectTrigger>
@@ -1275,7 +1470,7 @@ const PromptEditor = ({
             <div className="rounded-lg border border-border/70 bg-background/95 p-3">
               <p className="text-sm text-muted-foreground">
                 {reviewStatus ||
-                  "Chưa có kết quả test. Bấm Test để gửi bản prompt hiện tại lên backend."}
+                  "Chưa có kết quả chạy thử. Bấm Chạy thử để gửi bản mẫu lệnh hiện tại lên máy chủ."}
               </p>
               {reviewError ? (
                 <p className="mt-2 text-sm font-medium text-destructive">
@@ -1283,6 +1478,41 @@ const PromptEditor = ({
                 </p>
               ) : null}
             </div>
+
+            <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Lưu nhanh khi chạy thử: {testSnapshots.length} bản. Có thể dùng
+                Cmd/Ctrl+Z để quay lại bản trước khi chạy thử.
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={undoTestSnapshot}
+                  disabled={!canUndoTestSnapshot || isSubmitting}
+                >
+                  <ArrowCounterClockwise size={14} className="mr-1.5" />
+                  Hoàn tác
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={redoTestSnapshot}
+                  disabled={!canRedoTestSnapshot || isSubmitting}
+                >
+                  <ArrowClockwise size={14} className="mr-1.5" />
+                  Làm lại
+                </Button>
+              </div>
+            </div>
+
+            {isEditing && rollbackProductionLabel ? (
+              <p className="text-sm text-muted-foreground">
+                Khôi phục hệ thống sẽ kích hoạt lại {rollbackProductionLabel}.
+              </p>
+            ) : null}
 
             <AiStreamPanel
               open={
@@ -1306,7 +1536,7 @@ const PromptEditor = ({
             />
           </section>
 
-          <div className="sticky bottom-0 z-10 -mx-1 flex justify-end gap-2 rounded-xl border border-border/70 bg-card/95 px-3 py-3 backdrop-blur">
+          <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap justify-end gap-2 rounded-xl border border-border/70 bg-card/95 px-3 py-3 backdrop-blur">
             <Button
               type="button"
               variant="outline"
@@ -1324,22 +1554,41 @@ const PromptEditor = ({
               {isSubmitting
                 ? "Đang lưu..."
                 : isEditing
-                  ? "Lưu draft"
-                  : "Tạo prompt"}
+                  ? "Lưu bản nháp"
+                  : "Tạo mẫu lệnh"}
             </Button>
             {isEditing ? (
               <Button
                 type="button"
-                variant="outline"
-                onClick={onRollback}
-                disabled={isSubmitting || isRollingBack || !canRollback}
+                variant="destructive"
+                onClick={onDiscardDraft}
+                disabled={isSubmitting || isDiscardingDraft || !canDiscardDraft}
               >
-                {isRollingBack ? (
+                {isDiscardingDraft ? (
+                  <CircleNotch size={16} className="mr-2 animate-spin" />
+                ) : (
+                  <Trash size={16} className="mr-2" />
+                )}
+                Hủy bản nháp
+              </Button>
+            ) : null}
+            {isEditing ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onRollbackProduction}
+                disabled={
+                  isSubmitting ||
+                  isRollingBackProduction ||
+                  !canRollbackProduction
+                }
+              >
+                {isRollingBackProduction ? (
                   <CircleNotch size={16} className="mr-2 animate-spin" />
                 ) : (
                   <ArrowCounterClockwise size={16} className="mr-2" />
                 )}
-                Rollback
+                Khôi phục hệ thống
               </Button>
             ) : null}
             <Button
@@ -1353,7 +1602,7 @@ const PromptEditor = ({
               ) : (
                 <ArrowClockwise size={16} className="mr-2" />
               )}
-              Test nhanh
+              Chạy thử nhanh
             </Button>
           </div>
         </form>
