@@ -28,6 +28,7 @@ import {
   Pulse,
   Radio,
   Shield,
+  Siren,
   SquaresFour,
   Stethoscope,
   Target,
@@ -466,6 +467,11 @@ export const navigationItems = [
     icon: SquaresFour,
     label: "Tổng quan",
     href: "/dashboard/admin",
+  },
+  {
+    icon: Siren,
+    label: "Quản lý yêu cầu SOS",
+    href: "/dashboard/admin/sos-requests",
   },
   {
     icon: UserIcon,
