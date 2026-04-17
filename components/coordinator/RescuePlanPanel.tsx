@@ -9492,12 +9492,18 @@ const RescuePlanPanel = ({
                                           null;
                                         const selectedAssemblyPointStatusLabel =
                                           selectedAssemblyPointStatus ===
-                                          "Unavailable"
-                                            ? "Không khả dụng"
+                                          "Created"
+                                            ? "Mới tạo"
                                             : selectedAssemblyPointStatus ===
-                                                "Closed"
-                                              ? "Đã đóng"
-                                              : selectedAssemblyPointStatus;
+                                                "Available"
+                                              ? "Sẵn sàng"
+                                              : selectedAssemblyPointStatus ===
+                                                  "Unavailable"
+                                                ? "Không khả dụng"
+                                                : selectedAssemblyPointStatus ===
+                                                    "Closed"
+                                                  ? "Đã đóng"
+                                                  : selectedAssemblyPointStatus;
                                         const isSelectedAssemblyPointRestricted =
                                           selectedAssemblyPointStatus ===
                                             "Unavailable" ||

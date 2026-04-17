@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowCounterClockwise,
+  ArrowClockwise,
+  CircleNotch,
+  FloppyDisk,
+  Gear,
+  TestTube,
+  X,
+} from "@phosphor-icons/react";
+import AiStreamPanel from "@/components/coordinator/AiStreamPanel";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -14,40 +22,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle,
-  TestTubeIcon,
-  FloppyDisk,
-  X,
-  CircleNotch,
-  Gear,
-  Plus,
-} from "@phosphor-icons/react";
-import type {
-  PromptEditorProps,
-  PromptFormData,
-  PromptTextField,
-} from "@/type";
-import {
-  AI_PROVIDER_OPTIONS,
   INITIAL_FORM_DATA,
   PROMPT_TYPE_OPTIONS,
   PROMPT_VARIABLES_BY_TYPE,
 } from "@/lib/constants";
-import type {
-  PromptDetailEntity,
-  CreatePromptRequest,
-  UpdatePromptRequest,
-  PreviewPromptRescueSuggestionRequest,
-  TestPromptRescueSuggestionRequest,
-  TestPromptRescueSuggestionResponse,
-} from "@/services/prompt/type";
-import {
-  usePromptRescuePreviewStream,
-  useTestPromptRescueSuggestion,
-} from "@/services/prompt/hooks";
+import { cn } from "@/lib/utils";
+import type { PromptFormData, PromptTextField } from "@/type";
 import { useSOSClusters } from "@/services/sos_cluster/hooks";
 import type {
   ClusterMissionType,
@@ -55,167 +37,43 @@ import type {
   ClusterSeverityLevel,
   ClusterSuggestedActivity,
 } from "@/services/sos_cluster/type";
-import AiStreamPanel from "@/components/coordinator/AiStreamPanel";
+import type {
+  CreatePromptRequest,
+  PromptDetailEntity,
+  PromptType,
+  TestNewPromptRescueSuggestionRequest,
+  TestPromptRescueSuggestionRequest,
+  TestPromptRescueSuggestionResponse,
+  UpdatePromptRequest,
+} from "@/services/prompt/type";
+import {
+  useTestNewPromptRescueSuggestion,
+  useTestPromptRescueSuggestion,
+} from "@/services/prompt/hooks";
+import type { AiConfigSummaryEntity } from "@/services/ai-config/type";
 
-// --- Helpers ---
+const FORM_SELECT_TRIGGER_CLASSNAME =
+  "h-12 w-full rounded-lg bg-background px-4 text-sm";
+const FORM_INPUT_CLASSNAME = "h-12 rounded-lg bg-background px-4 text-sm";
+const INVALID_FIELD_CLASSNAME =
+  "border-destructive focus-visible:ring-destructive/20";
 
-type PromptDetailModelFallback = PromptDetailEntity & {
-  modelCode?: string | null;
-  modelName?: string | null;
-  model_code?: string | null;
-  model_name?: string | null;
-  prompt_type?: string | null;
+type PromptEditorProps = {
+  prompt?: PromptDetailEntity | null;
+  forcedPromptType?: PromptType | null;
+  aiConfig?: AiConfigSummaryEntity | null;
+  aiConfigId?: number | null;
+  isSubmitting?: boolean;
+  onSave: (
+    data: CreatePromptRequest | UpdatePromptRequest,
+  ) => void | Promise<void>;
+  onRollback?: () => void;
+  canRollback?: boolean;
+  isRollingBack?: boolean;
+  onCancel: () => void;
+  hideHeaderClose?: boolean;
+  onOpenAiConfig?: () => void;
 };
-
-const stripVersionPrefix = (version: string): string =>
-  version.replace(/^v/i, "");
-
-const toVersionString = (version: string): string =>
-  `v${stripVersionPrefix(version)}`;
-
-const CUSTOM_MODEL_OPTION_VALUE = "__custom_model__";
-
-const sanitizeModelCode = (value: string): string =>
-  value.replace(/\s+/g, "").trim();
-
-const resolveModelCode = (detail: PromptDetailModelFallback): string => {
-  const candidates = [
-    detail.model,
-    detail.modelCode,
-    detail.modelName,
-    detail.model_code,
-    detail.model_name,
-  ];
-
-  const model = candidates.find(
-    (candidate) => typeof candidate === "string" && candidate.trim().length > 0,
-  );
-
-  return sanitizeModelCode(model ?? "");
-};
-
-const normalizeModelCode = (modelCode: string): string =>
-  sanitizeModelCode(modelCode).toLowerCase();
-
-const canonicalizePromptType = (value: string): string =>
-  value.replace(/[^a-z0-9]/gi, "").toLowerCase();
-
-const normalizePromptType = (
-  ...candidates: Array<string | null | undefined>
-): PromptFormData["prompt_type"] => {
-  const promptTypeByCanonical = new Map(
-    PROMPT_TYPE_OPTIONS.map((option) => [
-      canonicalizePromptType(option.value),
-      option.value,
-    ]),
-  );
-
-  for (const candidate of candidates) {
-    if (typeof candidate !== "string") {
-      continue;
-    }
-
-    const trimmedCandidate = candidate.trim();
-    if (!trimmedCandidate) {
-      continue;
-    }
-
-    const normalizedMatch = promptTypeByCanonical.get(
-      canonicalizePromptType(trimmedCandidate),
-    );
-
-    if (normalizedMatch) {
-      return normalizedMatch;
-    }
-  }
-
-  return INITIAL_FORM_DATA.prompt_type;
-};
-
-const findProviderModelByCode = (
-  provider: PromptFormData["provider"],
-  modelCode: string,
-) => {
-  if (!modelCode.trim()) {
-    return undefined;
-  }
-
-  const providerOption = AI_PROVIDER_OPTIONS.find(
-    (option) => option.value === provider,
-  );
-
-  return providerOption?.models.find(
-    (model) => normalizeModelCode(model.code) === normalizeModelCode(modelCode),
-  );
-};
-
-const mapDetailToForm = (detail: PromptDetailEntity): PromptFormData => ({
-  name: detail.name,
-  prompt_type: normalizePromptType(
-    detail.promptType,
-    (detail as PromptDetailModelFallback).prompt_type,
-  ),
-  provider: detail.provider,
-  purpose: detail.purpose || "",
-  system_prompt: detail.systemPrompt || "",
-  user_prompt_template: detail.userPromptTemplate || "",
-  model: resolveModelCode(detail as PromptDetailModelFallback),
-  temperature: detail.temperature ?? 0,
-  max_tokens: detail.maxTokens ?? 0,
-  version: stripVersionPrefix(detail.version || ""),
-  api_url: detail.apiUrl || "",
-  api_key: "",
-  is_active: detail.isActive,
-});
-
-// --- Sub-components ---
-
-const VariableChips = ({
-  variables = [],
-  onInsert,
-}: {
-  variables?: readonly { label: string; value: string }[];
-  onInsert: (field: PromptTextField, variable: string) => void;
-}) => (
-  <div className="flex flex-wrap gap-1.5 pb-1">
-    {variables.map((v) => (
-      <button
-        key={`user_prompt_template-${v.value}`}
-        type="button"
-        onClick={() => onInsert("user_prompt_template", v.value)}
-        className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1 text-sm font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
-      >
-        <Plus size={10} weight="bold" />
-        {v.label}
-      </button>
-    ))}
-  </div>
-);
-
-type CreateStep = 1 | 2 | 3;
-
-const CREATE_STEPS: ReadonlyArray<{ step: CreateStep; label: string }> = [
-  { step: 1, label: "Chọn Provider & Model" },
-  { step: 2, label: "Thông tin API" },
-  { step: 3, label: "Setup Prompt" },
-];
-
-const USER_PROMPT_TEMPLATE_HINTS = {
-  SosPriorityAnalysis:
-    "SOS analysis hiện replace {{structured_data}}, {{raw_message}}, {{sos_type}}.",
-  MissionPlanning:
-    "Mission planning legacy hiện replace {{sos_requests_data}}, {{total_count}}, {{depots_data}} trước khi agent gọi tool.",
-  MissionRequirementsAssessment:
-    "Requirements stage hiện replace {{sos_requests_data}}, {{total_count}}.",
-  MissionDepotPlanning:
-    "Depot stage hiện replace {{sos_requests_data}}, {{requirements_fragment}}, {{single_depot_required}}, {{eligible_depot_count}}.",
-  MissionTeamPlanning:
-    "Team stage hiện replace {{sos_requests_data}}, {{requirements_fragment}}, {{depot_fragment}}, {{nearby_team_count}}.",
-  MissionPlanValidation:
-    "Validation stage hiện replace {{sos_requests_data}}, {{mission_draft_body}}.",
-} satisfies Record<PromptFormData["prompt_type"], string>;
-
-type PromptReviewMode = "draft-stream" | "saved-test";
 
 type PromptReviewPhase =
   | "idle"
@@ -225,6 +83,17 @@ type PromptReviewPhase =
   | "processing"
   | "done"
   | "error";
+
+type PromptReviewLogEntry = {
+  id: number;
+  timestamp: number;
+  message: string;
+  type: "status" | "chunk" | "result" | "error";
+};
+
+type PromptDetailTypeFallback = PromptDetailEntity & {
+  prompt_type?: string | null;
+};
 
 const VALID_MISSION_TYPES: ReadonlySet<string> = new Set([
   "RESCUE",
@@ -240,6 +109,238 @@ const VALID_SEVERITY_LEVELS: ReadonlySet<string> = new Set([
   "High",
   "Critical",
 ]);
+
+const canonicalizePromptType = (value: string): string =>
+  value.replace(/[^a-z0-9]/gi, "").toLowerCase();
+
+const promptTypeByCanonical = new Map<string, PromptType>(
+  PROMPT_TYPE_OPTIONS.map((option) => [
+    canonicalizePromptType(option.value),
+    option.value,
+  ]),
+);
+
+const normalizePromptType = (
+  ...candidates: Array<string | null | undefined>
+): PromptType => {
+  for (const candidate of candidates) {
+    if (typeof candidate !== "string") {
+      continue;
+    }
+
+    const trimmedCandidate = candidate.trim();
+    if (!trimmedCandidate) {
+      continue;
+    }
+
+    const matchedPromptType = promptTypeByCanonical.get(
+      canonicalizePromptType(trimmedCandidate),
+    );
+
+    if (matchedPromptType) {
+      return matchedPromptType;
+    }
+  }
+
+  return INITIAL_FORM_DATA.prompt_type;
+};
+
+const stripVersionPrefix = (version: string): string =>
+  version.replace(/^v/i, "");
+
+const toVersionString = (version: string): string =>
+  `v${stripVersionPrefix(version)}`;
+
+type PromptFormErrors = Partial<Record<keyof PromptFormData, string>>;
+
+function validatePromptForm(
+  formData: PromptFormData,
+  isEditing: boolean,
+): PromptFormErrors {
+  const errors: PromptFormErrors = {};
+  const trimmedName = formData.name.trim();
+  const trimmedPurpose = formData.purpose.trim();
+  const trimmedSystemPrompt = formData.system_prompt.trim();
+  const trimmedUserPromptTemplate = formData.user_prompt_template.trim();
+  const normalizedVersion = toVersionString(formData.version.trim());
+
+  if (!trimmedName) {
+    errors.name = "Tên prompt không được để trống.";
+  } else if (trimmedName.length > 255) {
+    errors.name = "Tên prompt không được vượt quá 255 ký tự.";
+  }
+
+  if (!trimmedPurpose) {
+    errors.purpose = "Mục đích không được để trống.";
+  }
+
+  if (!trimmedSystemPrompt) {
+    errors.system_prompt = "System prompt không được để trống.";
+  }
+
+  if (!trimmedUserPromptTemplate) {
+    errors.user_prompt_template = "User prompt template không được để trống.";
+  }
+
+  if (!formData.version.trim()) {
+    errors.version = "Phiên bản không được để trống.";
+  } else if (normalizedVersion.length > 20) {
+    errors.version = "Phiên bản không được vượt quá 20 ký tự.";
+  } else if (isEditing && !normalizedVersion.includes("-D")) {
+    errors.version = "Version của draft phải chứa dấu hiệu '-D'.";
+  } else if (!isEditing && normalizedVersion.includes("-D")) {
+    errors.version =
+      "Version tạo mới không được dùng định dạng draft '-D'. Hãy tạo xong rồi clone draft khi cần sửa.";
+  }
+
+  return errors;
+}
+
+function findMatchingClosingBrace(source: string, openIndex: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
+
+  for (let index = openIndex; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+        continue;
+      }
+
+      if (char === "\\") {
+        escaping = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = false;
+      }
+
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") {
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return index;
+      }
+
+      if (depth < 0) {
+        return -1;
+      }
+    }
+  }
+
+  return -1;
+}
+
+function splitSystemPromptSections(systemPrompt: string): {
+  editableText: string;
+  lockedJson: string;
+} {
+  const normalizedPrompt = systemPrompt.toLowerCase();
+  const markerIndex = normalizedPrompt.lastIndexOf("format json");
+  let searchIndex = markerIndex >= 0 ? markerIndex : 0;
+
+  while (searchIndex < systemPrompt.length) {
+    const openIndex = systemPrompt.indexOf("{", searchIndex);
+
+    if (openIndex === -1) {
+      break;
+    }
+
+    const closeIndex = findMatchingClosingBrace(systemPrompt, openIndex);
+    if (closeIndex === -1) {
+      break;
+    }
+
+    const trailingText = systemPrompt.slice(closeIndex + 1).trim();
+    if (trailingText.length > 0) {
+      searchIndex = openIndex + 1;
+      continue;
+    }
+
+    const lockedJson = systemPrompt.slice(openIndex, closeIndex + 1).trim();
+    if (!lockedJson.includes(":")) {
+      searchIndex = openIndex + 1;
+      continue;
+    }
+
+    return {
+      editableText: systemPrompt.slice(0, openIndex).trimEnd(),
+      lockedJson,
+    };
+  }
+
+  return {
+    editableText: systemPrompt,
+    lockedJson: "",
+  };
+}
+
+function mergeSystemPromptSections(
+  editableText: string,
+  lockedJson: string,
+): string {
+  if (!lockedJson.trim()) {
+    return editableText;
+  }
+
+  const trimmedText = editableText.trimEnd();
+  if (!trimmedText) {
+    return lockedJson.trim();
+  }
+
+  return `${trimmedText}\n\n${lockedJson.trim()}`;
+}
+
+const mapDetailToForm = (detail: PromptDetailEntity): PromptFormData => ({
+  name: detail.name,
+  prompt_type: normalizePromptType(
+    detail.promptType,
+    (detail as PromptDetailTypeFallback).prompt_type,
+  ),
+  purpose: detail.purpose ?? "",
+  system_prompt: detail.systemPrompt ?? "",
+  user_prompt_template: detail.userPromptTemplate ?? "",
+  version: stripVersionPrefix(detail.version ?? ""),
+  is_active: detail.isActive,
+});
+
+const VariableChips = ({
+  variables = [],
+  onInsert,
+}: {
+  variables?: readonly { label: string; value: string }[];
+  onInsert: (field: PromptTextField, variable: string) => void;
+}) => (
+  <div className="flex flex-wrap gap-1.5 pb-1">
+    {variables.map((item) => (
+      <button
+        key={`variable-${item.value}`}
+        type="button"
+        onClick={() => onInsert("user_prompt_template", item.value)}
+        className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2.5 py-1 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
+      >
+        + {item.label}
+      </button>
+    ))}
+  </div>
+);
 
 function normalizeMissionType(value?: string | null): ClusterMissionType {
   const normalized = value?.trim().toUpperCase() ?? "";
@@ -429,16 +530,17 @@ function toUserFriendlyAiErrorMessage(options: {
     return "Dịch vụ AI đang gián đoạn tạm thời. Vui lòng thử lại sau.";
   }
 
-  const isNetworkError =
+  if (
     /(network|failed\s*to\s*fetch|connection|socket|econn|enotfound)/i.test(
       normalizedMessage,
-    );
-
-  if (isNetworkError) {
+    )
+  ) {
     return "Không kết nối được tới dịch vụ AI. Vui lòng kiểm tra mạng rồi thử lại.";
   }
 
-  return "AI chưa thể xử lý yêu cầu lúc này. Vui lòng thử lại sau.";
+  return (
+    rawMessage || "AI chưa thể xử lý yêu cầu lúc này. Vui lòng thử lại sau."
+  );
 }
 
 function extractPromptTestErrorMessage(error: unknown): string {
@@ -485,76 +587,74 @@ function extractPromptTestErrorMessage(error: unknown): string {
 
 const PromptEditor = ({
   prompt,
-  isSubmitting,
+  forcedPromptType = null,
+  aiConfig = null,
+  aiConfigId = null,
+  isSubmitting = false,
   onSave,
+  onRollback,
+  canRollback = false,
+  isRollingBack = false,
   onCancel,
   hideHeaderClose = false,
+  onOpenAiConfig,
 }: PromptEditorProps) => {
   const isEditing = Boolean(prompt);
-
   const systemPromptRef = useRef<HTMLTextAreaElement>(null);
   const userPromptRef = useRef<HTMLTextAreaElement>(null);
-  const customModelInputRef = useRef<HTMLInputElement>(null);
-  const hasPreviewArtifactsRef = useRef(false);
-  const savedTestRunIdRef = useRef(0);
-  const savedTestLogIdRef = useRef(0);
-
-  const textareaRefMap: Record<
-    PromptTextField,
-    React.RefObject<HTMLTextAreaElement | null>
-  > = {
-    system_prompt: systemPromptRef,
-    user_prompt_template: userPromptRef,
-  };
-
   const [formData, setFormData] = useState<PromptFormData>(INITIAL_FORM_DATA);
-  const [currentStep, setCurrentStep] = useState<CreateStep>(1);
-  const [maxUnlockedStep, setMaxUnlockedStep] = useState<CreateStep>(1);
-  const [isCustomModelMode, setIsCustomModelMode] = useState(false);
   const [previewClusterId, setPreviewClusterId] = useState<number | null>(null);
-  const [reviewMode, setReviewMode] =
-    useState<PromptReviewMode>("draft-stream");
-  const [savedTestStatus, setSavedTestStatus] = useState("");
-  const [savedTestStatusLog, setSavedTestStatusLog] = useState<
-    Array<{
-      id: number;
-      timestamp: number;
-      message: string;
-      type: "status" | "chunk" | "result" | "error";
-    }>
+  const [reviewStatus, setReviewStatus] = useState("");
+  const [reviewStatusLog, setReviewStatusLog] = useState<
+    PromptReviewLogEntry[]
   >([]);
-  const [savedTestResult, setSavedTestResult] =
+  const [reviewResult, setReviewResult] =
     useState<ClusterRescueSuggestionResponse | null>(null);
-  const [savedTestError, setSavedTestError] = useState<string | null>(null);
-  const [savedTestLoading, setSavedTestLoading] = useState(false);
-  const [savedTestPhase, setSavedTestPhase] =
-    useState<PromptReviewPhase>("idle");
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewPhase, setReviewPhase] = useState<PromptReviewPhase>("idle");
+  const reviewLogIdRef = useRef(0);
+
+  const textareaRefMap = useMemo<
+    Record<PromptTextField, React.RefObject<HTMLTextAreaElement | null>>
+  >(
+    () => ({
+      system_prompt: systemPromptRef,
+      user_prompt_template: userPromptRef,
+    }),
+    [],
+  );
 
   const { data: clustersData, isLoading: clustersLoading } = useSOSClusters();
-  const {
-    status: previewStatus,
-    statusLog: previewStatusLog,
-    thinkingText: previewThinkingText,
-    result: previewResult,
-    error: previewError,
-    loading: previewLoading,
-    phase: previewPhase,
-    startPreview,
-    stopPreview,
-    resetPreview,
-  } = usePromptRescuePreviewStream();
-  const testSavedPromptMutation = useTestPromptRescueSuggestion();
+  const testExistingPromptMutation = useTestPromptRescueSuggestion();
+  const testNewPromptMutation = useTestNewPromptRescueSuggestion();
 
-  const addSavedTestLog = useCallback(
-    (
-      message: string,
-      type: "status" | "chunk" | "result" | "error" = "status",
-    ) => {
-      savedTestLogIdRef.current += 1;
-      setSavedTestStatusLog((previous) => [
+  useEffect(() => {
+    if (prompt) {
+      setFormData(mapDetailToForm(prompt));
+      return;
+    }
+
+    setFormData({
+      ...INITIAL_FORM_DATA,
+      prompt_type: forcedPromptType ?? INITIAL_FORM_DATA.prompt_type,
+    });
+  }, [forcedPromptType, prompt]);
+
+  useEffect(() => {
+    const firstClusterId = clustersData?.clusters?.[0]?.id ?? null;
+    if (previewClusterId === null && firstClusterId !== null) {
+      setPreviewClusterId(firstClusterId);
+    }
+  }, [clustersData, previewClusterId]);
+
+  const addReviewLog = useCallback(
+    (message: string, type: PromptReviewLogEntry["type"]) => {
+      reviewLogIdRef.current += 1;
+      setReviewStatusLog((previous) => [
         ...previous,
         {
-          id: savedTestLogIdRef.current,
+          id: reviewLogIdRef.current,
           timestamp: Date.now(),
           message,
           type,
@@ -564,136 +664,72 @@ const PromptEditor = ({
     [],
   );
 
-  const resetSavedPromptTest = useCallback(() => {
-    setSavedTestStatus("");
-    setSavedTestStatusLog([]);
-    setSavedTestResult(null);
-    setSavedTestError(null);
-    setSavedTestLoading(false);
-    setSavedTestPhase("idle");
-    savedTestLogIdRef.current = 0;
+  const resetReview = useCallback(() => {
+    setReviewStatus("");
+    setReviewStatusLog([]);
+    setReviewResult(null);
+    setReviewError(null);
+    setReviewLoading(false);
+    setReviewPhase("idle");
+    reviewLogIdRef.current = 0;
   }, []);
 
   useEffect(() => {
-    if (prompt) {
-      const mappedFormData = mapDetailToForm(prompt);
-      const matchedModel = findProviderModelByCode(
-        mappedFormData.provider,
-        mappedFormData.model,
-      );
-      const normalizedModel = matchedModel?.code ?? mappedFormData.model;
-
-      setFormData({
-        ...mappedFormData,
-        model: normalizedModel,
-      });
-      setIsCustomModelMode(Boolean(normalizedModel) && !matchedModel);
-      setCurrentStep(1);
-      setMaxUnlockedStep(1);
-      return;
-    }
-
-    setFormData(INITIAL_FORM_DATA);
-    setIsCustomModelMode(false);
-    setCurrentStep(1);
-    setMaxUnlockedStep(1);
-  }, [prompt]);
-
-  useEffect(() => {
-    if (!isEditing || !prompt || isCustomModelMode || formData.model.trim()) {
-      return;
-    }
-
-    const fallbackModel = resolveModelCode(prompt as PromptDetailModelFallback);
-    if (!fallbackModel) {
-      return;
-    }
-
-    const matchedModel = findProviderModelByCode(
-      formData.provider,
-      fallbackModel,
-    );
-    const normalizedFallbackModel = matchedModel?.code ?? fallbackModel;
-
-    setFormData((prev) => ({
-      ...prev,
-      model: normalizedFallbackModel,
-    }));
-    setIsCustomModelMode(Boolean(normalizedFallbackModel) && !matchedModel);
-  }, [isEditing, prompt, formData.model, formData.provider, isCustomModelMode]);
-
-  useEffect(() => {
-    if (!isCustomModelMode) {
-      return;
-    }
-
-    requestAnimationFrame(() => {
-      customModelInputRef.current?.focus();
-    });
-  }, [isCustomModelMode]);
-
-  useEffect(() => {
-    const firstClusterId = clustersData?.clusters?.[0]?.id ?? null;
-
-    if (previewClusterId === null && firstClusterId !== null) {
-      setPreviewClusterId(firstClusterId);
-    }
-  }, [clustersData, previewClusterId]);
-
-  useEffect(() => {
-    hasPreviewArtifactsRef.current = Boolean(
-      previewLoading ||
-      previewResult ||
-      previewError ||
-      previewStatusLog.length > 0 ||
-      savedTestLoading ||
-      savedTestResult ||
-      savedTestError ||
-      savedTestStatusLog.length > 0,
-    );
+    resetReview();
   }, [
-    previewLoading,
-    previewResult,
-    previewError,
-    previewStatusLog.length,
-    savedTestLoading,
-    savedTestResult,
-    savedTestError,
-    savedTestStatusLog.length,
-  ]);
-
-  useEffect(() => {
-    if (!hasPreviewArtifactsRef.current) {
-      return;
-    }
-
-    resetPreview();
-    resetSavedPromptTest();
-    setReviewMode("draft-stream");
-  }, [
-    formData.provider,
-    formData.model,
+    aiConfigId,
+    formData.name,
     formData.prompt_type,
+    formData.purpose,
     formData.system_prompt,
     formData.user_prompt_template,
-    formData.api_url,
-    formData.api_key,
+    formData.version,
     previewClusterId,
-    resetPreview,
-    resetSavedPromptTest,
+    resetReview,
   ]);
 
   const updateField = <K extends keyof PromptFormData>(
     key: K,
     value: PromptFormData[K],
   ) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
+    setFormData((previous) => ({
+      ...previous,
+      [key]: value,
+    }));
   };
+
+  const effectivePromptType = normalizePromptType(
+    forcedPromptType,
+    formData.prompt_type,
+    prompt?.promptType,
+    (prompt as PromptDetailTypeFallback | undefined)?.prompt_type,
+  );
+  const selectedPromptType = PROMPT_TYPE_OPTIONS.find(
+    (option) => option.value === effectivePromptType,
+  );
+  const promptTypeVariables = PROMPT_VARIABLES_BY_TYPE[effectivePromptType];
+  const clusterOptions = clustersData?.clusters ?? [];
+  const {
+    editableText: editableSystemPromptText,
+    lockedJson: lockedSystemPromptJson,
+  } = useMemo(
+    () => splitSystemPromptSections(formData.system_prompt),
+    [formData.system_prompt],
+  );
+  const hasLockedSystemPromptJson = lockedSystemPromptJson.length > 0;
+  const promptFormErrors = useMemo(
+    () => validatePromptForm(formData, isEditing),
+    [formData, isEditing],
+  );
+  const canSubmit = Object.keys(promptFormErrors).length === 0;
+  const canRunPromptTest = Boolean(previewClusterId && canSubmit);
 
   const handleInsertVariable = useCallback(
     (field: PromptTextField, variable: string) => {
       const textarea = textareaRefMap[field].current;
-      if (!textarea) return;
+      if (!textarea) {
+        return;
+      }
 
       const { selectionStart: start, selectionEnd: end } = textarea;
       const insertion = `{{${variable}}}`;
@@ -706,374 +742,518 @@ const PromptEditor = ({
 
       requestAnimationFrame(() => {
         textarea.focus();
-        const pos = start + insertion.length;
-        textarea.setSelectionRange(pos, pos);
+        const cursorPosition = start + insertion.length;
+        textarea.setSelectionRange(cursorPosition, cursorPosition);
       });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [formData],
+    [formData, textareaRefMap],
   );
 
-  const effectivePromptType = normalizePromptType(
-    formData.prompt_type,
-    prompt?.promptType,
-  );
-  const promptTypeVariables = PROMPT_VARIABLES_BY_TYPE[effectivePromptType];
-  const selectedPromptType = PROMPT_TYPE_OPTIONS.find(
-    (option) => option.value === effectivePromptType,
-  );
-  const selectedProvider = AI_PROVIDER_OPTIONS.find(
-    (option) => option.value === formData.provider,
-  );
-  const systemPromptHelperText =
-    effectivePromptType === "SosPriorityAnalysis"
-      ? "Backend không replace biến trong trường này."
-      : "Backend không replace biến trong trường này. Các prompt mission có thể được nối thêm hướng dẫn stage/tool phù hợp trước khi gọi AI.";
-  const userPromptHelperText = USER_PROMPT_TEMPLATE_HINTS[effectivePromptType];
-  const providerModelOptions: Array<{ label: string; code: string }> =
-    selectedProvider?.models ? [...selectedProvider.models] : [];
-  const matchedProviderModel = providerModelOptions.find(
-    (model) =>
-      normalizeModelCode(model.code) === normalizeModelCode(formData.model),
-  );
-  const hasModelInProviderOptions = Boolean(matchedProviderModel);
-  const modelSelectValue = isCustomModelMode
-    ? CUSTOM_MODEL_OPTION_VALUE
-    : (matchedProviderModel?.code ?? formData.model);
+  const handleSystemPromptTextChange = (nextText: string) => {
+    updateField(
+      "system_prompt",
+      mergeSystemPromptSections(nextText, lockedSystemPromptJson),
+    );
+  };
 
-  const isStep1Complete = Boolean(formData.provider && formData.model);
-  const hasEffectiveApiKey =
-    Boolean(formData.api_key.trim()) || Boolean(isEditing && prompt?.hasApiKey);
-  const isStep2Complete = Boolean(
-    formData.api_url.trim() && hasEffectiveApiKey,
-  );
-  const isStep3Complete = Boolean(
-    formData.name.trim() &&
-    formData.purpose.trim() &&
-    formData.system_prompt.trim(),
-  );
-  const canSubmit = isEditing
-    ? isStep3Complete
-    : currentStep === 3 && isStep3Complete;
-  const supportsMissionPreview = effectivePromptType !== "SosPriorityAnalysis";
-  const clusterOptions = clustersData?.clusters ?? [];
-  const canUseSavedPromptTest = Boolean(isEditing && prompt?.id);
-  const canRunDraftPreview = Boolean(
-    formData.provider &&
-    formData.model.trim() &&
-    formData.system_prompt.trim() &&
-    formData.api_url.trim(),
-  );
-  const canRunPromptTest = Boolean(
-    supportsMissionPreview &&
-    previewClusterId &&
-    (canUseSavedPromptTest || canRunDraftPreview),
-  );
-  const activeReviewStatus =
-    reviewMode === "saved-test" ? savedTestStatus : previewStatus;
-  const activeReviewStatusLog =
-    reviewMode === "saved-test" ? savedTestStatusLog : previewStatusLog;
-  const activeReviewThinkingText =
-    reviewMode === "saved-test" ? "" : previewThinkingText;
-  const activeReviewResult =
-    reviewMode === "saved-test" ? savedTestResult : previewResult;
-  const activeReviewError =
-    reviewMode === "saved-test" ? savedTestError : previewError;
-  const activeReviewLoading =
-    reviewMode === "saved-test" ? savedTestLoading : previewLoading;
-  const activeReviewPhase =
-    reviewMode === "saved-test" ? savedTestPhase : previewPhase;
-  const showReviewStatus = Boolean(activeReviewStatus) && !activeReviewError;
-  const hasReviewArtifact = Boolean(
-    activeReviewLoading ||
-    activeReviewResult ||
-    activeReviewError ||
-    activeReviewStatusLog.length > 0,
-  );
-
-  const buildSubmitPayload = useCallback((): UpdatePromptRequest => {
-    const normalizedApiKey = formData.api_key.trim();
-    const normalizedApiUrl = formData.api_url.trim();
+  const buildPayload = useCallback((): UpdatePromptRequest => {
+    const resolvedPromptType = normalizePromptType(
+      forcedPromptType,
+      formData.prompt_type,
+      prompt?.promptType,
+      (prompt as PromptDetailTypeFallback | undefined)?.prompt_type,
+    );
 
     return {
       name: formData.name.trim(),
-      prompt_type: normalizePromptType(
-        formData.prompt_type,
-        prompt?.promptType,
-      ),
-      provider: formData.provider,
+      prompt_type: resolvedPromptType,
       purpose: formData.purpose.trim(),
       system_prompt: formData.system_prompt.trim(),
       user_prompt_template: formData.user_prompt_template.trim(),
-      model: formData.model.trim(),
-      temperature: formData.temperature,
-      max_tokens: formData.max_tokens,
       version: toVersionString(formData.version.trim()),
-      api_url: normalizedApiUrl || undefined,
-      api_key: normalizedApiKey || undefined,
       is_active: formData.is_active,
     };
-  }, [formData, prompt?.promptType]);
+  }, [forcedPromptType, formData, prompt]);
 
-  const buildSavedPromptTestRequest = useCallback(
-    (
-      payload: UpdatePromptRequest,
-    ): TestPromptRescueSuggestionRequest | null => {
-      if (!previewClusterId) {
-        return null;
-      }
-
-      return {
-        clusterId: previewClusterId,
-        ...payload,
-      };
-    },
-    [previewClusterId],
-  );
-
-  const buildPreviewRequest = useCallback(() => {
+  const runPromptTest = useCallback(async () => {
     if (!previewClusterId) {
-      return null;
+      return;
     }
 
-    const payload = buildSubmitPayload();
-
-    const request: PreviewPromptRescueSuggestionRequest = {
-      cluster_id: previewClusterId,
-      source_prompt_id: prompt?.id,
-      prompt_type: payload.prompt_type,
-      provider: payload.provider,
-      system_prompt: payload.system_prompt,
-      user_prompt_template: payload.user_prompt_template,
-      model: payload.model,
-      temperature: payload.temperature,
-      max_tokens: payload.max_tokens,
-      version: payload.version,
-      api_url: payload.api_url,
-      api_key: payload.api_key,
+    const payload = buildPayload();
+    const requestBase = {
+      clusterId: previewClusterId,
+      ...payload,
+      ai_config_id: aiConfigId ?? undefined,
     };
 
-    return request;
-  }, [buildSubmitPayload, previewClusterId, prompt?.id]);
+    setReviewLoading(true);
+    setReviewError(null);
+    setReviewResult(null);
+    setReviewPhase("calling-ai");
+    setReviewStatus("Đang gửi bản nháp để test...");
+    setReviewStatusLog([]);
+    addReviewLog("Đang gửi bản nháp để test...", "status");
 
-  const runSavedPromptTest = useCallback(
-    async (payload: UpdatePromptRequest): Promise<boolean> => {
-      if (!prompt?.id) {
-        return false;
-      }
+    try {
+      const response =
+        isEditing && prompt
+          ? await testExistingPromptMutation.mutateAsync({
+              id: prompt.id,
+              data: requestBase as TestPromptRescueSuggestionRequest,
+            })
+          : await testNewPromptMutation.mutateAsync(
+              requestBase as TestNewPromptRescueSuggestionRequest,
+            );
 
-      const requestPayload = buildSavedPromptTestRequest(payload);
-      if (!requestPayload) {
-        const missingClusterMessage =
-          "Vui lòng chọn SOS cluster để test trước khi cập nhật.";
-        setReviewMode("saved-test");
-        setSavedTestError(missingClusterMessage);
-        setSavedTestStatus(missingClusterMessage);
-        setSavedTestPhase("error");
-        addSavedTestLog(missingClusterMessage, "error");
-        return false;
-      }
-
-      const currentRunId = savedTestRunIdRef.current + 1;
-      savedTestRunIdRef.current = currentRunId;
-
-      resetPreview();
-      resetSavedPromptTest();
-      setReviewMode("saved-test");
-      setSavedTestLoading(true);
-      setSavedTestPhase("calling-ai");
-
-      const startMessage = `Đang test bản nháp mới nhất của prompt #${prompt.id} với cụm SOS #${requestPayload.clusterId}...`;
-      setSavedTestStatus(startMessage);
-      addSavedTestLog(startMessage, "status");
-
-      try {
-        const response = await testSavedPromptMutation.mutateAsync({
-          id: prompt.id,
-          data: requestPayload,
+      if (!response.isSuccess) {
+        const failureMessage = toUserFriendlyAiErrorMessage({
+          rawMessage: response.errorMessage,
+          statusCode: response.httpStatusCode,
         });
-
-        if (currentRunId !== savedTestRunIdRef.current) {
-          return false;
-        }
-
-        if (!response.isSuccess) {
-          const failedMessage = toUserFriendlyAiErrorMessage({
-            rawMessage: response.errorMessage,
-            statusCode: response.httpStatusCode,
-          });
-
-          setSavedTestError(failedMessage);
-          setSavedTestStatus("Không thể lấy phản hồi từ AI.");
-          setSavedTestPhase("error");
-          addSavedTestLog(failedMessage, "error");
-          setSavedTestLoading(false);
-          return false;
-        }
-
-        const mappedResult = mapPromptTestResponseToReviewResult(response);
-        const doneMessage = `Test hoàn tất. Đã tạo ${mappedResult.suggestedActivities.length} activity đề xuất.`;
-
-        setSavedTestResult(mappedResult);
-        setSavedTestStatus(doneMessage);
-        setSavedTestPhase("done");
-        addSavedTestLog(doneMessage, "result");
-        setSavedTestLoading(false);
-        return true;
-      } catch (error) {
-        if (currentRunId !== savedTestRunIdRef.current) {
-          return false;
-        }
-
-        const errorMessage = extractPromptTestErrorMessage(error);
-        setSavedTestError(errorMessage);
-        setSavedTestStatus(errorMessage);
-        setSavedTestPhase("error");
-        addSavedTestLog(errorMessage, "error");
-        setSavedTestLoading(false);
-        return false;
+        setReviewError(failureMessage);
+        setReviewStatus("AI trả về lỗi khi test prompt.");
+        setReviewPhase("error");
+        addReviewLog(failureMessage, "error");
+        setReviewLoading(false);
+        return;
       }
-    },
-    [
-      prompt?.id,
-      buildSavedPromptTestRequest,
-      resetPreview,
-      resetSavedPromptTest,
-      addSavedTestLog,
-      testSavedPromptMutation,
-    ],
-  );
 
-  const handleRunPreview = useCallback(() => {
-    if (!supportsMissionPreview || !previewClusterId) {
-      return;
+      const mappedResult = mapPromptTestResponseToReviewResult(response);
+      const completedMessage = `Test hoàn tất. Đã tạo ${mappedResult.suggestedActivities.length} activity đề xuất.`;
+
+      setReviewResult(mappedResult);
+      setReviewStatus(completedMessage);
+      setReviewPhase("done");
+      addReviewLog(completedMessage, "result");
+    } catch (error) {
+      const message = extractPromptTestErrorMessage(error);
+      setReviewError(message);
+      setReviewStatus(message);
+      setReviewPhase("error");
+      addReviewLog(message, "error");
+    } finally {
+      setReviewLoading(false);
     }
-
-    if (canUseSavedPromptTest) {
-      const payload = buildSubmitPayload();
-      void runSavedPromptTest(payload);
-      return;
-    }
-
-    const request = buildPreviewRequest();
-    if (!request) {
-      return;
-    }
-
-    savedTestRunIdRef.current += 1;
-    resetSavedPromptTest();
-    setReviewMode("draft-stream");
-    startPreview(request);
   }, [
-    supportsMissionPreview,
+    addReviewLog,
+    aiConfigId,
+    buildPayload,
+    isEditing,
     previewClusterId,
-    canUseSavedPromptTest,
-    buildSubmitPayload,
-    runSavedPromptTest,
-    buildPreviewRequest,
-    resetSavedPromptTest,
-    startPreview,
+    prompt,
+    testExistingPromptMutation,
+    testNewPromptMutation,
   ]);
 
-  const handleStopReview = useCallback(() => {
-    if (reviewMode === "saved-test") {
-      savedTestRunIdRef.current += 1;
-      resetSavedPromptTest();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!canSubmit) {
       return;
     }
 
-    stopPreview();
-  }, [reviewMode, resetSavedPromptTest, stopPreview]);
+    const payload = buildPayload();
 
-  const renderModelField = (customInputId: string, helperText?: string) => (
-    <div className="space-y-1.5">
-      <Label htmlFor="model">Model *</Label>
-      <Select value={modelSelectValue} onValueChange={handleModelSelectChange}>
-        <SelectTrigger id="model">
-          <SelectValue placeholder="Chọn model" />
-        </SelectTrigger>
-        <SelectContent>
-          {providerModelOptions.map((model) => (
-            <SelectItem
-              key={`${formData.provider}-${model.code}`}
-              value={model.code}
+    if (isEditing) {
+      await Promise.resolve(onSave(payload as UpdatePromptRequest));
+      return;
+    }
+
+    await Promise.resolve(onSave(payload as CreatePromptRequest));
+  };
+
+  return (
+    <Card className="animate-in slide-in-from-top-2 border border-border/60 bg-card/95 shadow-sm duration-300">
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2">
+            <Gear size={20} weight="duotone" />
+            {isEditing ? "Chỉnh sửa draft prompt" : "Tạo prompt mới"}
+          </CardTitle>
+          {!hideHeaderClose ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={onCancel}
             >
-              {model.code}
-            </SelectItem>
-          ))}
-          <SelectItem value={CUSTOM_MODEL_OPTION_VALUE}>
-            Khác (tự nhập mã)
-          </SelectItem>
-        </SelectContent>
-      </Select>
-      {isCustomModelMode ? (
-        <div className="space-y-1.5 pt-1">
-          <Label htmlFor={customInputId}>Mã model custom</Label>
-          <Input
-            id={customInputId}
-            ref={customModelInputRef}
-            value={formData.model}
-            onChange={(e) => handleCustomModelChange(e.target.value)}
-            placeholder="Nhập mã model custom"
-          />
+              <X size={16} />
+            </Button>
+          ) : null}
         </div>
-      ) : null}
-      {helperText ? (
-        <p className="text-sm text-muted-foreground">{helperText}</p>
-      ) : null}
-    </div>
-  );
+      </CardHeader>
 
-  const renderPreviewSection = () => {
-    const testModeLabel = canUseSavedPromptTest
-      ? "Bản Nháp Cập Nhật"
-      : "Bản Nháp";
-    const testModeDescription = canUseSavedPromptTest
-      ? "Bấm Test để kiểm tra bản nháp mới nhất trước khi lưu vào hệ thống."
-      : "Chế độ create dùng stream preview theo draft hiện tại (chưa lưu).";
-
-    return (
-      <div className="space-y-4 rounded-xl border border-orange-200/80 bg-linear-to-br from-orange-50/70 via-background to-amber-50/40 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                Test Theo SOS Cluster
-              </h3>
-              <span className="inline-flex items-center rounded-full border border-orange-300/80 bg-orange-100/80 px-2 py-0.5 text-sm font-semibold text-orange-700">
-                {testModeLabel}
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-full border border-border bg-background px-2.5 py-0.5 font-medium">
+                Loại: {selectedPromptType?.label || effectivePromptType}
+              </span>
+              <span className="rounded-full border border-border bg-background px-2.5 py-0.5 font-medium">
+                Version: {toVersionString(formData.version || "1.0")}
+              </span>
+              <span className="rounded-full border border-border bg-background px-2.5 py-0.5 font-medium">
+                Trạng thái: {prompt?.status ?? "New"}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {testModeDescription}
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isEditing
+                ? "Prompt hiện được chỉnh trên draft phía server. Sau khi lưu bạn có thể test tiếp hoặc activate từ màn hình chính."
+                : "Tạo prompt mới rồi test nhanh với AI config đang chọn trước khi đưa vào hệ thống."}
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleRunPreview}
-            disabled={!canRunPromptTest || activeReviewLoading}
-            className="h-8 border-orange-300 bg-white text-orange-700 hover:bg-orange-50"
-          >
-            {activeReviewLoading ? (
-              <CircleNotch size={14} className="mr-1.5 animate-spin" />
-            ) : (
-              <TestTubeIcon size={14} className="mr-1.5" />
-            )}
-            {activeReviewLoading ? "Đang test..." : "Test"}
-          </Button>
-        </div>
 
-        {supportsMissionPreview ? (
-          <>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <div className="space-y-4 xl:col-span-4">
+              <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Thông tin cơ bản
+                </h3>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="prompt_name">Tên Prompt *</Label>
+                  <Input
+                    id="prompt_name"
+                    value={formData.name}
+                    maxLength={255}
+                    className={cn(
+                      FORM_INPUT_CLASSNAME,
+                      promptFormErrors.name && INVALID_FIELD_CLASSNAME,
+                    )}
+                    onChange={(event) =>
+                      updateField("name", event.target.value)
+                    }
+                    required
+                    placeholder="VD: Mission Planning Stage"
+                  />
+                  {promptFormErrors.name ? (
+                    <p className="text-sm text-destructive">
+                      {promptFormErrors.name}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="prompt_version">Phiên bản *</Label>
+                    <Input
+                      id="prompt_version"
+                      value={formData.version}
+                      className={cn(
+                        FORM_INPUT_CLASSNAME,
+                        promptFormErrors.version && INVALID_FIELD_CLASSNAME,
+                      )}
+                      onChange={(event) =>
+                        updateField(
+                          "version",
+                          event.target.value.replace(/[^0-9.a-zA-Z-]/g, ""),
+                        )
+                      }
+                      leftIcon={
+                        <span className="text-sm text-muted-foreground/70">
+                          v
+                        </span>
+                      }
+                      placeholder="1.0"
+                    />
+                    <p
+                      className={cn(
+                        "text-sm",
+                        promptFormErrors.version
+                          ? "text-destructive"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {promptFormErrors.version ??
+                        (isEditing
+                          ? "Draft version phải giữ hậu tố -D để đúng rule backend."
+                          : "Prompt tạo mới không dùng hậu tố -D. Backend sẽ tạo draft riêng khi cần chỉnh sửa.")}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="prompt_type">Loại Prompt *</Label>
+                    <Select
+                      value={effectivePromptType}
+                      onValueChange={(value) =>
+                        updateField("prompt_type", normalizePromptType(value))
+                      }
+                      disabled={isEditing}
+                    >
+                      <SelectTrigger
+                        id="prompt_type"
+                        className={cn(
+                          FORM_SELECT_TRIGGER_CLASSNAME,
+                          "border-input",
+                        )}
+                      >
+                        <SelectValue placeholder="Chọn loại prompt" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROMPT_TYPE_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <p className="text-sm text-muted-foreground">
+                  {selectedPromptType?.description}
+                </p>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="prompt_purpose">Mục đích *</Label>
+                  <Input
+                    id="prompt_purpose"
+                    value={formData.purpose}
+                    className={cn(
+                      FORM_INPUT_CLASSNAME,
+                      promptFormErrors.purpose && INVALID_FIELD_CLASSNAME,
+                    )}
+                    onChange={(event) =>
+                      updateField("purpose", event.target.value)
+                    }
+                    required
+                    placeholder="Mô tả ngắn gọn mục đích prompt"
+                  />
+                  {promptFormErrors.purpose ? (
+                    <p className="text-sm text-destructive">
+                      {promptFormErrors.purpose}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="prompt_is_active"
+                      type="checkbox"
+                      checked={formData.is_active}
+                      onChange={(event) =>
+                        updateField("is_active", event.target.checked)
+                      }
+                      className="rounded border-border"
+                    />
+                    <Label
+                      htmlFor="prompt_is_active"
+                      className="cursor-pointer text-sm font-medium"
+                    >
+                      Đánh dấu active khi tạo mới
+                    </Label>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Với draft đang chỉnh, backend sẽ không cho activate qua
+                    endpoint update.
+                  </p>
+                </div>
+              </section>
+
+              <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">
+                      AI config dùng chung
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Prompt không còn giữ model/provider riêng. Toàn bộ phần AI
+                      lấy từ AI config hệ thống đang chọn.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={onOpenAiConfig}
+                    disabled={!onOpenAiConfig}
+                  >
+                    Mở AI config
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
+                    <p className="text-sm text-muted-foreground">Provider</p>
+                    <p className="mt-1 font-medium">
+                      {aiConfig?.provider ?? "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
+                    <p className="text-sm text-muted-foreground">Model</p>
+                    <p className="mt-1 font-medium break-all">
+                      {aiConfig?.model ?? "Chưa có AI config"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
+                    <p className="text-sm text-muted-foreground">Temperature</p>
+                    <p className="mt-1 font-medium">
+                      {aiConfig?.temperature ?? "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
+                    <p className="text-sm text-muted-foreground">Max tokens</p>
+                    <p className="mt-1 font-medium">
+                      {aiConfig?.maxTokens?.toLocaleString() ?? "—"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
+                  <p className="text-sm text-muted-foreground">API URL</p>
+                  <p className="mt-1 break-all font-medium">
+                    {aiConfig?.apiUrl || "Dùng endpoint mặc định phía backend"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-border/70 bg-muted/30 p-3">
+                  <p className="text-sm text-muted-foreground">API Key</p>
+                  <p className="mt-1 font-medium">
+                    {aiConfig?.hasApiKey
+                      ? aiConfig.apiKeyMasked || "Đã cấu hình"
+                      : "Chưa cấu hình key riêng"}
+                  </p>
+                </div>
+              </section>
+            </div>
+
+            <div className="space-y-4 xl:col-span-8">
+              <section className="space-y-4 rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Nội dung Prompt
+                </h3>
+
+                <div className="space-y-2">
+                  <Label htmlFor="system_prompt">System Prompt *</Label>
+                  <Textarea
+                    id="system_prompt"
+                    ref={systemPromptRef}
+                    value={editableSystemPromptText}
+                    className={cn(
+                      "font-mono text-base",
+                      promptFormErrors.system_prompt && INVALID_FIELD_CLASSNAME,
+                    )}
+                    onChange={(event) =>
+                      handleSystemPromptTextChange(event.target.value)
+                    }
+                    required
+                    rows={12}
+                    placeholder="Nhập system prompt..."
+                  />
+                  <p
+                    className={cn(
+                      "text-sm",
+                      promptFormErrors.system_prompt
+                        ? "text-destructive"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {promptFormErrors.system_prompt ??
+                      "Backend không replace biến ở trường này. Nếu prompt có JSON output schema phía cuối, phần schema sẽ được khóa riêng để tránh sửa sai."}
+                  </p>
+                </div>
+
+                {hasLockedSystemPromptJson ? (
+                  <div className="space-y-2 rounded-lg border border-border/70 bg-muted/25 p-3">
+                    <Label htmlFor="system_prompt_locked_json">
+                      JSON Output Schema (khóa chỉnh sửa)
+                    </Label>
+                    <Textarea
+                      id="system_prompt_locked_json"
+                      value={lockedSystemPromptJson}
+                      readOnly
+                      disabled
+                      rows={10}
+                      className="font-mono text-base opacity-70"
+                    />
+                  </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  <Label htmlFor="user_prompt_template">
+                    User Prompt Template *
+                  </Label>
+                  <VariableChips
+                    variables={promptTypeVariables}
+                    onInsert={handleInsertVariable}
+                  />
+                  <Textarea
+                    id="user_prompt_template"
+                    ref={userPromptRef}
+                    value={formData.user_prompt_template}
+                    className={cn(
+                      "font-mono text-base",
+                      promptFormErrors.user_prompt_template &&
+                        INVALID_FIELD_CLASSNAME,
+                    )}
+                    onChange={(event) =>
+                      updateField("user_prompt_template", event.target.value)
+                    }
+                    rows={8}
+                    placeholder="Nhập user prompt template..."
+                  />
+                  <p
+                    className={cn(
+                      "text-sm",
+                      promptFormErrors.user_prompt_template
+                        ? "text-destructive"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {promptFormErrors.user_prompt_template ??
+                      "Backend yêu cầu trường này không được để trống để có đủ dữ liệu dựng request test và chạy thật."}
+                  </p>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <section className="space-y-4 rounded-xl border border-border/70 bg-card p-4 shadow-xs">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Test theo SOS cluster
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Dùng AI config đang chọn để test nội dung prompt trước khi lưu
+                  hoặc activate.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={runPromptTest}
+                disabled={!canRunPromptTest || reviewLoading || !aiConfigId}
+              >
+                {reviewLoading ? (
+                  <CircleNotch size={16} className="mr-2 animate-spin" />
+                ) : (
+                  <TestTube size={16} className="mr-2" />
+                )}
+                {reviewLoading ? "Đang test..." : "Test"}
+              </Button>
+            </div>
+
+            {!aiConfigId ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                Cần chọn hoặc tạo AI config trước khi test prompt.
+              </p>
+            ) : null}
+
             <div className="space-y-1.5">
               <Label htmlFor="preview_cluster">SOS Cluster để test</Label>
               <Select
                 value={previewClusterId ? String(previewClusterId) : ""}
                 onValueChange={(value) => setPreviewClusterId(Number(value))}
               >
-                <SelectTrigger id="preview_cluster" className="bg-white/90">
+                <SelectTrigger
+                  id="preview_cluster"
+                  className={FORM_SELECT_TRIGGER_CLASSNAME}
+                >
                   <SelectValue
                     placeholder={
                       clustersLoading
@@ -1092,832 +1272,93 @@ const PromptEditor = ({
               </Select>
             </div>
 
-            <div className="rounded-lg border border-orange-200/70 bg-white/80 p-3">
+            <div className="rounded-lg border border-border/70 bg-background/95 p-3">
               <p className="text-sm text-muted-foreground">
-                {canUseSavedPromptTest
-                  ? "Lưu ý: Test sẽ gửi toàn bộ bản nháp mới nhất. Sau khi test ổn, bấm Cập nhật để lưu vào hệ thống."
-                  : "Preview không ghi mission suggestion thật vào hệ thống. Bạn có thể test draft nhiều lần trước khi lưu."}
+                {reviewStatus ||
+                  "Chưa có kết quả test. Bấm Test để gửi bản prompt hiện tại lên backend."}
               </p>
-
-              {showReviewStatus ? (
-                <p className="mt-2 text-sm font-medium text-foreground/80">
-                  Trạng thái: {activeReviewStatus}
-                </p>
-              ) : null}
-
-              {!activeReviewStatus && !activeReviewLoading ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Chưa có review chi tiết. Bấm{" "}
-                  <span className="font-medium text-foreground">Test</span> để
-                  tạo kế hoạch hiển thị ngay bên dưới.
-                </p>
-              ) : null}
-
-              {activeReviewResult ? (
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
-                    {activeReviewResult.suggestedActivities.length} hoạt động
-                  </span>
-                  <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 font-medium text-sky-700">
-                    {activeReviewResult.responseTimeMs} ms
-                  </span>
-                  <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 font-medium text-violet-700">
-                    Tin cậy{" "}
-                    {(activeReviewResult.confidenceScore * 100).toFixed(0)}%
-                  </span>
-                </div>
-              ) : null}
-
-              {activeReviewError ? (
-                <p className="mt-2 text-sm font-medium text-red-600">
-                  Lỗi test: {activeReviewError}
+              {reviewError ? (
+                <p className="mt-2 text-sm font-medium text-destructive">
+                  {reviewError}
                 </p>
               ) : null}
             </div>
 
             <AiStreamPanel
-              open={hasReviewArtifact}
+              open={
+                reviewLoading || Boolean(reviewResult) || Boolean(reviewError)
+              }
               inline
-              onClose={handleStopReview}
+              size="expanded"
+              onClose={resetReview}
               clusterId={previewClusterId}
-              status={activeReviewStatus}
-              statusLog={activeReviewStatusLog}
-              thinkingText={activeReviewThinkingText}
-              result={activeReviewResult}
-              error={activeReviewError}
-              loading={activeReviewLoading}
-              phase={activeReviewPhase}
-              onStop={handleStopReview}
-              onRetry={handleRunPreview}
-              onViewPlan={handleStopReview}
+              status={reviewStatus}
+              statusLog={reviewStatusLog}
+              thinkingText=""
+              result={reviewResult}
+              error={reviewError}
+              loading={reviewLoading}
+              phase={reviewPhase}
+              onStop={resetReview}
+              onRetry={runPromptTest}
+              onViewPlan={resetReview}
               hidePlanAction
             />
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Preview theo sos-cluster hiện chỉ hỗ trợ các prompt Mission*.
-          </p>
-        )}
-      </div>
-    );
-  };
+          </section>
 
-  useEffect(() => {
-    if (isEditing) return;
-
-    const nextMaxUnlockedStep: CreateStep = !isStep1Complete
-      ? 1
-      : !isStep2Complete
-        ? 2
-        : 3;
-
-    if (maxUnlockedStep !== nextMaxUnlockedStep) {
-      setMaxUnlockedStep(nextMaxUnlockedStep);
-    }
-
-    if (currentStep > nextMaxUnlockedStep) {
-      setCurrentStep(nextMaxUnlockedStep);
-    }
-  }, [
-    isEditing,
-    isStep1Complete,
-    isStep2Complete,
-    currentStep,
-    maxUnlockedStep,
-  ]);
-
-  const handleProviderChange = (value: PromptFormData["provider"]) => {
-    const providerOption = AI_PROVIDER_OPTIONS.find(
-      (option) => option.value === value,
-    );
-
-    const matchedModel = providerOption?.models.find(
-      (model) =>
-        normalizeModelCode(model.code) === normalizeModelCode(formData.model),
-    );
-    const shouldKeepCustomModel =
-      isCustomModelMode && Boolean(formData.model.trim());
-    const nextModel =
-      matchedModel?.code ?? (shouldKeepCustomModel ? formData.model : "");
-
-    setIsCustomModelMode(Boolean(nextModel) && !matchedModel);
-
-    setFormData((prev) => ({
-      ...prev,
-      provider: value,
-      model: nextModel,
-    }));
-  };
-
-  const handleModelSelectChange = (value: string) => {
-    if (value === CUSTOM_MODEL_OPTION_VALUE) {
-      setIsCustomModelMode(true);
-
-      if (hasModelInProviderOptions) {
-        updateField("model", "");
-      }
-
-      return;
-    }
-
-    setIsCustomModelMode(false);
-    updateField("model", value);
-  };
-
-  const handleCustomModelChange = (value: string) => {
-    const matchedModel = providerModelOptions.find(
-      (model) => normalizeModelCode(model.code) === normalizeModelCode(value),
-    );
-    const sanitizedValue = sanitizeModelCode(value);
-
-    if (matchedModel) {
-      setIsCustomModelMode(false);
-      updateField("model", matchedModel.code);
-      return;
-    }
-
-    setIsCustomModelMode(true);
-    updateField("model", sanitizedValue);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!canSubmit) {
-      return;
-    }
-
-    const payload = buildSubmitPayload();
-
-    if (isEditing) {
-      await Promise.resolve(onSave(payload as UpdatePromptRequest));
-      return;
-    }
-
-    await Promise.resolve(onSave(payload as CreatePromptRequest));
-  };
-
-  const getNextStepEnabled = () => {
-    if (currentStep === 1) return isStep1Complete;
-    if (currentStep === 2) return isStep2Complete;
-    return false;
-  };
-
-  const handleNextStep = () => {
-    if (!getNextStepEnabled() || currentStep === 3) {
-      return;
-    }
-
-    const nextStep = (currentStep + 1) as CreateStep;
-    setMaxUnlockedStep((prev) => {
-      if (nextStep > prev) {
-        return nextStep;
-      }
-      return prev;
-    });
-    setCurrentStep(nextStep);
-  };
-
-  const handlePreviousStep = () => {
-    if (currentStep === 1) return;
-    setCurrentStep((prev) => (prev - 1) as CreateStep);
-  };
-
-  const handleSelectStep = (step: CreateStep) => {
-    if (step <= maxUnlockedStep) {
-      setCurrentStep(step);
-    }
-  };
-
-  return (
-    <>
-      <Card className="border border-border/50 animate-in fade-in slide-in-from-top-2 duration-300">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Gear size={20} weight="duotone" />
-              {isEditing ? "Chỉnh sửa Prompt" : "Tạo Prompt mới"}
-            </CardTitle>
-            {!hideHeaderClose ? (
+          <div className="sticky bottom-0 z-10 -mx-1 flex justify-end gap-2 rounded-xl border border-border/70 bg-card/95 px-3 py-3 backdrop-blur">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={isSubmitting}
+            >
+              Hủy
+            </Button>
+            <Button type="submit" disabled={isSubmitting || !canSubmit}>
+              {isSubmitting ? (
+                <CircleNotch size={16} className="mr-2 animate-spin" />
+              ) : (
+                <FloppyDisk size={16} className="mr-2" />
+              )}
+              {isSubmitting
+                ? "Đang lưu..."
+                : isEditing
+                  ? "Lưu draft"
+                  : "Tạo prompt"}
+            </Button>
+            {isEditing ? (
               <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={onCancel}
+                type="button"
+                variant="outline"
+                onClick={onRollback}
+                disabled={isSubmitting || isRollingBack || !canRollback}
               >
-                <X size={16} />
+                {isRollingBack ? (
+                  <CircleNotch size={16} className="mr-2 animate-spin" />
+                ) : (
+                  <ArrowCounterClockwise size={16} className="mr-2" />
+                )}
+                Rollback
               </Button>
             ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={runPromptTest}
+              disabled={!canRunPromptTest || reviewLoading || !aiConfigId}
+            >
+              {reviewLoading ? (
+                <CircleNotch size={16} className="mr-2 animate-spin" />
+              ) : (
+                <ArrowClockwise size={16} className="mr-2" />
+              )}
+              Test nhanh
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {isEditing ? (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="name">Tên Prompt *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => updateField("name", e.target.value)}
-                      required
-                      placeholder="VD: Dispatch Decision Prompt"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="version">Phiên bản</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base text-muted-foreground/70 select-none pointer-events-none">
-                        v
-                      </span>
-                      <Input
-                        id="version"
-                        value={formData.version}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9.]/g, "");
-                          updateField("version", val);
-                        }}
-                        placeholder="1.0"
-                        className="pl-6"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="prompt_type">Loại Prompt *</Label>
-                    <Select
-                      value={effectivePromptType}
-                      onValueChange={(value) =>
-                        updateField("prompt_type", normalizePromptType(value))
-                      }
-                    >
-                      <SelectTrigger id="prompt_type">
-                        <SelectValue placeholder="Chọn loại prompt" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PROMPT_TYPE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedPromptType?.description}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="purpose">Mục đích *</Label>
-                  <Input
-                    id="purpose"
-                    value={formData.purpose}
-                    onChange={(e) => updateField("purpose", e.target.value)}
-                    required
-                    placeholder="Mô tả ngắn gọn mục đích của prompt này"
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="provider">AI Provider *</Label>
-                    <Select
-                      value={formData.provider}
-                      onValueChange={(value) =>
-                        handleProviderChange(
-                          value as PromptFormData["provider"],
-                        )
-                      }
-                    >
-                      <SelectTrigger id="provider">
-                        <SelectValue placeholder="Chọn provider" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {AI_PROVIDER_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedProvider?.description}
-                    </p>
-                  </div>
-
-                  {renderModelField("custom_model_code")}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="temperature">Temperature</Label>
-                    <Input
-                      id="temperature"
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="2"
-                      value={formData.temperature}
-                      onChange={(e) =>
-                        updateField(
-                          "temperature",
-                          parseFloat(e.target.value) || 0,
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="max_tokens">Max Tokens</Label>
-                    <Input
-                      id="max_tokens"
-                      type="number"
-                      min="1"
-                      value={formData.max_tokens}
-                      onChange={(e) =>
-                        updateField("max_tokens", parseInt(e.target.value) || 0)
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="api_url">API URL</Label>
-                  <Input
-                    id="api_url"
-                    value={formData.api_url}
-                    onChange={(e) => updateField("api_url", e.target.value)}
-                    placeholder={
-                      formData.provider === "OpenRouter"
-                        ? "https://openrouter.ai/api/v1/chat/completions"
-                        : "https://generativelanguage.googleapis.com/v1beta/models/{0}:generateContent?key={1}"
-                    }
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="api_key">API Key theo prompt</Label>
-                  <Input
-                    id="api_key"
-                    type="password"
-                    value={formData.api_key}
-                    onChange={(e) => updateField("api_key", e.target.value)}
-                    placeholder={
-                      prompt?.hasApiKey
-                        ? prompt.apiKeyMasked || "Đang có key đã lưu"
-                        : "Để trống để dùng default key của backend"
-                    }
-                    autoComplete="new-password"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    {prompt?.hasApiKey
-                      ? "Để trống sẽ giữ key hiện có. Backend hiện chưa hỗ trợ xóa prompt-level key chỉ bằng cách gửi rỗng."
-                      : "Dán key riêng cho prompt này nếu muốn test nhanh mà không sửa config mặc định ở server."}
-                  </p>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  <Label htmlFor="system_prompt">System Prompt *</Label>
-                  <Textarea
-                    id="system_prompt"
-                    ref={systemPromptRef}
-                    value={formData.system_prompt}
-                    onChange={(e) =>
-                      updateField("system_prompt", e.target.value)
-                    }
-                    required
-                    rows={6}
-                    className="font-mono text-base"
-                    placeholder="Nhập system prompt..."
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    {systemPromptHelperText}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="user_prompt_template">
-                    User Prompt Template
-                  </Label>
-                  <VariableChips
-                    variables={promptTypeVariables}
-                    onInsert={handleInsertVariable}
-                  />
-                  <Textarea
-                    id="user_prompt_template"
-                    ref={userPromptRef}
-                    value={formData.user_prompt_template}
-                    onChange={(e) =>
-                      updateField("user_prompt_template", e.target.value)
-                    }
-                    rows={4}
-                    className="font-mono text-base"
-                    placeholder="Nhập user prompt template với biến {{placeholder}}..."
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    {userPromptHelperText}
-                  </p>
-                </div>
-
-                {renderPreviewSection()}
-
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                  <input
-                    type="checkbox"
-                    id="is_active"
-                    checked={formData.is_active}
-                    onChange={(e) => updateField("is_active", e.target.checked)}
-                    className="rounded border-border"
-                  />
-                  <Label
-                    htmlFor="is_active"
-                    className="cursor-pointer text-base"
-                  >
-                    Kích hoạt prompt này
-                  </Label>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onCancel}
-                    disabled={isSubmitting}
-                  >
-                    Hủy
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting || !canSubmit}>
-                    {isSubmitting ? (
-                      <CircleNotch size={16} className="mr-2 animate-spin" />
-                    ) : (
-                      <FloppyDisk size={16} className="mr-2" />
-                    )}
-                    {isSubmitting ? "Đang cập nhật..." : "Cập nhật"}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    Luồng tạo mới gồm 3 bước. Hoàn tất bước hiện tại để mở bước
-                    kế tiếp.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    {CREATE_STEPS.map((item) => {
-                      const isCompleted = item.step < maxUnlockedStep;
-                      const isCurrent = item.step === currentStep;
-                      const isLocked = item.step > maxUnlockedStep;
-
-                      return (
-                        <button
-                          key={item.step}
-                          type="button"
-                          onClick={() => handleSelectStep(item.step)}
-                          disabled={isLocked}
-                          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
-                            isCurrent
-                              ? "border-primary bg-primary/10"
-                              : isCompleted
-                                ? "border-emerald-500/40 bg-emerald-500/10"
-                                : "border-border bg-background"
-                          } ${isLocked ? "opacity-50 cursor-not-allowed" : "hover:border-primary/40"}`}
-                        >
-                          {isCompleted ? (
-                            <CheckCircle
-                              size={16}
-                              className="text-emerald-600"
-                            />
-                          ) : (
-                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border text-sm font-semibold">
-                              {item.step}
-                            </span>
-                          )}
-                          <span className="text-sm font-medium">
-                            {item.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-border/70 p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">
-                      Bước 1: AI Provider & Model
-                    </h3>
-                    {isStep1Complete && (
-                      <span className="text-sm font-medium text-emerald-700">
-                        Đã hoàn tất
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="provider">AI Provider *</Label>
-                      <Select
-                        value={formData.provider}
-                        onValueChange={(value) =>
-                          handleProviderChange(
-                            value as PromptFormData["provider"],
-                          )
-                        }
-                      >
-                        <SelectTrigger id="provider">
-                          <SelectValue placeholder="Chọn provider" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {AI_PROVIDER_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedProvider?.description}
-                      </p>
-                    </div>
-
-                    {renderModelField(
-                      "custom_model_code_create",
-                      "Chọn model phù hợp theo provider đã chọn.",
-                    )}
-                  </div>
-                </div>
-
-                {maxUnlockedStep >= 2 && (
-                  <div className="rounded-lg border border-border/70 p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">
-                        Bước 2: Thông tin API
-                      </h3>
-                      {isStep2Complete && (
-                        <span className="text-sm font-medium text-emerald-700">
-                          Đã hoàn tất
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="temperature">Temperature</Label>
-                        <Input
-                          id="temperature"
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          max="2"
-                          value={formData.temperature}
-                          onChange={(e) =>
-                            updateField(
-                              "temperature",
-                              parseFloat(e.target.value) || 0,
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="max_tokens">Max Tokens</Label>
-                        <Input
-                          id="max_tokens"
-                          type="number"
-                          min="1"
-                          value={formData.max_tokens}
-                          onChange={(e) =>
-                            updateField(
-                              "max_tokens",
-                              parseInt(e.target.value) || 0,
-                            )
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label htmlFor="api_url">API URL *</Label>
-                      <Input
-                        id="api_url"
-                        value={formData.api_url}
-                        onChange={(e) => updateField("api_url", e.target.value)}
-                        placeholder={
-                          formData.provider === "OpenRouter"
-                            ? "https://openrouter.ai/api/v1/chat/completions"
-                            : "https://generativelanguage.googleapis.com/v1beta/models/{0}:generateContent?key={1}"
-                        }
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label htmlFor="api_key">API Key theo prompt *</Label>
-                      <Input
-                        id="api_key"
-                        type="password"
-                        value={formData.api_key}
-                        onChange={(e) => updateField("api_key", e.target.value)}
-                        placeholder="Nhập API key cho prompt"
-                        autoComplete="new-password"
-                      />
-                    </div>
-
-                    <p className="text-sm text-muted-foreground">
-                      Cần nhập đủ API URL và API Key để mở bước 3.
-                    </p>
-                  </div>
-                )}
-
-                {maxUnlockedStep >= 3 && (
-                  <div className="rounded-lg border border-border/70 p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold">
-                        Bước 3: Setup Prompt
-                      </h3>
-                      {isStep3Complete && (
-                        <span className="text-sm font-medium text-emerald-700">
-                          Đã hoàn tất
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="name">Tên Prompt *</Label>
-                        <Input
-                          id="name"
-                          value={formData.name}
-                          onChange={(e) => updateField("name", e.target.value)}
-                          required
-                          placeholder="VD: Dispatch Decision Prompt"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label htmlFor="version">Phiên bản</Label>
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base text-muted-foreground/70 select-none pointer-events-none">
-                            v
-                          </span>
-                          <Input
-                            id="version"
-                            value={formData.version}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(
-                                /[^0-9.]/g,
-                                "",
-                              );
-                              updateField("version", val);
-                            }}
-                            placeholder="1.0"
-                            className="pl-6"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label htmlFor="prompt_type">Loại Prompt *</Label>
-                        <Select
-                          value={effectivePromptType}
-                          onValueChange={(value) =>
-                            updateField(
-                              "prompt_type",
-                              normalizePromptType(value),
-                            )
-                          }
-                        >
-                          <SelectTrigger id="prompt_type">
-                            <SelectValue placeholder="Chọn loại prompt" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PROMPT_TYPE_OPTIONS.map((option) => (
-                              <SelectItem
-                                key={option.value}
-                                value={option.value}
-                              >
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedPromptType?.description}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label htmlFor="purpose">Mục đích *</Label>
-                      <Input
-                        id="purpose"
-                        value={formData.purpose}
-                        onChange={(e) => updateField("purpose", e.target.value)}
-                        required
-                        placeholder="Mô tả ngắn gọn mục đích của prompt này"
-                      />
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-2">
-                      <Label htmlFor="system_prompt">System Prompt *</Label>
-                      <Textarea
-                        id="system_prompt"
-                        ref={systemPromptRef}
-                        value={formData.system_prompt}
-                        onChange={(e) =>
-                          updateField("system_prompt", e.target.value)
-                        }
-                        required
-                        rows={6}
-                        className="font-mono text-base"
-                        placeholder="Nhập system prompt..."
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        {systemPromptHelperText}
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="user_prompt_template">
-                        User Prompt Template
-                      </Label>
-                      <VariableChips
-                        variables={promptTypeVariables}
-                        onInsert={handleInsertVariable}
-                      />
-                      <Textarea
-                        id="user_prompt_template"
-                        ref={userPromptRef}
-                        value={formData.user_prompt_template}
-                        onChange={(e) =>
-                          updateField("user_prompt_template", e.target.value)
-                        }
-                        rows={4}
-                        className="font-mono text-base"
-                        placeholder="Nhập user prompt template với biến {{placeholder}}..."
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        {userPromptHelperText}
-                      </p>
-                    </div>
-
-                    {renderPreviewSection()}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap justify-end gap-2 pt-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onCancel}
-                    disabled={isSubmitting}
-                  >
-                    Hủy
-                  </Button>
-
-                  {currentStep > 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handlePreviousStep}
-                      disabled={isSubmitting}
-                    >
-                      <ArrowLeft size={16} className="mr-2" />
-                      Quay lại
-                    </Button>
-                  )}
-
-                  {currentStep < 3 ? (
-                    <Button
-                      type="button"
-                      onClick={handleNextStep}
-                      disabled={isSubmitting || !getNextStepEnabled()}
-                    >
-                      Tiếp tục
-                      <ArrowRight size={16} className="ml-2" />
-                    </Button>
-                  ) : (
-                    <Button type="submit" disabled={isSubmitting || !canSubmit}>
-                      {isSubmitting ? (
-                        <CircleNotch size={16} className="mr-2 animate-spin" />
-                      ) : (
-                        <FloppyDisk size={16} className="mr-2" />
-                      )}
-                      Tạo mới
-                    </Button>
-                  )}
-                </div>
-              </>
-            )}
-          </form>
-        </CardContent>
-      </Card>
-    </>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
 

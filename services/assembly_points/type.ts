@@ -3,7 +3,7 @@ import type { RescuerType } from "../rescuers/type";
 // Assembly Point Status
 export type AssemblyPointStatus =
   | "Created"
-  | "Active"
+  | "Available"
   | "Unavailable"
   | "Closed";
 

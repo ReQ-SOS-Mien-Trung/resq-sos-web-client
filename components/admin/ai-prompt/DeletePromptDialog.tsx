@@ -3,14 +3,22 @@
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Warning, CircleNotch } from "@phosphor-icons/react";
-import type { DeletePromptDialogProps } from "@/type";
+import { CircleNotch, Warning } from "@phosphor-icons/react";
+import type { PromptEntity } from "@/services/prompt/type";
+
+type DeletePromptDialogProps = {
+  prompt: PromptEntity | null;
+  open: boolean;
+  isDeleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+};
 
 const DeletePromptDialog = ({
   prompt,
@@ -19,7 +27,9 @@ const DeletePromptDialog = ({
   onClose,
   onConfirm,
 }: DeletePromptDialogProps) => {
-  if (!prompt) return null;
+  if (!prompt) {
+    return null;
+  }
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -27,14 +37,14 @@ const DeletePromptDialog = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <Warning size={20} weight="fill" />
-            Xác nhận xóa Prompt
+            Xóa draft prompt
           </DialogTitle>
           <DialogDescription>
-            Bạn có chắc chắn muốn xóa prompt{" "}
+            Bạn sắp xóa draft{" "}
             <strong className="text-foreground">
               &quot;{prompt.name}&quot;
-            </strong>
-            ? Hành động này không thể hoàn tác.
+            </strong>{" "}
+            ({prompt.version || "—"}). Hành động này không thể hoàn tác.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -49,7 +59,7 @@ const DeletePromptDialog = ({
             {isDeleting ? (
               <CircleNotch size={16} className="mr-2 animate-spin" />
             ) : null}
-            Xóa
+            Xóa draft
           </Button>
         </DialogFooter>
       </DialogContent>

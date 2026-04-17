@@ -1,23 +1,46 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Robot,
-  Lightning,
-  ThermometerHot,
-  Hash,
   Clock,
-  Globe,
   Eye,
+  Hash,
   Key,
+  Robot,
+  Sparkle,
 } from "@phosphor-icons/react";
-import type { PromptDetailPanelProps } from "@/type";
 import { PROMPT_TYPE_LABELS } from "@/services/prompt/constants";
+import type { PromptDetailEntity } from "@/services/prompt/type";
+import type { AiConfigSummaryEntity } from "@/services/ai-config/type";
 
-const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
+type PromptDetailPanelProps = {
+  prompt: PromptDetailEntity | null;
+  isLoading: boolean;
+  aiConfig?: AiConfigSummaryEntity | null;
+};
+
+function formatDate(date: string | null) {
+  if (!date) {
+    return "—";
+  }
+
+  return new Date(date).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+const PromptDetailPanel = ({
+  prompt,
+  isLoading,
+  aiConfig = null,
+}: PromptDetailPanelProps) => {
   if (isLoading) {
     return (
       <Card className="border border-border/50">
@@ -26,7 +49,6 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-3/4" />
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-24 w-full" />
         </CardContent>
@@ -40,146 +62,140 @@ const PromptDetailPanel = ({ prompt, isLoading }: PromptDetailPanelProps) => {
         <CardContent className="p-12 text-center">
           <Eye
             size={48}
-            className="mx-auto text-muted-foreground/40 mb-3"
+            className="mx-auto mb-3 text-muted-foreground/40"
             weight="duotone"
           />
-          <p className="text-base text-muted-foreground font-medium">
+          <p className="text-base font-medium text-muted-foreground">
             Chọn một prompt để xem chi tiết
-          </p>
-          <p className="text-base text-muted-foreground/70 mt-1">
-            Nhấn vào prompt trong danh sách bên trái
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   return (
-    <Card className="border border-border/50 animate-in fade-in slide-in-from-right-2 duration-300">
+    <Card className="animate-in slide-in-from-right-2 border border-border/50 duration-300">
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle className="text-xl">{prompt.name}</CardTitle>
-            <p className="text-base text-muted-foreground mt-1">
+            <p className="mt-1 text-sm text-muted-foreground">
               {prompt.purpose || "—"}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge variant="outline">
                 {PROMPT_TYPE_LABELS[prompt.promptType] ?? prompt.promptType}
               </Badge>
-              <Badge variant="outline">{prompt.provider}</Badge>
-              <Badge variant="outline">
-                <Key size={12} className="mr-1" />
-                {prompt.hasApiKey
-                  ? prompt.apiKeyMasked || "Có key riêng"
-                  : "Dùng key mặc định của server"}
+              <Badge variant={prompt.status === "Active" ? "success" : "outline"}>
+                {prompt.status}
               </Badge>
+              <Badge variant="outline">{prompt.version || "—"}</Badge>
             </div>
           </div>
-          <Badge
-            variant={prompt.isActive ? "success" : "secondary"}
-            className="shrink-0"
-          >
-            {prompt.isActive ? "Hoạt động" : "Tắt"}
-          </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Model Info Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-            <Robot size={18} className="text-blue-500 shrink-0" />
-            <div>
-              <p className="text-sm text-muted-foreground">Model</p>
-              <p className="text-sm font-medium">{prompt.model || "Default"}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-            <ThermometerHot size={18} className="text-orange-500 shrink-0" />
-            <div>
-              <p className="text-sm text-muted-foreground">Temperature</p>
-              <p className="text-sm font-medium">{prompt.temperature ?? "—"}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-            <Lightning size={18} className="text-amber-500 shrink-0" />
-            <div>
-              <p className="text-sm text-muted-foreground">Max Tokens</p>
-              <p className="text-sm font-medium">
-                {prompt.maxTokens?.toLocaleString() ?? "—"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-            <Hash size={18} className="text-purple-500 shrink-0" />
-            <div>
-              <p className="text-sm text-muted-foreground">Version</p>
-              <p className="text-sm font-medium">{prompt.version || "—"}</p>
-            </div>
-          </div>
-        </div>
 
-        {/* API URL */}
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-          <Globe size={18} className="text-emerald-500 shrink-0" />
-          <div className="min-w-0">
-            <p className="text-sm text-muted-foreground">API URL</p>
-            <p className="text-sm font-mono truncate">
-              {prompt.apiUrl || "Dùng API URL mặc định của provider"}
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-lg bg-muted/50 p-3">
+            <p className="text-sm text-muted-foreground">Version</p>
+            <p className="mt-1 text-sm font-medium">{prompt.version || "—"}</p>
+          </div>
+          <div className="rounded-lg bg-muted/50 p-3">
+            <p className="text-sm text-muted-foreground">Tạo lúc</p>
+            <p className="mt-1 text-sm font-medium">
+              {formatDate(prompt.createdAt)}
+            </p>
+          </div>
+          <div className="rounded-lg bg-muted/50 p-3">
+            <p className="text-sm text-muted-foreground">Cập nhật</p>
+            <p className="mt-1 text-sm font-medium">
+              {formatDate(prompt.updatedAt)}
             </p>
           </div>
         </div>
 
-        <Separator />
+        <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+          <div className="flex items-start gap-3">
+            <Robot size={18} className="mt-0.5 text-primary" />
+            <div className="min-w-0 space-y-2">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  AI config dùng chung
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Prompt này sẽ dùng AI config hệ thống đang chọn hoặc đang active.
+                </p>
+              </div>
 
-        {/* System Prompt */}
-        <div>
-          <h4 className="text-base font-semibold mb-2 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
-            System Prompt
-          </h4>
-          <div className="relative">
-            <pre className="text-sm font-mono bg-muted/70 p-3 rounded-lg overflow-auto max-h-48 whitespace-pre-wrap wrap-break-word leading-relaxed border border-border/30">
-              {prompt.systemPrompt || "—"}
-            </pre>
+              {aiConfig ? (
+                <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
+                  <div className="rounded-lg border border-border/60 bg-background p-3">
+                    <p className="text-muted-foreground">Tên config</p>
+                    <p className="mt-1 font-medium">{aiConfig.name}</p>
+                  </div>
+                  <div className="rounded-lg border border-border/60 bg-background p-3">
+                    <p className="text-muted-foreground">Provider / Model</p>
+                    <p className="mt-1 font-medium break-all">
+                      {aiConfig.provider} • {aiConfig.model}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/60 bg-background p-3">
+                    <p className="text-muted-foreground">Version</p>
+                    <p className="mt-1 font-medium">
+                      {aiConfig.version || "—"} • {aiConfig.status}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/60 bg-background p-3">
+                    <p className="text-muted-foreground">API key</p>
+                    <p className="mt-1 font-medium">
+                      {aiConfig.hasApiKey
+                        ? aiConfig.apiKeyMasked || "Đã cấu hình"
+                        : "Chưa có key riêng"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Chưa có AI config để gắn vào phần test hoặc hiển thị tóm tắt.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* User Prompt Template */}
-        {prompt.userPromptTemplate && (
-          <div>
-            <h4 className="text-base font-semibold mb-2 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              User Prompt Template
-            </h4>
-            <pre className="text-sm font-mono bg-muted/70 p-3 rounded-lg overflow-auto max-h-36 whitespace-pre-wrap wrap-break-word leading-relaxed border border-border/30">
-              {prompt.userPromptTemplate}
-            </pre>
-          </div>
-        )}
+        <Separator />
+
+        <div>
+          <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+            <Sparkle size={14} />
+            System Prompt
+          </h4>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-border/30 bg-muted/70 p-3 font-mono text-sm leading-relaxed">
+            {prompt.systemPrompt || "—"}
+          </pre>
+        </div>
+
+        <div>
+          <h4 className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+            <Hash size={14} />
+            User Prompt Template
+          </h4>
+          <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-border/30 bg-muted/70 p-3 font-mono text-sm leading-relaxed">
+            {prompt.userPromptTemplate || "—"}
+          </pre>
+        </div>
 
         <Separator />
 
-        {/* Timestamps */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span className="flex items-center gap-1">
+        <div className="grid grid-cols-1 gap-3 text-sm text-muted-foreground md:grid-cols-2">
+          <span className="flex items-center gap-2">
             <Clock size={14} />
             Tạo: {formatDate(prompt.createdAt)}
           </span>
-          <span className="flex items-center gap-1">
-            <Clock size={14} />
-            Cập nhật: {formatDate(prompt.updatedAt)}
+          <span className="flex items-center gap-2">
+            <Key size={14} />
+            AI config: {aiConfig?.name ?? "Chưa chọn"}
           </span>
         </div>
       </CardContent>

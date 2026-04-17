@@ -11,35 +11,23 @@ export type PromptType =
   | "MissionTeamPlanning"
   | "MissionPlanValidation";
 
-export type AiProvider = "Gemini" | "OpenRouter";
-
-// Prompt Entity (item in paginated list)
 export interface PromptEntity {
   id: number;
+  status: "Active" | "Draft" | "Archived" | string;
   name: string;
   promptType: PromptType;
-  provider: AiProvider;
   purpose: string | null;
-  model: string | null;
-  temperature: number | null;
-  maxTokens: number | null;
   version: string | null;
-  apiUrl: string | null;
-  apiKeyMasked: string | null;
-  hasApiKey: boolean;
   isActive: boolean;
-  createdAt: string;
+  createdAt: string | null;
   updatedAt: string | null;
 }
 
-// Prompt Detail Entity (GET /system/prompts/{id})
 export interface PromptDetailEntity extends PromptEntity {
   systemPrompt: string | null;
   userPromptTemplate: string | null;
-  apiKey: string | null;
 }
 
-// Paginated Response for Prompts
 export interface GetPromptsResponse {
   items: PromptEntity[];
   pageNumber: number;
@@ -50,83 +38,78 @@ export interface GetPromptsResponse {
   hasPreviousPage: boolean;
 }
 
-// Query params for fetching prompts
 export interface GetPromptsParams {
   pageNumber?: number;
   pageSize?: number;
 }
 
-// Create Prompt Request
-export interface CreatePromptRequest {
+export interface PromptVersionSummary {
+  id: number;
+  status: "Active" | "Draft" | "Archived" | string;
   name: string;
-  prompt_type: PromptType;
-  provider: AiProvider;
-  purpose: string;
-  system_prompt: string;
-  user_prompt_template: string;
-  model: string;
-  temperature: number;
-  max_tokens: number;
-  version: string;
-  api_url?: string;
-  api_key?: string;
-  is_active?: boolean;
+  promptType: PromptType;
+  version: string | null;
+  isActive: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
-// Create Prompt Response
-export interface CreatePromptResponse {
+export interface GetPromptVersionsResponse {
+  sourcePromptId: number;
+  promptType: PromptType;
+  items: PromptVersionSummary[];
+}
+
+export interface PromptVersionActionResponse {
+  id: number;
   name: string;
+  promptType: PromptType;
+  version: string | null;
+  status: "Active" | "Draft" | "Archived" | string;
   message: string;
 }
 
-// Update Prompt Request
-export interface UpdatePromptRequest {
+export interface CreatePromptRequest {
   name: string;
   prompt_type: PromptType;
-  provider: AiProvider;
   purpose: string;
   system_prompt: string;
   user_prompt_template: string;
-  model: string;
-  temperature: number;
-  max_tokens: number;
   version: string;
-  api_url?: string;
-  api_key?: string;
-  is_active: boolean;
+  is_active?: boolean;
 }
 
-export interface PreviewPromptRescueSuggestionRequest {
-  cluster_id: number;
-  source_prompt_id?: number;
+export interface CreatePromptResponse {
+  id: number;
+  name: string;
+  promptType: PromptType;
+  message: string;
+}
+
+export interface UpdatePromptRequest {
+  name: string;
   prompt_type: PromptType;
-  provider: AiProvider;
+  purpose: string;
   system_prompt: string;
   user_prompt_template: string;
-  model: string;
-  temperature: number;
-  max_tokens: number;
   version: string;
-  api_url?: string;
-  api_key?: string;
+  is_active: boolean;
 }
 
 export interface TestPromptRescueSuggestionRequest {
   clusterId: number;
   name: string;
   prompt_type: PromptType;
-  provider: AiProvider;
   purpose: string;
   system_prompt: string;
   user_prompt_template: string;
-  model: string;
-  temperature: number;
-  max_tokens: number;
   version: string;
-  api_url?: string;
-  api_key?: string;
   is_active: boolean;
+  ai_config_id?: number;
 }
+
+export type TestNewPromptRescueSuggestionRequest =
+  TestPromptRescueSuggestionRequest;
 
 export interface PromptTestSupplyItem {
   itemId: number | null;

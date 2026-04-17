@@ -61,6 +61,7 @@ interface AiStreamPanelProps {
   onPrimaryAction?: () => void;
   hidePlanAction?: boolean;
   inline?: boolean;
+  size?: "default" | "expanded";
 }
 
 /* ═══ Activity icon map ═══ */
@@ -175,9 +176,11 @@ export default function AiStreamPanel({
   onPrimaryAction,
   hidePlanAction = false,
   inline = false,
+  size = "default",
 }: AiStreamPanelProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const isExpanded = size === "expanded";
 
   useEffect(() => {
     if (!open || !panelRef.current || !overlayRef.current) return;
@@ -213,13 +216,19 @@ export default function AiStreamPanel({
     <div
       ref={panelRef}
       className={cn(
-        "relative w-full overflow-hidden flex flex-col bg-background border text-[14px] shadow-2xl",
-        inline ? "rounded-2xl" : "max-w-5xl max-h-[92vh] mx-4 rounded-2xl",
+        "relative w-full overflow-hidden flex flex-col bg-background border shadow-2xl",
+        isExpanded ? "text-[15px]" : "text-[14px]",
+        inline
+          ? isExpanded
+            ? "rounded-2xl min-h-180"
+            : "rounded-2xl"
+          : "max-w-5xl max-h-[92vh] mx-4 rounded-2xl",
       )}
       style={{ opacity: 0 }}
     >
       <TopBar
         clusterId={clusterId}
+        status={status}
         loading={loading}
         result={result}
         error={error}
@@ -227,6 +236,7 @@ export default function AiStreamPanel({
         onStop={onStop}
         onClose={onClose}
         inline={inline}
+        expanded={isExpanded}
       />
       <div className="relative flex-1 min-h-0 overflow-auto bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_34%),linear-gradient(180deg,_rgba(255,255,255,0.82)_0%,_rgba(255,255,255,0.96)_24%,_rgba(255,255,255,1)_100%)]">
         {showProgress && (
@@ -235,10 +245,15 @@ export default function AiStreamPanel({
             statusLog={statusLog}
             thinkingText={thinkingText}
             phase={phase}
+            expanded={isExpanded}
           />
         )}
-        {showActionMap && <ActionMapView result={result} />}
-        {showError && <ErrorView error={error} onRetry={onRetry} />}
+        {showActionMap && (
+          <ActionMapView result={result} expanded={isExpanded} />
+        )}
+        {showError && (
+          <ErrorView error={error} onRetry={onRetry} expanded={isExpanded} />
+        )}
       </div>
       {result && (
         <FooterBar
@@ -247,6 +262,7 @@ export default function AiStreamPanel({
           primaryActionLabel={primaryActionLabel}
           onPrimaryAction={onPrimaryAction}
           hidePlanAction={hidePlanAction}
+          expanded={isExpanded}
         />
       )}
     </div>
@@ -275,6 +291,7 @@ export default function AiStreamPanel({
 
 function TopBar({
   clusterId,
+  status,
   loading,
   result,
   error,
@@ -282,8 +299,10 @@ function TopBar({
   onStop,
   onClose,
   inline = false,
+  expanded = false,
 }: {
   clusterId: number | null;
+  status: string;
   loading: boolean;
   result: ClusterRescueSuggestionResponse | null;
   error: string | null;
@@ -291,9 +310,10 @@ function TopBar({
   onStop: () => void;
   onClose: () => void;
   inline?: boolean;
+  expanded?: boolean;
 }) {
   const statusLabel = loading
-    ? phaseLabel(phase)
+    ? status.trim() || phaseLabel(phase)
     : result
       ? "HOÀN TẤT"
       : error
@@ -301,11 +321,24 @@ function TopBar({
         : "SẴN SÀNG";
 
   return (
-    <div className="relative flex items-center justify-between px-5 py-3 border-b bg-background shrink-0">
-      <div className="flex items-center gap-3">
+    <div
+      className={cn(
+        "relative flex items-center justify-between border-b bg-background shrink-0",
+        expanded ? "px-6 py-4" : "px-5 py-3",
+      )}
+    >
+      <div className={cn("flex items-center", expanded ? "gap-4" : "gap-3")}>
         <div className="relative">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-orange-500 flex items-center justify-center shadow-md">
-            <Brain className="h-4.5 w-4.5 text-white" weight="fill" />
+          <div
+            className={cn(
+              "bg-gradient-to-br from-primary to-orange-500 flex items-center justify-center shadow-md",
+              expanded ? "w-11 h-11 rounded-xl" : "w-9 h-9 rounded-lg",
+            )}
+          >
+            <Brain
+              className={cn("text-white", expanded ? "h-5 w-5" : "h-4.5 w-4.5")}
+              weight="fill"
+            />
           </div>
           {loading && (
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-primary rounded-full animate-pulse" />
@@ -317,16 +350,30 @@ function TopBar({
           )}
         </div>
         <div>
-          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+          <h3
+            className={cn(
+              "font-bold text-foreground flex items-center gap-2",
+              expanded ? "text-base" : "text-sm",
+            )}
+          >
             Gợi ý nhiệm vụ AI
             {clusterId && (
-              <Badge variant="outline" className="text-sm font-mono px-1.5">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "font-mono",
+                  expanded ? "text-base px-2" : "text-sm px-1.5",
+                )}
+              >
                 Cụm #{clusterId}
               </Badge>
             )}
           </h3>
           <p
-            className="max-w-xl truncate text-sm text-muted-foreground"
+            className={cn(
+              "max-w-xl truncate text-muted-foreground",
+              expanded ? "text-base" : "text-sm",
+            )}
             title={error ? normalizeAiErrorText(error) : undefined}
           >
             {statusLabel}
@@ -338,10 +385,13 @@ function TopBar({
           <Button
             variant="destructive"
             size="sm"
-            className="h-7 text-sm"
+            className={cn(expanded ? "h-9 px-3 text-sm" : "h-7 text-sm")}
             onClick={onStop}
           >
-            <Stop className="h-3 w-3 mr-1" weight="fill" />
+            <Stop
+              className={cn(expanded ? "h-4 w-4 mr-1.5" : "h-3 w-3 mr-1")}
+              weight="fill"
+            />
             Dừng
           </Button>
         )}
@@ -349,7 +399,9 @@ function TopBar({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 rounded-md"
+            className={cn(
+              expanded ? "h-8 w-8 rounded-md" : "h-7 w-7 rounded-md",
+            )}
             onClick={onClose}
           >
             <X className="h-4 w-4" />
@@ -445,11 +497,13 @@ function LoadingStreamView({
   statusLog,
   thinkingText,
   phase,
+  expanded = false,
 }: {
   status: string;
   statusLog: StreamLogEntry[];
   thinkingText: string;
   phase: string;
+  expanded?: boolean;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -475,16 +529,25 @@ function LoadingStreamView({
   return (
     <div
       ref={wrapperRef}
-      className="h-full px-4 py-6 md:px-6 md:py-8"
+      className={cn(
+        "h-full",
+        expanded ? "px-5 py-8 md:px-7 md:py-10" : "px-4 py-6 md:px-6 md:py-8",
+      )}
       style={{ contentVisibility: "auto" }}
     >
-      <div className="mx-auto flex w-full flex-col items-center gap-5">
+      <div
+        className={cn(
+          "mx-auto flex w-full flex-col items-center",
+          expanded ? "gap-6" : "gap-5",
+        )}
+      >
         <div className="loading-block w-full">
           <SonarRadar
             status={status}
             statusLog={statusLog}
             thinkingText={thinkingText}
             phase={phase}
+            expanded={expanded}
           />
         </div>
       </div>
@@ -499,11 +562,13 @@ function SonarRadar({
   statusLog,
   thinkingText,
   phase,
+  expanded = false,
 }: {
   status: string;
   statusLog: StreamLogEntry[];
   thinkingText: string;
   phase: string;
+  expanded?: boolean;
 }) {
   const ringRefs = useRef<(SVGCircleElement | null)[]>([]);
   const tickerRef = useRef<HTMLDivElement>(null);
@@ -599,16 +664,32 @@ function SonarRadar({
   }, [thinkingText]);
 
   return (
-    <div className="w-full px-2 py-4 md:px-4">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-        <div className="rounded-2xl border border-primary/10 bg-white/92 px-4 py-3 shadow-[0_20px_60px_-42px_rgba(249,115,22,0.45)] backdrop-blur">
+    <div
+      className={cn(
+        "w-full",
+        expanded ? "px-3 py-5 md:px-5" : "px-2 py-4 md:px-4",
+      )}
+    >
+      <div
+        className={cn(
+          "mx-auto flex w-full flex-col",
+          expanded ? "max-w-6xl gap-5" : "max-w-5xl gap-4",
+        )}
+      >
+        <div
+          className={cn(
+            "rounded-2xl border border-primary/10 bg-white/92 shadow-[0_20px_60px_-42px_rgba(249,115,22,0.45)] backdrop-blur",
+            expanded ? "px-5 py-4" : "px-4 py-3",
+          )}
+        >
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge
                   variant="outline"
                   className={cn(
-                    "rounded-full px-2.5 py-1 text-sm font-semibold uppercase tracking-[0.18em]",
+                    "rounded-full font-semibold uppercase tracking-[0.18em]",
+                    expanded ? "px-3 py-1.5 text-sm" : "px-2.5 py-1 text-sm",
                     phaseTone.pill,
                   )}
                 >
@@ -620,13 +701,23 @@ function SonarRadar({
                   />
                   {phaseLabel(phase)}
                 </Badge>
-                <span className="text-sm font-medium text-foreground/90">
+                <span
+                  className={cn(
+                    "font-medium text-foreground/90",
+                    expanded ? "text-base" : "text-sm",
+                  )}
+                >
                   {latestEntry?.message || status || phaseDescription(phase)}
                 </span>
               </div>
             </div>
 
-            <div className="flex w-full items-center gap-3 md:max-w-xs">
+            <div
+              className={cn(
+                "flex w-full items-center gap-3",
+                expanded ? "md:max-w-sm" : "md:max-w-xs",
+              )}
+            >
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-primary/8">
                 <div
                   className={cn(
@@ -640,17 +731,41 @@ function SonarRadar({
                   style={{ width: `${progressValue}%` }}
                 />
               </div>
-              <span className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <span
+                className={cn(
+                  "font-semibold uppercase tracking-[0.18em] text-muted-foreground",
+                  expanded ? "text-base" : "text-sm",
+                )}
+              >
                 {progressValue}%
               </span>
             </div>
           </div>
         </div>
 
-        <div className="mx-auto grid w-full max-w-5xl gap-5 md:grid-cols-[300px_minmax(0,1fr)] md:items-start">
-          <div className="overflow-hidden rounded-[28px] border border-primary/10 bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_55%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(255,248,244,0.96))] p-4 shadow-[0_20px_60px_-42px_rgba(249,115,22,0.55)] md:p-5">
+        <div
+          className={cn(
+            "mx-auto grid w-full gap-5 md:items-start",
+            expanded
+              ? "max-w-6xl md:grid-cols-[360px_minmax(0,1fr)]"
+              : "max-w-5xl md:grid-cols-[300px_minmax(0,1fr)]",
+          )}
+        >
+          <div
+            className={cn(
+              "overflow-hidden rounded-[28px] border border-primary/10 bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_55%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(255,248,244,0.96))] shadow-[0_20px_60px_-42px_rgba(249,115,22,0.55)]",
+              expanded ? "p-5 md:p-6" : "p-4 md:p-5",
+            )}
+          >
             <div className="flex flex-col items-center">
-              <div className="relative h-56 w-56 md:h-60 md:w-60">
+              <div
+                className={cn(
+                  "relative",
+                  expanded
+                    ? "h-64 w-64 md:h-72 md:w-72"
+                    : "h-56 w-56 md:h-60 md:w-60",
+                )}
+              >
                 <div
                   className={cn(
                     "absolute inset-0 rounded-full bg-gradient-to-b opacity-80 blur-3xl",
@@ -748,53 +863,99 @@ function SonarRadar({
                   </defs>
                 </svg>
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/70 bg-white/85 shadow-lg shadow-primary/10 backdrop-blur">
+                  <div
+                    className={cn(
+                      "flex items-center justify-center rounded-2xl border border-white/70 bg-white/85 shadow-lg shadow-primary/10 backdrop-blur",
+                      expanded ? "h-16 w-16" : "h-14 w-14",
+                    )}
+                  >
                     <Brain
-                      className="h-7 w-7 text-primary animate-pulse"
+                      className={cn(
+                        "text-primary animate-pulse",
+                        expanded ? "h-8 w-8" : "h-7 w-7",
+                      )}
                       weight="fill"
                     />
                   </div>
                 </div>
               </div>
 
-              <Badge className="mt-2 border-primary/20 bg-white text-primary shadow-sm hover:bg-white">
+              <Badge
+                className={cn(
+                  "mt-2 border-primary/20 bg-white text-primary shadow-sm hover:bg-white",
+                  expanded ? "text-base px-3 py-1" : "text-sm",
+                )}
+              >
                 {phaseLabel(phase)}
               </Badge>
-              <p className="mt-3 text-center text-sm font-medium tracking-tight text-foreground">
+              <p
+                className={cn(
+                  "mt-3 text-center font-medium tracking-tight text-foreground",
+                  expanded ? "text-base" : "text-sm",
+                )}
+              >
                 {status || phaseDescription(phase)}
               </p>
-              <p className="mt-1 text-center text-sm text-muted-foreground">
+              <p
+                className={cn(
+                  "mt-1 text-center text-muted-foreground",
+                  expanded ? "text-base" : "text-sm",
+                )}
+              >
                 AI đang phân tích
               </p>
             </div>
           </div>
 
           <div className="overflow-hidden rounded-[28px] border border-primary/10 bg-white/92 shadow-[0_24px_72px_-42px_rgba(15,23,42,0.28)] backdrop-blur">
-            <div className="border-b border-primary/10 bg-[linear-gradient(135deg,rgba(249,115,22,0.08),rgba(249,115,22,0.02)_55%,transparent)] px-4 py-4 md:px-5">
+            <div
+              className={cn(
+                "border-b border-primary/10 bg-[linear-gradient(135deg,rgba(249,115,22,0.08),rgba(249,115,22,0.02)_55%,transparent)]",
+                expanded ? "px-5 py-5 md:px-6" : "px-4 py-4 md:px-5",
+              )}
+            >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-3 w-3 shrink-0">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/35" />
                     <span className="relative inline-flex h-3 w-3 rounded-full bg-primary" />
                   </span>
-                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary/80">
+                  <p
+                    className={cn(
+                      "font-semibold uppercase tracking-[0.24em] text-primary/80",
+                      expanded ? "text-base" : "text-sm",
+                    )}
+                  >
                     AI Suy nghĩ
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 rounded-full border border-primary/10 bg-primary/5 px-3 py-1.5 text-sm text-primary/80">
+                <div
+                  className={cn(
+                    "flex items-center gap-2 rounded-full border border-primary/10 bg-primary/5 text-primary/80",
+                    expanded ? "px-3.5 py-2 text-base" : "px-3 py-1.5 text-sm",
+                  )}
+                >
                   <ArrowsClockwise className="h-3.5 w-3.5 animate-spin" />
                   {statusEntries.length}
                 </div>
               </div>
             </div>
 
-            <div className="relative px-4 py-4 md:px-5">
+            <div
+              className={cn(
+                "relative",
+                expanded ? "px-5 py-5 md:px-6" : "px-4 py-4 md:px-5",
+              )}
+            >
               <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-white via-white/90 to-transparent" />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white via-white/90 to-transparent" />
               <div
                 ref={tickerRef}
-                className="relative max-h-[23rem] space-y-2 overflow-y-auto pr-1"
+                className={cn(
+                  "relative space-y-2 overflow-y-auto pr-1",
+                  expanded ? "max-h-116" : "max-h-92",
+                )}
               >
                 {visibleStatusEntries.length > 0 ? (
                   visibleStatusEntries.map((entry, index) => {
@@ -807,7 +968,10 @@ function SonarRadar({
                       <div
                         key={entry.id}
                         className={cn(
-                          "status-ticker-item relative flex items-start gap-3 rounded-2xl border px-3 py-3 transition-colors md:px-4",
+                          "status-ticker-item relative flex items-start gap-3 rounded-2xl border transition-colors",
+                          expanded
+                            ? "px-4 py-3.5 md:px-5"
+                            : "px-3 py-3 md:px-4",
                           isLatest
                             ? "border-primary/18 bg-primary/[0.07] shadow-[0_12px_40px_-28px_rgba(249,115,22,0.65)]"
                             : "border-border/50 bg-white/72",
@@ -829,8 +993,12 @@ function SonarRadar({
                           className={cn(
                             "min-w-0 flex-1 wrap-break-word font-medium leading-6",
                             isLatest
-                              ? "text-[15px] text-foreground"
-                              : "text-sm text-muted-foreground",
+                              ? expanded
+                                ? "text-base text-foreground"
+                                : "text-[15px] text-foreground"
+                              : expanded
+                                ? "text-base text-muted-foreground"
+                                : "text-sm text-muted-foreground",
                           )}
                         >
                           {entry.message}
@@ -839,7 +1007,12 @@ function SonarRadar({
                     );
                   })
                 ) : (
-                  <div className="status-ticker-item rounded-2xl border border-primary/12 bg-primary/[0.06] px-4 py-3 text-sm font-medium text-primary/85">
+                  <div
+                    className={cn(
+                      "status-ticker-item rounded-2xl border border-primary/12 bg-primary/[0.06] px-4 py-3 font-medium text-primary/85",
+                      expanded ? "text-base" : "text-sm",
+                    )}
+                  >
                     {status || "Đang khởi tạo..."}
                   </div>
                 )}
@@ -848,9 +1021,17 @@ function SonarRadar({
               {thinkingText && (
                 <div
                   ref={thinkingRef}
-                  className="mt-3 rounded-2xl border border-primary/10 bg-primary/[0.04] px-3 py-2.5"
+                  className={cn(
+                    "mt-3 rounded-2xl border border-primary/10 bg-primary/[0.04]",
+                    expanded ? "px-4 py-3" : "px-3 py-2.5",
+                  )}
                 >
-                  <p className="line-clamp-2 text-sm font-mono leading-5 text-primary/70 whitespace-pre-wrap wrap-break-word">
+                  <p
+                    className={cn(
+                      "line-clamp-2 font-mono leading-5 text-primary/70 whitespace-pre-wrap wrap-break-word",
+                      expanded ? "text-base" : "text-sm",
+                    )}
+                  >
                     {thinkingText}
                     <span className="ml-1 inline-block h-3 w-1 animate-pulse rounded-full bg-primary/60 align-middle" />
                   </p>
@@ -868,8 +1049,10 @@ function SonarRadar({
 
 function ActionMapView({
   result,
+  expanded = false,
 }: {
   result: ClusterRescueSuggestionResponse;
+  expanded?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const activities = result.suggestedActivities;
@@ -879,7 +1062,10 @@ function ActionMapView({
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-5 space-y-5" ref={containerRef}>
+      <div
+        className={cn(expanded ? "p-6 space-y-6 md:p-7" : "p-5 space-y-5")}
+        ref={containerRef}
+      >
         <MissionBanner result={result} />
         <StatsRow result={result} />
         <ActionFlowTimeline key={activitiesKey} activities={activities} />
@@ -1546,7 +1732,15 @@ function WarningsBlock({
 
 /* ═══ Error View ═══ */
 
-function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
+function ErrorView({
+  error,
+  onRetry,
+  expanded = false,
+}: {
+  error: string;
+  onRetry: () => void;
+  expanded?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const readableError = normalizeAiErrorText(error);
 
@@ -1568,17 +1762,38 @@ function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
     <div className="absolute inset-0 flex items-center justify-center p-8">
       <div
         ref={ref}
-        className="max-w-sm p-5 rounded-xl bg-red-50 dark:bg-red-500/[0.06] border border-red-500/20 text-center"
+        className={cn(
+          "rounded-xl bg-red-50 dark:bg-red-500/[0.06] border border-red-500/20 text-center",
+          expanded ? "max-w-md p-6" : "max-w-sm p-5",
+        )}
       >
-        <Warning className="h-8 w-8 text-red-500 mx-auto mb-3" weight="fill" />
-        <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">
+        <Warning
+          className={cn(
+            "text-red-500 mx-auto mb-3",
+            expanded ? "h-9 w-9" : "h-8 w-8",
+          )}
+          weight="fill"
+        />
+        <p
+          className={cn(
+            "font-bold text-red-600 dark:text-red-400 mb-1",
+            expanded ? "text-base" : "text-sm",
+          )}
+        >
           Phân tích thất bại
         </p>
-        <p className="text-sm text-red-500/60 mb-4">{readableError}</p>
+        <p
+          className={cn(
+            "text-red-500/60 mb-4",
+            expanded ? "text-base" : "text-sm",
+          )}
+        >
+          {readableError}
+        </p>
         <Button
           variant="destructive"
           size="sm"
-          className="h-8 text-sm"
+          className={cn(expanded ? "h-9 text-sm" : "h-8 text-sm")}
           onClick={onRetry}
         >
           <ArrowsClockwise className="h-3.5 w-3.5 mr-1.5" />
@@ -1597,12 +1812,14 @@ function FooterBar({
   primaryActionLabel,
   onPrimaryAction,
   hidePlanAction,
+  expanded = false,
 }: {
   onRetry: () => void;
   onViewPlan: () => void;
   primaryActionLabel?: string;
   onPrimaryAction?: () => void;
   hidePlanAction?: boolean;
+  expanded?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1617,12 +1834,15 @@ function FooterBar({
   return (
     <div
       ref={ref}
-      className="px-5 py-3 border-t bg-background flex items-center gap-2"
+      className={cn(
+        "border-t bg-background flex items-center gap-2",
+        expanded ? "px-6 py-4" : "px-5 py-3",
+      )}
     >
       <Button
         variant="outline"
         size="sm"
-        className="h-9 text-sm"
+        className={cn(expanded ? "h-10 px-3 text-sm" : "h-9 text-sm")}
         onClick={onRetry}
       >
         <ArrowsClockwise className="h-3.5 w-3.5 mr-1.5" />
@@ -1633,7 +1853,10 @@ function FooterBar({
         onPrimaryAction ? (
           <Button
             size="sm"
-            className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
+            className={cn(
+              "text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25",
+              expanded ? "h-10 px-4" : "h-9",
+            )}
             onClick={onPrimaryAction}
           >
             <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
@@ -1642,7 +1865,10 @@ function FooterBar({
         ) : (
           <Button
             size="sm"
-            className="h-9 text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
+            className={cn(
+              "text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25",
+              expanded ? "h-10 px-4" : "h-9",
+            )}
             onClick={onViewPlan}
           >
             <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
