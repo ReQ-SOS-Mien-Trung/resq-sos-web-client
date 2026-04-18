@@ -174,6 +174,11 @@ export interface RoleMetadataOption {
   value: string;
 }
 
+export interface AbilityCategoryMetadataOption {
+  key: string;
+  value: string;
+}
+
 export interface AdminUpdateUserRequest {
   firstName?: string;
   lastName?: string;

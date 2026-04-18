@@ -100,7 +100,7 @@ function getAvailableAssemblyPointActions(
   switch (status) {
     case "Created":
       return ["activate"];
-    case "Active":
+    case "Available":
       return ["startMaintenance", "close"];
     case "Unavailable":
       return ["completeMaintenance"];
@@ -143,7 +143,7 @@ function getAssemblyPointActionDialogDescription(
 ): string {
   switch (action) {
     case "activate":
-      return `Kích hoạt "${pointName}" để chuyển từ trạng thái Mới tạo sang Đang hoạt động.`;
+      return `Kích hoạt "${pointName}" để chuyển từ trạng thái Mới tạo sang Sẵn sàng.`;
     case "startMaintenance":
       return `Chuyển "${pointName}" sang trạng thái Không khả dụng để tạm ngưng sử dụng điểm tập kết này.`;
     case "completeMaintenance":
@@ -261,7 +261,7 @@ export default function AssemblyPointsPage() {
     page * ITEMS_PER_PAGE,
   );
 
-  const activeCount = items.filter((i) => i.status === "Active").length;
+  const availableCount = items.filter((i) => i.status === "Available").length;
   const createdCount = items.filter((i) => i.status === "Created").length;
   const unavailableCount = items.filter(
     (i) => i.status === "Unavailable",
@@ -377,8 +377,8 @@ export default function AssemblyPointsPage() {
               bgColor: "bg-blue-50 dark:bg-blue-950/30",
             },
             {
-              label: assemblyPointStatusConfig.Active.label,
-              value: activeCount,
+              label: assemblyPointStatusConfig.Available.label,
+              value: availableCount,
               icon: CheckCircle,
               color: "text-emerald-600 dark:text-emerald-400",
               bgColor: "bg-emerald-50 dark:bg-emerald-950/30",

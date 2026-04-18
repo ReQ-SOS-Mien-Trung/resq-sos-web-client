@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { SOSRequest, Rescuer, Mission, SOSSidebarProps } from "@/type";
 import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,11 @@ import {
 import { useMissions } from "@/services/mission/hooks";
 import type { MissionEntity } from "@/services/mission/type";
 import type { TeamIncidentEntity } from "@/services/team_incidents/type";
+import type {
+  ClusterLifecycleStatus,
+  ClusterSeverityLevel,
+  SOSClusterEntity,
+} from "@/services/sos_cluster/type";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -152,6 +157,190 @@ function getIncidentReporterPhone(
   return reportedBy.phone;
 }
 
+const CLUSTER_SEVERITY_SORT_ORDER: Record<ClusterSeverityLevel, number> = {
+  Critical: 0,
+  High: 1,
+  Medium: 2,
+  Low: 3,
+};
+
+const CLUSTER_SEVERITY_LABELS: Record<ClusterSeverityLevel, string> = {
+  Critical: "Rất nghiêm trọng",
+  High: "Nghiêm trọng",
+  Medium: "Trung bình",
+  Low: "Thấp",
+};
+
+const CLUSTER_CONTAINER_CLASS_BY_SEVERITY: Record<
+  ClusterSeverityLevel,
+  string
+> = {
+  Critical:
+    "border-red-400 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10",
+  High: "border-orange-400 bg-orange-50/50 dark:border-orange-800/40 dark:bg-orange-900/10",
+  Medium:
+    "border-yellow-400 bg-yellow-50/50 dark:border-yellow-800/40 dark:bg-yellow-900/10",
+  Low: "border-teal-400 bg-teal-50/50 dark:border-teal-800/40 dark:bg-teal-900/10",
+};
+
+const CLUSTER_SEVERITY_BADGE_CLASS_BY_SEVERITY: Record<
+  ClusterSeverityLevel,
+  string
+> = {
+  Critical: "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30",
+  High: "text-orange-700 bg-orange-100 dark:text-orange-300 dark:bg-orange-900/30",
+  Medium:
+    "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/30",
+  Low: "text-teal-700 bg-teal-100 dark:text-teal-300 dark:bg-teal-900/30",
+};
+
+const CLUSTER_STATUS_SORT_ORDER: Record<ClusterLifecycleStatus, number> = {
+  InProgress: 0,
+  Suggested: 1,
+  Pending: 2,
+  Completed: 3,
+};
+
+const CLUSTER_STATUS_LABELS: Record<ClusterLifecycleStatus, string> = {
+  Pending: "Chờ AI phân tích",
+  Suggested: "Đã có gợi ý AI",
+  InProgress: "Đang thực hiện",
+  Completed: "Đã hoàn thành",
+};
+
+const CLUSTER_STATUS_BADGE_CLASS_BY_STATUS: Record<
+  ClusterLifecycleStatus,
+  string
+> = {
+  Pending:
+    "text-slate-700 bg-slate-100 dark:text-slate-300 dark:bg-slate-800/50",
+  Suggested:
+    "text-violet-700 bg-violet-100 dark:text-violet-300 dark:bg-violet-900/30",
+  InProgress:
+    "text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/30",
+  Completed:
+    "text-emerald-700 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-900/30",
+};
+
+function resolveClusterStatus(
+  cluster: SOSClusterEntity,
+): ClusterLifecycleStatus {
+  if (
+    cluster.status === "Pending" ||
+    cluster.status === "Suggested" ||
+    cluster.status === "InProgress" ||
+    cluster.status === "Completed"
+  ) {
+    return cluster.status;
+  }
+
+  return cluster.isMissionCreated ? "InProgress" : "Pending";
+}
+
+function getTimestamp(value: string): number {
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeSOSRequestId(id: string | number): string {
+  const normalized = String(id).trim();
+  const asNumber = Number(normalized);
+  if (Number.isFinite(asNumber)) {
+    return String(asNumber);
+  }
+  return normalized;
+}
+
+type SOSStatusBucket = "pending" | "active" | "resolved" | "cancelled";
+type SOSStatusBadgeVariant = "warning" | "info" | "success" | "outline";
+
+function normalizeSOSStatus(status: SOSRequest["status"]): string {
+  return String(status || "")
+    .trim()
+    .toUpperCase();
+}
+
+function getSOSStatusBucket(status: SOSRequest["status"]): SOSStatusBucket {
+  const normalized = normalizeSOSStatus(status);
+
+  if (normalized === "PENDING") {
+    return "pending";
+  }
+
+  if (
+    normalized === "ASSIGNED" ||
+    normalized === "IN_PROGRESS" ||
+    normalized === "INPROGRESS" ||
+    normalized === "INCIDENT"
+  ) {
+    return "active";
+  }
+
+  if (normalized === "CANCELLED") {
+    return "cancelled";
+  }
+
+  return "resolved";
+}
+
+function getSOSStatusSortWeight(status: SOSRequest["status"]): number {
+  const bucket = getSOSStatusBucket(status);
+  if (bucket === "pending") return 0;
+  if (bucket === "active") return 1;
+  if (bucket === "resolved") return 2;
+  return 3;
+}
+
+function getSOSStatusLabel(status: SOSRequest["status"]): string {
+  const normalized = normalizeSOSStatus(status);
+
+  if (normalized === "PENDING") {
+    return "Chờ";
+  }
+
+  if (normalized === "INCIDENT") {
+    return "Có sự cố";
+  }
+
+  if (
+    normalized === "ASSIGNED" ||
+    normalized === "IN_PROGRESS" ||
+    normalized === "INPROGRESS"
+  ) {
+    return "Đang cứu";
+  }
+
+  if (normalized === "CANCELLED") {
+    return "Đã hủy";
+  }
+
+  if (normalized === "RESCUED" || normalized === "RESOLVED") {
+    return "Đã xử lý";
+  }
+
+  return "Đã xử lý";
+}
+
+function getSOSStatusBadgeVariant(
+  status: SOSRequest["status"],
+): SOSStatusBadgeVariant {
+  const bucket = getSOSStatusBucket(status);
+
+  if (bucket === "pending") {
+    return "warning";
+  }
+
+  if (bucket === "active") {
+    return "info";
+  }
+
+  if (bucket === "resolved") {
+    return "success";
+  }
+
+  return "outline";
+}
+
 const SOSSidebar = ({
   sosRequests,
   rescuers,
@@ -182,8 +371,12 @@ const SOSSidebar = ({
   );
   const currentTab = selectedTeamIncident ? "incidents" : activeTab;
 
-  const pendingRequests = sosRequests.filter((s) => s.status === "PENDING");
-  const assignedRequests = sosRequests.filter((s) => s.status === "ASSIGNED");
+  const pendingRequests = sosRequests.filter(
+    (s) => getSOSStatusBucket(s.status) === "pending",
+  );
+  const assignedRequests = sosRequests.filter(
+    (s) => getSOSStatusBucket(s.status) === "active",
+  );
   const availableRescuers = rescuers.filter((r) => r.status === "AVAILABLE");
   const busyRescuers = rescuers.filter((r) => r.status === "BUSY");
   const reportedIncidents = teamIncidents.filter(
@@ -217,15 +410,32 @@ const SOSSidebar = ({
     (s) => !backendClusteredIds.has(s.id),
   );
 
-  // Backend clusters that are still active in operations (pending/assigned/mission-created)
-  const activeClusters = backendClusters.filter((c) => {
-    const clusterSOS = sosRequests.filter((s) =>
-      c.sosRequestIds.some((id) => String(id) === String(s.id)),
-    );
-    const hasActiveSOS = clusterSOS.some((s) => s.status !== "RESCUED");
+  // Show only clusters that are not completed, sorted by severity (Critical -> Low).
+  const activeClusters = useMemo(() => {
+    return [...backendClusters]
+      .filter((cluster) => resolveClusterStatus(cluster) !== "Completed")
+      .sort((left, right) => {
+        const severityDelta =
+          CLUSTER_SEVERITY_SORT_ORDER[left.severityLevel] -
+          CLUSTER_SEVERITY_SORT_ORDER[right.severityLevel];
 
-    return hasActiveSOS || c.isMissionCreated;
-  });
+        if (severityDelta !== 0) {
+          return severityDelta;
+        }
+
+        const statusDelta =
+          CLUSTER_STATUS_SORT_ORDER[resolveClusterStatus(left)] -
+          CLUSTER_STATUS_SORT_ORDER[resolveClusterStatus(right)];
+
+        if (statusDelta !== 0) {
+          return statusDelta;
+        }
+
+        return (
+          getTimestamp(right.lastUpdatedAt) - getTimestamp(left.lastUpdatedAt)
+        );
+      });
+  }, [backendClusters]);
 
   return (
     <div className="flex h-full min-h-0 flex-col border-r bg-background text-[14px]">
@@ -330,60 +540,54 @@ const SOSSidebar = ({
                     Cụm đã gom ({activeClusters.length})
                   </div>
                   {activeClusters.map((cluster) => {
-                    const severityColors: Record<string, string> = {
-                      Critical:
-                        "border-red-400 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10",
-                      High: "border-orange-400 bg-orange-50/50 dark:border-orange-800/40 dark:bg-orange-900/10",
-                      Medium:
-                        "border-yellow-400 bg-yellow-50/50 dark:border-yellow-800/40 dark:bg-yellow-900/10",
-                      Low: "border-teal-400 bg-teal-50/50 dark:border-teal-800/40 dark:bg-teal-900/10",
-                    };
-                    const severityBadge: Record<string, string> = {
-                      Critical:
-                        "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/30",
-                      High: "text-orange-700 bg-orange-100 dark:text-orange-300 dark:bg-orange-900/30",
-                      Medium:
-                        "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/30",
-                      Low: "text-teal-700 bg-teal-100 dark:text-teal-300 dark:bg-teal-900/30",
-                    };
-                    const severityLabels: Record<string, string> = {
-                      Critical: "Rất nghiêm trọng",
-                      High: "Nghiêm trọng",
-                      Medium: "Trung bình",
-                      Low: "Thấp",
-                    };
+                    const clusterStatus = resolveClusterStatus(cluster);
                     const isAnalyzing =
                       isAnalyzingCluster && analyzingClusterId === cluster.id;
                     const sosCount =
                       cluster.sosRequestCount || cluster.sosRequestIds.length;
                     const isExpanded = expandedClusters.has(cluster.id);
+                    const clusterSosIdSet = new Set(
+                      cluster.sosRequestIds.map(normalizeSOSRequestId),
+                    );
                     const clusterSOS = sosRequests.filter((s) =>
-                      cluster.sosRequestIds.some(
-                        (id) => String(id) === String(s.id),
-                      ),
+                      clusterSosIdSet.has(normalizeSOSRequestId(s.id)),
                     );
                     const pendingClusterSOS = clusterSOS.filter(
-                      (s) => s.status === "PENDING",
+                      (s) => getSOSStatusBucket(s.status) === "pending",
                     );
-                    const assignedClusterSOS = clusterSOS.filter(
-                      (s) => s.status === "ASSIGNED",
+                    const activeClusterSOS = clusterSOS.filter(
+                      (s) => getSOSStatusBucket(s.status) === "active",
                     );
                     const rescuedClusterSOS = clusterSOS.filter(
-                      (s) => s.status === "RESCUED",
+                      (s) => getSOSStatusBucket(s.status) === "resolved",
                     );
-                    const displayClusterSOS = [
-                      ...pendingClusterSOS,
-                      ...assignedClusterSOS,
-                      ...rescuedClusterSOS,
-                    ];
+                    const cancelledClusterSOS = clusterSOS.filter(
+                      (s) => getSOSStatusBucket(s.status) === "cancelled",
+                    );
+                    const displayClusterSOS = [...clusterSOS].sort(
+                      (left, right) => {
+                        const statusDelta =
+                          getSOSStatusSortWeight(left.status) -
+                          getSOSStatusSortWeight(right.status);
+
+                        if (statusDelta !== 0) {
+                          return statusDelta;
+                        }
+
+                        return (
+                          right.createdAt.getTime() - left.createdAt.getTime()
+                        );
+                      },
+                    );
 
                     return (
                       <div
                         key={cluster.id}
                         className={cn(
                           "rounded-xl border overflow-hidden",
-                          severityColors[cluster.severityLevel] ||
-                            severityColors.Low,
+                          CLUSTER_CONTAINER_CLASS_BY_SEVERITY[
+                            cluster.severityLevel
+                          ],
                         )}
                       >
                         {/* Cluster header - clickable to expand */}
@@ -414,23 +618,36 @@ const SOSSidebar = ({
                                 variant="outline"
                                 className={cn(
                                   "text-[14px] h-6 px-2 border-0 leading-none whitespace-nowrap shrink-0",
-                                  severityBadge[cluster.severityLevel] ||
-                                    severityBadge.Low,
+                                  CLUSTER_SEVERITY_BADGE_CLASS_BY_SEVERITY[
+                                    cluster.severityLevel
+                                  ],
                                 )}
                               >
-                                {severityLabels[cluster.severityLevel] ||
-                                  cluster.severityLevel}
+                                {CLUSTER_SEVERITY_LABELS[cluster.severityLevel]}
+                              </Badge>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[14px] h-6 px-2 border-0 leading-none whitespace-nowrap shrink-0",
+                                  CLUSTER_STATUS_BADGE_CLASS_BY_STATUS[
+                                    clusterStatus
+                                  ],
+                                )}
+                              >
+                                {CLUSTER_STATUS_LABELS[clusterStatus]}
                               </Badge>
                             </div>
                             <div className="flex items-center gap-1.5 self-end sm:self-auto">
                               <span className="text-[14px] text-muted-foreground whitespace-nowrap">
                                 {pendingClusterSOS.length > 0
                                   ? `${pendingClusterSOS.length} chờ xử lý`
-                                  : assignedClusterSOS.length > 0
-                                    ? `${assignedClusterSOS.length} đang cứu hộ`
+                                  : activeClusterSOS.length > 0
+                                    ? `${activeClusterSOS.length} đang cứu hộ`
                                     : rescuedClusterSOS.length > 0
-                                      ? `${rescuedClusterSOS.length} đã cứu hộ`
-                                      : `${sosCount} SOS`}
+                                      ? `${rescuedClusterSOS.length} đã xử lý`
+                                      : cancelledClusterSOS.length > 0
+                                        ? `${cancelledClusterSOS.length} đã hủy`
+                                        : `${sosCount} SOS`}
                               </span>
                               {isExpanded ? (
                                 <CaretUp className="h-3.5 w-3.5 text-muted-foreground" />
@@ -461,72 +678,81 @@ const SOSSidebar = ({
                         {isExpanded && (
                           <>
                             <div className="border-t border-inherit divide-y divide-inherit">
-                              {displayClusterSOS.length > 0 ? (
-                                displayClusterSOS.map((sos) => (
-                                  <div
-                                    key={sos.id}
-                                    className={cn(
-                                      "px-3 py-2 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5",
-                                      selectedSOS?.id === sos.id &&
-                                        "bg-black/10 dark:bg-white/10",
-                                    )}
-                                    onClick={() => onSOSSelect(sos)}
-                                  >
-                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                                        <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
-                                          SOS {sos.id}
-                                        </span>
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <Badge
-                                            variant={
-                                              PRIORITY_BADGE_VARIANT[
-                                                sos.priority
-                                              ]
-                                            }
-                                            className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
-                                          >
-                                            {PRIORITY_LABELS[sos.priority]}
-                                          </Badge>
-                                          <Badge
-                                            variant={
-                                              sos.status === "PENDING"
-                                                ? "warning"
-                                                : sos.status === "ASSIGNED"
-                                                  ? "info"
-                                                  : "success"
-                                            }
-                                            className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
-                                          >
-                                            {sos.status === "PENDING"
-                                              ? "Chờ"
-                                              : sos.status === "ASSIGNED"
-                                                ? "Đang cứu"
-                                                : "Đã cứu"}
-                                          </Badge>
+                              {displayClusterSOS.length > 0
+                                ? displayClusterSOS.map((sos) => (
+                                    <div
+                                      key={sos.id}
+                                      className={cn(
+                                        "px-3 py-2 cursor-pointer transition-colors hover:bg-black/5 dark:hover:bg-white/5",
+                                        selectedSOS?.id === sos.id &&
+                                          "bg-black/10 dark:bg-white/10",
+                                      )}
+                                      onClick={() => onSOSSelect(sos)}
+                                    >
+                                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                                          <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
+                                            SOS {sos.id}
+                                          </span>
+                                          <div className="flex items-center gap-1.5 flex-wrap">
+                                            <Badge
+                                              variant={
+                                                PRIORITY_BADGE_VARIANT[
+                                                  sos.priority
+                                                ]
+                                              }
+                                              className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
+                                            >
+                                              {PRIORITY_LABELS[sos.priority]}
+                                            </Badge>
+                                            <Badge
+                                              variant={getSOSStatusBadgeVariant(
+                                                sos.status,
+                                              )}
+                                              className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
+                                            >
+                                              {getSOSStatusLabel(sos.status)}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-1 text-[14px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
+                                          <Clock className="h-3 w-3" />
+                                          <TimeElapsed date={sos.createdAt} />
                                         </div>
                                       </div>
-                                      <div className="flex items-center gap-1 text-[14px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
-                                        <Clock className="h-3 w-3" />
-                                        <TimeElapsed date={sos.createdAt} />
-                                      </div>
+                                      <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
+                                        {sos.message}
+                                      </p>
                                     </div>
-                                    <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
-                                      {sos.message}
-                                    </p>
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="px-3 py-2 text-[14px] text-muted-foreground italic">
-                                  SOS IDs: [{cluster.sosRequestIds.join(", ")}]
-                                </div>
-                              )}
+                                  ))
+                                : cluster.sosRequestIds.map((sosId) => (
+                                    <div
+                                      key={`cluster-${cluster.id}-fallback-${sosId}`}
+                                      className="px-3 py-2"
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[14px] font-mono font-semibold text-foreground/90 whitespace-nowrap">
+                                          SOS {sosId}
+                                        </span>
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[14px] h-6 px-2 leading-none whitespace-nowrap"
+                                        >
+                                          Chưa tải chi tiết
+                                        </Badge>
+                                      </div>
+                                      <p className="text-[14px] text-muted-foreground line-clamp-1 mt-1">
+                                        Dữ liệu SOS chưa đồng bộ trong danh sách
+                                        hiện tại.
+                                      </p>
+                                    </div>
+                                  ))}
                             </div>
 
                             {/* Action buttons + Missions (uses hook inside) */}
                             <ClusterActionButtons
                               clusterId={cluster.id}
-                              isMissionCreated={cluster.isMissionCreated}
+                              clusterStatus={clusterStatus}
                               isAnalyzing={!!isAnalyzing}
                               isAnalyzingCluster={isAnalyzingCluster}
                               analyzingStatus={analyzingStatus}
@@ -1200,7 +1426,7 @@ const missionStatusConfig: Record<
 
 function ClusterActionButtons({
   clusterId,
-  isMissionCreated,
+  clusterStatus,
   isAnalyzing,
   isAnalyzingCluster,
   analyzingStatus,
@@ -1209,7 +1435,7 @@ function ClusterActionButtons({
   onManualMission,
 }: {
   clusterId: number;
-  isMissionCreated: boolean;
+  clusterStatus: ClusterLifecycleStatus;
   isAnalyzing: boolean;
   isAnalyzingCluster: boolean;
   analyzingStatus?: string;
@@ -1218,9 +1444,12 @@ function ClusterActionButtons({
   onViewMission?: (clusterId: number, missionId: number) => void;
   onManualMission?: (clusterId: number) => void;
 }) {
+  const hasMission =
+    clusterStatus === "InProgress" || clusterStatus === "Completed";
+
   return (
     <div className="px-3 py-2 border-t border-inherit space-y-1.5">
-      {isMissionCreated ? (
+      {hasMission ? (
         // Mission exists — show view plan + re-analyze
         <>
           {onViewClusterPlan && (
@@ -1454,11 +1683,7 @@ function MissionEntityCard({
 
 // ── ClusterMissionsGroup: used in the Missions tab to show all missions per cluster ──
 
-function ClusterMissionsGroup({
-  cluster,
-}: {
-  cluster: import("@/services/sos_cluster/type").SOSClusterEntity;
-}) {
+function ClusterMissionsGroup({ cluster }: { cluster: SOSClusterEntity }) {
   const { data: missionsData, isLoading } = useMissions(cluster.id);
   const [expandedMissionId, setExpandedMissionId] = useState<number | null>(
     null,

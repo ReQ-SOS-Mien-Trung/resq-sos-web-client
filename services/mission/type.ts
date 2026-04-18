@@ -174,8 +174,8 @@ export interface UpdateMissionActivityRequest {
   description: string;
   target: string;
   assemblyPointId?: number | null;
-  targetLatitude: number;
-  targetLongitude: number;
+  targetLatitude?: number;
+  targetLongitude?: number;
   items: UpdateMissionActivityItemRequest[];
 }
 

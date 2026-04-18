@@ -110,13 +110,52 @@ const TOOL_LABELS: Record<string, string> = {
 
 const STATUS_TOKEN_LABELS: Record<string, string> = {
   loading_context: "Đang tải ngữ cảnh hiện trường...",
+  loading_data: "Đang tải dữ liệu hiện trường...",
+  context: "Đang tải ngữ cảnh hiện trường...",
+  load_context: "Đang tải ngữ cảnh hiện trường...",
   requirements: "Đang tổng hợp nhu cầu cứu hộ...",
   requirements_fragment: "Đang tổng hợp nhu cầu vật phẩm và nhân lực...",
+  requirement: "Đang tổng hợp nhu cầu cứu hộ...",
   depot_fragment: "Đang đối chiếu kho vật phẩm phù hợp...",
+  depot: "Đang đối chiếu kho vật phẩm phù hợp...",
+  depots: "Đang đối chiếu kho vật phẩm phù hợp...",
   single_depot_required: "Đang xác định kho xuất phát phù hợp...",
   eligible_depot_count: "Đang kiểm tra số kho có thể đáp ứng...",
   nearby_team_count: "Đang rà soát đội cứu hộ lân cận...",
+  team: "Đang gán đội cứu hộ phù hợp...",
+  teams: "Đang gán đội cứu hộ phù hợp...",
+  assemble: "Đang ráp nháp kế hoạch nhiệm vụ...",
+  assembly: "Đang ráp nháp kế hoạch nhiệm vụ...",
+  draft: "Đang ráp nháp kế hoạch nhiệm vụ...",
+  validate: "Đang kiểm tra và chuẩn hóa kế hoạch cuối...",
+  validation: "Đang kiểm tra và chuẩn hóa kế hoạch cuối...",
+  finalize: "Đang hoàn thiện kế hoạch cuối...",
+  done: "AI đã hoàn tất phân tích.",
 };
+
+const escapeRegex = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function findStatusTokenLabel(lowerMessage: string): string | null {
+  const normalizedToken = lowerMessage.replace(/[\s-]+/g, "_");
+  if (STATUS_TOKEN_LABELS[normalizedToken]) {
+    return STATUS_TOKEN_LABELS[normalizedToken];
+  }
+
+  for (const [token, label] of Object.entries(STATUS_TOKEN_LABELS)) {
+    const tokenPattern = token
+      .split("_")
+      .map((part) => escapeRegex(part))
+      .join("[\\s_-]*");
+    const regex = new RegExp(`\\b${tokenPattern}\\b`, "i");
+
+    if (regex.test(lowerMessage)) {
+      return label;
+    }
+  }
+
+  return null;
+}
 
 function toReadableToolLabel(toolName?: string): string {
   if (!toolName) return "dữ liệu hiện trường";
@@ -140,14 +179,12 @@ function normalizeStatusMessage(raw: string): string {
   if (!message) return "Đang chuẩn bị phân tích...";
 
   const lower = message.toLowerCase();
-  const matchedStatusToken = Object.keys(STATUS_TOKEN_LABELS).find((token) =>
-    lower.includes(token),
-  );
+  const matchedStatusLabel = findStatusTokenLabel(lower);
   const toolName = extractToolName(message) ?? undefined;
   const toolLabel = toReadableToolLabel(toolName);
 
-  if (matchedStatusToken) {
-    return STATUS_TOKEN_LABELS[matchedStatusToken];
+  if (matchedStatusLabel) {
+    return matchedStatusLabel;
   }
 
   if (lower.includes("agent") && lower.includes("công cụ")) {
@@ -156,10 +193,6 @@ function normalizeStatusMessage(raw: string): string {
 
   if (lower.includes("công cụ") && lower.includes("đã trả về kết quả")) {
     return `Đã tải xong ${toolLabel}.`;
-  }
-
-  if (lower === "done") {
-    return "AI đã hoàn tất phân tích.";
   }
 
   return message
@@ -213,15 +246,54 @@ export function useAiMissionStream() {
   );
 
   const derivePhase = useCallback((msg: string) => {
-    if (msg.includes("Đang tải") || msg.includes("thu thập"))
+    const normalizedMessage = msg.toLowerCase();
+
+    if (msg.includes("Đang tải") || msg.includes("thu thập")) {
       return "loading-data" as const;
-    if (msg.includes("Đã tải")) return "loading-data" as const;
-    if (msg.includes("Đang tổng hợp") || msg.includes("Đang rà soát"))
+    }
+
+    if (msg.includes("Đã tải")) {
       return "loading-data" as const;
-    if (msg.includes("Đang gọi AI")) return "calling-ai" as const;
-    if (msg.includes("Đang xử lý")) return "processing" as const;
-    if (msg.includes("Đã lưu")) return "done" as const;
-    if (msg.includes("hoàn tất")) return "done" as const;
+    }
+
+    if (
+      msg.includes("Đang tổng hợp") ||
+      msg.includes("Đang rà soát") ||
+      msg.includes("Đang xác định")
+    ) {
+      return "loading-data" as const;
+    }
+
+    if (
+      msg.includes("Đang gọi AI") ||
+      msg.includes("Đang đối chiếu") ||
+      msg.includes("Đang gán đội") ||
+      normalizedMessage.includes("depot") ||
+      normalizedMessage.includes("team")
+    ) {
+      return "calling-ai" as const;
+    }
+
+    if (
+      msg.includes("Đang xử lý") ||
+      msg.includes("Đang ráp") ||
+      msg.includes("Đang kiểm tra") ||
+      msg.includes("Đang hoàn thiện") ||
+      msg.includes("chuẩn hóa") ||
+      normalizedMessage.includes("assemble") ||
+      normalizedMessage.includes("validate")
+    ) {
+      return "processing" as const;
+    }
+
+    if (msg.includes("Đã lưu")) {
+      return "done" as const;
+    }
+
+    if (msg.includes("hoàn tất")) {
+      return "done" as const;
+    }
+
     return "connecting" as const;
   }, []);
 

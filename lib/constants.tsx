@@ -28,6 +28,7 @@ import {
   Pulse,
   Radio,
   Shield,
+  Siren,
   SquaresFour,
   Stethoscope,
   Target,
@@ -285,15 +286,15 @@ export const AI_PROVIDER_OPTIONS = [
       "Dùng Google AI Studio API key hoặc default Gemini config của server.",
     models: [
       {
-        label: "Gemini 3.1 Pro",
+        label: "Gemini 3.1 Pro Preview",
         code: "gemini-3.1-pro-preview",
       },
       {
-        label: "Gemini 3.1 Flash Lite",
+        label: "Gemini 3.1 Flash Lite Preview",
         code: "gemini-3.1-flash-lite-preview",
       },
       {
-        label: "Gemini 3 Flash",
+        label: "Gemini 3 Flash Preview",
         code: "gemini-3-flash-preview",
       },
       {
@@ -303,6 +304,22 @@ export const AI_PROVIDER_OPTIONS = [
       {
         label: "Gemini 2.5 Pro",
         code: "gemini-2.5-pro",
+      },
+      {
+        label: "Gemini 2 Flash",
+        code: "gemini-2-flash",
+      },
+      {
+        label: "Gemini 2 Flash Lite",
+        code: "gemini-2-flash-lite",
+      },
+      {
+        label: "Gemini 2.5 Flash TTS",
+        code: "gemini-2.5-flash-tts",
+      },
+      {
+        label: "Gemini 2.5 Pro TTS",
+        code: "gemini-2.5-pro-tts",
       },
     ],
   },
@@ -371,16 +388,10 @@ export const PROMPT_VARIABLES_BY_TYPE = {
 export const INITIAL_FORM_DATA: PromptFormData = {
   name: "",
   prompt_type: "MissionPlanning",
-  provider: "Gemini",
   purpose: "",
   system_prompt: "",
   user_prompt_template: "",
-  model: "",
-  temperature: 0,
-  max_tokens: 0,
   version: "",
-  api_url: "",
-  api_key: "",
   is_active: true,
 };
 
@@ -457,6 +468,7 @@ export const navigationItems = [
     label: "Tổng quan",
     href: "/dashboard/admin",
   },
+
   {
     icon: UserIcon,
     label: "Quản lý người dùng",
@@ -779,8 +791,8 @@ export const assemblyPointStatusConfig = {
     bgColor: "bg-sky-50 dark:bg-sky-950/30",
     icon: Clock,
   },
-  Active: {
-    label: "Hoạt động",
+  Available: {
+    label: "Sẵn sàng",
     color: "bg-green-500",
     textColor: "text-green-700 dark:text-green-400",
     bgColor: "bg-green-50 dark:bg-green-950/30",

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSOSRequests,
@@ -26,6 +27,15 @@ export interface UseSOSRequestByIdOptions {
   enabled?: boolean;
 }
 
+export interface UseSOSRequestsByIdsOptions {
+  enabled?: boolean;
+}
+
+type SOSRequestsByIdsQueryData = {
+  items: SOSRequestEntity[];
+  failedIds: number[];
+};
+
 /**
  * Hook to fetch all SOS requests (paginated)
  */
@@ -53,6 +63,66 @@ export function useSOSRequestById(
     queryFn: () => getSOSRequestById(id),
     enabled: options?.enabled ?? true,
   });
+}
+
+/**
+ * Hook to fetch SOS requests by a list of IDs.
+ * Requests run in parallel and partial failures are surfaced via failedIds.
+ */
+export function useSOSRequestsByIds(
+  ids: number[],
+  options?: UseSOSRequestsByIdsOptions,
+) {
+  const normalizedIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          ids.filter((id): id is number => Number.isFinite(id) && id > 0),
+        ),
+      ).sort((left, right) => left - right),
+    [ids],
+  );
+
+  const query = useQuery<SOSRequestsByIdsQueryData>({
+    queryKey: [...SOS_REQUESTS_QUERY_KEY, "by-ids", normalizedIds],
+    queryFn: async () => {
+      const results = await Promise.allSettled(
+        normalizedIds.map((id) => getSOSRequestById(id)),
+      );
+
+      const items: SOSRequestEntity[] = [];
+      const failedIds: number[] = [];
+
+      results.forEach((result, index) => {
+        const id = normalizedIds[index];
+
+        if (result.status === "fulfilled") {
+          items.push(result.value.sosRequest);
+        } else {
+          failedIds.push(id);
+        }
+      });
+
+      return { items, failedIds };
+    },
+    enabled: (options?.enabled ?? true) && normalizedIds.length > 0,
+  });
+
+  const byId = useMemo(
+    () =>
+      new Map(
+        (query.data?.items ?? []).map((item) => [item.id, item] as const),
+      ),
+    [query.data?.items],
+  );
+
+  return {
+    ...query,
+    ids: normalizedIds,
+    items: query.data?.items ?? [],
+    failedIds: query.data?.failedIds ?? [],
+    byId,
+  };
 }
 
 /**

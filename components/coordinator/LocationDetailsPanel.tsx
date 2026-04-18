@@ -976,6 +976,9 @@ function AssemblyPointDetails({
 }) {
   const router = useRouter();
   const [assemblyDateInput, setAssemblyDateInput] = useState<Date | null>(null);
+  const [checkInDeadlineInput, setCheckInDeadlineInput] = useState<Date | null>(
+    null,
+  );
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [expandedTeamIds, setExpandedTeamIds] = useState<
@@ -1033,6 +1036,8 @@ function AssemblyPointDetails({
   useEffect(() => {
     if (hasActiveEvent) {
       setShowScheduleForm(false);
+      setAssemblyDateInput(null);
+      setCheckInDeadlineInput(null);
     }
   }, [hasActiveEvent]);
 
@@ -1064,9 +1069,20 @@ function AssemblyPointDetails({
       return;
     }
 
+    if (!checkInDeadlineInput) {
+      toast.error("Vui lòng chọn hạn xác nhận (có mặt).");
+      return;
+    }
+
     const assemblyDate = new Date(assemblyDateInput);
+    const checkInDeadline = new Date(checkInDeadlineInput);
     if (Number.isNaN(assemblyDate.getTime())) {
       toast.error("Thời gian không hợp lệ.");
+      return;
+    }
+
+    if (Number.isNaN(checkInDeadline.getTime())) {
+      toast.error("Hạn xác nhận (có mặt) không hợp lệ.");
       return;
     }
 
@@ -1078,16 +1094,32 @@ function AssemblyPointDetails({
       return;
     }
 
+    if (checkInDeadline.getTime() < minAllowedDate.getTime()) {
+      toast.error(
+        `Hạn xác nhận (có mặt) không được ở quá khứ. Vui lòng chọn từ ${formatDateTimeVi(minAllowedDate)} (giờ VN).`,
+      );
+      return;
+    }
+
+    if (checkInDeadline.getTime() > assemblyDate.getTime()) {
+      toast.error(
+        "Hạn xác nhận (có mặt) phải trước hoặc bằng thời gian tập kết.",
+      );
+      return;
+    }
+
     try {
-      const result = await scheduleGathering({
+      await scheduleGathering({
         id: assemblyPoint.id,
         assemblyDate: assemblyDate.toISOString(),
+        checkInDeadline: checkInDeadline.toISOString(),
       });
       toast.success(`Đã lên lịch tập trung thành công.`);
       setAssemblyDateInput(null);
+      setCheckInDeadlineInput(null);
     } catch (error) {
       const backendMessage = extractBackendErrorMessage(error);
-      toast.error(backendMessage || "Yeu cau that bai. Vui long thu lai.");
+      toast.error(backendMessage || "Yêu cầu thất bại. Vui lòng thử lại.");
     }
   };
 
@@ -1126,7 +1158,7 @@ function AssemblyPointDetails({
       void refetchAssemblyPointDetail();
     } catch (error) {
       const backendMessage = extractBackendErrorMessage(error);
-      toast.error(backendMessage || "Yeu cau that bai. Vui long thu lai.");
+      toast.error(backendMessage || "Yêu cầu thất bại. Vui lòng thử lại.");
     }
   };
 
@@ -1152,6 +1184,10 @@ function AssemblyPointDetails({
   const isRefreshingAssemblyData =
     isAssemblyPointDetailFetching || isAssemblyPointEventsFetching;
   const assemblyPointImageUrl = displayAssemblyPoint.imageUrl?.trim() || null;
+  const isScheduleOrderInvalid =
+    !!assemblyDateInput &&
+    !!checkInDeadlineInput &&
+    checkInDeadlineInput.getTime() > assemblyDateInput.getTime();
 
   const handleRefreshAssemblyData = useCallback(() => {
     void refetchAssemblyPointDetail();
@@ -1313,22 +1349,57 @@ function AssemblyPointDetails({
         </div>
 
         {!hasActiveEvent && showScheduleForm && (
-          <div className="mt-3 rounded-lg border border-[#FF5722]/25 bg-[#FF5722]/5 p-3 space-y-2">
-            <AssemblyDateTimePicker
-              value={assemblyDateInput}
-              onChange={setAssemblyDateInput}
-            />
+          <div className="mt-3 rounded-lg border border-[#FF5722]/25 bg-[#FF5722]/5 p-3 space-y-3">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-[#FF5722]">
+                Thời gian tập kết
+              </p>
+              <AssemblyDateTimePicker
+                value={assemblyDateInput}
+                onChange={(nextValue) => {
+                  setAssemblyDateInput(nextValue);
+                  setCheckInDeadlineInput((previous) => {
+                    if (!nextValue) return null;
+                    if (!previous) return nextValue;
+                    return previous.getTime() <= nextValue.getTime()
+                      ? previous
+                      : nextValue;
+                  });
+                }}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-[#FF5722]">
+                Hạn xác nhận (có mặt)
+              </p>
+              <AssemblyDateTimePicker
+                value={checkInDeadlineInput}
+                onChange={setCheckInDeadlineInput}
+              />
+            </div>
+
             <p className="text-xs text-muted-foreground">
-              Giờ triệu tập là thời điểm rescuer cần có mặt tại điểm tập kết để
-              check-in.
+              Giờ triệu tập là thời điểm người cứu hộ cần có mặt tại điểm tập
+              kết. Hạn xác nhận (có mặt) phải trước hoặc bằng thời gian tập kết.
             </p>
+            {isScheduleOrderInvalid && (
+              <p className="text-xs text-red-600">
+                Hạn xác nhận (có mặt) phải trước hoặc bằng thời gian tập kết.
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <Button
                 type="button"
                 size="sm"
                 className="bg-[#FF5722] hover:bg-[#E64A19] text-white"
                 onClick={handleScheduleGathering}
-                disabled={isSchedulingGathering || !assemblyDateInput}
+                disabled={
+                  isSchedulingGathering ||
+                  !assemblyDateInput ||
+                  !checkInDeadlineInput ||
+                  isScheduleOrderInvalid
+                }
               >
                 {isSchedulingGathering ? "Đang lên lịch..." : "Lên lịch"}
               </Button>

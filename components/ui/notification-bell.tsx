@@ -7,7 +7,6 @@ import {
   BellRinging,
   BellSlash,
   CheckCircle,
-  Circle,
   CaretLeft,
   CaretRight,
 } from "@phosphor-icons/react";
@@ -15,7 +14,6 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth.store";
 import {
-  getNotificationTypeLabel,
   getNotificationTypeTone,
   NOTIFICATION_RECENT_QUERY,
   resolveNotificationRoute,
@@ -33,36 +31,29 @@ const PAGE_SIZE = 4;
 
 // ─── Tone styles ──────────────────────────────────────────────────────────────
 
-const TONE_STYLES: Record<
-  NotificationTone,
-  { dot: string; badge: string; leftBar: string }
-> = {
-  danger: {
-    dot: "bg-red-500",
-    badge: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300",
-    leftBar: "bg-red-400",
-  },
-  warning: {
-    dot: "bg-amber-500",
-    badge: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-    leftBar: "bg-amber-400",
-  },
-  success: {
-    dot: "bg-emerald-500",
-    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-    leftBar: "bg-emerald-500",
-  },
-  info: {
-    dot: "bg-blue-500",
-    badge: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
-    leftBar: "bg-blue-400",
-  },
-  neutral: {
-    dot: "bg-slate-400",
-    badge: "bg-muted text-muted-foreground",
-    leftBar: "bg-slate-300",
-  },
-};
+const TONE_STYLES: Record<NotificationTone, { dot: string; leftBar: string }> =
+  {
+    danger: {
+      dot: "bg-red-500",
+      leftBar: "bg-red-400",
+    },
+    warning: {
+      dot: "bg-amber-500",
+      leftBar: "bg-amber-400",
+    },
+    success: {
+      dot: "bg-emerald-500",
+      leftBar: "bg-emerald-500",
+    },
+    info: {
+      dot: "bg-primary",
+      leftBar: "bg-primary",
+    },
+    neutral: {
+      dot: "bg-primary/70",
+      leftBar: "bg-primary/45",
+    },
+  };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -172,7 +163,9 @@ export function NotificationBell({
       return;
     }
 
-    const hasNew = notifications.some((n) => !prevIds.has(n.userNotificationId));
+    const hasNew = notifications.some(
+      (n) => !prevIds.has(n.userNotificationId),
+    );
     if (hasNew) {
       ringStartId = window.setTimeout(() => {
         setIsRinging(true);
@@ -227,7 +220,8 @@ export function NotificationBell({
   const handleMarkAllAsRead = () => {
     markAllAsRead(undefined, {
       onSuccess: () => toast.success("Đã đánh dấu tất cả là đã đọc"),
-      onError: () => toast.error("Không thể cập nhật thông báo. Vui lòng thử lại."),
+      onError: () =>
+        toast.error("Không thể cập nhật thông báo. Vui lòng thử lại."),
     });
   };
 
@@ -244,14 +238,14 @@ export function NotificationBell({
         >
           {unreadCount > 0 ? (
             <BellRinging
-              className={cn("h-5 w-5", isRinging && "bell-ring")}
+              className={cn("h-5 w-5 text-primary", isRinging && "bell-ring")}
               weight="duotone"
             />
           ) : (
-            <Bell className="h-5 w-5" />
+            <Bell className="h-5 w-5 text-primary/80" />
           )}
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+            <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center leading-none shadow-sm shadow-primary/40">
               {displayUnreadCount}
             </span>
           )}
@@ -261,14 +255,18 @@ export function NotificationBell({
       <PopoverContent
         align="end"
         sideOffset={10}
-        className={cn("w-[360px] p-0 overflow-hidden shadow-xl", contentClassName)}
+        className={cn("w-90 p-0 overflow-hidden shadow-xl", contentClassName)}
       >
         {/* ── Header ── */}
-        <div className="border-b px-4 py-3 flex items-center justify-between gap-3">
+        <div className="border-b border-primary/15 bg-linear-to-r from-primary/12 via-primary/6 to-transparent px-4 py-3 flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold tracking-tighter">{title}</p>
-            <p className="text-xs text-muted-foreground tracking-tighter mt-0.5">
-              {unreadCount > 0 ? `${unreadCount} chưa đọc` : "Tất cả đã được đọc"}
+            <p className="text-sm font-semibold tracking-tighter text-primary">
+              {title}
+            </p>
+            <p className="text-xs text-primary/80 tracking-tighter mt-0.5">
+              {unreadCount > 0
+                ? `${unreadCount} chưa đọc`
+                : "Tất cả đã được đọc"}
             </p>
           </div>
           {showMarkAll && unreadCount > 0 && (
@@ -277,7 +275,7 @@ export function NotificationBell({
               size="sm"
               onClick={handleMarkAllAsRead}
               disabled={isMarkingAll}
-              className="text-xs h-8 px-2.5 text-muted-foreground hover:text-foreground gap-1.5"
+              className="text-xs h-8 px-2.5 text-primary/85 hover:text-primary hover:bg-primary/10 gap-1.5"
             >
               <CheckCircle className="h-3.5 w-3.5" />
               Đọc hết
@@ -290,9 +288,11 @@ export function NotificationBell({
           <NotificationListSkeleton />
         ) : notifications.length === 0 ? (
           <div className="px-4 py-10 text-center flex flex-col items-center justify-center gap-3">
-            <BellSlash size={36} weight="light" className="text-muted-foreground/40" />
+            <BellSlash size={36} weight="light" className="text-primary/45" />
             <div>
-              <p className="text-sm font-medium tracking-tighter">{emptyTitle}</p>
+              <p className="text-sm font-medium tracking-tighter">
+                {emptyTitle}
+              </p>
               <p className="text-xs text-muted-foreground mt-1 tracking-tighter">
                 {emptyDescription}
               </p>
@@ -313,10 +313,10 @@ export function NotificationBell({
                     onClick={() => handleNotificationClick(notification)}
                     className={cn(
                       "w-full rounded-xl border text-left transition-all duration-150 overflow-hidden",
-                      "hover:shadow-sm hover:border-border",
+                      "hover:shadow-sm",
                       isUnread
-                        ? "border-border/60 bg-muted/30"
-                        : "border-transparent bg-transparent hover:bg-muted/40",
+                        ? "border-primary/25 bg-primary/6 hover:border-primary/40 hover:bg-primary/10"
+                        : "border-transparent bg-transparent hover:bg-primary/4",
                     )}
                   >
                     <div className="flex">
@@ -334,14 +334,19 @@ export function NotificationBell({
                             className={cn(
                               "text-sm tracking-tighter line-clamp-1 leading-snug",
                               isUnread
-                                ? "font-semibold text-foreground"
+                                ? "font-semibold text-primary"
                                 : "font-medium text-foreground/80",
                             )}
                           >
                             {notification.title}
                           </p>
                           {isUnread && (
-                            <span className={cn("mt-1 h-2 w-2 rounded-full shrink-0", styles.dot)} />
+                            <span
+                              className={cn(
+                                "mt-1 h-2 w-2 rounded-full shrink-0",
+                                styles.dot,
+                              )}
+                            />
                           )}
                         </div>
 
@@ -352,18 +357,16 @@ export function NotificationBell({
                           </p>
                         )}
 
-                        {/* Badge + time */}
-                        <div className="mt-2 flex items-center justify-between gap-2">
+                        {/* Time */}
+                        <div className="mt-2 flex items-center justify-end">
                           <span
                             className={cn(
-                              "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium tracking-tighter",
-                              styles.badge,
+                              "text-[11px] tracking-tighter whitespace-nowrap",
+                              isUnread
+                                ? "text-primary/70"
+                                : "text-muted-foreground/70",
                             )}
                           >
-                            <Circle size={6} weight="fill" className="shrink-0" />
-                            {getNotificationTypeLabel(notification.type)}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground/70 tracking-tighter whitespace-nowrap">
                             {formatRelativeTime(notification.createdAt)}
                           </span>
                         </div>
@@ -376,24 +379,26 @@ export function NotificationBell({
 
             {/* ── Pagination ── */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t px-3 py-2 bg-muted/30">
+              <div className="flex items-center justify-between border-t border-primary/15 px-3 py-2 bg-primary/5">
                 <button
                   type="button"
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1 rounded-md hover:bg-muted transition-colors"
+                  className="inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1 rounded-md hover:bg-primary/10 transition-colors"
                 >
                   <CaretLeft size={12} />
                   Trước
                 </button>
-                <span className="text-xs text-muted-foreground tracking-tighter tabular-nums">
+                <span className="text-xs text-primary/80 tracking-tighter tabular-nums">
                   {page + 1} / {totalPages}
                 </span>
                 <button
                   type="button"
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  onClick={() =>
+                    setPage((p) => Math.min(totalPages - 1, p + 1))
+                  }
                   disabled={page === totalPages - 1}
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1 rounded-md hover:bg-muted transition-colors"
+                  className="inline-flex items-center gap-1 text-xs text-primary/80 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed px-2 py-1 rounded-md hover:bg-primary/10 transition-colors"
                 >
                   Sau
                   <CaretRight size={12} />

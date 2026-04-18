@@ -16,6 +16,7 @@ import {
 } from "./api";
 import { NOTIFICATION_DEFAULT_QUERY } from "./config";
 import { notificationRealtimeClient } from "./realtime";
+import { normalizeNotificationItem } from "./normalize";
 import {
   BroadcastNotificationPayload,
   NotificationListParams,
@@ -48,21 +49,7 @@ function normalizeParams(
 function normalizeRealtimeNotification(
   payload: NotificationRealtimePayload,
 ): UserNotificationItem | null {
-  const id = Number(payload?.userNotificationId);
-  if (!Number.isFinite(id) || id <= 0) {
-    return null;
-  }
-
-  return {
-    userNotificationId: id,
-    title: String(payload.title ?? "Thông báo"),
-    type: String(payload.type ?? "general"),
-    body: String(payload.body ?? ""),
-    isRead: Boolean(payload.isRead),
-    createdAt: String(payload.createdAt ?? new Date().toISOString()),
-    data:
-      payload.data && typeof payload.data === "object" ? payload.data : null,
-  };
+  return normalizeNotificationItem(payload);
 }
 
 function createEmptyList(

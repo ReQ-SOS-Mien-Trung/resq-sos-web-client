@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useState,
-  useMemo,
-  useCallback,
-  useRef,
-  useEffect,
-  useDeferredValue,
-} from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import { RescuePlanPanelProps } from "@/type";
@@ -135,6 +128,8 @@ import {
 // Matches patterns like "17.214, 106.785" or "17.2195,106.792"
 const COORD_REGEX = /(\d{1,2}\.\d{2,6})[,\s]\s*(\d{2,3}\.\d{2,6})/;
 const CLEAR_ACTIVITY_TEAM_VALUE = "__clear_activity_team__";
+const DEPOT_INVENTORY_PAGE_SIZE = 6;
+const DEPOT_INVENTORY_SEARCH_DEBOUNCE_MS = 1000;
 const BACKEND_ERROR_STEP_REGEX = /\b(?:bước|step)\s*(\d+)\b/i;
 const BACKEND_ERROR_ITEM_ID_REGEX = /\bID\s*=\s*(\d+)\b/i;
 const BACKEND_ERROR_ITEM_NAME_REGEX =
@@ -260,11 +255,14 @@ function normalizeMissionActivityStatusKey(status?: string | null): string {
     .replaceAll(" ", "");
 }
 
-function isPendingMissionActivityStatus(status?: string | null): boolean {
+function isPlannedMissionActivityStatus(status?: string | null): boolean {
   const normalizedStatus = normalizeMissionActivityStatusKey(status);
-  return (
-    normalizedStatus === "pending" || normalizedStatus === "pendingconfirmation"
-  );
+  return normalizedStatus === "planned";
+}
+
+function isOngoingMissionActivityStatus(status?: string | null): boolean {
+  const normalizedStatus = normalizeMissionActivityStatusKey(status);
+  return normalizedStatus === "ongoing" || normalizedStatus === "inprogress";
 }
 
 function normalizeActivityTypeKey(activityType?: string | null): string {
@@ -1075,13 +1073,34 @@ const DepotInventoryCard = ({
 }) => {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
-  const deferredSearchTerm = useDeferredValue(searchTerm.trim());
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm.trim());
+    }, DEPOT_INVENTORY_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [searchTerm]);
+
   const { data, isLoading } = useDepotInventory({
     depotId,
-    itemName: deferredSearchTerm || undefined,
+    itemName: debouncedSearchTerm || undefined,
     pageNumber: page,
-    pageSize: 6,
+    pageSize: DEPOT_INVENTORY_PAGE_SIZE,
   });
+
+  const visibleItems = useMemo(
+    () =>
+      (data?.items ?? []).filter((item) =>
+        item.itemType === "Reusable"
+          ? item.availableUnit > 0
+          : item.availableQuantity > 0,
+      ),
+    [data?.items],
+  );
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
@@ -1142,6 +1161,7 @@ const DepotInventoryCard = ({
                 className="absolute right-1 top-0.5 h-7 w-7"
                 onClick={() => {
                   setSearchTerm("");
+                  setDebouncedSearchTerm("");
                   setPage(1);
                 }}
                 aria-label="Xóa từ khóa tìm vật phẩm"
@@ -1152,131 +1172,133 @@ const DepotInventoryCard = ({
           </div>
         </div>
 
-        {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-8 w-full rounded" />
-          ))
-        ) : data?.items && data.items.length > 0 ? (
-          data.items
-            .filter((item) =>
-              item.itemType === "Reusable"
-                ? item.availableUnit > 0
-                : item.availableQuantity > 0,
-            )
-            .map((item, index) =>
-              // Inventory API returns a union shape. Normalize fields for rendering and DnD.
-              (() => {
-                const availableQuantity =
-                  item.itemType === "Reusable"
-                    ? item.availableUnit
-                    : item.availableQuantity;
-                const itemId = item.itemModelId;
-                const itemName = item.itemModelName;
+        <div className="mt-1 flex min-h-80 flex-col">
+          <div className="flex-1 space-y-1">
+            {isLoading ? (
+              Array.from({ length: DEPOT_INVENTORY_PAGE_SIZE }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full rounded" />
+              ))
+            ) : visibleItems.length > 0 ? (
+              visibleItems.map((item, index) =>
+                // Inventory API returns a union shape. Normalize fields for rendering and DnD.
+                (() => {
+                  const availableQuantity =
+                    item.itemType === "Reusable"
+                      ? item.availableUnit
+                      : item.availableQuantity;
+                  const itemId = item.itemModelId;
+                  const itemName = item.itemModelName;
 
-                return (
-                  <div
-                    key={`${depotId}-${itemId}-${item.itemType}-${index}`}
-                    draggable={isDraggable}
-                    onDragStart={
-                      isDraggable
-                        ? (e) => {
-                            const itemWithUnit = item as typeof item & {
-                              unit?: string;
-                              unitName?: string;
-                            };
-                            const rawUnit =
-                              (typeof itemWithUnit.unit === "string"
-                                ? itemWithUnit.unit.trim()
-                                : "") ||
-                              (typeof itemWithUnit.unitName === "string"
-                                ? itemWithUnit.unitName.trim()
-                                : "");
+                  return (
+                    <div
+                      key={`${depotId}-${itemId}-${item.itemType}-${index}`}
+                      draggable={isDraggable}
+                      onDragStart={
+                        isDraggable
+                          ? (e) => {
+                              const itemWithUnit = item as typeof item & {
+                                unit?: string;
+                                unitName?: string;
+                              };
+                              const rawUnit =
+                                (typeof itemWithUnit.unit === "string"
+                                  ? itemWithUnit.unit.trim()
+                                  : "") ||
+                                (typeof itemWithUnit.unitName === "string"
+                                  ? itemWithUnit.unitName.trim()
+                                  : "");
 
-                            e.dataTransfer.setData(
-                              "application/inventory-item",
-                              JSON.stringify({
-                                itemId,
-                                itemName,
-                                availableQuantity,
-                                categoryName: item.categoryName,
-                                unit: rawUnit || null,
-                                sourceDepotId: depotId,
-                                sourceDepotName: depotName,
-                                sourceDepotAddress: depotAddress,
-                              }),
-                            );
-                            e.dataTransfer.effectAllowed = "copy";
-                          }
-                        : undefined
-                    }
-                    className={cn(
-                      "flex items-center gap-2 p-1.5 rounded border bg-background transition-colors",
-                      isDraggable
-                        ? "hover:bg-accent/30 cursor-grab active:cursor-grabbing"
-                        : "cursor-default",
-                    )}
-                  >
-                    <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{itemName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {item.categoryName}
-                      </p>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className="text-sm h-5 px-1 shrink-0 font-bold"
+                              e.dataTransfer.setData(
+                                "application/inventory-item",
+                                JSON.stringify({
+                                  itemId,
+                                  itemName,
+                                  availableQuantity,
+                                  categoryName: item.categoryName,
+                                  unit: rawUnit || null,
+                                  sourceDepotId: depotId,
+                                  sourceDepotName: depotName,
+                                  sourceDepotAddress: depotAddress,
+                                }),
+                              );
+                              e.dataTransfer.effectAllowed = "copy";
+                            }
+                          : undefined
+                      }
+                      className={cn(
+                        "flex items-center gap-2 p-1.5 rounded border bg-background transition-colors",
+                        isDraggable
+                          ? "hover:bg-accent/30 cursor-grab active:cursor-grabbing"
+                          : "cursor-default",
+                      )}
                     >
-                      {availableQuantity}
-                    </Badge>
-                  </div>
-                );
-              })(),
-            )
-        ) : (
-          <p className="text-sm text-muted-foreground text-center py-2">
-            {deferredSearchTerm
-              ? "Không tìm thấy vật phẩm phù hợp"
-              : "Kho trống"}
-          </p>
-        )}
-
-        {data && data.totalPages > 1 ? (
-          <div className="mt-2 flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-2 py-1.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 gap-1 px-2 text-sm font-semibold"
-              disabled={!data.hasPreviousPage}
-              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-            >
-              <CaretLeft className="h-3 w-3" />
-              Trước
-            </Button>
-
-            <div className="text-center leading-none">
-              <p className="text-sm font-semibold text-foreground">
-                Trang {data.pageNumber}/{data.totalPages}
+                      <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">
+                          {itemName}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.categoryName}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className="text-sm h-5 px-1 shrink-0 font-bold"
+                      >
+                        {availableQuantity}
+                      </Badge>
+                    </div>
+                  );
+                })(),
+              )
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-2">
+                {debouncedSearchTerm
+                  ? "Không tìm thấy vật phẩm phù hợp"
+                  : "Kho trống"}
               </p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                6 Vật phẩm mỗi trang
-              </p>
-            </div>
-
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-6 gap-1 px-2 text-sm font-semibold"
-              disabled={!data.hasNextPage}
-              onClick={() => setPage((prev) => prev + 1)}
-            >
-              Sau
-              <CaretRight className="h-3 w-3" />
-            </Button>
+            )}
           </div>
-        ) : null}
+
+          <div className="mt-2 min-h-10">
+            {data && data.totalPages > 1 ? (
+              <div className="flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-2 py-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 gap-1 px-2 text-sm font-semibold"
+                  disabled={!data.hasPreviousPage}
+                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                >
+                  <CaretLeft className="h-3 w-3" />
+                  Trước
+                </Button>
+
+                <div className="text-center leading-none">
+                  <p className="text-sm font-semibold text-foreground">
+                    Trang {data.pageNumber}/{data.totalPages}
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {DEPOT_INVENTORY_PAGE_SIZE} Vật phẩm mỗi trang
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 gap-1 px-2 text-sm font-semibold"
+                  disabled={!data.hasNextPage}
+                  onClick={() => setPage((prev) => prev + 1)}
+                >
+                  Sau
+                  <CaretRight className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -5540,9 +5562,11 @@ const MissionTeamRoutePreview = ({
 const SuggestionCard = ({
   suggestion,
   onEdit,
+  editable = true,
 }: {
   suggestion: MissionSuggestionEntity;
   onEdit: () => void;
+  editable?: boolean;
 }) => {
   const [expanded, setExpanded] = useState(false);
   const allActivities = suggestion.activities.flatMap(
@@ -5562,17 +5586,19 @@ const SuggestionCard = ({
               {suggestion.suggestedMissionTitle}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-6 text-sm gap-1 px-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-              onClick={onEdit}
-            >
-              <PencilSimpleLine className="h-3 w-3" />
-              Dùng gợi ý này
-            </Button>
-          </div>
+          {editable ? (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-sm gap-1 px-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                onClick={onEdit}
+              >
+                <PencilSimpleLine className="h-3 w-3" />
+                Dùng gợi ý này
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
@@ -5763,6 +5789,7 @@ const RescuePlanPanel = ({
   isReAnalyzing,
   onShowRoute,
   defaultTab,
+  readOnly = false,
 }: RescuePlanPanelProps) => {
   // ── Custom resizable split ──
   const [splitPercent, setSplitPercent] = useState(42); // left panel %
@@ -6439,11 +6466,13 @@ const RescuePlanPanel = ({
   ]);
 
   const handleOpenSubmitConfirm = useCallback(() => {
+    if (readOnly) return;
     if (!validateEditMission()) return;
     setConfirmSubmitOpen(true);
-  }, [validateEditMission]);
+  }, [readOnly, validateEditMission]);
 
   const handleSubmitEdit = useCallback(() => {
+    if (readOnly) return;
     if (!validateEditMission() || !clusterId) return;
 
     const submit = async () => {
@@ -6591,12 +6620,28 @@ const RescuePlanPanel = ({
 
         return {
           sourceActivityId: activity._missionActivityId ?? null,
+          sourceMissionStatus: activity._missionStatus ?? null,
           createRequest,
         };
       });
 
       try {
         if (editingMissionId) {
+          const updatableActivities = normalizedActivities.filter(
+            ({ sourceMissionStatus, createRequest }) =>
+              sourceMissionStatus == null ||
+              isPlannedMissionActivityStatus(sourceMissionStatus) ||
+              (isOngoingMissionActivityStatus(sourceMissionStatus) &&
+                isReturnAssemblyPointActivityType(createRequest.activityType)),
+          );
+
+          if (updatableActivities.length === 0) {
+            toast.error(
+              "Không có activity đủ điều kiện cập nhật (Planned hoặc bước quay về điểm tập kết đang OnGoing).",
+            );
+            return;
+          }
+
           await updateMissionAsync({
             missionId: editingMissionId,
             request: {
@@ -6604,7 +6649,7 @@ const RescuePlanPanel = ({
               priorityScore: editPriorityScore,
               startTime: new Date(editStartTime).toISOString(),
               expectedEndTime: new Date(editExpectedEndTime).toISOString(),
-              activities: normalizedActivities.map(
+              activities: updatableActivities.map(
                 ({ sourceActivityId, createRequest }) => ({
                   activityId:
                     typeof sourceActivityId === "number" && sourceActivityId > 0
@@ -6614,8 +6659,12 @@ const RescuePlanPanel = ({
                   description: createRequest.description,
                   target: createRequest.target,
                   assemblyPointId: createRequest.assemblyPointId ?? null,
-                  targetLatitude: createRequest.targetLatitude,
-                  targetLongitude: createRequest.targetLongitude,
+                  ...(createRequest.assemblyPointId == null
+                    ? {
+                        targetLatitude: createRequest.targetLatitude,
+                        targetLongitude: createRequest.targetLongitude,
+                      }
+                    : {}),
                   items: createRequest.suppliesToCollect.map((supply) => ({
                     itemId: supply.id,
                     itemName: supply.name,
@@ -6693,6 +6742,7 @@ const RescuePlanPanel = ({
     createMissionAsync,
     exitEditMode,
     onApprove,
+    readOnly,
     updateMissionAsync,
     validateEditMission,
   ]);
@@ -6956,6 +7006,25 @@ const RescuePlanPanel = ({
 
   const updateEditActivityAssemblyPoint = useCallback(
     (activityId: string, selectedAssemblyPointId: string) => {
+      if (editingMissionId) {
+        const targetActivity = editActivities.find(
+          (activity) => activity._id === activityId,
+        );
+        const canEditAssemblyPointForStatus = Boolean(
+          targetActivity &&
+          (isPlannedMissionActivityStatus(targetActivity._missionStatus) ||
+            (isOngoingMissionActivityStatus(targetActivity._missionStatus) &&
+              isReturnAssemblyPointActivityType(targetActivity.activityType))),
+        );
+
+        if (targetActivity && !canEditAssemblyPointForStatus) {
+          toast.info(
+            "Chỉ có thể đổi điểm tập kết ở activity Planned hoặc bước quay về điểm tập kết đang OnGoing.",
+          );
+          return;
+        }
+      }
+
       const parsedAssemblyPointId = Number(selectedAssemblyPointId);
       if (
         !Number.isFinite(parsedAssemblyPointId) ||
@@ -6993,6 +7062,8 @@ const RescuePlanPanel = ({
     [
       assemblyPointOptionById,
       clearEditActivityErrors,
+      editActivities,
+      editingMissionId,
       syncReturnActivitiesWithCollectors,
     ],
   );
@@ -7145,9 +7216,10 @@ const RescuePlanPanel = ({
 
   // Trigger stream when panel opens or re-analyze requested
   const handleStreamAnalyze = useCallback(() => {
+    if (readOnly) return;
     if (!clusterId) return;
     aiStream.startStream(clusterId);
-  }, [clusterId, aiStream]);
+  }, [clusterId, aiStream, readOnly]);
 
   // Sync stream result → rescueSuggestion equivalent
   const streamResult = aiStream.result;
@@ -7376,7 +7448,14 @@ const RescuePlanPanel = ({
       ? (activeSuggestion?.sosRequestCount ?? 0)
       : panelSOSRequests.length;
 
+  useEffect(() => {
+    if (readOnly) {
+      setIsEditMode(false);
+    }
+  }, [readOnly]);
+
   const enterEditMode = useCallback(() => {
+    if (readOnly) return;
     setEditActivityErrors({});
     setExpandedEditSupplyKeys({});
     if (activeSuggestion) {
@@ -7405,11 +7484,12 @@ const RescuePlanPanel = ({
     setEditExpectedEndTime(formatDateTimeLocalInputValue(end));
     setEditingMissionId(null);
     setIsEditMode(true);
-  }, [activeSuggestion, syncReturnActivitiesWithCollectors]);
+  }, [activeSuggestion, readOnly, syncReturnActivitiesWithCollectors]);
 
   // Enter edit from an existing mission (missions tab -> edit)
   const enterEditFromMission = useCallback(
     (mission: MissionEntity) => {
+      if (readOnly) return;
       setEditActivityErrors({});
       setExpandedEditSupplyKeys({});
       const sortedActivities = [...mission.activities].sort((a, b) => {
@@ -7485,7 +7565,7 @@ const RescuePlanPanel = ({
       setActiveTab("plan");
       setIsEditMode(true);
     },
-    [panelSOSRequests, syncReturnActivitiesWithCollectors],
+    [panelSOSRequests, readOnly, syncReturnActivitiesWithCollectors],
   );
 
   const hasSidebar = !!activeSuggestion;
@@ -7797,24 +7877,15 @@ const RescuePlanPanel = ({
                         </Badge>
                       )}
                     </>
-                  ) : (
+                  ) : aiStream.loading ? (
                     <Badge
                       variant="outline"
                       className="text-sm px-1.5 py-0 h-5 gap-1"
                     >
-                      {aiStream.loading ? (
-                        <CircleNotch className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <ClockCounterClockwise
-                          className="h-3 w-3"
-                          weight="fill"
-                        />
-                      )}
-                      {aiStream.loading
-                        ? aiStream.status || "Đang phân tích..."
-                        : "Chưa có kế hoạch"}
+                      <CircleNotch className="h-3 w-3 animate-spin" />
+                      {aiStream.status || "Đang phân tích..."}
                     </Badge>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -7830,24 +7901,26 @@ const RescuePlanPanel = ({
                   Thoát chỉnh sửa
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-sm"
-                onClick={() => {
-                  handleStreamAnalyze();
-                }}
-                disabled={isReAnalyzing || aiStream.loading || isEditMode}
-              >
-                {isReAnalyzing || aiStream.loading ? (
-                  <CircleNotch className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ArrowsClockwise className="h-3.5 w-3.5" />
-                )}
-                {isReAnalyzing || aiStream.loading
-                  ? "Đang phân tích..."
-                  : "Phân tích lại"}
-              </Button>
+              {!readOnly ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-sm"
+                  onClick={() => {
+                    handleStreamAnalyze();
+                  }}
+                  disabled={isReAnalyzing || aiStream.loading || isEditMode}
+                >
+                  {isReAnalyzing || aiStream.loading ? (
+                    <CircleNotch className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ArrowsClockwise className="h-3.5 w-3.5" />
+                  )}
+                  {isReAnalyzing || aiStream.loading
+                    ? "Đang phân tích..."
+                    : "Phân tích lại"}
+                </Button>
+              ) : null}
               <Badge
                 variant="outline"
                 className="text-sm gap-1 px-1.5 py-0 h-5"
@@ -8044,6 +8117,19 @@ const RescuePlanPanel = ({
                             getActiveMissionTeams(mission);
                           const hasAssignedTeams =
                             activeMissionTeams.length > 0;
+                          const editableActivitiesCount =
+                            mission.activities?.filter(
+                              (activity) =>
+                                isPlannedMissionActivityStatus(
+                                  activity.status,
+                                ) ||
+                                (isOngoingMissionActivityStatus(
+                                  activity.status,
+                                ) &&
+                                  isReturnAssemblyPointActivityType(
+                                    activity.activityType,
+                                  )),
+                            ).length ?? 0;
 
                           return (
                             <Card
@@ -8087,17 +8173,28 @@ const RescuePlanPanel = ({
                                         </Badge>
                                       </div>
                                       <div className="flex items-center gap-1.5 shrink-0">
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="h-7 text-sm gap-1 px-2.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-                                          onClick={() =>
-                                            enterEditFromMission(mission)
-                                          }
-                                        >
-                                          <PencilSimpleLine className="h-3.5 w-3.5" />
-                                          Chỉnh sửa
-                                        </Button>
+                                        {!readOnly ? (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-sm gap-1 px-2.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                                            onClick={() => {
+                                              if (
+                                                editableActivitiesCount === 0
+                                              ) {
+                                                toast.info(
+                                                  "Nhiệm vụ này không còn activity đủ điều kiện cập nhật.",
+                                                );
+                                                return;
+                                              }
+
+                                              enterEditFromMission(mission);
+                                            }}
+                                          >
+                                            <PencilSimpleLine className="h-3.5 w-3.5" />
+                                            Chỉnh sửa
+                                          </Button>
+                                        ) : null}
                                         <Badge
                                           variant="outline"
                                           className={cn(
@@ -9367,20 +9464,29 @@ const RescuePlanPanel = ({
                                               "number" &&
                                             activity._missionActivityId > 0,
                                           );
-                                        const isPendingMissionActivity =
+                                        const isPlannedMissionActivity =
                                           isExistingMissionActivity &&
-                                          isPendingMissionActivityStatus(
+                                          isPlannedMissionActivityStatus(
                                             activity._missionStatus,
                                           );
-                                        const isPendingReturnAssemblyPointActivity =
-                                          isPendingMissionActivity &&
+                                        const isOngoingMissionActivity =
+                                          isExistingMissionActivity &&
+                                          isOngoingMissionActivityStatus(
+                                            activity._missionStatus,
+                                          );
+                                        const canUpdateReturnAssemblyPointWhenOngoing =
+                                          isOngoingMissionActivity &&
                                           isReturnAssemblyPointActivity;
+                                        const isLockedExistingMissionActivity =
+                                          isExistingMissionActivity &&
+                                          !isPlannedMissionActivity;
                                         const lockGeneralActivityEdits =
-                                          isPendingMissionActivity;
+                                          isLockedExistingMissionActivity;
                                         const isTeamEditingLocked =
                                           Boolean(editingMissionId);
                                         const canEditReturnAssemblyPoint =
-                                          isExistingMissionActivity &&
+                                          (isPlannedMissionActivity ||
+                                            canUpdateReturnAssemblyPointWhenOngoing) &&
                                           isReturnAssemblyPointActivity;
                                         const parsedAssemblyPointId = Number(
                                           activity.assemblyPointId,
@@ -9409,12 +9515,18 @@ const RescuePlanPanel = ({
                                           null;
                                         const selectedAssemblyPointStatusLabel =
                                           selectedAssemblyPointStatus ===
-                                          "Unavailable"
-                                            ? "Không khả dụng"
+                                          "Created"
+                                            ? "Mới tạo"
                                             : selectedAssemblyPointStatus ===
-                                                "Closed"
-                                              ? "Đã đóng"
-                                              : selectedAssemblyPointStatus;
+                                                "Available"
+                                              ? "Sẵn sàng"
+                                              : selectedAssemblyPointStatus ===
+                                                  "Unavailable"
+                                                ? "Không khả dụng"
+                                                : selectedAssemblyPointStatus ===
+                                                    "Closed"
+                                                  ? "Đã đóng"
+                                                  : selectedAssemblyPointStatus;
                                         const isSelectedAssemblyPointRestricted =
                                           selectedAssemblyPointStatus ===
                                             "Unavailable" ||
@@ -9688,9 +9800,11 @@ const RescuePlanPanel = ({
                                             {lockGeneralActivityEdits ? (
                                               <div className="rounded-lg border border-amber-300/80 bg-amber-50/80 px-3 py-2 dark:border-amber-700/60 dark:bg-amber-950/20">
                                                 <p className="text-sm leading-relaxed text-amber-800 dark:text-amber-300">
-                                                  {isPendingReturnAssemblyPointActivity
-                                                    ? "Bước này đang ở trạng thái chờ, chỉ cho phép cập nhật điểm tập kết quay về."
-                                                    : "Bước đang ở trạng thái chờ xử lý/chờ xác nhận nên không thể chỉnh sửa nội dung."}
+                                                  {isReturnAssemblyPointActivity
+                                                    ? canUpdateReturnAssemblyPointWhenOngoing
+                                                      ? "Bước đang OnGoing, chỉ cho phép cập nhật điểm tập kết quay về khi có sự cố tại điểm tập kết hiện tại."
+                                                      : "Bước quay về điểm tập kết chỉ được cập nhật khi activity ở trạng thái Planned hoặc OnGoing."
+                                                    : `Chỉ có thể cập nhật activity Planned. Bước này hiện ở trạng thái ${activity._missionStatus || "không xác định"}.`}
                                                 </p>
                                               </div>
                                             ) : null}
@@ -9845,12 +9959,11 @@ const RescuePlanPanel = ({
                                                     an toàn.
                                                   </p>
                                                 ) : null}
-                                                {isPendingReturnAssemblyPointActivity ? (
+                                                {canEditReturnAssemblyPoint ? (
                                                   <p className="text-sm leading-relaxed text-sky-700/80 dark:text-sky-300/80">
-                                                    Bước đang chờ xác nhận, bạn
-                                                    chỉ có thể đổi điểm tập kết
-                                                    quay về để đội cứu hộ trở về
-                                                    vị trí an toàn hơn.
+                                                    {canUpdateReturnAssemblyPointWhenOngoing
+                                                      ? "Bước đang OnGoing nên chỉ cho phép đổi điểm tập kết quay về để xử lý sự cố tại điểm hiện tại."
+                                                      : "Bạn có thể cập nhật điểm tập kết quay về cho bước này."}
                                                   </p>
                                                 ) : null}
                                               </div>
@@ -10157,7 +10270,7 @@ const RescuePlanPanel = ({
                                                     lockGeneralActivityEdits
                                                   ) {
                                                     toast.info(
-                                                      "Bước đang chờ xác nhận nên chưa thể chỉnh sửa vật phẩm.",
+                                                      "Chỉ có thể chỉnh sửa vật phẩm ở activity Planned.",
                                                     );
                                                     return;
                                                   }
@@ -10493,19 +10606,21 @@ const RescuePlanPanel = ({
                               <ArrowsClockwise className="h-3 w-3" />
                               Làm mới
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-sm gap-1.5"
-                              onClick={handleStreamAnalyze}
-                              disabled={!clusterId}
-                            >
-                              <Lightning
-                                className="h-3.5 w-3.5"
-                                weight="fill"
-                              />
-                              Phân tích bằng AI
-                            </Button>
+                            {!readOnly ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-sm gap-1.5"
+                                onClick={handleStreamAnalyze}
+                                disabled={!clusterId}
+                              >
+                                <Lightning
+                                  className="h-3.5 w-3.5"
+                                  weight="fill"
+                                />
+                                Phân tích bằng AI
+                              </Button>
+                            ) : null}
                           </div>
                         </div>
 
@@ -10526,7 +10641,11 @@ const RescuePlanPanel = ({
                                 <SuggestionCard
                                   key={suggestion.id}
                                   suggestion={suggestion}
+                                  editable={!readOnly}
                                   onEdit={() => {
+                                    if (readOnly) {
+                                      return;
+                                    }
                                     // Flatten activities from suggestion
                                     const allActivities =
                                       suggestion.activities.flatMap(
@@ -10567,19 +10686,21 @@ const RescuePlanPanel = ({
                               Chưa có gợi ý AI nào cho cụm này
                             </p>
                             <div className="flex items-center justify-center gap-2 mt-3">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1.5 text-sm"
-                                onClick={handleStreamAnalyze}
-                                disabled={!clusterId}
-                              >
-                                <Lightning
-                                  className="h-3.5 w-3.5"
-                                  weight="fill"
-                                />
-                                Phân tích bằng AI
-                              </Button>
+                              {!readOnly ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5 text-sm"
+                                  onClick={handleStreamAnalyze}
+                                  disabled={!clusterId}
+                                >
+                                  <Lightning
+                                    className="h-3.5 w-3.5"
+                                    weight="fill"
+                                  />
+                                  Phân tích bằng AI
+                                </Button>
+                              ) : null}
                             </div>
                           </div>
                         )}
@@ -10623,15 +10744,17 @@ const RescuePlanPanel = ({
                             Các bước thực hiện
                           </h3>
                           <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-sm gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-                              onClick={enterEditMode}
-                            >
-                              <PencilSimpleLine className="h-3 w-3" />
-                              Chỉnh sửa
-                            </Button>
+                            {!readOnly ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-sm gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                                onClick={enterEditMode}
+                              >
+                                <PencilSimpleLine className="h-3 w-3" />
+                                Chỉnh sửa
+                              </Button>
+                            ) : null}
                             <Badge
                               variant="secondary"
                               className="text-sm h-5 px-2"
@@ -11432,7 +11555,7 @@ const RescuePlanPanel = ({
                     ? "Cập nhật nhiệm vụ"
                     : "Xác nhận nhiệm vụ"}
               </Button>
-            ) : activeSuggestion ? (
+            ) : activeSuggestion && !readOnly ? (
               <Button
                 className="flex-1 bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/20"
                 onClick={() => {

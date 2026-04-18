@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +23,7 @@ import type {
 } from "@/services/sos_request/type";
 import {
   Anchor,
+  ArrowRight,
   CheckCircle,
   Clock,
   ForkKnife,
@@ -62,6 +65,16 @@ const statusConfig: Record<
   },
   Completed: {
     label: "Hoàn thành",
+    icon: <CheckCircle className="h-3.5 w-3.5" weight="fill" />,
+    badgeVariant: "success",
+  },
+  Incident: {
+    label: "Sự cố",
+    icon: <Warning className="h-3.5 w-3.5" weight="fill" />,
+    badgeVariant: "destructive",
+  },
+  Resolved: {
+    label: "Đã giải quyết",
     icon: <CheckCircle className="h-3.5 w-3.5" weight="fill" />,
     badgeVariant: "success",
   },
@@ -447,10 +460,23 @@ const SOSOverview = () => {
               </p>
             </div>
           </div>
-          <Badge variant="outline" className="h-6 gap-1 text-[11px]">
-            <Pulse className="h-3.5 w-3.5 text-emerald-500" weight="bold" />
-            Realtime
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="h-6 gap-1 text-[11px]">
+              <Pulse className="h-3.5 w-3.5 text-emerald-500" weight="bold" />
+              Realtime
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 gap-1 text-[11px] px-2.5"
+              asChild
+            >
+              <Link href="/dashboard/admin/sos-requests">
+                Xem tất cả
+                <ArrowRight className="h-3 w-3" weight="bold" />
+              </Link>
+            </Button>
+          </div>
         </div>
       </CardHeader>
 
