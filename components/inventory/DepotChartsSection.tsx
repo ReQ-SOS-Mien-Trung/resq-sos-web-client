@@ -23,7 +23,7 @@ import {
   Legend,
   Filler,
 } from "chart.js";
-import { Line, Doughnut } from "react-chartjs-2";
+import { Bar, Line, Doughnut } from "react-chartjs-2";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -31,11 +31,13 @@ import {
   useDepotInventoryMovementChart,
   useDepotFundMovementChart,
 } from "@/services/depot/hooks";
+import LowStockAlerts from "./LowStockAlerts";
 import {
   Cube,
   ArrowsDownUp,
   CurrencyCircleDollar,
   CalendarBlank,
+  X,
 } from "@phosphor-icons/react";
 
 ChartJS.register(
@@ -307,33 +309,63 @@ function DateRangeFilter({
   to,
   onFromChange,
   onToChange,
+  onReset,
 }: {
   from: Date | undefined;
   to: Date | undefined;
   onFromChange: (d: Date | undefined) => void;
   onToChange: (d: Date | undefined) => void;
+  onReset?: () => void;
 }) {
+  const hasFilter = !!from || !!to;
+
+  const handleFromChange = (d: Date | undefined) => {
+    onFromChange(d);
+    if (d && to && d > to) onToChange(undefined);
+  };
+
+  const handleToChange = (d: Date | undefined) => {
+    onToChange(d);
+    if (d && from && d < from) onFromChange(undefined);
+  };
+
   return (
     <>
       <DatePickerButton
         value={from}
-        onChange={onFromChange}
+        onChange={handleFromChange}
         placeholder="Từ ngày"
         disabledDate={(d) => (to ? d > to : false)}
       />
       <span className="text-xs text-muted-foreground">–</span>
       <DatePickerButton
         value={to}
-        onChange={onToChange}
+        onChange={handleToChange}
         placeholder="Đến ngày"
         disabledDate={(d) => (from ? d < from : false)}
       />
+      {hasFilter && onReset && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+          onClick={onReset}
+          title="Đặt lại bộ lọc"
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </>
   );
 }
 
 function Chart2InventoryMovement({ depotId }: { depotId: number }) {
-  const [from, setFrom] = useState<Date | undefined>(undefined);
+  const defaultFrom = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d;
+  }, []);
+  const [from, setFrom] = useState<Date | undefined>(defaultFrom);
   const [to, setTo] = useState<Date | undefined>(undefined);
   const { data, isLoading } = useDepotInventoryMovementChart(depotId, {
     from: from ? from.toISOString() : undefined,
@@ -342,7 +374,8 @@ function Chart2InventoryMovement({ depotId }: { depotId: number }) {
 
   const chartData = useMemo(() => {
     if (!data) return null;
-    const labels = data.dataPoints.map((p) =>
+    const points = data.dataPoints.slice(-30);
+    const labels = points.map((p) =>
       new Date(p.date).toLocaleDateString("vi-VN", {
         month: "short",
         day: "numeric",
@@ -353,37 +386,33 @@ function Chart2InventoryMovement({ depotId }: { depotId: number }) {
       datasets: [
         {
           label: "Nhập kho",
-          data: data.dataPoints.map((p) => p.totalIn),
+          data: points.map((p) => p.totalIn),
+          backgroundColor: "rgba(34,197,94,0.8)",
           borderColor: "rgb(34,197,94)",
-          backgroundColor: "rgba(34,197,94,0.08)",
-          pointBackgroundColor: "rgb(34,197,94)",
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          tension: 0.4,
-          fill: false,
+          borderWidth: 1,
+          borderRadius: 4,
+          barPercentage: 0.85,
+          categoryPercentage: 0.7,
         },
         {
           label: "Xuất kho",
-          data: data.dataPoints.map((p) => p.totalOut),
+          data: points.map((p) => p.totalOut),
+          backgroundColor: "rgba(239,68,68,0.8)",
           borderColor: "rgb(239,68,68)",
-          backgroundColor: "rgba(239,68,68,0.08)",
-          pointBackgroundColor: "rgb(239,68,68)",
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          tension: 0.4,
-          fill: false,
+          borderWidth: 1,
+          borderRadius: 4,
+          barPercentage: 0.85,
+          categoryPercentage: 0.7,
         },
         {
           label: "Điều chỉnh",
-          data: data.dataPoints.map((p) => p.totalAdjust),
+          data: points.map((p) => p.totalAdjust),
+          backgroundColor: "rgba(168,85,247,0.8)",
           borderColor: "rgb(168,85,247)",
-          backgroundColor: "rgba(168,85,247,0.08)",
-          pointBackgroundColor: "rgb(168,85,247)",
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          borderDash: [4, 4],
-          tension: 0.4,
-          fill: false,
+          borderWidth: 1,
+          borderRadius: 4,
+          barPercentage: 0.85,
+          categoryPercentage: 0.7,
         },
       ],
     };
@@ -401,11 +430,15 @@ function Chart2InventoryMovement({ depotId }: { depotId: number }) {
           to={to}
           onFromChange={setFrom}
           onToChange={setTo}
+          onReset={() => {
+            setFrom(defaultFrom);
+            setTo(undefined);
+          }}
         />
       }
     >
       {chartData ? (
-        <Line
+        <Bar
           data={chartData}
           options={{
             responsive: true,
@@ -425,11 +458,12 @@ function Chart2InventoryMovement({ depotId }: { depotId: number }) {
             },
             scales: {
               x: {
+                stacked: false,
                 ticks: {
                   font: { size: 10 },
                   maxRotation: 45,
                   autoSkip: true,
-                  maxTicksLimit: 14,
+                  maxTicksLimit: 30,
                 },
               },
               y: {
@@ -507,6 +541,10 @@ function Chart3FundMovement({ depotId }: { depotId: number }) {
           to={to}
           onFromChange={setFrom}
           onToChange={setTo}
+          onReset={() => {
+            setFrom(undefined);
+            setTo(undefined);
+          }}
         />
       }
     >
@@ -565,15 +603,17 @@ export default function DepotChartsSection({ depotId }: { depotId: number }) {
       <h2 className="text-xs font-semibold tracking-tighter text-muted-foreground uppercase">
         Biểu đồ tổng quan
       </h2>
-      {/* Row 1: Capacity (1 col) + Inventory Movement (3 col) */}
+      {/* Row 1: Capacity (1 col) + Low Stock Alerts (3 col) */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <Chart1Capacity depotId={depotId} />
         <div className="lg:col-span-3">
-          <Chart2InventoryMovement depotId={depotId} />
+          <LowStockAlerts />
         </div>
       </div>
       {/* Row 2: Fund Movement (full) */}
       <Chart3FundMovement depotId={depotId} />
+      {/* Row 3: Inventory Movement (full) */}
+      <Chart2InventoryMovement depotId={depotId} />
     </div>
   );
 }

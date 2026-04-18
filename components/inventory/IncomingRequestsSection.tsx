@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
-  Lightning,
   Truck,
   CheckCircle,
   XCircle,
@@ -23,7 +22,6 @@ import {
   Note,
   Spinner,
   X,
-  Funnel,
   ArrowRight,
 } from "@phosphor-icons/react";
 import {
@@ -35,21 +33,20 @@ import {
   useConfirmSupplyRequest,
   useRejectSupplyRequest,
 } from "@/services/inventory/hooks";
-import type { SupplyRequestListItem } from "@/services/inventory/type";
+import type {
+  SourceSupplyRequestStatus,
+  SupplyRequestListItem,
+} from "@/services/inventory/type";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { SupplyRequestTracker } from "./SupplyRequestTracker";
 import { ResponseCountdown } from "./ResponseCountdown";
 import { toast } from "sonner";
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
-type FilterTab = "all" | "needs_action" | "in_transit" | "done" | "rejected";
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function getRequestBucket(
   r: SupplyRequestListItem,
-): Exclude<FilterTab, "all"> | "other" {
+): "needs_action" | "in_transit" | "done" | "rejected" | "other" {
   if (r.sourceStatus === "Rejected" || r.requestingStatus === "Rejected") {
     return "rejected";
   }
@@ -149,30 +146,46 @@ function getRoleInfo(role: "Source" | "Requester"): {
 } {
   return role === "Source"
     ? {
-      label: "Kho nguồn",
-      className: "bg-orange-100 text-orange-700 border-orange-200",
-    }
+        label: "Kho nguồn",
+        className: "bg-orange-100 text-orange-700 border-orange-200",
+      }
     : {
-      label: "Kho yêu cầu",
-      className: "bg-sky-100 text-sky-700 border-sky-200",
-    };
+        label: "Kho yêu cầu",
+        className: "bg-sky-100 text-sky-700 border-sky-200",
+      };
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function IncomingRequestsSection() {
   const { selectedDepotId } = useManagerDepot();
-  const [filter, setFilter] = useState<FilterTab>("all");
+  const [sourceStatusFilter, setSourceStatusFilter] = useState<
+    "all" | SourceSupplyRequestStatus
+  >("all");
   const [trackerOpen, setTrackerOpen] = useState(false);
   const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    refetch,
-  } = useSupplyRequests(
-    { depotId: selectedDepotId ?? 0, pageNumber: 1, pageSize: 100 },
+  const sourceStatusOptions: {
+    value: "all" | SourceSupplyRequestStatus;
+    label: string;
+  }[] = [
+    { value: "all", label: "Tất cả" },
+    { value: "Pending", label: "Chờ duyệt" },
+    { value: "Accepted", label: "Đã chấp nhận" },
+    { value: "Preparing", label: "Đang đóng gói" },
+    { value: "Shipping", label: "Đang vận chuyển" },
+    { value: "Completed", label: "Hoàn thành" },
+    { value: "Rejected", label: "Từ chối" },
+  ];
+
+  const { data, isLoading, isFetching, refetch } = useSupplyRequests(
+    {
+      depotId: selectedDepotId ?? 0,
+      sourceStatus:
+        sourceStatusFilter === "all" ? undefined : sourceStatusFilter,
+      pageNumber: 1,
+      pageSize: 100,
+    },
     {
       refetchInterval: 10_000,
       refetchOnWindowFocus: true,
@@ -194,37 +207,12 @@ export default function IncomingRequestsSection() {
     [data],
   );
 
-  // ── Stats ──
-  const needsActionCount = allItems.filter(
-    (r) => getRequestBucket(r) === "needs_action",
-  ).length;
-  const inTransitCount = allItems.filter(
-    (r) => getRequestBucket(r) === "in_transit",
-  ).length;
-  const doneCount = allItems.filter((r) => getRequestBucket(r) === "done").length;
-  const rejectedCount = allItems.filter(
-    (r) => getRequestBucket(r) === "rejected",
-  ).length;
-
-  // ── Filtered list ──
-  const filteredItems = useMemo(() => {
-    switch (filter) {
-      case "needs_action":
-        return allItems.filter((r) => getRequestBucket(r) === "needs_action");
-      case "in_transit":
-        return allItems.filter((r) => getRequestBucket(r) === "in_transit");
-      case "done":
-        return allItems.filter((r) => getRequestBucket(r) === "done");
-      case "rejected":
-        return allItems.filter((r) => getRequestBucket(r) === "rejected");
-      default:
-        return allItems;
-    }
-  }, [allItems, filter]);
-
   // Tracker request
   const trackerRequest = useMemo(
-    () => (trackerRequestId !== null ? allItems.find((r) => r.id === trackerRequestId) ?? null : null),
+    () =>
+      trackerRequestId !== null
+        ? (allItems.find((r) => r.id === trackerRequestId) ?? null)
+        : null,
     [allItems, trackerRequestId],
   );
 
@@ -234,14 +222,14 @@ export default function IncomingRequestsSection() {
   };
 
   // ── Card pagination ──
-  const [cardsPerPage, setCardsPerPage] = useState(10);
+  const [cardsPerPage, setCardsPerPage] = useState(6);
   const [cardPage, setCardPage] = useState(1);
   const totalCardPages = Math.max(
     1,
-    Math.ceil(filteredItems.length / cardsPerPage),
+    Math.ceil(allItems.length / cardsPerPage),
   );
   const currentCardPage = Math.min(cardPage, totalCardPages);
-  const pagedItems = filteredItems.slice(
+  const pagedItems = allItems.slice(
     (currentCardPage - 1) * cardsPerPage,
     currentCardPage * cardsPerPage,
   );
@@ -249,113 +237,30 @@ export default function IncomingRequestsSection() {
   // ── Render ──
   return (
     <div className="space-y-5">
-      {/* ── Stats Strip ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard
-          icon={<Lightning className="h-5 w-5" weight="fill" />}
-          label="Cần xử lý ngay"
-          value={needsActionCount}
-          colorClass="from-red-500/10 to-orange-500/10 border-red-200/60"
-          valueClass="text-red-600"
-          iconClass="text-red-500 bg-red-100"
-          active={filter === "needs_action"}
-          onClick={() =>
-            setFilter(filter === "needs_action" ? "all" : "needs_action")
-          }
-        />
-        <StatCard
-          icon={<Truck className="h-5 w-5" weight="fill" />}
-          label="Đang vận chuyển"
-          value={inTransitCount}
-          colorClass="from-blue-500/10 to-sky-500/10 border-blue-200/60"
-          valueClass="text-blue-600"
-          iconClass="text-blue-500 bg-blue-100"
-          active={filter === "in_transit"}
-          onClick={() =>
-            setFilter(filter === "in_transit" ? "all" : "in_transit")
-          }
-        />
-        <StatCard
-          icon={<SealCheck className="h-5 w-5" weight="fill" />}
-          label="Hoàn thành"
-          value={doneCount}
-          colorClass="from-green-500/10 to-emerald-500/10 border-green-200/60"
-          valueClass="text-green-600"
-          iconClass="text-green-500 bg-green-100"
-          active={filter === "done"}
-          onClick={() => setFilter(filter === "done" ? "all" : "done")}
-        />
-        <StatCard
-          icon={<XCircle className="h-5 w-5" weight="fill" />}
-          label="Từ chối"
-          value={rejectedCount}
-          colorClass="from-gray-500/10 to-slate-500/10 border-gray-200/60"
-          valueClass="text-gray-600"
-          iconClass="text-gray-500 bg-gray-100"
-          active={filter === "rejected"}
-          onClick={() =>
-            setFilter(filter === "rejected" ? "all" : "rejected")
-          }
-        />
-      </div>
-
-      {/* ── Filter Bar ── */}
-      <div className="flex items-center gap-2 flex-wrap bg-muted/40 border border-border/50 rounded-xl px-3 py-2">
-        <Funnel className="h-4 w-4 text-muted-foreground shrink-0" weight="duotone" />
-        <div className="flex items-center gap-1.5 flex-wrap flex-1">
-          <FilterChip
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-            icon={<ClipboardText className="h-3.5 w-3.5" />}
-            label="Tất cả"
-            count={allItems.length}
-          />
-          <div className="w-px h-4 bg-border/60 shrink-0" />
-          <FilterChip
-            active={filter === "needs_action"}
-            onClick={() => setFilter(filter === "needs_action" ? "all" : "needs_action")}
-            icon={<Lightning className="h-3.5 w-3.5" weight="fill" />}
-            label="Cần xử lý"
-            count={needsActionCount}
-            urgent={needsActionCount > 0}
-            color="orange"
-          />
-          <FilterChip
-            active={filter === "in_transit"}
-            onClick={() => setFilter(filter === "in_transit" ? "all" : "in_transit")}
-            icon={<Truck className="h-3.5 w-3.5" weight="fill" />}
-            label="Đang vận chuyển"
-            count={inTransitCount}
-            color="blue"
-          />
-          <FilterChip
-            active={filter === "done"}
-            onClick={() => setFilter(filter === "done" ? "all" : "done")}
-            icon={<SealCheck className="h-3.5 w-3.5" weight="fill" />}
-            label="Hoàn thành"
-            count={doneCount}
-            color="green"
-          />
-          <FilterChip
-            active={filter === "rejected"}
-            onClick={() => setFilter(filter === "rejected" ? "all" : "rejected")}
-            icon={<XCircle className="h-3.5 w-3.5" weight="fill" />}
-            label="Từ chối"
-            count={rejectedCount}
-            color="gray"
-          />
-        </div>
-        {filter !== "all" && (
-          <button
-            type="button"
-            onClick={() => setFilter("all")}
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors shrink-0"
+      <div className="flex items-center justify-between gap-3 flex-wrap bg-muted/40 border border-border/50 rounded-xl px-3 py-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground tracking-tighter whitespace-nowrap">
+            Trạng thái kho nguồn
+          </span>
+          <Select
+            value={sourceStatusFilter}
+            onValueChange={(value) => {
+              setSourceStatusFilter(value as "all" | SourceSupplyRequestStatus);
+              setCardPage(1);
+            }}
           >
-            <X className="h-3 w-3" />
-            Xóa lọc
-          </button>
-        )}
-        <div className="w-px h-4 bg-border/60 shrink-0" />
+            <SelectTrigger className="h-9 w-[220px] text-sm tracking-tighter">
+              <SelectValue placeholder="Chọn trạng thái" />
+            </SelectTrigger>
+            <SelectContent>
+              {sourceStatusOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <Button
           variant="ghost"
           size="sm"
@@ -363,7 +268,9 @@ export default function IncomingRequestsSection() {
           onClick={() => refetch()}
           disabled={isFetching}
         >
-          <ArrowsClockwise className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+          <ArrowsClockwise
+            className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
+          />
           Làm mới
         </Button>
       </div>
@@ -378,7 +285,7 @@ export default function IncomingRequestsSection() {
             />
           ))}
         </div>
-      ) : filteredItems.length === 0 ? (
+      ) : allItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground/50 gap-3">
           <ClipboardText className="h-10 w-10 opacity-30" />
           <p className="text-sm tracking-tighter">Không có yêu cầu nào</p>
@@ -398,10 +305,11 @@ export default function IncomingRequestsSection() {
       )}
 
       {/* ── Cards Pagination ── */}
-      {filteredItems.length > 0 && (
+      {allItems.length > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground tracking-tighter order-2 sm:order-1">
-            {filteredItems.length} yêu cầu • Trang {currentCardPage} / {totalCardPages}
+            {allItems.length} yêu cầu • Trang {currentCardPage} /{" "}
+            {totalCardPages}
           </p>
           <div className="flex items-center gap-2 order-1 sm:order-2 flex-wrap justify-end">
             <div className="flex items-center gap-2">
@@ -419,7 +327,7 @@ export default function IncomingRequestsSection() {
                   <SelectValue placeholder="10" />
                 </SelectTrigger>
                 <SelectContent>
-                  {[5, 10, 20, 50, 100].map((size) => (
+                  {[6, 9, 15, 30, 60, 90].map((size) => (
                     <SelectItem key={size} value={String(size)}>
                       {size}
                     </SelectItem>
@@ -428,73 +336,82 @@ export default function IncomingRequestsSection() {
               </Select>
             </div>
             <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0"
-              disabled={currentCardPage === 1}
-              onClick={() => setCardPage(1)}
-            >
-              «
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-3"
-              disabled={currentCardPage === 1}
-              onClick={() => setCardPage((p) => Math.max(1, p - 1))}
-            >
-              ‹ Trước
-            </Button>
-            {(() => {
-              const pages: (number | "...")[] = [];
-              if (totalCardPages <= 7) {
-                for (let i = 1; i <= totalCardPages; i++) pages.push(i);
-              } else {
-                pages.push(1);
-                if (currentCardPage > 3) pages.push("...");
-                for (let i = Math.max(2, currentCardPage - 1); i <= Math.min(totalCardPages - 1, currentCardPage + 1); i++) {
-                  pages.push(i);
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                disabled={currentCardPage === 1}
+                onClick={() => setCardPage(1)}
+              >
+                «
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3"
+                disabled={currentCardPage === 1}
+                onClick={() => setCardPage((p) => Math.max(1, p - 1))}
+              >
+                ‹ Trước
+              </Button>
+              {(() => {
+                const pages: (number | "...")[] = [];
+                if (totalCardPages <= 7) {
+                  for (let i = 1; i <= totalCardPages; i++) pages.push(i);
+                } else {
+                  pages.push(1);
+                  if (currentCardPage > 3) pages.push("...");
+                  for (
+                    let i = Math.max(2, currentCardPage - 1);
+                    i <= Math.min(totalCardPages - 1, currentCardPage + 1);
+                    i++
+                  ) {
+                    pages.push(i);
+                  }
+                  if (currentCardPage < totalCardPages - 2) pages.push("...");
+                  pages.push(totalCardPages);
                 }
-                if (currentCardPage < totalCardPages - 2) pages.push("...");
-                pages.push(totalCardPages);
-              }
-              return pages.map((p, i) =>
-                p === "..." ? (
-                  <span key={`ellipsis-${i}`} className="px-1 text-xs text-muted-foreground select-none">
-                    ···
-                  </span>
-                ) : (
-                  <Button
-                    key={p}
-                    variant={currentCardPage === p ? "default" : "outline"}
-                    size="sm"
-                    className="h-8 w-8 p-0 text-xs"
-                    onClick={() => setCardPage(p as number)}
-                  >
-                    {p}
-                  </Button>
-                ),
-              );
-            })()}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-3"
-              disabled={currentCardPage === totalCardPages}
-              onClick={() => setCardPage((p) => Math.min(totalCardPages, p + 1))}
-            >
-              Sau ›
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0"
-              disabled={currentCardPage === totalCardPages}
-              onClick={() => setCardPage(totalCardPages)}
-            >
-              »
-            </Button>
+                return pages.map((p, i) =>
+                  p === "..." ? (
+                    <span
+                      key={`ellipsis-${i}`}
+                      className="px-1 text-xs text-muted-foreground select-none"
+                    >
+                      ···
+                    </span>
+                  ) : (
+                    <Button
+                      key={p}
+                      variant={currentCardPage === p ? "default" : "outline"}
+                      size="sm"
+                      className="h-8 w-8 p-0 text-xs"
+                      onClick={() => setCardPage(p as number)}
+                    >
+                      {p}
+                    </Button>
+                  ),
+                );
+              })()}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3"
+                disabled={currentCardPage === totalCardPages}
+                onClick={() =>
+                  setCardPage((p) => Math.min(totalCardPages, p + 1))
+                }
+              >
+                Sau ›
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                disabled={currentCardPage === totalCardPages}
+                onClick={() => setCardPage(totalCardPages)}
+              >
+                »
+              </Button>
             </div>
           </div>
         </div>
@@ -508,133 +425,6 @@ export default function IncomingRequestsSection() {
         onActionSuccess={() => refetch()}
       />
     </div>
-  );
-}
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-function StatCard({
-  icon,
-  label,
-  value,
-  colorClass,
-  valueClass,
-  iconClass,
-  active,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  colorClass: string;
-  valueClass: string;
-  iconClass: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "relative rounded-xl tracking-tighter border bg-linear-to-br px-4 py-6 text-left transition-all hover:shadow-md",
-        colorClass,
-        active && "ring-2 ring-primary shadow-md",
-      )}
-    >
-      {/* Icon pinned to top-right */}
-      <div className={cn("absolute top-3.5 right-3.5 h-9 w-9 rounded-xl flex items-center justify-center", iconClass)}>
-        {icon}
-      </div>
-      {/* Number + label on the left */}
-      <p className={cn("text-3xl font-bold tabular-nums tracking-tighter", valueClass)}>{value}</p>
-      <p className="text-sm font-medium tracking-tighter mt-1 text-foreground/70 pr-10">{label}</p>
-      {active && (
-        <span className="absolute bottom-3 right-3.5 h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-      )}
-    </button>
-  );
-}
-
-const filterColorMap = {
-  orange: {
-    active: "bg-orange-500 text-white border-orange-500",
-    idle: "text-orange-600 hover:bg-orange-50 hover:border-orange-200 border-transparent",
-    count: "bg-orange-100 text-orange-700",
-    countActive: "bg-orange-400/30 text-white",
-  },
-  blue: {
-    active: "bg-blue-500 text-white border-blue-500",
-    idle: "text-blue-600 hover:bg-blue-50 hover:border-blue-200 border-transparent",
-    count: "bg-blue-100 text-blue-700",
-    countActive: "bg-blue-400/30 text-white",
-  },
-  green: {
-    active: "bg-green-500 text-white border-green-500",
-    idle: "text-green-600 hover:bg-green-50 hover:border-green-200 border-transparent",
-    count: "bg-green-100 text-green-700",
-    countActive: "bg-green-400/30 text-white",
-  },
-  gray: {
-    active: "bg-slate-500 text-white border-slate-500",
-    idle: "text-slate-600 hover:bg-slate-50 hover:border-slate-200 border-transparent",
-    count: "bg-slate-100 text-slate-600",
-    countActive: "bg-slate-400/30 text-white",
-  },
-};
-
-function FilterChip({
-  active,
-  onClick,
-  label,
-  icon,
-  count,
-  urgent,
-  color,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  icon?: React.ReactNode;
-  count?: number;
-  urgent?: boolean;
-  color?: keyof typeof filterColorMap;
-}) {
-  const colors = color ? filterColorMap[color] : null;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "relative inline-flex tracking-tighter items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm font-medium transition-all border",
-        colors
-          ? active
-            ? colors.active
-            : colors.idle
-          : active
-            ? "bg-primary text-primary-foreground border-primary shadow-sm"
-            : "text-foreground/70 hover:bg-background hover:text-foreground border-transparent hover:border-border/60",
-      )}
-    >
-      {urgent && !active && (
-        <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-red-500" />
-      )}
-      {icon && <span className="shrink-0">{icon}</span>}
-      <span>{label}</span>
-      {count !== undefined && (
-        <span
-          className={cn(
-            "inline-flex items-center justify-center min-w-4.5 h-4.5 px-1 rounded-md text-xs font-bold tabular-nums",
-            colors
-              ? active ? colors.countActive : colors.count
-              : active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground",
-          )}
-        >
-          {count}
-        </span>
-      )}
-    </button>
   );
 }
 
@@ -771,7 +561,9 @@ function RequestCard({
       role="button"
       tabIndex={0}
       onClick={onViewDetail}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onViewDetail(); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onViewDetail();
+      }}
       className={cn(
         "rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer flex flex-col group",
         isRejected && "opacity-60 grayscale-[40%]",
@@ -782,14 +574,23 @@ function RequestCard({
 
       {/* ── Card body ── */}
       <div className="p-4 flex flex-col gap-2 flex-1">
-
         {/* Row 1: Badges left | ID right */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className={cn("inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border tracking-tighter", roleInfo.className)}>
+            <span
+              className={cn(
+                "inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border tracking-tighter",
+                roleInfo.className,
+              )}
+            >
               {roleInfo.label}
             </span>
-            <span className={cn("inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border tracking-tighter", statusInfo.className)}>
+            <span
+              className={cn(
+                "inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border tracking-tighter",
+                statusInfo.className,
+              )}
+            >
               {statusInfo.label}
             </span>
             {needsAction && (
@@ -799,7 +600,9 @@ function RequestCard({
               </span>
             )}
           </div>
-          <p className="text-xs font-bold tracking-tight shrink-0">#{request.id}</p>
+          <p className="text-xs font-bold tracking-tight shrink-0">
+            #{request.id}
+          </p>
         </div>
 
         {/* Row 2: Countdown left | Created time right */}
@@ -829,7 +632,7 @@ function RequestCard({
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-1 mb-2">
             <Package className="h-3 w-3" />
-            {request.items.length} mặt hàng
+            {request.items.length} vật phẩm
           </p>
           {request.items[0] && (
             <div className="divide-y divide-dashed divide-border/50">
@@ -846,27 +649,31 @@ function RequestCard({
               </div>
             </div>
           )}
-          {request.items.length >= 2 && (
+          {request.items.length - 1 > 0 && (
             <p className="text-xs italic text-muted-foreground tracking-tighter pt-1.5">
-              Có {request.items.length} mặt hàng
+              Còn {request.items.length - 1} vật phẩm khác
             </p>
           )}
         </div>
 
         {/* Note / Rejected reason */}
         {(request.note || request.rejectedReason) && (
-          <div className={cn(
-            "flex gap-2 items-start rounded-lg px-3 py-2 text-xs tracking-tighter leading-relaxed",
-            request.rejectedReason
-              ? "bg-red-50/80 text-red-600 border border-red-100"
-              : "bg-amber-50/60 text-amber-700 border border-amber-100/80",
-          )}>
+          <div
+            className={cn(
+              "flex gap-2 items-start rounded-lg px-3 py-2 text-xs tracking-tighter leading-relaxed",
+              request.rejectedReason
+                ? "bg-red-50/80 text-red-600 border border-red-100"
+                : "bg-amber-50/60 text-amber-700 border border-amber-100/80",
+            )}
+          >
             {request.rejectedReason ? (
               <XCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" weight="fill" />
             ) : (
               <Note className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             )}
-            <span className="line-clamp-2">{request.rejectedReason || request.note}</span>
+            <span className="line-clamp-2">
+              {request.rejectedReason || request.note}
+            </span>
           </div>
         )}
 
@@ -880,7 +687,11 @@ function RequestCard({
               </p>
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setShowRejectForm(false); setRejectReason(""); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowRejectForm(false);
+                  setRejectReason("");
+                }}
                 className="text-red-400 hover:text-red-600 transition-colors rounded p-0.5 hover:bg-red-100"
               >
                 <X className="h-3.5 w-3.5" />
@@ -898,10 +709,17 @@ function RequestCard({
               size="sm"
               variant="destructive"
               className="w-full h-7 text-xs gap-1 tracking-tighter"
-              onClick={(e) => { e.stopPropagation(); handleReject(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleReject();
+              }}
               disabled={rejectMutation.isPending || !rejectReason.trim()}
             >
-              {rejectMutation.isPending ? <Spinner className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3" weight="fill" />}
+              {rejectMutation.isPending ? (
+                <Spinner className="h-3 w-3 animate-spin" />
+              ) : (
+                <XCircle className="h-3 w-3" weight="fill" />
+              )}
               Xác nhận từ chối
             </Button>
           </div>
@@ -911,74 +729,129 @@ function RequestCard({
       {/* ── Footer actions ── */}
       <div className="px-4 pb-3 mt-auto">
         {/* Source + Pending → Accept / Reject */}
-        {request.role === "Source" && request.sourceStatus === "Pending" && !showRejectForm && (
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 text-xs gap-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 tracking-tighter shrink-0"
-              onClick={(e) => { e.stopPropagation(); setShowRejectForm(true); }}
-              disabled={isAnyPending}
-            >
-              <XCircle className="h-3.5 w-3.5" weight="fill" />
-              Từ chối
-            </Button>
-            <Button
-              size="sm"
-              className="h-8 text-xs gap-1 flex-1 bg-emerald-600 hover:bg-emerald-700 tracking-tighter"
-              onClick={(e) => { e.stopPropagation(); handleAccept(); }}
-              disabled={isAnyPending}
-            >
-              {acceptMutation.isPending ? <Spinner className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" weight="fill" />}
-              Chấp nhận
-            </Button>
-          </div>
-        )}
+        {request.role === "Source" &&
+          request.sourceStatus === "Pending" &&
+          !showRejectForm && (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs gap-1 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 tracking-tighter shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowRejectForm(true);
+                }}
+                disabled={isAnyPending}
+              >
+                <XCircle className="h-3.5 w-3.5" weight="fill" />
+                Từ chối
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 text-xs gap-1 flex-1 bg-emerald-600 hover:bg-emerald-700 tracking-tighter"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAccept();
+                }}
+                disabled={isAnyPending}
+              >
+                {acceptMutation.isPending ? (
+                  <Spinner className="h-3 w-3 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-3.5 w-3.5" weight="fill" />
+                )}
+                Chấp nhận
+              </Button>
+            </div>
+          )}
 
         {/* Source + Accepted → Prepare */}
         {request.role === "Source" && request.sourceStatus === "Accepted" && (
-          <Button size="sm" className="w-full h-8 text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 tracking-tighter"
-            onClick={(e) => { e.stopPropagation(); handlePrepare(); }} disabled={isAnyPending}>
-            {prepareMutation.isPending ? <Spinner className="h-3 w-3 animate-spin" /> : <Package className="h-3.5 w-3.5" weight="fill" />}
+          <Button
+            size="sm"
+            className="w-full h-8 text-xs gap-1.5 bg-purple-600 hover:bg-purple-700 tracking-tighter"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrepare();
+            }}
+            disabled={isAnyPending}
+          >
+            {prepareMutation.isPending ? (
+              <Spinner className="h-3 w-3 animate-spin" />
+            ) : (
+              <Package className="h-3.5 w-3.5" weight="fill" />
+            )}
             Bắt đầu đóng gói
           </Button>
         )}
 
         {/* Source + Preparing → Ship */}
         {request.role === "Source" && request.sourceStatus === "Preparing" && (
-          <Button size="sm" className="w-full h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 tracking-tighter"
-            onClick={(e) => { e.stopPropagation(); handleShip(); }} disabled={isAnyPending}>
-            {shipMutation.isPending ? <Spinner className="h-3 w-3 animate-spin" /> : <Truck className="h-3.5 w-3.5" weight="fill" />}
+          <Button
+            size="sm"
+            className="w-full h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 tracking-tighter"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShip();
+            }}
+            disabled={isAnyPending}
+          >
+            {shipMutation.isPending ? (
+              <Spinner className="h-3 w-3 animate-spin" />
+            ) : (
+              <Truck className="h-3.5 w-3.5" weight="fill" />
+            )}
             Xuất kho — Gửi đi
           </Button>
         )}
 
         {/* Source + Shipping → Complete */}
         {request.role === "Source" && request.sourceStatus === "Shipping" && (
-          <Button size="sm" className="w-full h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-700 tracking-tighter"
-            onClick={(e) => { e.stopPropagation(); handleComplete(); }} disabled={isAnyPending}>
-            {completeMutation.isPending ? <Spinner className="h-3 w-3 animate-spin" /> : <SealCheck className="h-3.5 w-3.5" weight="fill" />}
+          <Button
+            size="sm"
+            className="w-full h-8 text-xs gap-1.5 bg-teal-600 hover:bg-teal-700 tracking-tighter"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleComplete();
+            }}
+            disabled={isAnyPending}
+          >
+            {completeMutation.isPending ? (
+              <Spinner className="h-3 w-3 animate-spin" />
+            ) : (
+              <SealCheck className="h-3.5 w-3.5" weight="fill" />
+            )}
             Xác nhận đã giao
           </Button>
         )}
 
         {/* Requester + InTransit → Confirm received */}
-        {request.role === "Requester" && request.requestingStatus === "InTransit" && (
-          <Button
-            size="sm"
-            className={cn(
-              "w-full h-8 text-xs gap-1.5 tracking-tighter",
-              request.sourceStatus === "Completed"
-                ? "bg-emerald-600 hover:bg-emerald-700"
-                : "bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed",
-            )}
-            onClick={(e) => { e.stopPropagation(); handleConfirm(); }}
-            disabled={isAnyPending || request.sourceStatus !== "Completed"}
-          >
-            {confirmMutation.isPending ? <Spinner className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" weight="fill" />}
-            {request.sourceStatus === "Completed" ? "Xác nhận đã nhận" : "Chờ bên gửi xác nhận giao"}
-          </Button>
-        )}
+        {request.role === "Requester" &&
+          request.requestingStatus === "InTransit" && (
+            <Button
+              size="sm"
+              className={cn(
+                "w-full h-8 text-xs gap-1.5 tracking-tighter",
+                request.sourceStatus === "Completed"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed",
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleConfirm();
+              }}
+              disabled={isAnyPending || request.sourceStatus !== "Completed"}
+            >
+              {confirmMutation.isPending ? (
+                <Spinner className="h-3 w-3 animate-spin" />
+              ) : (
+                <CheckCircle className="h-3.5 w-3.5" weight="fill" />
+              )}
+              {request.sourceStatus === "Completed"
+                ? "Xác nhận đã nhận"
+                : "Chờ bên gửi xác nhận giao"}
+            </Button>
+          )}
       </div>
     </div>
   );

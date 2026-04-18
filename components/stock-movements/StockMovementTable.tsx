@@ -708,7 +708,7 @@ const StockMovementTable: React.FC = () => {
                                   {movement.items[0].categoryName}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-0.5 italic">
-                                  +{movement.items.length - 1} mặt hàng khác
+                                  +{movement.items.length - 1} vật phẩm khác
                                 </p>
                               </div>
                             )}

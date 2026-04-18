@@ -21,6 +21,7 @@ import {
   ClipboardText,
 } from "@phosphor-icons/react";
 import { useSupplyRequests } from "@/services/inventory/hooks";
+import type { RequestingSupplyRequestStatus } from "@/services/inventory/type";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
 import IncomingRequestsSection from "./IncomingRequestsSection";
 import { SupplyRequestTracker } from "./SupplyRequestTracker";
@@ -156,18 +157,37 @@ export default function SupplyRequestManagement({
 
 // ── Outgoing Requests Panel ──────────────────────────────────────────────────
 
-type OutgoingFilter = "all" | "pending" | "in_transit" | "done" | "rejected";
+type OutgoingStatusFilter = "all" | RequestingSupplyRequestStatus;
 
 function OutgoingRequestsPanel() {
   const { selectedDepotId } = useManagerDepot();
-  const [filter, setFilter] = useState<OutgoingFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<OutgoingStatusFilter>("all");
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [trackerRequestId, setTrackerRequestId] = useState<number | null>(null);
   const [trackerOpen, setTrackerOpen] = useState(false);
 
+  const requestingStatusOptions: {
+    value: OutgoingStatusFilter;
+    label: string;
+  }[] = [
+    { value: "all", label: "Tất cả" },
+    { value: "WaitingForApproval", label: "Chờ phê duyệt" },
+    { value: "Approved", label: "Đã duyệt" },
+    { value: "InTransit", label: "Đang được chi viện đến" },
+    { value: "Received", label: "Đã nhận" },
+    { value: "Rejected", label: "Từ chối" },
+  ];
+
   const { data, isLoading, isFetching, refetch } = useSupplyRequests(
-    { depotId: selectedDepotId ?? 0, pageNumber, pageSize },
+    {
+      depotId: selectedDepotId ?? 0,
+      role: "Requester",
+      requestingStatus:
+        statusFilter === "all" ? undefined : statusFilter,
+      pageNumber,
+      pageSize,
+    },
     {
       refetchInterval: 10_000,
       refetchOnWindowFocus: true,
@@ -175,60 +195,21 @@ function OutgoingRequestsPanel() {
     },
   );
 
-  // Only show Requester-role requests (requests we sent out)
-  const allItems = useMemo(
+  const requests = useMemo(
     () =>
-      [...(data?.items ?? [])]
-        .filter((r) => r.role === "Requester")
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        ),
+      [...(data?.items ?? [])].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
     [data],
   );
-
-  // Stats
-  const pendingCount = allItems.filter(
-    (r) =>
-      r.requestingStatus === "WaitingForApproval" ||
-      r.requestingStatus === "Approved",
-  ).length;
-  const inTransitCount = allItems.filter(
-    (r) => r.requestingStatus === "InTransit",
-  ).length;
-  const doneCount = allItems.filter(
-    (r) => r.requestingStatus === "Received",
-  ).length;
-  const rejectedCount = allItems.filter(
-    (r) => r.requestingStatus === "Rejected",
-  ).length;
-
-  // Filter
-  const filteredItems = useMemo(() => {
-    switch (filter) {
-      case "pending":
-        return allItems.filter(
-          (r) =>
-            r.requestingStatus === "WaitingForApproval" ||
-            r.requestingStatus === "Approved",
-        );
-      case "in_transit":
-        return allItems.filter((r) => r.requestingStatus === "InTransit");
-      case "done":
-        return allItems.filter((r) => r.requestingStatus === "Received");
-      case "rejected":
-        return allItems.filter((r) => r.requestingStatus === "Rejected");
-      default:
-        return allItems;
-    }
-  }, [allItems, filter]);
 
   const trackerRequest = useMemo(
     () =>
       trackerRequestId !== null
-        ? ((data?.items ?? []).find((r) => r.id === trackerRequestId) ?? null)
+        ? (requests.find((r) => r.id === trackerRequestId) ?? null)
         : null,
-    [data, trackerRequestId],
+    [requests, trackerRequestId],
   );
 
   const canPrev = data?.hasPreviousPage ?? pageNumber > 1;
@@ -236,50 +217,6 @@ function OutgoingRequestsPanel() {
 
   return (
     <div className="space-y-4">
-      {/* ── Stats strip ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-3"
-      >
-        <OutgoingStatCard
-          label="Đang chờ duyệt"
-          value={pendingCount}
-          colorClass="border-amber-200 bg-amber-50 dark:bg-amber-950/20"
-          valueClass="text-amber-600"
-          active={filter === "pending"}
-          onClick={() => setFilter(filter === "pending" ? "all" : "pending")}
-        />
-        <OutgoingStatCard
-          label="Đang vận chuyển"
-          value={inTransitCount}
-          colorClass="border-blue-200 bg-blue-50 dark:bg-blue-950/20"
-          valueClass="text-blue-600"
-          active={filter === "in_transit"}
-          onClick={() =>
-            setFilter(filter === "in_transit" ? "all" : "in_transit")
-          }
-        />
-        <OutgoingStatCard
-          label="Đã nhận hàng"
-          value={doneCount}
-          colorClass="border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20"
-          valueClass="text-emerald-600"
-          active={filter === "done"}
-          onClick={() => setFilter(filter === "done" ? "all" : "done")}
-        />
-        <OutgoingStatCard
-          label="Đã từ chối"
-          value={rejectedCount}
-          colorClass="border-red-200 bg-red-50 dark:bg-red-950/20"
-          valueClass="text-red-600"
-          active={filter === "rejected"}
-          onClick={() => setFilter(filter === "rejected" ? "all" : "rejected")}
-        />
-      </motion.div>
-
-      {/* ── Filter chips + refresh ── */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -287,28 +224,27 @@ function OutgoingRequestsPanel() {
         className="flex items-center justify-between gap-3 flex-wrap"
       >
         <div className="flex items-center gap-2 flex-wrap">
-          {(
-            [
-              { key: "all", label: `Tất cả (${allItems.length})` },
-              { key: "pending", label: `Chờ duyệt (${pendingCount})` },
-              { key: "in_transit", label: `Đang đến (${inTransitCount})` },
-              { key: "done", label: `Hoàn thành (${doneCount})` },
-              { key: "rejected", label: `Từ chối (${rejectedCount})` },
-            ] as { key: OutgoingFilter; label: string }[]
-          ).map((chip) => (
-            <button
-              key={chip.key}
-              onClick={() => setFilter(chip.key)}
-              className={cn(
-                "rounded-full px-3.5 py-1.5 text-xs font-medium tracking-tighter transition-all border",
-                filter === chip.key
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-background text-muted-foreground border-border/60 hover:border-foreground/30",
-              )}
-            >
-              {chip.label}
-            </button>
-          ))}
+          <span className="text-xs text-muted-foreground tracking-tighter whitespace-nowrap">
+            Trạng thái
+          </span>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => {
+              setStatusFilter(value as OutgoingStatusFilter);
+              setPageNumber(1);
+            }}
+          >
+            <SelectTrigger className="h-9 w-[220px] text-sm tracking-tighter">
+              <SelectValue placeholder="Chọn trạng thái" />
+            </SelectTrigger>
+            <SelectContent>
+              {requestingStatusOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Button
           variant="outline"
@@ -324,7 +260,6 @@ function OutgoingRequestsPanel() {
         </Button>
       </motion.div>
 
-      {/* ── Table ── */}
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -334,7 +269,7 @@ function OutgoingRequestsPanel() {
             />
           ))}
         </div>
-      ) : filteredItems.length === 0 ? (
+      ) : requests.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground/50 gap-3">
           <Package className="h-10 w-10 opacity-30" />
           <p className="text-sm tracking-tighter">Không có đơn nào</p>
@@ -356,11 +291,11 @@ function OutgoingRequestsPanel() {
                       <th className="px-4 py-3 font-semibold">Trạng thái</th>
                       <th className="px-4 py-3 font-semibold">Vật phẩm</th>
                       <th className="px-4 py-3 font-semibold">Thời gian tạo</th>
-                      <th className="px-4 py-3 font-semibold w-44">Ghi chú</th>
+                      <th className="px-4 py-3 font-semibold w-56">Ghi chú</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredItems.map((request, idx) => (
+                    {requests.map((request, idx) => (
                       <motion.tr
                         key={request.id}
                         initial={{ opacity: 0, y: 8 }}
@@ -406,9 +341,9 @@ function OutgoingRequestsPanel() {
                                 </span>
                               </div>
                             )}
-                            {request.items.length >= 2 && (
+                            {request.items.length - 1 > 0 && (
                               <p className="text-xs italic text-muted-foreground tracking-tighter">
-                                Có {request.items.length} vật phẩm khác...
+                                Có {request.items.length - 1} vật phẩm khác...
                               </p>
                             )}
                           </div>
@@ -416,7 +351,7 @@ function OutgoingRequestsPanel() {
                         <td className="px-4 py-3 whitespace-nowrap">
                           {new Date(request.createdAt).toLocaleString("vi-VN")}
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground w-44 max-w-44 whitespace-normal wrap-break-word leading-snug">
+                        <td className="px-4 py-3 text-muted-foreground w-56 max-w-56 whitespace-normal wrap-break-word leading-snug">
                           {request.note || "—"}
                         </td>
                       </motion.tr>
@@ -429,7 +364,6 @@ function OutgoingRequestsPanel() {
         </motion.div>
       )}
 
-      {/* ── Pagination ── */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -486,7 +420,6 @@ function OutgoingRequestsPanel() {
         </div>
       </motion.div>
 
-      {/* ── Tracker Sheet ── */}
       <SupplyRequestTracker
         request={trackerRequest}
         open={trackerOpen}
@@ -494,41 +427,5 @@ function OutgoingRequestsPanel() {
         onActionSuccess={() => refetch()}
       />
     </div>
-  );
-}
-
-// ── Stat Card ─────────────────────────────────────────────────────────────────
-
-function OutgoingStatCard({
-  label,
-  value,
-  colorClass,
-  valueClass,
-  active,
-  onClick,
-}: {
-  label: string;
-  value: number;
-  colorClass: string;
-  valueClass: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "rounded-xl border p-3.5 text-left transition-all",
-        colorClass,
-        active && "ring-2 ring-foreground/20 ring-offset-1",
-      )}
-    >
-      <p className={cn("text-2xl font-bold tracking-tighter", valueClass)}>
-        {value}
-      </p>
-      <p className="text-xs text-muted-foreground tracking-tighter mt-0.5 font-medium">
-        {label}
-      </p>
-    </button>
   );
 }

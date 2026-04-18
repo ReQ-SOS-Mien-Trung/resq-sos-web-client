@@ -53,6 +53,9 @@ import {
   ClockCounterClockwise,
   ArrowUp,
   ArrowDown,
+  Bank,
+  CalendarBlank,
+  FunnelSimple,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -70,10 +73,12 @@ import {
   useMyDepotAdvancers,
   useCreateInternalAdvance,
   useCreateInternalRepayment,
+  useDepotFundTransactionsByFundId,
 } from "@/services/depot/hooks";
 import type {
   DepotFundTransaction,
   DepotFundSource,
+  DepotFundReferenceType,
 } from "@/services/depot/type";
 import {
   useDepotFundTransactionTypes,
@@ -82,6 +87,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useFundingRequests,
+  useFundingRequestStatuses,
   useFundingRequestItems,
   useCreateFundingRequest,
   useDownloadFundingRequestTemplate,
@@ -95,6 +101,14 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Icon } from "@iconify/react";
 import { AxiosError } from "axios";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { vi as viLocale } from "date-fns/locale";
 
 function getApiErrorMessage(error: unknown, fallback: string): string {
   const axiosError = error as AxiosError<{ message?: string }>;
@@ -200,6 +214,22 @@ const statusConfig: Record<
     dotColor: "bg-rose-500",
   },
 };
+
+type HistoryStatusFilter = "all" | FundingRequestStatus;
+
+const FUND_TX_REFERENCE_TYPE_OPTIONS: Array<{
+  value: DepotFundReferenceType;
+  label: string;
+}> = [
+  {
+    value: "CampaignDisbursement",
+    label: "Giải ngân chiến dịch",
+  },
+  {
+    value: "VatInvoice",
+    label: "Hóa đơn VAT",
+  },
+];
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
@@ -468,7 +498,7 @@ function matchCategoryCode(
   return fallback ? FALLBACK_CATEGORY_MAP[fallback] : "";
 }
 
-type TabType = "create" | "history" | "transactions" | "ledger";
+type TabType = "create" | "history" | "ledger" | "funds";
 type LedgerMode = "advance" | "repayment";
 
 /* ── Import row with validation ───────────────────────────── */
@@ -581,12 +611,6 @@ export default function FundingRequestPage() {
     enabled: Boolean(depotId),
   });
   const queryClient = useQueryClient();
-  const [txPage, setTxPage] = useState(1);
-  const [txPageSize, setTxPageSize] = useState(10);
-  const { data: txData, isLoading: loadingTx } = useMyDepotFundTransactions(
-    { depotId, pageNumber: txPage, pageSize: txPageSize },
-    { enabled: Boolean(depotId) },
-  );
   const { data: txTypesMeta = [] } = useDepotFundTransactionTypes();
   const { data: refTypesMeta = [] } = useDepotFundReferenceTypes();
   const txTypeMap = useMemo(
@@ -621,6 +645,89 @@ export default function FundingRequestPage() {
     return Math.max(advanceLimit - outstandingAdvanceAmount, 0);
   }, [myFund?.advanceLimit, myFund?.outstandingAdvanceAmount]);
 
+  // ── Quỹ kho (fund transactions by fundId) state ──
+  const [selectedFundId, setSelectedFundId] = useState<number | null>(null);
+  const [fundTxPage, setFundTxPage] = useState(1);
+  const [fundTxPageSize, setFundTxPageSize] = useState(10);
+  const [fundTxSearch, setFundTxSearch] = useState("");
+  const [fundTxSearchInput, setFundTxSearchInput] = useState("");
+  const [fundTxFromDate, setFundTxFromDate] = useState<Date | undefined>(
+    undefined,
+  );
+  const [fundTxToDate, setFundTxToDate] = useState<Date | undefined>(undefined);
+  const [fundTxFromDateOpen, setFundTxFromDateOpen] = useState(false);
+  const [fundTxToDateOpen, setFundTxToDateOpen] = useState(false);
+  const [fundTxMinAmount, setFundTxMinAmount] = useState("");
+  const [fundTxMaxAmount, setFundTxMaxAmount] = useState("");
+  const [fundTxReferenceTypes, setFundTxReferenceTypes] = useState<
+    DepotFundReferenceType[]
+  >([]);
+  const [fundTxAmountError, setFundTxAmountError] = useState("");
+  const [fundTxDateError, setFundTxDateError] = useState("");
+
+  const fundTxParams = useMemo(
+    () => ({
+      depotId,
+      pageNumber: fundTxPage,
+      pageSize: fundTxPageSize,
+      search: fundTxSearch || undefined,
+      fromDate: fundTxFromDate
+        ? format(fundTxFromDate, "yyyy-MM-dd")
+        : undefined,
+      toDate: fundTxToDate ? format(fundTxToDate, "yyyy-MM-dd") : undefined,
+      minAmount: fundTxMinAmount ? Number(fundTxMinAmount) : undefined,
+      maxAmount: fundTxMaxAmount ? Number(fundTxMaxAmount) : undefined,
+      referenceTypes:
+        fundTxReferenceTypes.length > 0 ? fundTxReferenceTypes : undefined,
+    }),
+    [
+      depotId,
+      fundTxPage,
+      fundTxPageSize,
+      fundTxSearch,
+      fundTxFromDate,
+      fundTxToDate,
+      fundTxMinAmount,
+      fundTxMaxAmount,
+      fundTxReferenceTypes,
+    ],
+  );
+
+  function handleFundTxApplyFilters() {
+    // validate date
+    if (fundTxFromDate && fundTxToDate && fundTxFromDate > fundTxToDate) {
+      setFundTxDateError("Ngày bắt đầu không được sau ngày kết thúc");
+      return;
+    }
+    setFundTxDateError("");
+    // validate amount
+    const min = fundTxMinAmount ? Number(fundTxMinAmount) : undefined;
+    const max = fundTxMaxAmount ? Number(fundTxMaxAmount) : undefined;
+    if (min !== undefined && max !== undefined && min > max) {
+      setFundTxAmountError("Số tiền tối thiểu không được lớn hơn tối đa");
+      return;
+    }
+    setFundTxAmountError("");
+    setFundTxSearch(fundTxSearchInput);
+    setFundTxPage(1);
+  }
+
+  function handleFundTxResetFilters() {
+    setFundTxSearch("");
+    setFundTxSearchInput("");
+    setFundTxFromDate(undefined);
+    setFundTxToDate(undefined);
+    setFundTxMinAmount("");
+    setFundTxMaxAmount("");
+    setFundTxReferenceTypes([]);
+    setFundTxAmountError("");
+    setFundTxDateError("");
+    setFundTxPage(1);
+  }
+
+  const selectedFundTxReferenceType =
+    fundTxReferenceTypes.length === 1 ? fundTxReferenceTypes[0] : "all";
+
   const [activeTab, setActiveTab] = useState<TabType>("create");
   const [ledgerMode, setLedgerMode] = useState<LedgerMode>("advance");
   const [ledgerSearch, setLedgerSearch] = useState("");
@@ -644,6 +751,13 @@ export default function FundingRequestPage() {
     useMyDepotAdvancers(
       { depotId, pageNumber: advancersPage, pageSize: advancersPageSize },
       { enabled: activeTab === "ledger" && Boolean(depotId) },
+    );
+
+  const { data: fundTxData, isLoading: loadingFundTx } =
+    useDepotFundTransactionsByFundId(
+      selectedFundId ?? undefined,
+      fundTxParams,
+      { enabled: activeTab === "funds" && !!selectedFundId && !!depotId },
     );
 
   const ledgerContributors = useMemo(() => {
@@ -845,6 +959,28 @@ export default function FundingRequestPage() {
   // ── History ──
   const [histPage, setHistPage] = useState(1);
   const [histPageSize, setHistPageSize] = useState(10);
+  const [histStatusFilter, setHistStatusFilter] =
+    useState<HistoryStatusFilter>("all");
+  const { data: fundingRequestStatusesData } = useFundingRequestStatuses({
+    enabled: activeTab === "history",
+  });
+  const historyStatusOptions = useMemo(() => {
+    const apiStatuses = (fundingRequestStatusesData ?? []).filter(
+      (status): status is FundingRequestStatus => status in statusConfig,
+    );
+    const statuses =
+      apiStatuses.length > 0
+        ? apiStatuses
+        : (Object.keys(statusConfig) as FundingRequestStatus[]);
+
+    return [
+      { value: "all" as const, label: "Tất cả" },
+      ...statuses.map((status) => ({
+        value: status,
+        label: statusConfig[status].label,
+      })),
+    ];
+  }, [fundingRequestStatusesData]);
   const { data: requestsData, isLoading: loadingRequests } = useFundingRequests(
     {
       params: {
@@ -852,7 +988,9 @@ export default function FundingRequestPage() {
         pageSize: histPageSize,
         depotId: depotId || undefined,
         depotIds: depotId ? [depotId] : undefined,
+        statuses: histStatusFilter === "all" ? undefined : [histStatusFilter],
       },
+      enabled: activeTab === "history" && Boolean(depotId),
     },
   );
   const requests = useMemo(() => requestsData?.items ?? [], [requestsData]);
@@ -1499,10 +1637,11 @@ export default function FundingRequestPage() {
               </p>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter text-foreground leading-tight">
-              Yêu cầu cấp quỹ
+              Quản lý quỹ kho
             </h1>
             <p className="text-base tracking-tighter text-muted-foreground mt-1.5">
-              Gửi yêu cầu cấp quỹ mua vật phẩm và xem lịch sử yêu cầu
+              Tạo yêu cầu cấp quỹ, quản lý ứng tiền và quyết toán, xem biến động
+              quỹ kho.
             </p>
           </div>
           {activeTab === "create" && (
@@ -1558,15 +1697,15 @@ export default function FundingRequestPage() {
             )}
           </button>
           <button
-            onClick={() => setActiveTab("transactions")}
+            onClick={() => setActiveTab("funds")}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium tracking-tighter rounded-md transition-colors ${
-              activeTab === "transactions"
+              activeTab === "funds"
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <ClockCounterClockwise size={20} />
-            Biến động quỹ kho
+            <Bank size={20} />
+            Quỹ kho
           </button>
           <button
             onClick={() => setActiveTab("ledger")}
@@ -2201,7 +2340,7 @@ export default function FundingRequestPage() {
             >
               <Card className="border border-border/50">
                 <CardContent className="px-5 space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
                     <h3 className="text-base font-semibold tracking-tighter flex items-center gap-1.5">
                       <ListBullets size={16} className="text-primary" />
                       Lịch sử yêu cầu cấp quỹ
@@ -2214,6 +2353,30 @@ export default function FundingRequestPage() {
                         </Badge>
                       )}
                     </h3>
+
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-sm font-medium tracking-tighter text-muted-foreground">
+                        Trạng thái
+                      </span>
+                      <Select
+                        value={histStatusFilter}
+                        onValueChange={(value) => {
+                          setHistStatusFilter(value as HistoryStatusFilter);
+                          setHistPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="h-9 w-[180px] text-sm tracking-tighter">
+                          <SelectValue placeholder="Chọn trạng thái" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {historyStatusOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   {loadingRequests ? (
@@ -3093,247 +3256,642 @@ export default function FundingRequestPage() {
               </div>
             </motion.div>
           )}
+        </AnimatePresence>
 
-          {/* ─── TRANSACTIONS TAB ──────────────────────────────── */}
-          {activeTab === "transactions" && (
-            <motion.div
-              key="transactions"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
-            >
-              <Card className="border border-border/50">
-                <CardContent className="px-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold tracking-tighter flex items-center gap-1.5">
-                      <ClockCounterClockwise
-                        size={16}
-                        className="text-primary"
-                      />
-                      Lịch sử giao dịch kho
-                      {txData && (
-                        <Badge
-                          variant="secondary"
-                          className="ml-1 text-[10px] px-1.5 py-0 font-medium"
-                        >
-                          {txData.totalCount}
-                        </Badge>
-                      )}
-                    </h3>
+        {/* ─── QUỸ KHO TAB ─────────────────────────────── */}
+        {activeTab === "funds" && (
+          <motion.div
+            key="funds"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="space-y-4"
+          >
+            <Card className="border border-border/50">
+              <CardContent className="px-5 space-y-4">
+                <h3 className="text-base font-semibold tracking-tighter flex items-center gap-1.5 pt-1">
+                  <Bank size={16} className="text-primary" />
+                  Danh sách quỹ kho
+                  {fundSources.length > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="ml-1 text-[10px] px-1.5 py-0 font-medium"
+                    >
+                      {fundSources.length}
+                    </Badge>
+                  )}
+                </h3>
+                {loadingFund ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                    ))}
                   </div>
-
-                  {loadingTx ? (
-                    <div className="space-y-2">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Skeleton key={i} className="h-12 w-full rounded-lg" />
-                      ))}
-                    </div>
-                  ) : !txData?.items?.length ? (
-                    <div className="p-10 text-center">
-                      <ClockCounterClockwise
-                        size={40}
-                        className="mx-auto text-muted-foreground/30 mb-3"
-                      />
-                      <p className="text-sm text-muted-foreground tracking-tighter">
-                        Chưa có giao dịch nào
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="rounded-lg border border-border/60 overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-muted/50 hover:bg-muted/50">
-                              <TableHead className="w-12 text-center text-sm tracking-tighter">
-                                #
-                              </TableHead>
-                              <TableHead className="text-sm tracking-tighter">
-                                Loại giao dịch
-                              </TableHead>
-                              <TableHead className="text-sm tracking-tighter">
-                                Nguồn tham chiếu
-                              </TableHead>
-                              <TableHead className="text-sm tracking-tighter">
-                                Người ứng
-                              </TableHead>
-                              <TableHead className="text-sm tracking-tighter min-w-50">
-                                Ghi chú
-                              </TableHead>
-                              <TableHead className="text-sm tracking-tighter text-right">
-                                Số tiền
-                              </TableHead>
-                              <TableHead className="text-sm tracking-tighter text-right">
-                                Thời gian
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {txData.items.map((tx, idx) => {
-                              const isCredit = tx.amount >= 0;
-                              const displayType =
-                                txTypeMap[tx.transactionType] ??
-                                tx.transactionType;
-                              const displayRef =
-                                refTypeMap[tx.referenceType] ??
-                                tx.referenceType;
-                              return (
-                                <motion.tr
-                                  key={tx.id}
-                                  className="hover:bg-muted/30 transition-colors border-b border-border/40"
-                                  initial={{ opacity: 0, y: 8 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  transition={{
-                                    duration: 0.25,
-                                    delay: idx * 0.04,
-                                    ease: "easeOut",
-                                  }}
-                                >
-                                  <TableCell className="text-center text-sm text-muted-foreground">
-                                    {(txPage - 1) * txPageSize + idx + 1}
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-2">
-                                      <div
-                                        className={cn(
-                                          "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
-                                          isCredit
-                                            ? "bg-emerald-100 dark:bg-emerald-950/40"
-                                            : "bg-rose-100 dark:bg-rose-950/40",
-                                        )}
-                                      >
-                                        {isCredit ? (
-                                          <ArrowDown
-                                            size={12}
-                                            weight="bold"
-                                            className="text-emerald-600"
-                                          />
-                                        ) : (
-                                          <ArrowUp
-                                            size={12}
-                                            weight="bold"
-                                            className="text-rose-600"
-                                          />
-                                        )}
-                                      </div>
-                                      <span className="text-sm font-medium tracking-tighter">
-                                        {displayType}
-                                      </span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <span className="text-sm tracking-tighter text-muted-foreground">
-                                      {displayRef}
-                                      {tx.referenceId != null
-                                        ? ` #${tx.referenceId}`
-                                        : ""}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell>
-                                    {tx.contributorName ? (
-                                      <div className="text-sm tracking-tighter leading-tight">
-                                        <p className="font-medium text-foreground">
-                                          {tx.contributorName}
-                                        </p>
-                                        <p className="text-muted-foreground">
-                                          {tx.phoneNumber || "—"}
-                                        </p>
-                                      </div>
-                                    ) : (
-                                      <span className="text-sm tracking-tighter text-muted-foreground">
-                                        —
-                                      </span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    <span className="text-sm tracking-tighter text-muted-foreground line-clamp-1">
-                                      {tx.note || "—"}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <span
-                                      className={cn(
-                                        "text-sm font-bold tracking-tighter",
-                                        isCredit
-                                          ? "text-emerald-600"
-                                          : "text-rose-600",
-                                      )}
-                                    >
-                                      {isCredit ? "+" : "-"}
-                                      {formatMoney(Math.abs(tx.amount))}
-                                    </span>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <span className="text-sm text-muted-foreground tracking-tighter">
-                                      {new Date(tx.createdAt).toLocaleString(
-                                        "vi-VN",
-                                      )}
-                                    </span>
-                                  </TableCell>
-                                </motion.tr>
+                ) : fundSources.length === 0 ? (
+                  <div className="p-10 text-center">
+                    <Bank
+                      size={40}
+                      className="mx-auto text-muted-foreground/30 mb-3"
+                    />
+                    <p className="text-sm text-muted-foreground tracking-tighter">
+                      Chưa có quỹ nào
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-border/60 overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableHead className="text-sm tracking-tighter">
+                            #
+                          </TableHead>
+                          <TableHead className="text-sm tracking-tighter">
+                            Nguồn quỹ
+                          </TableHead>
+                          <TableHead className="text-sm tracking-tighter">
+                            Kho
+                          </TableHead>
+                          <TableHead className="text-sm tracking-tighter text-right">
+                            Số dư
+                          </TableHead>
+                          <TableHead className="text-sm tracking-tighter text-right">
+                            Cập nhật
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {fundSources.map((fund, idx) => (
+                          <TableRow
+                            key={fund.id}
+                            className={cn(
+                              "cursor-pointer transition-colors",
+                              selectedFundId === fund.id
+                                ? "bg-primary/8 border-l-2 border-primary"
+                                : "hover:bg-muted/30",
+                            )}
+                            onClick={() => {
+                              setSelectedFundId(
+                                selectedFundId === fund.id ? null : fund.id,
                               );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-
-                      {/* Pagination */}
-                      <div className="flex items-center justify-between pt-2">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-muted-foreground tracking-tighter">
-                            Trang {txData.pageNumber}/{txData.totalPages} ·{" "}
-                            {txData.totalCount} giao dịch
-                          </p>
-                          <Select
-                            value={String(txPageSize)}
-                            onValueChange={(v) => {
-                              setTxPageSize(Number(v));
-                              setTxPage(1);
+                              setFundTxPage(1);
+                              handleFundTxResetFilters();
                             }}
                           >
-                            <SelectTrigger className="w-16 h-7 text-sm">
-                              <SelectValue />
+                            <TableCell className="text-sm text-muted-foreground">
+                              {idx + 1}
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm font-medium tracking-tighter">
+                                {fund.fundSourceName}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm tracking-tighter text-muted-foreground">
+                                {fund.depotName}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span
+                                className={cn(
+                                  "text-sm font-semibold tabular-nums",
+                                  fund.balance >= 0
+                                    ? "text-emerald-600"
+                                    : "text-rose-600",
+                                )}
+                              >
+                                {fund.balance.toLocaleString("vi-VN")}đ
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right text-sm text-muted-foreground tracking-tighter">
+                              {new Date(fund.lastUpdatedAt).toLocaleString(
+                                "vi-VN",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* ─── Bottom panel: transactions ─── */}
+            <AnimatePresence>
+              {selectedFundId !== null && (
+                <motion.div
+                  key="fund-tx-panel"
+                  initial={{ opacity: 0, y: 60 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 60 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                >
+                  <Card className="border border-border/50">
+                    <CardContent className="px-5 space-y-4">
+                      {/* Panel header */}
+                      <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                        <h3 className="text-base font-semibold tracking-tighter flex items-center gap-1.5">
+                          <ClockCounterClockwise
+                            size={16}
+                            className="text-primary"
+                          />
+                          Giao dịch quỹ #{selectedFundId}
+                          {fundTxData && (
+                            <Badge
+                              variant="secondary"
+                              className="ml-1 text-[10px] px-1.5 py-0 font-medium"
+                            >
+                              {fundTxData.totalCount}
+                            </Badge>
+                          )}
+                        </h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 gap-1 text-xs text-muted-foreground"
+                          onClick={() => {
+                            setSelectedFundId(null);
+                            handleFundTxResetFilters();
+                          }}
+                        >
+                          <X size={14} />
+                          Đóng
+                        </Button>
+                      </div>
+
+                      {/* ─── Filters ─── */}
+                      <div className="rounded-lg border border-border/50 bg-muted/20 p-3 space-y-3">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground tracking-tighter">
+                          <FunnelSimple size={13} />
+                          Bộ lọc
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 xl:flex-nowrap">
+                          <div className="min-w-[280px] flex-1">
+                            <Input
+                              className="h-8 tracking-tighter text-xs"
+                              placeholder="Tìm ghi chú, tên người nộp, số điện thoại..."
+                              value={fundTxSearchInput}
+                              onChange={(e) =>
+                                setFundTxSearchInput(e.target.value)
+                              }
+                              onKeyDown={(e) =>
+                                e.key === "Enter" && handleFundTxApplyFilters()
+                              }
+                            />
+                          </div>
+                          <Select
+                            value={selectedFundTxReferenceType}
+                            onValueChange={(value) => {
+                              setFundTxReferenceTypes(
+                                value === "all"
+                                  ? []
+                                  : [value as DepotFundReferenceType],
+                              );
+                            }}
+                          >
+                            <SelectTrigger className="h-8 min-w-[150px] shrink-0 text-xs tracking-tighter">
+                              <SelectValue placeholder="Loại tham chiếu" />
                             </SelectTrigger>
                             <SelectContent>
-                              {[5, 10, 20, 50].map((s) => (
-                                <SelectItem key={s} value={String(s)}>
-                                  {s}
+                              <SelectItem value="all">Tất cả</SelectItem>
+                              {FUND_TX_REFERENCE_TYPE_OPTIONS.map((option) => (
+                                <SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                >
+                                  {option.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                          <span className="text-sm text-muted-foreground tracking-tighter">
-                            / trang
-                          </span>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <Popover
+                              open={fundTxFromDateOpen}
+                              onOpenChange={setFundTxFromDateOpen}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="default"
+                                  className="h-8 min-w-32 justify-start gap-1.5 px-2.5 text-xs font-normal"
+                                >
+                                  <CalendarBlank className="h-3 w-3 shrink-0" />
+                                  {fundTxFromDate ? (
+                                    format(fundTxFromDate, "dd/MM/yyyy")
+                                  ) : (
+                                    <span className="text-muted-foreground">
+                                      Từ ngày
+                                    </span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-auto p-0"
+                                align="start"
+                              >
+                                <Calendar
+                                  mode="single"
+                                  selected={fundTxFromDate}
+                                  onSelect={(d) => {
+                                    if (d && fundTxToDate && d > fundTxToDate) {
+                                      setFundTxToDate(undefined);
+                                    }
+                                    setFundTxFromDate(d);
+                                    setFundTxFromDateOpen(false);
+                                  }}
+                                  disabled={(d) =>
+                                    fundTxToDate ? d > fundTxToDate : false
+                                  }
+                                  locale={viLocale}
+                                  initialFocus
+                                />
+                                {fundTxFromDate && (
+                                  <div className="border-t px-3 py-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-full text-xs text-muted-foreground"
+                                      onClick={() => {
+                                        setFundTxFromDate(undefined);
+                                        setFundTxFromDateOpen(false);
+                                      }}
+                                    >
+                                      Xóa
+                                    </Button>
+                                  </div>
+                                )}
+                              </PopoverContent>
+                            </Popover>
+                            <span className="text-xs text-muted-foreground">
+                              –
+                            </span>
+                            <Popover
+                              open={fundTxToDateOpen}
+                              onOpenChange={setFundTxToDateOpen}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="default"
+                                  className="h-8 min-w-32 justify-start gap-1.5 px-2.5 text-xs font-normal"
+                                >
+                                  <CalendarBlank className="h-3 w-3 shrink-0" />
+                                  {fundTxToDate ? (
+                                    format(fundTxToDate, "dd/MM/yyyy")
+                                  ) : (
+                                    <span className="text-muted-foreground">
+                                      Đến ngày
+                                    </span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-auto p-0"
+                                align="start"
+                              >
+                                <Calendar
+                                  mode="single"
+                                  selected={fundTxToDate}
+                                  onSelect={(d) => {
+                                    if (
+                                      d &&
+                                      fundTxFromDate &&
+                                      d < fundTxFromDate
+                                    ) {
+                                      setFundTxFromDate(undefined);
+                                    }
+                                    setFundTxToDate(d);
+                                    setFundTxToDateOpen(false);
+                                  }}
+                                  disabled={(d) =>
+                                    fundTxFromDate ? d < fundTxFromDate : false
+                                  }
+                                  locale={viLocale}
+                                  initialFocus
+                                />
+                                {fundTxToDate && (
+                                  <div className="border-t px-3 py-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-full text-xs text-muted-foreground"
+                                      onClick={() => {
+                                        setFundTxToDate(undefined);
+                                        setFundTxToDateOpen(false);
+                                      }}
+                                    >
+                                      Xóa
+                                    </Button>
+                                  </div>
+                                )}
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              className="h-8 w-37 tracking-tighter text-xs"
+                              placeholder="Tiền tối thiểu"
+                              value={formatMoneyInput(fundTxMinAmount)}
+                              onChange={(e) => {
+                                const rawValue = e.target.value.replace(
+                                  /\D/g,
+                                  "",
+                                );
+                                setFundTxMinAmount(rawValue);
+                                setFundTxAmountError(
+                                  fundTxMaxAmount &&
+                                    Number(rawValue) > Number(fundTxMaxAmount)
+                                    ? "Tối thiểu không được lớn hơn tối đa"
+                                    : "",
+                                );
+                              }}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              –
+                            </span>
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              className="h-8 w-37 tracking-tighter text-xs"
+                              placeholder="Tiền tối đa"
+                              value={formatMoneyInput(fundTxMaxAmount)}
+                              onChange={(e) => {
+                                const rawValue = e.target.value.replace(
+                                  /\D/g,
+                                  "",
+                                );
+                                setFundTxMaxAmount(rawValue);
+                                setFundTxAmountError(
+                                  fundTxMinAmount &&
+                                    Number(rawValue) < Number(fundTxMinAmount)
+                                    ? "Tối đa không được nhỏ hơn tối thiểu"
+                                    : "",
+                                );
+                              }}
+                            />
+                          </div>
+                          <div className="flex w-full items-center gap-2 sm:w-[260px] xl:w-[280px]">
+                            <Button
+                              size="sm"
+                              className="h-8 flex-1 px-3 text-xs gap-1 tracking-tighter"
+                              onClick={handleFundTxApplyFilters}
+                              disabled={
+                                !!fundTxAmountError || !!fundTxDateError
+                              }
+                            >
+                              Áp dụng bộ lọc
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 flex-1 px-3 text-xs gap-1 text-muted-foreground tracking-tighter"
+                              onClick={handleFundTxResetFilters}
+                            >
+                              Đặt lại
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex gap-1.5">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!txData.hasPreviousPage}
-                            onClick={() => setTxPage((p) => Math.max(1, p - 1))}
-                            className="h-7 px-3 text-sm"
-                          >
-                            Trước
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!txData.hasNextPage}
-                            onClick={() => setTxPage((p) => p + 1)}
-                            className="h-7 px-3 text-sm"
-                          >
-                            Tiếp
-                          </Button>
-                        </div>
+                        {(fundTxAmountError || fundTxDateError) && (
+                          <p className="text-xs text-rose-500 tracking-tighter flex items-center gap-1">
+                            <WarningCircle size={13} weight="fill" />
+                            {fundTxAmountError || fundTxDateError}
+                          </p>
+                        )}
                       </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
+
+                      {/* ─── Transaction table ─── */}
+                      {loadingFundTx ? (
+                        <div className="space-y-2">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Skeleton
+                              key={i}
+                              className="h-12 w-full rounded-lg"
+                            />
+                          ))}
+                        </div>
+                      ) : !fundTxData?.items?.length ? (
+                        <div className="p-10 text-center">
+                          <ClockCounterClockwise
+                            size={40}
+                            className="mx-auto text-muted-foreground/30 mb-3"
+                          />
+                          <p className="text-sm text-muted-foreground tracking-tighter">
+                            Không có giao dịch nào
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="rounded-lg border border-border/60 overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                  <TableHead className="w-12 text-center text-sm tracking-tighter">
+                                    #
+                                  </TableHead>
+                                  <TableHead className="text-sm tracking-tighter">
+                                    Loại GD
+                                  </TableHead>
+                                  <TableHead className="text-sm tracking-tighter">
+                                    Tham chiếu
+                                  </TableHead>
+                                  <TableHead className="text-sm tracking-tighter">
+                                    Người nộp
+                                  </TableHead>
+                                  <TableHead className="text-sm tracking-tighter">
+                                    Ghi chú
+                                  </TableHead>
+                                  <TableHead className="text-sm tracking-tighter text-right">
+                                    Số tiền
+                                  </TableHead>
+                                  <TableHead className="text-sm tracking-tighter text-right">
+                                    Thời gian
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {fundTxData.items.map((tx, idx) => {
+                                  const isCredit = tx.amount >= 0;
+                                  const displayRef =
+                                    refTypeMap[tx.referenceType] ??
+                                    tx.referenceType;
+                                  const displayType =
+                                    txTypeMap[tx.transactionType] ??
+                                    tx.transactionType;
+                                  return (
+                                    <motion.tr
+                                      key={tx.id}
+                                      className="hover:bg-muted/30 transition-colors border-b border-border/40"
+                                      initial={{ opacity: 0, y: 8 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      transition={{
+                                        duration: 0.2,
+                                        delay: idx * 0.03,
+                                        ease: "easeOut",
+                                      }}
+                                    >
+                                      <TableCell className="text-center text-sm text-muted-foreground">
+                                        {(fundTxPage - 1) * fundTxPageSize +
+                                          idx +
+                                          1}
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex items-center gap-2">
+                                          <div
+                                            className={cn(
+                                              "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
+                                              isCredit
+                                                ? "bg-emerald-100 dark:bg-emerald-950/40"
+                                                : "bg-rose-100 dark:bg-rose-950/40",
+                                            )}
+                                          >
+                                            {isCredit ? (
+                                              <ArrowDown
+                                                size={12}
+                                                weight="bold"
+                                                className="text-emerald-600"
+                                              />
+                                            ) : (
+                                              <ArrowUp
+                                                size={12}
+                                                weight="bold"
+                                                className="text-rose-600"
+                                              />
+                                            )}
+                                          </div>
+                                          <span className="text-sm font-medium tracking-tighter">
+                                            {displayType}
+                                          </span>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>
+                                        <span className="text-sm tracking-tighter text-muted-foreground">
+                                          {displayRef}
+                                          {tx.referenceId != null
+                                            ? ` #${tx.referenceId}`
+                                            : ""}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell>
+                                        {tx.contributorName ? (
+                                          <div className="text-sm tracking-tighter leading-tight">
+                                            <p className="font-medium text-foreground">
+                                              {tx.contributorName}
+                                            </p>
+                                            <p className="text-muted-foreground">
+                                              {tx.contributorPhoneNumber || "—"}
+                                            </p>
+                                          </div>
+                                        ) : (
+                                          <span className="text-sm text-muted-foreground">
+                                            —
+                                          </span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        <span className="text-sm tracking-tighter text-muted-foreground line-clamp-2">
+                                          {tx.note || "—"}
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        <span
+                                          className={cn(
+                                            "text-sm font-semibold tabular-nums",
+                                            isCredit
+                                              ? "text-emerald-600"
+                                              : "text-rose-600",
+                                          )}
+                                        >
+                                          {/* {isCredit ? "+" : ""} */}
+                                          {tx.amount.toLocaleString("vi-VN")}đ
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="text-right text-sm text-muted-foreground tracking-tighter">
+                                        {new Date(tx.createdAt).toLocaleString(
+                                          "vi-VN",
+                                          {
+                                            month: "short",
+                                            day: "numeric",
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          },
+                                        )}
+                                      </TableCell>
+                                    </motion.tr>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                          <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-muted-foreground tracking-tighter">
+                                Trang {fundTxData.pageNumber} /{" "}
+                                {fundTxData.totalPages} ·{" "}
+                                {fundTxData.totalCount} giao dịch
+                              </p>
+                              <Select
+                                value={String(fundTxPageSize)}
+                                onValueChange={(value) => {
+                                  setFundTxPageSize(Number(value));
+                                  setFundTxPage(1);
+                                }}
+                              >
+                                <SelectTrigger className="h-7 w-[72px] text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {[5, 10, 20, 50, 100].map((size) => (
+                                    <SelectItem key={size} value={String(size)}>
+                                      {size}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <span className="text-xs text-muted-foreground tracking-tighter">
+                                / trang
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2.5 text-xs"
+                                disabled={!fundTxData.hasPreviousPage}
+                                onClick={() =>
+                                  setFundTxPage((p) => Math.max(1, p - 1))
+                                }
+                              >
+                                Trước
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2.5 text-xs"
+                                disabled={!fundTxData.hasNextPage}
+                                onClick={() => setFundTxPage((p) => p + 1)}
+                              >
+                                Tiếp
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
       </div>
 
       {/* ── Detail Dialog ─────────────────────────────────── */}

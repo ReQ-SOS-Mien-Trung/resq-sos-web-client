@@ -2,11 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
-import {
-  mockInventoryItems,
-  mockShipments,
-  mockActivityLogs,
-} from "@/lib/mock-data";
+import { mockInventoryItems, mockShipments } from "@/lib/mock-data";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -46,8 +42,6 @@ import {
   CategoryOverview,
   DepotSidebar,
   ItemDetailsSheet,
-  LowStockAlerts,
-  RecentActivity,
 } from "@/components/inventory";
 import SupplyRequestManagement from "@/components/inventory/SupplyRequestManagement";
 import { VatTuSection } from "@/components/inventory/VatTuTabContent";
@@ -650,7 +644,7 @@ const InventoryDashboardPage = () => {
             onClick={() => router.push("/dashboard/inventory/funding-request")}
           >
             <WalletIcon className="h-4 w-4" />
-            Yêu cầu cấp quỹ
+            Quản lý quỹ kho
           </Button>
           <Button
             variant="outline"
@@ -987,15 +981,6 @@ const InventoryDashboardPage = () => {
                 {selectedDepotId && (
                   <DepotChartsSection depotId={selectedDepotId} />
                 )}
-
-                {/* Two Column Layout: Alerts + Activity */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Low Stock Alerts */}
-                  <LowStockAlerts />
-
-                  {/* Recent Activity */}
-                  <RecentActivity activities={mockActivityLogs} maxItems={8} />
-                </div>
               </>
             )}
           </motion.div>

@@ -394,6 +394,7 @@ export type SupplyRequestRole = "Requester" | "Source";
 
 export interface GetSupplyRequestsParams {
   depotId: number;
+  role?: SupplyRequestRole;
   sourceStatus?: SourceSupplyRequestStatus;
   requestingStatus?: RequestingSupplyRequestStatus;
   pageNumber?: number;

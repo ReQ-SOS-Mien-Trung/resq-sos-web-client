@@ -205,13 +205,13 @@ function CampaignFundFlowChart() {
     : "Biến động quỹ chiến dịch";
 
   return (
-    <Card className="border border-border/50">
+    <Card className="border border-border/50 py-0">
       <CardContent className="p-4">
         <div className="flex items-center gap-2 mb-4">
           <div className="p-1.5 rounded-md bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
             <ChartBarHorizontal className="h-4 w-4" weight="fill" />
           </div>
-          <p className="text-sm font-semibold tracking-tight">{title}</p>
+          <p className="text-base font-semibold tracking-tighter">{title}</p>
         </div>
         {isLoading || loadingCampaigns ? (
           <div className="h-52 flex items-center justify-center">
@@ -249,11 +249,11 @@ function CampaignFundFlowChart() {
             }}
           />
         ) : !loadingCampaigns && !firstCampaign ? (
-          <p className="text-xs text-muted-foreground tracking-tighter">
+          <p className="text-sm text-muted-foreground tracking-tighter">
             Không có chiến dịch đang hoạt động
           </p>
         ) : (
-          <p className="text-xs text-muted-foreground tracking-tighter">
+          <p className="text-sm text-muted-foreground tracking-tighter">
             Không có dữ liệu
           </p>
         )}

@@ -13,8 +13,9 @@ import {
   useBanUser,
   useUnbanUser,
   ADMIN_USERS_QUERY_KEY,
+  useRoleMetadata,
 } from "@/services/user/hooks";
-import { UserEntity } from "@/services/user/type";
+import { RoleMetadataOption, UserEntity } from "@/services/user/type";
 import { User } from "@/type";
 import {
   Dialog,
@@ -77,11 +78,31 @@ const UsersPage = () => {
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useState("");
+  const [selectedRoleId, setSelectedRoleId] = useState("all");
+  const [selectedBanFilter, setSelectedBanFilter] = useState<
+    "all" | "active" | "banned"
+  >("all");
+
+  const { data: roleMetadata = [] } = useRoleMetadata();
+  const roleOptions = roleMetadata
+    .filter((role: RoleMetadataOption) => Number(role.key) !== 3)
+    .map((role: RoleMetadataOption) => ({
+      value: role.key,
+      label: role.value,
+    }));
 
   // Fetch users with server-side pagination
   const { data: usersData, isLoading: isLoadingUsers } = useAdminUsers({
     pageNumber: page,
     pageSize,
+    roleId:
+      selectedRoleId !== "all" ? Number(selectedRoleId) : undefined,
+    isBanned:
+      selectedBanFilter === "all"
+        ? undefined
+        : selectedBanFilter === "banned",
+    search: search.trim() || undefined,
   });
 
   const dynamicStats = {
@@ -182,6 +203,22 @@ const UsersPage = () => {
 
         <UserTable
           users={usersData?.items?.map(mapUserEntityToUser) ?? []}
+          searchValue={search}
+          onSearchChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          roleOptions={roleOptions}
+          selectedRoleId={selectedRoleId}
+          onRoleIdChange={(value) => {
+            setSelectedRoleId(value);
+            setPage(1);
+          }}
+          selectedBanFilter={selectedBanFilter}
+          onBanFilterChange={(value) => {
+            setSelectedBanFilter(value);
+            setPage(1);
+          }}
           onEdit={handleEditClick}
           onBan={handleBanClick}
           onActivate={handleActivateClick}

@@ -1,3 +1,5 @@
+import type { DepotFundReferenceType } from "@/services/depot/type";
+
 // ─── Depot Fund Metadata ───
 
 export interface DepotFundMetadataItem {
@@ -11,6 +13,12 @@ export interface GetDepotFundTransactionsParams {
   depotId: number;
   pageNumber?: number;
   pageSize?: number;
+  fromDate?: string;
+  toDate?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  referenceTypes?: DepotFundReferenceType[];
+  search?: string;
 }
 
 export interface DepotFundTransactionItem {

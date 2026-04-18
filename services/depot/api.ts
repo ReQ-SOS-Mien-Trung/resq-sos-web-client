@@ -679,3 +679,17 @@ export async function getDepotFundMovementChart(
   );
   return data;
 }
+
+/**
+ * GET /finance/depot-funds/{fundId}/fund-transactions
+ */
+export async function getDepotFundTransactionsByFundId(
+  fundId: number,
+  params: import("./type").GetFundTransactionsByFundIdParams,
+): Promise<import("./type").GetFundTransactionsByFundIdResponse> {
+  const { data } = await api.get(
+    `/finance/depot-funds/${fundId}/fund-transactions`,
+    { params },
+  );
+  return data;
+}

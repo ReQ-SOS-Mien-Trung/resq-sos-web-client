@@ -327,7 +327,14 @@ export async function getSupplyRequests(
   params: GetSupplyRequestsParams,
 ): Promise<GetSupplyRequestsResponse> {
   const { data } = await api.get("/logistics/inventory/supply-requests", {
-    params,
+    params: {
+      depotId: params.depotId,
+      role: params.role,
+      sourceStatus: params.sourceStatus,
+      requestingStatus: params.requestingStatus,
+      pageNumber: params.pageNumber,
+      pageSize: params.pageSize,
+    },
   });
   // API wraps response in { data: { items: [...], ... }, serverTime: "..." }
   return data?.data ?? data;

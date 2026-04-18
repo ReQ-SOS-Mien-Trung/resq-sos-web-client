@@ -41,6 +41,7 @@ import {
   getDepotCapacityChart,
   getDepotInventoryMovementChart,
   getDepotFundMovementChart,
+  getDepotFundTransactionsByFundId,
 } from "./api";
 import {
   GetDepotsResponse,
@@ -127,6 +128,9 @@ export const MY_DEPOT_FUND_TRANSACTIONS_QUERY_KEY = [
   "my-depot-fund-transactions",
 ] as const;
 export const MY_DEPOT_ADVANCERS_QUERY_KEY = ["my-depot-advancers"] as const;
+export const DEPOT_FUND_TRANSACTIONS_BY_FUND_ID_QUERY_KEY = [
+  "depot-fund-transactions-by-fund-id",
+] as const;
 
 function invalidateDepotFundFinanceQueries(
   queryClient: ReturnType<typeof useQueryClient>,
@@ -907,5 +911,17 @@ export function useDepotFundMovementChart(
     queryKey: ["depot-fund-movement-chart", depotId, params],
     queryFn: () => getDepotFundMovementChart(depotId!, params),
     enabled: (options?.enabled ?? true) && !!depotId,
+  });
+}
+
+export function useDepotFundTransactionsByFundId(
+  fundId: number | undefined,
+  params: import("./type").GetFundTransactionsByFundIdParams,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: [...DEPOT_FUND_TRANSACTIONS_BY_FUND_ID_QUERY_KEY, fundId, params],
+    queryFn: () => getDepotFundTransactionsByFundId(fundId!, params),
+    enabled: (options?.enabled ?? true) && !!fundId,
   });
 }

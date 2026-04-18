@@ -252,12 +252,19 @@ function ThresholdConfigRow({
             {label}
           </p>
           {sublabel ? (
-            <p className="text-sm tracking-tighter text-muted-foreground">{sublabel}</p>
+            <p className="text-sm tracking-tighter text-muted-foreground">
+              {sublabel}
+            </p>
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {canEdit ? (
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onEdit}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onEdit}
+            >
               <PencilSimple className="h-3 w-3" />
             </Button>
           ) : null}
@@ -283,19 +290,25 @@ function ThresholdConfigRow({
           )}
         >
           <span className="text-sm font-bold tabular-nums tracking-tighter text-foreground">
-            <span className="text-sm tracking-tighter font-normal">Ngưỡng tối thiểu: </span>
+            <span className="text-sm tracking-tighter font-normal">
+              Ngưỡng tối thiểu:{" "}
+            </span>
             {config.minimumThreshold != null
               ? formatNumber(config.minimumThreshold)
               : "—"}
           </span>
-
         </div>
         <div className="text-right">
           <p className="text-xs tabular-nums tracking-tighter text-muted-foreground whitespace-nowrap">
             Tạo lúc: {formatDate(config.updatedAt)}
           </p>
           {config.rowVersion != null ? (
-            <p className="text-xs tracking-tighter text-muted-foreground">Version: <span className="text-black font-medium">v{config.rowVersion}</span></p>
+            <p className="text-xs tracking-tighter text-muted-foreground">
+              Version:{" "}
+              <span className="text-black font-medium">
+                v{config.rowVersion}
+              </span>
+            </p>
           ) : null}
         </div>
       </div>
@@ -605,7 +618,9 @@ export default function ThresholdConfigPage() {
         config,
         label: `Ngưỡng theo vật phẩm số ${config.itemModelId}`,
         sublabel:
-          config.itemModelId != null ? `Mã số ${config.itemModelId}` : undefined,
+          config.itemModelId != null
+            ? `Mã số ${config.itemModelId}`
+            : undefined,
         canEdit: true,
         canDelete: true,
       });
@@ -754,11 +769,11 @@ export default function ThresholdConfigPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={tabTransition}
             >
-
-
               {loadingThresholds ? (
                 <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-                  {(["Global", "Depot", "DepotCategory", "DepotItem"] as const).map((scope) => (
+                  {(
+                    ["Global", "Depot", "DepotCategory", "DepotItem"] as const
+                  ).map((scope) => (
                     <div key={scope} className="flex flex-col">
                       <div
                         className={cn(
@@ -800,17 +815,19 @@ export default function ThresholdConfigPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={cardTransition}
                 >
-                  {(["Global", "Depot", "DepotCategory", "DepotItem"] as const).map(
-                    (scope) => (
-                      <ThresholdScopeSection
-                        key={scope}
-                        scopeType={scope}
-                        items={allConfigs.filter((c) => c.config.scopeType === scope)}
-                        onEdit={openEdit}
-                        onDelete={openDelete}
-                      />
-                    ),
-                  )}
+                  {(
+                    ["Global", "Depot", "DepotCategory", "DepotItem"] as const
+                  ).map((scope) => (
+                    <ThresholdScopeSection
+                      key={scope}
+                      scopeType={scope}
+                      items={allConfigs.filter(
+                        (c) => c.config.scopeType === scope,
+                      )}
+                      onEdit={openEdit}
+                      onDelete={openDelete}
+                    />
+                  ))}
                 </motion.div>
               )}
             </motion.div>
@@ -854,7 +871,7 @@ export default function ThresholdConfigPage() {
                       className={cn(
                         "border-0 shadow-none",
                         WARNING_LEVEL_COLORS[level] ??
-                        "bg-slate-100 text-slate-700",
+                          "bg-slate-100 text-slate-700",
                       )}
                     >
                       {getLowStockWarningLabel(level)}:{" "}
@@ -988,12 +1005,8 @@ export default function ThresholdConfigPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Depot">Kho (Depot)</SelectItem>
-                <SelectItem value="DepotCategory">
-                  Theo danh mục
-                </SelectItem>
-                <SelectItem value="DepotItem">
-                  Theo vật phẩm
-                </SelectItem>
+                <SelectItem value="DepotCategory">Theo danh mục</SelectItem>
+                <SelectItem value="DepotItem">Theo vật phẩm</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1100,7 +1113,10 @@ export default function ThresholdConfigPage() {
 
             {form.minimumThreshold ? (
               <div className="flex gap-2.5 rounded-lg border border-blue-200 bg-blue-50/60 p-3">
-                <ChartBar className="h-4 w-4 shrink-0 text-blue-500 mt-0.5" weight="fill" />
+                <ChartBar
+                  className="h-4 w-4 shrink-0 text-blue-500 mt-0.5"
+                  weight="fill"
+                />
                 <div className="space-y-1 text-sm tracking-tighter">
                   <p className="font-medium text-foreground">
                     Severity ratio = Khả dụng /{" "}
@@ -1109,7 +1125,8 @@ export default function ThresholdConfigPage() {
                     </span>
                   </p>
                   <p className="text-muted-foreground">
-                    Hệ thống sẽ so sánh ratio với warning band mặc định để xác định cảnh báo.
+                    Hệ thống sẽ so sánh ratio với warning band mặc định để xác
+                    định cảnh báo.
                   </p>
                 </div>
               </div>
@@ -1136,7 +1153,11 @@ export default function ThresholdConfigPage() {
 
           {/* Footer */}
           <div className="flex items-center justify-end gap-2 border-t px-5 py-3 bg-muted/30">
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(false)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditOpen(false)}
+            >
               Hủy
             </Button>
             <Button
@@ -1157,30 +1178,33 @@ export default function ThresholdConfigPage() {
       </Dialog>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="sm:max-w-md gap-0 p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[26rem] gap-0 p-0 overflow-hidden">
           {/* Header with red accent */}
-          <div className="flex flex-col items-center gap-3 border-b px-5 pt-6 pb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600">
-              <Trash className="h-6 w-6" weight="fill" />
+          <div className="flex flex-col items-center gap-2.5 border-b px-4 pt-5 pb-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
+              <Trash className="h-5 w-5" weight="fill" />
             </div>
             <div className="text-center">
               <DialogTitle className="text-base font-bold tracking-tighter">
                 Reset cấu hình ngưỡng
               </DialogTitle>
-              <p className="mt-1 text-sm tracking-tighter text-muted-foreground">
-                Fallback về scope cao hơn trong chuỗi ưu tiên
-              </p>
             </div>
           </div>
 
           {/* Body */}
-          <div className="space-y-3 px-5 py-4">
+          <div className="space-y-3 px-4 py-3">
             {deleteTarget ? (
-              <div className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5">
-                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", SCOPE_DOT[deleteTarget.scopeType] ?? "bg-slate-400")} />
+              <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                <span
+                  className={cn(
+                    "h-2 w-2 shrink-0 rounded-full",
+                    SCOPE_DOT[deleteTarget.scopeType] ?? "bg-slate-400",
+                  )}
+                />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium tracking-tighter text-foreground">
-                    {SCOPE_LABELS[deleteTarget.scopeType] ?? deleteTarget.scopeType}
+                    {SCOPE_LABELS[deleteTarget.scopeType] ??
+                      deleteTarget.scopeType}
                   </p>
                   <p className="text-sm tracking-tighter text-muted-foreground">
                     {formatThresholdDisplay(deleteTarget)}
@@ -1189,27 +1213,27 @@ export default function ThresholdConfigPage() {
               </div>
             ) : null}
 
-            <div className="flex gap-2.5 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
-              <WarningCircle className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" weight="fill" />
-              <p className="text-sm tracking-tighter text-muted-foreground">
-                Hành động này không thể hoàn tác. Ngưỡng sẽ fallback về DepotItem → DepotCategory → Depot → Global.
-              </p>
-            </div>
-
             <div className="space-y-1.5">
-              <Label className="text-sm tracking-tighter font-medium">Lý do reset (tùy chọn)</Label>
+              <Label className="text-sm tracking-tighter font-medium">
+                Lý do reset (tùy chọn)
+              </Label>
               <Textarea
-                placeholder="VD: Không cần override riêng nữa"
+                placeholder="VD: Cấu hình này không còn phù hợp do thay đổi về chiến lược tồn kho"
                 value={deleteReason}
                 onChange={(event) => setDeleteReason(event.target.value)}
                 rows={2}
+                className="min-h-20"
               />
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 border-t px-5 py-3 bg-muted/30">
-            <Button variant="outline" size="sm" onClick={() => setDeleteOpen(false)}>
+          <div className="flex items-center justify-end gap-2 border-t px-4 py-2.5 bg-muted/30">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteOpen(false)}
+            >
               Hủy
             </Button>
             <Button

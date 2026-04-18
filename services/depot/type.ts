@@ -700,3 +700,48 @@ export interface GetDepotFundMovementParams {
   from?: string;
   to?: string;
 }
+
+// ─── Fund Transactions by FundId ─────────────────────────────────────────────
+// GET /finance/depot-funds/{fundId}/fund-transactions
+
+export type DepotFundReferenceType = "CampaignDisbursement" | "VatInvoice";
+
+export interface FundTransactionDetail {
+  id: number;
+  depotFundId: number;
+  transactionType: string;
+  amount: number;
+  referenceType: string;
+  referenceId: number | null;
+  note: string;
+  createdBy: string;
+  createdAt: string;
+  contributorName: string | null;
+  contributorPhoneNumber: string | null;
+  contributorTotalAdvancedAmount: number;
+  contributorTotalRepaidAmount: number;
+  contributorOutstandingAmount: number;
+  contributorRepaidPercentage: number;
+}
+
+export interface GetFundTransactionsByFundIdParams {
+  depotId: number;
+  pageNumber?: number;
+  pageSize?: number;
+  fromDate?: string;
+  toDate?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  referenceTypes?: DepotFundReferenceType[];
+  search?: string;
+}
+
+export interface GetFundTransactionsByFundIdResponse {
+  items: FundTransactionDetail[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
