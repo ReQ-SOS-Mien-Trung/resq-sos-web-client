@@ -1,9 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import {
   DropdownMenu,
@@ -16,31 +15,38 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   SidebarSimple,
-  MagnifyingGlass,
   User,
-  CaretDown,
   Gear,
   SignOut,
-  DownloadSimple,
-  UploadSimple,
   SquaresFour,
-  Sparkle,
   ShareNetwork,
   Warning,
   UsersThree,
+  Buildings,
 } from "@phosphor-icons/react";
 import { HeaderProps } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
+import { useSystemFund } from "@/services/system_fund";
 
-const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
+function formatMoney(value: number) {
+  return value.toLocaleString("vi-VN") + "đ";
+}
+
+const Header = ({
+  onSidebarToggle,
+  sidebarOpen = true,
+}: HeaderProps) => {
   const router = useRouter();
+  const pathname = usePathname();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
+  const { data: systemFund, isLoading: loadingSystemFund } = useSystemFund();
 
   const userDisplayName = getUserDisplayName(user);
   const userInitials = getUserAvatarInitials(user);
+  const isSystemFundPage = pathname === "/dashboard/admin/system-fund";
 
   // Get role name based on roleId
   const getRoleName = (roleId?: number) => {
@@ -85,26 +91,25 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
         </div>
       </div>
 
-      {/* Center Section - Search */}
-      <div className="flex-1 max-w-md mx-8">
-        <div className="relative group">
-          <MagnifyingGlass
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-red-500 transition-colors"
-          />
-          <Input
-            placeholder="Tìm kiếm..."
-            className="w-full pl-10 pr-4 h-10 bg-muted/60 border-2 border-border/60 rounded-xl focus:bg-background focus:border-red-600 focus:ring-2 focus:ring-red-500/30 transition-all duration-200 text-foreground placeholder:text-foreground/50"
-          />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-sm tracking-tighter text-muted-foreground">
-            <Sparkle size={12} className="text-red-500" />
-            <span>AI</span>
-          </div>
-        </div>
-      </div>
-
       {/* Right Section */}
       <div className="flex items-center gap-2">
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => router.push("/dashboard/admin/system-fund")}
+          className={cn(
+            "hidden md:flex gap-1.5 h-9 rounded-lg transition-all duration-200 shadow-sm",
+            isSystemFundPage
+              ? "bg-emerald-700 text-white hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+              : "bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600",
+          )}
+        >
+          <Buildings size={16} className="text-white" />
+          {loadingSystemFund
+            ? "Số dư quỹ hệ thống: —"
+            : `Số dư quỹ hệ thống: ${formatMoney(systemFund?.balance ?? 0)}`}
+        </Button>
+
         {/* Customize Widget Button */}
         <Button
           variant="outline"

@@ -109,6 +109,7 @@ export interface DepotEntity {
   latitude: number;
   longitude: number;
   capacity: number;
+  weightCapacity?: number;
   currentUtilization: number;
   status: DepotStatus;
   imageUrl?: string | null;
@@ -143,6 +144,7 @@ export interface CreateDepotRequest {
   latitude: number;
   longitude: number;
   capacity: number;
+  weightCapacity: number;
   managerId?: string;
   imageUrl?: string;
 }
@@ -155,6 +157,7 @@ export interface UpdateDepotRequest {
   latitude: number;
   longitude: number;
   capacity: number;
+  weightCapacity?: number;
 }
 
 // Update Depot Status Request

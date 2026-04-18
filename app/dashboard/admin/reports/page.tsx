@@ -553,8 +553,7 @@ export default function FundingRequestsPage() {
         ): item is {
           key: DepotFundReferenceType;
           value: string;
-        } =>
-          item.key === "CampaignDisbursement" || item.key === "VatInvoice",
+        } => item.key === "CampaignDisbursement" || item.key === "VatInvoice",
       ),
     [refTypesMeta],
   );
@@ -698,8 +697,12 @@ export default function FundingRequestsPage() {
 
     setDepotTxDateError("");
 
-    const min = depotTxMinAmountInput ? Number(depotTxMinAmountInput) : undefined;
-    const max = depotTxMaxAmountInput ? Number(depotTxMaxAmountInput) : undefined;
+    const min = depotTxMinAmountInput
+      ? Number(depotTxMinAmountInput)
+      : undefined;
+    const max = depotTxMaxAmountInput
+      ? Number(depotTxMaxAmountInput)
+      : undefined;
 
     if (min !== undefined && max !== undefined && min > max) {
       setDepotTxAmountError("Số tiền tối thiểu không được lớn hơn tối đa");
@@ -1759,7 +1762,11 @@ export default function FundingRequestsPage() {
                             mode="single"
                             selected={depotTxFromDate}
                             onSelect={(date) => {
-                              if (date && depotTxToDate && date > depotTxToDate) {
+                              if (
+                                date &&
+                                depotTxToDate &&
+                                date > depotTxToDate
+                              ) {
                                 setDepotTxToDate(undefined);
                               }
                               setDepotTxFromDate(date);

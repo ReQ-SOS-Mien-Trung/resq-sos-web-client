@@ -21,13 +21,16 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowsDownUp,
-  Clock,
   ArrowLeft,
   CaretDown,
   CaretRight,
 } from "@phosphor-icons/react";
 import { useRescueTeamsOverview } from "@/services/admin_dashboard/team-overview.hooks";
 import { RescueTeamOverviewItem } from "@/services/admin_dashboard/team-overview.type";
+import {
+  useRescueTeamStatuses,
+  useRescueTeamTypes,
+} from "@/services/rescue_teams/hooks";
 import {
   TeamDetailPanel,
   getStatusBadge,
@@ -41,6 +44,13 @@ type SortColumn =
   | "updatedAt";
 type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
+
+const TEAM_TYPE_BADGE_CLASS: Record<string, string> = {
+  Rescue: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+  Medical: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  Transportation: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  Mixed: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
+};
 
 const SortIcon = ({
   column,
@@ -74,7 +84,7 @@ const SortHeader = ({
   <th className="text-left p-3">
     <button
       onClick={() => onSort(column)}
-      className="flex items-center gap-1 text-sm font-semibold text-foreground hover:text-foreground/70 transition-colors"
+      className="flex items-center gap-1 text-sm font-semibold tracking-tighter text-foreground hover:text-foreground/70 transition-colors"
     >
       {label}
       <SortIcon column={column} sort={sort} />
@@ -98,10 +108,18 @@ const TeamOverviewPage = () => {
     pageNumber: page,
     pageSize,
   });
+  const { data: rescueTeamStatuses = [] } = useRescueTeamStatuses();
+  const { data: rescueTeamTypes = [] } = useRescueTeamTypes();
 
   const teams = data?.items ?? [];
   const totalCount = data?.totalCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rescueTeamStatusMap = Object.fromEntries(
+    rescueTeamStatuses.map((status) => [status.key, status.value]),
+  );
+  const rescueTeamTypeMap = Object.fromEntries(
+    rescueTeamTypes.map((type) => [type.key, type.value]),
+  );
 
   const sortedTeams = sort
     ? [...teams].sort((a, b) => {
@@ -156,34 +174,37 @@ const TeamOverviewPage = () => {
       >
         {/* Page Header */}
         <motion.div
-          className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4"
+          className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-2"
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.05, ease: "easeOut" }}
         >
           <div>
+            <button
+              onClick={() => router.back()}
+              className="flex items-center mb-2 gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+            >
+              <ArrowLeft
+                size={16}
+                className="group-hover:-translate-x-0.5 transition-transform"
+              />
+              <span className="tracking-tighter text-sm font-medium">
+                Quay lại
+              </span>
+            </button>
             <div className="flex items-center gap-2.5 mb-1">
               <UsersThree size={24} weight="fill" className="text-red-500" />
-              <p className="text-sm font-semibold uppercase text-muted-foreground">
+              <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
                 Nhân sự
               </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter text-foreground leading-tight">
               Tổng quan đội cứu hộ
             </h1>
-            <p className="text-[16px] text-muted-foreground mt-1.5">
+            <p className="text-base tracking-tighter text-muted-foreground mt-1.5">
               Danh sách tất cả đội, ưu tiên biến động mới nhất
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.back()}
-            className="gap-2 h-9 rounded-lg"
-          >
-            <ArrowLeft size={16} />
-            Quay lại
-          </Button>
         </motion.div>
 
         {/* Table Card */}
@@ -192,14 +213,14 @@ const TeamOverviewPage = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.12, ease: "easeOut" }}
         >
-          <Card className="border border-border/50">
+          <Card className="border border-border/50 py-0">
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border/50">
                       <th className="w-8 p-3" />
-                      <th className="text-left p-3 text-sm font-semibold text-foreground">
+                      <th className="text-left p-3 text-sm tracking-tighter font-semibold text-foreground">
                         Mã
                       </th>
                       <SortHeader
@@ -220,7 +241,7 @@ const TeamOverviewPage = () => {
                         sort={sort}
                         onSort={handleSort}
                       />
-                      <th className="text-left p-3 text-sm font-semibold text-foreground">
+                      <th className="text-left p-3 text-sm tracking-tighter font-semibold text-foreground">
                         Điểm tập kết
                       </th>
                       <SortHeader
@@ -252,7 +273,7 @@ const TeamOverviewPage = () => {
                       <tr>
                         <td
                           colSpan={8}
-                          className="p-10 text-center text-muted-foreground text-sm"
+                          className="p-10 text-center tracking-tighter text-muted-foreground text-sm"
                         >
                           Không có đội cứu hộ nào
                         </td>
@@ -262,11 +283,18 @@ const TeamOverviewPage = () => {
                         (team: RescueTeamOverviewItem, rowIdx: number) => {
                           const isExpanded = expandedTeamId === team.id;
                           const statusBadge = getStatusBadge(team.status);
+                          const statusLabel =
+                            rescueTeamStatusMap[team.status] ?? team.status;
+                          const teamTypeLabel =
+                            rescueTeamTypeMap[team.teamType] ?? team.teamType;
+                          const teamTypeBadgeClass =
+                            TEAM_TYPE_BADGE_CLASS[team.teamType] ??
+                            "border-border/60 bg-background text-foreground";
                           return (
                             <React.Fragment key={team.id}>
                               <tr
                                 onClick={() => handleRowClick(team.id)}
-                                className={`border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer ${isExpanded ? "bg-muted/40" : ""}`}
+                                className={`transition-colors cursor-pointer ${isExpanded ? "bg-muted/40" : ""}`}
                                 style={{
                                   animationDelay: `${rowIdx * 40}ms`,
                                   animation: "fadeSlideIn 0.35s ease-out both",
@@ -286,50 +314,48 @@ const TeamOverviewPage = () => {
                                   )}
                                 </td>
                                 <td className="p-3">
-                                  <Badge
-                                    variant="outline"
-                                    className="text-sm font-mono"
-                                  >
+                                  <span className="text-sm font-medium text-foreground tracking-tighter">
                                     {team.code}
-                                  </Badge>
+                                  </span>
                                 </td>
                                 <td className="p-3">
-                                  <span className="text-sm font-medium text-foreground">
+                                  <span className="text-sm font-medium text-foreground tracking-tighter">
                                     {team.name}
                                   </span>
                                 </td>
                                 <td className="p-3">
-                                  <Badge variant="outline" className="text-sm">
-                                    {team.teamType}
+                                  <Badge
+                                    className={`text-sm tracking-tighter ${teamTypeBadgeClass}`}
+                                  >
+                                    {teamTypeLabel}
                                   </Badge>
                                 </td>
                                 <td className="p-3">
                                   <Badge
                                     className={`text-sm ${statusBadge.className}`}
                                   >
-                                    {team.status}
+                                    {statusLabel}
                                   </Badge>
                                 </td>
-                                <td className="p-3 text-sm text-foreground/80">
+                                <td className="p-3 text-sm tracking-tighter text-foreground/80">
                                   {team.assemblyPointName}
                                 </td>
-                                <td className="p-3 text-sm text-foreground/80">
+                                <td className="p-3 text-sm tracking-tighter">
                                   <span
                                     className={
                                       team.currentMemberCount >= team.maxMembers
-                                        ? "text-rose-500 font-medium"
-                                        : ""
+                                        ? "text-rose-500 tracking-tighter font-semibold"
+                                        : "tracking-tighter font-semibold"
                                     }
                                   >
                                     {team.currentMemberCount}
                                   </span>
-                                  <span className="text-muted-foreground">
+                                  <span className="text-muted-foreground font-mono tracking-tighter">
                                     /{team.maxMembers}
                                   </span>
                                 </td>
                                 <td className="p-3">
-                                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                    <Clock size={12} />
+                                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground tracking-tighter">
                                     {new Date(team.updatedAt).toLocaleString(
                                       "vi-VN",
                                       {

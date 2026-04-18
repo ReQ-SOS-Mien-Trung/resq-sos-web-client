@@ -44,7 +44,6 @@ import {
   CalendarBlank,
   MapPin,
   TrendUp,
-  Wallet,
   CheckCircle,
   XCircle,
   ArrowClockwise,
