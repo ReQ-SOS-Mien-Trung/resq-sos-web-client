@@ -33,11 +33,15 @@ type LogisticsUpdateListener = (
   payload: ReceiveLogisticsUpdatePayload,
 ) => void;
 
+const START_RETRY_DELAY_MS = 2000;
+
 export class OperationalRealtimeClient {
   private connection: HubConnection | null = null;
   private startPromise: Promise<void> | null = null;
   private isLifecycleBound = false;
   private isReceiveEventsBound = false;
+  private pendingRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private shouldMaintainConnection = false;
   private connectionState: OperationalRealtimeConnectionState = "disconnected";
   private stateListeners = new Set<ConnectionStateListener>();
   private assemblyPointListListeners = new Set<AssemblyPointListUpdateListener>();
@@ -59,6 +63,55 @@ export class OperationalRealtimeClient {
 
     this.connectionState = nextState;
     this.notifyConnectionState();
+  }
+
+  private clearPendingRetry(): void {
+    if (!this.pendingRetryTimer) {
+      return;
+    }
+
+    clearTimeout(this.pendingRetryTimer);
+    this.pendingRetryTimer = null;
+  }
+
+  private isNegotiationAbortError(error: unknown): boolean {
+    const message =
+      error instanceof Error ? error.message : String(error ?? "");
+    const normalized = message.toLowerCase();
+
+    return (
+      normalized.includes("stopped during negotiation") ||
+      normalized.includes("aborterror")
+    );
+  }
+
+  private scheduleRetryStart(): void {
+    if (!this.shouldMaintainConnection) {
+      this.clearPendingRetry();
+      return;
+    }
+
+    if (this.pendingRetryTimer) {
+      return;
+    }
+
+    this.setConnectionState("reconnecting");
+
+    this.pendingRetryTimer = setTimeout(() => {
+      this.pendingRetryTimer = null;
+
+      if (!this.shouldMaintainConnection) {
+        return;
+      }
+
+      void this.start().catch((error) => {
+        if (this.isNegotiationAbortError(error)) {
+          return;
+        }
+
+        console.error("Failed to reconnect operational hub:", error);
+      });
+    }, START_RETRY_DELAY_MS);
   }
 
   private async waitForDisconnected(
@@ -119,6 +172,10 @@ export class OperationalRealtimeClient {
 
       this.connection.onclose(() => {
         this.setConnectionState("disconnected");
+
+        if (this.shouldMaintainConnection) {
+          this.scheduleRetryStart();
+        }
       });
 
       this.isLifecycleBound = true;
@@ -202,6 +259,7 @@ export class OperationalRealtimeClient {
 
   subscribeConnectionState(listener: ConnectionStateListener): () => void {
     this.stateListeners.add(listener);
+    listener(this.connectionState);
 
     return () => {
       this.stateListeners.delete(listener);
@@ -209,6 +267,9 @@ export class OperationalRealtimeClient {
   }
 
   async start(): Promise<void> {
+    this.shouldMaintainConnection = true;
+    this.clearPendingRetry();
+
     if (this.startPromise) {
       await this.startPromise;
       return;
@@ -229,7 +290,7 @@ export class OperationalRealtimeClient {
     }
 
     if (connection.state === HubConnectionState.Connecting) {
-      this.setConnectionState("reconnecting");
+      this.setConnectionState("connecting");
       return;
     }
 
@@ -239,6 +300,11 @@ export class OperationalRealtimeClient {
       }
 
       if (connection.state === HubConnectionState.Disconnected) {
+        this.setConnectionState(
+          this.connectionState === "reconnecting"
+            ? "reconnecting"
+            : "connecting",
+        );
         await connection.start();
       }
 
@@ -250,6 +316,14 @@ export class OperationalRealtimeClient {
     this.startPromise = startTask()
       .catch((error) => {
         this.setConnectionState("disconnected");
+
+        if (
+          this.shouldMaintainConnection &&
+          !this.isNegotiationAbortError(error)
+        ) {
+          this.scheduleRetryStart();
+        }
+
         throw error;
       })
       .finally(() => {
@@ -260,6 +334,9 @@ export class OperationalRealtimeClient {
   }
 
   async stop(): Promise<void> {
+    this.shouldMaintainConnection = false;
+    this.clearPendingRetry();
+
     if (!this.connection) {
       this.setConnectionState("disconnected");
       return;

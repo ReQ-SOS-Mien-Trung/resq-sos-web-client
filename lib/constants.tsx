@@ -468,11 +468,7 @@ export const navigationItems = [
     label: "Tổng quan",
     href: "/dashboard/admin",
   },
-  {
-    icon: Siren,
-    label: "Quản lý yêu cầu SOS",
-    href: "/dashboard/admin/sos-requests",
-  },
+
   {
     icon: UserIcon,
     label: "Quản lý người dùng",

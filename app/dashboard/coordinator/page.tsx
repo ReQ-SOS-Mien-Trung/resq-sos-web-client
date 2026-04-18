@@ -405,10 +405,14 @@ const CoordinatorDashboardContent = () => {
     clusterIds: activeRealtimeClusterIds,
   });
   const isConnected = operationalConnectionState === "connected";
+  const isConnecting = operationalConnectionState === "connecting";
   const isReconnecting = operationalConnectionState === "reconnecting";
+  const isConnectingLike = isConnecting || isReconnecting;
   const connectionLabel = isConnected
     ? "Đang kết nối"
-    : isReconnecting
+    : isConnecting
+      ? "Đang kết nối realtime"
+      : isReconnecting
       ? "Đang kết nối lại"
       : "Mất kết nối";
 
@@ -1061,7 +1065,7 @@ const CoordinatorDashboardContent = () => {
               "relative flex h-9 w-9 items-center justify-center rounded-full border",
               isConnected
                 ? "border-green-200 bg-green-100 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-400"
-                : isReconnecting
+                : isConnectingLike
                   ? "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/30 dark:text-amber-400"
                   : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
             )}
@@ -1073,7 +1077,7 @@ const CoordinatorDashboardContent = () => {
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-green-500 opacity-75 animate-ping" />
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-green-500 dark:border-zinc-900/70" />
               </>
-            ) : isReconnecting ? (
+            ) : isConnectingLike ? (
               <>
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-amber-500 opacity-75 animate-ping" />
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-amber-500 dark:border-zinc-900/70" />
@@ -1083,7 +1087,7 @@ const CoordinatorDashboardContent = () => {
             )}
             {isConnected ? (
               <WifiHigh className="h-4 w-4" weight="bold" />
-            ) : isReconnecting ? (
+            ) : isConnectingLike ? (
               <ArrowsClockwise className="h-4 w-4 animate-spin" weight="bold" />
             ) : (
               <WifiSlash className="h-4 w-4" weight="bold" />

@@ -76,8 +76,8 @@ function applyI18n() {
 }
 
 // ─── Zone colors ───
-const ACTIVE_COLOR = "#16A34A";    // dark green for active zones
-const INACTIVE_COLOR = "#94a3b8";  // gray for inactive zones
+const ACTIVE_COLOR = "#16A34A"; // dark green for active zones
+const INACTIVE_COLOR = "#94a3b8"; // gray for inactive zones
 const HIGHLIGHT_COLOR = "#FF5722"; // orange when hovered from sidebar
 
 // ─── Component ───
@@ -92,7 +92,9 @@ export default function MapZoneEditor({
   const mapRef = useRef<L.Map | null>(null);
   const featureGroupRef = useRef<L.FeatureGroup | null>(null);
   const bgLayersRef = useRef<L.Layer[]>([]);
-  const bgPolygonsRef = useRef<Map<number, { polygon: L.Polygon; isActive: boolean }>>(new Map());
+  const bgPolygonsRef = useRef<
+    Map<number, { polygon: L.Polygon; isActive: boolean }>
+  >(new Map());
 
   // Keep latest callback in ref — avoids re-initializing map when callback changes
   const onChangeRef = useRef(onCoordinatesChange);
@@ -128,7 +130,6 @@ export default function MapZoneEditor({
     fg.addTo(map);
     featureGroupRef.current = fg;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const drawControl = new (L.Control as any).Draw({
       position: "topright",
       edit: { featureGroup: fg },
@@ -192,6 +193,7 @@ export default function MapZoneEditor({
   // ── Sync existing coordinates into the draw feature group ──
   useEffect(() => {
     const fg = featureGroupRef.current;
+    const map = mapRef.current;
     if (!fg) return;
 
     fg.clearLayers();
@@ -203,6 +205,13 @@ export default function MapZoneEditor({
         DRAW_STYLE,
       );
       fg.addLayer(polygon);
+
+      if (map) {
+        map.fitBounds(polygon.getBounds(), {
+          padding: [24, 24],
+          maxZoom: 12,
+        });
+      }
     }
   }, [existingCoordinates]);
 

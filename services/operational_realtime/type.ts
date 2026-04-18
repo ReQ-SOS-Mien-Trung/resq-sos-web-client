@@ -2,6 +2,7 @@
 
 export type OperationalRealtimeConnectionState =
   | "connected"
+  | "connecting"
   | "reconnecting"
   | "disconnected";
 
