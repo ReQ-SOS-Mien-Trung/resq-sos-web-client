@@ -1,6 +1,4 @@
-import type {
-  PromptType,
-} from "@/services/prompt/type";
+import type { PromptType } from "@/services/prompt/type";
 import type {
   MedicalSupportNeedType,
   SOSClothingPerson,
@@ -814,6 +812,8 @@ export interface SOSDetailsPanelProps {
   /** SOS requests in the same auto-cluster (within 1 km) */
   nearbySOSRequests: SOSRequest[];
   allSOSRequests: SOSRequest[];
+  /** Hide footer processing CTA when this panel is used in read-only flows */
+  hideProcessAction?: boolean;
 }
 
 export interface TeamIncidentDetailsPanelProps {
@@ -837,6 +837,8 @@ export interface RescuePlanPanelProps {
   onShowRoute?: (coords: [number, number][]) => void;
   /** Which tab to show when the panel opens */
   defaultTab?: "plan" | "missions";
+  /** True to disable all mutate actions and keep this panel in view-only mode */
+  readOnly?: boolean;
 }
 
 export interface ActivityTypeConfig {

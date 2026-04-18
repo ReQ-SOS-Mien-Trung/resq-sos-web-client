@@ -5562,9 +5562,11 @@ const MissionTeamRoutePreview = ({
 const SuggestionCard = ({
   suggestion,
   onEdit,
+  editable = true,
 }: {
   suggestion: MissionSuggestionEntity;
   onEdit: () => void;
+  editable?: boolean;
 }) => {
   const [expanded, setExpanded] = useState(false);
   const allActivities = suggestion.activities.flatMap(
@@ -5584,17 +5586,19 @@ const SuggestionCard = ({
               {suggestion.suggestedMissionTitle}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-6 text-sm gap-1 px-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-              onClick={onEdit}
-            >
-              <PencilSimpleLine className="h-3 w-3" />
-              Dùng gợi ý này
-            </Button>
-          </div>
+          {editable ? (
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-sm gap-1 px-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                onClick={onEdit}
+              >
+                <PencilSimpleLine className="h-3 w-3" />
+                Dùng gợi ý này
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
@@ -5785,6 +5789,7 @@ const RescuePlanPanel = ({
   isReAnalyzing,
   onShowRoute,
   defaultTab,
+  readOnly = false,
 }: RescuePlanPanelProps) => {
   // ── Custom resizable split ──
   const [splitPercent, setSplitPercent] = useState(42); // left panel %
@@ -6461,11 +6466,13 @@ const RescuePlanPanel = ({
   ]);
 
   const handleOpenSubmitConfirm = useCallback(() => {
+    if (readOnly) return;
     if (!validateEditMission()) return;
     setConfirmSubmitOpen(true);
-  }, [validateEditMission]);
+  }, [readOnly, validateEditMission]);
 
   const handleSubmitEdit = useCallback(() => {
+    if (readOnly) return;
     if (!validateEditMission() || !clusterId) return;
 
     const submit = async () => {
@@ -6735,6 +6742,7 @@ const RescuePlanPanel = ({
     createMissionAsync,
     exitEditMode,
     onApprove,
+    readOnly,
     updateMissionAsync,
     validateEditMission,
   ]);
@@ -7208,9 +7216,10 @@ const RescuePlanPanel = ({
 
   // Trigger stream when panel opens or re-analyze requested
   const handleStreamAnalyze = useCallback(() => {
+    if (readOnly) return;
     if (!clusterId) return;
     aiStream.startStream(clusterId);
-  }, [clusterId, aiStream]);
+  }, [clusterId, aiStream, readOnly]);
 
   // Sync stream result → rescueSuggestion equivalent
   const streamResult = aiStream.result;
@@ -7439,7 +7448,14 @@ const RescuePlanPanel = ({
       ? (activeSuggestion?.sosRequestCount ?? 0)
       : panelSOSRequests.length;
 
+  useEffect(() => {
+    if (readOnly) {
+      setIsEditMode(false);
+    }
+  }, [readOnly]);
+
   const enterEditMode = useCallback(() => {
+    if (readOnly) return;
     setEditActivityErrors({});
     setExpandedEditSupplyKeys({});
     if (activeSuggestion) {
@@ -7468,11 +7484,12 @@ const RescuePlanPanel = ({
     setEditExpectedEndTime(formatDateTimeLocalInputValue(end));
     setEditingMissionId(null);
     setIsEditMode(true);
-  }, [activeSuggestion, syncReturnActivitiesWithCollectors]);
+  }, [activeSuggestion, readOnly, syncReturnActivitiesWithCollectors]);
 
   // Enter edit from an existing mission (missions tab -> edit)
   const enterEditFromMission = useCallback(
     (mission: MissionEntity) => {
+      if (readOnly) return;
       setEditActivityErrors({});
       setExpandedEditSupplyKeys({});
       const sortedActivities = [...mission.activities].sort((a, b) => {
@@ -7548,7 +7565,7 @@ const RescuePlanPanel = ({
       setActiveTab("plan");
       setIsEditMode(true);
     },
-    [panelSOSRequests, syncReturnActivitiesWithCollectors],
+    [panelSOSRequests, readOnly, syncReturnActivitiesWithCollectors],
   );
 
   const hasSidebar = !!activeSuggestion;
@@ -7884,24 +7901,26 @@ const RescuePlanPanel = ({
                   Thoát chỉnh sửa
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-sm"
-                onClick={() => {
-                  handleStreamAnalyze();
-                }}
-                disabled={isReAnalyzing || aiStream.loading || isEditMode}
-              >
-                {isReAnalyzing || aiStream.loading ? (
-                  <CircleNotch className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <ArrowsClockwise className="h-3.5 w-3.5" />
-                )}
-                {isReAnalyzing || aiStream.loading
-                  ? "Đang phân tích..."
-                  : "Phân tích lại"}
-              </Button>
+              {!readOnly ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-sm"
+                  onClick={() => {
+                    handleStreamAnalyze();
+                  }}
+                  disabled={isReAnalyzing || aiStream.loading || isEditMode}
+                >
+                  {isReAnalyzing || aiStream.loading ? (
+                    <CircleNotch className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ArrowsClockwise className="h-3.5 w-3.5" />
+                  )}
+                  {isReAnalyzing || aiStream.loading
+                    ? "Đang phân tích..."
+                    : "Phân tích lại"}
+                </Button>
+              ) : null}
               <Badge
                 variant="outline"
                 className="text-sm gap-1 px-1.5 py-0 h-5"
@@ -8154,24 +8173,28 @@ const RescuePlanPanel = ({
                                         </Badge>
                                       </div>
                                       <div className="flex items-center gap-1.5 shrink-0">
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="h-7 text-sm gap-1 px-2.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-                                          onClick={() => {
-                                            if (editableActivitiesCount === 0) {
-                                              toast.info(
-                                                "Nhiệm vụ này không còn activity đủ điều kiện cập nhật.",
-                                              );
-                                              return;
-                                            }
+                                        {!readOnly ? (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7 text-sm gap-1 px-2.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                                            onClick={() => {
+                                              if (
+                                                editableActivitiesCount === 0
+                                              ) {
+                                                toast.info(
+                                                  "Nhiệm vụ này không còn activity đủ điều kiện cập nhật.",
+                                                );
+                                                return;
+                                              }
 
-                                            enterEditFromMission(mission);
-                                          }}
-                                        >
-                                          <PencilSimpleLine className="h-3.5 w-3.5" />
-                                          Chỉnh sửa
-                                        </Button>
+                                              enterEditFromMission(mission);
+                                            }}
+                                          >
+                                            <PencilSimpleLine className="h-3.5 w-3.5" />
+                                            Chỉnh sửa
+                                          </Button>
+                                        ) : null}
                                         <Badge
                                           variant="outline"
                                           className={cn(
@@ -10583,19 +10606,21 @@ const RescuePlanPanel = ({
                               <ArrowsClockwise className="h-3 w-3" />
                               Làm mới
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-sm gap-1.5"
-                              onClick={handleStreamAnalyze}
-                              disabled={!clusterId}
-                            >
-                              <Lightning
-                                className="h-3.5 w-3.5"
-                                weight="fill"
-                              />
-                              Phân tích bằng AI
-                            </Button>
+                            {!readOnly ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-sm gap-1.5"
+                                onClick={handleStreamAnalyze}
+                                disabled={!clusterId}
+                              >
+                                <Lightning
+                                  className="h-3.5 w-3.5"
+                                  weight="fill"
+                                />
+                                Phân tích bằng AI
+                              </Button>
+                            ) : null}
                           </div>
                         </div>
 
@@ -10616,7 +10641,11 @@ const RescuePlanPanel = ({
                                 <SuggestionCard
                                   key={suggestion.id}
                                   suggestion={suggestion}
+                                  editable={!readOnly}
                                   onEdit={() => {
+                                    if (readOnly) {
+                                      return;
+                                    }
                                     // Flatten activities from suggestion
                                     const allActivities =
                                       suggestion.activities.flatMap(
@@ -10657,19 +10686,21 @@ const RescuePlanPanel = ({
                               Chưa có gợi ý AI nào cho cụm này
                             </p>
                             <div className="flex items-center justify-center gap-2 mt-3">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1.5 text-sm"
-                                onClick={handleStreamAnalyze}
-                                disabled={!clusterId}
-                              >
-                                <Lightning
-                                  className="h-3.5 w-3.5"
-                                  weight="fill"
-                                />
-                                Phân tích bằng AI
-                              </Button>
+                              {!readOnly ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5 text-sm"
+                                  onClick={handleStreamAnalyze}
+                                  disabled={!clusterId}
+                                >
+                                  <Lightning
+                                    className="h-3.5 w-3.5"
+                                    weight="fill"
+                                  />
+                                  Phân tích bằng AI
+                                </Button>
+                              ) : null}
                             </div>
                           </div>
                         )}
@@ -10713,15 +10744,17 @@ const RescuePlanPanel = ({
                             Các bước thực hiện
                           </h3>
                           <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-sm gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-                              onClick={enterEditMode}
-                            >
-                              <PencilSimpleLine className="h-3 w-3" />
-                              Chỉnh sửa
-                            </Button>
+                            {!readOnly ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-sm gap-1 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                                onClick={enterEditMode}
+                              >
+                                <PencilSimpleLine className="h-3 w-3" />
+                                Chỉnh sửa
+                              </Button>
+                            ) : null}
                             <Badge
                               variant="secondary"
                               className="text-sm h-5 px-2"
@@ -11522,7 +11555,7 @@ const RescuePlanPanel = ({
                     ? "Cập nhật nhiệm vụ"
                     : "Xác nhận nhiệm vụ"}
               </Button>
-            ) : activeSuggestion ? (
+            ) : activeSuggestion && !readOnly ? (
               <Button
                 className="flex-1 bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/20"
                 onClick={() => {

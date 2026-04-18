@@ -938,7 +938,7 @@ export default function CoordinatorRescuerManagementPage() {
     }
 
     const draggedCount = draggedRescuers.length;
-    const primaryName = `${primaryRescuer.firstName} ${primaryRescuer.lastName}`;
+    const primaryName = `${primaryRescuer.lastName} ${primaryRescuer.firstName}`;
     const secondaryLabel =
       draggedCount > 1
         ? `+${draggedCount - 1} người cứu hộ nữa`
@@ -1749,7 +1749,7 @@ export default function CoordinatorRescuerManagementPage() {
     const isRowInDragGroup =
       draggingRescuerIds.length > 1 && draggingRescuerIds.includes(rescuer.id);
     const isRowBeingDragged = isDragAnchorRow || isRowInDragGroup;
-    const fullName = `${rescuer.firstName} ${rescuer.lastName}`;
+    const fullName = `${rescuer.lastName} ${rescuer.firstName}`;
     const assemblyPointName =
       rescuer.assemblyPointId != null
         ? (assemblyPointNameById.get(rescuer.assemblyPointId) ??

@@ -20,7 +20,6 @@ import {
   Mission,
 } from "@/type";
 import { useSOSRequests } from "@/services/sos_request/hooks";
-import type { SOSRequestEntity } from "@/services/sos_request/type";
 import {
   useCreateSOSCluster,
   useClusterRescueSuggestion,
@@ -86,7 +85,7 @@ import { useThemeStore } from "@/stores/theme.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
-import { deriveSOSNeeds } from "@/lib/sos";
+import { mapSOSRequestEntityToSOS } from "@/lib/sos-request-mapper";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 
 // ── Lazy-loaded map components ──
@@ -116,113 +115,6 @@ const WindyLeafletMap = dynamic(
 );
 
 // ── Helpers ──
-
-/** Map backend priority to frontend priority code */
-function toPriority(level: string): "P1" | "P2" | "P3" | "P4" {
-  if (level === "Critical") return "P1";
-  if (level === "High") return "P2";
-  if (level === "Medium") return "P3";
-  return "P4";
-}
-
-/** Map backend status to frontend status */
-function toStatus(status: string): "PENDING" | "ASSIGNED" | "RESCUED" {
-  if (status === "Pending") return "PENDING";
-  if (
-    status === "InProgress" ||
-    status === "Assigned" ||
-    status === "Incident"
-  ) {
-    return "ASSIGNED";
-  }
-
-  if (
-    status === "Resolved" ||
-    status === "Completed" ||
-    status === "Cancelled"
-  ) {
-    return "RESCUED";
-  }
-
-  return "RESCUED";
-}
-
-/** Convert SOSRequestEntity from API to SOSRequest used by UI */
-function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
-  const sd = entity.structuredData;
-  const victimInfo = entity.victimInfo ?? null;
-  // Prefer explicit reporter info. Keep senderInfo as backward-compatible fallback.
-  const reporterInfo = entity.reporterInfo ?? entity.senderInfo ?? null;
-  const nm = entity.networkMetadata;
-  const supplies = sd?.supplies ?? [];
-  const supplyDetails = sd?.supply_details;
-  const createdAt = new Date(entity.createdAt);
-  const computedWaitTimeMinutes = Math.max(
-    0,
-    Math.floor((Date.now() - createdAt.getTime()) / 60000),
-  );
-  const needs = deriveSOSNeeds(sd, entity.sosType);
-
-  return {
-    id: String(entity.id),
-    groupId: entity.clusterId ? String(entity.clusterId) : String(entity.id),
-    location: { lat: entity.latitude, lng: entity.longitude },
-    priority: toPriority(entity.priorityLevel),
-    needs,
-    status: toStatus(entity.status),
-    message: entity.msg,
-    createdAt,
-    receivedAt: entity.receivedAt ? new Date(entity.receivedAt) : null,
-    peopleCount: sd?.people_count,
-    injuredPersons: sd?.injured_persons?.map((person) => ({
-      index: person.index,
-      name: person.name,
-      customName: person.custom_name,
-      personType: person.person_type,
-      medicalIssues: person.medical_issues,
-      severity: person.severity,
-    })),
-    waitTimeMinutes: computedWaitTimeMinutes,
-    sosType: entity.sosType ?? undefined,
-    situation: sd?.situation,
-    medicalIssues: sd?.medical_issues,
-    supplies: supplies.length > 0 ? supplies : undefined,
-    canMove: sd?.can_move,
-    hasInjured: sd?.has_injured,
-    othersAreStable: sd?.others_are_stable,
-    additionalDescription: sd?.additional_description ?? undefined,
-    otherSupplyDescription: sd?.other_supply_description ?? undefined,
-    structuredData: sd,
-    supplyDetails,
-    specialDietPersons: supplyDetails?.special_diet_persons ?? undefined,
-    clothingPersons: supplyDetails?.clothing_persons ?? undefined,
-    medicalSupportNeeds: supplyDetails?.medical_needs ?? undefined,
-    medicalDescription: supplyDetails?.medical_description ?? undefined,
-    waterDuration: supplyDetails?.water_duration ?? undefined,
-    waterRemaining: supplyDetails?.water_remaining ?? undefined,
-    foodDuration: supplyDetails?.food_duration ?? undefined,
-    areBlanketsEnough: supplyDetails?.are_blankets_enough,
-    blanketRequestCount: supplyDetails?.blanket_request_count,
-    address: sd?.address ?? undefined,
-    victimPhone: victimInfo?.user_phone ?? undefined,
-    victimName: victimInfo?.user_name ?? undefined,
-    reporterPhone: reporterInfo?.user_phone ?? undefined,
-    reporterName:
-      reporterInfo?.user_name ?? entity.createdByCoordinatorName ?? undefined,
-    createdByCoordinatorId: entity.createdByCoordinatorId ?? null,
-    createdByCoordinatorName:
-      entity.createdByCoordinatorName ??
-      (entity as { createdByCoordinator?: { fullName?: string | null } })
-        .createdByCoordinator?.fullName ??
-      null,
-    isSentOnBehalf:
-      entity.isSentOnBehalf ?? Boolean(entity.createdByCoordinatorId),
-    reporterIsOnline:
-      reporterInfo?.is_online ?? entity.senderInfo?.is_online ?? undefined,
-    hopCount: nm?.hop_count,
-    locationAccuracy: entity.locationAccuracy,
-  };
-}
 
 /** Haversine distance in km between two lat/lng points */
 function haversine(
@@ -449,7 +341,7 @@ const CoordinatorDashboardContent = () => {
   const { data: clustersData } = useSOSClusters();
 
   const sosRequests = useMemo(
-    () => sosData?.items?.map(mapEntityToSOS) ?? [],
+    () => sosData?.items?.map(mapSOSRequestEntityToSOS) ?? [],
     [sosData],
   );
   const depots = useMemo<DepotEntity[]>(

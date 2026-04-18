@@ -6,7 +6,7 @@ import {
   HourglassHigh,
   Spinner,
   CheckCircle,
-  XCircle,
+  Lightning,
 } from "@phosphor-icons/react";
 
 export interface SOSRequestStatsData {
@@ -20,14 +20,14 @@ export interface SOSRequestStatsData {
 const SOSRequestStats = ({ stats }: { stats: SOSRequestStatsData }) => {
   const statItems = [
     {
-      label: "Tổng yêu cầu SOS",
+      label: "Tổng cụm SOS",
       value: stats.total,
       icon: Siren,
       color: "text-red-600 dark:text-red-400",
       bgColor: "bg-red-50 dark:bg-red-950/30",
     },
     {
-      label: "Chờ xử lý",
+      label: "Chờ AI phân tích",
       value: stats.pending,
       icon: HourglassHigh,
       color: "text-amber-600 dark:text-amber-400",
@@ -48,11 +48,11 @@ const SOSRequestStats = ({ stats }: { stats: SOSRequestStatsData }) => {
       bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
     },
     {
-      label: "Đã huỷ",
+      label: "Đã có gợi ý AI",
       value: stats.cancelled,
-      icon: XCircle,
-      color: "text-slate-600 dark:text-slate-400",
-      bgColor: "bg-slate-50 dark:bg-slate-950/30",
+      icon: Lightning,
+      color: "text-violet-600 dark:text-violet-400",
+      bgColor: "bg-violet-50 dark:bg-violet-950/30",
     },
   ];
 
