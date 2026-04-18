@@ -33,8 +33,6 @@ import {
   GetInventoryLotsParams,
   GetThresholdsParams,
   GetThresholdsResponse,
-  GetThresholdsHistoryParams,
-  GetThresholdsHistoryResponse,
   UpdateThresholdPayload,
   UpdateThresholdResponse,
   DeleteThresholdPayload,
@@ -329,7 +327,14 @@ export async function getSupplyRequests(
   params: GetSupplyRequestsParams,
 ): Promise<GetSupplyRequestsResponse> {
   const { data } = await api.get("/logistics/inventory/supply-requests", {
-    params,
+    params: {
+      depotId: params.depotId,
+      role: params.role,
+      sourceStatus: params.sourceStatus,
+      requestingStatus: params.requestingStatus,
+      pageNumber: params.pageNumber,
+      pageSize: params.pageSize,
+    },
   });
   // API wraps response in { data: { items: [...], ... }, serverTime: "..." }
   return data?.data ?? data;
@@ -761,20 +766,6 @@ export async function getMyDepotThresholds(
   const { data } = await api.get("/logistics/inventory/my-depot/thresholds", {
     params: { depotId },
   });
-  return data;
-}
-
-/**
- * Get threshold change history with optional filters + pagination
- * GET /logistics/inventory/my-depot/thresholds/history
- */
-export async function getMyDepotThresholdsHistory(
-  params: GetThresholdsHistoryParams,
-): Promise<GetThresholdsHistoryResponse> {
-  const { data } = await api.get(
-    "/logistics/inventory/my-depot/thresholds/history",
-    { params },
-  );
   return data;
 }
 

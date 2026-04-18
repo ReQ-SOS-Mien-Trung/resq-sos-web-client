@@ -9,6 +9,7 @@ import {
   extendCampaign,
   updateCampaignTarget,
   updateCampaignStatus,
+  getCampaignFundFlowChart,
 } from "./api";
 import type {
   AllocateDisbursementRequest,
@@ -22,6 +23,8 @@ import type {
   ExtendCampaignRequest,
   UpdateCampaignTargetRequest,
   UpdateCampaignStatusRequest,
+  CampaignFundFlowChartResponse,
+  GetCampaignFundFlowParams,
 } from "./type";
 
 export const CAMPAIGN_SPENDING_QUERY_KEY = ["campaign-spending"] as const;
@@ -111,7 +114,11 @@ export function useCreateCampaign() {
 export function useUpdateCampaignInfo() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, { id: number; payload: UpdateCampaignInfoRequest }>({
+  return useMutation<
+    void,
+    Error,
+    { id: number; payload: UpdateCampaignInfoRequest }
+  >({
     mutationFn: ({ id, payload }) => updateCampaignInfo(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CAMPAIGNS_QUERY_KEY });
@@ -124,7 +131,11 @@ export function useUpdateCampaignInfo() {
 export function useExtendCampaign() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, { id: number; payload: ExtendCampaignRequest }>({
+  return useMutation<
+    void,
+    Error,
+    { id: number; payload: ExtendCampaignRequest }
+  >({
     mutationFn: ({ id, payload }) => extendCampaign(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CAMPAIGNS_QUERY_KEY });
@@ -137,7 +148,11 @@ export function useExtendCampaign() {
 export function useUpdateCampaignTarget() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, { id: number; payload: UpdateCampaignTargetRequest }>({
+  return useMutation<
+    void,
+    Error,
+    { id: number; payload: UpdateCampaignTargetRequest }
+  >({
     mutationFn: ({ id, payload }) => updateCampaignTarget(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CAMPAIGNS_QUERY_KEY });
@@ -150,10 +165,28 @@ export function useUpdateCampaignTarget() {
 export function useUpdateCampaignStatus() {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, { id: number; payload: UpdateCampaignStatusRequest }>({
+  return useMutation<
+    void,
+    Error,
+    { id: number; payload: UpdateCampaignStatusRequest }
+  >({
     mutationFn: ({ id, payload }) => updateCampaignStatus(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CAMPAIGNS_QUERY_KEY });
     },
+  });
+}
+
+/* ── GET campaign fund-flow chart ── */
+
+export function useCampaignFundFlowChart(
+  campaignId: number | undefined,
+  params?: GetCampaignFundFlowParams,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<CampaignFundFlowChartResponse>({
+    queryKey: ["campaign-fund-flow-chart", campaignId, params],
+    queryFn: () => getCampaignFundFlowChart(campaignId!, params),
+    enabled: (options?.enabled ?? true) && !!campaignId,
   });
 }

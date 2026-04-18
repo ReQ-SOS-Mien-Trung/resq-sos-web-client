@@ -41,7 +41,6 @@ import {
   updateWarningBandConfig,
   getThresholds,
   getMyDepotThresholds,
-  getMyDepotThresholdsHistory,
   updateMyDepotThreshold,
   deleteMyDepotThreshold,
   getLowStock,
@@ -81,8 +80,6 @@ import {
   GetInventoryLotsParams,
   GetThresholdsParams,
   GetThresholdsResponse,
-  GetThresholdsHistoryParams,
-  GetThresholdsHistoryResponse,
   UpdateThresholdPayload,
   UpdateThresholdResponse,
   DeleteThresholdPayload,
@@ -146,8 +143,6 @@ export const INVENTORY_KEYS = {
   thresholdsByDepot: (params?: GetThresholdsParams) =>
     [...INVENTORY_KEYS.all, "thresholdsByDepot", params] as const,
   thresholds: () => [...INVENTORY_KEYS.all, "thresholds"] as const,
-  thresholdsHistory: (params: GetThresholdsHistoryParams) =>
-    [...INVENTORY_KEYS.all, "thresholdsHistory", params] as const,
   inventoryLowStock: (params?: GetLowStockParams) =>
     [...INVENTORY_KEYS.all, "inventoryLowStock", params] as const,
   lowStock: (params?: GetLowStockParams) =>
@@ -635,20 +630,6 @@ export function useMyDepotThresholds(
     queryKey: [...INVENTORY_KEYS.thresholds(), params],
     queryFn: () => getMyDepotThresholds(params.depotId as number),
     enabled: Number.isFinite(params.depotId) && (params.depotId as number) > 0,
-    ...options,
-  });
-}
-
-export function useMyDepotThresholdsHistory(
-  params: GetThresholdsHistoryParams,
-  options?: Omit<
-    UseQueryOptions<GetThresholdsHistoryResponse, Error>,
-    "queryKey" | "queryFn"
-  >,
-) {
-  return useQuery<GetThresholdsHistoryResponse>({
-    queryKey: INVENTORY_KEYS.thresholdsHistory(params),
-    queryFn: () => getMyDepotThresholdsHistory(params),
     ...options,
   });
 }

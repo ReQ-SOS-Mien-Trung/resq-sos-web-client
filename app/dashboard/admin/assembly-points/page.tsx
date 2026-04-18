@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Popover,
   PopoverContent,
@@ -49,6 +50,7 @@ import {
   ArrowClockwise,
   GarageIcon,
 } from "@phosphor-icons/react";
+import { Icon } from "@iconify/react";
 import { toast } from "sonner";
 import {
   AssemblyPointDetailSheet,
@@ -64,8 +66,8 @@ import {
   useAssemblyPoints,
   useAssemblyPointStatuses,
   useCloseAssemblyPoint,
-  useCompleteAssemblyPointMaintenance,
-  useStartAssemblyPointMaintenance,
+  useSetAssemblyPointAvailable,
+  useSetAssemblyPointUnavailable,
 } from "@/services/assembly_points";
 import type {
   AssemblyPointEntity,
@@ -76,8 +78,8 @@ const ITEMS_PER_PAGE = 12;
 
 type AssemblyPointActionType =
   | "activate"
-  | "startMaintenance"
-  | "completeMaintenance"
+  | "setUnavailable"
+  | "setAvailable"
   | "close";
 
 function formatLastUpdated(date: string | null) {
@@ -99,11 +101,11 @@ function getAvailableAssemblyPointActions(
 ): AssemblyPointActionType[] {
   switch (status) {
     case "Created":
-      return ["activate"];
+      return ["activate", "close"];
     case "Available":
-      return ["startMaintenance", "close"];
+      return ["setUnavailable"];
     case "Unavailable":
-      return ["completeMaintenance"];
+      return ["setAvailable", "close"];
     default:
       return [];
   }
@@ -113,10 +115,10 @@ function getAssemblyPointActionLabel(action: AssemblyPointActionType): string {
   switch (action) {
     case "activate":
       return "Kích hoạt";
-    case "startMaintenance":
+    case "setUnavailable":
       return "Đánh dấu không khả dụng";
-    case "completeMaintenance":
-      return "Đánh dấu hoạt động lại";
+    case "setAvailable":
+      return "Đánh dấu khả dụng";
     case "close":
       return "Đóng vĩnh viễn";
   }
@@ -128,10 +130,10 @@ function getAssemblyPointActionDialogTitle(
   switch (action) {
     case "activate":
       return "Kích hoạt điểm tập kết";
-    case "startMaintenance":
+    case "setUnavailable":
       return "Đánh dấu điểm tập kết không khả dụng";
-    case "completeMaintenance":
-      return "Khôi phục điểm tập kết hoạt động";
+    case "setAvailable":
+      return "Khôi phục điểm tập kết khả dụng";
     case "close":
       return "Đóng điểm tập kết";
   }
@@ -143,13 +145,13 @@ function getAssemblyPointActionDialogDescription(
 ): string {
   switch (action) {
     case "activate":
-      return `Kích hoạt "${pointName}" để chuyển từ trạng thái Mới tạo sang Sẵn sàng.`;
-    case "startMaintenance":
+      return `Kích hoạt "${pointName}" để chuyển từ trạng thái Mới tạo sang Khả dụng.`;
+    case "setUnavailable":
       return `Chuyển "${pointName}" sang trạng thái Không khả dụng để tạm ngưng sử dụng điểm tập kết này.`;
-    case "completeMaintenance":
-      return `Đánh dấu "${pointName}" hoạt động trở lại từ trạng thái Không khả dụng.`;
+    case "setAvailable":
+      return `Đánh dấu "${pointName}" khả dụng trở lại từ trạng thái Không khả dụng.`;
     case "close":
-      return `Đóng vĩnh viễn "${pointName}". Sau khi đóng sẽ không thể chỉnh sửa hay thực hiện thao tác trạng thái khác. API cũng yêu cầu điểm tập kết không còn người cứu hộ hoặc đội cứu hộ nào.`;
+      return `Đóng vĩnh viễn "${pointName}". Điểm tập kết đang Khả dụng phải chuyển sang Không khả dụng trước khi đóng. Nếu còn rescuer đang gán, hệ thống sẽ tự gỡ trước khi hoàn tất.`;
   }
 }
 
@@ -159,10 +161,10 @@ function getAssemblyPointActionSuccessMessage(
   switch (action) {
     case "activate":
       return "Kích hoạt điểm tập kết thành công!";
-    case "startMaintenance":
+    case "setUnavailable":
       return "Đã chuyển điểm tập kết sang trạng thái không khả dụng!";
-    case "completeMaintenance":
-      return "Điểm tập kết đã hoạt động trở lại!";
+    case "setAvailable":
+      return "Điểm tập kết đã khả dụng trở lại!";
     case "close":
       return "Đóng điểm tập kết thành công!";
   }
@@ -174,13 +176,21 @@ function getAssemblyPointActionErrorMessage(
   switch (action) {
     case "activate":
       return "Không thể kích hoạt điểm tập kết.";
-    case "startMaintenance":
+    case "setUnavailable":
       return "Không thể chuyển điểm tập kết sang trạng thái không khả dụng.";
-    case "completeMaintenance":
-      return "Không thể khôi phục điểm tập kết hoạt động.";
+    case "setAvailable":
+      return "Không thể chuyển điểm tập kết sang trạng thái khả dụng.";
     case "close":
       return "Không thể đóng điểm tập kết.";
   }
+}
+
+function actionSupportsReason(action: AssemblyPointActionType): boolean {
+  return action !== "activate";
+}
+
+function actionRequiresReason(action: AssemblyPointActionType): boolean {
+  return action === "close";
 }
 
 export default function AssemblyPointsPage() {
@@ -188,10 +198,11 @@ export default function AssemblyPointsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState<
-    AssemblyPointStatus[]
-  >([]);
+  const [selectedStatus, setSelectedStatus] = useState<AssemblyPointStatus | null>(
+    null,
+  );
   const [statusOpen, setStatusOpen] = useState(false);
+  const [actionReason, setActionReason] = useState("");
 
   const [formOpen, setFormOpen] = useState(false);
   const [editItem, setEditItem] = useState<AssemblyPointEntity | null>(null);
@@ -204,34 +215,46 @@ export default function AssemblyPointsPage() {
   }>({ open: false, action: null, item: null });
 
   const contentRef = useRef<HTMLDivElement>(null);
-  const panelWidth = 448;
-
-  const handlePanelChange = useCallback((open: boolean) => {
+  const handlePanelChange = useCallback((state: {
+    open: boolean;
+    isFullscreen: boolean;
+    dockedWidth: number;
+  }) => {
     if (!contentRef.current) return;
 
-    contentRef.current.style.marginRight = open ? `${panelWidth}px` : "0px";
+    contentRef.current.style.marginRight = state.open
+      ? `${state.dockedWidth}px`
+      : "0px";
     contentRef.current.style.transition =
-      "margin-right 300ms cubic-bezier(0.32,0.72,0,1)";
+      "margin-right 380ms cubic-bezier(0.22,1,0.36,1)";
   }, []);
 
-  const { data, isLoading } = useAssemblyPoints({
+  const { data: summaryData } = useAssemblyPoints({
     params: { pageNumber: 1, pageSize: 200 },
+  });
+  const { data, isLoading } = useAssemblyPoints({
+    params: {
+      pageNumber: 1,
+      pageSize: 200,
+      status: selectedStatus ?? undefined,
+    },
   });
   const { data: statusMetadata = [] } = useAssemblyPointStatuses();
   const activatePointMutation = useActivateAssemblyPoint();
-  const startMaintenanceMutation = useStartAssemblyPointMaintenance();
-  const completeMaintenanceMutation = useCompleteAssemblyPointMaintenance();
+  const setUnavailableMutation = useSetAssemblyPointUnavailable();
+  const setAvailableMutation = useSetAssemblyPointAvailable();
   const closePointMutation = useCloseAssemblyPoint();
 
   const items = useMemo(() => data?.items ?? [], [data]);
+  const allItems = useMemo(() => summaryData?.items ?? items, [summaryData, items]);
   const assemblyPointStatusConfig = useMemo(
     () => buildAssemblyPointStatusConfig(statusMetadata),
     [statusMetadata],
   );
   const isStatusActionPending =
     activatePointMutation.isPending ||
-    startMaintenanceMutation.isPending ||
-    completeMaintenanceMutation.isPending ||
+    setUnavailableMutation.isPending ||
+    setAvailableMutation.isPending ||
     closePointMutation.isPending;
 
   const filtered = useMemo(() => {
@@ -246,14 +269,8 @@ export default function AssemblyPointsPage() {
       );
     }
 
-    if (selectedStatuses.length > 0) {
-      result = result.filter((it) =>
-        selectedStatuses.includes(it.status as AssemblyPointStatus),
-      );
-    }
-
     return result;
-  }, [items, search, selectedStatuses]);
+  }, [items, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paged = filtered.slice(
@@ -261,33 +278,49 @@ export default function AssemblyPointsPage() {
     page * ITEMS_PER_PAGE,
   );
 
-  const availableCount = items.filter((i) => i.status === "Available").length;
-  const createdCount = items.filter((i) => i.status === "Created").length;
-  const unavailableCount = items.filter(
+  const availableCount = allItems.filter((i) => i.status === "Available").length;
+  const createdCount = allItems.filter((i) => i.status === "Created").length;
+  const unavailableCount = allItems.filter(
     (i) => i.status === "Unavailable",
   ).length;
-  const closedCount = items.filter((i) => i.status === "Closed").length;
+  const closedCount = allItems.filter((i) => i.status === "Closed").length;
 
   const handleStatusAction = async () => {
     if (!actionDialog.item || !actionDialog.action) return;
+    const trimmedReason = actionReason.trim();
+
+    if (actionRequiresReason(actionDialog.action) && !trimmedReason) {
+      toast.error("Vui lòng nhập lý do bắt buộc cho thao tác này.");
+      return;
+    }
 
     try {
       switch (actionDialog.action) {
         case "activate":
           await activatePointMutation.mutateAsync(actionDialog.item.id);
           break;
-        case "startMaintenance":
-          await startMaintenanceMutation.mutateAsync(actionDialog.item.id);
+        case "setUnavailable":
+          await setUnavailableMutation.mutateAsync({
+            id: actionDialog.item.id,
+            reason: trimmedReason || null,
+          });
           break;
-        case "completeMaintenance":
-          await completeMaintenanceMutation.mutateAsync(actionDialog.item.id);
+        case "setAvailable":
+          await setAvailableMutation.mutateAsync({
+            id: actionDialog.item.id,
+            reason: trimmedReason || null,
+          });
           break;
         case "close":
-          await closePointMutation.mutateAsync(actionDialog.item.id);
+          await closePointMutation.mutateAsync({
+            id: actionDialog.item.id,
+            reason: trimmedReason,
+          });
           break;
       }
 
       toast.success(getAssemblyPointActionSuccessMessage(actionDialog.action));
+      setActionReason("");
       setActionDialog({ open: false, action: null, item: null });
     } catch (err) {
       toast.error(
@@ -312,7 +345,6 @@ export default function AssemblyPointsPage() {
   const openDetail = (id: number) => {
     setDetailId(id);
     setDetailOpen(true);
-    handlePanelChange(true);
   };
 
   return (
@@ -370,9 +402,9 @@ export default function AssemblyPointsPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
           {[
             {
-              label: "Tổng điểm",
-              value: items.length,
-              icon: FlagBanner,
+              label: "Tổng số điểm tập kết",
+              value: allItems.length,
+              icon: "fa7-solid:people-roof",
               color: "text-blue-600 dark:text-blue-400",
               bgColor: "bg-blue-50 dark:bg-blue-950/30",
             },
@@ -386,7 +418,7 @@ export default function AssemblyPointsPage() {
             {
               label: assemblyPointStatusConfig.Created.label,
               value: createdCount,
-              icon: Clock,
+              icon: "tabler:plus",
               color: "text-sky-600 dark:text-sky-400",
               bgColor: "bg-sky-50 dark:bg-sky-950/30",
             },
@@ -401,11 +433,11 @@ export default function AssemblyPointsPage() {
               label: assemblyPointStatusConfig.Closed.label,
               value: closedCount,
               icon: XCircle,
-              color: "text-rose-600 dark:text-rose-400",
-              bgColor: "bg-rose-50 dark:bg-rose-950/30",
+              color: "text-violet-600 dark:text-violet-400",
+              bgColor: "bg-violet-50 dark:bg-violet-950/30",
             },
           ].map((stat) => {
-            const Icon = stat.icon;
+            const StatIcon = stat.icon;
 
             return (
               <Card key={stat.label} className="border border-border/50">
@@ -422,7 +454,20 @@ export default function AssemblyPointsPage() {
                     <div
                       className={`h-12 w-12 rounded-lg ${stat.bgColor} flex items-center justify-center`}
                     >
-                      <Icon size={24} weight="fill" className={stat.color} />
+                      {typeof StatIcon === "string" ? (
+                        <Icon
+                          icon={StatIcon}
+                          width="640"
+                          height="640"
+                          className={cn("h-6 w-6", stat.color)}
+                        />
+                      ) : (
+                        <StatIcon
+                          size={24}
+                          weight="fill"
+                          className={stat.color}
+                        />
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -456,9 +501,9 @@ export default function AssemblyPointsPage() {
                 className="gap-1.5 font-normal h-8"
               >
                 Trạng thái
-                {selectedStatuses.length > 0 ? (
-                  <Badge className="h-5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
-                    {selectedStatuses.length}
+                {selectedStatus ? (
+                  <Badge className="h-5 max-w-32 truncate px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
+                    {assemblyPointStatusConfig[selectedStatus]?.label ?? selectedStatus}
                   </Badge>
                 ) : (
                   <CaretDown size={13} className="text-muted-foreground" />
@@ -474,18 +519,15 @@ export default function AssemblyPointsPage() {
               collisionPadding={16}
             >
               {ASSEMBLY_POINT_STATUS_ORDER.map((status) => {
-                const checked = selectedStatuses.includes(status);
+                const checked = selectedStatus === status;
 
                 return (
                   <button
                     key={status}
                     onClick={() => {
                       setPage(1);
-                      setSelectedStatuses((prev) =>
-                        prev.includes(status)
-                          ? prev.filter((item) => item !== status)
-                          : [...prev, status],
-                      );
+                      setSelectedStatus((prev) => (prev === status ? null : status));
+                      setStatusOpen(false);
                     }}
                     className="flex items-center gap-2 w-full px-2.5 py-1.5 text-sm rounded-md hover:bg-muted/60 transition-colors"
                   >
@@ -514,13 +556,13 @@ export default function AssemblyPointsPage() {
             </PopoverContent>
           </Popover>
 
-          {(search || selectedStatuses.length > 0) && (
+          {(search || selectedStatus) && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
                 setSearch("");
-                setSelectedStatuses([]);
+                setSelectedStatus(null);
                 setPage(1);
               }}
               className="text-muted-foreground gap-1 h-8"
@@ -552,7 +594,7 @@ export default function AssemblyPointsPage() {
                 className="mx-auto text-muted-foreground/30 mb-3"
               />
               <p className="text-base text-muted-foreground tracking-tight">
-                {search || selectedStatuses.length > 0
+                {search || selectedStatus
                   ? "Không tìm thấy điểm tập kết nào phù hợp"
                   : "Chưa có điểm tập kết nào. Hãy tạo mới!"}
               </p>
@@ -627,6 +669,19 @@ export default function AssemblyPointsPage() {
                         Cập nhật lần cuối:{" "}
                         <span>{formatLastUpdated(point.lastUpdatedAt)}</span>
                       </div>
+                      {point.statusChangedAt && (
+                        <div className="flex items-center gap-1.5 text-sm tracking-tighter text-muted-foreground">
+                          <Clock size={13} className="shrink-0" />
+                          Đổi trạng thái:{" "}
+                          <span>{formatLastUpdated(point.statusChangedAt)}</span>
+                        </div>
+                      )}
+                      {point.statusReason && (
+                        <div className="rounded-md border border-amber-200/70 bg-amber-50/70 px-2.5 py-2 text-sm tracking-tight text-amber-900">
+                          <span className="font-medium">Lý do:</span>{" "}
+                          {point.statusReason}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex gap-2 pt-1">
@@ -684,13 +739,14 @@ export default function AssemblyPointsPage() {
                                 action === "close" ? "destructive" : "default"
                               }
                               className="cursor-pointer"
-                              onSelect={() =>
+                              onSelect={() => {
                                 setActionDialog({
                                   open: true,
                                   action,
                                   item: point,
-                                })
-                              }
+                                });
+                                setActionReason("");
+                              }}
                             >
                               {getAssemblyPointActionLabel(action)}
                             </DropdownMenuItem>
@@ -746,7 +802,6 @@ export default function AssemblyPointsPage() {
         open={detailOpen}
         onOpenChange={(open) => {
           setDetailOpen(open);
-          handlePanelChange(open);
         }}
         pointId={detailId}
         onPanelChange={handlePanelChange}
@@ -755,11 +810,11 @@ export default function AssemblyPointsPage() {
 
       <Dialog
         open={actionDialog.open}
-        onOpenChange={(open) =>
-          setActionDialog((prev) =>
-            open ? prev : { open: false, action: null, item: null },
-          )
-        }
+        onOpenChange={(open) => {
+          if (open) return;
+          setActionDialog({ open: false, action: null, item: null });
+          setActionReason("");
+        }}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -777,12 +832,45 @@ export default function AssemblyPointsPage() {
                 : "Xác nhận thao tác với điểm tập kết này."}
             </DialogDescription>
           </DialogHeader>
+          {actionDialog.action && actionSupportsReason(actionDialog.action) && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium tracking-tight text-foreground">
+                  Lý do {actionRequiresReason(actionDialog.action) ? "*" : ""}
+                </p>
+                <span className="text-xs text-muted-foreground">
+                  {actionRequiresReason(actionDialog.action)
+                    ? "Bắt buộc"
+                    : "Không bắt buộc"}
+                </span>
+              </div>
+              <Textarea
+                value={actionReason}
+                onChange={(event) => setActionReason(event.target.value)}
+                placeholder={
+                  actionDialog.action === "setUnavailable"
+                    ? "Ví dụ: Đang sửa chữa"
+                    : actionDialog.action === "setAvailable"
+                      ? "Ví dụ: Đã sửa xong"
+                      : "Nhập lý do đóng điểm tập kết"
+                }
+                rows={4}
+                disabled={isStatusActionPending}
+              />
+              <p className="text-xs text-muted-foreground tracking-tight">
+                {actionDialog.action === "close"
+                  ? "API yêu cầu lý do đóng không được để trống."
+                  : "Bạn có thể để trống nếu không cần ghi chú thêm."}
+              </p>
+            </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() =>
-                setActionDialog({ open: false, action: null, item: null })
-              }
+              onClick={() => {
+                setActionDialog({ open: false, action: null, item: null });
+                setActionReason("");
+              }}
               disabled={isStatusActionPending}
               className="tracking-tight"
             >
@@ -793,7 +881,14 @@ export default function AssemblyPointsPage() {
                 actionDialog.action === "close" ? "destructive" : "default"
               }
               onClick={handleStatusAction}
-              disabled={isStatusActionPending}
+              disabled={
+                isStatusActionPending ||
+                Boolean(
+                  actionDialog.action &&
+                    actionRequiresReason(actionDialog.action) &&
+                    !actionReason.trim(),
+                )
+              }
               className="gap-2 tracking-tight"
             >
               {isStatusActionPending && (

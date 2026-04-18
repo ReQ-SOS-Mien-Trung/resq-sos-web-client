@@ -45,7 +45,7 @@ const STATUS_STYLE: Record<AssemblyPointStatus, AssemblyPointStatusStyle> = {
     icon: <Clock size={20} weight="fill" className="text-sky-500" />,
   },
   Available: {
-    fallbackLabel: "Sẵn sàng",
+    fallbackLabel: "Khả dụng",
     color: "text-emerald-700",
     bg: "bg-emerald-500/10 border-emerald-200",
     icon: <CheckCircle size={20} weight="fill" className="text-emerald-500" />,

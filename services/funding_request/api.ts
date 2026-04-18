@@ -200,6 +200,7 @@ export async function getFundingRequests(
       params: {
         pageNumber,
         pageSize,
+        depotId: params?.depotId,
         depotIds: params?.depotIds,
         statuses: params?.statuses,
       },

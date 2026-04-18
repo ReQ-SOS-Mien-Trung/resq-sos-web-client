@@ -265,15 +265,15 @@ export async function updateDepotStatus(
 }
 
 /**
- * Assign or replace manager for a depot
+ * Assign one or many managers for a depot
  * PATCH /logistics/depot/{id}/manager
  */
 export async function assignDepotManager(
   request: AssignDepotManagerRequest,
 ): Promise<DepotManagerAssignmentResponse> {
-  const { id, managerId } = request;
+  const { id, managerIds } = request;
   const { data } = await api.patch(`/logistics/depot/${id}/manager`, {
-    managerId,
+    managerIds,
   });
   return data;
 }
@@ -295,11 +295,13 @@ export async function unassignDepotManager(
 }
 
 /**
- * [Admin] Get all depot funds
+ * [Admin] Get all depot funds (paginated)
  * GET /logistics/depot/funds
  */
-export async function getDepotFunds(): Promise<DepotFund[]> {
-  const { data } = await api.get("/logistics/depot/funds");
+export async function getDepotFunds(
+  params?: import("./type").GetDepotFundsParams,
+): Promise<import("./type").GetDepotFundsResponse> {
+  const { data } = await api.get("/logistics/depot/funds", { params });
   return data;
 }
 
@@ -643,6 +645,51 @@ export async function receiveDepotTransfer(
     {
       params: { depotId },
     },
+  );
+  return data;
+}
+
+// ─── Chart API ────────────────────────────────────────────────────────────────
+
+export async function getDepotCapacityChart(
+  depotId: number,
+): Promise<import("./type").DepotCapacityChartResponse> {
+  const { data } = await api.get(`/logistics/depot/${depotId}/chart/capacity`);
+  return data;
+}
+
+export async function getDepotInventoryMovementChart(
+  depotId: number,
+  params?: import("./type").GetDepotInventoryMovementParams,
+): Promise<import("./type").DepotInventoryMovementChartResponse> {
+  const { data } = await api.get(
+    `/logistics/depot/${depotId}/chart/inventory-movement`,
+    { params },
+  );
+  return data;
+}
+
+export async function getDepotFundMovementChart(
+  depotId: number,
+  params?: import("./type").GetDepotFundMovementParams,
+): Promise<import("./type").DepotFundMovementChartResponse> {
+  const { data } = await api.get(
+    `/finance/depot-funds/${depotId}/chart/fund-movement`,
+    { params },
+  );
+  return data;
+}
+
+/**
+ * GET /finance/depot-funds/{fundId}/fund-transactions
+ */
+export async function getDepotFundTransactionsByFundId(
+  fundId: number,
+  params: import("./type").GetFundTransactionsByFundIdParams,
+): Promise<import("./type").GetFundTransactionsByFundIdResponse> {
+  const { data } = await api.get(
+    `/finance/depot-funds/${fundId}/fund-transactions`,
+    { params },
   );
   return data;
 }

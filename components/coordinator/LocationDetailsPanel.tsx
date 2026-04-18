@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { DepotEntity } from "@/services/depot/type";
 import {
@@ -190,6 +190,14 @@ function formatDateTimeVi(date: Date): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatOptionalDateTimeVi(dateStr: string | null | undefined): string {
+  if (!dateStr) return "Chưa có";
+
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return "Chưa có";
+  return formatDateTimeVi(date);
 }
 
 function getMinimumGatheringDate(now = new Date()): Date {
@@ -531,11 +539,13 @@ const LocationDetailsPanel = ({
         <div className="h-full bg-background border-r shadow-2xl overflow-y-auto">
           {location?.type === "depot" ? (
             <DepotDetails
+              key={location.data.id}
               depot={location.data}
               onClose={() => onOpenChange(false)}
             />
           ) : location?.type === "assemblyPoint" ? (
             <AssemblyPointDetails
+              key={location.data.id}
               assemblyPoint={location.data}
               onClose={() => onOpenChange(false)}
             />
@@ -557,10 +567,6 @@ function DepotDetails({
   onClose: () => void;
 }) {
   const [inventoryPageNumber, setInventoryPageNumber] = useState(1);
-
-  useEffect(() => {
-    setInventoryPageNumber(1);
-  }, [depot.id]);
 
   const {
     data: inventoryData,
@@ -1028,29 +1034,17 @@ function AssemblyPointDetails({
     );
   }, [assemblyPointEvents]);
 
-  const selectedEvent = useMemo(
-    () => events.find((event) => event.eventId === selectedEventId) ?? null,
-    [events, selectedEventId],
+  const effectiveSelectedEventId = useMemo(
+    () => selectedEventId ?? getDefaultEventId(events, activeEventId),
+    [activeEventId, events, selectedEventId],
   );
 
-  useEffect(() => {
-    if (hasActiveEvent) {
-      setShowScheduleForm(false);
-      setAssemblyDateInput(null);
-      setCheckInDeadlineInput(null);
-    }
-  }, [hasActiveEvent]);
-
-  useEffect(() => {
-    setSelectedEventId((previous) => {
-      if (typeof previous === "number") {
-        const exists = events.some((event) => event.eventId === previous);
-        if (exists) return previous;
-      }
-
-      return getDefaultEventId(events, activeEventId);
-    });
-  }, [events, activeEventId]);
+  const selectedEvent = useMemo(
+    () =>
+      events.find((event) => event.eventId === effectiveSelectedEventId) ??
+      null,
+    [effectiveSelectedEventId, events],
+  );
 
   const statusConfig = assemblyPointStatusConfig[
     displayAssemblyPoint.status as keyof typeof assemblyPointStatusConfig
@@ -1128,7 +1122,7 @@ function AssemblyPointDetails({
       return;
     }
 
-    let targetEventId = selectedEventId ?? activeEventId;
+    let targetEventId = effectiveSelectedEventId ?? activeEventId;
 
     if (!targetEventId) {
       const refreshed = await refetchAssemblyPointDetail();
@@ -1176,8 +1170,9 @@ function AssemblyPointDetails({
   const shouldShowCreateTeam =
     hasActiveEvent && selectedEvent?.status === "Gathering";
   const canToggleSchedule = !hasActiveEvent;
+  const effectiveShowScheduleForm = canToggleSchedule && showScheduleForm;
   const canOpenCheckIn =
-    shouldShowOpenCheckIn && !isStartingGathering && !!selectedEventId;
+    shouldShowOpenCheckIn && !isStartingGathering && !!effectiveSelectedEventId;
   const canCreateTeam = shouldShowCreateTeam;
   const checkInActionLabel =
     selectedEvent?.status === "Gathering" ? "Đang check-in" : "Mở check-in";
@@ -1195,7 +1190,7 @@ function AssemblyPointDetails({
   }, [refetchAssemblyPointDetail, refetchAssemblyPointEvents]);
 
   const handleCreateTeam = () => {
-    const eventId = selectedEvent?.eventId ?? selectedEventId;
+    const eventId = selectedEvent?.eventId ?? effectiveSelectedEventId;
     const query = eventId
       ? `?assemblyPointId=${assemblyPoint.id}&eventId=${eventId}`
       : "";
@@ -1276,6 +1271,37 @@ function AssemblyPointDetails({
           <span className="text-xs text-muted-foreground">•</span>
           <span className="text-xs text-muted-foreground">Điểm tập kết</span>
         </div>
+
+        {(displayAssemblyPoint.statusReason ||
+          displayAssemblyPoint.statusChangedAt ||
+          displayAssemblyPoint.statusChangedBy) && (
+          <div className="mt-3 grid gap-2 rounded-xl border border-border/60 bg-muted/30 p-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Lý do trạng thái</p>
+              <p className="mt-1 text-sm text-foreground">
+                {displayAssemblyPoint.statusReason?.trim() || "Không có"}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-lg border border-border/60 bg-background px-2.5 py-2">
+                <p className="text-xs text-muted-foreground">
+                  Đổi trạng thái lúc
+                </p>
+                <p className="mt-1">
+                  {formatOptionalDateTimeVi(displayAssemblyPoint.statusChangedAt)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-background px-2.5 py-2">
+                <p className="text-xs text-muted-foreground">
+                  Đổi trạng thái bởi
+                </p>
+                <p className="mt-1 break-all">
+                  {displayAssemblyPoint.statusChangedBy?.trim() || "Chưa có"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}
@@ -1284,13 +1310,13 @@ function AssemblyPointDetails({
           <div className="flex justify-center">
             <ActionButton
               icon={<CalendarBlank className="h-5 w-5" weight="fill" />}
-              label={showScheduleForm ? "Ẩn triệu tập" : "Triệu tập"}
+              label={effectiveShowScheduleForm ? "Ẩn triệu tập" : "Triệu tập"}
               color={
                 canToggleSchedule
                   ? "text-[#FF5722]"
                   : "text-slate-600 dark:text-slate-300"
               }
-              active={canToggleSchedule && showScheduleForm}
+              active={effectiveShowScheduleForm}
               disabled={!canToggleSchedule}
               onClick={
                 canToggleSchedule
@@ -1419,7 +1445,7 @@ function AssemblyPointDetails({
             </Badge>
           </div>
 
-          {isAssemblyPointEventsLoading ? (
+              {isAssemblyPointEventsLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-9 w-full rounded-md" />
               <Skeleton className="h-20 w-full rounded-lg" />
@@ -1431,7 +1457,11 @@ function AssemblyPointDetails({
           ) : events.length > 0 ? (
             <div className="space-y-3">
               <Select
-                value={selectedEventId ? String(selectedEventId) : undefined}
+                value={
+                  effectiveSelectedEventId
+                    ? String(effectiveSelectedEventId)
+                    : undefined
+                }
                 onValueChange={(value) => setSelectedEventId(Number(value))}
               >
                 <SelectTrigger className="h-10 w-full border-border/70 bg-white px-3 py-2">
@@ -1694,14 +1724,6 @@ function AssemblyDateTimePicker({
     [],
   );
 
-  useEffect(() => {
-    if (!open) return;
-    const d = value ?? getMinimumGatheringDate();
-    setDraft(d);
-    setHourInput(String(d.getHours()).padStart(2, "0"));
-    setMinuteInput(String(d.getMinutes()).padStart(2, "0"));
-  }, [open, value]);
-
   const clampToCurrentOrFuture = (date: Date): Date => {
     const minAllowedDate = getMinimumGatheringDate();
     if (date.getTime() < minAllowedDate.getTime()) {
@@ -1749,7 +1771,10 @@ function AssemblyDateTimePicker({
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
         if (nextOpen) {
-          setDraft(value ?? getMinimumGatheringDate());
+          const nextDraft = value ?? getMinimumGatheringDate();
+          setDraft(nextDraft);
+          setHourInput(String(nextDraft.getHours()).padStart(2, "0"));
+          setMinuteInput(String(nextDraft.getMinutes()).padStart(2, "0"));
         }
       }}
     >

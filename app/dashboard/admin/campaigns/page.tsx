@@ -56,7 +56,28 @@ import {
   ArrowDown,
   ArrowsLeftRight,
   Plus,
+  PiggyBankIcon,
+  ChartBarHorizontal,
 } from "@phosphor-icons/react";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Bar } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+);
 import { useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import { toast } from "sonner";
@@ -68,6 +89,7 @@ import {
   useExtendCampaign,
   useUpdateCampaignTarget,
   useUpdateCampaignStatus,
+  useCampaignFundFlowChart,
 } from "@/services/campaign_disbursement";
 import type {
   CampaignStatus,
@@ -130,6 +152,114 @@ function normalizeText(value: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+/* ── Campaign Fund Flow Chart ─────────────────────────────── */
+
+function CampaignFundFlowChart() {
+  const { data: campaignsData, isLoading: loadingCampaigns } = useCampaigns({
+    params: { pageSize: 10, statuses: ["Active"] },
+  });
+  const firstCampaign = campaignsData?.items?.[0];
+  const { data, isLoading } = useCampaignFundFlowChart(
+    firstCampaign?.id,
+    undefined,
+    { enabled: !!firstCampaign },
+  );
+
+  const chartData = useMemo(() => {
+    if (!data) return null;
+    return {
+      labels: data.dataPoints.map((p) => p.periodLabel),
+      datasets: [
+        {
+          label: "Thu (VND)",
+          data: data.dataPoints.map((p) => p.totalIn),
+          backgroundColor: "rgba(34,197,94,0.75)",
+          borderColor: "rgb(34,197,94)",
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: "Chi (VND)",
+          data: data.dataPoints.map((p) => p.totalOut),
+          backgroundColor: "rgba(239,68,68,0.75)",
+          borderColor: "rgb(239,68,68)",
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: "Số dư ròng (VND)",
+          data: data.dataPoints.map((p) => p.netBalance),
+          backgroundColor: "rgba(59,130,246,0.75)",
+          borderColor: "rgb(59,130,246)",
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
+    };
+  }, [data]);
+
+  const title = firstCampaign
+    ? `Quỹ chiến dịch: ${firstCampaign.name}`
+    : "Biến động quỹ chiến dịch";
+
+  return (
+    <Card className="border border-border/50 py-0">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="p-1.5 rounded-md bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
+            <ChartBarHorizontal className="h-4 w-4" weight="fill" />
+          </div>
+          <p className="text-base font-semibold tracking-tighter">{title}</p>
+        </div>
+        {isLoading || loadingCampaigns ? (
+          <div className="h-52 flex items-center justify-center">
+            <div className="h-4 w-4 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
+          </div>
+        ) : chartData ? (
+          <Bar
+            data={chartData}
+            options={{
+              responsive: true,
+              maintainAspectRatio: true,
+              interaction: { mode: "index", intersect: false },
+              plugins: {
+                legend: {
+                  position: "top",
+                  labels: { font: { size: 11 }, boxWidth: 12 },
+                },
+                tooltip: {
+                  callbacks: {
+                    label: (ctx) =>
+                      ` ${ctx.dataset.label}: ${formatMoney(ctx.parsed.y)}`,
+                  },
+                },
+              },
+              scales: {
+                x: { ticks: { font: { size: 11 } } },
+                y: {
+                  ticks: {
+                    font: { size: 10 },
+                    callback: (v) => formatMoney(Number(v)),
+                  },
+                  beginAtZero: true,
+                },
+              },
+            }}
+          />
+        ) : !loadingCampaigns && !firstCampaign ? (
+          <p className="text-sm text-muted-foreground tracking-tighter">
+            Không có chiến dịch đang hoạt động
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground tracking-tighter">
+            Không có dữ liệu
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 /* ── Main Page ────────────────────────────────────────────── */
@@ -467,7 +597,7 @@ export default function CampaignsPage() {
               {
                 label: "Tổng quyên góp",
                 value: isLoading ? "—" : formatMoney(stats.totalRaised),
-                icon: Wallet,
+                icon: PiggyBankIcon,
                 color: "text-amber-600 dark:text-amber-400",
                 bgColor: "bg-amber-50 dark:bg-amber-950/30",
                 isText: true,
@@ -506,6 +636,9 @@ export default function CampaignsPage() {
             })}
           </div>
 
+          {/* ── Campaign Fund Flow Chart ── */}
+          <CampaignFundFlowChart />
+
           {/* ── Toolbar ── */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-52">
@@ -543,7 +676,12 @@ export default function CampaignsPage() {
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-52 p-1.5" align="start">
+              <PopoverContent
+                className="w-56 max-h-72 overflow-y-auto p-1.5"
+                align="end"
+                side="bottom"
+                sideOffset={4}
+              >
                 {campaignStatuses.map((s) => {
                   const checked = selectedStatuses.includes(s.key);
                   return (

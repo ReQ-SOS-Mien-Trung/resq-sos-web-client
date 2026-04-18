@@ -27,6 +27,7 @@ import {
   Sparkle,
   ShareNetwork,
   Warning,
+  UsersThree,
 } from "@phosphor-icons/react";
 import { HeaderProps } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
@@ -95,7 +96,7 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
             placeholder="Tìm kiếm..."
             className="w-full pl-10 pr-4 h-10 bg-muted/60 border-2 border-border/60 rounded-xl focus:bg-background focus:border-red-600 focus:ring-2 focus:ring-red-500/30 transition-all duration-200 text-foreground placeholder:text-foreground/50"
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-xs text-muted-foreground">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted text-sm tracking-tighter text-muted-foreground">
             <Sparkle size={12} className="text-red-500" />
             <span>AI</span>
           </div>
@@ -108,14 +109,25 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
         <Button
           variant="outline"
           size="sm"
-          className="hidden md:flex gap-2 h-9 rounded-lg border-border/50 hover:border-red-500/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-200"
+          onClick={() => router.push("/dashboard/admin/team-overview")}
+          className="hidden md:flex gap-1.5 h-9 rounded-lg border-border/50 hover:border-red-500/50 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all duration-200"
         >
-          <Gear size={16} />
-          Tùy chỉnh
+          <UsersThree size={16} className="text-red-500" />
+          Tổng quan đội
+        </Button>
+
+        {/* Flood Alert Button */}
+        <Button
+          size="sm"
+          onClick={() => router.push("/dashboard/admin/weather-flood")}
+          className="hidden md:flex gap-1.5 h-9 rounded-lg bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-200"
+        >
+          <Warning size={16} weight="fill" />
+          Phát cảnh báo lũ
         </Button>
 
         {/* Imports Dropdown */}
-        <DropdownMenu>
+        {/* <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
@@ -130,7 +142,7 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
             align="end"
             className="w-48 rounded-xl border-border/50 shadow-xl"
           >
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
+            <DropdownMenuLabel className="text-sm tracking-tighter text-muted-foreground">
               Tùy chọn nhập
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -147,20 +159,11 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
               Nhập JSON
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Flood Alert Button */}
-        <Button
-          size="sm"
-          onClick={() => router.push("/dashboard/admin/weather-flood")}
-          className="hidden md:flex gap-1.5 h-9 rounded-lg bg-linear-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-200"
-        >
-          <Warning size={16} weight="fill" />
-          Phát cảnh báo lũ
-        </Button>
+        </DropdownMenu> */}
 
         {/* Exports Dropdown */}
-        <DropdownMenu>
+
+        {/* <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
@@ -175,7 +178,7 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
             align="end"
             className="w-48 rounded-xl border-border/50 shadow-xl"
           >
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
+            <DropdownMenuLabel className="text-sm tracking-tighter text-muted-foreground">
               Tùy chọn xuất
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -192,7 +195,7 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
               Xuất PDF
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu> */}
 
         {/* Notifications */}
         <NotificationBell
@@ -231,7 +234,7 @@ const Header = ({ onSidebarToggle, sidebarOpen = true }: HeaderProps) => {
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-semibold">{userDisplayName}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm tracking-tighter text-muted-foreground">
                   {getRoleName(user?.roleId)}
                 </p>
               </div>

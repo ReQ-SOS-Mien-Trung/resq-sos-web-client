@@ -950,3 +950,14 @@ button {
   transform-origin: top center;
   animation: bell-ring 0.9s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1;
 }
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

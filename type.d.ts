@@ -553,6 +553,13 @@ export interface UserTableProps {
   onViewDetail?: (userId: string) => void;
   isLoading?: boolean;
   totalCount?: number;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  roleOptions?: Array<{ value: string; label: string }>;
+  selectedRoleId?: string;
+  onRoleIdChange?: (value: string) => void;
+  selectedBanFilter?: "all" | "active" | "banned";
+  onBanFilterChange?: (value: "all" | "active" | "banned") => void;
   serverPagination?: {
     totalCount: number;
     totalPages: number;

@@ -172,7 +172,7 @@ export interface UpdateDepotStatusResponse {
 
 export interface AssignDepotManagerRequest {
   id: number;
-  managerId: string;
+  managerIds: string[];
 }
 
 export interface UnassignDepotManagerRequest {
@@ -213,6 +213,22 @@ export interface DepotFund {
   advanceLimit: number;
   outstandingAdvanceAmount: number;
   funds: AdminDepotFundSource[];
+}
+
+export interface GetDepotFundsParams {
+  pageNumber?: number;
+  pageSize?: number;
+  search?: string;
+}
+
+export interface GetDepotFundsResponse {
+  items: DepotFund[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 }
 
 // My Depot Fund Ledger (from /finance/depot-funds/my)
@@ -627,4 +643,105 @@ export interface DepotReceiveTransferResponse {
   reusableItemsMoved: number;
   completedAt: string;
   message: string;
+}
+
+// ─── Chart: Capacity ───────────────────────────────────────────────────────
+// GET /logistics/depot/{id}/chart/capacity
+export interface DepotCapacityChartResponse {
+  depotId: number;
+  depotName: string;
+  currentVolume: number;
+  maxVolume: number;
+  volumeUsagePercent: number;
+  currentWeight: number;
+  maxWeight: number;
+  weightUsagePercent: number;
+}
+
+// ─── Chart: Inventory Movement ────────────────────────────────────────────
+// GET /logistics/depot/{id}/chart/inventory-movement
+export interface InventoryMovementDataPoint {
+  date: string;
+  totalIn: number;
+  totalOut: number;
+  totalAdjust: number;
+}
+
+export interface DepotInventoryMovementChartResponse {
+  depotId: number;
+  depotName: string;
+  from: string;
+  to: string;
+  dataPoints: InventoryMovementDataPoint[];
+}
+
+export interface GetDepotInventoryMovementParams {
+  from?: string;
+  to?: string;
+}
+
+// ─── Chart: Fund Movement ─────────────────────────────────────────────────
+// GET /finance/depot-funds/{depotId}/chart/fund-movement
+export interface FundMovementDataPoint {
+  date: string;
+  totalIn: number;
+  totalOut: number;
+}
+
+export interface DepotFundMovementChartResponse {
+  depotId: number;
+  depotName: string;
+  from: string;
+  to: string;
+  dataPoints: FundMovementDataPoint[];
+}
+
+export interface GetDepotFundMovementParams {
+  from?: string;
+  to?: string;
+}
+
+// ─── Fund Transactions by FundId ─────────────────────────────────────────────
+// GET /finance/depot-funds/{fundId}/fund-transactions
+
+export type DepotFundReferenceType = "CampaignDisbursement" | "VatInvoice";
+
+export interface FundTransactionDetail {
+  id: number;
+  depotFundId: number;
+  transactionType: string;
+  amount: number;
+  referenceType: string;
+  referenceId: number | null;
+  note: string;
+  createdBy: string;
+  createdAt: string;
+  contributorName: string | null;
+  contributorPhoneNumber: string | null;
+  contributorTotalAdvancedAmount: number;
+  contributorTotalRepaidAmount: number;
+  contributorOutstandingAmount: number;
+  contributorRepaidPercentage: number;
+}
+
+export interface GetFundTransactionsByFundIdParams {
+  depotId: number;
+  pageNumber?: number;
+  pageSize?: number;
+  fromDate?: string;
+  toDate?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  referenceTypes?: DepotFundReferenceType[];
+  search?: string;
+}
+
+export interface GetFundTransactionsByFundIdResponse {
+  items: FundTransactionDetail[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
 }

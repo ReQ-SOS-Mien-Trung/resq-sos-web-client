@@ -3,6 +3,9 @@ import {
   SosStatusOption,
   VictimsByPeriodParams,
   VictimsByPeriodResponse,
+  RescuersDailyStatisticsResponse,
+  MissionSuccessRateSummaryResponse,
+  SosRequestsSummaryResponse,
 } from "./type";
 
 /**
@@ -28,5 +31,33 @@ export async function getVictimsByPeriod(
       indexes: null, // ?statuses=Pending&statuses=Resolved
     },
   });
+  return data;
+}
+
+/**
+ * GET /personnel/dashboard/rescuers/daily-statistics
+ */
+export async function getRescuersDailyStatistics(): Promise<RescuersDailyStatisticsResponse> {
+  const { data } = await api.get(
+    "/personnel/dashboard/rescuers/daily-statistics",
+  );
+  return data;
+}
+
+/**
+ * GET /personnel/dashboard/missions/success-rate/summary
+ */
+export async function getMissionSuccessRateSummary(): Promise<MissionSuccessRateSummaryResponse> {
+  const { data } = await api.get(
+    "/personnel/dashboard/missions/success-rate/summary",
+  );
+  return data;
+}
+
+/**
+ * GET /personnel/dashboard/sos-requests/summary
+ */
+export async function getSosRequestsSummary(): Promise<SosRequestsSummaryResponse> {
+  const { data } = await api.get("/personnel/dashboard/sos-requests/summary");
   return data;
 }

@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -127,13 +126,38 @@ const RETURN_UPCOMING_STATUS_OPTIONS = [
   { value: "OnGoing", label: "Đang trên đường về kho" },
 ] as const;
 
-const RETURN_DISCREPANCY_NOTE_TEMPLATE = [
-  "- Chênh lệch số lượng:",
-  "- Vật phẩm/đơn vị thiếu:",
-  "- Vật phẩm/đơn vị hư hỏng:",
-  "- Vật phẩm/đơn vị trả thêm:",
-  "- Nguyên nhân / ghi chú bổ sung:",
-].join("\n");
+const RETURN_DISCREPANCY_FIELDS = [
+  {
+    key: "quantityMismatch",
+    label: "Chênh lệch số lượng",
+    placeholder: "Ví dụ: thiếu 5 gói, thừa 2 chai...",
+  },
+  {
+    key: "missingItems",
+    label: "Vật phẩm/đơn vị thiếu",
+    placeholder: "Liệt kê vật phẩm hoặc serial còn thiếu",
+  },
+  {
+    key: "damagedItems",
+    label: "Vật phẩm/đơn vị hư hỏng",
+    placeholder: "Mô tả vật phẩm hư hỏng và tình trạng",
+  },
+  {
+    key: "extraItems",
+    label: "Vật phẩm/đơn vị trả thêm",
+    placeholder: "Liệt kê vật phẩm được trả thêm",
+  },
+  {
+    key: "additionalNotes",
+    label: "Nguyên nhân / ghi chú bổ sung",
+    placeholder: "Nhập nguyên nhân hoặc ghi chú bổ sung",
+  },
+] as const;
+
+type ReturnDiscrepancyFieldKey =
+  (typeof RETURN_DISCREPANCY_FIELDS)[number]["key"];
+
+type ConfirmReturnDiscrepancyFields = Record<ReturnDiscrepancyFieldKey, string>;
 
 interface ConfirmReturnConsumableDraft {
   itemId: number;
@@ -167,9 +191,33 @@ interface ConfirmReturnReusableDraft {
 }
 
 interface ConfirmReturnFormState {
-  discrepancyNote: string;
+  discrepancyFields: ConfirmReturnDiscrepancyFields;
   consumableItems: ConfirmReturnConsumableDraft[];
   reusableItems: ConfirmReturnReusableDraft[];
+}
+
+function createEmptyDiscrepancyFields(): ConfirmReturnDiscrepancyFields {
+  return {
+    quantityMismatch: "",
+    missingItems: "",
+    damagedItems: "",
+    extraItems: "",
+    additionalNotes: "",
+  };
+}
+
+function buildDiscrepancyNotePayload(
+  fields: ConfirmReturnDiscrepancyFields,
+): string | null {
+  const hasAnyValue = Object.values(fields).some((value) => value.trim());
+
+  if (!hasAnyValue) {
+    return null;
+  }
+
+  return RETURN_DISCREPANCY_FIELDS.map(
+    ({ key, label }) => `- ${label}: ${fields[key].trim()}`,
+  ).join("\n");
 }
 
 const PRIORITY_MAP: Record<
@@ -433,7 +481,7 @@ function buildConfirmReturnFormState(
   }
 
   return {
-    discrepancyNote: RETURN_DISCREPANCY_NOTE_TEMPLATE,
+    discrepancyFields: createEmptyDiscrepancyFields(),
     consumableItems,
     reusableItems,
   };
@@ -935,6 +983,19 @@ function ConfirmReturnFormSection({
     [],
   );
 
+  const handleDiscrepancyFieldChange = useCallback(
+    (field: ReturnDiscrepancyFieldKey, value: string) => {
+      setForm((prev) => ({
+        ...prev,
+        discrepancyFields: {
+          ...prev.discrepancyFields,
+          [field]: value,
+        },
+      }));
+    },
+    [],
+  );
+
   const handleSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -975,12 +1036,9 @@ function ConfirmReturnFormSection({
           missionId: activity.missionId,
           activityId: activity.activityId,
           request: {
-            discrepancyNote:
-              form.discrepancyNote.trim() &&
-              form.discrepancyNote.trim() !==
-                RETURN_DISCREPANCY_NOTE_TEMPLATE.trim()
-                ? form.discrepancyNote.trim()
-                : null,
+            discrepancyNote: buildDiscrepancyNotePayload(
+              form.discrepancyFields,
+            ),
             consumableItems: form.consumableItems.map((row) => ({
               itemModelId: row.itemModelId,
               quantity: Number.parseInt(row.quantity || "0", 10) || 0,
@@ -1021,6 +1079,225 @@ function ConfirmReturnFormSection({
     ],
   );
 
+  const hasConsumableItems = form.consumableItems.length > 0;
+  const hasReusableItems = form.reusableItems.length > 0;
+  const hasSingleItemTypeSection = hasConsumableItems !== hasReusableItems;
+
+  const consumableSection = hasConsumableItems ? (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex h-7 items-center rounded-full bg-orange-100 px-3 text-sm font-medium tracking-tighter text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
+          Vật phẩm tiêu thụ
+        </span>
+        <span className="text-sm tracking-tighter text-muted-foreground">
+          Xác nhận số lượng thực kho nhận
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        {form.consumableItems.map((row) => (
+          <div
+            key={row.itemId}
+            className="rounded-xl border border-border/60 bg-background/90 p-4"
+          >
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
+              <div className="min-w-0 space-y-1">
+                <p className="text-base font-semibold tracking-tight">
+                  {row.itemName}
+                </p>
+                <p className="text-xs tracking-tighter text-muted-foreground">
+                  itemModelId gửi lên: {row.itemModelId}
+                </p>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 dark:border-amber-800/60 dark:bg-amber-950/20">
+                  <p className="text-sm uppercase tracking-[0.14em] text-amber-700 dark:text-amber-300">
+                    Ban đầu
+                  </p>
+                  <p className="text-sm font-semibold tracking-tighter text-amber-900 dark:text-amber-100">
+                    {row.expectedQuantity.toLocaleString("vi-VN")} {row.unit}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Kho xác nhận
+                  </label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={row.quantity}
+                    onChange={(event) =>
+                      handleConsumableQuantityChange(
+                        row.itemId,
+                        event.target.value,
+                      )
+                    }
+                    className="h-10 bg-background"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  const reusableSection = hasReusableItems ? (
+    <div className="space-y-3">
+      <div className="flex items-center">
+        <span className="inline-flex h-7 items-center rounded-full bg-emerald-100 px-3 text-sm font-medium tracking-tighter text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+          Vật phẩm tái sử dụng
+        </span>
+      </div>
+
+      {!isConditionsLoading && conditionOptions.length === 0 && (
+        <div className="rounded-xl border border-red-200/70 bg-red-50/80 px-3 py-2 text-sm tracking-tighter text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
+          Chưa tải được danh sách tình trạng vật phẩm tái sử dụng. Bạn vẫn có
+          thể xem danh sách, nhưng cần có tình trạng để xác nhận.
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {form.reusableItems.map((row) => (
+          <div
+            key={row.itemId}
+            className="rounded-xl border border-border/60 bg-background/90 p-4 shadow-sm"
+          >
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_minmax(320px,380px)] lg:items-start">
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-base font-semibold tracking-tight">
+                    {row.itemName}
+                  </p>
+                  <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/40 px-2 py-0.5 text-[11px] font-medium tracking-tighter text-muted-foreground">
+                    itemModelId #{row.itemModelId}
+                  </span>
+                </div>
+                <p className="text-sm tracking-tighter text-muted-foreground">
+                  Kiểm tra từng serial bên dưới rồi nhập số kho thực nhận.
+                </p>
+              </div>
+
+              <div className="min-w-0 rounded-xl border border-amber-200/70 bg-amber-50 px-4 py-3 dark:border-amber-800/60 dark:bg-amber-950/20">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+                  Ban đầu
+                </p>
+                <p className="mt-1 text-xl font-semibold tracking-tight text-amber-900 dark:text-amber-100">
+                  {row.expectedQuantity.toLocaleString("vi-VN")} {row.unit}
+                </p>
+              </div>
+
+              <div className="min-w-0 grid grid-cols-[max-content_minmax(0,1fr)] items-center gap-3">
+                <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Kho xác nhận
+                </label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={row.quantity}
+                  onChange={(event) =>
+                    handleReusableQuantityChange(row.itemId, event.target.value)
+                  }
+                  className="h-10 w-full bg-background shadow-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {row.units.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm tracking-tighter text-muted-foreground">
+                  Chưa có danh sách reusable unit để đối chiếu.
+                </div>
+              ) : (
+                row.units.map((unit) => (
+                  <div
+                    key={`${row.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
+                    className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3"
+                  >
+                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px_minmax(260px,1fr)] lg:items-end">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold tracking-tight">
+                            {unit.itemName || row.itemName}
+                          </p>
+                          <span className="inline-flex items-center rounded-full border border-border/70 bg-background/80 px-2 py-0.5 text-[11px] font-medium tracking-tighter text-muted-foreground">
+                            ID #{unit.reusableItemId}
+                          </span>
+                        </div>
+                        <p className="text-xs tracking-tighter text-muted-foreground">
+                          Serial:{" "}
+                          <span className="font-medium text-foreground/90">
+                            {unit.serialNumber || "—"}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className="min-w-0 space-y-1">
+                        <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          Tình trạng
+                        </label>
+                        <Select
+                          value={unit.condition}
+                          onValueChange={(value) =>
+                            handleReusableUnitFieldChange(
+                              row.itemId,
+                              unit.reusableItemId,
+                              "condition",
+                              value,
+                            )
+                          }
+                        >
+                          <SelectTrigger className="h-10 w-full min-w-0 bg-background shadow-none">
+                            <SelectValue placeholder="Chọn tình trạng" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {conditionOptions.map((condition) => (
+                              <SelectItem
+                                key={condition.key}
+                                value={condition.key}
+                              >
+                                {condition.value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="min-w-0 space-y-1">
+                        <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          Ghi chú unit
+                        </label>
+                        <Input
+                          value={unit.note}
+                          onChange={(event) =>
+                            handleReusableUnitFieldChange(
+                              row.itemId,
+                              unit.reusableItemId,
+                              "note",
+                              event.target.value,
+                            )
+                          }
+                          placeholder="VD: trầy nhẹ vỏ ngoài"
+                          className="h-10 w-full min-w-0 bg-background shadow-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  const singleItemTypeSection = hasConsumableItems
+    ? consumableSection
+    : reusableSection;
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -1042,243 +1319,49 @@ function ConfirmReturnFormSection({
           </div> */}
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]">
+        <div
+          className={cn(
+            "grid gap-5",
+            hasSingleItemTypeSection
+              ? "xl:grid-cols-2"
+              : "xl:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]",
+          )}
+        >
           <div className="space-y-5">
             <div className="space-y-2">
               <label className="text-base font-semibold tracking-tighter text-foreground">
                 Nội dung báo cáo sai lệch
               </label>
-              <Textarea
-                value={form.discrepancyNote}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    discrepancyNote: event.target.value,
-                  }))
-                }
-                className="min-h-32 resize-y bg-background/90"
-              />
+              <div className="space-y-3 rounded-xl border border-border/60 bg-background/90 p-3">
+                {RETURN_DISCREPANCY_FIELDS.map((field) => (
+                  <div
+                    key={field.key}
+                    className="grid gap-2 md:grid-cols-[220px_minmax(0,1fr)] md:items-center"
+                  >
+                    <div className="rounded-lg bg-muted/60 px-3 py-2 text-sm font-medium tracking-tight text-foreground">
+                      - {field.label}:
+                    </div>
+                    <Input
+                      value={form.discrepancyFields[field.key]}
+                      onChange={(event) =>
+                        handleDiscrepancyFieldChange(
+                          field.key,
+                          event.target.value,
+                        )
+                      }
+                      placeholder={field.placeholder}
+                      className="bg-background"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {form.consumableItems.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-7 items-center rounded-full bg-orange-100 px-3 text-sm font-medium tracking-tighter text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
-                    Vật phẩm tiêu hao
-                  </span>
-                  <span className="text-sm tracking-tighter text-muted-foreground">
-                    Xác nhận số lượng thực kho nhận
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {form.consumableItems.map((row) => (
-                    <div
-                      key={row.itemId}
-                      className="rounded-xl border border-border/60 bg-background/90 p-4"
-                    >
-                      <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
-                        <div className="min-w-0 space-y-1">
-                          <p className="text-base font-semibold tracking-tight">
-                            {row.itemName}
-                          </p>
-                          <p className="text-xs tracking-tighter text-muted-foreground">
-                            itemModelId gửi lên: {row.itemModelId}
-                          </p>
-                        </div>
-
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <div className="rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 dark:border-amber-800/60 dark:bg-amber-950/20">
-                            <p className="text-sm uppercase tracking-[0.14em] text-amber-700 dark:text-amber-300">
-                              Ban đầu
-                            </p>
-                            <p className="text-sm font-semibold tracking-tighter text-amber-900 dark:text-amber-100">
-                              {row.expectedQuantity.toLocaleString("vi-VN")}{" "}
-                              {row.unit}
-                            </p>
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                              Kho xác nhận
-                            </label>
-                            <Input
-                              type="text"
-                              inputMode="numeric"
-                              value={row.quantity}
-                              onChange={(event) =>
-                                handleConsumableQuantityChange(
-                                  row.itemId,
-                                  event.target.value,
-                                )
-                              }
-                              className="h-10 bg-background"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {!hasSingleItemTypeSection && consumableSection}
           </div>
 
           <div className="space-y-5">
-            {form.reusableItems.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center">
-                  <span className="inline-flex h-7 items-center rounded-full bg-emerald-100 px-3 text-sm font-medium tracking-tighter text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    Vật phẩm tái sử dụng
-                  </span>
-                </div>
-
-                {!isConditionsLoading && conditionOptions.length === 0 && (
-                  <div className="rounded-xl border border-red-200/70 bg-red-50/80 px-3 py-2 text-sm tracking-tighter text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
-                    Chưa tải được danh sách tình trạng vật phẩm tái sử dụng. Bạn
-                    vẫn có thể xem danh sách, nhưng cần có tình trạng để xác
-                    nhận.
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  {form.reusableItems.map((row) => (
-                    <div
-                      key={row.itemId}
-                      className="rounded-xl border border-border/60 bg-background/90 p-4 shadow-sm"
-                    >
-                      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_minmax(320px,380px)] lg:items-start">
-                        <div className="min-w-0 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-base font-semibold tracking-tight">
-                              {row.itemName}
-                            </p>
-                            <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/40 px-2 py-0.5 text-[11px] font-medium tracking-tighter text-muted-foreground">
-                              itemModelId #{row.itemModelId}
-                            </span>
-                          </div>
-                          <p className="text-sm tracking-tighter text-muted-foreground">
-                            Kiểm tra từng serial bên dưới rồi nhập số kho thực
-                            nhận.
-                          </p>
-                        </div>
-
-                        <div className="min-w-0 rounded-xl border border-amber-200/70 bg-amber-50 px-4 py-3 dark:border-amber-800/60 dark:bg-amber-950/20">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
-                            Ban đầu
-                          </p>
-                          <p className="mt-1 text-xl font-semibold tracking-tight text-amber-900 dark:text-amber-100">
-                            {row.expectedQuantity.toLocaleString("vi-VN")}{" "}
-                            {row.unit}
-                          </p>
-                        </div>
-
-                        <div className="min-w-0 grid grid-cols-[max-content_minmax(0,1fr)] items-center gap-3">
-                          <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            Kho xác nhận
-                          </label>
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                            value={row.quantity}
-                            onChange={(event) =>
-                              handleReusableQuantityChange(
-                                row.itemId,
-                                event.target.value,
-                              )
-                            }
-                            className="h-10 w-full bg-background shadow-none"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mt-4 space-y-3">
-                        {row.units.length === 0 ? (
-                          <div className="rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm tracking-tighter text-muted-foreground">
-                            Chưa có danh sách reusable unit để đối chiếu.
-                          </div>
-                        ) : (
-                          row.units.map((unit) => (
-                            <div
-                              key={`${row.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
-                              className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3"
-                            >
-                              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px_minmax(260px,1fr)] lg:items-end">
-                                <div className="min-w-0 space-y-1">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-sm font-semibold tracking-tight">
-                                      {unit.itemName || row.itemName}
-                                    </p>
-                                    <span className="inline-flex items-center rounded-full border border-border/70 bg-background/80 px-2 py-0.5 text-[11px] font-medium tracking-tighter text-muted-foreground">
-                                      ID #{unit.reusableItemId}
-                                    </span>
-                                  </div>
-                                  <p className="text-xs tracking-tighter text-muted-foreground">
-                                    Serial:{" "}
-                                    <span className="font-medium text-foreground/90">
-                                      {unit.serialNumber || "—"}
-                                    </span>
-                                  </p>
-                                </div>
-
-                                <div className="min-w-0 space-y-1">
-                                  <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                    Tình trạng
-                                  </label>
-                                  <Select
-                                    value={unit.condition}
-                                    onValueChange={(value) =>
-                                      handleReusableUnitFieldChange(
-                                        row.itemId,
-                                        unit.reusableItemId,
-                                        "condition",
-                                        value,
-                                      )
-                                    }
-                                  >
-                                    <SelectTrigger className="h-10 w-full min-w-0 bg-background shadow-none">
-                                      <SelectValue placeholder="Chọn tình trạng" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {conditionOptions.map((condition) => (
-                                        <SelectItem
-                                          key={condition.key}
-                                          value={condition.key}
-                                        >
-                                          {condition.value}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-
-                                <div className="min-w-0 space-y-1">
-                                  <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                                    Ghi chú unit
-                                  </label>
-                                  <Input
-                                    value={unit.note}
-                                    onChange={(event) =>
-                                      handleReusableUnitFieldChange(
-                                        row.itemId,
-                                        unit.reusableItemId,
-                                        "note",
-                                        event.target.value,
-                                      )
-                                    }
-                                    placeholder="VD: trầy nhẹ vỏ ngoài"
-                                    className="h-10 w-full min-w-0 bg-background shadow-none"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {hasSingleItemTypeSection ? singleItemTypeSection : reusableSection}
           </div>
         </div>
 

@@ -55,13 +55,13 @@ const LeadsManagement = ({ data }: LeadsManagementProps) => {
                         }}
                       >
                         {!isTiny && (
-                          <span className="text-xs font-semibold text-white drop-shadow-sm">
+                          <span className="text-sm tracking-tighter font-semibold text-white drop-shadow-sm">
                             {category.percentage}%
                           </span>
                         )}
                       </div>
                       {isTiny && (
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-foreground/90">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm tracking-tighter font-semibold text-foreground/90">
                           {category.percentage}%
                         </span>
                       )}
@@ -100,19 +100,19 @@ const LeadsManagement = ({ data }: LeadsManagementProps) => {
           <TabsList className="grid w-full grid-cols-3 bg-muted/50 p-1 rounded-lg">
             <TabsTrigger
               value="status"
-              className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
+              className="text-sm tracking-tighter font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
             >
               Trạng thái
             </TabsTrigger>
             <TabsTrigger
               value="sources"
-              className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
+              className="text-sm tracking-tighter font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
             >
               Nguồn
             </TabsTrigger>
             <TabsTrigger
               value="qualification"
-              className="text-xs font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
+              className="text-sm tracking-tighter font-medium rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200"
             >
               Mức độ
             </TabsTrigger>

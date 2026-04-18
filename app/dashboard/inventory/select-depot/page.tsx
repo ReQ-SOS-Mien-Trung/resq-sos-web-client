@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLogout } from "@/services/auth/hooks";
+import { useDepotStatuses } from "@/services/depot/hooks";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
 
 const STATUS_TONE: Record<string, string> = {
@@ -32,6 +33,16 @@ export default function SelectDepotPage() {
   const router = useRouter();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const { managedDepots, selectedDepotId, selectDepot } = useManagerDepot();
+  const { data: depotStatuses = [] } = useDepotStatuses();
+
+  const statusLabelMap = useMemo(
+    () =>
+      new Map<string, string>(
+        depotStatuses.map((status) => [String(status.key), status.value]),
+      ),
+    [depotStatuses],
+  );
+
   const uniqueManagedDepots = useMemo(() => {
     const deduped = new Map<string, (typeof managedDepots)[number]>();
     for (const depot of managedDepots) {
@@ -128,7 +139,7 @@ export default function SelectDepotPage() {
                             "border-slate-200 bg-white/80 text-slate-700",
                         )}
                       >
-                        {depot.status}
+                        {statusLabelMap.get(depot.status) ?? depot.status}
                       </Badge>
                     </div>
 

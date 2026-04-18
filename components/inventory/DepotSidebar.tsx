@@ -23,6 +23,14 @@ import {
   ArrowFatLinesRight,
 } from "@phosphor-icons/react";
 import { DepotSidebarProps, InventoryItem, SupplyRequest } from "@/type";
+import { useMyDepotLowStock } from "@/services/inventory/hooks";
+import {
+  getLowStockWarningLevel,
+  compareLowStockItems,
+} from "@/services/inventory/utils";
+import { LowStockItem } from "@/services/inventory/type";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // ── Main component ────────────────────────────────────────────────────────────
 const DepotSidebar = ({
@@ -40,7 +48,22 @@ const DepotSidebar = ({
 }: DepotSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
 
-  // ── Derived data ─────────────────────────────────────────────────────────
+  // ── Real low-stock data ───────────────────────────────────────────────
+  const { selectedDepotId } = useManagerDepot();
+  const { data: lowStockData, isLoading: loadingLowStock } = useMyDepotLowStock(
+    selectedDepotId ? { depotId: selectedDepotId } : undefined,
+  );
+
+  const urgentItems: LowStockItem[] = (lowStockData?.items ?? [])
+    .filter((item) => getLowStockWarningLevel(item) !== "OK")
+    .filter((item) =>
+      searchQuery
+        ? item.itemModelName.toLowerCase().includes(searchQuery.toLowerCase())
+        : true,
+    )
+    .sort(compareLowStockItems);
+
+  // ── Derived data (normal items from prop) ────────────────────────────
   const filteredItems = inventoryItems.filter((item) => {
     const matchesSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -51,10 +74,6 @@ const DepotSidebar = ({
     return matchesSearch && matchesCategory;
   });
 
-  const criticalItems = filteredItems.filter(
-    (i) => i.stockLevel === "CRITICAL",
-  );
-  const lowStockItems = filteredItems.filter((i) => i.stockLevel === "LOW");
   const normalItems = filteredItems.filter(
     (i) => i.stockLevel === "NORMAL" || i.stockLevel === "OVERSTOCKED",
   );
@@ -84,8 +103,7 @@ const DepotSidebar = ({
     .sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime())
     .slice(0, 2);
 
-  const hasUrgent = criticalItems.length > 0 || lowStockItems.length > 0;
-  const hasPendingReqs = pendingRequestsAll.length > 0;
+  const hasUrgent = urgentItems.length > 0;
 
   return (
     <div className="h-full flex flex-col bg-sidebar border-r border-sidebar-border overflow-hidden">
@@ -161,12 +179,6 @@ const DepotSidebar = ({
             icon={<Cube className="h-4 w-4" />}
           />
           <TabTriggerWithDot
-            value="requests"
-            dot={hasPendingReqs}
-            label="Tạo yêu cầu"
-            icon={<ClipboardText className="h-4 w-4" />}
-          />
-          <TabTriggerWithDot
             value="supply-management"
             dot={hasIncomingItems || hasAnyRequests}
             label="Quản lý tiếp tế"
@@ -193,21 +205,24 @@ const DepotSidebar = ({
 
           <ScrollArea className="flex-1 min-h-0">
             <div className="px-3 pb-4 space-y-4">
-              {(criticalItems.length > 0 || lowStockItems.length > 0) && (
+              {loadingLowStock && (
+                <div className="space-y-2">
+                  <Skeleton className="h-3 w-28" />
+                  <Skeleton className="h-14 w-full rounded-lg" />
+                  <Skeleton className="h-14 w-full rounded-lg" />
+                </div>
+              )}
+
+              {!loadingLowStock && urgentItems.length > 0 && (
                 <div>
                   <SectionHeader
-                    label={`Cần bổ sung (${criticalItems.length + lowStockItems.length})`}
+                    label={`Cần bổ sung (${urgentItems.length})`}
                     color="text-red-500"
                     icon={<ShieldWarning className="h-3 w-3" weight="fill" />}
                   />
                   <div className="space-y-1.5 mt-2">
-                    {[...criticalItems, ...lowStockItems].map((item) => (
-                      <InventoryItemRow
-                        key={item.id}
-                        item={item}
-                        isSelected={selectedItem?.id === item.id}
-                        onClick={() => onItemSelect(item)}
-                      />
+                    {urgentItems.map((item) => (
+                      <LowStockItemRow key={item.itemModelId} item={item} />
                     ))}
                   </div>
                 </div>
@@ -217,7 +232,7 @@ const DepotSidebar = ({
                 <div>
                   <SectionHeader
                     label={`Bình thường (${normalItems.length})`}
-                    color="text-muted-foreground"
+                    color="text-green-600"
                     icon={<CheckCircle className="h-3 w-3" weight="fill" />}
                   />
                   <div className="space-y-1.5 mt-2">
@@ -452,7 +467,7 @@ function SectionHeader({
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest",
+        "flex items-center gap-1.5 text-xs font-semibold tracking-tighter",
         color,
       )}
     >
@@ -465,7 +480,7 @@ function SectionHeader({
 
 function EmptyState({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-10 text-muted-foreground/50 gap-2">
+    <div className="flex flex-col tracking-tighter items-center justify-center py-10 text-muted-foreground/50 gap-2">
       <div className="opacity-40">{icon}</div>
       <p className="text-xs tracking-tighter">{label}</p>
     </div>
@@ -509,12 +524,12 @@ function InventoryItemRow({
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold tracking-tighter truncate flex-1">
+        <p className="text-sm font-semibold tracking-tighter truncate flex-1">
           {item.name}
         </p>
         <span
           className={cn(
-            "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
+            "text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0",
             item.stockLevel === "CRITICAL"
               ? "bg-red-100 text-red-600"
               : item.stockLevel === "LOW"
@@ -523,7 +538,10 @@ function InventoryItemRow({
           )}
         >
           {item.quantity}
-          <span className="font-normal opacity-70"> {item.unit}</span>
+          <span className="font-normal tracking-tighter opacity-70">
+            {" "}
+            {item.unit}
+          </span>
         </span>
       </div>
       <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
@@ -532,10 +550,63 @@ function InventoryItemRow({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-[10px] text-muted-foreground mt-1 tracking-tighter">
+      <p className="text-xs text-muted-foreground mt-1.5 tracking-tighter">
         {item.sku} · {item.location}
       </p>
     </button>
+  );
+}
+
+function LowStockItemRow({ item }: { item: LowStockItem }) {
+  const level = getLowStockWarningLevel(item);
+  const isCritical = level === "CRITICAL" || level === "DANGER";
+  const pct =
+    item.minimumThreshold && item.minimumThreshold > 0
+      ? Math.min((item.availableQuantity / item.minimumThreshold) * 100, 100)
+      : 0;
+  const barColor = isCritical ? "bg-red-500" : "bg-orange-400";
+  const borderColor = isCritical ? "border-l-red-500" : "border-l-orange-400";
+  const badgeClass = isCritical
+    ? "bg-red-100 text-red-600"
+    : "bg-orange-100 text-orange-600";
+
+  return (
+    <div
+      className={cn(
+        "w-full text-left rounded-lg border bg-card px-3 py-2.5 border-l-2",
+        borderColor,
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold tracking-tighter truncate flex-1">
+          {item.itemModelName}
+        </p>
+        <span
+          className={cn(
+            "text-xs tracking-tighter font-bold px-1.5 py-0.5 rounded-full shrink-0",
+            badgeClass,
+          )}
+        >
+          {item.availableQuantity}
+          <span className="font-normal tracking-tighter opacity-70">
+            {" "}
+            {item.unit}
+          </span>
+        </span>
+      </div>
+      <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
+        <div
+          className={cn("h-full rounded-full transition-all", barColor)}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {item.minimumThreshold !== null &&
+        item.minimumThreshold !== undefined && (
+          <p className="text-xs text-muted-foreground mt-1.5 tracking-tighter">
+            Tối thiểu: {item.minimumThreshold} {item.unit}
+          </p>
+        )}
+    </div>
   );
 }
 

@@ -7,11 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
   DotsThreeVertical,
   PencilSimple,
   Prohibit,
@@ -21,8 +16,6 @@ import {
   ArrowsDownUp,
   MagnifyingGlass,
   X,
-  Check,
-  CaretDown,
 } from "@phosphor-icons/react";
 import {
   DropdownMenu,
@@ -43,14 +36,8 @@ type SortColumn = "name" | "email" | "role" | "region" | "status" | "createdAt";
 type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
 
-const ROLE_OPTIONS: { value: User["role"]; label: string }[] = [
-  { value: "admin", label: "Quản trị viên" },
-  { value: "manager", label: "Quản lý kho" },
-  { value: "coordinator", label: "Điều phối viên" },
-  { value: "victim", label: "Công dân" },
-];
-
-const STATUS_OPTIONS: { value: "active" | "banned"; label: string }[] = [
+const STATUS_OPTIONS: { value: "all" | "active" | "banned"; label: string }[] = [
+  { value: "all", label: "Tất cả" },
   { value: "active", label: "Hoạt động" },
   { value: "banned", label: "Bị cấm" },
 ];
@@ -130,6 +117,13 @@ const UserTable = ({
   onViewDetail,
   isLoading,
   totalCount,
+  searchValue = "",
+  onSearchChange,
+  roleOptions = [],
+  selectedRoleId = "all",
+  onRoleIdChange,
+  selectedBanFilter = "all",
+  onBanFilterChange,
   serverPagination,
 }: UserTableProps) => {
   const [_page, _setPage] = useState(1);
@@ -157,25 +151,6 @@ const UserTable = ({
       _setPage(1);
     }
   };
-  const [search, setSearch] = useState("");
-  const [selectedRoles, setSelectedRoles] = useState<User["role"][]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<("active" | "banned")[]>([]);
-  const [roleOpen, setRoleOpen] = useState(false);
-  const [statusOpen, setStatusOpen] = useState(false);
-
-  const toggleRole = (role: User["role"]) => {
-    setPage(1);
-    setSelectedRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
-    );
-  };
-
-  const toggleStatus = (status: "active" | "banned") => {
-    setPage(1);
-    setSelectedStatuses((prev) =>
-      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
-    );
-  };
 
   const handleSort = (column: SortColumn) => {
     setPage(1);
@@ -186,39 +161,22 @@ const UserTable = ({
     });
   };
 
-  const hasFilters = !!(search || selectedRoles.length > 0 || selectedStatuses.length > 0);
+  const hasFilters = !!(
+    searchValue.trim() ||
+    selectedRoleId !== "all" ||
+    selectedBanFilter !== "all"
+  );
 
   const clearFilters = () => {
-    setSearch("");
-    setSelectedRoles([]);
-    setSelectedStatuses([]);
+    onSearchChange?.("");
+    onRoleIdChange?.("all");
+    onBanFilterChange?.("all");
     setPage(1);
   };
 
   // ── Client-side filter + sort ─────────────────────────────────────────────
   const filteredAndSorted = useMemo(() => {
     let result = users;
-
-    // Search by name, email, phone
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      result = result.filter(
-        (u) =>
-          u.name.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q) ||
-          (u.phone && u.phone.toLowerCase().includes(q))
-      );
-    }
-
-    // Role filter
-    if (selectedRoles.length > 0) {
-      result = result.filter((u) => selectedRoles.includes(u.role));
-    }
-
-    // Status filter
-    if (selectedStatuses.length > 0) {
-      result = result.filter((u) => selectedStatuses.includes(u.status));
-    }
 
     // Sort
     if (sort) {
@@ -237,7 +195,7 @@ const UserTable = ({
     }
 
     return result;
-  }, [users, search, selectedRoles, selectedStatuses, sort]);
+  }, [users, sort]);
 
   // ── Pagination ────────────────────────────────────────────────────────────
   const displayTotalCount = isServerMode ? serverPagination!.totalCount : filteredAndSorted.length;
@@ -262,11 +220,13 @@ const UserTable = ({
         <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-border/40">
           {/* Search */}
           <div className="relative flex-1 min-w-52">
-
             <Input
               placeholder="Tìm theo tên, email, số điện thoại..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              value={searchValue}
+              onChange={(e) => {
+                onSearchChange?.(e.target.value);
+                setPage(1);
+              }}
               className="pl-9 h-9 text-sm"
               autoComplete="off"
             />
@@ -276,99 +236,44 @@ const UserTable = ({
             />
           </div>
 
-          {/* Role filter */}
-          <Popover open={roleOpen} onOpenChange={setRoleOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-1.5 font-normal text-sm">
-                Vai trò
-                {selectedRoles.length > 0 ? (
-                  <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
-                    {selectedRoles.length}
-                  </Badge>
-                ) : (
-                  <CaretDown size={13} className="text-muted-foreground" />
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-52 p-1.5" align="start">
-              {ROLE_OPTIONS.map(({ value, label }) => {
-                const checked = selectedRoles.includes(value);
-                return (
-                  <button
-                    key={value}
-                    onClick={() => toggleRole(value)}
-                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-md hover:bg-muted/60 transition-colors"
-                  >
-                    <span
-                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "border-border bg-background"
-                        }`}
-                    >
-                      {checked && <Check size={11} weight="bold" />}
-                    </span>
-                    <span className={checked ? "font-medium" : ""}>{label}</span>
-                  </button>
-                );
-              })}
-              {selectedRoles.length > 0 && (
-                <button
-                  onClick={() => { setSelectedRoles([]); setPage(1); }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
-                >
-                  <X size={11} />
-                  Xóa lọc vai trò
-                </button>
-              )}
-            </PopoverContent>
-          </Popover>
+          <Select
+            value={selectedRoleId}
+            onValueChange={(value) => {
+              onRoleIdChange?.(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-9 w-[200px] text-sm">
+              <SelectValue placeholder="Vai trò" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả vai trò</SelectItem>
+              {roleOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          {/* Status filter */}
-          <Popover open={statusOpen} onOpenChange={setStatusOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-1.5 font-normal text-sm">
-                Trạng thái
-                {selectedStatuses.length > 0 ? (
-                  <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
-                    {selectedStatuses.length}
-                  </Badge>
-                ) : (
-                  <CaretDown size={13} className="text-muted-foreground" />
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-44 p-1.5" align="start">
-              {STATUS_OPTIONS.map(({ value, label }) => {
-                const checked = selectedStatuses.includes(value);
-                return (
-                  <button
-                    key={value}
-                    onClick={() => toggleStatus(value)}
-                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm rounded-md hover:bg-muted/60 transition-colors"
-                  >
-                    <span
-                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "border-border bg-background"
-                        }`}
-                    >
-                      {checked && <Check size={11} weight="bold" />}
-                    </span>
-                    <span className={checked ? "font-medium" : ""}>{label}</span>
-                  </button>
-                );
-              })}
-              {selectedStatuses.length > 0 && (
-                <button
-                  onClick={() => { setSelectedStatuses([]); setPage(1); }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs tracking-tighter text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
-                >
-                  <X size={11} />
-                  Xóa lọc trạng thái
-                </button>
-              )}
-            </PopoverContent>
-          </Popover>
+          <Select
+            value={selectedBanFilter}
+            onValueChange={(value: "all" | "active" | "banned") => {
+              onBanFilterChange?.(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-9 w-[180px] text-sm">
+              <SelectValue placeholder="Trạng thái" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           {hasFilters && (
             <Button
@@ -383,9 +288,7 @@ const UserTable = ({
           )}
 
           <div className="ml-auto text-sm text-muted-foreground whitespace-nowrap">
-            {hasFilters
-              ? `${filteredAndSorted.length} / ${displayTotal?.toLocaleString("vi-VN")} người dùng`
-              : `${displayTotal?.toLocaleString("vi-VN")} người dùng`}
+            {displayTotal?.toLocaleString("vi-VN")} người dùng
           </div>
         </div>
 

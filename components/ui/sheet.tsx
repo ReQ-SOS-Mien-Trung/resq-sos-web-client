@@ -79,6 +79,7 @@ function SheetTrigger({
 interface SheetContentProps extends React.ComponentProps<"div"> {
   side?: "top" | "right" | "bottom" | "left";
   showOverlay?: boolean;
+  showClose?: boolean;
 }
 
 function SheetContent({
@@ -86,6 +87,7 @@ function SheetContent({
   children,
   side = "right",
   showOverlay = true,
+  showClose = true,
   ...props
 }: SheetContentProps) {
   const { open, onOpenChange } = useSheet();
@@ -158,13 +160,15 @@ function SheetContent({
         {...props}
       >
         {children}
-        <button
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
-          onClick={() => onOpenChange(false)}
-        >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </button>
+        {showClose && (
+          <button
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
+            onClick={() => onOpenChange(false)}
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </button>
+        )}
       </div>
     </>,
     document.body
