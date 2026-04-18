@@ -1034,23 +1034,15 @@ function AssemblyPointDetails({
     );
   }, [assemblyPointEvents]);
 
-  const selectedEvent = useMemo(
-    () => events.find((event) => event.eventId === selectedEventId) ?? null,
-    [events, selectedEventId],
+  const effectiveSelectedEventId = useMemo(
+    () => selectedEventId ?? getDefaultEventId(events, activeEventId),
+    [activeEventId, events, selectedEventId],
   );
 
-  useEffect(() => {
-    if (hasActiveEvent) {
-      setShowScheduleForm(false);
-      setAssemblyDateInput(null);
-      setCheckInDeadlineInput(null);
-    }
-
-    return getDefaultEventId(events, activeEventId);
-  }, [activeEventId, events, selectedEventId]);
-
   const selectedEvent = useMemo(
-    () => events.find((event) => event.eventId === effectiveSelectedEventId) ?? null,
+    () =>
+      events.find((event) => event.eventId === effectiveSelectedEventId) ??
+      null,
     [effectiveSelectedEventId, events],
   );
 
