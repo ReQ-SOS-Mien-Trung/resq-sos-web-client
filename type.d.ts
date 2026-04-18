@@ -1,11 +1,4 @@
-import type {
-  AiProvider,
-  PromptEntity,
-  PromptDetailEntity,
-  PromptType,
-  CreatePromptRequest,
-  UpdatePromptRequest,
-} from "@/services/prompt/type";
+import type { PromptType } from "@/services/prompt/type";
 import type {
   MedicalSupportNeedType,
   SOSClothingPerson,
@@ -306,52 +299,11 @@ export type PromptTextField = "system_prompt" | "user_prompt_template";
 export interface PromptFormData {
   name: string;
   prompt_type: PromptType;
-  provider: AiProvider;
   purpose: string;
   system_prompt: string;
   user_prompt_template: string;
-  model: string;
-  temperature: number;
-  max_tokens: number;
   version: string;
-  api_url: string;
-  api_key: string;
   is_active: boolean;
-}
-
-export interface PromptEditorProps {
-  prompt?: PromptDetailEntity | null;
-  isSubmitting?: boolean;
-  onSave: (
-    data: CreatePromptRequest | UpdatePromptRequest,
-  ) => void | Promise<void>;
-  onCancel: () => void;
-  hideHeaderClose?: boolean;
-}
-
-export interface PromptListProps {
-  prompts: PromptEntity[];
-  isLoading: boolean;
-  selectedId: number | null;
-  selectedPromptType: PromptType | null;
-  promptTypeCounts: Record<PromptType, number>;
-  onSelectPromptType: (promptType: PromptType) => void;
-  onSelect: (prompt: PromptEntity) => void;
-  onEdit: (prompt: PromptEntity) => void;
-  onDelete: (prompt: PromptEntity) => void;
-}
-
-export interface PromptDetailPanelProps {
-  prompt: PromptDetailEntity | null;
-  isLoading: boolean;
-}
-
-export interface DeletePromptDialogProps {
-  prompt: PromptEntity | null;
-  open: boolean;
-  isDeleting: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
 }
 
 export interface ChatRoomListProps {
@@ -867,6 +819,8 @@ export interface SOSDetailsPanelProps {
   /** SOS requests in the same auto-cluster (within 1 km) */
   nearbySOSRequests: SOSRequest[];
   allSOSRequests: SOSRequest[];
+  /** Hide footer processing CTA when this panel is used in read-only flows */
+  hideProcessAction?: boolean;
 }
 
 export interface TeamIncidentDetailsPanelProps {
@@ -890,6 +844,8 @@ export interface RescuePlanPanelProps {
   onShowRoute?: (coords: [number, number][]) => void;
   /** Which tab to show when the panel opens */
   defaultTab?: "plan" | "missions";
+  /** True to disable all mutate actions and keep this panel in view-only mode */
+  readOnly?: boolean;
 }
 
 export interface ActivityTypeConfig {

@@ -27,6 +27,7 @@ const DashboardLayout = ({
           isOpen={sidebarOpen}
         />
         <main
+          data-dashboard-main-scroll
           className="flex-1 overflow-y-auto bg-muted/20 p-6"
           style={{
             backgroundImage: `linear-gradient(to right, rgba(0,0,0,0.015) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.015) 1px, transparent 1px)`,

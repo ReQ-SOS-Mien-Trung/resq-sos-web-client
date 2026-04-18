@@ -1,8 +1,10 @@
 // SOS Request Status
 export type SOSRequestStatus =
   | "Pending"
-  | "InProgress"
   | "Assigned"
+  | "InProgress"
+  | "Incident"
+  | "Resolved"
   | "Completed"
   | "Cancelled";
 
@@ -71,11 +73,7 @@ export type WaterDurationType =
   | "1_TO_2_DAYS"
   | "OVER_2_DAYS";
 
-export type WaterRemainingType =
-  | "NONE"
-  | "UNDER_2L"
-  | "2_TO_5L"
-  | "OVER_5L";
+export type WaterRemainingType = "NONE" | "UNDER_2L" | "2_TO_5L" | "OVER_5L";
 
 export type FoodDurationType =
   | "UNDER_12H"

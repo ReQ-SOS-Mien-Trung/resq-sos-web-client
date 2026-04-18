@@ -1,28 +1,39 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMemo, useState } from "react";
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Lightning,
-  Trash,
-  PencilSimple,
-  Robot,
-  ThermometerHot,
-  Hash,
-  Key,
-} from "@phosphor-icons/react";
-import type { PromptListProps } from "@/type";
-import type { PromptType } from "@/services/prompt/type";
+import { PencilSimple, Robot, Trash } from "@phosphor-icons/react";
 import { PROMPT_TYPE_LABELS } from "@/services/prompt/constants";
+import type { PromptEntity, PromptType } from "@/services/prompt/type";
+import type { AiConfigSummaryEntity } from "@/services/ai-config/type";
 import { PROMPT_TYPE_OPTIONS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
-const PROVIDER_BADGE_CLASSNAMES = {
-  Gemini: "border-sky-200 bg-sky-50 text-sky-700",
-  OpenRouter: "border-amber-200 bg-amber-50 text-amber-700",
-} as const;
+type PromptListProps = {
+  prompts: PromptEntity[];
+  isLoading: boolean;
+  selectedId: number | null;
+  activatingPromptId?: number | null;
+  recommendedRollbackId?: number | null;
+  selectedPromptType: PromptType | null;
+  promptTypeCounts: Record<PromptType, number>;
+  aiConfig?: AiConfigSummaryEntity | null;
+  onSelectPromptType: (promptType: PromptType) => void;
+  onSelect: (prompt: PromptEntity) => void;
+  onEdit: (prompt: PromptEntity) => void | Promise<void>;
+  onDelete: (prompt: PromptEntity) => void;
+  onToggleActive: (prompt: PromptEntity, nextActive: boolean) => void;
+};
 
 const PROMPT_TYPE_FILTER_THEME: Record<
   PromptType,
@@ -63,29 +74,132 @@ const PROMPT_TYPE_FILTER_THEME: Record<
   },
 };
 
+function PromptTypeFilter({
+  selectedPromptType,
+  promptTypeCounts,
+  onSelectPromptType,
+}: {
+  selectedPromptType: PromptType | null;
+  promptTypeCounts: Record<PromptType, number>;
+  onSelectPromptType: (promptType: PromptType) => void;
+}) {
+  return (
+    <div className="overflow-x-auto pb-1">
+      <div className="flex min-w-max gap-2 pr-1">
+        {PROMPT_TYPE_OPTIONS.map((option) => {
+          const theme = PROMPT_TYPE_FILTER_THEME[option.value];
+          const isSelected = selectedPromptType === option.value;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onSelectPromptType(option.value)}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
+                isSelected ? theme.selected : theme.unselected,
+              )}
+            >
+              <span>{option.label}</span>
+              <span
+                className={cn(
+                  "rounded-full border px-2 py-0.5 text-xs",
+                  isSelected
+                    ? "border-white/30 bg-white/20 text-white"
+                    : theme.badge,
+                )}
+              >
+                {promptTypeCounts[option.value]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function formatDate(date: string | null) {
+  if (!date) {
+    return "—";
+  }
+
+  return new Date(date).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getStatusLabel(status: string) {
+  if (status === "Active") {
+    return "Đang chạy";
+  }
+
+  if (status === "Draft") {
+    return "Bản nháp";
+  }
+
+  if (status === "Archived") {
+    return "Lưu trữ";
+  }
+
+  return status;
+}
+
 const PromptList = ({
   prompts,
   isLoading,
   selectedId,
+  activatingPromptId = null,
+  recommendedRollbackId = null,
   selectedPromptType,
   promptTypeCounts,
+  aiConfig = null,
   onSelectPromptType,
   onSelect,
   onEdit,
   onDelete,
+  onToggleActive,
 }: PromptListProps) => {
+  const [showAllVersions, setShowAllVersions] = useState(false);
+
+  const archivedCount = useMemo(
+    () => prompts.filter((prompt) => prompt.status === "Archived").length,
+    [prompts],
+  );
+
+  const visiblePrompts = useMemo(() => {
+    if (showAllVersions) {
+      return prompts;
+    }
+
+    const compactPrompts = prompts.slice(0, 6);
+
+    if (
+      selectedId !== null &&
+      !compactPrompts.some((prompt) => prompt.id === selectedId)
+    ) {
+      const selectedPrompt = prompts.find((prompt) => prompt.id === selectedId);
+      if (selectedPrompt) {
+        compactPrompts.push(selectedPrompt);
+      }
+    }
+
+    return compactPrompts;
+  }, [prompts, selectedId, showAllVersions]);
+
   if (isLoading) {
     return (
       <div className="space-y-3">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Card key={i} className="border border-border/50">
-            <CardContent className="p-4 space-y-3">
-              <Skeleton className="h-5 w-3/4" />
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Card key={index} className="border border-border/50">
+            <CardContent className="space-y-3 p-4">
+              <Skeleton className="h-5 w-2/3" />
               <Skeleton className="h-4 w-1/2" />
-              <div className="flex gap-2">
-                <Skeleton className="h-5 w-16" />
-                <Skeleton className="h-5 w-20" />
-              </div>
+              <Skeleton className="h-4 w-1/3" />
             </CardContent>
           </Card>
         ))}
@@ -93,196 +207,194 @@ const PromptList = ({
     );
   }
 
-  if (!prompts.length) {
-    return (
-      <Card className="border border-border/50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Robot size={22} weight="duotone" />
-            Lọc theo loại Prompt
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <PromptTypeFilter
-            selectedPromptType={selectedPromptType}
-            promptTypeCounts={promptTypeCounts}
-            onSelectPromptType={onSelectPromptType}
-          />
-          <div className="p-8 text-center">
-            <Robot
-              size={48}
-              className="mx-auto text-muted-foreground/50 mb-3"
-            />
-            <p className="text-base text-muted-foreground font-medium">
-              {selectedPromptType
-                ? "Chưa có prompt thuộc loại này"
-                : "Chọn một loại prompt để xem danh sách"}
-            </p>
-            <p className="text-base text-muted-foreground/70 mt-1">
-              {selectedPromptType
-                ? "Tạo prompt mới hoặc chọn loại prompt khác."
-                : "Danh sách prompt sẽ chỉ hiện sau khi chọn loại."}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="border border-border/50">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <Robot size={22} weight="duotone" />
-          Danh sách Prompts ({prompts.length})
+          Danh sách phiên bản mẫu lệnh
         </CardTitle>
       </CardHeader>
+
       <CardContent className="space-y-4">
         <PromptTypeFilter
           selectedPromptType={selectedPromptType}
           promptTypeCounts={promptTypeCounts}
           onSelectPromptType={onSelectPromptType}
         />
-        <div className="space-y-2 max-h-[calc(100vh-390px)] overflow-y-auto">
-          {prompts.map((prompt) => (
-            <div
-              key={prompt.id}
-              onClick={() => onSelect(prompt)}
-              className={`group p-4 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md ${
-                selectedId === prompt.id
-                  ? "border-primary/50 bg-primary/5 shadow-sm"
-                  : "border-border/50 hover:border-border hover:bg-muted/30"
-              }`}
+
+        {prompts.length > 0 ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/95 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Đang hiển thị {visiblePrompts.length}/{prompts.length} phiên bản.
+              {archivedCount > 0
+                ? ` Có ${archivedCount} bản lưu trữ để khôi phục khi cần.`
+                : ""}
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setShowAllVersions((previous) => !previous)}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <h3 className="font-semibold text-base text-foreground truncate">
-                      {prompt.name}
-                    </h3>
-                    <Badge
-                      variant={prompt.isActive ? "success" : "secondary"}
-                      className="shrink-0 text-sm px-1.5 py-0"
-                    >
-                      {prompt.isActive ? "Hoạt động" : "Tắt"}
-                    </Badge>
-                    <Badge
-                      variant="outline"
-                      className={PROVIDER_BADGE_CLASSNAMES[prompt.provider]}
-                    >
-                      {prompt.provider}
-                    </Badge>
+              {showAllVersions ? "Thu gọn danh sách" : "Xem tất cả phiên bản"}
+            </Button>
+          </div>
+        ) : null}
+
+        {!selectedPromptType ? (
+          <div className="rounded-lg border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
+            Chọn một loại mẫu lệnh để xem các phiên bản tương ứng.
+          </div>
+        ) : prompts.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border/70 px-4 py-10 text-center text-sm text-muted-foreground">
+            Chưa có mẫu lệnh nào thuộc loại này.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {visiblePrompts.map((prompt) => {
+              const isDraft = prompt.status === "Draft";
+              const isActive = prompt.status === "Active";
+              const isActivating = activatingPromptId === prompt.id;
+              const isSwitchOn = isActive || isActivating;
+              const isRecommendedRollback =
+                recommendedRollbackId !== null &&
+                prompt.id === recommendedRollbackId &&
+                prompt.status === "Archived";
+
+              return (
+                <div
+                  key={prompt.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onSelect(prompt)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.target === event.currentTarget &&
+                      (event.key === "Enter" || event.key === " ")
+                    ) {
+                      event.preventDefault();
+                      onSelect(prompt);
+                    }
+                  }}
+                  className={cn(
+                    "w-full rounded-xl border p-4 text-left transition-all",
+                    selectedId === prompt.id
+                      ? "border-primary/50 bg-primary/5 shadow-sm"
+                      : "border-border/60 hover:border-border hover:bg-muted/20",
+                  )}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-foreground">
+                          {prompt.name}
+                        </p>
+                        {!isDraft ? (
+                          <Badge
+                            variant={
+                              prompt.status === "Active" ? "success" : "outline"
+                            }
+                          >
+                            {getStatusLabel(prompt.status)}
+                          </Badge>
+                        ) : null}
+                        {isRecommendedRollback ? (
+                          <Badge variant="outline">Gợi ý khôi phục</Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {PROMPT_TYPE_LABELS[prompt.promptType] ??
+                          prompt.promptType}
+                      </p>
+                    </div>
+                    <Badge variant="outline">{prompt.version || "—"}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                    {prompt.purpose}
-                  </p>
-                  <div className="mb-2 flex flex-wrap gap-2">
-                    <Badge variant="outline">
-                      {PROMPT_TYPE_LABELS[prompt.promptType] ??
-                        prompt.promptType}
-                    </Badge>
-                    <Badge variant="outline">
-                      <Key size={12} className="mr-1" />
-                      {prompt.hasApiKey ? "Có key riêng" : "Dùng key mặc định"}
-                    </Badge>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground/80">
-                    <span className="flex items-center gap-1">
-                      <Robot size={14} />
-                      {prompt.model || "Default"}
-                    </span>
-                    <span className="text-border">•</span>
-                    <span className="flex items-center gap-1">
-                      <ThermometerHot size={14} />
-                      {prompt.temperature ?? "—"}
-                    </span>
-                    <span className="text-border">•</span>
-                    <span className="flex items-center gap-1">
-                      <Lightning size={14} />
-                      {prompt.maxTokens?.toLocaleString() ?? "—"} tokens
-                    </span>
-                    <span className="text-border">•</span>
-                    <span className="flex items-center gap-1">
-                      <Hash size={14} />
-                      {prompt.version || "—"}
-                    </span>
+
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="grid grid-cols-1 gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                      <span>Tạo: {formatDate(prompt.createdAt)}</span>
+                      <span>Cập nhật: {formatDate(prompt.updatedAt)}</span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div
+                        className="inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {isActive
+                            ? "Đang chạy"
+                            : isActivating
+                              ? "Đang kích hoạt..."
+                              : "Kích hoạt"}
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isSwitchOn}
+                          aria-label={`Kích hoạt ${prompt.name}`}
+                          disabled={isActive || isActivating}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onToggleActive(prompt, true);
+                          }}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 items-center rounded-full border transition-colors",
+                            isSwitchOn
+                              ? "border-emerald-500 bg-emerald-500"
+                              : "border-border bg-muted",
+                            isActive || isActivating
+                              ? "cursor-default"
+                              : "cursor-pointer hover:border-emerald-400",
+                            isActivating && "opacity-80",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "inline-block h-5 w-5 rounded-full bg-white shadow transition-transform",
+                              isSwitchOn ? "translate-x-5" : "translate-x-0",
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void onEdit(prompt);
+                        }}
+                      >
+                        <PencilSimple size={14} className="mr-1.5" />
+                        {isDraft ? "Sửa bản nháp" : "Tạo bản nháp"}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        disabled={!isDraft}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDelete(prompt);
+                        }}
+                      >
+                        <Trash size={14} className="mr-1.5" />
+                        Xóa bản nháp
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(prompt);
-                    }}
-                  >
-                    <PencilSimple size={16} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(prompt);
-                    }}
-                  >
-                    <Trash size={16} />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 };
-
-const PromptTypeFilter = ({
-  selectedPromptType,
-  promptTypeCounts,
-  onSelectPromptType,
-}: Pick<
-  PromptListProps,
-  "selectedPromptType" | "promptTypeCounts" | "onSelectPromptType"
->) => (
-  <div className="space-y-2">
-    <p className="text-sm font-medium text-muted-foreground">Loại Prompt</p>
-    <div className="flex flex-wrap gap-2">
-      {PROMPT_TYPE_OPTIONS.map((option) => {
-        const isSelected = selectedPromptType === option.value;
-        const theme = PROMPT_TYPE_FILTER_THEME[option.value];
-
-        return (
-          <Button
-            key={option.value}
-            type="button"
-            variant="outline"
-            className={cn(
-              "h-auto rounded-full px-3 py-2 text-left transition-colors",
-              isSelected ? theme.selected : theme.unselected,
-            )}
-            onClick={() => onSelectPromptType(option.value)}
-          >
-            <span className="truncate text-sm font-medium">{option.label}</span>
-            <span
-              className={cn(
-                "ml-2 inline-flex min-w-6 items-center justify-center rounded-full border px-1.5 py-0.5 text-sm font-semibold",
-                isSelected
-                  ? "border-white/30 bg-white/20 text-white"
-                  : theme.badge,
-              )}
-            >
-              {promptTypeCounts[option.value] ?? 0}
-            </span>
-          </Button>
-        );
-      })}
-    </div>
-  </div>
-);
 
 export default PromptList;

@@ -155,6 +155,7 @@ export interface UpdateRescuerAssemblyPointAssignmentRequest {
 export interface ScheduleAssemblyPointGatheringRequest {
   id: number;
   assemblyDate: string;
+  checkInDeadline: string;
 }
 
 // Schedule gathering success response
@@ -167,6 +168,7 @@ export interface ScheduleAssemblyPointGatheringErrorResponse {
   message: string;
   errors?: {
     AssemblyDate?: string[];
+    CheckInDeadline?: string[];
     [key: string]: string[] | undefined;
   };
 }

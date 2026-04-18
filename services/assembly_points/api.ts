@@ -174,11 +174,12 @@ export async function updateRescuerAssemblyPointAssignment(
 export async function scheduleAssemblyPointGathering(
   payload: ScheduleAssemblyPointGatheringRequest,
 ): Promise<ScheduleAssemblyPointGatheringResponse> {
-  const { id, assemblyDate } = payload;
+  const { id, assemblyDate, checkInDeadline } = payload;
   const { data } = await api.post(
     `/personnel/assembly-point/${id}/schedule-gathering`,
     {
       assemblyDate,
+      checkInDeadline,
     },
   );
   return data;

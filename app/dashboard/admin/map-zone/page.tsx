@@ -78,6 +78,10 @@ const MapZonePage = () => {
     setDrawnCoordinates(coords);
   }, []);
 
+  const handleImportCoordinates = useCallback((coords: Coordinate[]) => {
+    setDrawnCoordinates(coords);
+  }, []);
+
   const goBackToList = useCallback(() => {
     setMode("list");
     setSelectedZone(null);
@@ -369,6 +373,7 @@ const MapZonePage = () => {
                 zone={mode === "edit" ? selectedZone : null}
                 isLoading={false}
                 drawnCoordinates={drawnCoordinates}
+                onImportCoordinates={handleImportCoordinates}
                 isSaving={
                   mode === "create"
                     ? createMutation.isPending
@@ -401,7 +406,8 @@ const MapZonePage = () => {
 
           <MapZoneEditor
             existingCoordinates={
-              mode === "edit" ? selectedZone?.coordinates : undefined
+              drawnCoordinates ??
+              (mode === "edit" ? selectedZone?.coordinates : undefined)
             }
             onCoordinatesChange={handleCoordinatesChange}
             sidebarOpen={sidebarOpen}

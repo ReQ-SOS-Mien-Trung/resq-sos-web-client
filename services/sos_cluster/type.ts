@@ -3,6 +3,13 @@
 // Severity level
 export type ClusterSeverityLevel = "Low" | "Medium" | "High" | "Critical";
 
+// Cluster lifecycle status from backend
+export type ClusterLifecycleStatus =
+  | "Pending"
+  | "Suggested"
+  | "InProgress"
+  | "Completed";
+
 // SOS Cluster Entity
 export interface SOSClusterEntity {
   id: number;
@@ -17,7 +24,9 @@ export interface SOSClusterEntity {
   medicalUrgencyScore: number | null;
   sosRequestCount: number;
   sosRequestIds: number[];
-  isMissionCreated: boolean;
+  status: ClusterLifecycleStatus;
+  // Kept optional for compatibility with old payloads.
+  isMissionCreated?: boolean;
   createdAt: string;
   lastUpdatedAt: string;
 }

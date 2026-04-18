@@ -42,13 +42,17 @@ export default function DepotManagerNotAssignedPage() {
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[20px] border border-slate-200 bg-white p-3.5 shadow-[0_12px_30px_-30px_rgba(15,23,42,0.35)]">
-                  <p className="text-[13px] font-medium tracking-tighter text-slate-500">Tài khoản hiện tại</p>
+                  <p className="text-[13px] font-medium tracking-tighter text-slate-500">
+                    Tài khoản hiện tại
+                  </p>
                   <p className="mt-1 text-base font-bold tracking-tighter text-slate-950">
                     {user?.fullName ?? "Quản lý kho"}
                   </p>
                 </div>
                 <div className="rounded-[20px] border border-slate-200 bg-white p-3.5 shadow-[0_12px_30px_-30px_rgba(15,23,42,0.35)]">
-                  <p className="text-[13px] font-medium tracking-tighter text-slate-500">Trạng thái</p>
+                  <p className="text-[13px] font-medium tracking-tighter text-slate-500">
+                    Trạng thái
+                  </p>
                   <p className="mt-1 text-base font-bold tracking-tighter text-slate-950">
                     Chưa có kho
                   </p>
