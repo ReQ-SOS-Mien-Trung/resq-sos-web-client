@@ -129,6 +129,47 @@ function normalizeAiConfigVersion(version: string) {
   return trimmedVersion.startsWith("v") ? trimmedVersion : `v${trimmedVersion}`;
 }
 
+function getDraftVersionTimestampSuffix(date = new Date()) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${day}${month}${hour}${minute}`;
+}
+
+function incrementVersionCore(versionCore: string) {
+  const normalizedCore = versionCore.trim();
+  if (!normalizedCore) {
+    return "1.0";
+  }
+
+  const lastNumericMatch = normalizedCore.match(/(\d+)(?!.*\d)/);
+  if (!lastNumericMatch || lastNumericMatch.index === undefined) {
+    return `${normalizedCore}.1`;
+  }
+
+  const currentNumber = Number(lastNumericMatch[1]);
+  if (!Number.isFinite(currentNumber)) {
+    return `${normalizedCore}.1`;
+  }
+
+  const nextNumber = String(currentNumber + 1);
+  const matchStart = lastNumericMatch.index;
+  const matchEnd = matchStart + lastNumericMatch[1].length;
+
+  return `${normalizedCore.slice(0, matchStart)}${nextNumber}${normalizedCore.slice(matchEnd)}`;
+}
+
+function getNextAiDraftVersion(version: string | null | undefined) {
+  const normalized = normalizeAiConfigVersion(version ?? "1.0").replace(
+    /^v/i,
+    "",
+  );
+  const [versionCore] = normalized.split("-D");
+  const nextCore = incrementVersionCore(versionCore || "1.0");
+  return `${nextCore}-D${getDraftVersionTimestampSuffix()}`;
+}
+
 function isAbsoluteUrl(value: string) {
   try {
     const parsedUrl = new URL(value);
@@ -921,7 +962,7 @@ const AIPromptPage = () => {
         temperature: selectedAiConfig.temperature,
         max_tokens: selectedAiConfig.maxTokens,
         api_key: "",
-        version: (selectedAiConfig.version ?? "1.0").replace(/^v/i, ""),
+        version: getNextAiDraftVersion(selectedAiConfig.version),
         is_active: selectedAiConfig.isActive,
       }),
     );
@@ -1787,6 +1828,7 @@ const AIPromptPage = () => {
                   id="ai_config_version"
                   value={aiConfigForm.version}
                   maxLength={20}
+                  disabled={aiConfigDialogMode === "edit"}
                   className={cn(
                     "pl-6",
                     aiConfigFormErrors.version && INVALID_FIELD_CLASSNAME,
@@ -1801,6 +1843,12 @@ const AIPromptPage = () => {
                     }))
                   }
                 />
+                {aiConfigDialogMode === "edit" &&
+                !aiConfigFormErrors.version ? (
+                  <p className="text-sm text-muted-foreground">
+                    Phiên bản bản nháp được tự tăng khi mở chỉnh sửa.
+                  </p>
+                ) : null}
               </div>
               {aiConfigFormErrors.version ? (
                 <p className="text-sm text-destructive">

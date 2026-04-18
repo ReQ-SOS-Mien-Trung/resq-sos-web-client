@@ -369,7 +369,11 @@ const SOSSidebar = ({
   const [expandedClusters, setExpandedClusters] = useState<Set<number>>(
     new Set(),
   );
-  const currentTab = selectedTeamIncident ? "incidents" : activeTab;
+  const currentTab = selectedTeamIncident
+    ? "incidents"
+    : selectedSOS
+      ? "incoming"
+      : activeTab;
 
   const pendingRequests = sosRequests.filter(
     (s) => getSOSStatusBucket(s.status) === "pending",
@@ -436,6 +440,20 @@ const SOSSidebar = ({
         );
       });
   }, [backendClusters]);
+
+  const selectedSOSId = selectedSOS
+    ? normalizeSOSRequestId(selectedSOS.id)
+    : null;
+
+  const selectedClusterId = useMemo(() => {
+    if (!selectedSOSId) return null;
+
+    const matchedCluster = activeClusters.find((cluster) =>
+      cluster.sosRequestIds.map(normalizeSOSRequestId).includes(selectedSOSId),
+    );
+
+    return matchedCluster?.id ?? null;
+  }, [activeClusters, selectedSOSId]);
 
   return (
     <div className="flex h-full min-h-0 flex-col border-r bg-background text-[14px]">
@@ -545,7 +563,9 @@ const SOSSidebar = ({
                       isAnalyzingCluster && analyzingClusterId === cluster.id;
                     const sosCount =
                       cluster.sosRequestCount || cluster.sosRequestIds.length;
-                    const isExpanded = expandedClusters.has(cluster.id);
+                    const isExpanded =
+                      expandedClusters.has(cluster.id) ||
+                      selectedClusterId === cluster.id;
                     const clusterSosIdSet = new Set(
                       cluster.sosRequestIds.map(normalizeSOSRequestId),
                     );
@@ -1446,20 +1466,24 @@ function ClusterActionButtons({
 }) {
   const hasMission =
     clusterStatus === "InProgress" || clusterStatus === "Completed";
+  const hasSuggestion = clusterStatus === "Suggested";
+  const canViewPlan = Boolean(
+    onViewClusterPlan && (hasMission || hasSuggestion),
+  );
 
   return (
     <div className="px-3 py-2 border-t border-inherit space-y-1.5">
       {hasMission ? (
         // Mission exists — show view plan + re-analyze
         <>
-          {onViewClusterPlan && (
+          {canViewPlan && (
             <Button
               variant="outline"
               size="sm"
               className="w-full h-9 text-[14px] border-emerald-300/60 dark:border-emerald-700/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
               onClick={(e) => {
                 e.stopPropagation();
-                onViewClusterPlan(clusterId);
+                onViewClusterPlan?.(clusterId);
               }}
             >
               <Eye className="h-3 w-3 mr-1" />
@@ -1508,6 +1532,21 @@ function ClusterActionButtons({
       ) : (
         // No mission yet — allow either manual creation or AI analysis
         <>
+          {canViewPlan && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-9 text-[14px] border-emerald-300/60 dark:border-emerald-700/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewClusterPlan?.(clusterId);
+              }}
+              disabled={isAnalyzingCluster}
+            >
+              <Eye className="h-3 w-3 mr-1" />
+              Xem kế hoạch
+            </Button>
+          )}
           {onManualMission && (
             <Button
               variant="outline"
