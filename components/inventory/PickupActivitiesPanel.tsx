@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -176,6 +176,7 @@ interface ConfirmReturnConsumableDraft {
   expectedQuantity: number;
   reportedQuantity: number;
   quantity: string;
+  lockQuantityToLots?: boolean;
   lotAllocations: ConfirmReturnConsumableLotAllocationDraft[];
   expiredDate: string | null;
 }
@@ -420,6 +421,15 @@ function normalizeRequestNote(rawNote: string): string {
   return rawNote.trim();
 }
 
+function sumReturnLotAllocationQuantity(
+  lotAllocations: ConfirmReturnConsumableLotAllocationDraft[],
+): number {
+  return lotAllocations.reduce(
+    (sum, allocation) => sum + getSafeNumericValue(allocation.quantityTaken, 0),
+    0,
+  );
+}
+
 function getReturnItemUnitCandidates(
   item: UpcomingReturnItem,
 ): ReturnReusableUnit[] {
@@ -479,9 +489,15 @@ function resolveReturnConsumableLotAllocations(
     return returnedLots;
   }
 
-  return normalizeReturnConsumableLotAllocations(
+  const expectedLots = normalizeReturnConsumableLotAllocations(
     item.expectedReturnLotAllocations,
   );
+
+  if (expectedLots.length > 0) {
+    return expectedLots;
+  }
+
+  return normalizeReturnConsumableLotAllocations(item.pickupLotAllocations);
 }
 
 function resolveReturnConsumableExpiredDate(
@@ -542,6 +558,7 @@ function buildConfirmReturnFormState(
     }
 
     const lotAllocations = resolveReturnConsumableLotAllocations(item);
+    const lotQuantity = sumReturnLotAllocationQuantity(lotAllocations);
 
     const consumableDraft: ConfirmReturnConsumableDraft = {
       itemId: item.itemId,
@@ -550,7 +567,8 @@ function buildConfirmReturnFormState(
       unit: item.unit,
       expectedQuantity,
       reportedQuantity,
-      quantity: String(reportedQuantity),
+      quantity: String(lotQuantity > 0 ? lotQuantity : reportedQuantity),
+      lockQuantityToLots: lotAllocations.length > 0,
       lotAllocations,
       expiredDate: resolveReturnConsumableExpiredDate(item, lotAllocations),
     };
@@ -972,42 +990,6 @@ function ConfirmReturnFormSection({
     buildConfirmReturnFormState(activity),
   );
 
-  useEffect(() => {
-    setForm(buildConfirmReturnFormState(activity));
-  }, [activity]);
-
-  useEffect(() => {
-    if (conditionOptions.length === 0) {
-      return;
-    }
-
-    setForm((prev) => {
-      let hasChanged = false;
-
-      const reusableItems = prev.reusableItems.map((row) => ({
-        ...row,
-        units: (row.units ?? []).map((unit) => {
-          const normalizedCondition = normalizeReusableConditionKey(
-            unit.condition,
-            conditionOptions,
-          );
-
-          if (normalizedCondition !== unit.condition) {
-            hasChanged = true;
-            return {
-              ...unit,
-              condition: normalizedCondition,
-            };
-          }
-
-          return unit;
-        }),
-      }));
-
-      return hasChanged ? { ...prev, reusableItems } : prev;
-    });
-  }, [conditionOptions]);
-
   const handleConsumableQuantityChange = useCallback(
     (itemId: number, value: string) => {
       const nextValue = sanitizeIntegerInput(value);
@@ -1118,7 +1100,9 @@ function ConfirmReturnFormSection({
             ),
             consumableItems: form.consumableItems.map((row) => ({
               itemModelId: row.itemModelId,
-              quantity: Number.parseInt(row.quantity || "0", 10) || 0,
+              quantity: row.lockQuantityToLots
+                ? sumReturnLotAllocationQuantity(row.lotAllocations ?? [])
+                : Number.parseInt(row.quantity || "0", 10) || 0,
               lotAllocations: (row.lotAllocations ?? []).map((allocation) => ({
                 lotId: allocation.lotId,
                 quantityTaken: allocation.quantityTaken,
@@ -1213,6 +1197,7 @@ function ConfirmReturnFormSection({
                     type="text"
                     inputMode="numeric"
                     value={row.quantity}
+                    disabled={row.lockQuantityToLots}
                     onChange={(event) =>
                       handleConsumableQuantityChange(
                         row.itemId,
@@ -1221,8 +1206,42 @@ function ConfirmReturnFormSection({
                     }
                     className="h-10 bg-background"
                   />
+                  {row.lockQuantityToLots && (
+                    <p className="text-xs tracking-tighter text-muted-foreground">
+                      Số lượng được khóa theo tổng các lot bên dưới.
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {row.lotAllocations.length > 0 && (
+                <div className="rounded-lg border border-sky-200/70 bg-sky-50/70 px-3 py-3 dark:border-sky-900/60 dark:bg-sky-950/20">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">
+                    Xác nhận theo từng lot
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {row.lotAllocations.map((allocation) => (
+                      <div
+                        key={`${row.itemId}-${allocation.lotId}`}
+                        className="grid gap-2 rounded-lg border border-sky-200/60 bg-background/80 px-3 py-2 text-sm tracking-tighter text-foreground dark:border-sky-900/60"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-semibold">
+                            Lot #{allocation.lotId}
+                          </span>
+                          <span className="font-semibold text-sky-700 dark:text-sky-300">
+                            {allocation.quantityTaken.toLocaleString("vi-VN")}{" "}
+                            {row.unit}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          HSD: {formatDate(allocation.expiredDate)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -1297,81 +1316,89 @@ function ConfirmReturnFormSection({
                   Chưa có danh sách reusable unit để đối chiếu.
                 </div>
               ) : (
-                (row.units ?? []).map((unit) => (
-                  <div
-                    key={`${row.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
-                    className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3"
-                  >
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px_minmax(260px,1fr)] lg:items-end">
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold tracking-tight">
-                            {unit.itemName || row.itemName}
+                (row.units ?? []).map((unit) => {
+                  const normalizedConditionValue =
+                    normalizeReusableConditionKey(
+                      unit.condition,
+                      conditionOptions,
+                    ) || undefined;
+
+                  return (
+                    <div
+                      key={`${row.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
+                      className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3"
+                    >
+                      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px_minmax(260px,1fr)] lg:items-end">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold tracking-tight">
+                              {unit.itemName || row.itemName}
+                            </p>
+                            <span className="inline-flex items-center rounded-full border border-border/70 bg-background/80 px-2 py-0.5 text-[11px] font-medium tracking-tighter text-muted-foreground">
+                              ID #{unit.reusableItemId}
+                            </span>
+                          </div>
+                          <p className="text-xs tracking-tighter text-muted-foreground">
+                            Serial:{" "}
+                            <span className="font-medium text-foreground/90">
+                              {unit.serialNumber || "—"}
+                            </span>
                           </p>
-                          <span className="inline-flex items-center rounded-full border border-border/70 bg-background/80 px-2 py-0.5 text-[11px] font-medium tracking-tighter text-muted-foreground">
-                            ID #{unit.reusableItemId}
-                          </span>
                         </div>
-                        <p className="text-xs tracking-tighter text-muted-foreground">
-                          Serial:{" "}
-                          <span className="font-medium text-foreground/90">
-                            {unit.serialNumber || "—"}
-                          </span>
-                        </p>
-                      </div>
 
-                      <div className="min-w-0 space-y-1">
-                        <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                          Tình trạng
-                        </label>
-                        <Select
-                          value={unit.condition}
-                          onValueChange={(value) =>
-                            handleReusableUnitFieldChange(
-                              row.itemId,
-                              unit.reusableItemId,
-                              "condition",
-                              value,
-                            )
-                          }
-                        >
-                          <SelectTrigger className="h-10 w-full min-w-0 bg-background shadow-none">
-                            <SelectValue placeholder="Chọn tình trạng" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {conditionOptions.map((condition) => (
-                              <SelectItem
-                                key={condition.key}
-                                value={condition.key}
-                              >
-                                {condition.value}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                        <div className="min-w-0 space-y-1">
+                          <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                            Tình trạng
+                          </label>
+                          <Select
+                            value={normalizedConditionValue}
+                            onValueChange={(value) =>
+                              handleReusableUnitFieldChange(
+                                row.itemId,
+                                unit.reusableItemId,
+                                "condition",
+                                value,
+                              )
+                            }
+                          >
+                            <SelectTrigger className="h-10 w-full min-w-0 bg-background shadow-none">
+                              <SelectValue placeholder="Chọn tình trạng" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {conditionOptions.map((condition) => (
+                                <SelectItem
+                                  key={condition.key}
+                                  value={condition.key}
+                                >
+                                  {condition.value}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                      <div className="min-w-0 space-y-1">
-                        <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                          Ghi chú unit
-                        </label>
-                        <Input
-                          value={unit.note}
-                          onChange={(event) =>
-                            handleReusableUnitFieldChange(
-                              row.itemId,
-                              unit.reusableItemId,
-                              "note",
-                              event.target.value,
-                            )
-                          }
-                          placeholder="VD: trầy nhẹ vỏ ngoài"
-                          className="h-10 w-full min-w-0 bg-background shadow-none"
-                        />
+                        <div className="min-w-0 space-y-1">
+                          <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                            Ghi chú unit
+                          </label>
+                          <Input
+                            value={unit.note}
+                            onChange={(event) =>
+                              handleReusableUnitFieldChange(
+                                row.itemId,
+                                unit.reusableItemId,
+                                "note",
+                                event.target.value,
+                              )
+                            }
+                            placeholder="VD: trầy nhẹ vỏ ngoài"
+                            className="h-10 w-full min-w-0 bg-background shadow-none"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -1822,6 +1849,7 @@ function DetailPanel({
 
                 {canConfirmReturn && (
                   <ConfirmReturnFormSection
+                    key={item.activityId}
                     activity={item as UpcomingReturnEntity}
                     onConfirmed={onClose}
                   />

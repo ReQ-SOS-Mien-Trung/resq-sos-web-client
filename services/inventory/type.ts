@@ -583,9 +583,10 @@ export interface UpcomingReturnItem {
   imageUrl: string | null;
   quantity: number;
   unit: string;
-  actualReturnedQuantity: number;
+  actualReturnedQuantity: number | null;
   expectedReturnLotAllocations?: ReturnConsumableLotAllocation[] | null;
   returnedLotAllocations?: ReturnConsumableLotAllocation[] | null;
+  pickupLotAllocations?: ReturnConsumableLotAllocation[] | null;
   expiredDate?: string | null;
   expectedReturnUnits: ReturnReusableUnit[];
   returnedReusableUnits: ReturnReusableUnit[];

@@ -422,6 +422,12 @@ const SOSSidebar = ({
     return [...backendClusters]
       .filter((cluster) => resolveClusterStatus(cluster) !== "Completed")
       .filter((cluster) => {
+        const clusterStatus = resolveClusterStatus(cluster);
+        if (clusterStatus === "InProgress") {
+          // Always keep active clusters visible based on cluster lifecycle status.
+          return true;
+        }
+
         const knownBuckets = cluster.sosRequestIds
           .map(normalizeSOSRequestId)
           .map((sosId) => sosStatusById.get(sosId))
