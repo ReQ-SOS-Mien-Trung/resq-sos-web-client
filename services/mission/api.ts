@@ -496,6 +496,50 @@ function normalizeActivityStatusInput(status: string): ActivityStatus | string {
   return status;
 }
 
+function normalizeConfirmReturnSuppliesRequest(
+  request: ConfirmReturnSuppliesRequest,
+): ConfirmReturnSuppliesRequest {
+  const normalizedConsumableItems = Array.isArray(request?.consumableItems)
+    ? request.consumableItems.map((item) => ({
+        itemModelId: toNumberOrZero(item?.itemModelId),
+        quantity: toNumberOrZero(item?.quantity),
+        lotAllocations: Array.isArray(item?.lotAllocations)
+          ? item.lotAllocations.map((allocation) => ({
+              lotId: toNumberOrZero(allocation?.lotId),
+              quantityTaken: toNumberOrZero(allocation?.quantityTaken),
+              receivedDate: String(allocation?.receivedDate ?? ""),
+              expiredDate: String(allocation?.expiredDate ?? ""),
+              remainingQuantityAfterExecution: toNumberOrZero(
+                allocation?.remainingQuantityAfterExecution,
+              ),
+            }))
+          : [],
+        expiredDate: toTrimmedStringOrNull(item?.expiredDate),
+      }))
+    : [];
+
+  const normalizedReusableItems = Array.isArray(request?.reusableItems)
+    ? request.reusableItems.map((item) => ({
+        itemModelId: toNumberOrZero(item?.itemModelId),
+        quantity: toNumberOrZero(item?.quantity),
+        units: Array.isArray(item?.units)
+          ? item.units.map((unit) => ({
+              reusableItemId: toNumberOrZero(unit?.reusableItemId),
+              serialNumber: String(unit?.serialNumber ?? "").trim(),
+              condition: String(unit?.condition ?? "").trim(),
+              note: toTrimmedStringOrNull(unit?.note),
+            }))
+          : [],
+      }))
+    : [];
+
+  return {
+    discrepancyNote: toTrimmedStringOrNull(request?.discrepancyNote),
+    consumableItems: normalizedConsumableItems,
+    reusableItems: normalizedReusableItems,
+  };
+}
+
 export async function getMissions(
   params: GetMissionsParams,
 ): Promise<GetMissionsResponse> {
@@ -629,8 +673,9 @@ export async function confirmReturnSupplies(
   activityId: number,
   request: ConfirmReturnSuppliesRequest,
 ): Promise<void> {
+  const payload = normalizeConfirmReturnSuppliesRequest(request);
   await api.post(
     `/operations/missions/${missionId}/activities/${activityId}/confirm-return`,
-    request,
+    payload,
   );
 }

@@ -568,13 +568,25 @@ export interface ReturnReusableUnit {
   note: string | null;
 }
 
+export interface ReturnConsumableLotAllocation {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate: string;
+  expiredDate: string;
+  remainingQuantityAfterExecution: number;
+}
+
 export interface UpcomingReturnItem {
   itemId: number;
+  itemModelId?: number | null;
   itemName: string;
   imageUrl: string | null;
   quantity: number;
   unit: string;
   actualReturnedQuantity: number;
+  expectedReturnLotAllocations?: ReturnConsumableLotAllocation[] | null;
+  returnedLotAllocations?: ReturnConsumableLotAllocation[] | null;
+  expiredDate?: string | null;
   expectedReturnUnits: ReturnReusableUnit[];
   returnedReusableUnits: ReturnReusableUnit[];
 }

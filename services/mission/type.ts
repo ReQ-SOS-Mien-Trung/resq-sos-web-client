@@ -295,9 +295,19 @@ export interface UpdateActivityResponse {
   status: ActivityStatus;
 }
 
+export interface ConfirmReturnConsumableLotAllocationRequest {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate: string;
+  expiredDate: string;
+  remainingQuantityAfterExecution: number;
+}
+
 export interface ConfirmReturnConsumableItemRequest {
   itemModelId: number;
   quantity: number;
+  lotAllocations: ConfirmReturnConsumableLotAllocationRequest[];
+  expiredDate: string | null;
 }
 
 export interface ConfirmReturnReusableUnitRequest {

@@ -60,6 +60,7 @@ import type {
   UpcomingReturnEntity,
   ReturnHistoryEntity,
   UpcomingReturnItem,
+  ReturnConsumableLotAllocation,
   ReturnReusableUnit,
   ReusableItemCondition,
 } from "@/services/inventory/type";
@@ -159,6 +160,14 @@ type ReturnDiscrepancyFieldKey =
 
 type ConfirmReturnDiscrepancyFields = Record<ReturnDiscrepancyFieldKey, string>;
 
+interface ConfirmReturnConsumableLotAllocationDraft {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate: string;
+  expiredDate: string;
+  remainingQuantityAfterExecution: number;
+}
+
 interface ConfirmReturnConsumableDraft {
   itemId: number;
   itemModelId: number;
@@ -167,6 +176,8 @@ interface ConfirmReturnConsumableDraft {
   expectedQuantity: number;
   reportedQuantity: number;
   quantity: string;
+  lotAllocations: ConfirmReturnConsumableLotAllocationDraft[];
+  expiredDate: string | null;
 }
 
 interface ConfirmReturnReusableUnitDraft {
@@ -423,7 +434,69 @@ function isReusableReturnItem(item: UpcomingReturnItem): boolean {
 }
 
 function resolveReturnItemModelId(item: UpcomingReturnItem): number {
-  return getReturnItemUnitCandidates(item)[0]?.itemModelId ?? item.itemId;
+  return (
+    item.itemModelId ??
+    getReturnItemUnitCandidates(item)[0]?.itemModelId ??
+    item.itemId
+  );
+}
+
+function normalizeReturnConsumableLotAllocations(
+  allocations: ReturnConsumableLotAllocation[] | null | undefined,
+): ConfirmReturnConsumableLotAllocationDraft[] {
+  if (!Array.isArray(allocations)) {
+    return [];
+  }
+
+  return allocations
+    .map((allocation) => ({
+      lotId: getSafeNumericValue(allocation.lotId, 0),
+      quantityTaken: getSafeNumericValue(allocation.quantityTaken, 0),
+      receivedDate:
+        typeof allocation.receivedDate === "string"
+          ? allocation.receivedDate
+          : "",
+      expiredDate:
+        typeof allocation.expiredDate === "string"
+          ? allocation.expiredDate
+          : "",
+      remainingQuantityAfterExecution: getSafeNumericValue(
+        allocation.remainingQuantityAfterExecution,
+        0,
+      ),
+    }))
+    .filter((allocation) => allocation.lotId > 0);
+}
+
+function resolveReturnConsumableLotAllocations(
+  item: UpcomingReturnItem,
+): ConfirmReturnConsumableLotAllocationDraft[] {
+  const returnedLots = normalizeReturnConsumableLotAllocations(
+    item.returnedLotAllocations,
+  );
+
+  if (returnedLots.length > 0) {
+    return returnedLots;
+  }
+
+  return normalizeReturnConsumableLotAllocations(
+    item.expectedReturnLotAllocations,
+  );
+}
+
+function resolveReturnConsumableExpiredDate(
+  item: UpcomingReturnItem,
+  lotAllocations: ConfirmReturnConsumableLotAllocationDraft[],
+): string | null {
+  if (typeof item.expiredDate === "string" && item.expiredDate.trim()) {
+    return item.expiredDate.trim();
+  }
+
+  const firstLotWithExpiry = lotAllocations.find(
+    (allocation) => allocation.expiredDate.trim().length > 0,
+  );
+
+  return firstLotWithExpiry?.expiredDate ?? null;
 }
 
 function buildConfirmReturnFormState(
@@ -468,6 +541,8 @@ function buildConfirmReturnFormState(
       continue;
     }
 
+    const lotAllocations = resolveReturnConsumableLotAllocations(item);
+
     const consumableDraft: ConfirmReturnConsumableDraft = {
       itemId: item.itemId,
       itemModelId,
@@ -476,6 +551,8 @@ function buildConfirmReturnFormState(
       expectedQuantity,
       reportedQuantity,
       quantity: String(reportedQuantity),
+      lotAllocations,
+      expiredDate: resolveReturnConsumableExpiredDate(item, lotAllocations),
     };
     consumableItems.push(consumableDraft);
   }
@@ -909,7 +986,7 @@ function ConfirmReturnFormSection({
 
       const reusableItems = prev.reusableItems.map((row) => ({
         ...row,
-        units: row.units.map((unit) => {
+        units: (row.units ?? []).map((unit) => {
           const normalizedCondition = normalizeReusableConditionKey(
             unit.condition,
             conditionOptions,
@@ -970,7 +1047,7 @@ function ConfirmReturnFormSection({
           row.itemId === itemId
             ? {
                 ...row,
-                units: row.units.map((unit) =>
+                units: (row.units ?? []).map((unit) =>
                   unit.reusableItemId === reusableItemId
                     ? { ...unit, [field]: value }
                     : unit,
@@ -1042,11 +1119,20 @@ function ConfirmReturnFormSection({
             consumableItems: form.consumableItems.map((row) => ({
               itemModelId: row.itemModelId,
               quantity: Number.parseInt(row.quantity || "0", 10) || 0,
+              lotAllocations: (row.lotAllocations ?? []).map((allocation) => ({
+                lotId: allocation.lotId,
+                quantityTaken: allocation.quantityTaken,
+                receivedDate: allocation.receivedDate,
+                expiredDate: allocation.expiredDate,
+                remainingQuantityAfterExecution:
+                  allocation.remainingQuantityAfterExecution,
+              })),
+              expiredDate: row.expiredDate,
             })),
             reusableItems: form.reusableItems.map((row) => ({
               itemModelId: row.itemModelId,
               quantity: Number.parseInt(row.quantity || "0", 10) || 0,
-              units: row.units.map((unit) => ({
+              units: (row.units ?? []).map((unit) => ({
                 reusableItemId: unit.reusableItemId,
                 serialNumber: unit.serialNumber,
                 condition: normalizeReusableConditionKey(
@@ -1206,12 +1292,12 @@ function ConfirmReturnFormSection({
             </div>
 
             <div className="mt-4 space-y-3">
-              {row.units.length === 0 ? (
+              {(row.units ?? []).length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm tracking-tighter text-muted-foreground">
                   Chưa có danh sách reusable unit để đối chiếu.
                 </div>
               ) : (
-                row.units.map((unit) => (
+                (row.units ?? []).map((unit) => (
                   <div
                     key={`${row.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
                     className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3"
