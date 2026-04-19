@@ -56,6 +56,7 @@ import {
   useInfiniteAssemblyPoints,
 } from "@/services/assembly_points/hooks";
 import { useInfiniteRescuers } from "@/services/rescuers/hooks";
+import { useAbilityCategoryMetadata } from "@/services/user/hooks";
 import type { RescuerEntity, RescuerType } from "@/services/rescuers/type";
 import type { AssemblyPointCheckedInRescuerEntity } from "@/services/assembly_points/type";
 
@@ -136,6 +137,21 @@ const TEAM_TYPE_ABILITY_FILTER: Record<
   Mixed: {},
 };
 
+const ABILITY_CATEGORY_LABELS: Record<string, string> = {
+  RESCUE: "Cứu hộ",
+  MEDICAL: "Y tế",
+  TRANSPORTATION: "Vận chuyển",
+};
+
+function getAbilityCategoryLabelVi(code: string): string {
+  if (ABILITY_CATEGORY_LABELS[code]) return ABILITY_CATEGORY_LABELS[code];
+  return code
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function getAbilityLabelVi(code: string): string {
   if (ABILITY_LABELS_VI[code]) return ABILITY_LABELS_VI[code];
   return code
@@ -207,7 +223,7 @@ function TypeCard({
         {label}
       </div>
       {description && (
-        <div className="line-clamp-1 text-xs text-black/70">{description}</div>
+        <div className="line-clamp-1 text-sm text-black/70">{description}</div>
       )}
     </button>
   );
@@ -220,6 +236,7 @@ function RescuerCard({
   selected,
   isLeader,
   canBeLeader,
+  disabled,
   onToggleSelect,
   onToggleLeader,
 }: {
@@ -227,11 +244,12 @@ function RescuerCard({
   selected: boolean;
   isLeader: boolean;
   canBeLeader: boolean;
+  disabled: boolean;
   onToggleSelect: () => void;
   onToggleLeader: () => void;
 }) {
   const initials =
-    `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() ||
+    `${user.lastName?.[0] || ""}${user.firstName?.[0] || ""}`.toUpperCase() ||
     "?";
   const avatarSrc = user.avatarUrl || DEFAULT_RESCUER_AVATAR;
   const [isHovering, setIsHovering] = useState(false);
@@ -259,11 +277,21 @@ function RescuerCard({
     <>
       <div
         className={`relative flex cursor-pointer items-center gap-3 border p-2.5 transition-all ${
+          disabled
+            ? "cursor-not-allowed border-black/20 bg-black/3 opacity-70"
+            : ""
+        } ${
           selected
             ? "border-[#FF5722] bg-[#FF5722]/5"
             : "border-black/30 bg-white hover:border-black hover:bg-black/5"
         }`}
-        onClick={onToggleSelect}
+        onClick={() => {
+          if (disabled) {
+            return;
+          }
+
+          onToggleSelect();
+        }}
         onMouseEnter={(e) => {
           setIsHovering(true);
           handleMouseMove(e);
@@ -281,34 +309,44 @@ function RescuerCard({
 
         <Avatar className="h-8 w-8 border border-background shadow-sm">
           <AvatarImage src={avatarSrc} />
-          <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-xs font-bold">
+          <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-sm font-bold">
             {initials}
           </AvatarFallback>
         </Avatar>
 
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-[13px] truncate flex items-center gap-2">
-            {user.firstName} {user.lastName}
+          <div className="font-medium text-sm truncate flex items-center gap-2">
+            {user.lastName} {user.firstName}
+            {disabled ? (
+              <Badge
+                variant="outline"
+                className="h-5 border-black/30 px-1.5 text-xs"
+              >
+                Đã có đội
+              </Badge>
+            ) : null}
           </div>
-          <div className="text-xs text-muted-foreground flex items-center gap-1.5 truncate mt-0.5">
+          <div className="text-sm text-muted-foreground flex items-center gap-1.5 truncate mt-0.5">
             {user.rescuerType && (
               <Badge
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
-                className="text-xs font-medium h-4 px-1"
+                className="text-sm font-medium h-5 px-1.5"
               >
-                {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
+                {user.rescuerType === "Core"
+                  ? "Nhân viên cố định"
+                  : "Tình nguyện"}
               </Badge>
             )}
             {user.phone && <span>· {user.phone}</span>}
           </div>
         </div>
 
-        {selected && canBeLeader && (
+        {selected && canBeLeader && !disabled && (
           <Button
             type="button"
             variant={isLeader ? "default" : "outline"}
             size="sm"
-            className={`h-7 shrink-0 gap-1 border-black px-2.5 text-xs shadow-none transition-colors ${isLeader ? "border-transparent bg-[#FF5722] text-white hover:bg-[#e64a19]" : "text-black/70 hover:bg-black/5 hover:text-black"}`}
+            className={`h-7 shrink-0 gap-1 border-black px-2.5 text-sm shadow-none transition-colors ${isLeader ? "border-transparent bg-[#FF5722] text-white hover:bg-[#e64a19]" : "text-black/70 hover:bg-black/5 hover:text-black"}`}
             onClick={(e) => {
               e.stopPropagation();
               onToggleLeader();
@@ -331,23 +369,25 @@ function RescuerCard({
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border border-background shadow-sm">
               <AvatarImage src={avatarSrc} />
-              <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-[12px] font-bold">
+              <AvatarFallback className="bg-gradient-to-br from-slate-400 to-slate-500 text-white text-sm font-bold">
                 {initials}
               </AvatarFallback>
             </Avatar>
             <div>
               <div className="font-semibold text-sm">
-                {user.firstName} {user.lastName}
+                {user.lastName} {user.firstName}
               </div>
               <Badge
                 variant={user.rescuerType === "Core" ? "default" : "secondary"}
-                className="mt-1 h-5 border border-black px-1.5 text-xs font-medium"
+                className="mt-1 h-6 border border-black px-1.5 text-sm font-medium"
               >
-                {user.rescuerType === "Core" ? "Cốt cán" : "Tình nguyện"}
+                {user.rescuerType === "Core"
+                  ? "Nhân viên cố định"
+                  : "Tình nguyện"}
               </Badge>
             </div>
           </div>
-          <div className="mt-2 space-y-1.5 border-t border-black/40 pt-2 text-xs">
+          <div className="mt-2 space-y-1.5 border-t border-black/40 pt-2 text-sm">
             <div className="flex flex-col gap-0.5">
               <span className="text-muted-foreground">SĐT:</span>
               <span className="font-medium text-foreground">
@@ -378,7 +418,7 @@ function RescuerCard({
                     <Badge
                       key={idx}
                       variant="outline"
-                      className="h-auto border-black bg-white px-1.5 py-0.5 text-xs leading-none"
+                      className="h-auto border-black bg-white px-1.5 py-0.5 text-sm leading-none"
                     >
                       {getAbilityLabelVi(ability)}
                     </Badge>
@@ -399,12 +439,14 @@ function RescuerCard({
 
 // ── Main Page ──
 
-function CreateRescueTeamContent() {
+function CreateRescueTeamForm({
+  initialAssemblyPointId,
+  eventId,
+}: {
+  initialAssemblyPointId: string;
+  eventId: number | null;
+}) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialAssemblyPointId =
-    searchParams.get("assemblyPointId")?.trim() ?? "";
-  const eventId = parsePositiveInteger(searchParams.get("eventId"));
   const lockedAssemblyPointId = parsePositiveInteger(initialAssemblyPointId);
   const isEventScopedTeamCreation =
     eventId !== null && lockedAssemblyPointId !== null;
@@ -424,6 +466,8 @@ function CreateRescueTeamContent() {
   const [rescuerTypeFilter, setRescuerTypeFilter] = useState<
     Exclude<RescuerType, null> | "all"
   >("all");
+  const [abilityCategoryFilterCode, setAbilityCategoryFilterCode] =
+    useState<string>("all");
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -435,6 +479,10 @@ function CreateRescueTeamContent() {
 
   // ─── Data Fetching ───
   const { data: teamTypes, isLoading: isLoadingTypes } = useRescueTeamTypes();
+  const {
+    data: abilityCategoryMetadata = [],
+    isLoading: isLoadingAbilityCategories,
+  } = useAbilityCategoryMetadata();
 
   const {
     data: pointsData,
@@ -453,37 +501,91 @@ function CreateRescueTeamContent() {
 
   const assemblyPoints = useMemo(() => {
     const allPoints = pointsData?.pages.flatMap((page) => page.items) || [];
-    const activePoints = allPoints.filter(
-      (point) => point.status === "Active" || point.status === "Overloaded",
+    const availablePoints = allPoints.filter(
+      (point) => point.status === "Available",
     );
 
     if (
       lockedAssemblyPoint &&
-      (lockedAssemblyPoint.status === "Active" ||
-        lockedAssemblyPoint.status === "Overloaded") &&
-      !activePoints.some((point) => point.id === lockedAssemblyPoint.id)
+      !availablePoints.some((point) => point.id === lockedAssemblyPoint.id)
     ) {
-      return [lockedAssemblyPoint, ...activePoints];
+      return [lockedAssemblyPoint, ...availablePoints];
     }
 
-    return activePoints;
+    return availablePoints;
   }, [pointsData, lockedAssemblyPoint]);
+
+  const teamTypeAbilityCategoryCode = useMemo(() => {
+    if (!teamType || teamType === "Mixed") {
+      return undefined;
+    }
+
+    return TEAM_TYPE_ABILITY_FILTER[teamType].abilityCategoryCode;
+  }, [teamType]);
+
+  const abilityCategoryOptions = useMemo(() => {
+    const optionsMap = new Map<string, string>();
+
+    Object.entries(ABILITY_CATEGORY_LABELS).forEach(([code, label]) => {
+      optionsMap.set(code, label);
+    });
+
+    abilityCategoryMetadata.forEach((option) => {
+      const normalizedCode = option.key.trim().toUpperCase();
+      if (!normalizedCode) {
+        return;
+      }
+
+      const normalizedLabel =
+        option.value.trim() || getAbilityCategoryLabelVi(normalizedCode);
+      optionsMap.set(normalizedCode, normalizedLabel);
+    });
+
+    return Array.from(optionsMap.entries())
+      .map(([key, value]) => ({ key, value }))
+      .sort((a, b) => a.value.localeCompare(b.value, "vi"));
+  }, [abilityCategoryMetadata]);
+
+  const effectiveAbilityCategoryCode = useMemo(() => {
+    if (teamTypeAbilityCategoryCode) {
+      return teamTypeAbilityCategoryCode;
+    }
+
+    return abilityCategoryFilterCode !== "all"
+      ? abilityCategoryFilterCode
+      : undefined;
+  }, [teamTypeAbilityCategoryCode, abilityCategoryFilterCode]);
+
+  useEffect(() => {
+    if (teamTypeAbilityCategoryCode || abilityCategoryFilterCode === "all") {
+      return;
+    }
+
+    const optionStillExists = abilityCategoryOptions.some(
+      (option) => option.key === abilityCategoryFilterCode,
+    );
+
+    if (!optionStillExists) {
+      setAbilityCategoryFilterCode("all");
+    }
+  }, [
+    teamTypeAbilityCategoryCode,
+    abilityCategoryFilterCode,
+    abilityCategoryOptions,
+  ]);
 
   const rescuerFilters = useMemo(() => {
     const filters: {
       hasTeam: boolean;
       rescuerType?: Exclude<RescuerType, null>;
       abilityCategoryCode?: string;
-      abilitySubgroupCode?: string;
       search?: string;
     } = {
       hasTeam: false,
     };
 
-    if (teamType && teamType !== "Mixed") {
-      const abilityFilter = TEAM_TYPE_ABILITY_FILTER[teamType];
-      filters.abilityCategoryCode = abilityFilter.abilityCategoryCode;
-      filters.abilitySubgroupCode = abilityFilter.abilitySubgroupCode;
+    if (effectiveAbilityCategoryCode) {
+      filters.abilityCategoryCode = effectiveAbilityCategoryCode;
     }
 
     if (rescuerTypeFilter !== "all") {
@@ -495,12 +597,7 @@ function CreateRescueTeamContent() {
     }
 
     return filters;
-  }, [
-    rescuerTypeFilter,
-    teamType,
-    isEventScopedTeamCreation,
-    debouncedSearchQuery,
-  ]);
+  }, [rescuerTypeFilter, debouncedSearchQuery, effectiveAbilityCategoryCode]);
 
   const {
     data: usersData,
@@ -523,7 +620,6 @@ function CreateRescueTeamContent() {
         rescuerType:
           rescuerTypeFilter !== "all" ? rescuerTypeFilter : undefined,
         abilityCategoryCode: rescuerFilters.abilityCategoryCode,
-        abilitySubgroupCode: rescuerFilters.abilitySubgroupCode,
         search: debouncedSearchQuery || undefined,
       },
     });
@@ -587,11 +683,9 @@ function CreateRescueTeamContent() {
   const eligibleRescuers = useMemo(() => {
     if (isEventScopedTeamCreation) {
       const checkedInRescuers = checkedInRescuersData?.items ?? [];
-      return checkedInRescuers
-        .filter((rescuer) => !rescuer.isInTeam)
-        .map((rescuer) =>
-          mapCheckedInRescuerToRescuerEntity(rescuer, lockedAssemblyPointId),
-        );
+      return checkedInRescuers.map((rescuer) =>
+        mapCheckedInRescuerToRescuerEntity(rescuer, lockedAssemblyPointId),
+      );
     }
 
     if (!usersData?.pages) return [];
@@ -605,12 +699,8 @@ function CreateRescueTeamContent() {
   ]);
 
   const isBackendAbilityFilterActive = useMemo(
-    () =>
-      Boolean(
-        rescuerFilters.abilityCategoryCode ||
-        rescuerFilters.abilitySubgroupCode,
-      ),
-    [rescuerFilters.abilityCategoryCode, rescuerFilters.abilitySubgroupCode],
+    () => Boolean(rescuerFilters.abilityCategoryCode),
+    [rescuerFilters.abilityCategoryCode],
   );
 
   const displayedRescuers = useMemo(() => eligibleRescuers, [eligibleRescuers]);
@@ -624,16 +714,43 @@ function CreateRescueTeamContent() {
     return matchingType?.value ?? teamType;
   }, [teamType, teamTypes]);
 
+  const selectedAbilityCategoryLabel = useMemo(() => {
+    if (!effectiveAbilityCategoryCode) {
+      return null;
+    }
+
+    const matchedOption = abilityCategoryOptions.find(
+      (option) => option.key === effectiveAbilityCategoryCode,
+    );
+
+    return (
+      matchedOption?.value ??
+      getAbilityCategoryLabelVi(effectiveAbilityCategoryCode)
+    );
+  }, [abilityCategoryOptions, effectiveAbilityCategoryCode]);
+
+  const shouldShowSelectedAbilityCategory = useMemo(
+    () => Boolean(selectedAbilityCategoryLabel && !teamTypeAbilityCategoryCode),
+    [selectedAbilityCategoryLabel, teamTypeAbilityCategoryCode],
+  );
+
   const isLoadingUsers = isEventScopedTeamCreation
     ? isLoadingCheckedInRescuers
     : isLoadingFreeRescuers;
 
-  const selectedAssemblyPoint = useMemo(
-    () =>
+  const selectedAssemblyPoint = useMemo(() => {
+    if (
+      lockedAssemblyPoint &&
+      String(lockedAssemblyPoint.id) === assemblyPointId
+    ) {
+      return lockedAssemblyPoint;
+    }
+
+    return (
       assemblyPoints.find((point) => String(point.id) === assemblyPointId) ??
-      null,
-    [assemblyPoints, assemblyPointId],
-  );
+      null
+    );
+  }, [assemblyPoints, assemblyPointId, lockedAssemblyPoint]);
 
   // ─── Member Selection Helpers ───
   const isMemberSelected = (userId: string) =>
@@ -643,6 +760,15 @@ function CreateRescueTeamContent() {
     selectedMembers.find((m) => m.userId === userId)?.isLeader || false;
 
   const toggleMember = (userId: string) => {
+    const user = eligibleRescuers.find((candidate) => candidate.id === userId);
+
+    if (user?.hasTeam) {
+      toast.error(
+        "Người cứu hộ này đã thuộc một đội khác trong sự kiện và không thể thêm vào đội mới.",
+      );
+      return;
+    }
+
     const maxMembersLimit = Math.min(
       8,
       Math.max(6, Number.parseInt(maxMembers, 10) || 6),
@@ -662,7 +788,7 @@ function CreateRescueTeamContent() {
   const toggleLeader = (userId: string) => {
     const user = eligibleRescuers.find((u) => u.id === userId);
     if (user?.rescuerType !== "Core") {
-      toast.error("Chỉ thành viên cốt cán mới có thể làm đội trưởng.");
+      toast.error("Chỉ  Nhân viên cố định mới có thể làm đội trưởng.");
       return;
     }
 
@@ -774,7 +900,7 @@ function CreateRescueTeamContent() {
             </h1>
             <Badge
               variant="secondary"
-              className="h-5 rounded-none border border-black bg-black px-2 font-normal text-xs text-white"
+              className="h-6 rounded-none border border-black bg-black px-2 font-normal text-sm text-white"
             >
               Thiết lập nhanh
             </Badge>
@@ -784,7 +910,7 @@ function CreateRescueTeamContent() {
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 rounded-none border-black text-xs"
+              className="h-8 rounded-none border-black text-sm"
               onClick={() => router.push("/dashboard/coordinator")}
               disabled={isCreating}
             >
@@ -794,7 +920,7 @@ function CreateRescueTeamContent() {
               type="submit"
               size="sm"
               disabled={isCreating}
-              className="h-8 gap-1.5 rounded-none bg-[#FF5722] text-xs text-white hover:bg-[#e64a19]"
+              className="h-8 gap-1.5 rounded-none bg-[#FF5722] text-sm text-white hover:bg-[#e64a19]"
               onClick={(e) => {
                 e.preventDefault();
                 const form = document.querySelector("form");
@@ -837,7 +963,7 @@ function CreateRescueTeamContent() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5 col-span-2">
-                    <Label className="text-xs text-muted-foreground">
+                    <Label className="text-sm text-muted-foreground">
                       Tên đội cứu hộ <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -849,7 +975,7 @@ function CreateRescueTeamContent() {
                     />
                   </div>
                   <div className="space-y-1.5 col-span-2">
-                    <Label className="text-xs text-muted-foreground">
+                    <Label className="text-sm text-muted-foreground">
                       Số thành viên tối đa
                     </Label>
                     <Input
@@ -872,7 +998,7 @@ function CreateRescueTeamContent() {
                         setMaxMembers(String(clamped));
                       }}
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       Hệ thống yêu cầu từ 6 đến 8 thành viên.
                     </p>
                   </div>
@@ -903,8 +1029,8 @@ function CreateRescueTeamContent() {
                     </SelectTrigger>
                     <SelectContent>
                       {assemblyPoints.length === 0 && (
-                        <div className="px-2 py-2 text-xs text-muted-foreground">
-                          Không có điểm tập kết đang hoạt động
+                        <div className="px-2 py-2 text-sm text-muted-foreground">
+                          Không có điểm tập kết sẵn sàng
                         </div>
                       )}
                       {assemblyPoints.map((point) => (
@@ -913,19 +1039,21 @@ function CreateRescueTeamContent() {
                             <span>{point.name}</span>
                             <Badge
                               variant={
-                                point.status === "Active"
+                                point.status === "Available"
                                   ? "default"
-                                  : point.status === "Overloaded"
+                                  : point.status === "Created"
                                     ? "secondary"
                                     : "destructive"
                               }
-                              className="text-xs font-medium h-4 px-1"
+                              className="text-sm font-medium h-5 px-1.5"
                             >
-                              {point.status === "Active"
-                                ? "Hoạt động"
-                                : point.status === "Overloaded"
-                                  ? "Quá tải"
-                                  : "Đóng"}
+                              {point.status === "Available"
+                                ? "Sẵn sàng"
+                                : point.status === "Created"
+                                  ? "Mới tạo"
+                                  : point.status === "Unavailable"
+                                    ? "Không khả dụng"
+                                    : "Đóng"}
                             </Badge>
                           </div>
                         </SelectItem>
@@ -945,7 +1073,7 @@ function CreateRescueTeamContent() {
                       className="h-3.5 w-3.5 text-[#FF5722]"
                       weight="fill"
                     />
-                    <span className="text-[12px] text-[#c2410c]">
+                    <span className="text-sm text-[#c2410c]">
                       {selectedAssemblyPoint
                         ? `Sức chứa khả dụng: ${selectedAssemblyPoint.maxCapacity} người`
                         : null}
@@ -1007,61 +1135,83 @@ function CreateRescueTeamContent() {
                   Thành viên đội{" "}
                   <span className="text-red-500 ml-[-4px]">*</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-2 text-sm">
                   <span className="text-muted-foreground">Đã chọn:</span>
                   <Badge
                     variant={
                       selectedMembers.length > 0 ? "secondary" : "outline"
                     }
-                    className="h-5 border border-black px-2 font-medium"
+                    className="h-6 border border-black px-2 font-medium text-sm"
                   >
                     {selectedMembers.length} / {maxMembers}
                   </Badge>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-[170px_1fr] gap-2">
-                <Select
-                  value={rescuerTypeFilter}
-                  onValueChange={(value) =>
-                    setRescuerTypeFilter(
-                      value as Exclude<RescuerType, null> | "all",
-                    )
-                  }
-                >
-                  <SelectTrigger className="h-9 text-sm bg-background border-border/60">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả vai trò</SelectItem>
-                    <SelectItem value="Core">Cốt cán</SelectItem>
-                    <SelectItem value="Volunteer">Tình nguyện</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                <div className="md:w-36 md:shrink-0">
+                  <Select
+                    value={rescuerTypeFilter}
+                    onValueChange={(value) =>
+                      setRescuerTypeFilter(
+                        value as Exclude<RescuerType, null> | "all",
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-9 w-full text-sm bg-background border-border/60">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả vai trò</SelectItem>
+                      <SelectItem value="Core">Nhân viên cố định</SelectItem>
+                      <SelectItem value="Volunteer">Tình nguyện</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                <div className="relative">
+                <div className="md:w-44 md:shrink-0">
+                  <Select
+                    value={
+                      teamTypeAbilityCategoryCode ?? abilityCategoryFilterCode
+                    }
+                    onValueChange={setAbilityCategoryFilterCode}
+                    disabled={
+                      Boolean(teamTypeAbilityCategoryCode) ||
+                      isLoadingAbilityCategories
+                    }
+                  >
+                    <SelectTrigger className="h-9 w-full bg-background text-sm border-border/60">
+                      <SelectValue
+                        placeholder={
+                          isLoadingAbilityCategories
+                            ? "Đang tải nhóm kỹ năng..."
+                            : "Lọc nhóm kỹ năng"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!teamTypeAbilityCategoryCode && (
+                        <SelectItem value="all">Tất cả nhóm kỹ năng</SelectItem>
+                      )}
+                      {abilityCategoryOptions.map((option) => (
+                        <SelectItem key={option.key} value={option.key}>
+                          {option.value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative md:min-w-80 md:flex-1">
                   <MagnifyingGlass className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-black/45" />
                   <Input
-                    className="h-9 border-black/50 bg-white pl-8 text-sm"
+                    className="h-9 w-full border-black/50 bg-white pl-8 text-sm"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Lọc theo họ tên, email, số điện thoại..."
                   />
                 </div>
               </div>
-
-              {isBackendAbilityFilterActive ? (
-                <div className="mt-2 flex items-center gap-2 border border-[#FF5722]/40 bg-[#FF5722]/10 px-2.5 py-1.5">
-                  <Sparkle
-                    className="h-3.5 w-3.5 text-[#FF5722]"
-                    weight="fill"
-                  />
-                  <p className="text-[12px] text-[#C2410C]">
-                    Đang lọc thành viên theo chuyên môn đội:{" "}
-                    <strong>{selectedTeamTypeLabel}</strong>
-                  </p>
-                </div>
-              ) : null}
 
               {/* Selected tags */}
               {selectedMembers.length > 0 && (
@@ -1075,7 +1225,7 @@ function CreateRescueTeamContent() {
                       <Badge
                         key={member.userId}
                         variant={member.isLeader ? "default" : "secondary"}
-                        className={`text-xs py-0.5 px-2 gap-1.5 ${
+                        className={`text-sm py-0.5 px-2 gap-1.5 ${
                           member.isLeader
                             ? "bg-[#FF5722] hover:bg-[#e64a19] text-white"
                             : ""
@@ -1084,7 +1234,7 @@ function CreateRescueTeamContent() {
                         {member.isLeader && (
                           <Crown className="h-3 w-3" weight="fill" />
                         )}
-                        {user.firstName} {user.lastName}
+                        {user.lastName} {user.firstName}
                         <button
                           type="button"
                           className="ml-1 hover:text-red-500 focus:outline-none"
@@ -1106,9 +1256,9 @@ function CreateRescueTeamContent() {
                       className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5722]"
                       weight="fill"
                     />
-                    <p className="text-[12px] leading-snug text-[#c2410c]">
+                    <p className="text-sm leading-snug text-[#c2410c]">
                       Vui lòng <strong>Chọn làm đội trưởng</strong> cho một
-                      thành viên <strong>cốt cán</strong> trong nhóm.
+                      thành viên <strong>nhân viên cố định</strong> trong nhóm.
                     </p>
                   </div>
                 )}
@@ -1132,6 +1282,7 @@ function CreateRescueTeamContent() {
                         selected={isMemberSelected(user.id)}
                         isLeader={isLeader(user.id)}
                         canBeLeader={user.rescuerType === "Core"}
+                        disabled={Boolean(user.hasTeam)}
                         onToggleSelect={() => toggleMember(user.id)}
                         onToggleLeader={() => toggleLeader(user.id)}
                       />
@@ -1153,18 +1304,22 @@ function CreateRescueTeamContent() {
                   <div className="bg-background p-4 rounded-full border border-dashed mb-3 shadow-sm">
                     <UserCirclePlus className="h-8 w-8 text-muted-foreground/40" />
                   </div>
-                  <p className="text-[13px] font-medium text-foreground">
+                  <p className="text-sm font-medium text-foreground">
                     {searchQuery
                       ? "Không tìm thấy kết quả"
                       : "Chưa có người cứu hộ phù hợp"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-[250px]">
+                  <p className="text-sm text-muted-foreground mt-1 max-w-[250px]">
                     {searchQuery
                       ? "Liên hệ hoặc tìm kiếm với từ khóa khác."
                       : isBackendAbilityFilterActive
-                        ? `Không có rescuer có khả năng phù hợp với chuyên môn ${selectedTeamTypeLabel}.`
+                        ? shouldShowSelectedAbilityCategory
+                          ? `Không có người cứu hộ phù hợp với nhóm kỹ năng ${selectedAbilityCategoryLabel}${selectedTeamTypeLabel ? ` trong chuyên môn ${selectedTeamTypeLabel}` : ""}.`
+                          : selectedTeamTypeLabel
+                            ? `Không có người cứu hộ có khả năng phù hợp với chuyên môn ${selectedTeamTypeLabel}.`
+                            : "Không có người cứu hộ phù hợp với bộ lọc nhóm kỹ năng hiện tại."
                         : isEventScopedTeamCreation
-                          ? "Không có rescuer nào đã check-in phù hợp để thêm vào đội ở sự kiện này."
+                          ? "Không có người cứu hộ nào đã check-in phù hợp để thêm vào đội ở sự kiện này."
                           : "Chỉ hiển thị người cứu hộ đã được duyệt và đang hoạt động."}
                   </p>
                 </div>
@@ -1174,6 +1329,21 @@ function CreateRescueTeamContent() {
         </form>
       </div>
     </div>
+  );
+}
+
+function CreateRescueTeamContent() {
+  const searchParams = useSearchParams();
+  const initialAssemblyPointId =
+    searchParams.get("assemblyPointId")?.trim() ?? "";
+  const eventId = parsePositiveInteger(searchParams.get("eventId"));
+
+  return (
+    <CreateRescueTeamForm
+      key={`${initialAssemblyPointId}:${eventId ?? "none"}`}
+      initialAssemblyPointId={initialAssemblyPointId}
+      eventId={eventId}
+    />
   );
 }
 

@@ -1,3 +1,5 @@
+import { ManagedDepotSummary } from "@/services/auth/type";
+
 // User Me Response
 export interface UserMeResponse {
   id: string;
@@ -19,6 +21,9 @@ export interface UserMeResponse {
   approvedBy: string | null;
   approvedAt: string | null;
   rescuerApplicationDocuments: unknown[];
+  managedDepots?: ManagedDepotSummary[];
+  depotId?: number | null;
+  depotName?: string | null;
 }
 
 // User Entity
@@ -164,6 +169,16 @@ export interface GetUsersForPermissionResponse {
   totalCount: number;
 }
 
+export interface RoleMetadataOption {
+  key: string;
+  value: string;
+}
+
+export interface AbilityCategoryMetadataOption {
+  key: string;
+  value: string;
+}
+
 export interface AdminUpdateUserRequest {
   firstName?: string;
   lastName?: string;
@@ -209,4 +224,9 @@ export interface AdminCreateUserRequest {
   isEligibleRescuer?: boolean;
   approvedBy?: string;
   approvedAt?: string;
+}
+
+export interface AdminCreateUserResponse {
+  id?: string;
+  userId?: string;
 }

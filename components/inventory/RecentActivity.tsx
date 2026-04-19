@@ -1,189 +1,258 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+import { Bar } from "react-chartjs-2";
 import {
-  ArrowLineDown,
-  ArrowLineUp,
-  ClipboardText,
-  PencilSimple,
-  Truck,
-  Package,
-  ClockCounterClockwise,
-} from "@phosphor-icons/react";
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend,
+  LinearScale,
+  Tooltip as ChartTooltip,
+} from "chart.js";
+import { ClockCounterClockwise } from "@phosphor-icons/react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { RecentActivityProps } from "@/type";
 
-const actionConfig: Record<
-  string,
-  { icon: React.ReactNode; color: string; bgColor: string; label: string }
-> = {
+ChartJS.register(CategoryScale, LinearScale, BarElement, ChartTooltip, Legend);
+
+const actionConfig = {
   STOCK_IN: {
-    icon: <ArrowLineDown className="h-4 w-4" />,
-    color: "text-green-500",
-    bgColor: "bg-green-500/10",
     label: "Nhập kho",
+    color: "#22c55e",
+    tone: "bg-green-500/10 text-green-600",
   },
   STOCK_OUT: {
-    icon: <ArrowLineUp className="h-4 w-4" />,
-    color: "text-blue-500",
-    bgColor: "bg-blue-500/10",
     label: "Xuất kho",
+    color: "#3b82f6",
+    tone: "bg-blue-500/10 text-blue-600",
   },
   ADJUSTMENT: {
-    icon: <PencilSimple className="h-4 w-4" />,
-    color: "text-orange-500",
-    bgColor: "bg-orange-500/10",
     label: "Điều chỉnh",
+    color: "#f97316",
+    tone: "bg-orange-500/10 text-orange-600",
   },
   REQUEST_CREATED: {
-    icon: <ClipboardText className="h-4 w-4" />,
-    color: "text-purple-500",
-    bgColor: "bg-purple-500/10",
     label: "Tạo yêu cầu",
+    color: "#a855f7",
+    tone: "bg-purple-500/10 text-purple-600",
   },
   REQUEST_APPROVED: {
-    icon: <ClipboardText className="h-4 w-4" />,
-    color: "text-emerald-500",
-    bgColor: "bg-emerald-500/10",
     label: "Duyệt yêu cầu",
+    color: "#10b981",
+    tone: "bg-emerald-500/10 text-emerald-600",
   },
   SHIPMENT_SENT: {
-    icon: <Truck className="h-4 w-4" />,
-    color: "text-cyan-500",
-    bgColor: "bg-cyan-500/10",
     label: "Gửi hàng",
+    color: "#06b6d4",
+    tone: "bg-cyan-500/10 text-cyan-600",
   },
   SHIPMENT_RECEIVED: {
-    icon: <Package className="h-4 w-4" weight="fill" />,
-    color: "text-teal-500",
-    bgColor: "bg-teal-500/10",
     label: "Nhận hàng",
+    color: "#14b8a6",
+    tone: "bg-teal-500/10 text-teal-600",
   },
-};
-
-function formatTimeAgo(date: Date, now: Date): string {
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffMins < 60) {
-    return `${diffMins} phút trước`;
-  } else if (diffHours < 24) {
-    return `${diffHours} giờ trước`;
-  } else {
-    return `${diffDays} ngày trước`;
-  }
-}
+} as const;
 
 const RecentActivity = ({ activities, maxItems = 10 }: RecentActivityProps) => {
-  const [currentTime, setCurrentTime] = useState<Date | null>(null);
-  const displayedActivities = activities.slice(0, maxItems);
+  const displayedActivities = [...activities]
+    .sort((left, right) => {
+      return right.performedAt.getTime() - left.performedAt.getTime();
+    })
+    .slice(0, maxItems);
 
-  // Use setTimeout to avoid synchronous setState warning in effect
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setCurrentTime(new Date());
-    }, 0);
-    return () => clearTimeout(timeoutId);
-  }, []);
+  const chartEntries = Object.entries(actionConfig)
+    .map(([action, config]) => {
+      const count = displayedActivities.filter(
+        (activity) => activity.action === action,
+      ).length;
+
+      return {
+        action,
+        ...config,
+        count,
+      };
+    })
+    .filter((entry) => entry.count > 0);
+
+  const dominantEntry = [...chartEntries].sort((left, right) => {
+    return right.count - left.count;
+  })[0];
+
+  const lastUpdated = displayedActivities[0]?.performedAt;
+  const totalQuantity = displayedActivities.reduce((sum, activity) => {
+    return sum + Math.abs(activity.quantity ?? 0);
+  }, 0);
+
+  const chartData = {
+    labels: chartEntries.map((entry) => entry.label),
+    datasets: [
+      {
+        label: "Số hoạt động",
+        data: chartEntries.map((entry) => entry.count),
+        backgroundColor: chartEntries.map((entry) => entry.color),
+        borderRadius: 999,
+        borderSkipped: false,
+        maxBarThickness: 38,
+      },
+    ],
+  };
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="flex h-full flex-col">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-base font-semibold">
           <ClockCounterClockwise className="h-5 w-5 text-primary" />
           Hoạt Động Gần Đây
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 p-0">
-        <ScrollArea className="h-100 px-6">
-          <div className="space-y-1 pb-4">
-            {displayedActivities.map((activity, index) => {
-              const config = actionConfig[activity.action];
-              return (
-                <div key={activity.id} className="relative">
-                  {/* Timeline line */}
-                  {index < displayedActivities.length - 1 && (
-                    <div className="absolute left-5 top-10 bottom-0 w-px bg-border" />
-                  )}
 
-                  <div className="flex gap-4 py-3">
-                    {/* Icon */}
-                    <div
-                      className={cn(
-                        "relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                        config?.bgColor || "bg-muted",
-                      )}
-                    >
-                      <span
-                        className={config?.color || "text-muted-foreground"}
-                      >
-                        {config?.icon || (
-                          <ClockCounterClockwise className="h-4 w-4" />
-                        )}
-                      </span>
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={cn(
-                            "text-sm font-medium",
-                            config?.color || "text-foreground",
-                          )}
-                        >
-                          {config?.label || activity.action}
-                        </span>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          {currentTime
-                            ? formatTimeAgo(activity.performedAt, currentTime)
-                            : "..."}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
-                        {activity.details}
-                      </p>
-                      {activity.itemName && (
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs bg-muted px-2 py-0.5 rounded">
-                            {activity.itemName}
-                          </span>
-                          {activity.quantity && (
-                            <span
-                              className={cn(
-                                "text-xs font-medium",
-                                activity.quantity > 0
-                                  ? "text-green-500"
-                                  : "text-red-500",
-                              )}
-                            >
-                              {activity.quantity > 0 ? "+" : ""}
-                              {activity.quantity}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        bởi {activity.performedBy}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {activities.length === 0 && (
-              <div className="text-center text-muted-foreground py-8">
-                <ClockCounterClockwise className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Chưa có hoạt động nào</p>
+      <CardContent className="flex flex-1 flex-col gap-5 p-6 pt-0">
+        {displayedActivities.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border bg-muted/30 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Tổng hoạt động
+                </p>
+                <p className="mt-2 text-2xl font-semibold">
+                  {displayedActivities.length}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Trong {maxItems} bản ghi gần nhất
+                </p>
               </div>
-            )}
+
+              <div className="rounded-2xl border bg-muted/30 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Nổi bật nhất
+                </p>
+                <p className="mt-2 text-lg font-semibold">
+                  {dominantEntry?.label ?? "Chưa có dữ liệu"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {dominantEntry?.count ?? 0} lần ghi nhận
+                </p>
+              </div>
+
+              <div className="rounded-2xl border bg-muted/30 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  Số lượng xử lý
+                </p>
+                <p className="mt-2 text-2xl font-semibold">{totalQuantity}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {lastUpdated
+                    ? `Cập nhật ${new Intl.DateTimeFormat("vi-VN", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }).format(lastUpdated)}`
+                    : "Chưa có cập nhật"}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border bg-linear-to-br from-slate-50 via-white to-slate-100 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-base font-semibold tracking-tighter">
+                    Phân bố hoạt động theo nhóm
+                  </p>
+                  <p className="text-sm text-muted-foreground tracking-tighter">
+                    Biểu đồ tạm thời để thay cho danh sách timeline cũ
+                  </p>
+                </div>
+              </div>
+
+              <div className="h-70">
+                <Bar
+                  data={chartData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                      duration: 700,
+                    },
+                    plugins: {
+                      legend: {
+                        display: false,
+                      },
+                      tooltip: {
+                        backgroundColor: "#0f172a",
+                        padding: 12,
+                        displayColors: false,
+                        callbacks: {
+                          label: (context) =>
+                            `${context.label}: ${context.parsed.y} hoạt động`,
+                        },
+                      },
+                    },
+                    scales: {
+                      x: {
+                        grid: {
+                          display: false,
+                        },
+                        ticks: {
+                          color: "#64748b",
+                          font: {
+                            size: 11,
+                            weight: 600,
+                          },
+                        },
+                        border: {
+                          display: false,
+                        },
+                      },
+                      y: {
+                        beginAtZero: true,
+                        ticks: {
+                          precision: 0,
+                          stepSize: 1,
+                          color: "#94a3b8",
+                          font: {
+                            size: 11,
+                          },
+                        },
+                        grid: {
+                          color: "rgba(148, 163, 184, 0.18)",
+                          drawBorder: false,
+                        },
+                        border: {
+                          display: false,
+                        },
+                      },
+                    },
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {chartEntries.map((entry) => (
+                <div
+                  key={entry.action}
+                  className={cn(
+                    "flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium",
+                    entry.tone,
+                  )}
+                >
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: entry.color }}
+                  />
+                  {entry.label}
+                  <span className="text-foreground/80">{entry.count}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center py-8 text-center text-muted-foreground">
+            <ClockCounterClockwise className="mb-2 h-8 w-8 opacity-50" />
+            <p className="text-sm">Chưa có dữ liệu để vẽ biểu đồ</p>
           </div>
-        </ScrollArea>
+        )}
       </CardContent>
     </Card>
   );

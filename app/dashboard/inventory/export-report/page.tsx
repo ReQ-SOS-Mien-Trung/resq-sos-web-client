@@ -66,6 +66,7 @@ import { useItemCategories } from "@/services/item_categories/hooks";
 import { useExportInventoryMovements } from "@/services/inventory/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,7 @@ export default function ExportReportPage() {
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
   const { data: userMe } = useUserMe();
+  const { selectedDepot, selectedDepotId } = useManagerDepot();
   const displayName = useMemo(
     () =>
       userMe
@@ -174,12 +176,30 @@ export default function ExportReportPage() {
     useItemCategories({
       params: { pageNumber: 1, pageSize: 50 },
     });
-  const currentDepot = depotsData?.items?.[0] ?? null;
+  const currentDepot =
+    depotsData?.items?.find((depot) => depot.id === selectedDepotId) ?? null;
   const totalCategories = categoriesData?.totalCount ?? 0;
   const depotInfo = useMemo<DepotInfo | null>(() => {
-    if (!currentDepot) return null;
-    return mapDepotEntityToInfo(currentDepot, displayName, totalCategories);
-  }, [currentDepot, displayName, totalCategories]);
+    if (currentDepot) {
+      return mapDepotEntityToInfo(currentDepot, displayName, totalCategories);
+    }
+
+    if (!selectedDepot) return null;
+
+    return {
+      id: String(selectedDepot.depotId),
+      name: selectedDepot.depotName,
+      address: selectedDepot.address,
+      phone: "—",
+      manager: displayName,
+      totalItems: 0,
+      totalCategories,
+      criticalAlerts: 0,
+      lowStockAlerts: 0,
+      pendingRequests: 0,
+      activeShipments: 0,
+    };
+  }, [currentDepot, displayName, selectedDepot, totalCategories]);
   // ── Form state ──
   const [leftFromDate, setLeftFromDate] = useState(toInputDate(thirtyDaysAgo));
   const [leftToDate, setLeftToDate] = useState(toInputDate(today));
@@ -191,14 +211,27 @@ export default function ExportReportPage() {
     useExportInventoryMovements();
 
   const handleExport = (panel: "range" | "month") => {
+    if (panel === "range") {
+      if (!leftFromDate || !leftToDate) {
+        toast.error("Vui lòng chọn đủ ngày bắt đầu và ngày kết thúc.");
+        return;
+      }
+      if (leftFromDate > leftToDate) {
+        toast.error("Ngày bắt đầu không được lớn hơn ngày kết thúc.");
+        return;
+      }
+    }
+
     const params =
       panel === "range"
         ? {
+            depotId: selectedDepotId ?? 0,
             periodType: "ByDateRange" as const,
             fromDate: leftFromDate,
             toDate: leftToDate,
           }
         : {
+            depotId: selectedDepotId ?? 0,
             periodType: "ByMonth" as const,
             month: Number(rightMonth),
             year: Number(rightYear),
@@ -283,17 +316,33 @@ export default function ExportReportPage() {
           <span className="font-semibold tracking-tighter text-lg hidden sm:inline">
             ResQ-SOS | Quản Lý Kho
           </span>
-          <Badge
-            variant={currentDepot ? "success" : "destructive"}
-            className="hidden sm:flex items-center gap-1"
+          <div
+            className={cn(
+              "relative hidden h-9 w-9 items-center justify-center rounded-full border sm:flex",
+              currentDepot
+                ? "border-green-200 bg-green-100 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-400"
+                : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
+            )}
+            title={currentDepot ? "Đang kết nối" : "Mất kết nối"}
+            aria-label={currentDepot ? "Đang kết nối" : "Mất kết nối"}
           >
             {currentDepot ? (
-              <WifiHigh className="h-3 w-3" weight="bold" />
+              <>
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-green-500 opacity-75 animate-ping" />
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-green-500 dark:border-zinc-900/70" />
+              </>
             ) : (
-              <WifiSlash className="h-3 w-3" weight="bold" />
+              <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-red-500 dark:border-zinc-900/70" />
             )}
-            {currentDepot ? "Đang kết nối" : "Mất kết nối"}
-          </Badge>
+            {currentDepot ? (
+              <WifiHigh className="h-4 w-4" weight="bold" />
+            ) : (
+              <WifiSlash className="h-4 w-4" weight="bold" />
+            )}
+            <span className="sr-only">
+              {currentDepot ? "Đang kết nối" : "Mất kết nối"}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -341,7 +390,7 @@ export default function ExportReportPage() {
             onClick={() => router.push("/dashboard/inventory/stock-movements")}
           >
             <FileTextIcon className="h-4 w-4" />
-            Truy xuất
+            Xem biến động kho
           </Button>
 
           <NotificationBell />
@@ -505,7 +554,14 @@ export default function ExportReportPage() {
                         </Label>
                         <DatePickerInput
                           value={leftFromDate}
-                          onChange={setLeftFromDate}
+                          onChange={(val) => {
+                            setLeftFromDate(val);
+                            // If fromDate > toDate, reset toDate
+                            if (val && leftToDate && val > leftToDate) {
+                              setLeftToDate(val);
+                            }
+                          }}
+                          maxDate={leftToDate || undefined}
                           placeholder="Chọn ngày..."
                           className="h-10 mt-1"
                         />
@@ -516,7 +572,14 @@ export default function ExportReportPage() {
                         </Label>
                         <DatePickerInput
                           value={leftToDate}
-                          onChange={setLeftToDate}
+                          onChange={(val) => {
+                            setLeftToDate(val);
+                            // If toDate < fromDate, reset fromDate
+                            if (val && leftFromDate && val < leftFromDate) {
+                              setLeftFromDate(val);
+                            }
+                          }}
+                          minDate={leftFromDate || undefined}
                           placeholder="Chọn ngày..."
                           className="h-10 mt-1"
                         />

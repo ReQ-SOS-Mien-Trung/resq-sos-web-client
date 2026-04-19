@@ -3,9 +3,8 @@ import type { RescuerType } from "../rescuers/type";
 // Assembly Point Status
 export type AssemblyPointStatus =
   | "Created"
-  | "Active"
-  | "Overloaded"
-  | "UnderMaintenance"
+  | "Available"
+  | "Unavailable"
   | "Closed";
 
 // Assembly Point Status Metadata (from /personnel/assembly-point/status-metadata)
@@ -20,8 +19,14 @@ export interface AssemblyPointMetadataOption {
   value: string;
 }
 
+export interface AssemblyPointStatusAuditFields {
+  statusReason: string | null;
+  statusChangedAt: string | null;
+  statusChangedBy: string | null;
+}
+
 // Assembly Point Entity
-export interface AssemblyPointEntity {
+export interface AssemblyPointEntity extends AssemblyPointStatusAuditFields {
   id: number;
   code: string;
   name: string;
@@ -86,6 +91,7 @@ export interface GetAssemblyPointsResponse {
 export interface GetAssemblyPointsParams {
   pageNumber?: number;
   pageSize?: number;
+  status?: AssemblyPointStatus;
 }
 
 // Create Assembly Point Request
@@ -128,14 +134,12 @@ export interface UpdateAssemblyPointResponse {
   lastUpdatedAt: string | null;
 }
 
-// Update Assembly Point Status Request
-export interface UpdateAssemblyPointStatusRequest {
+export interface AssemblyPointStatusTransitionRequest {
   id: number;
-  status: AssemblyPointStatus;
+  reason?: string | null;
 }
 
-// Update Assembly Point Status Response
-export interface UpdateAssemblyPointStatusResponse {
+export interface AssemblyPointStatusTransitionResponse {
   id: number;
   status: AssemblyPointStatus;
   message: string;
@@ -151,6 +155,7 @@ export interface UpdateRescuerAssemblyPointAssignmentRequest {
 export interface ScheduleAssemblyPointGatheringRequest {
   id: number;
   assemblyDate: string;
+  checkInDeadline: string;
 }
 
 // Schedule gathering success response
@@ -163,6 +168,7 @@ export interface ScheduleAssemblyPointGatheringErrorResponse {
   message: string;
   errors?: {
     AssemblyDate?: string[];
+    CheckInDeadline?: string[];
     [key: string]: string[] | undefined;
   };
 }

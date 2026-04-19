@@ -1,10 +1,10 @@
 "use client";
 
-import React from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft } from '@phosphor-icons/react';
-import { Button } from '@/components/ui/button';
-import StockMovementTable from '@/components/stock-movements/StockMovementTable';
+import React from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import StockMovementTable from "@/components/stock-movements/StockMovementTable";
 
 const StockMovementsPage: React.FC = () => {
   const router = useRouter();
@@ -19,12 +19,14 @@ const StockMovementsPage: React.FC = () => {
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              onClick={() => router.push('/dashboard/inventory')}
+              onClick={() => router.push("/dashboard/inventory")}
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-2xl tracking-tighter font-bold text-foreground">Truy xuất biến động kho</h1>
+              <h1 className="text-2xl tracking-tighter font-bold text-foreground">
+                Truy xuất biến động kho
+              </h1>
               <p className="text-sm tracking-tighter text-muted-foreground">
                 Theo dõi tất cả các lần biến động kho
               </p>

@@ -20,7 +20,6 @@ import {
   Mission,
 } from "@/type";
 import { useSOSRequests } from "@/services/sos_request/hooks";
-import type { SOSRequestEntity } from "@/services/sos_request/type";
 import {
   useCreateSOSCluster,
   useClusterRescueSuggestion,
@@ -58,6 +57,7 @@ import {
   SidebarSimple,
   Gear,
   User,
+  ArrowsClockwise,
   WifiHigh,
   WifiSlash,
   Sun,
@@ -84,7 +84,8 @@ import { useAuthStore } from "@/stores/auth.store";
 import { useThemeStore } from "@/stores/theme.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
-import { deriveSOSNeeds } from "@/lib/sos";
+import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
+import { mapSOSRequestEntityToSOS } from "@/lib/sos-request-mapper";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 
 // ── Lazy-loaded map components ──
@@ -115,98 +116,6 @@ const WindyLeafletMap = dynamic(
 
 // ── Helpers ──
 
-/** Map backend priority to frontend priority code */
-function toPriority(level: string): "P1" | "P2" | "P3" | "P4" {
-  if (level === "Critical") return "P1";
-  if (level === "High") return "P2";
-  if (level === "Medium") return "P3";
-  return "P4";
-}
-
-/** Map backend status to frontend status */
-function toStatus(status: string): "PENDING" | "ASSIGNED" | "RESCUED" {
-  if (status === "Pending") return "PENDING";
-  if (status === "InProgress" || status === "Assigned") return "ASSIGNED";
-  return "RESCUED";
-}
-
-/** Convert SOSRequestEntity from API to SOSRequest used by UI */
-function mapEntityToSOS(entity: SOSRequestEntity): SOSRequest {
-  const sd = entity.structuredData;
-  const victimInfo = entity.victimInfo ?? null;
-  // Prefer explicit reporter info. Keep senderInfo as backward-compatible fallback.
-  const reporterInfo = entity.reporterInfo ?? entity.senderInfo ?? null;
-  const nm = entity.networkMetadata;
-  const supplies = sd?.supplies ?? [];
-  const supplyDetails = sd?.supply_details;
-  const createdAt = new Date(entity.createdAt);
-  const computedWaitTimeMinutes = Math.max(
-    0,
-    Math.floor((Date.now() - createdAt.getTime()) / 60000),
-  );
-  const needs = deriveSOSNeeds(sd, entity.sosType);
-
-  return {
-    id: String(entity.id),
-    groupId: entity.clusterId ? String(entity.clusterId) : String(entity.id),
-    location: { lat: entity.latitude, lng: entity.longitude },
-    priority: toPriority(entity.priorityLevel),
-    needs,
-    status: toStatus(entity.status),
-    message: entity.msg,
-    createdAt,
-    receivedAt: entity.receivedAt ? new Date(entity.receivedAt) : null,
-    peopleCount: sd?.people_count,
-    injuredPersons: sd?.injured_persons?.map((person) => ({
-      index: person.index,
-      name: person.name,
-      customName: person.custom_name,
-      personType: person.person_type,
-      medicalIssues: person.medical_issues,
-      severity: person.severity,
-    })),
-    waitTimeMinutes: computedWaitTimeMinutes,
-    sosType: entity.sosType ?? undefined,
-    situation: sd?.situation,
-    medicalIssues: sd?.medical_issues,
-    supplies: supplies.length > 0 ? supplies : undefined,
-    canMove: sd?.can_move,
-    hasInjured: sd?.has_injured,
-    othersAreStable: sd?.others_are_stable,
-    additionalDescription: sd?.additional_description ?? undefined,
-    otherSupplyDescription: sd?.other_supply_description ?? undefined,
-    structuredData: sd,
-    supplyDetails,
-    specialDietPersons: supplyDetails?.special_diet_persons ?? undefined,
-    clothingPersons: supplyDetails?.clothing_persons ?? undefined,
-    medicalSupportNeeds: supplyDetails?.medical_needs ?? undefined,
-    medicalDescription: supplyDetails?.medical_description ?? undefined,
-    waterDuration: supplyDetails?.water_duration ?? undefined,
-    waterRemaining: supplyDetails?.water_remaining ?? undefined,
-    foodDuration: supplyDetails?.food_duration ?? undefined,
-    areBlanketsEnough: supplyDetails?.are_blankets_enough,
-    blanketRequestCount: supplyDetails?.blanket_request_count,
-    address: sd?.address ?? undefined,
-    victimPhone: victimInfo?.user_phone ?? undefined,
-    victimName: victimInfo?.user_name ?? undefined,
-    reporterPhone: reporterInfo?.user_phone ?? undefined,
-    reporterName:
-      reporterInfo?.user_name ?? entity.createdByCoordinatorName ?? undefined,
-    createdByCoordinatorId: entity.createdByCoordinatorId ?? null,
-    createdByCoordinatorName:
-      entity.createdByCoordinatorName ??
-      (entity as { createdByCoordinator?: { fullName?: string | null } })
-        .createdByCoordinator?.fullName ??
-      null,
-    isSentOnBehalf:
-      entity.isSentOnBehalf ?? Boolean(entity.createdByCoordinatorId),
-    reporterIsOnline:
-      reporterInfo?.is_online ?? entity.senderInfo?.is_online ?? undefined,
-    hopCount: nm?.hop_count,
-    locationAccuracy: entity.locationAccuracy,
-  };
-}
-
 /** Haversine distance in km between two lat/lng points */
 function haversine(
   lat1: number,
@@ -226,9 +135,20 @@ function haversine(
 }
 
 /** Group nearby PENDING SOS requests within 10km using Union-Find */
-function buildAutoClusters(sosRequests: SOSRequest[]): SOSRequest[][] {
+function buildAutoClusters(
+  sosRequests: SOSRequest[],
+  backendClusters: SOSClusterEntity[],
+): SOSRequest[][] {
+  const backendClusteredIds = new Set(
+    backendClusters.flatMap((cluster) =>
+      cluster.sosRequestIds.map((id) => String(id)),
+    ),
+  );
   const pending = sosRequests.filter(
-    (s) => s.status === "PENDING" && s.groupId === s.id,
+    (s) =>
+      s.status === "PENDING" &&
+      s.groupId === s.id &&
+      !backendClusteredIds.has(String(s.id)),
   );
   const n = pending.length;
   if (n < 2) return [];
@@ -342,8 +262,6 @@ const CoordinatorDashboardContent = () => {
   const {
     urlState,
     hasInitialView,
-    initialCenter,
-    initialZoom,
     handleMapViewChange,
     handleEntitySelect,
     clearSelection,
@@ -361,7 +279,6 @@ const CoordinatorDashboardContent = () => {
     useState<TeamIncidentEntity | null>(null);
   const [flyToLocation, setFlyToLocation] = useState<Location | null>(null);
   const [flyToZoom, setFlyToZoom] = useState<number | undefined>(undefined);
-  const [isConnected] = useState(true);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
@@ -406,11 +323,12 @@ const CoordinatorDashboardContent = () => {
 
   // ─── Refs ───
   const sidebarBeforeRescuePlanRef = useRef(true);
-  const initialSelectionAppliedRef = useRef(false);
+  const lastAppliedSelectionSignatureRef = useRef<string | null>(null);
 
   // ─── Data Fetching ───
   const { data: sosData } = useSOSRequests({
-    params: { pageSize: 200 },
+    // Keep enough rows in-memory so cluster cards can resolve sosRequestIds.
+    params: { pageSize: 1000 },
   });
   const { data: depotsData } = useDepots({ params: { pageSize: 100 } });
   const { data: assemblyPointsData } = useAssemblyPoints({
@@ -423,7 +341,7 @@ const CoordinatorDashboardContent = () => {
   const { data: clustersData } = useSOSClusters();
 
   const sosRequests = useMemo(
-    () => sosData?.items?.map(mapEntityToSOS) ?? [],
+    () => sosData?.items?.map(mapSOSRequestEntityToSOS) ?? [],
     [sosData],
   );
   const depots = useMemo<DepotEntity[]>(
@@ -454,10 +372,53 @@ const CoordinatorDashboardContent = () => {
     () => clustersData?.clusters ?? [],
     [clustersData],
   );
+  const activeRealtimeDepotId = useMemo(() => {
+    if (!locationPanelOpen || locationPanelData?.type !== "depot") {
+      return null;
+    }
+
+    return locationPanelData.data.id;
+  }, [locationPanelData, locationPanelOpen]);
+  const activeRealtimeAssemblyPointId = useMemo(() => {
+    if (!locationPanelOpen || locationPanelData?.type !== "assemblyPoint") {
+      return null;
+    }
+
+    return locationPanelData.data.id;
+  }, [locationPanelData, locationPanelOpen]);
+  const activeRealtimeClusterIds = useMemo(
+    () =>
+      [
+        rescuePlanOpen ? activeClusterId : null,
+        manualMissionOpen ? manualMissionClusterId : null,
+      ].filter((clusterId): clusterId is number => Number.isFinite(clusterId)),
+    [
+      activeClusterId,
+      manualMissionClusterId,
+      manualMissionOpen,
+      rescuePlanOpen,
+    ],
+  );
+  const operationalConnectionState = useOperationalRealtime({
+    depotId: activeRealtimeDepotId,
+    assemblyPointId: activeRealtimeAssemblyPointId,
+    clusterIds: activeRealtimeClusterIds,
+  });
+  const isConnected = operationalConnectionState === "connected";
+  const isConnecting = operationalConnectionState === "connecting";
+  const isReconnecting = operationalConnectionState === "reconnecting";
+  const isConnectingLike = isConnecting || isReconnecting;
+  const connectionLabel = isConnected
+    ? "Đang kết nối"
+    : isConnecting
+      ? "Đang kết nối realtime"
+      : isReconnecting
+      ? "Đang kết nối lại"
+      : "Mất kết nối";
 
   const autoClusters = useMemo(
-    () => buildAutoClusters(sosRequests),
-    [sosRequests],
+    () => buildAutoClusters(sosRequests, clusters),
+    [sosRequests, clusters],
   );
 
   // ─── Auth ───
@@ -469,10 +430,7 @@ const CoordinatorDashboardContent = () => {
   // ─── Mutations ───
   const { mutate: createCluster, isPending: isCreatingCluster } =
     useCreateSOSCluster();
-  const {
-    mutate: fetchClusterRescueSuggestion,
-    isPending: isFetchingSuggestion,
-  } = useClusterRescueSuggestion();
+  const { isPending: isFetchingSuggestion } = useClusterRescueSuggestion();
   const isProcessingSOS = isCreatingCluster || isFetchingSuggestion;
 
   // ─── AI Stream ───
@@ -551,50 +509,93 @@ const CoordinatorDashboardContent = () => {
 
   // ─── URL → State: Restore selection from URL on initial load ───
   useEffect(() => {
-    if (initialSelectionAppliedRef.current) return;
     if (!urlState.selected) return;
 
     const sel = urlState.selected;
+    const shouldOpenClusterPlan = searchParams.get("openPlan") === "1";
+    const focusSosId = searchParams.get("focusSosId") ?? "";
+    const openAt = searchParams.get("openAt") ?? "";
+    const planTabParam = searchParams.get("planTab");
+    const planTab =
+      planTabParam === "plan" || planTabParam === "missions"
+        ? planTabParam
+        : "missions";
+    const selectionSignature = JSON.stringify({
+      selected: sel,
+      shouldOpenClusterPlan,
+      focusSosId,
+      openAt,
+      planTab,
+    });
 
     if (sel.type === "sos" && sosRequests.length > 0) {
       const sos = sosRequests.find((s) => s.id === sel.id);
       if (sos) {
+        if (lastAppliedSelectionSignatureRef.current === selectionSignature) {
+          return;
+        }
         setSelectedSOS(sos);
         setSOSDetailOpen(true);
+        setRescuePlanOpen(false);
+        setLocationPanelOpen(false);
+        setTeamIncidentDetailOpen(false);
+        setSelectedTeamIncident(null);
         if (!hasInitialView) {
           setFlyToLocation(sos.location);
         }
-        initialSelectionAppliedRef.current = true;
+        lastAppliedSelectionSignatureRef.current = selectionSignature;
       }
     } else if (sel.type === "cluster" && clusters.length > 0) {
       const cluster = clusters.find((c) => c.id === sel.id);
       if (cluster) {
+        if (lastAppliedSelectionSignatureRef.current === selectionSignature) {
+          return;
+        }
         setFlyToZoom(13);
         setFlyToLocation({
           lat: cluster.centerLatitude,
           lng: cluster.centerLongitude,
         });
-        initialSelectionAppliedRef.current = true;
+
+        if (shouldOpenClusterPlan) {
+          setActiveClusterId(cluster.id);
+          const cachedSuggestion = suggestionCacheRef.current.get(cluster.id);
+          setRescueSuggestion(cachedSuggestion ?? null);
+          setRescuePlanDefaultTab(planTab);
+          setRescuePlanOpen(true);
+          setSOSDetailOpen(false);
+          setLocationPanelOpen(false);
+          setTeamIncidentDetailOpen(false);
+          setSelectedTeamIncident(null);
+        }
+
+        lastAppliedSelectionSignatureRef.current = selectionSignature;
       }
     } else if (sel.type === "depot" && depots.length > 0) {
       const depot = depots.find((d) => d.id === sel.id);
       if (depot) {
+        if (lastAppliedSelectionSignatureRef.current === selectionSignature) {
+          return;
+        }
         setLocationPanelData({ type: "depot", data: depot });
         setLocationPanelOpen(true);
         if (!hasInitialView) {
           setFlyToLocation({ lat: depot.latitude, lng: depot.longitude });
         }
-        initialSelectionAppliedRef.current = true;
+        lastAppliedSelectionSignatureRef.current = selectionSignature;
       }
     } else if (sel.type === "assemblyPoint" && assemblyPoints.length > 0) {
       const point = assemblyPoints.find((p) => p.id === sel.id);
       if (point) {
+        if (lastAppliedSelectionSignatureRef.current === selectionSignature) {
+          return;
+        }
         setLocationPanelData({ type: "assemblyPoint", data: point });
         setLocationPanelOpen(true);
         if (!hasInitialView) {
           setFlyToLocation({ lat: point.latitude, lng: point.longitude });
         }
-        initialSelectionAppliedRef.current = true;
+        lastAppliedSelectionSignatureRef.current = selectionSignature;
       }
     }
   }, [
@@ -604,6 +605,7 @@ const CoordinatorDashboardContent = () => {
     depots,
     assemblyPoints,
     hasInitialView,
+    searchParams,
   ]);
 
   // ─── URL → State: Set initial map view from URL ───
@@ -625,6 +627,50 @@ const CoordinatorDashboardContent = () => {
       window.location.href = "/dashboard/coordinator?mode=weather";
     }
   }, [isWeatherMode, router]);
+
+  const syncRescuePlanUrlState = useCallback(
+    (
+      nextOpen: boolean,
+      clusterId: number | null,
+      tab?: "plan" | "missions",
+    ) => {
+      const params = new URLSearchParams(searchParams.toString());
+
+      if (nextOpen && clusterId != null) {
+        params.set("sel", "cluster");
+        params.set("id", String(clusterId));
+        params.set("openPlan", "1");
+        params.set("openAt", String(Date.now()));
+        if (tab) {
+          params.set("planTab", tab);
+        } else {
+          params.delete("planTab");
+        }
+      } else {
+        params.delete("openPlan");
+        params.delete("openAt");
+        params.delete("focusSosId");
+        params.delete("planTab");
+      }
+
+      const nextQuery = params.toString();
+      router.replace(
+        nextQuery
+          ? `/dashboard/coordinator?${nextQuery}`
+          : "/dashboard/coordinator",
+        { scroll: false },
+      );
+    },
+    [router, searchParams],
+  );
+
+  const handleRescuePlanOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setRescuePlanOpen(nextOpen);
+      syncRescuePlanUrlState(nextOpen, activeClusterId, rescuePlanDefaultTab);
+    },
+    [activeClusterId, rescuePlanDefaultTab, syncRescuePlanUrlState],
+  );
 
   const handleSOSSelect = useCallback(
     (sos: SOSRequest) => {
@@ -653,12 +699,13 @@ const CoordinatorDashboardContent = () => {
       setSelectedRescuer(null);
       setSOSDetailOpen(false);
       setRescuePlanOpen(false);
+      syncRescuePlanUrlState(false, activeClusterId);
       setSelectedTeamIncident(incident);
       setTeamIncidentDetailOpen(true);
       setFlyToZoom(16);
       setFlyToLocation({ lat: incident.latitude, lng: incident.longitude });
     },
-    [],
+    [activeClusterId, syncRescuePlanUrlState],
   );
 
   const handleDepotSelect = useCallback(
@@ -720,10 +767,11 @@ const CoordinatorDashboardContent = () => {
       setRescueSuggestion(cached ?? null);
       setRescuePlanDefaultTab(undefined);
       setRescuePlanOpen(true);
+      syncRescuePlanUrlState(true, clusterId);
       setSOSDetailOpen(false);
       setLocationPanelOpen(false);
     },
-    [clusters],
+    [clusters, syncRescuePlanUrlState],
   );
 
   const handleClusterOnly = useCallback(
@@ -808,7 +856,7 @@ const CoordinatorDashboardContent = () => {
         },
       );
     },
-    [sosRequests, autoClusters, createCluster, fetchClusterRescueSuggestion],
+    [sosRequests, autoClusters, createCluster, aiStream],
   );
 
   const handleAnalyzeCluster = useCallback(
@@ -846,7 +894,6 @@ const CoordinatorDashboardContent = () => {
   }, [aiStream.loading, aiStreamClusterId]);
 
   const handleApproveDecision = useCallback(() => {
-    toast.success("Đã gửi nhiệm vụ thành công");
     setRescuePlanOpen(false);
     setSOSDetailOpen(false);
     setSelectedSOS(null);
@@ -855,14 +902,18 @@ const CoordinatorDashboardContent = () => {
     clearSelection();
   }, [clearSelection]);
 
-  const handleOpenManualMission = useCallback((clusterId: number) => {
-    setManualMissionClusterId(clusterId);
-    setExistingMissionId(null);
-    setManualMissionOpen(true);
-    setSOSDetailOpen(false);
-    setRescuePlanOpen(false);
-    setLocationPanelOpen(false);
-  }, []);
+  const handleOpenManualMission = useCallback(
+    (clusterId: number) => {
+      setManualMissionClusterId(clusterId);
+      setExistingMissionId(null);
+      setManualMissionOpen(true);
+      setSOSDetailOpen(false);
+      setRescuePlanOpen(false);
+      syncRescuePlanUrlState(false, activeClusterId);
+      setLocationPanelOpen(false);
+    },
+    [activeClusterId, syncRescuePlanUrlState],
+  );
 
   const handleViewMission = useCallback(
     (clusterId: number | null, missionId: number) => {
@@ -871,9 +922,10 @@ const CoordinatorDashboardContent = () => {
       setManualMissionOpen(true);
       setSOSDetailOpen(false);
       setRescuePlanOpen(false);
+      syncRescuePlanUrlState(false, activeClusterId);
       setLocationPanelOpen(false);
     },
-    [],
+    [activeClusterId, syncRescuePlanUrlState],
   );
 
   const handleManualMissionCreated = useCallback(() => {
@@ -887,8 +939,9 @@ const CoordinatorDashboardContent = () => {
     setAiStreamClusterId(activeClusterId);
     setAiStreamOpen(true);
     setRescuePlanOpen(false);
+    syncRescuePlanUrlState(false, activeClusterId);
     aiStream.startStream(activeClusterId);
-  }, [activeClusterId, aiStream]);
+  }, [activeClusterId, aiStream, syncRescuePlanUrlState]);
 
   // ─── Derived data for panels ───
 
@@ -919,12 +972,21 @@ const CoordinatorDashboardContent = () => {
     [manualMissionClusterId, clusters],
   );
 
+  useEffect(() => {
+    document.body.classList.add("coordinator-dashboard-readable");
+
+    return () => {
+      document.body.classList.remove("coordinator-dashboard-readable");
+    };
+  }, []);
+
   // ── Render ──
 
   return (
     <div
+      data-coordinator-dashboard-root
       className={cn(
-        "h-screen flex flex-col overflow-hidden",
+        "coordinator-dashboard h-screen flex flex-col overflow-hidden",
         isDarkMode && "dark",
       )}
     >
@@ -1003,27 +1065,34 @@ const CoordinatorDashboardContent = () => {
               "relative flex h-9 w-9 items-center justify-center rounded-full border",
               isConnected
                 ? "border-green-200 bg-green-100 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-400"
-                : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
+                : isConnectingLike
+                  ? "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800/50 dark:bg-amber-900/30 dark:text-amber-400"
+                  : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
             )}
-            title={isConnected ? "Đang kết nối" : "Mất kết nối"}
-            aria-label={isConnected ? "Đang kết nối" : "Mất kết nối"}
+            title={connectionLabel}
+            aria-label={connectionLabel}
           >
             {isConnected ? (
               <>
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-green-500 opacity-75 animate-ping" />
                 <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-green-500 dark:border-zinc-900/70" />
               </>
+            ) : isConnectingLike ? (
+              <>
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-amber-500 opacity-75 animate-ping" />
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-amber-500 dark:border-zinc-900/70" />
+              </>
             ) : (
               <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-red-500 dark:border-zinc-900/70" />
             )}
             {isConnected ? (
               <WifiHigh className="h-4 w-4" weight="bold" />
+            ) : isConnectingLike ? (
+              <ArrowsClockwise className="h-4 w-4 animate-spin" weight="bold" />
             ) : (
               <WifiSlash className="h-4 w-4" weight="bold" />
             )}
-            <span className="sr-only">
-              {isConnected ? "Đang kết nối" : "Mất kết nối"}
-            </span>
+            <span className="sr-only">{connectionLabel}</span>
           </div>
 
           {/* Weather Map Toggle */}
@@ -1183,6 +1252,7 @@ const CoordinatorDashboardContent = () => {
                 flyToLocation={flyToLocation}
                 flyToZoom={flyToZoom}
                 userLocation={userLocation}
+                panelOpen={aiStreamOpen}
                 onViewChange={handleMapViewChange}
                 routeOverlay={routeOverlay}
               />
@@ -1228,7 +1298,7 @@ const CoordinatorDashboardContent = () => {
               {/* Rescue Plan Panel */}
               <RescuePlanPanel
                 open={rescuePlanOpen}
-                onOpenChange={setRescuePlanOpen}
+                onOpenChange={handleRescuePlanOpenChange}
                 clusterSOSRequests={rescuePlanSOSRequests}
                 clusterId={activeClusterId}
                 rescueSuggestion={rescueSuggestion}
@@ -1264,6 +1334,11 @@ const CoordinatorDashboardContent = () => {
                   setAiStreamOpen(false);
                   setRescuePlanDefaultTab("plan");
                   setRescuePlanOpen(true);
+                  syncRescuePlanUrlState(
+                    true,
+                    activeClusterId ?? aiStreamClusterId,
+                    "plan",
+                  );
                 }}
               />
 

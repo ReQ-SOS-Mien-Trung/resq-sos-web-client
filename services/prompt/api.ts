@@ -1,17 +1,25 @@
 import api from "@/config/axios";
 import {
-  GetPromptsResponse,
-  GetPromptsParams,
-  PromptDetailEntity,
   CreatePromptRequest,
   CreatePromptResponse,
+  GetPromptVersionsResponse,
+  GetPromptsParams,
+  GetPromptsResponse,
+  PromptDetailEntity,
+  PromptVersionActionResponse,
+  TestNewPromptRescueSuggestionRequest,
+  TestPromptRescueSuggestionRequest,
+  TestPromptRescueSuggestionResponse,
   UpdatePromptRequest,
 } from "./type";
 
-/**
- * Get all prompts with pagination
- * GET /system/prompts
- */
+function withPromptTypeAlias<T extends { prompt_type: string }>(request: T) {
+  return {
+    ...request,
+    promptType: request.prompt_type,
+  };
+}
+
 export async function getPrompts(
   params?: GetPromptsParams,
 ): Promise<GetPromptsResponse> {
@@ -21,44 +29,90 @@ export async function getPrompts(
       pageSize: params?.pageSize ?? 10,
     },
   });
+
   return data;
 }
 
-/**
- * Create a new prompt
- * POST /system/prompts
- */
 export async function createPrompt(
   request: CreatePromptRequest,
 ): Promise<CreatePromptResponse> {
-  const { data } = await api.post("/system/prompts", request);
+  const { data } = await api.post(
+    "/system/prompts",
+    withPromptTypeAlias(request),
+  );
+
   return data;
 }
 
-/**
- * Get a prompt by ID
- * GET /system/prompts/{id}
- */
 export async function getPromptById(id: number): Promise<PromptDetailEntity> {
   const { data } = await api.get(`/system/prompts/${id}`);
   return data;
 }
 
-/**
- * Update a prompt
- * PUT /system/prompts/{id}
- */
+export async function getPromptVersions(
+  id: number,
+): Promise<GetPromptVersionsResponse> {
+  const { data } = await api.get(`/system/prompts/${id}/versions`);
+  return data;
+}
+
 export async function updatePrompt(
   id: number,
   request: UpdatePromptRequest,
 ): Promise<void> {
-  await api.put(`/system/prompts/${id}`, request);
+  await api.put(`/system/prompts/drafts/${id}`, withPromptTypeAlias(request));
 }
 
-/**
- * Delete a prompt
- * DELETE /system/prompts/{id}
- */
 export async function deletePrompt(id: number): Promise<void> {
-  await api.delete(`/system/prompts/${id}`);
+  await api.delete(`/system/prompts/drafts/${id}`);
+}
+
+export async function createPromptDraft(
+  id: number,
+): Promise<PromptVersionActionResponse> {
+  const { data } = await api.post(`/system/prompts/${id}/drafts`);
+  return data;
+}
+
+export async function activatePrompt(
+  id: number,
+): Promise<PromptVersionActionResponse> {
+  const { data } = await api.post(`/system/prompts/${id}/activate`);
+  return data;
+}
+
+export async function rollbackPrompt(
+  id: number,
+): Promise<PromptVersionActionResponse> {
+  const { data } = await api.post(`/system/prompts/${id}/rollback`);
+  return data;
+}
+
+export async function testPromptRescueSuggestion(
+  id: number,
+  request: TestPromptRescueSuggestionRequest,
+): Promise<TestPromptRescueSuggestionResponse> {
+  const { data } = await api.post(
+    `/system/prompts/${id}/test`,
+    withPromptTypeAlias(request),
+    {
+      timeout: 120000,
+    },
+  );
+
+  return data;
+}
+
+export async function testNewPromptRescueSuggestion(
+  request: TestNewPromptRescueSuggestionRequest,
+): Promise<TestPromptRescueSuggestionResponse> {
+  const { data } = await api.post(
+    "/system/prompts/test",
+    withPromptTypeAlias(request),
+    {
+      timeout: 120000,
+    },
+  );
+
+  return data;
 }

@@ -24,7 +24,6 @@ import {
   ArrowCounterClockwise,
   SlidersHorizontal,
   Package,
-  User,
   Calendar,
   Hash,
   Tag,
@@ -45,30 +44,57 @@ interface StockMovementDetailSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const ACTION_TYPE_MAP: Record<string, { label: string; className: string; icon: React.ElementType }> = {
-  Import:      { label: "Nhập kho",    className: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: ArrowDown },
-  Export:      { label: "Xuất kho",    className: "bg-red-100 text-red-700 border-red-200", icon: ArrowUp },
-  Adjust:      { label: "Điều chỉnh",  className: "bg-orange-100 text-orange-700 border-orange-200", icon: SlidersHorizontal },
-  Return:      { label: "Hoàn trả",    className: "bg-blue-100 text-blue-700 border-blue-200", icon: ArrowCounterClockwise },
-  TransferIn:  { label: "Chuyển nhập", className: "bg-teal-100 text-teal-700 border-teal-200", icon: ArrowDown },
-  TransferOut: { label: "Chuyển xuất", className: "bg-purple-100 text-purple-700 border-purple-200", icon: ArrowsLeftRight },
+const ACTION_TYPE_MAP: Record<
+  string,
+  { label: string; className: string; icon: React.ElementType }
+> = {
+  Import: {
+    label: "Nhập kho",
+    className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    icon: ArrowDown,
+  },
+  Export: {
+    label: "Xuất kho",
+    className: "bg-red-100 text-red-700 border-red-200",
+    icon: ArrowUp,
+  },
+  Adjust: {
+    label: "Điều chỉnh",
+    className: "bg-orange-100 text-orange-700 border-orange-200",
+    icon: SlidersHorizontal,
+  },
+  Return: {
+    label: "Hoàn trả",
+    className: "bg-blue-100 text-blue-700 border-blue-200",
+    icon: ArrowCounterClockwise,
+  },
+  TransferIn: {
+    label: "Chuyển nhập",
+    className: "bg-teal-100 text-teal-700 border-teal-200",
+    icon: ArrowDown,
+  },
+  TransferOut: {
+    label: "Chuyển xuất",
+    className: "bg-purple-100 text-purple-700 border-purple-200",
+    icon: ArrowsLeftRight,
+  },
 };
 
 const SOURCE_TYPE_MAP: Record<string, string> = {
-  Donation:   "Quyên góp",
-  Mission:    "Nhiệm vụ",
-  Purchase:   "Mua sắm",
+  Donation: "Quyên góp",
+  Mission: "Nhiệm vụ",
+  Purchase: "Mua sắm",
   Adjustment: "Điều chỉnh",
-  Transfer:   "Chuyển kho",
-  Manual:     "Thủ công",
+  Transfer: "Chuyển kho",
+  Manual: "Thủ công",
 };
 
 const TARGET_GROUP_MAP: Record<string, string> = {
-  Medical:    "Y tế",
-  Food:       "Thực phẩm",
-  Clothing:   "Quần áo",
-  Hygiene:    "Vệ sinh",
-  Emergency:  "Khẩn cấp",
+  Medical: "Y tế",
+  Food: "Thực phẩm",
+  Clothing: "Quần áo",
+  Hygiene: "Vệ sinh",
+  Emergency: "Khẩn cấp",
 };
 
 function formatDate(dateString: string | null | undefined) {
@@ -89,6 +115,22 @@ function formatDateShort(dateString: string | null | undefined) {
   }
 }
 
+function getStockMovementItemRowKey(
+  transactionId: string,
+  item: StockMovementEntity["items"][number],
+  index: number,
+) {
+  return [
+    transactionId,
+    item.itemId,
+    item.supplyInventoryLotId ?? "no-lot",
+    item.receivedDate ?? "no-received",
+    item.expiredDate ?? "no-expired",
+    item.quantityChange,
+    index,
+  ].join("-");
+}
+
 export function StockMovementDetailSheet({
   movement,
   open,
@@ -106,10 +148,15 @@ export function StockMovementDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto" side="right">
+      <SheetContent
+        className="w-full sm:max-w-2xl overflow-y-auto"
+        side="right"
+      >
         <SheetHeader className="pb-4">
           <div className="flex items-start gap-3">
-            <div className={`p-2 rounded-lg border ${actionConfig?.className ?? "bg-muted"}`}>
+            <div
+              className={`p-2 rounded-lg border ${actionConfig?.className ?? "bg-muted"}`}
+            >
               <ActionIcon size={20} />
             </div>
             <div className="flex-1 min-w-0">
@@ -143,14 +190,18 @@ export function StockMovementDetailSheet({
                 <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
                   <Hash size={18} /> Mã giao dịch
                 </span>
-                <span className="font-medium text-sm break-all">{movement.transactionId}</span>
+                <span className="font-medium text-sm break-all">
+                  {movement.transactionId}
+                </span>
               </div>
 
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
                   <Calendar size={16} /> Thời gian nhập kho
                 </span>
-                <span className="font-medium tracking-tighter">{formatDate(movement.createdAt)}</span>
+                <span className="font-medium tracking-tighter">
+                  {formatDate(movement.createdAt)}
+                </span>
               </div>
 
               <div className="flex flex-col gap-0.5">
@@ -158,7 +209,8 @@ export function StockMovementDetailSheet({
                   <Tag size={16} /> Loại nguồn
                 </span>
                 <span className="font-medium tracking-tighter">
-                  {SOURCE_TYPE_MAP[movement.sourceType] ?? (movement.sourceType || "—")}
+                  {SOURCE_TYPE_MAP[movement.sourceType] ??
+                    (movement.sourceType || "—")}
                 </span>
               </div>
 
@@ -166,7 +218,9 @@ export function StockMovementDetailSheet({
                 <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
                   <Warehouse size={16} /> Nguồn
                 </span>
-                <span className="font-medium tracking-tighter">{movement.sourceName || "—"}</span>
+                <span className="font-medium tracking-tighter">
+                  {movement.sourceName || "—"}
+                </span>
               </div>
 
               {/* {movement.sourceId != null && (
@@ -200,7 +254,7 @@ export function StockMovementDetailSheet({
           <section className="space-y-3">
             <h3 className="text-base font-semibold tracking-tighter flex items-center gap-2">
               <Package size={24} className="text-muted-foreground" />
-              Danh sách vật tư
+              Danh sách vật phẩm
               <span className="ml-1 text-xs font-normal bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
                 {movement.items.length} mặt hàng
               </span>
@@ -210,16 +264,29 @@ export function StockMovementDetailSheet({
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs tracking-tighter">Vật tư</TableHead>
-                    <TableHead className="text-xs tracking-tighter">Loại</TableHead>
-                    <TableHead className="text-xs tracking-tighter text-right">Số lượng</TableHead>
-                    <TableHead className="text-xs tracking-tighter">Ngày nhập / HSD</TableHead>
-                    <TableHead className="text-xs tracking-tighter">Lô</TableHead>
+                    <TableHead className="text-xs tracking-tighter">
+                      Vật phẩm
+                    </TableHead>
+                    <TableHead className="text-xs tracking-tighter">
+                      Loại
+                    </TableHead>
+                    <TableHead className="text-xs tracking-tighter text-right">
+                      Số lượng
+                    </TableHead>
+                    <TableHead className="text-xs tracking-tighter">
+                      Ngày nhập / HSD
+                    </TableHead>
+                    <TableHead className="text-xs tracking-tighter">
+                      Lô
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {movement.items.map((item) => {
-                    const expired = item.expiredDate ? new Date(item.expiredDate) < new Date(movement.createdAt) : false;
+                  {movement.items.map((item, index) => {
+                    const expired = item.expiredDate
+                      ? new Date(item.expiredDate) <
+                        new Date(movement.createdAt)
+                      : false;
                     const thirtyDaysLater = new Date(movement.createdAt);
                     thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
                     const expiringSoon =
@@ -228,13 +295,24 @@ export function StockMovementDetailSheet({
                       new Date(item.expiredDate) < thirtyDaysLater;
 
                     return (
-                      <TableRow key={`${item.itemId}-${item.supplyInventoryLotId ?? "no-lot"}`}>
+                      <TableRow
+                        key={getStockMovementItemRowKey(
+                          movement.transactionId,
+                          item,
+                          index,
+                        )}
+                      >
                         <TableCell className="py-2.5">
-                          <p className="font-medium text-sm tracking-tighter">{item.itemName}</p>
-                          <p className="text-xs text-muted-foreground tracking-tighter">{item.categoryName}</p>
+                          <p className="font-medium text-sm tracking-tighter">
+                            {item.itemName}
+                          </p>
+                          <p className="text-xs text-muted-foreground tracking-tighter">
+                            {item.categoryName}
+                          </p>
                           {item.targetGroup && (
                             <p className="text-xs text-muted-foreground tracking-tighter">
-                              {TARGET_GROUP_MAP[item.targetGroup] ?? item.targetGroup}
+                              {TARGET_GROUP_MAP[item.targetGroup] ??
+                                item.targetGroup}
                             </p>
                           )}
                         </TableCell>
@@ -251,13 +329,16 @@ export function StockMovementDetailSheet({
                               item.quantityChange > 0
                                 ? "text-emerald-600"
                                 : item.quantityChange < 0
-                                ? "text-red-600"
-                                : ""
+                                  ? "text-red-600"
+                                  : ""
                             }`}
                           >
-                            {item.formattedQuantityChange || `${item.quantityChange > 0 ? "+" : ""}${item.quantityChange.toLocaleString("vi-VN")}`}
+                            {item.formattedQuantityChange ||
+                              `${item.quantityChange > 0 ? "+" : ""}${item.quantityChange.toLocaleString("vi-VN")}`}
                           </span>
-                          <p className="text-xs text-muted-foreground">{item.unit}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.unit}
+                          </p>
                         </TableCell>
 
                         <TableCell className="py-2.5">
@@ -265,7 +346,10 @@ export function StockMovementDetailSheet({
                             <div className="space-y-0.5">
                               {item.receivedDate && (
                                 <p className="text-xs tracking-tighter text-muted-foreground">
-                                  Nhận: <span className="text-foreground">{formatDateShort(item.receivedDate)}</span>
+                                  Nhận:{" "}
+                                  <span className="text-foreground">
+                                    {formatDateShort(item.receivedDate)}
+                                  </span>
                                 </p>
                               )}
                               {item.expiredDate && (
@@ -276,22 +360,42 @@ export function StockMovementDetailSheet({
                                       expired
                                         ? "text-red-600"
                                         : expiringSoon
-                                        ? "text-amber-600"
-                                        : "text-foreground"
+                                          ? "text-amber-600"
+                                          : "text-foreground"
                                     }`}
                                   >
                                     {formatDateShort(item.expiredDate)}
                                   </span>
-                                  {expired && <XCircle size={12} className="text-red-500" weight="fill" />}
-                                  {expiringSoon && !expired && <Warning size={12} className="text-amber-500" weight="fill" />}
-                                  {!expired && !expiringSoon && item.expiredDate && (
-                                    <CheckCircle size={12} className="text-emerald-500" weight="fill" />
+                                  {expired && (
+                                    <XCircle
+                                      size={12}
+                                      className="text-red-500"
+                                      weight="fill"
+                                    />
                                   )}
+                                  {expiringSoon && !expired && (
+                                    <Warning
+                                      size={12}
+                                      className="text-amber-500"
+                                      weight="fill"
+                                    />
+                                  )}
+                                  {!expired &&
+                                    !expiringSoon &&
+                                    item.expiredDate && (
+                                      <CheckCircle
+                                        size={12}
+                                        className="text-emerald-500"
+                                        weight="fill"
+                                      />
+                                    )}
                                 </p>
                               )}
                             </div>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
                           )}
                         </TableCell>
 
@@ -301,7 +405,9 @@ export function StockMovementDetailSheet({
                               #{item.supplyInventoryLotId}
                             </span>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
                           )}
                         </TableCell>
                       </TableRow>

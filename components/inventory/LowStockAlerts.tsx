@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { useMyDepotLowStock } from "@/services/inventory/hooks";
 import {
   compareLowStockItems,
@@ -54,7 +55,10 @@ function getContainerTone(level: string): string {
 
 const LowStockAlerts = () => {
   const router = useRouter();
-  const { data: lowStock, isLoading } = useMyDepotLowStock();
+  const { selectedDepotId } = useManagerDepot();
+  const { data: lowStock, isLoading } = useMyDepotLowStock(
+    selectedDepotId ? { depotId: selectedDepotId } : undefined,
+  );
 
   const items = (lowStock?.items ?? [])
     .filter((item) => getLowStockWarningLevel(item) !== "OK")
@@ -79,8 +83,8 @@ const LowStockAlerts = () => {
 
   return (
     <Card className="flex h-full flex-col">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-3">
+      <CardHeader className="pb-0.5">
+        <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Warning className="h-5 w-5 text-red-500" weight="fill" />
             Cảnh Báo Tồn Kho
@@ -98,7 +102,7 @@ const LowStockAlerts = () => {
               </Badge>
             ))}
             {items.length > 0 ? (
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="info" className="text-xs tracking-tighter">
                 {items.length} mục
               </Badge>
             ) : null}
@@ -123,7 +127,7 @@ const LowStockAlerts = () => {
             ))}
           </div>
         ) : items.length > 0 ? (
-          <ScrollArea className="h-85 px-6">
+          <ScrollArea className="min-h-0 flex-1 px-6">
             <div className="space-y-2 pb-4">
               {items.slice(0, MAX_VISIBLE).map((item) => {
                 const level = getLowStockWarningLevel(item);
@@ -155,7 +159,7 @@ const LowStockAlerts = () => {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <h4 className="truncate text-sm font-medium">
+                          <h4 className="truncate text-base font-semibold tracking-tighter">
                             {item.itemModelName}
                           </h4>
                           <Badge
@@ -169,25 +173,27 @@ const LowStockAlerts = () => {
                           </Badge>
                         </div>
 
-                        <div className="mt-1 flex items-center justify-between gap-2">
-                          <span className="truncate text-xs text-muted-foreground">
-                            {item.categoryName ?? "Chưa rõ danh mục"}
+                        <div className="mt-0.5 flex items-center justify-between gap-2">
+                          <span className="truncate text-xs font-medium text-muted-foreground tracking-tighter">
+                            Danh mục: {item.categoryName ?? "Chưa rõ danh mục"}
                           </span>
                           <span className="text-xs font-medium">
                             Khả dụng {item.availableQuantity}
+                            {item.unit ? ` ${item.unit}` : ""}
                             {item.minimumThreshold != null
-                              ? ` / Ngưỡng ${item.minimumThreshold}`
+                              ? ` / Ngưỡng ${item.minimumThreshold}${item.unit ? ` ${item.unit}` : ""}`
                               : ""}
                           </span>
                         </div>
 
-                        <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <div className="mt-1 flex items-center justify-between font-medium gap-2 text-xs tracking-tighter text-muted-foreground">
                           <span className="truncate">
+                            Cấu hình:{" "}
                             {getResolvedThresholdScopeLabel(
                               item.resolvedThresholdScope,
                             )}
                             {item.isUsingGlobalDefault
-                              ? " · mặc định hệ thống"
+                              ? " · Mặc định hệ thống"
                               : ""}
                           </span>
                           <span>
@@ -198,9 +204,13 @@ const LowStockAlerts = () => {
                         </div>
 
                         {shortage != null ? (
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            Thiếu <strong>{shortage}</strong> để đạt ngưỡng tối
-                            thiểu
+                          <div className="mt-1 text-xs text-muted-foreground tracking-tighter">
+                            Thiếu{" "}
+                            <strong className="text-black">
+                              {shortage}
+                              {item.unit ? ` ${item.unit}` : ""}
+                            </strong>{" "}
+                            để đạt ngưỡng tối thiểu
                           </div>
                         ) : null}
                       </div>

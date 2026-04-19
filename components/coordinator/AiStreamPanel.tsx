@@ -57,6 +57,11 @@ interface AiStreamPanelProps {
   onStop: () => void;
   onRetry: () => void;
   onViewPlan: () => void;
+  primaryActionLabel?: string;
+  onPrimaryAction?: () => void;
+  hidePlanAction?: boolean;
+  inline?: boolean;
+  size?: "default" | "expanded";
 }
 
 /* ═══ Activity icon map ═══ */
@@ -73,6 +78,9 @@ const activityIconMap: Record<
   ASSESS: Eye,
   COORDINATE: TreeStructure,
   RETURN_SUPPLIES: ArrowsClockwise,
+  RETURN_ASSEMBLY_POINT: MapPin,
+  RETURN_TO_ASSEMBLY_POINT: MapPin,
+  RETURN_ASSEMBLY: MapPin,
   MIXED: Sparkle,
 };
 
@@ -103,6 +111,39 @@ function normalizeAiErrorText(error: string): string {
     return "AI phân tích thất bại. Backend chưa trả chi tiết lỗi.";
   }
 
+  const isServiceUnavailable =
+    /\b503\b/.test(lower) ||
+    lower.includes("service unavailable") ||
+    lower.includes("temporarily unavailable") ||
+    lower.includes("upstream connect error") ||
+    lower.includes("backend unavailable");
+
+  const isQuotaOrTokenIssue =
+    lower.includes("insufficient_quota") ||
+    lower.includes("quota") ||
+    lower.includes("rate limit") ||
+    lower.includes("too many requests") ||
+    lower.includes("token") ||
+    lower.includes("api key") ||
+    lower.includes("billing") ||
+    lower.includes("credit");
+
+  const isAuthConfigIssue =
+    /\b401\b/.test(lower) ||
+    /\b403\b/.test(lower) ||
+    lower.includes("unauthorized") ||
+    lower.includes("forbidden") ||
+    lower.includes("invalid api key") ||
+    lower.includes("permission denied");
+
+  if (isQuotaOrTokenIssue || isAuthConfigIssue) {
+    return "AI hiện không khả dụng do token/quota đã hết hoặc cấu hình API key chưa đúng. Vui lòng báo Admin kiểm tra cấu hình AI (API key, quota, billing).";
+  }
+
+  if (isServiceUnavailable) {
+    return "Dịch vụ AI đang tạm quá tải hoặc gián đoạn (503). Vui lòng thử lại sau ít phút; nếu vẫn lỗi, hãy báo Admin kiểm tra cấu hình AI và hạn mức token/quota.";
+  }
+
   return message;
 }
 
@@ -131,9 +172,15 @@ export default function AiStreamPanel({
   onStop,
   onRetry,
   onViewPlan,
+  primaryActionLabel,
+  onPrimaryAction,
+  hidePlanAction = false,
+  inline = false,
+  size = "default",
 }: AiStreamPanelProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const isExpanded = size === "expanded";
 
   useEffect(() => {
     if (!open || !panelRef.current || !overlayRef.current) return;
@@ -165,7 +212,67 @@ export default function AiStreamPanel({
   const showActionMap = result !== null;
   const showError = error !== null && !result;
 
-  return (
+  const panelShell = (
+    <div
+      ref={panelRef}
+      className={cn(
+        "relative w-full overflow-hidden flex flex-col bg-background border shadow-2xl",
+        isExpanded ? "text-[15px]" : "text-[14px]",
+        inline
+          ? isExpanded
+            ? "rounded-2xl min-h-180"
+            : "rounded-2xl"
+          : "max-w-5xl max-h-[92vh] mx-4 rounded-2xl",
+      )}
+      style={{ opacity: 0 }}
+    >
+      <TopBar
+        clusterId={clusterId}
+        status={status}
+        loading={loading}
+        result={result}
+        error={error}
+        phase={phase}
+        onStop={onStop}
+        onClose={onClose}
+        inline={inline}
+        expanded={isExpanded}
+      />
+      <div className="relative flex-1 min-h-0 overflow-auto bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_34%),linear-gradient(180deg,_rgba(255,255,255,0.82)_0%,_rgba(255,255,255,0.96)_24%,_rgba(255,255,255,1)_100%)]">
+        {showProgress && (
+          <LoadingStreamView
+            status={status}
+            statusLog={statusLog}
+            thinkingText={thinkingText}
+            phase={phase}
+            expanded={isExpanded}
+          />
+        )}
+        {showActionMap && (
+          <ActionMapView result={result} expanded={isExpanded} />
+        )}
+        {showError && (
+          <ErrorView error={error} onRetry={onRetry} expanded={isExpanded} />
+        )}
+      </div>
+      {result && (
+        <FooterBar
+          onRetry={onRetry}
+          onViewPlan={onViewPlan}
+          primaryActionLabel={primaryActionLabel}
+          onPrimaryAction={onPrimaryAction}
+          hidePlanAction={hidePlanAction}
+          expanded={isExpanded}
+        />
+      )}
+    </div>
+  );
+
+  return inline ? (
+    <div ref={overlayRef} className="w-full" style={{ opacity: 0 }}>
+      {panelShell}
+    </div>
+  ) : (
     <div
       ref={overlayRef}
       className="absolute inset-0 z-50 flex items-center justify-center"
@@ -175,34 +282,7 @@ export default function AiStreamPanel({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div
-        ref={panelRef}
-        className="relative w-full max-w-5xl max-h-[92vh] mx-4 rounded-2xl overflow-hidden flex flex-col bg-background border shadow-2xl"
-        style={{ opacity: 0 }}
-      >
-        <TopBar
-          clusterId={clusterId}
-          loading={loading}
-          result={result}
-          error={error}
-          phase={phase}
-          onStop={onStop}
-          onClose={onClose}
-        />
-        <div className="relative flex-1 min-h-0 overflow-auto">
-          {showProgress && (
-            <LoadingStreamView
-              status={status}
-              statusLog={statusLog}
-              thinkingText={thinkingText}
-              phase={phase}
-            />
-          )}
-          {showActionMap && <ActionMapView result={result} />}
-          {showError && <ErrorView error={error} onRetry={onRetry} />}
-        </div>
-        {result && <FooterBar onRetry={onRetry} onViewPlan={onViewPlan} />}
-      </div>
+      {panelShell}
     </div>
   );
 }
@@ -211,23 +291,29 @@ export default function AiStreamPanel({
 
 function TopBar({
   clusterId,
+  status,
   loading,
   result,
   error,
   phase,
   onStop,
   onClose,
+  inline = false,
+  expanded = false,
 }: {
   clusterId: number | null;
+  status: string;
   loading: boolean;
   result: ClusterRescueSuggestionResponse | null;
   error: string | null;
   phase: string;
   onStop: () => void;
   onClose: () => void;
+  inline?: boolean;
+  expanded?: boolean;
 }) {
   const statusLabel = loading
-    ? phaseLabel(phase)
+    ? status.trim() || phaseLabel(phase)
     : result
       ? "HOÀN TẤT"
       : error
@@ -235,11 +321,24 @@ function TopBar({
         : "SẴN SÀNG";
 
   return (
-    <div className="relative flex items-center justify-between px-5 py-3 border-b bg-background shrink-0">
-      <div className="flex items-center gap-3">
+    <div
+      className={cn(
+        "relative flex items-center justify-between border-b bg-background shrink-0",
+        expanded ? "px-6 py-4" : "px-5 py-3",
+      )}
+    >
+      <div className={cn("flex items-center", expanded ? "gap-4" : "gap-3")}>
         <div className="relative">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-orange-500 flex items-center justify-center shadow-md">
-            <Brain className="h-4.5 w-4.5 text-white" weight="fill" />
+          <div
+            className={cn(
+              "bg-gradient-to-br from-primary to-orange-500 flex items-center justify-center shadow-md",
+              expanded ? "w-11 h-11 rounded-xl" : "w-9 h-9 rounded-lg",
+            )}
+          >
+            <Brain
+              className={cn("text-white", expanded ? "h-5 w-5" : "h-4.5 w-4.5")}
+              weight="fill"
+            />
           </div>
           {loading && (
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-primary rounded-full animate-pulse" />
@@ -251,16 +350,30 @@ function TopBar({
           )}
         </div>
         <div>
-          <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-            AI Mission Suggestion
+          <h3
+            className={cn(
+              "font-bold text-foreground flex items-center gap-2",
+              expanded ? "text-base" : "text-sm",
+            )}
+          >
+            Gợi ý nhiệm vụ AI
             {clusterId && (
-              <Badge variant="outline" className="text-xs font-mono px-1.5">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "font-mono",
+                  expanded ? "text-base px-2" : "text-sm px-1.5",
+                )}
+              >
                 Cụm #{clusterId}
               </Badge>
             )}
           </h3>
           <p
-            className="max-w-xl truncate text-xs text-muted-foreground"
+            className={cn(
+              "max-w-xl truncate text-muted-foreground",
+              expanded ? "text-base" : "text-sm",
+            )}
             title={error ? normalizeAiErrorText(error) : undefined}
           >
             {statusLabel}
@@ -272,21 +385,28 @@ function TopBar({
           <Button
             variant="destructive"
             size="sm"
-            className="h-7 text-xs"
+            className={cn(expanded ? "h-9 px-3 text-sm" : "h-7 text-sm")}
             onClick={onStop}
           >
-            <Stop className="h-3 w-3 mr-1" weight="fill" />
+            <Stop
+              className={cn(expanded ? "h-4 w-4 mr-1.5" : "h-3 w-3 mr-1")}
+              weight="fill"
+            />
             Dừng
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 rounded-md"
-          onClick={onClose}
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        {!inline && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              expanded ? "h-8 w-8 rounded-md" : "h-7 w-7 rounded-md",
+            )}
+            onClick={onClose}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -309,16 +429,81 @@ function phaseLabel(phase: string): string {
   }
 }
 
+function phaseDescription(phase: string): string {
+  switch (phase) {
+    case "connecting":
+      return "Thiết lập kết nối thời gian thực với tác nhân AI.";
+    case "loading-data":
+      return "AI đang gom dữ liệu hiện trường, đội cứu hộ và kho gần nhất.";
+    case "calling-ai":
+      return "Mô hình đang cân nhắc phương án điều phối và thứ tự hành động.";
+    case "processing":
+      return "Chuẩn hóa kết quả và dựng luồng nhiệm vụ để hiển thị.";
+    case "done":
+      return "Gợi ý nhiệm vụ đã sẵn sàng để xem và duyệt.";
+    default:
+      return "Khởi tạo tiến trình phân tích nhiệm vụ.";
+  }
+}
+
+function phaseProgressValue(phase: string): number {
+  switch (phase) {
+    case "connecting":
+      return 16;
+    case "loading-data":
+      return 42;
+    case "calling-ai":
+      return 72;
+    case "processing":
+      return 90;
+    case "done":
+      return 100;
+    default:
+      return 8;
+  }
+}
+
+function phaseToneClasses(phase: string) {
+  switch (phase) {
+    case "done":
+      return {
+        pill: "border-emerald-500/25 bg-emerald-500/10 text-emerald-600",
+        dot: "bg-emerald-500 shadow-emerald-500/50",
+        glow: "from-emerald-500/22 via-emerald-500/8 to-transparent",
+      };
+    case "processing":
+      return {
+        pill: "border-sky-500/25 bg-sky-500/10 text-sky-600",
+        dot: "bg-sky-500 shadow-sky-500/50",
+        glow: "from-sky-500/20 via-sky-500/8 to-transparent",
+      };
+    case "calling-ai":
+      return {
+        pill: "border-primary/30 bg-primary/12 text-primary",
+        dot: "bg-primary shadow-primary/50",
+        glow: "from-primary/24 via-primary/10 to-transparent",
+      };
+    default:
+      return {
+        pill: "border-primary/25 bg-primary/10 text-primary",
+        dot: "bg-primary shadow-primary/50",
+        glow: "from-primary/20 via-primary/8 to-transparent",
+      };
+  }
+}
+
 function LoadingStreamView({
   status,
   statusLog,
   thinkingText,
   phase,
+  expanded = false,
 }: {
   status: string;
   statusLog: StreamLogEntry[];
   thinkingText: string;
   phase: string;
+  expanded?: boolean;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -342,14 +527,27 @@ function LoadingStreamView({
   }, []);
 
   return (
-    <div ref={wrapperRef} className="h-full px-4 py-8 md:px-6 md:py-10">
-      <div className="mx-auto flex w-full flex-col items-center gap-5">
+    <div
+      ref={wrapperRef}
+      className={cn(
+        "h-full",
+        expanded ? "px-5 py-8 md:px-7 md:py-10" : "px-4 py-6 md:px-6 md:py-8",
+      )}
+      style={{ contentVisibility: "auto" }}
+    >
+      <div
+        className={cn(
+          "mx-auto flex w-full flex-col items-center",
+          expanded ? "gap-6" : "gap-5",
+        )}
+      >
         <div className="loading-block w-full">
           <SonarRadar
             status={status}
             statusLog={statusLog}
             thinkingText={thinkingText}
             phase={phase}
+            expanded={expanded}
           />
         </div>
       </div>
@@ -364,19 +562,24 @@ function SonarRadar({
   statusLog,
   thinkingText,
   phase,
+  expanded = false,
 }: {
   status: string;
   statusLog: StreamLogEntry[];
   thinkingText: string;
   phase: string;
+  expanded?: boolean;
 }) {
   const ringRefs = useRef<(SVGCircleElement | null)[]>([]);
   const tickerRef = useRef<HTMLDivElement>(null);
   const thinkingRef = useRef<HTMLDivElement>(null);
-  const previousStatusCountRef = useRef(0);
   const statusEntries = statusLog.filter(
     (entry) => entry.type === "status" || entry.type === "result",
   );
+  const visibleStatusEntries = statusEntries.slice(-7);
+  const latestEntry = visibleStatusEntries[visibleStatusEntries.length - 1];
+  const phaseTone = phaseToneClasses(phase);
+  const progressValue = phaseProgressValue(phase);
 
   useEffect(() => {
     const rings = ringRefs.current.filter(Boolean) as SVGCircleElement[];
@@ -406,66 +609,53 @@ function SonarRadar({
     );
 
     if (items.length === 0) {
-      previousStatusCountRef.current = 0;
       return;
     }
 
-    const previousCount = previousStatusCountRef.current;
+    const earlierItems = items.slice(0, -1);
+    const newestItem = items.at(-1);
 
-    if (previousCount === 0 || items.length <= previousCount) {
-      gsap.killTweensOf(items);
+    if (earlierItems.length > 0) {
+      gsap.killTweensOf(earlierItems);
       gsap.fromTo(
-        items,
-        { y: 10, opacity: 0 },
+        earlierItems,
+        { y: 0, opacity: 1 },
         {
-          y: 0,
-          opacity: 1,
-          duration: 0.28,
-          stagger: 0.04,
-          ease: "power2.out",
+          y: -10,
+          opacity: 0.74,
+          duration: 0.24,
+          stagger: 0.028,
+          ease: "power1.out",
+          yoyo: true,
+          repeat: 1,
           overwrite: "auto",
         },
       );
-    } else {
-      const existingItems = items.slice(0, previousCount);
-      const newItems = items.slice(previousCount);
+    }
 
-      if (existingItems.length > 0) {
-        gsap.killTweensOf(existingItems);
-        gsap.fromTo(
-          existingItems,
-          { y: 0 },
-          {
-            y: -8,
-            duration: 0.18,
-            stagger: 0.014,
-            ease: "power1.out",
-            yoyo: true,
-            repeat: 1,
-            overwrite: "auto",
-          },
-        );
-      }
-
-      gsap.killTweensOf(newItems);
+    if (newestItem) {
+      gsap.killTweensOf(newestItem);
       gsap.fromTo(
-        newItems,
-        { y: 16, x: 10, opacity: 0 },
+        newestItem,
+        { y: 22, opacity: 0, scale: 0.96 },
         {
           y: 0,
-          x: 0,
           opacity: 1,
-          duration: 0.34,
-          stagger: 0.05,
+          scale: 1,
+          duration: 0.38,
           ease: "power2.out",
           overwrite: "auto",
         },
       );
     }
 
-    previousStatusCountRef.current = items.length;
-    tickerRef.current.scrollTop = tickerRef.current.scrollHeight;
-  }, [statusEntries.length]);
+    gsap.to(tickerRef.current, {
+      scrollTop: tickerRef.current.scrollHeight,
+      duration: 0.34,
+      ease: "power2.out",
+      overwrite: "auto",
+    });
+  }, [latestEntry?.id]);
 
   useEffect(() => {
     if (thinkingRef.current) {
@@ -474,159 +664,381 @@ function SonarRadar({
   }, [thinkingText]);
 
   return (
-    <div className="w-full px-2 py-5 md:px-4">
-      <div className="mx-auto grid w-full max-w-5xl gap-5 md:grid-cols-[280px_minmax(0,1fr)] md:items-start">
-        <div className="rounded-2xl border bg-card/40 p-3 md:p-4">
-          <div className="flex flex-col items-center">
-            <div className="relative h-52 w-52 md:h-56 md:w-56">
-              <svg viewBox="0 0 300 300" className="w-full h-full">
-                {[60, 100, 140].map((r) => (
-                  <circle
-                    key={r}
-                    cx="150"
-                    cy="150"
-                    r={r}
-                    fill="none"
-                    className="stroke-primary/10"
-                    strokeWidth="0.5"
+    <div
+      className={cn(
+        "w-full",
+        expanded ? "px-3 py-5 md:px-5" : "px-2 py-4 md:px-4",
+      )}
+    >
+      <div
+        className={cn(
+          "mx-auto flex w-full flex-col",
+          expanded ? "max-w-6xl gap-5" : "max-w-5xl gap-4",
+        )}
+      >
+        <div
+          className={cn(
+            "rounded-2xl border border-primary/10 bg-white/92 shadow-[0_20px_60px_-42px_rgba(249,115,22,0.45)] backdrop-blur",
+            expanded ? "px-5 py-4" : "px-4 py-3",
+          )}
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "rounded-full font-semibold uppercase tracking-[0.18em]",
+                    expanded ? "px-3 py-1.5 text-sm" : "px-2.5 py-1 text-sm",
+                    phaseTone.pill,
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "mr-2 h-2 w-2 rounded-full shadow-[0_0_14px]",
+                      phaseTone.dot,
+                    )}
                   />
-                ))}
-                <line
-                  x1="150"
-                  y1="30"
-                  x2="150"
-                  y2="270"
-                  className="stroke-primary/10"
-                  strokeWidth="0.5"
-                />
-                <line
-                  x1="30"
-                  y1="150"
-                  x2="270"
-                  y2="150"
-                  className="stroke-primary/10"
-                  strokeWidth="0.5"
-                />
-                {[0, 1, 2, 3].map((i) => (
-                  <circle
-                    key={`ring-${i}`}
-                    ref={(el) => {
-                      ringRefs.current[i] = el;
-                    }}
-                    cx="150"
-                    cy="150"
-                    r="20"
-                    fill="none"
-                    stroke="url(#sonarGrad)"
-                    strokeWidth={2.5 - i * 0.4}
-                    opacity="0"
-                  />
-                ))}
-                <circle
-                  cx="150"
-                  cy="150"
-                  r="18"
-                  className="fill-primary/15 stroke-primary/60"
-                  strokeWidth="2"
-                />
-                <circle cx="150" cy="150" r="8" className="fill-primary/50">
-                  <animate
-                    attributeName="r"
-                    values="6;10;6"
-                    dur="1.5s"
-                    repeatCount="indefinite"
-                  />
-                  <animate
-                    attributeName="opacity"
-                    values="0.8;0.4;0.8"
-                    dur="1.5s"
-                    repeatCount="indefinite"
-                  />
-                </circle>
-                <defs>
-                  <radialGradient id="sonarGrad">
-                    <stop offset="0%" stopColor="rgba(249,115,22,0.8)" />
-                    <stop offset="100%" stopColor="rgba(249,115,22,0)" />
-                  </radialGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <Brain
-                  className="h-6 w-6 text-primary animate-pulse"
-                  weight="fill"
-                />
+                  {phaseLabel(phase)}
+                </Badge>
+                <span
+                  className={cn(
+                    "font-medium text-foreground/90",
+                    expanded ? "text-base" : "text-sm",
+                  )}
+                >
+                  {latestEntry?.message || status || phaseDescription(phase)}
+                </span>
               </div>
             </div>
 
-            <Badge className="mt-1 border-primary/20 bg-primary/10 text-primary hover:bg-primary/10">
-              {phaseLabel(phase)}
-            </Badge>
-            <p className="mt-2 text-center text-xs text-muted-foreground/80">
-              AI đang phân tích
-            </p>
+            <div
+              className={cn(
+                "flex w-full items-center gap-3",
+                expanded ? "md:max-w-sm" : "md:max-w-xs",
+              )}
+            >
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-primary/8">
+                <div
+                  className={cn(
+                    "h-full rounded-full bg-gradient-to-r transition-[width] duration-700 ease-out",
+                    phase === "done"
+                      ? "from-emerald-500 to-emerald-400"
+                      : phase === "calling-ai"
+                        ? "from-primary via-orange-500 to-amber-400"
+                        : "from-primary to-orange-400",
+                  )}
+                  style={{ width: `${progressValue}%` }}
+                />
+              </div>
+              <span
+                className={cn(
+                  "font-semibold uppercase tracking-[0.18em] text-muted-foreground",
+                  expanded ? "text-base" : "text-sm",
+                )}
+              >
+                {progressValue}%
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-card/40 p-3 md:p-4">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-primary/70 animate-pulse" />
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary/80">
-              SUY NGHĨ AI
-            </p>
-          </div>
-
+        <div
+          className={cn(
+            "mx-auto grid w-full gap-5 md:items-start",
+            expanded
+              ? "max-w-6xl md:grid-cols-[360px_minmax(0,1fr)]"
+              : "max-w-5xl md:grid-cols-[300px_minmax(0,1fr)]",
+          )}
+        >
           <div
-            ref={tickerRef}
-            className="mt-3 max-h-65 overflow-y-auto space-y-1.5 pr-1"
+            className={cn(
+              "overflow-hidden rounded-[28px] border border-primary/10 bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.12),_transparent_55%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(255,248,244,0.96))] shadow-[0_20px_60px_-42px_rgba(249,115,22,0.55)]",
+              expanded ? "p-5 md:p-6" : "p-4 md:p-5",
+            )}
           >
-            {statusEntries.length > 0 ? (
-              statusEntries.map((entry, index) => {
-                const isLatest = index === statusEntries.length - 1;
-                return (
+            <div className="flex flex-col items-center">
+              <div
+                className={cn(
+                  "relative",
+                  expanded
+                    ? "h-64 w-64 md:h-72 md:w-72"
+                    : "h-56 w-56 md:h-60 md:w-60",
+                )}
+              >
+                <div
+                  className={cn(
+                    "absolute inset-0 rounded-full bg-gradient-to-b opacity-80 blur-3xl",
+                    phaseTone.glow,
+                  )}
+                />
+                <svg viewBox="0 0 300 300" className="relative h-full w-full">
+                  {[56, 96, 136].map((r) => (
+                    <circle
+                      key={r}
+                      cx="150"
+                      cy="150"
+                      r={r}
+                      fill="none"
+                      className="stroke-primary/10"
+                      strokeWidth="0.7"
+                    />
+                  ))}
+                  {[40, 80, 120, 160].map((offset) => (
+                    <circle
+                      key={`grid-${offset}`}
+                      cx="150"
+                      cy="150"
+                      r={offset / 4}
+                      fill="none"
+                      className="stroke-primary/5"
+                      strokeDasharray="2 10"
+                      strokeWidth="0.9"
+                    />
+                  ))}
+                  <line
+                    x1="150"
+                    y1="24"
+                    x2="150"
+                    y2="276"
+                    className="stroke-primary/10"
+                    strokeWidth="0.6"
+                  />
+                  <line
+                    x1="24"
+                    y1="150"
+                    x2="276"
+                    y2="150"
+                    className="stroke-primary/10"
+                    strokeWidth="0.6"
+                  />
+                  {[0, 1, 2, 3].map((i) => (
+                    <circle
+                      key={`ring-${i}`}
+                      ref={(el) => {
+                        ringRefs.current[i] = el;
+                      }}
+                      cx="150"
+                      cy="150"
+                      r="20"
+                      fill="none"
+                      stroke="url(#sonarGrad)"
+                      strokeWidth={2.5 - i * 0.4}
+                      opacity="0"
+                    />
+                  ))}
+                  <circle
+                    cx="150"
+                    cy="150"
+                    r="28"
+                    className="fill-primary/10 stroke-primary/35"
+                    strokeWidth="1.5"
+                  />
+                  <circle
+                    cx="150"
+                    cy="150"
+                    r="18"
+                    className="fill-white stroke-primary/60"
+                    strokeWidth="2"
+                  />
+                  <circle cx="150" cy="150" r="8" className="fill-primary/50">
+                    <animate
+                      attributeName="r"
+                      values="6;10;6"
+                      dur="1.5s"
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="0.8;0.4;0.8"
+                      dur="1.5s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                  <defs>
+                    <radialGradient id="sonarGrad">
+                      <stop offset="0%" stopColor="rgba(249,115,22,0.8)" />
+                      <stop offset="100%" stopColor="rgba(249,115,22,0)" />
+                    </radialGradient>
+                  </defs>
+                </svg>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                   <div
-                    key={entry.id}
                     className={cn(
-                      "status-ticker-item flex items-start gap-2 rounded-lg border border-transparent bg-background/50 px-2.5 py-2 transition-colors",
-                      isLatest
-                        ? "border-primary/25 bg-primary/8"
-                        : "text-muted-foreground/85",
+                      "flex items-center justify-center rounded-2xl border border-white/70 bg-white/85 shadow-lg shadow-primary/10 backdrop-blur",
+                      expanded ? "h-16 w-16" : "h-14 w-14",
                     )}
                   >
-                    <span
+                    <Brain
                       className={cn(
-                        "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
-                        isLatest ? "bg-primary/70" : "bg-primary/30",
+                        "text-primary animate-pulse",
+                        expanded ? "h-8 w-8" : "h-7 w-7",
                       )}
+                      weight="fill"
                     />
-                    <p
-                      className={cn(
-                        "font-mono wrap-break-word leading-relaxed",
-                        isLatest ? "text-[13px] text-primary/90" : "text-xs",
-                      )}
-                    >
-                      {entry.message}
-                    </p>
                   </div>
-                );
-              })
-            ) : (
-              <div className="status-ticker-item rounded-lg bg-background/50 px-2.5 py-2 text-xs font-mono text-primary/80">
-                {status || "Đang khởi tạo..."}
+                </div>
               </div>
-            )}
-          </div>
 
-          {thinkingText && (
-            <div
-              ref={thinkingRef}
-              className="mt-3 max-h-28 overflow-y-auto rounded-lg border border-primary/15 bg-primary/4 p-3 scrollbar-none"
-            >
-              <p className="text-xs font-mono leading-5 text-primary/65 whitespace-pre-wrap wrap-break-word">
-                {thinkingText}
-                <span className="ml-1 inline-block h-3 w-1.5 animate-pulse bg-primary/60 align-middle" />
+              <Badge
+                className={cn(
+                  "mt-2 border-primary/20 bg-white text-primary shadow-sm hover:bg-white",
+                  expanded ? "text-base px-3 py-1" : "text-sm",
+                )}
+              >
+                {phaseLabel(phase)}
+              </Badge>
+              <p
+                className={cn(
+                  "mt-3 text-center font-medium tracking-tight text-foreground",
+                  expanded ? "text-base" : "text-sm",
+                )}
+              >
+                {status || phaseDescription(phase)}
+              </p>
+              <p
+                className={cn(
+                  "mt-1 text-center text-muted-foreground",
+                  expanded ? "text-base" : "text-sm",
+                )}
+              >
+                AI đang phân tích
               </p>
             </div>
-          )}
+          </div>
+
+          <div className="overflow-hidden rounded-[28px] border border-primary/10 bg-white/92 shadow-[0_24px_72px_-42px_rgba(15,23,42,0.28)] backdrop-blur">
+            <div
+              className={cn(
+                "border-b border-primary/10 bg-[linear-gradient(135deg,rgba(249,115,22,0.08),rgba(249,115,22,0.02)_55%,transparent)]",
+                expanded ? "px-5 py-5 md:px-6" : "px-4 py-4 md:px-5",
+              )}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-3 w-3 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/35" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-primary" />
+                  </span>
+                  <p
+                    className={cn(
+                      "font-semibold uppercase tracking-[0.24em] text-primary/80",
+                      expanded ? "text-base" : "text-sm",
+                    )}
+                  >
+                    AI Suy nghĩ
+                  </p>
+                </div>
+
+                <div
+                  className={cn(
+                    "flex items-center gap-2 rounded-full border border-primary/10 bg-primary/5 text-primary/80",
+                    expanded ? "px-3.5 py-2 text-base" : "px-3 py-1.5 text-sm",
+                  )}
+                >
+                  <ArrowsClockwise className="h-3.5 w-3.5 animate-spin" />
+                  {statusEntries.length}
+                </div>
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                "relative",
+                expanded ? "px-5 py-5 md:px-6" : "px-4 py-4 md:px-5",
+              )}
+            >
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-white via-white/90 to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white via-white/90 to-transparent" />
+              <div
+                ref={tickerRef}
+                className={cn(
+                  "relative space-y-2 overflow-y-auto pr-1",
+                  expanded ? "max-h-116" : "max-h-92",
+                )}
+              >
+                {visibleStatusEntries.length > 0 ? (
+                  visibleStatusEntries.map((entry, index) => {
+                    const reverseIndex =
+                      visibleStatusEntries.length - index - 1;
+                    const isLatest = reverseIndex === 0;
+                    const ageOpacity = Math.max(0.38, 1 - reverseIndex * 0.16);
+
+                    return (
+                      <div
+                        key={entry.id}
+                        className={cn(
+                          "status-ticker-item relative flex items-start gap-3 rounded-2xl border transition-colors",
+                          expanded
+                            ? "px-4 py-3.5 md:px-5"
+                            : "px-3 py-3 md:px-4",
+                          isLatest
+                            ? "border-primary/18 bg-primary/[0.07] shadow-[0_12px_40px_-28px_rgba(249,115,22,0.65)]"
+                            : "border-border/50 bg-white/72",
+                        )}
+                        style={{ opacity: ageOpacity }}
+                      >
+                        <div className="relative mt-1 flex h-4 w-4 shrink-0 items-center justify-center">
+                          <span
+                            className={cn(
+                              "h-2.5 w-2.5 rounded-full",
+                              isLatest ? "bg-primary" : "bg-primary/35",
+                            )}
+                          />
+                          {isLatest && (
+                            <span className="absolute inline-flex h-4 w-4 animate-ping rounded-full bg-primary/20" />
+                          )}
+                        </div>
+                        <p
+                          className={cn(
+                            "min-w-0 flex-1 wrap-break-word font-medium leading-6",
+                            isLatest
+                              ? expanded
+                                ? "text-base text-foreground"
+                                : "text-[15px] text-foreground"
+                              : expanded
+                                ? "text-base text-muted-foreground"
+                                : "text-sm text-muted-foreground",
+                          )}
+                        >
+                          {entry.message}
+                        </p>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div
+                    className={cn(
+                      "status-ticker-item rounded-2xl border border-primary/12 bg-primary/[0.06] px-4 py-3 font-medium text-primary/85",
+                      expanded ? "text-base" : "text-sm",
+                    )}
+                  >
+                    {status || "Đang khởi tạo..."}
+                  </div>
+                )}
+              </div>
+
+              {thinkingText && (
+                <div
+                  ref={thinkingRef}
+                  className={cn(
+                    "mt-3 rounded-2xl border border-primary/10 bg-primary/[0.04]",
+                    expanded ? "px-4 py-3" : "px-3 py-2.5",
+                  )}
+                >
+                  <p
+                    className={cn(
+                      "line-clamp-2 font-mono leading-5 text-primary/70 whitespace-pre-wrap wrap-break-word",
+                      expanded ? "text-base" : "text-sm",
+                    )}
+                  >
+                    {thinkingText}
+                    <span className="ml-1 inline-block h-3 w-1 animate-pulse rounded-full bg-primary/60 align-middle" />
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -637,8 +1049,10 @@ function SonarRadar({
 
 function ActionMapView({
   result,
+  expanded = false,
 }: {
   result: ClusterRescueSuggestionResponse;
+  expanded?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const activities = result.suggestedActivities;
@@ -648,7 +1062,10 @@ function ActionMapView({
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-5 space-y-5" ref={containerRef}>
+      <div
+        className={cn(expanded ? "p-6 space-y-6 md:p-7" : "p-5 space-y-5")}
+        ref={containerRef}
+      >
         <MissionBanner result={result} />
         <StatsRow result={result} />
         <ActionFlowTimeline key={activitiesKey} activities={activities} />
@@ -697,7 +1114,7 @@ function ActionFlowTimeline({
       </div>
       {revealedCount < activities.length && (
         <div className="ml-12 border-l-2 border-dashed border-primary/20 py-3 pl-4">
-          <div className="flex items-center gap-2 text-xs font-mono text-primary/40">
+          <div className="flex items-center gap-2 text-sm font-mono text-primary/40">
             <span className="h-2 w-2 rounded-full bg-primary/30 animate-pulse" />
             Đang tải bước {revealedCount + 1}/{activities.length}...
           </div>
@@ -746,11 +1163,11 @@ function MissionBanner({
             {result.suggestedMissionTitle}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge className="text-xs bg-primary text-white border-primary hover:bg-primary/90">
+            <Badge className="text-sm bg-primary text-white border-primary hover:bg-primary/90">
               {severityConfig[result.suggestedSeverityLevel]?.label ||
                 result.suggestedSeverityLevel}
             </Badge>
-            <span className="text-xs font-mono text-muted-foreground">
+            <span className="text-sm font-mono text-muted-foreground">
               {result.modelName} • {result.responseTimeMs}ms
             </span>
           </div>
@@ -807,7 +1224,7 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
       icon: Rocket,
       label: "Hoạt động",
       value: `${result.suggestedActivities.length}`,
-      color: "text-violet-400",
+      color: "text-primary",
     },
   ];
 
@@ -824,7 +1241,7 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
             <span className={cn("text-sm font-bold font-mono", s.color)}>
               {s.value}
             </span>
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">
+            <span className="text-sm text-muted-foreground uppercase tracking-wider">
               {s.label}
             </span>
           </div>
@@ -853,8 +1270,8 @@ function AiOriginNode() {
         <Brain className="h-4 w-4 text-primary" weight="fill" />
       </div>
       <div>
-        <span className="text-xs font-bold text-primary">AI Engine</span>
-        <p className="text-xs text-muted-foreground font-mono">
+        <span className="text-sm font-bold text-primary">AI Engine</span>
+        <p className="text-sm text-muted-foreground font-mono">
           Bắt đầu thực thi kế hoạch
         </p>
       </div>
@@ -871,19 +1288,27 @@ function ActivityFlowNode({
 }) {
   const nodeRef = useRef<HTMLDivElement>(null);
   const lineRef = useRef<SVGSVGElement>(null);
+  const normalizedActivityType = (activity.activityType ?? "")
+    .trim()
+    .toUpperCase();
 
-  const config = activityTypeConfig[activity.activityType] || {
-    label: activity.activityType,
-    color: "text-zinc-400",
-    bgColor: "bg-zinc-800",
-  };
-  const Icon = activityIconMap[activity.activityType] || Sparkle;
+  const config = activityTypeConfig[activity.activityType] ||
+    activityTypeConfig[normalizedActivityType] || {
+      label: normalizedActivityType || activity.activityType,
+      color: "text-zinc-400",
+      bgColor: "bg-zinc-800",
+    };
+  const Icon =
+    activityIconMap[activity.activityType] ||
+    activityIconMap[normalizedActivityType] ||
+    Sparkle;
   const isDepotStep =
-    activity.activityType === "COLLECT_SUPPLIES" || activity.depotName !== null;
+    normalizedActivityType === "COLLECT_SUPPLIES" ||
+    activity.depotName !== null;
   const isSosStep =
-    activity.activityType === "RESCUE" ||
-    activity.activityType === "MEDICAL_AID" ||
-    activity.activityType === "EVACUATE";
+    normalizedActivityType === "RESCUE" ||
+    normalizedActivityType === "MEDICAL_AID" ||
+    normalizedActivityType === "EVACUATE";
 
   useEffect(() => {
     if (!nodeRef.current) return;
@@ -988,13 +1413,13 @@ function ActivityFlowNode({
                 strokeWidth="1"
               />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-primary">
+            <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-primary">
               {activity.step}
             </span>
           </div>
           <Badge
             className={cn(
-              "text-xs px-1.5 h-5 border",
+              "text-sm px-1.5 h-5 border",
               config.bgColor,
               config.color,
               "border-current/20",
@@ -1003,33 +1428,33 @@ function ActivityFlowNode({
             <Icon className="h-3 w-3 mr-0.5" weight="fill" />
             {config.label}
           </Badge>
-          <Badge className="text-xs px-1.5 h-5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
+          <Badge className="text-sm px-1.5 h-5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15">
             {severityConfig[activity.priority]?.label || activity.priority}
           </Badge>
           {activity.estimatedTime && (
-            <span className="text-xs font-mono text-muted-foreground flex items-center gap-0.5 ml-auto">
+            <span className="text-sm font-mono text-muted-foreground flex items-center gap-0.5 ml-auto">
               <Clock className="h-3 w-3" />
               {activity.estimatedTime}
             </span>
           )}
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground mb-2 pl-9">
+        <p className="text-sm leading-relaxed text-muted-foreground mb-2 pl-9">
           {activity.description}
         </p>
 
         {activity.suggestedTeam && (
           <div className="ml-9 mb-2 rounded-lg border border-emerald-300/40 bg-emerald-50/50 dark:bg-emerald-900/15 dark:border-emerald-700/40 p-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+            <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
               <ShieldCheck className="h-3 w-3" weight="fill" />
               Đội đề xuất
             </p>
-            <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
+            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mt-0.5">
               {activity.suggestedTeam.teamName ||
                 (activity.suggestedTeam.teamId
                   ? `Đội #${activity.suggestedTeam.teamId}`
                   : "Đội chưa đặt tên")}
             </p>
-            <p className="text-xs text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
+            <p className="text-sm text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
               {`Loại: ${formatTeamTypeLabel(activity.suggestedTeam.teamType)}`}
               {activity.suggestedTeam.contactPhone
                 ? ` • SĐT: ${activity.suggestedTeam.contactPhone}`
@@ -1039,12 +1464,12 @@ function ActivityFlowNode({
                 : ""}
             </p>
             {activity.suggestedTeam.reason && (
-              <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
+              <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-1 leading-relaxed">
                 Lý do: {activity.suggestedTeam.reason}
               </p>
             )}
             {activity.suggestedTeam.assemblyPointName && (
-              <p className="text-xs text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
+              <p className="text-sm text-emerald-700/75 dark:text-emerald-300/75 mt-0.5 leading-relaxed">
                 Điểm tập kết đội: {activity.suggestedTeam.assemblyPointName}
               </p>
             )}
@@ -1055,18 +1480,18 @@ function ActivityFlowNode({
           (activity.assemblyPointLatitude != null &&
             activity.assemblyPointLongitude != null)) && (
           <div className="ml-9 mb-2 rounded-lg border border-blue-300/40 bg-blue-50/50 dark:bg-blue-900/15 dark:border-blue-700/40 p-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
+            <p className="text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 flex items-center gap-1">
               <MapPin className="h-3 w-3" weight="fill" />
               Điểm tập kết hoạt động
             </p>
             {activity.assemblyPointName && (
-              <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
+              <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 mt-0.5">
                 {activity.assemblyPointName}
               </p>
             )}
             {activity.assemblyPointLatitude != null &&
               activity.assemblyPointLongitude != null && (
-                <p className="text-xs text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mt-0.5">
                   Tọa độ: {activity.assemblyPointLatitude.toFixed(4)},{" "}
                   {activity.assemblyPointLongitude.toFixed(4)}
                 </p>
@@ -1090,11 +1515,11 @@ function ActivityFlowNode({
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold text-amber-600 dark:text-amber-400 truncate">
+              <p className="text-sm font-bold text-amber-600 dark:text-amber-400 truncate">
                 {activity.depotName}
               </p>
               {activity.depotAddress && (
-                <p className="text-xs text-amber-600/50 dark:text-amber-500/50 truncate">
+                <p className="text-sm text-amber-600/50 dark:text-amber-500/50 truncate">
                   {activity.depotAddress}
                 </p>
               )}
@@ -1117,7 +1542,7 @@ function ActivityFlowNode({
               className="h-3.5 w-3.5 text-red-500 shrink-0"
               weight="fill"
             />
-            <span className="text-xs font-mono text-red-500/70">
+            <span className="text-sm font-mono text-red-500/70">
               SOS #{activity.sosRequestId}
             </span>
           </div>
@@ -1129,7 +1554,7 @@ function ActivityFlowNode({
               {activity.suppliesToCollect.map((supply) => (
                 <div
                   key={supply.itemId}
-                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-xs"
+                  className="supply-tag flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/15 text-sm"
                 >
                   <Package className="h-2.5 w-2.5 text-primary" weight="fill" />
                   <span className="text-primary">{supply.itemName}</span>
@@ -1162,19 +1587,16 @@ function AssessmentBlock({ text }: { text: string }) {
   return (
     <div
       ref={ref}
-      className="rounded-xl border border-violet-500/15 overflow-hidden"
+      className="rounded-xl border border-primary/15 overflow-hidden"
     >
-      <div className="px-3 py-2 bg-violet-50 dark:bg-violet-500/[0.06] border-b border-violet-500/10 flex items-center gap-2">
-        <Brain
-          className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400"
-          weight="fill"
-        />
-        <span className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+      <div className="px-3 py-2 bg-primary/6 dark:bg-primary/12 border-b border-primary/10 flex items-center gap-2">
+        <Brain className="h-3.5 w-3.5 text-primary" weight="fill" />
+        <span className="text-sm font-bold text-primary uppercase tracking-wider">
           Đánh giá tổng thể
         </span>
       </div>
       <div className="p-3">
-        <p className="text-xs leading-relaxed text-muted-foreground">{text}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{text}</p>
       </div>
     </div>
   );
@@ -1217,7 +1639,7 @@ function ResourcesBlock({
           className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400"
           weight="fill"
         />
-        <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+        <span className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
           Tài nguyên cần thiết
         </span>
       </div>
@@ -1233,14 +1655,14 @@ function ResourcesBlock({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-foreground truncate">
+              <p className="text-sm font-semibold text-foreground truncate">
                 {res.description}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-xs font-mono text-blue-500 dark:text-blue-400">
+                <span className="text-sm font-mono text-blue-500 dark:text-blue-400">
                   SL: {res.quantity}
                 </span>
-                <Badge variant="outline" className="h-5 px-1.5 text-xs">
+                <Badge variant="outline" className="h-5 px-1.5 text-sm">
                   {res.priority}
                 </Badge>
               </div>
@@ -1271,7 +1693,7 @@ function WarningsBlock({
       {result.needsManualReview && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/[0.06] border border-yellow-500/15">
           <Warning className="h-4 w-4 text-yellow-500 shrink-0" weight="fill" />
-          <p className="text-xs text-yellow-600 dark:text-yellow-400/80">
+          <p className="text-sm text-yellow-600 dark:text-yellow-400/80">
             {result.lowConfidenceWarning ||
               "Cần kiểm tra thủ công trước khi phê duyệt."}
           </p>
@@ -1283,7 +1705,7 @@ function WarningsBlock({
             className="h-4 w-4 text-blue-500 dark:text-blue-400 shrink-0"
             weight="fill"
           />
-          <p className="text-xs text-blue-600 dark:text-blue-400/80">
+          <p className="text-sm text-blue-600 dark:text-blue-400/80">
             Kế hoạch yêu cầu phối hợp nhiều kho tiếp tế.
           </p>
         </div>
@@ -1295,10 +1717,10 @@ function WarningsBlock({
             weight="fill"
           />
           <div>
-            <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
+            <p className="text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-0.5">
               Lưu ý đặc biệt
             </p>
-            <p className="text-xs text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
+            <p className="text-sm text-amber-600/70 dark:text-amber-400/70 leading-relaxed">
               {result.specialNotes}
             </p>
           </div>
@@ -1310,7 +1732,15 @@ function WarningsBlock({
 
 /* ═══ Error View ═══ */
 
-function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
+function ErrorView({
+  error,
+  onRetry,
+  expanded = false,
+}: {
+  error: string;
+  onRetry: () => void;
+  expanded?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const readableError = normalizeAiErrorText(error);
 
@@ -1332,17 +1762,38 @@ function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
     <div className="absolute inset-0 flex items-center justify-center p-8">
       <div
         ref={ref}
-        className="max-w-sm p-5 rounded-xl bg-red-50 dark:bg-red-500/[0.06] border border-red-500/20 text-center"
+        className={cn(
+          "rounded-xl bg-red-50 dark:bg-red-500/[0.06] border border-red-500/20 text-center",
+          expanded ? "max-w-md p-6" : "max-w-sm p-5",
+        )}
       >
-        <Warning className="h-8 w-8 text-red-500 mx-auto mb-3" weight="fill" />
-        <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-1">
+        <Warning
+          className={cn(
+            "text-red-500 mx-auto mb-3",
+            expanded ? "h-9 w-9" : "h-8 w-8",
+          )}
+          weight="fill"
+        />
+        <p
+          className={cn(
+            "font-bold text-red-600 dark:text-red-400 mb-1",
+            expanded ? "text-base" : "text-sm",
+          )}
+        >
           Phân tích thất bại
         </p>
-        <p className="text-xs text-red-500/60 mb-4">{readableError}</p>
+        <p
+          className={cn(
+            "text-red-500/60 mb-4",
+            expanded ? "text-base" : "text-sm",
+          )}
+        >
+          {readableError}
+        </p>
         <Button
           variant="destructive"
           size="sm"
-          className="h-8 text-xs"
+          className={cn(expanded ? "h-9 text-sm" : "h-8 text-sm")}
           onClick={onRetry}
         >
           <ArrowsClockwise className="h-3.5 w-3.5 mr-1.5" />
@@ -1358,9 +1809,17 @@ function ErrorView({ error, onRetry }: { error: string; onRetry: () => void }) {
 function FooterBar({
   onRetry,
   onViewPlan,
+  primaryActionLabel,
+  onPrimaryAction,
+  hidePlanAction,
+  expanded = false,
 }: {
   onRetry: () => void;
   onViewPlan: () => void;
+  primaryActionLabel?: string;
+  onPrimaryAction?: () => void;
+  hidePlanAction?: boolean;
+  expanded?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1375,26 +1834,48 @@ function FooterBar({
   return (
     <div
       ref={ref}
-      className="px-5 py-3 border-t bg-background flex items-center gap-2"
+      className={cn(
+        "border-t bg-background flex items-center gap-2",
+        expanded ? "px-6 py-4" : "px-5 py-3",
+      )}
     >
       <Button
         variant="outline"
         size="sm"
-        className="h-9 text-xs"
+        className={cn(expanded ? "h-10 px-3 text-sm" : "h-9 text-sm")}
         onClick={onRetry}
       >
         <ArrowsClockwise className="h-3.5 w-3.5 mr-1.5" />
         Phân tích lại
       </Button>
       <div className="flex-1" />
-      <Button
-        size="sm"
-        className="h-9 text-xs bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25"
-        onClick={onViewPlan}
-      >
-        <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
-        Xem & Chỉnh sửa Kế hoạch
-      </Button>
+      {!hidePlanAction ? (
+        onPrimaryAction ? (
+          <Button
+            size="sm"
+            className={cn(
+              "text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25",
+              expanded ? "h-10 px-4" : "h-9",
+            )}
+            onClick={onPrimaryAction}
+          >
+            <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
+            {primaryActionLabel ?? "Xem & Chỉnh sửa Kế hoạch"}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            className={cn(
+              "text-sm bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/25",
+              expanded ? "h-10 px-4" : "h-9",
+            )}
+            onClick={onViewPlan}
+          >
+            <Rocket className="h-3.5 w-3.5 mr-1.5" weight="fill" />
+            Xem & Chỉnh sửa Kế hoạch
+          </Button>
+        )
+      ) : null}
     </div>
   );
 }

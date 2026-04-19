@@ -927,51 +927,233 @@ export default function CoordinatorRescuerManagementPage() {
     }
   };
 
-  const createMultiDragPreview = (draggedCount: number) => {
+  const createMultiDragPreview = (draggedRescuers: RescuerEntity[]) => {
     if (typeof document === "undefined") {
       return null;
     }
+
+    const primaryRescuer = draggedRescuers[0];
+    if (!primaryRescuer) {
+      return null;
+    }
+
+    const draggedCount = draggedRescuers.length;
+    const primaryName = `${primaryRescuer.lastName} ${primaryRescuer.firstName}`;
+    const secondaryLabel =
+      draggedCount > 1
+        ? `+${draggedCount - 1} người cứu hộ nữa`
+        : "Người cứu hộ được chọn";
 
     const preview = document.createElement("div");
     preview.style.position = "fixed";
     preview.style.top = "-9999px";
     preview.style.left = "-9999px";
     preview.style.pointerEvents = "none";
-    preview.style.display = "inline-flex";
-    preview.style.alignItems = "center";
-    preview.style.gap = "8px";
-    preview.style.padding = "8px 11px";
-    preview.style.borderRadius = "999px";
-    preview.style.background = "rgba(15, 23, 42, 0.95)";
-    preview.style.color = "#F8FAFC";
-    preview.style.border = "1px solid rgba(148, 163, 184, 0.55)";
-    preview.style.boxShadow = "0 14px 30px rgba(2, 6, 23, 0.45)";
+    preview.style.width = "248px";
+    preview.style.height = "92px";
+    preview.style.padding = "10px 0 0 12px";
     preview.style.font =
-      '600 12px/1.2 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+      '500 12px/1.2 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
 
-    const stack = document.createElement("span");
-    stack.style.position = "relative";
-    stack.style.display = "inline-block";
-    stack.style.width = "24px";
-    stack.style.height = "17px";
-
-    for (let layerIndex = 0; layerIndex < 3; layerIndex += 1) {
-      const layer = document.createElement("span");
+    for (let layerIndex = 2; layerIndex >= 1; layerIndex -= 1) {
+      const layer = document.createElement("div");
       layer.style.position = "absolute";
-      layer.style.top = `${layerIndex * 2}px`;
-      layer.style.left = `${layerIndex * 3}px`;
-      layer.style.width = "15px";
-      layer.style.height = "11px";
-      layer.style.borderRadius = "3px";
-      layer.style.border = "1px solid rgba(248, 250, 252, 0.82)";
-      layer.style.background = "rgba(248, 250, 252, 0.18)";
-      stack.appendChild(layer);
+      layer.style.inset = "0";
+      layer.style.width = "228px";
+      layer.style.height = "74px";
+      layer.style.borderRadius = "18px";
+      layer.style.border = "1px solid rgba(255, 87, 34, 0.18)";
+      layer.style.background =
+        layerIndex === 2 ? "rgba(255,255,255,0.72)" : "rgba(255,247,242,0.92)";
+      layer.style.boxShadow =
+        layerIndex === 2
+          ? "0 18px 34px rgba(15, 23, 42, 0.10)"
+          : "0 16px 28px rgba(255, 87, 34, 0.12)";
+      layer.style.transform = `translate(${layerIndex * 7}px, ${layerIndex * 4}px)`;
+      preview.appendChild(layer);
     }
 
-    const label = document.createElement("span");
-    label.textContent = `Kéo ${draggedCount} người cứu hộ`;
+    const card = document.createElement("div");
+    card.style.position = "relative";
+    card.style.display = "flex";
+    card.style.alignItems = "center";
+    card.style.gap = "12px";
+    card.style.width = "228px";
+    card.style.height = "74px";
+    card.style.padding = "12px 14px";
+    card.style.borderRadius = "18px";
+    card.style.border = "1px solid rgba(255, 87, 34, 0.24)";
+    card.style.background =
+      "linear-gradient(180deg, rgba(255,255,255,0.99) 0%, rgba(255,248,244,0.98) 100%)";
+    card.style.boxShadow =
+      "0 18px 40px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(255, 87, 34, 0.12)";
+    card.style.backdropFilter = "blur(8px)";
 
-    preview.append(stack, label);
+    const countBadge = document.createElement("span");
+    countBadge.textContent = `${draggedCount} người`;
+    countBadge.style.position = "absolute";
+    countBadge.style.top = "-9px";
+    countBadge.style.right = "10px";
+    countBadge.style.display = "inline-flex";
+    countBadge.style.alignItems = "center";
+    countBadge.style.justifyContent = "center";
+    countBadge.style.minWidth = "62px";
+    countBadge.style.height = "24px";
+    countBadge.style.padding = "0 10px";
+    countBadge.style.borderRadius = "999px";
+    countBadge.style.background = "#FF5722";
+    countBadge.style.color = "#FFF7ED";
+    countBadge.style.font =
+      '700 11px/1 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+    countBadge.style.boxShadow = "0 8px 18px rgba(255, 87, 34, 0.28)";
+
+    const avatarCluster = document.createElement("div");
+    avatarCluster.style.position = "relative";
+    avatarCluster.style.width = "52px";
+    avatarCluster.style.height = "40px";
+    avatarCluster.style.flexShrink = "0";
+
+    const buildAvatar = (
+      label: string,
+      background: string,
+      size: number,
+      left: number,
+      top: number,
+      borderColor: string,
+      textColor: string,
+      zIndex: number,
+    ) => {
+      const avatar = document.createElement("span");
+      avatar.textContent = label;
+      avatar.style.position = "absolute";
+      avatar.style.left = `${left}px`;
+      avatar.style.top = `${top}px`;
+      avatar.style.display = "flex";
+      avatar.style.alignItems = "center";
+      avatar.style.justifyContent = "center";
+      avatar.style.width = `${size}px`;
+      avatar.style.height = `${size}px`;
+      avatar.style.borderRadius = "999px";
+      avatar.style.border = `1px solid ${borderColor}`;
+      avatar.style.background = background;
+      avatar.style.color = textColor;
+      avatar.style.font =
+        '700 11px/1 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+      avatar.style.boxShadow = "0 8px 18px rgba(15, 23, 42, 0.10)";
+      avatar.style.zIndex = `${zIndex}`;
+      return avatar;
+    };
+
+    avatarCluster.appendChild(
+      buildAvatar(
+        getInitials(primaryRescuer.firstName, primaryRescuer.lastName),
+        "linear-gradient(180deg, #FFF1EB 0%, #FFE1D5 100%)",
+        36,
+        0,
+        2,
+        "rgba(255, 87, 34, 0.28)",
+        "#C2410C",
+        3,
+      ),
+    );
+
+    for (
+      let index = 1;
+      index < Math.min(draggedRescuers.length, 3);
+      index += 1
+    ) {
+      const rescuer = draggedRescuers[index];
+      avatarCluster.appendChild(
+        buildAvatar(
+          getInitials(rescuer.firstName, rescuer.lastName),
+          "rgba(255,255,255,0.96)",
+          24,
+          18 + (index - 1) * 12,
+          10,
+          "rgba(148, 163, 184, 0.25)",
+          "#64748B",
+          2 - index,
+        ),
+      );
+    }
+
+    const accentDot = document.createElement("span");
+    accentDot.style.position = "absolute";
+    accentDot.style.left = "26px";
+    accentDot.style.top = "-1px";
+    accentDot.style.width = "10px";
+    accentDot.style.height = "10px";
+    accentDot.style.borderRadius = "999px";
+    accentDot.style.background = "#FF8A65";
+    accentDot.style.boxShadow = "0 0 0 3px rgba(255, 138, 101, 0.16)";
+    accentDot.style.zIndex = "4";
+    avatarCluster.appendChild(accentDot);
+
+    const body = document.createElement("div");
+    body.style.display = "flex";
+    body.style.minWidth = "0";
+    body.style.flexDirection = "column";
+    body.style.gap = "5px";
+    body.style.flex = "1";
+
+    const title = document.createElement("div");
+    title.textContent = primaryName;
+    title.style.overflow = "hidden";
+    title.style.color = "#111827";
+    title.style.textOverflow = "ellipsis";
+    title.style.whiteSpace = "nowrap";
+    title.style.font =
+      '700 14px/1.2 "SF Pro Display", "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+
+    const subtitle = document.createElement("div");
+    subtitle.textContent = secondaryLabel;
+    subtitle.style.overflow = "hidden";
+    subtitle.style.color = "#6B7280";
+    subtitle.style.textOverflow = "ellipsis";
+    subtitle.style.whiteSpace = "nowrap";
+    subtitle.style.font =
+      '500 11px/1.2 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+
+    const chips = document.createElement("div");
+    chips.style.display = "flex";
+    chips.style.alignItems = "center";
+    chips.style.gap = "6px";
+    chips.style.flexWrap = "wrap";
+
+    const createChip = (
+      text: string,
+      background: string,
+      borderColor: string,
+      color: string,
+    ) => {
+      const chip = document.createElement("span");
+      chip.textContent = text;
+      chip.style.display = "inline-flex";
+      chip.style.alignItems = "center";
+      chip.style.height = "20px";
+      chip.style.padding = "0 8px";
+      chip.style.borderRadius = "999px";
+      chip.style.border = `1px solid ${borderColor}`;
+      chip.style.background = background;
+      chip.style.color = color;
+      chip.style.font =
+        '600 10px/1 "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif';
+      return chip;
+    };
+
+    chips.append(
+      createChip(
+        "Kéo cùng nhóm",
+        "rgba(255, 237, 213, 0.92)",
+        "rgba(255, 87, 34, 0.24)",
+        "#C2410C",
+      ),
+    );
+
+    body.append(title, subtitle, chips);
+    card.append(avatarCluster, body, countBadge);
+    preview.append(card);
+
     return preview;
   };
 
@@ -1017,11 +1199,16 @@ export default function CoordinatorRescuerManagementPage() {
     );
 
     if (draggedRescuerIds.length > 1) {
-      const preview = createMultiDragPreview(draggedRescuerIds.length);
+      const draggedRescuers = draggedRescuerIds
+        .map((rescuerId) => baseSplitRescuerMap.get(rescuerId))
+        .filter((rescuerItem): rescuerItem is RescuerEntity =>
+          Boolean(rescuerItem),
+        );
+      const preview = createMultiDragPreview(draggedRescuers);
       if (preview) {
         document.body.appendChild(preview);
         dragPreviewRef.current = preview;
-        event.dataTransfer.setDragImage(preview, 24, 14);
+        event.dataTransfer.setDragImage(preview, 38, 22);
       }
     }
 
@@ -1562,7 +1749,7 @@ export default function CoordinatorRescuerManagementPage() {
     const isRowInDragGroup =
       draggingRescuerIds.length > 1 && draggingRescuerIds.includes(rescuer.id);
     const isRowBeingDragged = isDragAnchorRow || isRowInDragGroup;
-    const fullName = `${rescuer.firstName} ${rescuer.lastName}`;
+    const fullName = `${rescuer.lastName} ${rescuer.firstName}`;
     const assemblyPointName =
       rescuer.assemblyPointId != null
         ? (assemblyPointNameById.get(rescuer.assemblyPointId) ??

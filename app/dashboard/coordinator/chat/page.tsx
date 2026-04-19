@@ -36,6 +36,7 @@ import {
   useSendConversationMessage,
 } from "@/services/chat/hooks";
 import { ReceiveMessageEvent } from "@/services/chat/type";
+import { useSOSClusters } from "@/services/sos_cluster/hooks";
 import { uploadMessageImageToCloudinary } from "@/utils/uploadFile";
 
 const ACTIVE_CONVERSATION_STORAGE_KEY =
@@ -95,6 +96,12 @@ export default function CoordinatorChatPage() {
     error: waitingError,
     refetch: refetchRooms,
   } = useCoordinatorChatRooms();
+  const { data: clustersData } = useSOSClusters();
+
+  const sosClusters = useMemo(
+    () => clustersData?.clusters ?? [],
+    [clustersData],
+  );
 
   const knownConversationIdsRef = useRef<Set<number>>(new Set());
 
@@ -341,6 +348,37 @@ export default function CoordinatorChatPage() {
       (message) => !isVictimFacingCoordinatorJoinNotice(message),
     );
   }, [activeConversationId, messagesQuery.data?.messages, realtimeMessages]);
+
+  const handleOpenSosMission = useCallback(
+    (sosRequestId: number) => {
+      const targetCluster = sosClusters.find((cluster) =>
+        cluster.sosRequestIds.some((id) => Number(id) === sosRequestId),
+      );
+
+      if (targetCluster) {
+        const params = new URLSearchParams({
+          sel: "cluster",
+          id: String(targetCluster.id),
+          openPlan: "1",
+          focusSosId: String(sosRequestId),
+          openAt: String(Date.now()),
+        });
+        router.push(`/dashboard/coordinator?${params.toString()}`);
+        return;
+      }
+
+      const params = new URLSearchParams({
+        sel: "sos",
+        id: String(sosRequestId),
+        openAt: String(Date.now()),
+      });
+      router.push(`/dashboard/coordinator?${params.toString()}`);
+      toast.info(
+        "SOS này chưa nằm trong cụm. Đã chuyển sang bản đồ để bạn xem yêu cầu trực tiếp.",
+      );
+    },
+    [router, sosClusters],
+  );
 
   const unreadByConversationView = useMemo(() => {
     const next: Record<number, number> = {};
@@ -642,6 +680,7 @@ export default function CoordinatorChatPage() {
                 <ChatMessageThread
                   messages={mergedMessages}
                   isLoading={messagesQuery.isLoading}
+                  onOpenSosRequest={handleOpenSosMission}
                   conversationPartnerLabel={
                     activeRoom?.participantLabel ||
                     activePartnerLabel ||

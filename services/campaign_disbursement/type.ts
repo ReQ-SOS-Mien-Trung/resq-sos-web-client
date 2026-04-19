@@ -129,3 +129,27 @@ export interface UpdateCampaignStatusRequest {
   newStatus: CampaignStatus;
   reason?: string;
 }
+
+/* ── GET /finance/campaigns/{id}/chart/fund-flow ── */
+
+export interface CampaignFundFlowDataPoint {
+  periodLabel: string;
+  totalIn: number;
+  totalOut: number;
+  netBalance: number;
+}
+
+export interface CampaignFundFlowChartResponse {
+  campaignId: number;
+  campaignName: string;
+  granularity: "month" | "week" | string;
+  from: string;
+  to: string;
+  dataPoints: CampaignFundFlowDataPoint[];
+}
+
+export interface GetCampaignFundFlowParams {
+  from?: string;
+  to?: string;
+  granularity?: "month" | "week";
+}

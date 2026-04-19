@@ -16,6 +16,10 @@ export interface MyDepotCategoryQuantityItem {
 export type GetMyDepotCategoryQuantitiesResponse =
   MyDepotCategoryQuantityItem[];
 
+export interface GetMyDepotCategoryQuantitiesParams {
+  depotId: number;
+}
+
 export type InventoryItemType = InventoryCategory;
 
 export type InventoryTargetGroup = InventoryCategory;
@@ -27,6 +31,8 @@ export type InventoryActionType = InventoryCategory;
 export type InventorySourceType = InventoryCategory;
 
 export type InventoryReliefItem = InventoryCategory;
+
+export type ReusableItemCondition = InventoryCategory;
 
 export interface ReusableBreakdown {
   totalUnits: number;
@@ -91,6 +97,7 @@ export interface ReusableItemEntity extends InventoryItemEntityBase {
 export type InventoryItemEntity = ConsumableItemEntity | ReusableItemEntity;
 
 export interface GetMyDepotInventoryParams {
+  depotId: number;
   categoryCode?: string[];
   itemTypes?: string[];
   targetGroups?: string[];
@@ -101,8 +108,10 @@ export interface GetMyDepotInventoryParams {
 export interface GetDepotInventoryParams {
   depotId: number;
   categoryIds?: number[];
+  categoryCode?: string[];
   itemTypes?: string[];
   targetGroups?: string[];
+  itemName?: string;
   pageNumber?: number;
   pageSize?: number;
 }
@@ -146,11 +155,14 @@ export interface ImportInventoryItem {
   unit: string;
   itemType: string;
   targetGroups: string[];
+  volumePerUnit?: number | null;
+  weightPerUnit?: number | null;
   receivedDate: string;
   expiredDate?: string | null;
 }
 
 export interface ImportInventoryRequest {
+  depotId: number;
   organizationId?: number;
   organizationName?: string;
   batchNote?: string;
@@ -181,12 +193,14 @@ export interface ImportPurchaseItem {
   unit: string;
   itemType: string;
   targetGroups: string[];
+  volumePerUnit?: number | null;
+  weightPerUnit?: number | null;
   receivedDate: string;
   expiredDate?: string | null;
 }
 
 export type ImportRegularRequest = {
-  advancedByName?: string;
+  depotId: number;
   invoices: Array<{
     batchNote?: string;
     vatInvoice: VatInvoice;
@@ -194,6 +208,18 @@ export type ImportRegularRequest = {
     campaignDisbursementId?: number;
   }>;
 };
+
+export interface UpdateItemModelPayload {
+  categoryId: number;
+  name: string;
+  description?: string | null;
+  unit: string;
+  itemType: string;
+  targetGroups: string[];
+  imageUrl?: string | null;
+  volumePerUnit: number;
+  weightPerUnit: number;
+}
 
 // ─── Stock Movement History ───
 
@@ -227,6 +253,7 @@ export interface StockMovementEntity {
 }
 
 export interface GetDepotStockMovementsParams {
+  depotId: number;
   actionTypes?: string[];
   sourceTypes?: string[];
   fromDate?: string;
@@ -240,6 +267,7 @@ export interface GetDepotStockMovementsParams {
 export type ExportPeriodType = "ByDateRange" | "ByMonth";
 
 export interface ExportMovementsParams {
+  depotId: number;
   periodType: ExportPeriodType;
   /** Required when periodType = ByMonth */
   month?: number;
@@ -277,6 +305,11 @@ export interface InventoryLotItem {
 
 export interface GetInventoryLotsResponse {
   items: InventoryLotItem[];
+}
+
+export interface GetInventoryLotsParams {
+  itemModelId: number;
+  depotId: number;
 }
 
 // ─── Search Depots by Relief Items ───
@@ -336,6 +369,7 @@ export interface CreateSupplyRequestEntry {
 }
 
 export interface CreateSupplyRequestsPayload {
+  depotId: number;
   requests: CreateSupplyRequestEntry[];
 }
 
@@ -359,6 +393,8 @@ export type RequestingSupplyRequestStatus =
 export type SupplyRequestRole = "Requester" | "Source";
 
 export interface GetSupplyRequestsParams {
+  depotId: number;
+  role?: SupplyRequestRole;
   sourceStatus?: SourceSupplyRequestStatus;
   requestingStatus?: RequestingSupplyRequestStatus;
   pageNumber?: number;
@@ -407,6 +443,12 @@ export interface GetSupplyRequestsResponse {
 export interface RejectSupplyRequestPayload {
   reason: string;
 }
+
+export interface SupplyRequestActionParams {
+  id: number;
+  depotId: number;
+}
+
 export type GetDepotInventoryResponse = GetMyDepotInventoryResponse;
 
 // ─── Upcoming Pickups (My Depot) ───
@@ -414,6 +456,7 @@ export type GetDepotInventoryResponse = GetMyDepotInventoryResponse;
 export interface UpcomingPickupItem {
   itemId: number;
   itemName: string;
+  imageUrl: string;
   quantity: number;
   unit: string;
 }
@@ -428,7 +471,7 @@ export interface UpcomingPickupEntity {
   missionExpectedEndTime: string;
   activityId: number;
   step: number;
-  activityCode: string;
+  activityCode?: string;
   activityType: string;
   description: string;
   priority: string;
@@ -443,6 +486,7 @@ export interface UpcomingPickupEntity {
 }
 
 export interface GetUpcomingPickupsParams {
+  depotId: number;
   pageNumber?: number;
   pageSize?: number;
 }
@@ -462,6 +506,7 @@ export interface GetUpcomingPickupsResponse {
 export interface PickupHistoryItem {
   itemId: number;
   itemName: string;
+  imageUrl: string;
   quantity: number;
   unit: string;
 }
@@ -477,7 +522,7 @@ export interface PickupHistoryEntity {
   missionExpectedEndTime: string;
   activityId: number;
   step: number;
-  activityCode: string;
+  activityCode?: string;
   activityType: string;
   description: string;
   priority: string;
@@ -495,6 +540,7 @@ export interface PickupHistoryEntity {
 }
 
 export interface GetPickupHistoryParams {
+  depotId: number;
   fromDate?: string;
   toDate?: string;
   pageNumber?: number;
@@ -503,6 +549,97 @@ export interface GetPickupHistoryParams {
 
 export interface GetPickupHistoryResponse {
   items: PickupHistoryEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+// ─── Upcoming Returns (My Depot) ───
+
+export interface ReturnReusableUnit {
+  reusableItemId: number;
+  itemModelId: number;
+  itemName: string;
+  serialNumber: string;
+  condition: string;
+  note: string | null;
+}
+
+export interface UpcomingReturnItem {
+  itemId: number;
+  itemName: string;
+  imageUrl: string | null;
+  quantity: number;
+  unit: string;
+  actualReturnedQuantity: number;
+  expectedReturnUnits: ReturnReusableUnit[];
+  returnedReusableUnits: ReturnReusableUnit[];
+}
+
+interface ReturnActivityEntityBase {
+  depotId: number;
+  depotName: string;
+  missionId: number;
+  missionType: string;
+  missionStatus: string;
+  missionStartTime: string;
+  missionExpectedEndTime: string;
+  activityId: number;
+  step: number;
+  activityType: string;
+  description: string;
+  priority: string;
+  estimatedTime: number;
+  status: string;
+  assignedAt: string;
+  missionTeamId: number;
+  rescueTeamId: number;
+  rescueTeamName: string;
+  teamType: string;
+  items: UpcomingReturnItem[];
+}
+
+export type UpcomingReturnEntity = ReturnActivityEntityBase;
+
+export interface GetUpcomingReturnsParams {
+  depotId: number;
+  status?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetUpcomingReturnsResponse {
+  items: UpcomingReturnEntity[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+// ─── Return History (My Depot) ───
+
+export interface ReturnHistoryEntity extends ReturnActivityEntityBase {
+  depotAddress: string;
+  completedAt: string;
+  completedBy: string;
+  completedByName: string;
+}
+
+export interface GetReturnHistoryParams {
+  depotId: number;
+  fromDate?: string;
+  toDate?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetReturnHistoryResponse {
+  items: ReturnHistoryEntity[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -546,9 +683,6 @@ export interface ThresholdConfig {
   rowVersion?: number | null;
   updatedAt?: string | null;
   message?: string;
-  // Legacy fields kept optional during backend rollout.
-  dangerPercent?: number;
-  warningPercent?: number;
 }
 
 export interface GetThresholdsResponse {
@@ -563,45 +697,8 @@ export interface GetThresholdsParams {
   depotId?: number;
 }
 
-export interface GetThresholdsHistoryParams {
-  scopeType?: ThresholdScopeType;
-  categoryId?: number;
-  itemModelId?: number;
-  pageNumber?: number;
-  pageSize?: number;
-}
-
-export interface ThresholdHistoryItem {
-  id: number;
-  configId?: number;
-  scopeType: string;
-  depotId?: number | null;
-  categoryId?: number | null;
-  itemModelId?: number | null;
-  oldMinimumThreshold?: number | null;
-  newMinimumThreshold?: number | null;
-  oldDangerPercent?: number | null;
-  oldWarningPercent?: number | null;
-  newDangerPercent?: number | null;
-  newWarningPercent?: number | null;
-  changedBy?: string;
-  changedAt: string;
-  changeReason?: string | null;
-  reason?: string | null;
-  action: string;
-}
-
-export interface GetThresholdsHistoryResponse {
-  items: ThresholdHistoryItem[];
-  pageNumber: number;
-  pageSize: number;
-  totalCount: number;
-  totalPages: number;
-  hasPreviousPage: boolean;
-  hasNextPage: boolean;
-}
-
 export interface UpdateThresholdPayload {
+  depotId: number;
   scopeType: ThresholdScopeType;
   categoryId?: number;
   itemModelId?: number;
@@ -613,6 +710,7 @@ export interface UpdateThresholdPayload {
 export type UpdateThresholdResponse = ThresholdConfig;
 
 export interface DeleteThresholdPayload {
+  depotId: number;
   scopeType: ThresholdScopeType;
   categoryId?: number;
   itemModelId?: number;
@@ -668,6 +766,7 @@ export interface GetLowStockResponse {
 }
 
 export interface GetLowStockParams {
+  depotId: number;
   warningLevel?: LowStockLevel;
   pageNumber?: number;
   pageSize?: number;

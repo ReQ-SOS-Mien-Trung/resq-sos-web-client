@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { persist, devtools } from "zustand/middleware";
-import { LoginResponse, RefreshTokenResponse } from "@/services/auth/type";
+import {
+  LoginResponse,
+  ManagedDepotSummary,
+  RefreshTokenResponse,
+} from "@/services/auth/type";
+import { useManagerDepotStore } from "@/stores/manager-depot.store";
 
 interface User {
   userId: string;
@@ -10,8 +15,9 @@ interface User {
   fullName: string;
   roleId: number;
   permissions: string[];
-  depotId: number | null;
-  depotName: string | null;
+  managedDepots: ManagedDepotSummary[];
+  depotId?: number | null;
+  depotName?: string | null;
 }
 
 interface AuthState {
@@ -57,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
                 fullName: data.fullName,
                 roleId: data.roleId,
                 permissions: data.permissions ?? [],
+                managedDepots: data.managedDepots ?? [],
                 depotId: data.depotId ?? null,
                 depotName: data.depotName ?? null,
               },
@@ -80,19 +87,22 @@ export const useAuthStore = create<AuthState>()(
           ),
 
         logout: () =>
-          set(
-            {
-              accessToken: null,
-              refreshToken: null,
-              expiresIn: null,
-              tokenType: null,
-              tokenObtainedAt: null,
-              user: null,
-              isAuthenticated: false,
-            },
-            false,
-            "auth/logout", // Action name hiển thị trong Redux DevTools
-          ),
+          {
+            useManagerDepotStore.getState().clearSelection();
+            set(
+              {
+                accessToken: null,
+                refreshToken: null,
+                expiresIn: null,
+                tokenType: null,
+                tokenObtainedAt: null,
+                user: null,
+                isAuthenticated: false,
+              },
+              false,
+              "auth/logout", // Action name hiển thị trong Redux DevTools
+            );
+          },
       }),
       {
         name: "auth-storage", // key trong localStorage

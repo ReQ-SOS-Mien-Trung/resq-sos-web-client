@@ -22,6 +22,8 @@ export type MissionActivityStatus =
 
 export type ActivityStatus = MissionActivityStatus;
 
+export type ActivityStatusInput = ActivityStatus | string;
+
 export interface MissionTeam {
   missionTeamId: number;
   rescueTeamId: number;
@@ -66,6 +68,7 @@ export interface MissionActivity {
   activityCode: string;
   activityType: string;
   description: string;
+  imageUrl?: string | null;
   priority: string | null;
   estimatedTime: number | null;
   sosRequestId: number | null;
@@ -128,11 +131,60 @@ export interface GetMissionsParams {
   clusterId: number;
 }
 
+export interface MissionSupplyLotAllocationRequest {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate: string;
+  expiredDate: string;
+  remainingQuantityAfterExecution: number;
+}
+
+export interface MissionSupplyReusableUnitRequest {
+  reusableItemId: number;
+  itemModelId: number;
+  itemName: string;
+  serialNumber: string;
+  condition: string;
+  note?: string | null;
+}
+
+export interface UpdateMissionActivityItemRequest {
+  itemId: number | null;
+  itemName: string | null;
+  imageUrl?: string | null;
+  quantity: number;
+  unit: string;
+  plannedPickupLotAllocations?: MissionSupplyLotAllocationRequest[];
+  plannedPickupReusableUnits?: MissionSupplyReusableUnitRequest[];
+  pickupLotAllocations?: MissionSupplyLotAllocationRequest[];
+  pickedReusableUnits?: MissionSupplyReusableUnitRequest[];
+  expectedReturnUnits?: MissionSupplyReusableUnitRequest[];
+  returnedReusableUnits?: MissionSupplyReusableUnitRequest[];
+  actualReturnedQuantity?: number;
+  bufferRatio?: number;
+  bufferQuantity?: number;
+  bufferUsedQuantity?: number;
+  bufferUsedReason?: string | null;
+  actualDeliveredQuantity?: number;
+}
+
+export interface UpdateMissionActivityRequest {
+  activityId: number;
+  step: number;
+  description: string;
+  target: string;
+  assemblyPointId?: number | null;
+  targetLatitude?: number;
+  targetLongitude?: number;
+  items: UpdateMissionActivityItemRequest[];
+}
+
 export interface UpdateMissionRequest {
   missionType: MissionType;
   priorityScore: number;
   startTime: string;
   expectedEndTime: string;
+  activities?: UpdateMissionActivityRequest[];
 }
 
 export interface UpdateMissionResponse {
@@ -203,7 +255,7 @@ export interface CreateMissionResponse {
 }
 
 export interface UpdateActivityStatusRequest {
-  status: ActivityStatus;
+  status: ActivityStatusInput;
 }
 
 export interface UpdateActivityStatusResponse {
@@ -231,6 +283,30 @@ export interface UpdateActivityResponse {
   activityType: string;
   description: string;
   status: ActivityStatus;
+}
+
+export interface ConfirmReturnConsumableItemRequest {
+  itemModelId: number;
+  quantity: number;
+}
+
+export interface ConfirmReturnReusableUnitRequest {
+  reusableItemId: number;
+  serialNumber: string;
+  condition: string;
+  note?: string | null;
+}
+
+export interface ConfirmReturnReusableItemRequest {
+  itemModelId: number;
+  quantity: number;
+  units: ConfirmReturnReusableUnitRequest[];
+}
+
+export interface ConfirmReturnSuppliesRequest {
+  discrepancyNote?: string | null;
+  consumableItems: ConfirmReturnConsumableItemRequest[];
+  reusableItems: ConfirmReturnReusableItemRequest[];
 }
 
 // ── Route types ──

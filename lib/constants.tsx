@@ -16,7 +16,6 @@ import {
   CheckCircle,
   Clock,
   Cloud,
-  CloudSun,
   Drop,
   FirstAid,
   ForkKnife,
@@ -28,7 +27,7 @@ import {
   Pulse,
   Radio,
   Shield,
-  Spinner,
+  Siren,
   SquaresFour,
   Stethoscope,
   Target,
@@ -46,9 +45,11 @@ import {
   SlidersIcon,
   UserIcon,
   PiggyBankIcon,
-  UsersIcon
+  UsersIcon,
 } from "@phosphor-icons/react";
 import { Icon as IconifyIcon } from "@iconify/react";
+import { PROMPT_TYPE_LABELS } from "@/services/prompt/constants";
+import type { PromptType } from "@/services/prompt/type";
 
 export const navLinks = [
   { href: "#features", label: "Tính năng" },
@@ -236,29 +237,160 @@ export const weekDays = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 export { CENTRAL_VN_LOCATIONS } from "./locations";
 
 //Admin Prompt
-export const PROMPT_VARIABLES = [
-  { label: "Tên nạn nhân", value: "victim_name" },
-  { label: "Tọa độ", value: "coordinates" },
-  { label: "Mức độ khẩn cấp", value: "urgency_level" },
-  { label: "Mô tả tình huống", value: "situation_description" },
-  { label: "Số người bị nạn", value: "victim_count" },
-  { label: "Loại thiên tai", value: "disaster_type" },
-  { label: "Khu vực", value: "region" },
-  { label: "Thời gian", value: "timestamp" },
-  { label: "Tài nguyên", value: "resources" },
-  { label: "Yêu cầu", value: "request" },
+export const PROMPT_TYPE_OPTIONS = [
+  {
+    label: PROMPT_TYPE_LABELS.SosPriorityAnalysis,
+    value: "SosPriorityAnalysis",
+    description: "Dùng để phân tích mức độ ưu tiên và dữ liệu SOS.",
+  },
+  {
+    label: PROMPT_TYPE_LABELS.MissionPlanning,
+    value: "MissionPlanning",
+    description: "Prompt legacy fallback cho AI gợi ý mission và rescue plan.",
+  },
+  {
+    label: PROMPT_TYPE_LABELS.MissionRequirementsAssessment,
+    value: "MissionRequirementsAssessment",
+    description:
+      "Stage pipeline phân tích SOS và trả fragment nhu cầu mission.",
+  },
+  {
+    label: PROMPT_TYPE_LABELS.MissionDepotPlanning,
+    value: "MissionDepotPlanning",
+    description:
+      "Stage pipeline chọn một kho và lập kế hoạch vật tư bằng inventory tool.",
+  },
+  {
+    label: PROMPT_TYPE_LABELS.MissionTeamPlanning,
+    value: "MissionTeamPlanning",
+    description:
+      "Stage pipeline gán đội cứu hộ và điểm tập kết bằng team/assembly tools.",
+  },
+  {
+    label: PROMPT_TYPE_LABELS.MissionPlanValidation,
+    value: "MissionPlanValidation",
+    description: "Stage pipeline chuẩn hóa draft thành JSON mission cuối cùng.",
+  },
+] as const satisfies readonly {
+  label: string;
+  value: PromptType;
+  description: string;
+}[];
+
+export const AI_PROVIDER_OPTIONS = [
+  {
+    label: "Gemini",
+    value: "Gemini",
+    description:
+      "Dùng Google AI Studio API key hoặc default Gemini config của server.",
+    models: [
+      {
+        label: "Gemini 3.1 Pro Preview",
+        code: "gemini-3.1-pro-preview",
+      },
+      {
+        label: "Gemini 3.1 Flash Lite Preview",
+        code: "gemini-3.1-flash-lite-preview",
+      },
+      {
+        label: "Gemini 3 Flash Preview",
+        code: "gemini-3-flash-preview",
+      },
+      {
+        label: "Gemini 2.5 Flash",
+        code: "gemini-2.5-flash",
+      },
+      {
+        label: "Gemini 2.5 Pro",
+        code: "gemini-2.5-pro",
+      },
+      {
+        label: "Gemini 2 Flash",
+        code: "gemini-2-flash",
+      },
+      {
+        label: "Gemini 2 Flash Lite",
+        code: "gemini-2-flash-lite",
+      },
+      {
+        label: "Gemini 2.5 Flash TTS",
+        code: "gemini-2.5-flash-tts",
+      },
+      {
+        label: "Gemini 2.5 Pro TTS",
+        code: "gemini-2.5-pro-tts",
+      },
+    ],
+  },
+  {
+    label: "OpenRouter",
+    value: "OpenRouter",
+    description:
+      "Dùng endpoint OpenRouter theo chuẩn OpenAI-compatible chat completions.",
+    models: [
+      {
+        label: "GPT-4o Mini",
+        code: "openai/gpt-4o-mini",
+      },
+      {
+        label: "GPT-4.1 Mini",
+        code: "openai/gpt-4.1-mini",
+      },
+      {
+        label: "Claude 3.5 Sonnet",
+        code: "anthropic/claude-3.5-sonnet",
+      },
+      {
+        label: "Llama 3.3 70B Instruct",
+        code: "meta-llama/llama-3.3-70b-instruct",
+      },
+    ],
+  },
 ] as const;
+
+export const PROMPT_VARIABLES_BY_TYPE = {
+  SosPriorityAnalysis: [
+    { label: "Dữ liệu đã trích xuất", value: "structured_data" },
+    { label: "Tin nhắn gốc", value: "raw_message" },
+    { label: "Loại SOS", value: "sos_type" },
+  ],
+  MissionPlanning: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Tổng số SOS", value: "total_count" },
+    { label: "Ghi chú kho", value: "depots_data" },
+  ],
+  MissionRequirementsAssessment: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Tổng số SOS", value: "total_count" },
+  ],
+  MissionDepotPlanning: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Requirements fragment", value: "requirements_fragment" },
+    { label: "Yêu cầu một kho", value: "single_depot_required" },
+    { label: "Số kho hợp lệ", value: "eligible_depot_count" },
+  ],
+  MissionTeamPlanning: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Requirements fragment", value: "requirements_fragment" },
+    { label: "Depot fragment", value: "depot_fragment" },
+    { label: "Số đội gần khu vực", value: "nearby_team_count" },
+  ],
+  MissionPlanValidation: [
+    { label: "JSON SOS requests", value: "sos_requests_data" },
+    { label: "Mission draft body", value: "mission_draft_body" },
+  ],
+} as const satisfies Record<
+  PromptType,
+  readonly { label: string; value: string }[]
+>;
 
 export const INITIAL_FORM_DATA: PromptFormData = {
   name: "",
+  prompt_type: "MissionPlanning",
   purpose: "",
   system_prompt: "",
   user_prompt_template: "",
-  model: "",
-  temperature: 0,
-  max_tokens: 0,
   version: "",
-  api_url: "",
   is_active: true,
 };
 
@@ -335,37 +467,92 @@ export const navigationItems = [
     label: "Tổng quan",
     href: "/dashboard/admin",
   },
+
   {
     icon: UserIcon,
     label: "Quản lý người dùng",
     children: [
-      { icon: UsersIcon, label: "Quản lý người dùng", href: "/dashboard/admin/users" },
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="fluent-emoji-high-contrast:rescue-workers-helmet" width={20} height={20} className={className} />
-    ), label: "Quản lý cứu hộ viên", href: "/dashboard/admin/rescuers" },
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="vaadin:user-card" width={18} height={18} className={className} />
-    ), label: "Quản lý hồ sơ cứu hộ viên", href: "/dashboard/admin/rescuer-verification" },
+      {
+        icon: UsersIcon,
+        label: "Quản lý người dùng",
+        href: "/dashboard/admin/users",
+      },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="fluent-emoji-high-contrast:rescue-workers-helmet"
+            width={20}
+            height={20}
+            className={className}
+          />
+        ),
+        label: "Quản lý cứu hộ viên",
+        href: "/dashboard/admin/rescuers",
+      },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="vaadin:user-card"
+            width={18}
+            height={18}
+            className={className}
+          />
+        ),
+        label: "Quản lý hồ sơ cứu hộ viên",
+        href: "/dashboard/admin/rescuer-verification",
+      },
     ],
   },
   {
     icon: SlidersIcon,
     label: "Cấu hình hệ thống",
     children: [
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="mynaui:config-vertical" width={20} height={20} className={className} />
-    ), label: "Tham số hệ thống", href: "/dashboard/admin/config" },
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="streamline:ai-prompt-spark" width={18} height={18} className={className} />
-    ), label: "Cấu hình AI Prompt", href: "/dashboard/admin/ai-prompt" },
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="proicons:chat" width={20} height={20} className={className} />
-    ), label: "Cấu hình phòng chat", href: "/dashboard/admin/chat-config" },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="mynaui:config-vertical"
+            width={20}
+            height={20}
+            className={className}
+          />
+        ),
+        label: "Tham số hệ thống",
+        href: "/dashboard/admin/config",
+      },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="streamline:ai-prompt-spark"
+            width={18}
+            height={18}
+            className={className}
+          />
+        ),
+        label: "Cấu hình AI Prompt",
+        href: "/dashboard/admin/ai-prompt",
+      },
+      {
+        icon: ({ className }: { size?: number; className?: string }) => (
+          <IconifyIcon
+            icon="proicons:chat"
+            width={20}
+            height={20}
+            className={className}
+          />
+        ),
+        label: "Cấu hình phòng chat",
+        href: "/dashboard/admin/chat-config",
+      },
     ],
   },
   {
     icon: ({ size, className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="fa7-solid:people-roof" width={size} height={size} className={className} />
+      <IconifyIcon
+        icon="fa7-solid:people-roof"
+        width={size}
+        height={size}
+        className={className}
+      />
     ),
     label: "Quản lý điểm tập kết",
     href: "/dashboard/admin/assembly-points",
@@ -375,11 +562,23 @@ export const navigationItems = [
     label: "Quản lý kho",
     href: "/dashboard/admin/depots",
   },
-  { icon: ({ size, className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="solar:hand-money-outline" width={size} height={size} className={className} />
-    )
-    , label: "Phân bổ quỹ từ thiện", href: "/dashboard/admin/reports" },
-  { icon: PiggyBankIcon, label: "Quản lý quỹ chiến dịch", href: "/dashboard/admin/campaigns" },
+  {
+    icon: ({ size, className }: { size?: number; className?: string }) => (
+      <IconifyIcon
+        icon="solar:hand-money-outline"
+        width={size}
+        height={size}
+        className={className}
+      />
+    ),
+    label: "Phân bổ quỹ từ thiện",
+    href: "/dashboard/admin/reports",
+  },
+  {
+    icon: PiggyBankIcon,
+    label: "Quản lý quỹ chiến dịch",
+    href: "/dashboard/admin/campaigns",
+  },
   {
     icon: LockKey,
     label: "Phân quyền người dùng",
@@ -391,17 +590,16 @@ export const navigationItems = [
     href: "/dashboard/admin/map-zone",
   },
   {
-    icon: CloudSun,
-    label: "Thời tiết",
-    children: [
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="fluent-mdl2:news"  width={18} height={18} className={className} />
-    ), 
-    label: "Bài đăng thời tiết", href: "/dashboard/admin/weather-posts" },
-      { icon: ({ className }: { size?: number; className?: string }) => (
-      <IconifyIcon icon="wi:forecast-io-hail" width={24} height={24} className={className} />
-    ), label: "Thời tiết & Lũ lụt", href: "/dashboard/admin/weather-flood" },
-    ],
+    icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon
+        icon="wi:forecast-io-hail"
+        width={24}
+        height={24}
+        className={className}
+      />
+    ),
+    label: "Thời tiết & Lũ lụt",
+    href: "/dashboard/admin/weather-flood",
   },
 ];
 
@@ -574,26 +772,19 @@ export const assemblyPointStatusConfig = {
     bgColor: "bg-sky-50 dark:bg-sky-950/30",
     icon: Clock,
   },
-  Active: {
-    label: "Hoạt động",
+  Available: {
+    label: "Khả dụng",
     color: "bg-green-500",
     textColor: "text-green-700 dark:text-green-400",
     bgColor: "bg-green-50 dark:bg-green-950/30",
     icon: CheckCircle,
   },
-  Overloaded: {
-    label: "Quá tải",
+  Unavailable: {
+    label: "Không khả dụng",
     color: "bg-orange-500",
     textColor: "text-orange-700 dark:text-orange-400",
     bgColor: "bg-orange-50 dark:bg-orange-950/30",
     icon: WarningCircle,
-  },
-  UnderMaintenance: {
-    label: "Đang bảo trì",
-    color: "bg-violet-500",
-    textColor: "text-violet-700 dark:text-violet-400",
-    bgColor: "bg-violet-50 dark:bg-violet-950/30",
-    icon: Spinner,
   },
   Closed: {
     label: "Đã đóng",
@@ -628,17 +819,32 @@ export const activityTypeConfig: Record<string, ActivityTypeConfig> = {
     bgColor: "bg-orange-100 dark:bg-orange-900/30",
   },
   DELIVER_SUPPLIES: {
-    label: "Tiếp tế",
+    label: "Phân phát vật phẩm",
     color: "text-purple-700 dark:text-purple-400",
     bgColor: "bg-purple-100 dark:bg-purple-900/30",
   },
   RETURN_SUPPLIES: {
-    label: "Trả đồ",
+    label: "Hoàn trả vật phẩm",
     color: "text-cyan-700 dark:text-cyan-400",
     bgColor: "bg-cyan-100 dark:bg-cyan-900/30",
   },
+  RETURN_ASSEMBLY_POINT: {
+    label: "Quay về điểm tập kết",
+    color: "text-slate-700 dark:text-slate-300",
+    bgColor: "bg-slate-100 dark:bg-slate-900/30",
+  },
+  RETURN_TO_ASSEMBLY_POINT: {
+    label: "Quay về điểm tập kết",
+    color: "text-slate-700 dark:text-slate-300",
+    bgColor: "bg-slate-100 dark:bg-slate-900/30",
+  },
+  RETURN_ASSEMBLY: {
+    label: "Quay về điểm tập kết",
+    color: "text-slate-700 dark:text-slate-300",
+    bgColor: "bg-slate-100 dark:bg-slate-900/30",
+  },
   COLLECT_SUPPLIES: {
-    label: "Lấy vật tư",
+    label: "Tiếp nhận vật phẩm",
     color: "text-amber-700 dark:text-amber-400",
     bgColor: "bg-amber-100 dark:bg-amber-900/30",
   },

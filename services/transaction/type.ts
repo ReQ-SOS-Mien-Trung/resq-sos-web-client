@@ -1,3 +1,5 @@
+import type { DepotFundReferenceType } from "@/services/depot/type";
+
 // ─── Depot Fund Metadata ───
 
 export interface DepotFundMetadataItem {
@@ -11,15 +13,24 @@ export interface GetDepotFundTransactionsParams {
   depotId: number;
   pageNumber?: number;
   pageSize?: number;
+  fromDate?: string;
+  toDate?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  referenceTypes?: DepotFundReferenceType[];
+  search?: string;
 }
 
 export interface DepotFundTransactionItem {
   id: number;
   depotFundId: number;
+  ledgerEntryId?: number | string | null;
   transactionType: string;
   amount: number;
   referenceType: string;
-  referenceId: number;
+  referenceId: number | null;
+  contributorName?: string | null;
+  phoneNumber?: string | null;
   note: string;
   createdBy: string;
   createdAt: string;
@@ -54,7 +65,7 @@ export interface CampaignTransactionItem {
   direction: string;
   amount: number;
   referenceType: string;
-  referenceId: number;
+  referenceId: number | null;
   createdByUserName: string;
   createdAt: string;
 }

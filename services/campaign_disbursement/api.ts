@@ -123,3 +123,18 @@ export async function updateCampaignStatus(
 ): Promise<void> {
   await api.patch(`/finance/campaigns/${id}/status`, payload);
 }
+
+/**
+ * Lấy biểu đồ biến động quỹ chiến dịch
+ * GET /finance/campaigns/{id}/chart/fund-flow
+ */
+export async function getCampaignFundFlowChart(
+  campaignId: number,
+  params?: import("./type").GetCampaignFundFlowParams,
+): Promise<import("./type").CampaignFundFlowChartResponse> {
+  const { data } = await api.get(
+    `/finance/campaigns/${campaignId}/chart/fund-flow`,
+    { params },
+  );
+  return data;
+}

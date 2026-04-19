@@ -2,12 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
-import {
-  mockInventoryItems,
-  mockSupplyRequests,
-  mockShipments,
-  mockActivityLogs,
-} from "@/lib/mock-data";
+import { mockInventoryItems, mockShipments } from "@/lib/mock-data";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -40,22 +35,19 @@ import {
   WalletIcon,
   SunIcon,
   MoonIcon,
-  ProhibitInset,
   LockIcon,
+  WarehouseIcon,
 } from "@phosphor-icons/react";
 import {
   CategoryOverview,
   DepotSidebar,
-  InventoryStats,
   ItemDetailsSheet,
-  LowStockAlerts,
-  RecentActivity,
-  SupplyRequestSection,
 } from "@/components/inventory";
 import SupplyRequestManagement from "@/components/inventory/SupplyRequestManagement";
 import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
 import SupplyRequestTracker from "@/components/inventory/SupplyRequestTracker";
+import DepotChartsSection from "@/components/inventory/DepotChartsSection";
 import {
   InventoryItemEntity,
   SupplyRequestListItem,
@@ -64,13 +56,7 @@ import {
   useMyDepotQuantityByCategory,
   useSupplyRequests,
 } from "@/services/inventory/hooks";
-import {
-  DepotInfo,
-  InventoryItem,
-  IInventoryStats,
-  Shipment,
-  SupplyRequest,
-} from "@/type";
+import { DepotInfo, InventoryItem, SupplyRequest } from "@/type";
 import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { useThemeStore } from "@/stores/theme.store";
@@ -80,6 +66,10 @@ import { DepotEntity } from "@/services/depot/type";
 import { useItemCategories } from "@/services/item_categories/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileTextIcon } from "lucide-react";
+import {
+  MANAGER_DEPOT_SELECT_ROUTE,
+  useManagerDepot,
+} from "@/hooks/use-manager-depot";
 
 // --- Helpers ---
 
@@ -106,41 +96,6 @@ const mapDepotEntityToInfo = (
     (s) => s.status === "PREPARING" || s.status === "IN_TRANSIT",
   ).length,
 });
-
-/** Compute dashboard stats from inventory & supply data */
-const computeStats = (
-  items: InventoryItem[],
-  requests: SupplyRequest[],
-  shipments: Shipment[],
-  totalCategories: number,
-): IInventoryStats => {
-  const now = new Date();
-  return {
-    totalItems: items.length,
-    totalCategories,
-    criticalStock: items.filter((i) => i.stockLevel === "CRITICAL").length,
-    lowStock: items.filter((i) => i.stockLevel === "LOW").length,
-    normalStock: items.filter(
-      (i) => i.stockLevel === "NORMAL" || i.stockLevel === "OVERSTOCKED",
-    ).length,
-    pendingInbound: requests.filter(
-      (r) => r.type === "INBOUND" && r.status === "PENDING",
-    ).length,
-    pendingOutbound: requests.filter(
-      (r) => r.type === "OUTBOUND" && r.status === "PENDING",
-    ).length,
-    activeShipments: shipments.filter(
-      (s) => s.status === "PREPARING" || s.status === "IN_TRANSIT",
-    ).length,
-    itemsExpiringSoon: items.filter((i) => {
-      if (!i.expiryDate) return false;
-      const days = Math.ceil(
-        (new Date(i.expiryDate).getTime() - now.getTime()) / 86_400_000,
-      );
-      return days > 0 && days <= 30;
-    }).length,
-  };
-};
 
 const mapApiSupplyRequestToSidebar = (
   request: SupplyRequestListItem,
@@ -224,7 +179,6 @@ const INVENTORY_TABS = new Set([
   "incoming",
   "vattu",
   "shipments",
-  "requests",
   "supply-management",
 ]);
 
@@ -258,7 +212,6 @@ const InventoryDashboardPage = () => {
   const mainRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
-  const panelWidthRef = useRef(480);
 
   const router = useRouter();
 
@@ -294,6 +247,8 @@ const InventoryDashboardPage = () => {
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const user = useAuthStore((state) => state.user);
   const { data: userMe } = useUserMe();
+  const { hasMultipleDepots, selectedDepot, selectedDepotId } =
+    useManagerDepot();
 
   const displayName = useMemo(
     () =>
@@ -341,7 +296,10 @@ const InventoryDashboardPage = () => {
   } = useItemCategories({ params: { pageNumber: 1, pageSize: 50 } });
 
   const { data: quantityByCategoryData, refetch: refetchQuantityByCategory } =
-    useMyDepotQuantityByCategory();
+    useMyDepotQuantityByCategory(
+      { depotId: selectedDepotId ?? 0 },
+      { enabled: Boolean(selectedDepotId) },
+    );
 
   const {
     data: supplyRequestsData,
@@ -349,8 +307,12 @@ const InventoryDashboardPage = () => {
     isFetching: isSupplyRequestsFetching,
     refetch: refetchSupplyRequests,
   } = useSupplyRequests(
-    { pageNumber: 1, pageSize: 10 },
-    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+    { depotId: selectedDepotId ?? 0, pageNumber: 1, pageSize: 10 },
+    {
+      refetchInterval: 10_000,
+      refetchOnWindowFocus: true,
+      enabled: Boolean(selectedDepotId),
+    },
   );
 
   const {
@@ -359,8 +321,16 @@ const InventoryDashboardPage = () => {
     isFetching: isAllRequestsFetching,
     refetch: refetchAllRequests,
   } = useSupplyRequests(
-    { pageNumber: requestsPageNumber, pageSize: 10 },
-    { refetchInterval: 10_000, refetchOnWindowFocus: true },
+    {
+      depotId: selectedDepotId ?? 0,
+      pageNumber: requestsPageNumber,
+      pageSize: 10,
+    },
+    {
+      refetchInterval: 10_000,
+      refetchOnWindowFocus: true,
+      enabled: Boolean(selectedDepotId),
+    },
   );
 
   const canPrevRequestsPage = requestsPageNumber > 1;
@@ -377,14 +347,15 @@ const InventoryDashboardPage = () => {
   );
 
   // Use the first depot as the current managed depot
-  const currentDepot = depotsData?.items?.[0] ?? null;
+  const currentDepot =
+    depotsData?.items?.find((depot) => depot.id === selectedDepotId) ?? null;
 
   // Real category count from API
   const totalCategories = categoriesData?.totalCount ?? 0;
 
   // Map API depot to DepotInfo for sidebar
   const depotInfo = useMemo<DepotInfo | null>(() => {
-    if (!currentDepot && !user?.depotName) return null;
+    if (!currentDepot && !selectedDepot) return null;
 
     const pendingCount = (supplyRequestsData?.items ?? []).filter(
       (request) =>
@@ -392,8 +363,7 @@ const InventoryDashboardPage = () => {
         request.requestingStatus === "WaitingForApproval",
     ).length;
 
-    // Use auth store depotName as primary, fallback to depot API
-    const resolvedName = user?.depotName ?? currentDepot?.name ?? "—";
+    const resolvedName = selectedDepot?.depotName ?? currentDepot?.name ?? "—";
 
     if (currentDepot) {
       const info = mapDepotEntityToInfo(
@@ -407,9 +377,9 @@ const InventoryDashboardPage = () => {
 
     // Minimal depotInfo built only from auth store data (no depot API yet)
     return {
-      id: String(user?.depotId ?? ""),
+      id: String(selectedDepot?.depotId ?? ""),
       name: resolvedName,
-      address: "",
+      address: selectedDepot?.address ?? "",
       phone: "—",
       manager: displayName,
       totalItems: 0,
@@ -419,7 +389,13 @@ const InventoryDashboardPage = () => {
       pendingRequests: pendingCount,
       activeShipments: 0,
     };
-  }, [currentDepot, user, displayName, totalCategories, supplyRequestsData]);
+  }, [
+    currentDepot,
+    selectedDepot,
+    displayName,
+    totalCategories,
+    supplyRequestsData,
+  ]);
 
   const sidebarSupplyRequests = useMemo(
     () => (supplyRequestsData?.items ?? []).map(mapApiSupplyRequestToSidebar),
@@ -447,18 +423,6 @@ const InventoryDashboardPage = () => {
         description: "",
       })),
     [quantityByCategoryData],
-  );
-
-  // ── Compute stats (will use real item APIs when available) ──
-  const stats = useMemo<IInventoryStats>(
-    () =>
-      computeStats(
-        mockInventoryItems,
-        mockSupplyRequests,
-        mockShipments,
-        totalCategories,
-      ),
-    [totalCategories],
   );
 
   // ── Handlers ──
@@ -584,17 +548,33 @@ const InventoryDashboardPage = () => {
               ResQ-SOS | Quản Lý Kho
             </span>
           </div>
-          <Badge
-            variant={currentDepot ? "success" : "destructive"}
-            className="hidden sm:flex items-center gap-1"
+          <div
+            className={cn(
+              "relative hidden h-9 w-9 items-center justify-center rounded-full border sm:flex",
+              currentDepot
+                ? "border-green-200 bg-green-100 text-green-700 dark:border-green-800/50 dark:bg-green-900/30 dark:text-green-400"
+                : "border-red-200 bg-red-100 text-red-700 dark:border-red-800/50 dark:bg-red-900/30 dark:text-red-400",
+            )}
+            title={currentDepot ? "Đang kết nối" : "Mất kết nối"}
+            aria-label={currentDepot ? "Đang kết nối" : "Mất kết nối"}
           >
             {currentDepot ? (
-              <WifiHigh className="h-3 w-3" weight="bold" />
+              <>
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full bg-green-500 opacity-75 animate-ping" />
+                <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-green-500 dark:border-zinc-900/70" />
+              </>
             ) : (
-              <WifiSlash className="h-3 w-3" weight="bold" />
+              <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-red-500 dark:border-zinc-900/70" />
             )}
-            {currentDepot ? "Đang kết nối" : "Mất kết nối"}
-          </Badge>
+            {currentDepot ? (
+              <WifiHigh className="h-4 w-4" weight="bold" />
+            ) : (
+              <WifiSlash className="h-4 w-4" weight="bold" />
+            )}
+            <span className="sr-only">
+              {currentDepot ? "Đang kết nối" : "Mất kết nối"}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -646,7 +626,7 @@ const InventoryDashboardPage = () => {
             onClick={() => router.push("/dashboard/inventory/stock-movements")}
           >
             <FileTextIcon className="h-4 w-4" />
-            Truy xuất
+            Xem biến động kho
           </Button>
           <Button
             variant="outline"
@@ -655,7 +635,7 @@ const InventoryDashboardPage = () => {
             onClick={() => router.push("/dashboard/inventory/pickups")}
           >
             <TruckIcon className="h-4 w-4" />
-            Quản lý lấy hàng
+            Quản lý giao nhận
           </Button>
           <Button
             variant="outline"
@@ -664,7 +644,7 @@ const InventoryDashboardPage = () => {
             onClick={() => router.push("/dashboard/inventory/funding-request")}
           >
             <WalletIcon className="h-4 w-4" />
-            Yêu cầu cấp quỹ
+            Quản lý quỹ kho
           </Button>
           <Button
             variant="outline"
@@ -705,9 +685,11 @@ const InventoryDashboardPage = () => {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
-                  <span className="font-semibold">{displayName}</span>
-                  <span className="text-xs text-muted-foreground">
-                    Quản lý kho
+                  <span className="font-semibold tracking-tighter text-sm">
+                    {displayName}
+                  </span>
+                  <span className="text-xs tracking-tighter text-neutral-500">
+                    {selectedDepot?.depotName ?? "Quản lý kho"}
                   </span>
                 </div>
               </DropdownMenuLabel>
@@ -716,10 +698,15 @@ const InventoryDashboardPage = () => {
                 <User className="h-4 w-4" />
                 Hồ sơ
               </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2 cursor-pointer">
-                <Gear className="h-4 w-4" />
-                Cài đặt
-              </DropdownMenuItem>
+              {hasMultipleDepots ? (
+                <DropdownMenuItem
+                  className="gap-2 cursor-pointer"
+                  onClick={() => router.push(MANAGER_DEPOT_SELECT_ROUTE)}
+                >
+                  <WarehouseIcon className="h-4 w-4" />
+                  Chuyển đổi kho
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="gap-2 cursor-pointer text-red-500 focus:text-red-500"
@@ -733,7 +720,7 @@ const InventoryDashboardPage = () => {
                   </>
                 ) : (
                   <>
-                    <SignOut className="h-4 w-4" />
+                    <SignOut className="h-4 w-4 text-red-500" />
                     Đăng xuất
                   </>
                 )}
@@ -792,8 +779,10 @@ const InventoryDashboardPage = () => {
                     Dashboard Kho Hàng
                   </h1>
                   <p className="text-muted-foreground tracking-tighter">
-                    {user?.depotName ?? depotInfo?.name ?? "Đang tải..."} • Quản
-                    lý bởi {displayName}
+                    {selectedDepot?.depotName ??
+                      depotInfo?.name ??
+                      "Đang tải..."}{" "}
+                    • Quản lý bởi {displayName}
                   </p>
                 </div>
                 <Button
@@ -816,7 +805,9 @@ const InventoryDashboardPage = () => {
             )}
 
             {activeTab === "supply-management" ? (
-              <SupplyRequestManagement />
+              <SupplyRequestManagement
+                onPanelOpenChange={(open) => setSidebarOpen(!open)}
+              />
             ) : activeTab === "vattu" ? (
               <VatTuSection
                 onItemSelect={(item) => {
@@ -849,7 +840,7 @@ const InventoryDashboardPage = () => {
                                 Trạng thái
                               </th>
                               <th className="px-4 py-3 font-semibold">
-                                Vật tư
+                                Vật phẩm
                               </th>
                               <th className="px-4 py-3 font-semibold">
                                 Thời gian tạo
@@ -977,30 +968,8 @@ const InventoryDashboardPage = () => {
                   </div>
                 </div>
               </div>
-            ) : activeTab === "requests" ? (
-              <SupplyRequestSection
-                onSelectionSidebarOpen={() => {
-                  if (sidebarOpen) setSidebarOpen(false);
-                }}
-                onSelectionSidebarChange={(open) => {
-                  if (mainRef.current) {
-                    mainRef.current.style.marginRight = open
-                      ? `${panelWidthRef.current}px`
-                      : "0px";
-                  }
-                }}
-                onPanelWidthChange={(w) => {
-                  panelWidthRef.current = w;
-                  if (mainRef.current) {
-                    mainRef.current.style.marginRight = `${w}px`;
-                  }
-                }}
-              />
             ) : (
               <>
-                {/* Stats Overview */}
-                <InventoryStats stats={stats} />
-
                 {/* Category Overview */}
                 <CategoryOverview
                   apiCategories={categoryOverviewData}
@@ -1008,14 +977,10 @@ const InventoryDashboardPage = () => {
                   selectedCategory={selectedCategory}
                 />
 
-                {/* Two Column Layout: Alerts + Activity */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Low Stock Alerts */}
-                  <LowStockAlerts />
-
-                  {/* Recent Activity */}
-                  <RecentActivity activities={mockActivityLogs} maxItems={8} />
-                </div>
+                {/* Charts Section */}
+                {selectedDepotId && (
+                  <DepotChartsSection depotId={selectedDepotId} />
+                )}
               </>
             )}
           </motion.div>

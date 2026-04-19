@@ -39,7 +39,7 @@ const CustomTooltip = ({
           return (
             <div
               key={segment.name}
-              className="flex items-center justify-between gap-4 text-xs py-0.5"
+              className="flex items-center justify-between gap-4 text-sm tracking-tighter py-0.5"
             >
               <div className="flex items-center gap-2">
                 <div
@@ -92,10 +92,10 @@ const RetentionRate = ({ data }: RetentionRateProps) => {
               />
             </div>
             <div className="flex items-baseline gap-2 mt-2">
-              <span className="text-3xl font-bold tracking-tight">
+              <span className="text-3xl font-bold tracking-tighter">
                 {data.currentRate}%
               </span>
-              <div className="flex items-center gap-1 text-xs text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full">
+              <div className="flex items-center gap-1 text-sm tracking-tighter text-emerald-500 font-medium bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-full">
                 <TrendUp size={12} />
                 <span>+{data.change}% so với tháng trước</span>
               </div>
@@ -114,7 +114,7 @@ const RetentionRate = ({ data }: RetentionRateProps) => {
                   className="w-2.5 h-2.5 rounded-full transition-transform group-hover:scale-125"
                   style={{ backgroundColor: color }}
                 />
-                <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
+                <span className="text-sm tracking-tighter text-muted-foreground group-hover:text-foreground transition-colors">
                   {segment.name}
                 </span>
               </div>

@@ -9,9 +9,9 @@ import {
   AssemblyPointMetadataOption,
   UpdateAssemblyPointRequest,
   UpdateAssemblyPointResponse,
-  UpdateAssemblyPointStatusRequest,
-  UpdateAssemblyPointStatusResponse,
   UpdateRescuerAssemblyPointAssignmentRequest,
+  AssemblyPointStatusTransitionRequest,
+  AssemblyPointStatusTransitionResponse,
   ScheduleAssemblyPointGatheringRequest,
   ScheduleAssemblyPointGatheringResponse,
   StartAssemblyPointGatheringRequest,
@@ -32,6 +32,7 @@ export async function getAssemblyPoints(
     params: {
       pageNumber: params?.pageNumber ?? 1,
       pageSize: params?.pageSize ?? 10,
+      status: params?.status,
     },
   });
   return data;
@@ -94,25 +95,62 @@ export async function updateAssemblyPoint(
 }
 
 /**
- * Update assembly point status
- * PATCH /personnel/assembly-point/{id}/status
+ * Activate an assembly point
+ * PATCH /personnel/assembly-point/{id}/activate
  */
-export async function updateAssemblyPointStatus(
-  payload: UpdateAssemblyPointStatusRequest,
-): Promise<UpdateAssemblyPointStatusResponse> {
-  const { id, status } = payload;
+export async function activateAssemblyPoint(
+  id: number,
+): Promise<AssemblyPointStatusTransitionResponse> {
+  const { data } = await api.patch(`/personnel/assembly-point/${id}/activate`);
+  return data;
+}
+
+/**
+ * Set an assembly point to unavailable
+ * PATCH /personnel/assembly-point/{id}/set-unavailable
+ */
+export async function setAssemblyPointUnavailable(
+  payload: AssemblyPointStatusTransitionRequest,
+): Promise<AssemblyPointStatusTransitionResponse> {
+  const { id, reason } = payload;
   const { data } = await api.patch(
-    `/personnel/assembly-point/${id}/status?status=${status}`,
+    `/personnel/assembly-point/${id}/set-unavailable`,
+    {
+      reason: reason ?? null,
+    },
   );
   return data;
 }
 
 /**
- * Delete an assembly point
- * DELETE /personnel/assembly-point/{id}
+ * Set an assembly point to available
+ * PATCH /personnel/assembly-point/{id}/set-available
  */
-export async function deleteAssemblyPoint(id: number): Promise<void> {
-  await api.delete(`/personnel/assembly-point/${id}`);
+export async function setAssemblyPointAvailable(
+  payload: AssemblyPointStatusTransitionRequest,
+): Promise<AssemblyPointStatusTransitionResponse> {
+  const { id, reason } = payload;
+  const { data } = await api.patch(
+    `/personnel/assembly-point/${id}/set-available`,
+    {
+      reason: reason ?? null,
+    },
+  );
+  return data;
+}
+
+/**
+ * Close an assembly point permanently
+ * PATCH /personnel/assembly-point/{id}/close
+ */
+export async function closeAssemblyPoint(
+  payload: AssemblyPointStatusTransitionRequest,
+): Promise<AssemblyPointStatusTransitionResponse> {
+  const { id, reason } = payload;
+  const { data } = await api.patch(`/personnel/assembly-point/${id}/close`, {
+    reason,
+  });
+  return data;
 }
 
 /**
@@ -136,11 +174,12 @@ export async function updateRescuerAssemblyPointAssignment(
 export async function scheduleAssemblyPointGathering(
   payload: ScheduleAssemblyPointGatheringRequest,
 ): Promise<ScheduleAssemblyPointGatheringResponse> {
-  const { id, assemblyDate } = payload;
+  const { id, assemblyDate, checkInDeadline } = payload;
   const { data } = await api.post(
     `/personnel/assembly-point/${id}/schedule-gathering`,
     {
       assemblyDate,
+      checkInDeadline,
     },
   );
   return data;

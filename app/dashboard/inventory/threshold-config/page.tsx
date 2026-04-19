@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useCallback, useMemo, useState } from "react";
+import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,13 +38,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  ArrowCounterClockwise,
   ArrowLeft,
-  CaretLeft,
-  CaretRight,
   ChartBar,
   CheckCircle,
-  ClockCounterClockwise,
   Funnel,
   Gear,
   PencilSimple,
@@ -50,13 +48,22 @@ import {
   SpinnerGap,
   Trash,
   WarningCircle,
+  Folders,
+  Package,
+  Scales,
+  ListDashes,
 } from "@phosphor-icons/react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   useDeleteMyDepotThreshold,
   useInventoryCategories,
   useMyDepotLowStock,
   useMyDepotThresholds,
-  useMyDepotThresholdsHistory,
   useUpdateMyDepotThreshold,
 } from "@/services/inventory/hooks";
 import {
@@ -69,10 +76,8 @@ import {
 } from "@/services/inventory/utils";
 import type {
   DeleteThresholdPayload,
-  GetThresholdsHistoryParams,
   LowStockItem,
   ThresholdConfig,
-  ThresholdHistoryItem,
   ThresholdScopeType,
   UpdateThresholdPayload,
 } from "@/services/inventory/type";
@@ -93,6 +98,13 @@ const SCOPE_COLORS: Record<string, string> = {
   DepotItem: "bg-emerald-100 text-emerald-700",
 };
 
+const SCOPE_ACCENT: Record<string, string> = {
+  Global: "border-l-purple-400",
+  Depot: "border-l-blue-400",
+  DepotCategory: "border-l-amber-400",
+  DepotItem: "border-l-emerald-400",
+};
+
 const WARNING_LEVEL_COLORS: Record<string, string> = {
   CRITICAL: "bg-red-100 text-red-700",
   HIGH: "bg-orange-100 text-orange-700",
@@ -101,6 +113,8 @@ const WARNING_LEVEL_COLORS: Record<string, string> = {
   OK: "bg-emerald-100 text-emerald-700",
   UNCONFIGURED: "bg-slate-100 text-slate-700",
 };
+
+const MOTION_EASE = [0.22, 1, 0.36, 1] as const;
 
 function formatDate(iso?: string | null): string {
   if (!iso) {
@@ -130,37 +144,7 @@ function formatThresholdDisplay(config: ThresholdConfig): string {
     return `${formatNumber(config.minimumThreshold)} đơn vị`;
   }
 
-  if (
-    config.dangerPercent != null ||
-    config.warningPercent != null
-  ) {
-    return `Danger ${config.dangerPercent ?? "—"}% · Warning ${config.warningPercent ?? "—"}%`;
-  }
-
   return "Chưa cấu hình";
-}
-
-function formatHistoryThresholdValue(
-  item: ThresholdHistoryItem,
-  variant: "old" | "new",
-): string {
-  const threshold =
-    variant === "old" ? item.oldMinimumThreshold : item.newMinimumThreshold;
-
-  if (threshold != null) {
-    return formatNumber(threshold);
-  }
-
-  const danger =
-    variant === "old" ? item.oldDangerPercent : item.newDangerPercent;
-  const warning =
-    variant === "old" ? item.oldWarningPercent : item.newWarningPercent;
-
-  if (danger != null || warning != null) {
-    return `${danger ?? "—"}% / ${warning ?? "—"}%`;
-  }
-
-  return "—";
 }
 
 function getWarningBadge(level?: string | null) {
@@ -221,12 +205,27 @@ function EmptyState({
   );
 }
 
-function ThresholdConfigCard({
+const SCOPE_DOT: Record<string, string> = {
+  Global: "bg-purple-400",
+  Depot: "bg-blue-400",
+  DepotCategory: "bg-amber-400",
+  DepotItem: "bg-emerald-400",
+};
+
+const SCOPE_SECTION_BG: Record<string, string> = {
+  Global: "bg-purple-50/60 dark:bg-purple-950/20",
+  Depot: "bg-blue-50/60 dark:bg-blue-950/20",
+  DepotCategory: "bg-amber-50/60 dark:bg-amber-950/20",
+  DepotItem: "bg-emerald-50/60 dark:bg-emerald-950/20",
+};
+
+function ThresholdConfigRow({
   config,
   label,
   sublabel,
   canEdit,
   canDelete,
+  isLast,
   onEdit,
   onDelete,
 }: {
@@ -235,93 +234,169 @@ function ThresholdConfigCard({
   sublabel?: string;
   canEdit: boolean;
   canDelete: boolean;
+  isLast: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
-    <Card className="group relative transition-shadow hover:shadow-md">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 flex items-center gap-2">
-              <Badge
-                className={cn(
-                  "text-xs font-medium",
-                  SCOPE_COLORS[config.scopeType] ?? "",
-                )}
-              >
-                {SCOPE_LABELS[config.scopeType] ?? config.scopeType}
-              </Badge>
-              {sublabel ? (
-                <span className="truncate text-xs text-muted-foreground">
-                  {sublabel}
-                </span>
-              ) : null}
-            </div>
-
-            <p className="text-sm font-semibold text-foreground">{label}</p>
-            <p className="mt-3 text-2xl font-semibold tracking-tight text-foreground">
-              {config.minimumThreshold != null
-                ? formatNumber(config.minimumThreshold)
-                : "—"}
+    <div
+      className={cn(
+        "group flex flex-col gap-1.5 px-3 py-3 hover:bg-black/[0.03] dark:hover:bg-white/[0.03] transition-colors",
+        !isLast && "border-b border-border/50",
+      )}
+    >
+      {/* Top: label + actions */}
+      <div className="flex items-start justify-between gap-1">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold tracking-tighter text-foreground leading-snug">
+            {label}
+          </p>
+          {sublabel ? (
+            <p className="text-sm tracking-tighter text-muted-foreground">
+              {sublabel}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {config.minimumThreshold != null
-                ? "Ngưỡng tối thiểu"
-                : formatThresholdDisplay(config)}
-            </p>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Cập nhật: {formatDate(config.updatedAt)}
-              {config.rowVersion != null ? ` · v${config.rowVersion}` : ""}
-            </p>
-          </div>
-
-          {canEdit || canDelete ? (
-            <div className="flex shrink-0 gap-1">
-              {canEdit ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={onEdit}
-                >
-                  <PencilSimple className="h-4 w-4" />
-                </Button>
-              ) : null}
-              {canDelete ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive"
-                  onClick={onDelete}
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
-              ) : null}
-            </div>
           ) : null}
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {canEdit ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onEdit}
+            >
+              <PencilSimple className="h-3 w-3" />
+            </Button>
+          ) : null}
+          {canDelete ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive hover:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash className="h-3 w-3" />
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Bottom: threshold chip + date */}
+      <div className="flex items-center justify-between gap-2">
+        <div
+          className={cn(
+            "inline-flex items-baseline gap-1 rounded-md px-2 py-0.5",
+            SCOPE_SECTION_BG[config.scopeType] ?? "bg-muted/40",
+          )}
+        >
+          <span className="text-sm font-bold tabular-nums tracking-tighter text-foreground">
+            <span className="text-sm tracking-tighter font-normal">
+              Ngưỡng tối thiểu:{" "}
+            </span>
+            {config.minimumThreshold != null
+              ? formatNumber(config.minimumThreshold)
+              : "—"}
+          </span>
+        </div>
+        <div className="text-right">
+          <p className="text-xs tabular-nums tracking-tighter text-muted-foreground whitespace-nowrap">
+            Tạo lúc: {formatDate(config.updatedAt)}
+          </p>
+          {config.rowVersion != null ? (
+            <p className="text-xs tracking-tighter text-muted-foreground">
+              Version:{" "}
+              <span className="text-black font-medium">
+                v{config.rowVersion}
+              </span>
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ThresholdScopeSection({
+  scopeType,
+  items,
+  onEdit,
+  onDelete,
+}: {
+  scopeType: string;
+  items: Array<{
+    config: ThresholdConfig;
+    label: string;
+    sublabel?: string;
+    canEdit: boolean;
+    canDelete: boolean;
+  }>;
+  onEdit: (config: ThresholdConfig) => void;
+  onDelete: (config: ThresholdConfig) => void;
+}) {
+  const dot = SCOPE_DOT[scopeType] ?? "bg-slate-400";
+  return (
+    <div className="flex flex-col">
+      {/* Column header */}
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-t-xl border border-b-0 border-border/60 px-3 py-2.5",
+          SCOPE_SECTION_BG[scopeType] ?? "bg-muted/30",
+        )}
+      >
+        <span className={cn("h-2 w-2 shrink-0 rounded-full", dot)} />
+        <p className="text-sm font-semibold tracking-tighter text-foreground">
+          {SCOPE_LABELS[scopeType as ThresholdScopeType] ?? scopeType}
+        </p>
+        <span className="ml-auto text-sm tracking-tighter">
+          {items.length > 0 ? `${items.length} cấu hình` : "—"}
+        </span>
+      </div>
+
+      {/* Items panel */}
+      <div className="overflow-hidden rounded-b-xl border border-border/60 bg-card shadow-sm flex-1">
+        {items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            <p className="text-sm tracking-tighter">Chưa cấu hình</p>
+          </div>
+        ) : (
+          items.map(({ config, label, sublabel, canEdit, canDelete }, idx) => (
+            <ThresholdConfigRow
+              key={`${config.scopeType}-${config.itemModelId ?? config.categoryId ?? "base"}`}
+              config={config}
+              label={label}
+              sublabel={sublabel}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              isLast={idx === items.length - 1}
+              onEdit={() => onEdit(config)}
+              onDelete={() => onDelete(config)}
+            />
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 
 export default function ThresholdConfigPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { selectedDepotId } = useManagerDepot();
+  const prefersReducedMotion = useReducedMotion();
 
   const [tab, setTab] = useState(() => {
     const current = searchParams.get("tab");
-    return current === "history" || current === "lowstock"
-      ? current
-      : "config";
+    return current === "history" || current === "lowstock" ? current : "config";
   });
 
   const {
     data: thresholds,
     isLoading: loadingThresholds,
     refetch: refetchThresholds,
-  } = useMyDepotThresholds();
+  } = useMyDepotThresholds(
+    { depotId: selectedDepotId ?? 0 },
+    { enabled: Boolean(selectedDepotId) },
+  );
   const { data: categories } = useInventoryCategories();
   const categoryMap = useMemo(() => {
     const map: Record<number, string> = {};
@@ -331,22 +406,16 @@ export default function ThresholdConfigPage() {
     return map;
   }, [categories]);
 
-  const [historyParams, setHistoryParams] = useState<GetThresholdsHistoryParams>(
-    {
-      pageNumber: 1,
-      pageSize: 10,
-    },
-  );
-  const { data: historyData, isLoading: loadingHistory } =
-    useMyDepotThresholdsHistory(historyParams);
-
   const [selectedWarningLevel, setSelectedWarningLevel] = useState("all");
-  const { data: lowStock, isLoading: loadingLowStock } = useMyDepotLowStock();
+  const { data: lowStock, isLoading: loadingLowStock } = useMyDepotLowStock(
+    selectedDepotId ? { depotId: selectedDepotId } : undefined,
+  );
 
   const updateMutation = useUpdateMyDepotThreshold();
   const deleteMutation = useDeleteMyDepotThreshold();
 
   const [editOpen, setEditOpen] = useState(false);
+  const [createInlineOpen, setCreateInlineOpen] = useState(false);
   const [editConfig, setEditConfig] = useState<ThresholdConfig | null>(null);
   const [form, setForm] = useState({
     scopeType: "Depot" as ThresholdScopeType,
@@ -369,17 +438,14 @@ export default function ThresholdConfigPage() {
   }, []);
 
   const openEdit = useCallback((config: ThresholdConfig) => {
+    setCreateInlineOpen(false);
     setEditConfig(config);
     setForm({
       scopeType: config.scopeType,
-      categoryId:
-        config.categoryId != null ? String(config.categoryId) : "",
-      itemModelId:
-        config.itemModelId != null ? String(config.itemModelId) : "",
+      categoryId: config.categoryId != null ? String(config.categoryId) : "",
+      itemModelId: config.itemModelId != null ? String(config.itemModelId) : "",
       minimumThreshold:
-        config.minimumThreshold != null
-          ? String(config.minimumThreshold)
-          : "",
+        config.minimumThreshold != null ? String(config.minimumThreshold) : "",
       reason: "",
     });
     setEditOpen(true);
@@ -409,6 +475,7 @@ export default function ThresholdConfigPage() {
     }
 
     const payload: UpdateThresholdPayload = {
+      depotId: selectedDepotId ?? 0,
       scopeType: form.scopeType,
       minimumThreshold: parsedThreshold,
       ...(form.scopeType === "DepotCategory"
@@ -431,6 +498,7 @@ export default function ThresholdConfigPage() {
           : "Đã tạo cấu hình ngưỡng mới",
       );
       setEditOpen(false);
+      setCreateInlineOpen(false);
       refetchThresholds();
     } catch (error: unknown) {
       const responseError = error as { response?: { status?: number } };
@@ -439,6 +507,7 @@ export default function ThresholdConfigPage() {
         toast.error("Dữ liệu đã thay đổi. Đang tải lại...");
         refetchThresholds();
         setEditOpen(false);
+        setCreateInlineOpen(false);
         return;
       }
 
@@ -449,10 +518,12 @@ export default function ThresholdConfigPage() {
 
       toast.error("Không thể lưu cấu hình ngưỡng.");
     }
-  }, [editConfig, form, refetchThresholds, updateMutation]);
+  }, [editConfig, form, refetchThresholds, selectedDepotId, updateMutation]);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<ThresholdConfig | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ThresholdConfig | null>(
+    null,
+  );
   const [deleteReason, setDeleteReason] = useState("");
 
   const openDelete = useCallback((config: ThresholdConfig) => {
@@ -467,6 +538,7 @@ export default function ThresholdConfigPage() {
     }
 
     const payload: DeleteThresholdPayload = {
+      depotId: selectedDepotId ?? 0,
       scopeType: deleteTarget.scopeType,
       ...(deleteTarget.categoryId != null
         ? { categoryId: deleteTarget.categoryId }
@@ -488,7 +560,13 @@ export default function ThresholdConfigPage() {
     } catch {
       toast.error("Không thể reset cấu hình ngưỡng.");
     }
-  }, [deleteMutation, deleteReason, deleteTarget, refetchThresholds]);
+  }, [
+    deleteMutation,
+    deleteReason,
+    deleteTarget,
+    refetchThresholds,
+    selectedDepotId,
+  ]);
 
   const allConfigs = useMemo(() => {
     if (!thresholds) {
@@ -516,7 +594,7 @@ export default function ThresholdConfigPage() {
     if (thresholds.depot) {
       result.push({
         config: thresholds.depot,
-        label: "Ngưỡng mức kho",
+        label: "Ngưỡng theo kho",
         canEdit: true,
         canDelete: true,
       });
@@ -527,9 +605,9 @@ export default function ThresholdConfigPage() {
         config,
         label:
           categoryMap[config.categoryId ?? -1] ??
-          `Danh mục #${config.categoryId}`,
+          `Ngưỡng theo danh mục số ${config.categoryId}`,
         sublabel:
-          config.categoryId != null ? `ID: ${config.categoryId}` : undefined,
+          config.categoryId != null ? `Mã số ${config.categoryId}` : undefined,
         canEdit: true,
         canDelete: true,
       });
@@ -538,9 +616,11 @@ export default function ThresholdConfigPage() {
     thresholds.depotItems?.forEach((config) => {
       result.push({
         config,
-        label: `Vật phẩm #${config.itemModelId}`,
+        label: `Ngưỡng theo vật phẩm số ${config.itemModelId}`,
         sublabel:
-          config.itemModelId != null ? `ID: ${config.itemModelId}` : undefined,
+          config.itemModelId != null
+            ? `Mã số ${config.itemModelId}`
+            : undefined,
         canEdit: true,
         canDelete: true,
       });
@@ -583,9 +663,24 @@ export default function ThresholdConfigPage() {
     );
   }, [lowStockItems, selectedWarningLevel]);
 
+  const entranceTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.42, ease: MOTION_EASE };
+  const tabTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.28, ease: MOTION_EASE };
+  const cardTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { duration: 0.3, ease: MOTION_EASE };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="border-b bg-background px-6 py-4">
+      <motion.header
+        className="border-b bg-background px-6 py-3.5"
+        initial={{ opacity: 0, y: -14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={entranceTransition}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
@@ -597,545 +692,407 @@ export default function ThresholdConfigPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold tracking-tighter text-foreground">
-                Cấu hình ngưỡng tồn kho
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold tracking-tighter text-foreground">
+                  Cấu hình ngưỡng tồn kho
+                </h1>
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="text-blue-500 hover:text-blue-600 transition-colors">
+                        <WarningCircle className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="right"
+                      className="text-sm tracking-tighter bg-blue-600 text-white border-blue-600"
+                    >
+                      Thứ tự áp dụng: Vật phẩm → Danh mục → Kho → Toàn hệ thống
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <p className="text-sm tracking-tighter text-muted-foreground">
-                Severity ratio = Số lượng khả dụng / Ngưỡng tối thiểu
+                Quản lý ngưỡng theo hệ thống, kho, danh mục và vật phẩm
               </p>
             </div>
           </div>
+          {tab === "config" ? (
+            <Button size="sm" onClick={openCreate} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              Thêm ngưỡng
+            </Button>
+          ) : null}
         </div>
-      </header>
+      </motion.header>
 
-      <div className="flex-1 px-6 py-4">
+      <motion.div
+        className="flex-1 px-6 py-4"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{
+          ...entranceTransition,
+          delay: prefersReducedMotion ? 0 : 0.06,
+        }}
+      >
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="config" className="gap-1.5">
-              <Gear className="h-4 w-4" />
-              Cấu hình
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-1.5">
-              <ClockCounterClockwise className="h-4 w-4" />
-              Lịch sử thay đổi
-            </TabsTrigger>
-            <TabsTrigger value="lowstock" className="gap-1.5">
-              <ChartBar className="h-4 w-4" />
-              Sắp hết hàng
-            </TabsTrigger>
-          </TabsList>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{
+              ...tabTransition,
+              delay: prefersReducedMotion ? 0 : 0.1,
+            }}
+          >
+            <TabsList className="mb-4 h-auto w-fit gap-1 rounded-lg bg-muted/40 p-1">
+              <TabsTrigger
+                value="config"
+                className="gap-1.5 rounded-md px-4 py-2 text-sm font-medium tracking-tighter text-muted-foreground transition-colors hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                <Gear size={18} />
+                Cấu hình
+              </TabsTrigger>
+              <TabsTrigger
+                value="lowstock"
+                className="gap-1.5 rounded-md px-4 py-2 text-sm font-medium tracking-tighter text-muted-foreground transition-colors hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                <ChartBar size={18} />
+                Sắp hết hàng
+              </TabsTrigger>
+            </TabsList>
+          </motion.div>
 
-          <TabsContent value="config">
-            <Card className="mb-4 border-dashed bg-muted/20">
-              <CardContent className="flex flex-col gap-2 p-4 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-                <div>
-                  Thứ tự áp dụng:{" "}
-                  <span className="font-medium text-foreground">
-                    Vật phẩm → Danh mục → Kho → Toàn hệ thống
-                  </span>
+          <TabsContent value="config" className="mt-0">
+            <motion.div
+              key="threshold-config-tab"
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={tabTransition}
+            >
+              {loadingThresholds ? (
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                  {(
+                    ["Global", "Depot", "DepotCategory", "DepotItem"] as const
+                  ).map((scope) => (
+                    <div key={scope} className="flex flex-col">
+                      <div
+                        className={cn(
+                          "flex items-center gap-2 rounded-t-xl border border-b-0 border-border/60 px-3 py-2.5",
+                          SCOPE_SECTION_BG[scope] ?? "bg-muted/30",
+                        )}
+                      >
+                        <Skeleton className="h-2 w-2 rounded-full" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                      <div className="overflow-hidden rounded-b-xl border border-border/60 bg-card">
+                        {Array.from({ length: 2 }).map((_, i, arr) => (
+                          <div
+                            key={i}
+                            className={cn(
+                              "flex flex-col gap-2 px-3 py-3",
+                              i < arr.length - 1 && "border-b border-border/50",
+                            )}
+                          >
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-16" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  Warning band được backend đối chiếu theo{" "}
-                  <span className="font-medium text-foreground">
-                    severity ratio
-                  </span>
-                  .
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Quản lý ngưỡng tối thiểu theo kho, danh mục hoặc vật phẩm.
-              </p>
-              <Button size="sm" onClick={openCreate} className="gap-1.5">
-                <Plus className="h-4 w-4" />
-                Thêm ngưỡng
-              </Button>
-            </div>
-
-            {loadingThresholds ? (
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <Card key={index}>
-                    <CardContent className="space-y-3 p-4">
-                      <Skeleton className="h-5 w-24" />
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-8 w-28" />
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : allConfigs.length === 0 ? (
-              <EmptyState
-                icon={Gear}
-                text={'Chưa có cấu hình ngưỡng nào. Nhấn "Thêm ngưỡng" để bắt đầu.'}
-              />
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {allConfigs.map(({ config, label, sublabel, canEdit, canDelete }) => (
-                  <ThresholdConfigCard
-                    key={`${config.scopeType}-${config.itemModelId ?? config.categoryId ?? "base"}`}
-                    config={config}
-                    label={label}
-                    sublabel={sublabel}
-                    canEdit={canEdit}
-                    canDelete={canDelete}
-                    onEdit={() => openEdit(config)}
-                    onDelete={() => openDelete(config)}
-                  />
-                ))}
-              </div>
-            )}
+              ) : allConfigs.length === 0 ? (
+                <EmptyState
+                  icon={Gear}
+                  text={
+                    'Chưa có cấu hình ngưỡng nào. Nhấn "Thêm ngưỡng" để bắt đầu.'
+                  }
+                />
+              ) : (
+                <motion.div
+                  className="grid gap-3 grid-cols-2 lg:grid-cols-4"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={cardTransition}
+                >
+                  {(
+                    ["Global", "Depot", "DepotCategory", "DepotItem"] as const
+                  ).map((scope) => (
+                    <ThresholdScopeSection
+                      key={scope}
+                      scopeType={scope}
+                      items={allConfigs.filter(
+                        (c) => c.config.scopeType === scope,
+                      )}
+                      onEdit={openEdit}
+                      onDelete={openDelete}
+                    />
+                  ))}
+                </motion.div>
+              )}
+            </motion.div>
           </TabsContent>
 
-          <TabsContent value="history">
-            <div className="mb-4 flex flex-wrap items-end gap-3">
-              <div>
-                <Label className="mb-1 block text-xs text-muted-foreground">
-                  Scope
-                </Label>
-                <Select
-                  value={historyParams.scopeType ?? "all"}
-                  onValueChange={(value) =>
-                    setHistoryParams((previous) => ({
-                      ...previous,
-                      scopeType:
-                        value === "all"
-                          ? undefined
-                          : (value as ThresholdScopeType),
-                      pageNumber: 1,
-                    }))
-                  }
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả</SelectItem>
-                    <SelectItem value="Global">Toàn hệ thống</SelectItem>
-                    <SelectItem value="Depot">Kho</SelectItem>
-                    <SelectItem value="DepotCategory">Danh mục</SelectItem>
-                    <SelectItem value="DepotItem">Vật phẩm</SelectItem>
-                  </SelectContent>
-                </Select>
+          <TabsContent value="lowstock" className="mt-0">
+            <motion.div
+              key="threshold-lowstock-tab"
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={tabTransition}
+            >
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Funnel className="h-4 w-4 text-muted-foreground" />
+                  <Select
+                    value={selectedWarningLevel}
+                    onValueChange={setSelectedWarningLevel}
+                  >
+                    <SelectTrigger className="w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả mức</SelectItem>
+                      {availableWarningLevels.map((level) => (
+                        <SelectItem key={level} value={level}>
+                          {getLowStockWarningLabel(level)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm tracking-tighter text-muted-foreground">
+                    Severity ratio = khả dụng / ngưỡng tối thiểu
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {availableWarningLevels.map((level) => (
+                    <Badge
+                      key={level}
+                      className={cn(
+                        "border-0 shadow-none",
+                        WARNING_LEVEL_COLORS[level] ??
+                          "bg-slate-100 text-slate-700",
+                      )}
+                    >
+                      {getLowStockWarningLabel(level)}:{" "}
+                      {warningLevelCounts[level] ?? 0}
+                    </Badge>
+                  ))}
+                </div>
               </div>
 
-              <div>
-                <Label className="mb-1 block text-xs text-muted-foreground">
-                  Category ID
-                </Label>
-                <Input
-                  type="number"
-                  className="w-30"
-                  placeholder="—"
-                  value={historyParams.categoryId ?? ""}
-                  onChange={(event) =>
-                    setHistoryParams((previous) => ({
-                      ...previous,
-                      categoryId: event.target.value
-                        ? Number(event.target.value)
-                        : undefined,
-                      pageNumber: 1,
-                    }))
-                  }
+              {loadingLowStock ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <Skeleton key={index} className="h-10 w-full" />
+                  ))}
+                </div>
+              ) : !filteredLowStockItems.length ? (
+                <EmptyState
+                  icon={CheckCircle}
+                  text="Không có vật phẩm nào đang dưới ngưỡng tối thiểu."
                 />
-              </div>
-
-              <div>
-                <Label className="mb-1 block text-xs text-muted-foreground">
-                  Item Model ID
-                </Label>
-                <Input
-                  type="number"
-                  className="w-30"
-                  placeholder="—"
-                  value={historyParams.itemModelId ?? ""}
-                  onChange={(event) =>
-                    setHistoryParams((previous) => ({
-                      ...previous,
-                      itemModelId: event.target.value
-                        ? Number(event.target.value)
-                        : undefined,
-                      pageNumber: 1,
-                    }))
-                  }
-                />
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() =>
-                  setHistoryParams({ pageNumber: 1, pageSize: 10 })
-                }
-              >
-                <ArrowCounterClockwise className="h-3.5 w-3.5" />
-                Reset
-              </Button>
-            </div>
-
-            {loadingHistory ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <Skeleton key={index} className="h-10 w-full" />
-                ))}
-              </div>
-            ) : !historyData?.items?.length ? (
-              <EmptyState
-                icon={ClockCounterClockwise}
-                text="Không có lịch sử thay đổi."
-              />
-            ) : (
-              <>
+              ) : (
                 <div className="overflow-x-auto rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-12.5">#</TableHead>
-                        <TableHead>Scope</TableHead>
-                        <TableHead>Đối tượng</TableHead>
-                        <TableHead>Hành động</TableHead>
-                        <TableHead className="text-right">Ngưỡng cũ</TableHead>
-                        <TableHead className="text-right">Ngưỡng mới</TableHead>
-                        <TableHead>Lý do</TableHead>
-                        <TableHead>Thời điểm</TableHead>
+                        <TableHead>Vật phẩm</TableHead>
+                        <TableHead>Danh mục</TableHead>
+                        <TableHead>Kho</TableHead>
+                        <TableHead className="text-right">Khả dụng</TableHead>
+                        <TableHead className="text-right">
+                          Ngưỡng tối thiểu
+                        </TableHead>
+                        <TableHead className="text-right">Severity</TableHead>
+                        <TableHead>Mức cảnh báo</TableHead>
+                        <TableHead>Phạm vi áp dụng</TableHead>
+                        <TableHead>Nguồn</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {historyData.items.map((item, index) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="text-muted-foreground">
-                            {((historyParams.pageNumber ?? 1) - 1) *
-                              (historyParams.pageSize ?? 10) +
-                              index +
-                              1}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              className={cn(
-                                "text-xs",
-                                SCOPE_COLORS[item.scopeType] ?? "",
-                              )}
-                            >
-                              {SCOPE_LABELS[item.scopeType as ThresholdScopeType] ??
-                                item.scopeType}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {item.itemModelId != null
-                              ? `Item #${item.itemModelId}`
-                              : item.categoryId != null
-                                ? `Category #${item.categoryId}`
-                                : "Mặc định"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                item.action === "RESET"
-                                  ? "destructive"
-                                  : "default"
-                              }
-                            >
-                              {item.action}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatHistoryThresholdValue(item, "old")}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatHistoryThresholdValue(item, "new")}
-                          </TableCell>
-                          <TableCell className="max-w-56 truncate text-muted-foreground">
-                            {item.changeReason ?? item.reason ?? "—"}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                            {formatDate(item.changedAt)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {filteredLowStockItems.map((item, index) => {
+                        const level = getLowStockWarningLevel(item);
+                        const severity = getLowStockSeverityRatio(item);
+
+                        return (
+                          <TableRow
+                            key={`${item.depotId ?? "my"}-${item.itemModelId}`}
+                          >
+                            <TableCell className="text-muted-foreground">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {item.itemModelName}
+                            </TableCell>
+                            <TableCell>{item.categoryName ?? "—"}</TableCell>
+                            <TableCell>
+                              {item.depotName ?? "Kho hiện tại"}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatNumber(item.availableQuantity)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatNumber(item.minimumThreshold)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono">
+                              {item.minimumThreshold != null
+                                ? severity.toFixed(2)
+                                : "—"}
+                            </TableCell>
+                            <TableCell>{getWarningBadge(level)}</TableCell>
+                            <TableCell>
+                              <Badge
+                                className={cn(
+                                  "border-0 shadow-none",
+                                  getLowStockRowTone(level),
+                                )}
+                              >
+                                {getResolvedThresholdScopeLabel(
+                                  item.resolvedThresholdScope,
+                                )}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {getThresholdSourceLabel(item)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
-
-                <div className="mt-4 flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    Trang {historyData.pageNumber} / {historyData.totalPages} ·
-                    Tổng {historyData.totalCount} bản ghi
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={!historyData.hasPreviousPage}
-                      onClick={() =>
-                        setHistoryParams((previous) => ({
-                          ...previous,
-                          pageNumber: (previous.pageNumber ?? 1) - 1,
-                        }))
-                      }
-                    >
-                      <CaretLeft className="mr-1 h-4 w-4" />
-                      Trước
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={!historyData.hasNextPage}
-                      onClick={() =>
-                        setHistoryParams((previous) => ({
-                          ...previous,
-                          pageNumber: (previous.pageNumber ?? 1) + 1,
-                        }))
-                      }
-                    >
-                      Sau
-                      <CaretRight className="ml-1 h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="lowstock">
-            <Card className="mb-4 border-dashed bg-muted/20">
-              <CardContent className="flex flex-col gap-2 p-4 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-                <div>
-                  Severity ratio ={" "}
-                  <span className="font-medium text-foreground">
-                    khả dụng / ngưỡng tối thiểu
-                  </span>
-                  . Ratio càng thấp thì mức độ càng nghiêm trọng.
-                </div>
-                <div>
-                  Scope áp dụng:{" "}
-                  <span className="font-medium text-foreground">
-                    Item → Category → Depot → Global
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Funnel className="h-4 w-4 text-muted-foreground" />
-                <Select
-                  value={selectedWarningLevel}
-                  onValueChange={setSelectedWarningLevel}
-                >
-                  <SelectTrigger className="w-44">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả mức</SelectItem>
-                    {availableWarningLevels.map((level) => (
-                      <SelectItem key={level} value={level}>
-                        {getLowStockWarningLabel(level)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {availableWarningLevels.map((level) => (
-                  <Badge
-                    key={level}
-                    className={cn(
-                      "border-0 shadow-none",
-                      WARNING_LEVEL_COLORS[level] ??
-                        "bg-slate-100 text-slate-700",
-                    )}
-                  >
-                    {getLowStockWarningLabel(level)}:{" "}
-                    {warningLevelCounts[level] ?? 0}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            {loadingLowStock ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <Skeleton key={index} className="h-10 w-full" />
-                ))}
-              </div>
-            ) : !filteredLowStockItems.length ? (
-              <EmptyState
-                icon={CheckCircle}
-                text="Không có vật phẩm nào đang dưới ngưỡng tối thiểu."
-              />
-            ) : (
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12.5">#</TableHead>
-                      <TableHead>Vật phẩm</TableHead>
-                      <TableHead>Danh mục</TableHead>
-                      <TableHead>Kho</TableHead>
-                      <TableHead className="text-right">Khả dụng</TableHead>
-                      <TableHead className="text-right">Ngưỡng tối thiểu</TableHead>
-                      <TableHead className="text-right">Severity</TableHead>
-                      <TableHead>Mức cảnh báo</TableHead>
-                      <TableHead>Phạm vi áp dụng</TableHead>
-                      <TableHead>Nguồn</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredLowStockItems.map((item, index) => {
-                      const level = getLowStockWarningLevel(item);
-                      const severity = getLowStockSeverityRatio(item);
-
-                      return (
-                        <TableRow
-                          key={`${item.depotId ?? "my"}-${item.itemModelId}`}
-                        >
-                          <TableCell className="text-muted-foreground">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {item.itemModelName}
-                          </TableCell>
-                          <TableCell>{item.categoryName ?? "—"}</TableCell>
-                          <TableCell>{item.depotName ?? "Kho hiện tại"}</TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatNumber(item.availableQuantity)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatNumber(item.minimumThreshold)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {item.minimumThreshold != null
-                              ? severity.toFixed(2)
-                              : "—"}
-                          </TableCell>
-                          <TableCell>{getWarningBadge(level)}</TableCell>
-                          <TableCell>
-                            <Badge
-                              className={cn(
-                                "border-0 shadow-none",
-                                getLowStockRowTone(level),
-                              )}
-                            >
-                              {getResolvedThresholdScopeLabel(
-                                item.resolvedThresholdScope,
-                              )}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {getThresholdSourceLabel(item)}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+              )}
+            </motion.div>
           </TabsContent>
         </Tabs>
-      </div>
+      </motion.div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-120">
-          <DialogHeader>
-            <DialogTitle>
-              {editConfig ? "Chỉnh sửa ngưỡng" : "Thêm ngưỡng mới"}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Phạm vi áp dụng</Label>
-              <Select
-                value={form.scopeType}
-                onValueChange={(value) =>
-                  setForm((previous) => ({
-                    ...previous,
-                    scopeType: value as ThresholdScopeType,
-                    categoryId:
-                      value === "DepotCategory" ? previous.categoryId : "",
-                    itemModelId:
-                      value === "DepotItem" ? previous.itemModelId : "",
-                  }))
-                }
-                disabled={!!editConfig}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Depot">Kho (Depot)</SelectItem>
-                  <SelectItem value="DepotCategory">
-                    Theo danh mục (DepotCategory)
-                  </SelectItem>
-                  <SelectItem value="DepotItem">
-                    Theo vật phẩm (DepotItem)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Global threshold và warning band do admin quản lý.
+        <DialogContent className="sm:max-w-lg gap-0 p-0 overflow-hidden">
+          {/* Header with accent */}
+          <div className="flex items-center gap-3 border-b px-5 py-4">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+              <Gear className="h-5 w-5" weight="fill" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-base font-bold tracking-tighter">
+                {editConfig ? "Chỉnh sửa ngưỡng" : "Thêm ngưỡng mới"}
+              </DialogTitle>
+              <p className="text-sm tracking-tighter text-muted-foreground">
+                {editConfig
+                  ? `Hiện tại: ${formatNumber(editConfig.minimumThreshold)}`
+                  : "Thiết lập ngưỡng tồn kho tối thiểu"}
               </p>
             </div>
+            <Select
+              value={form.scopeType}
+              onValueChange={(value) =>
+                setForm((previous) => ({
+                  ...previous,
+                  scopeType: value as ThresholdScopeType,
+                  categoryId:
+                    value === "DepotCategory" ? previous.categoryId : "",
+                  itemModelId:
+                    value === "DepotItem" ? previous.itemModelId : "",
+                }))
+              }
+              disabled={!!editConfig}
+            >
+              <SelectTrigger className="mr-8 w-auto shrink-0 gap-1.5 text-sm tracking-tighter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Depot">Kho (Depot)</SelectItem>
+                <SelectItem value="DepotCategory">Theo danh mục</SelectItem>
+                <SelectItem value="DepotItem">Theo vật phẩm</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            {form.scopeType === "DepotCategory" ? (
-              <div className="space-y-1.5">
-                <Label>Danh mục</Label>
-                <Select
-                  value={form.categoryId || undefined}
-                  onValueChange={(value) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      categoryId: value,
-                    }))
-                  }
-                  disabled={!!editConfig}
+          {/* Body */}
+          <div className="flex flex-col gap-4 px-5 py-4">
+            <AnimatePresence initial={false}>
+              {!editConfig && form.scopeType === "DepotCategory" ? (
+                <motion.div
+                  key="modal-depot-category"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="overflow-hidden"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn danh mục" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories?.map((category) => (
-                      <SelectItem
-                        key={category.key}
-                        value={String(Number(category.key))}
-                      >
-                        {category.value}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
+                  <div className="space-y-1.5 pb-1">
+                    <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-semibold text-amber-600">
+                      <Folders className="h-4 w-4" weight="fill" />
+                      Danh mục áp dụng
+                    </Label>
+                    <Select
+                      value={form.categoryId || undefined}
+                      onValueChange={(value) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          categoryId: value,
+                        }))
+                      }
+                      disabled={!!editConfig}
+                    >
+                      <SelectTrigger className="mt-1.5">
+                        <SelectValue placeholder="Chọn danh mục" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories?.map((category) => (
+                          <SelectItem
+                            key={category.key}
+                            value={String(Number(category.key))}
+                          >
+                            {category.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </motion.div>
+              ) : null}
 
-            {form.scopeType === "DepotItem" ? (
-              <div className="space-y-1.5">
-                <Label>Vật phẩm (Item Model ID)</Label>
-                <Input
-                  type="number"
-                  placeholder="VD: 101"
-                  value={form.itemModelId}
-                  onChange={(event) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      itemModelId: event.target.value,
-                    }))
-                  }
-                  disabled={!!editConfig}
-                />
-              </div>
-            ) : null}
-
-            <Separator />
+              {!editConfig && form.scopeType === "DepotItem" ? (
+                <motion.div
+                  key="modal-depot-item"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-1.5 pb-1">
+                    <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-semibold text-emerald-600">
+                      <Package className="h-4 w-4" weight="fill" />
+                      Vật phẩm áp dụng (Mã ID)
+                    </Label>
+                    <Input
+                      type="number"
+                      className="mt-1.5"
+                      placeholder="VD: 101"
+                      value={form.itemModelId}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          itemModelId: event.target.value,
+                        }))
+                      }
+                      disabled={!!editConfig}
+                    />
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
 
             <div className="space-y-1.5">
-              <Label>
+              <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-medium text-slate-800">
+                <Scales className="h-4 w-4 text-blue-500" weight="fill" />
                 Ngưỡng tối thiểu
-                <span className="ml-1 text-xs text-muted-foreground">
+                <span className="ml-auto font-normal text-muted-foreground text-[10px] uppercase tracking-widest">
                   số nguyên &gt; 0
                 </span>
               </Label>
@@ -1155,29 +1112,33 @@ export default function ThresholdConfigPage() {
             </div>
 
             {form.minimumThreshold ? (
-              <Card className="bg-muted/30">
-                <CardContent className="space-y-2 p-3 text-sm">
+              <div className="flex gap-2.5 rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                <ChartBar
+                  className="h-4 w-4 shrink-0 text-blue-500 mt-0.5"
+                  weight="fill"
+                />
+                <div className="space-y-1 text-sm tracking-tighter">
                   <p className="font-medium text-foreground">
-                    Minh họa tính severity ratio
-                  </p>
-                  <p className="text-muted-foreground">
-                    Severity ratio = Số lượng khả dụng /{" "}
-                    <span className="font-medium text-foreground">
+                    Severity ratio = Khả dụng /{" "}
+                    <span className="font-bold text-blue-600">
                       {formatNumber(Number(form.minimumThreshold))}
                     </span>
                   </p>
                   <p className="text-muted-foreground">
-                    Backend sẽ so sánh ratio này với warning band hiện hành để
-                    xác định mức cảnh báo.
+                    Hệ thống sẽ so sánh ratio với warning band mặc định để xác
+                    định cảnh báo.
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ) : null}
 
             <div className="space-y-1.5">
-              <Label>Lý do (tùy chọn)</Label>
+              <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-medium text-slate-800">
+                <ListDashes className="h-4 w-4 text-slate-400" />
+                Lý do (tùy chọn)
+              </Label>
               <Textarea
-                placeholder="VD: Vật tư y tế cần dự trữ cao hơn"
+                placeholder="VD: Vật phẩm y tế cần dự trữ cao hơn"
                 value={form.reason}
                 onChange={(event) =>
                   setForm((previous) => ({
@@ -1190,85 +1151,106 @@ export default function ThresholdConfigPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 border-t px-5 py-3 bg-muted/30">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditOpen(false)}
+            >
               Hủy
             </Button>
             <Button
+              size="sm"
               onClick={handleSave}
               disabled={updateMutation.isPending}
               className="gap-1.5"
             >
               {updateMutation.isPending ? (
                 <SpinnerGap className="h-4 w-4 animate-spin" />
-              ) : null}
+              ) : (
+                <CheckCircle className="h-4 w-4" weight="fill" />
+              )}
               {editConfig ? "Cập nhật" : "Tạo mới"}
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="sm:max-w-105">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <WarningCircle className="h-5 w-5" />
-              Reset cấu hình ngưỡng
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[26rem] gap-0 p-0 overflow-hidden">
+          {/* Header with red accent */}
+          <div className="flex flex-col items-center gap-2.5 border-b px-4 pt-5 pb-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
+              <Trash className="h-5 w-5" weight="fill" />
+            </div>
+            <div className="text-center">
+              <DialogTitle className="text-base font-bold tracking-tighter">
+                Reset cấu hình ngưỡng
+              </DialogTitle>
+            </div>
+          </div>
 
-          <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">
-              Hành động này sẽ gỡ override hiện tại và fallback về scope cao hơn
-              trong chuỗi DepotItem → DepotCategory → Depot → Global.
-            </p>
-
+          {/* Body */}
+          <div className="space-y-3 px-4 py-3">
             {deleteTarget ? (
-              <Card>
-                <CardContent className="p-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      className={cn(
-                        "text-xs",
-                        SCOPE_COLORS[deleteTarget.scopeType] ?? "",
-                      )}
-                    >
-                      {SCOPE_LABELS[deleteTarget.scopeType] ??
-                        deleteTarget.scopeType}
-                    </Badge>
-                    <span>{formatThresholdDisplay(deleteTarget)}</span>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                <span
+                  className={cn(
+                    "h-2 w-2 shrink-0 rounded-full",
+                    SCOPE_DOT[deleteTarget.scopeType] ?? "bg-slate-400",
+                  )}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium tracking-tighter text-foreground">
+                    {SCOPE_LABELS[deleteTarget.scopeType] ??
+                      deleteTarget.scopeType}
+                  </p>
+                  <p className="text-sm tracking-tighter text-muted-foreground">
+                    {formatThresholdDisplay(deleteTarget)}
+                  </p>
+                </div>
+              </div>
             ) : null}
 
             <div className="space-y-1.5">
-              <Label>Lý do reset (tùy chọn)</Label>
+              <Label className="text-sm tracking-tighter font-medium">
+                Lý do reset (tùy chọn)
+              </Label>
               <Textarea
-                placeholder="VD: Không cần override riêng nữa"
+                placeholder="VD: Cấu hình này không còn phù hợp do thay đổi về chiến lược tồn kho"
                 value={deleteReason}
                 onChange={(event) => setDeleteReason(event.target.value)}
                 rows={2}
+                className="min-h-20"
               />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-2 border-t px-4 py-2.5 bg-muted/30">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteOpen(false)}
+            >
               Hủy
             </Button>
             <Button
               variant="destructive"
+              size="sm"
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
               className="gap-1.5"
             >
               {deleteMutation.isPending ? (
                 <SpinnerGap className="h-4 w-4 animate-spin" />
-              ) : null}
+              ) : (
+                <Trash className="h-4 w-4" />
+              )}
               Reset
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

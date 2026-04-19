@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -35,13 +35,10 @@ import {
   X,
   CheckCircle,
   WarningCircle,
-  Spinner,
-  Package,
   ArrowClockwise,
   CaretLeft,
   CaretRight,
   CaretDown,
-  ProhibitInset,
   Eye,
   MagnifyingGlass,
   Check,
@@ -50,6 +47,7 @@ import {
   Users,
   ImageSquare,
 } from "@phosphor-icons/react";
+import { Icon as IconifyIcon } from "@iconify/react";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
 import {
@@ -90,34 +88,44 @@ type StatusCfgMap = Record<
 >;
 
 const STATUS_STYLE: Record<DepotStatus, { color: string; bg: string }> = {
+  Created: {
+    color: "text-sky-700 dark:text-sky-400",
+    bg: "bg-sky-500/10",
+  },
   Available: {
-    color: "text-white",
-    bg: "bg-emerald-600 border-emerald-400 dark:bg-emerald-700 dark:border-emerald-700",
+    color: "text-emerald-700 dark:text-emerald-400",
+    bg: "bg-emerald-500/10",
+  },
+  Unavailable: {
+    color: "text-orange-700 dark:text-orange-400",
+    bg: "bg-orange-500/10",
   },
   Full: {
-    color: "text-white",
-    bg: "bg-amber-500  border-amber-400  dark:bg-amber-600  dark:border-amber-600",
+    color: "text-amber-700 dark:text-amber-400",
+    bg: "bg-amber-500/10",
   },
   PendingAssignment: {
-    color: "text-white",
-    bg: "bg-blue-600   border-blue-400   dark:bg-blue-700   dark:border-blue-700",
+    color: "text-blue-700 dark:text-blue-400",
+    bg: "bg-blue-500/10",
   },
   Closed: {
-    color: "text-white",
-    bg: "bg-zinc-500   border-zinc-400   dark:bg-zinc-600   dark:border-zinc-600",
+    color: "text-zinc-700 dark:text-zinc-400",
+    bg: "bg-zinc-500/10",
   },
   Closing: {
-    color: "text-white",
-    bg: "bg-red-600    border-red-400    dark:bg-red-700    dark:border-red-700",
+    color: "text-red-700 dark:text-red-400",
+    bg: "bg-red-500/10",
   },
   UnderMaintenance: {
-    color: "text-white",
-    bg: "bg-purple-600 border-purple-400 dark:bg-purple-700 dark:border-purple-700",
+    color: "text-purple-700 dark:text-purple-400",
+    bg: "bg-purple-500/10",
   },
 };
 
 const STATUS_FALLBACK: Record<DepotStatus, string> = {
+  Created: "Vừa tạo, chưa có quản lý",
   Available: "Đang hoạt động",
+  Unavailable: "Ngưng hoạt động",
   Full: "Đã đầy",
   PendingAssignment: "Chưa có quản lý",
   Closed: "Đã đóng",
@@ -128,7 +136,9 @@ const STATUS_FALLBACK: Record<DepotStatus, string> = {
 function buildStatusCfg(apiStatuses?: DepotStatusMetadata[]): StatusCfgMap {
   const result: StatusCfgMap = {};
   const keys: DepotStatus[] = [
+    "Created",
     "Available",
+    "Unavailable",
     "Full",
     "PendingAssignment",
     "Closed",
@@ -250,9 +260,6 @@ function DepotTable({
             <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter hidden lg:table-cell">
               Tồn kho
             </th>
-            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter hidden xl:table-cell">
-              Quản lý kho
-            </th>
             <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter">
               Trạng thái
             </th>
@@ -264,12 +271,12 @@ function DepotTable({
             <TableSkeleton rows={skeletonRows} />
           ) : items.length === 0 ? (
             <tr>
-              <td colSpan={6} className="py-16 text-center">
+              <td colSpan={5} className="py-16 text-center">
                 <Warehouse
                   size={36}
                   className="mx-auto text-muted-foreground/30 mb-3"
                 />
-                <p className="text-sm text-muted-foreground tracking-tight">
+                <p className="text-sm text-muted-foreground tracking-tighter">
                   {emptyText ?? "Không có dữ liệu"}
                 </p>
               </td>
@@ -293,7 +300,7 @@ function DepotTable({
                         <p className="text-sm font-semibold tracking-tighter max-w-60">
                           {depot.name}
                         </p>
-                        <p className="text-sm text-muted-foreground tracking-tight">
+                        <p className="text-sm text-muted-foreground tracking-tighter">
                           Kho số {depot.id}
                         </p>
                       </div>
@@ -302,7 +309,7 @@ function DepotTable({
 
                   <td className="py-3.5 px-4 hidden md:table-cell max-w-55">
                     <div className="flex items-start">
-                      <span className="text-sm tracking-tight line-clamp-2">
+                      <span className="text-sm tracking-tighter line-clamp-2">
                         {depot.address}
                       </span>
                     </div>
@@ -320,25 +327,10 @@ function DepotTable({
                     </div>
                   </td>
 
-                  <td className="py-3.5 px-4 hidden xl:table-cell">
-                    {depot.manager ? (
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium tracking-tight truncate max-w-44">
-                          {depot.manager.lastName} {depot.manager.firstName}
-                        </p>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground/60 tracking-tight">
-                        Chưa phân công
-                      </span>
-                    )}
-                  </td>
-
                   <td className="py-3.5 px-4">
                     <Badge
-                      variant="outline"
                       className={cn(
-                        "text-sm font-medium tracking-tight shrink-0",
+                        "text-[13px] font-semibold tracking-tighter shrink-0",
                         cfg.bg,
                         cfg.color,
                       )}
@@ -438,70 +430,73 @@ export default function DepotsPage() {
   const allDepots = allData?.items ?? [];
   const { data: statusMetadata } = useDepotStatuses();
   const statusCfg = buildStatusCfg(statusMetadata);
+  const statusFilterKeys =
+    statusMetadata?.length && statusMetadata.length > 0
+      ? statusMetadata.map((status) => status.key)
+      : ([
+          "Created",
+          "PendingAssignment",
+          "Available",
+          "Unavailable",
+          "Closed",
+        ] satisfies DepotStatus[]);
 
   const tableItems = tableData?.items ?? [];
   const totalCount = tableData?.totalCount ?? 0;
   const totalPages = tableData?.totalPages ?? 1;
 
-  /* Stats — always from full unfiltered fetch */
-  const statsList = [
-    {
-      label: statusCfg["Available"]?.label ?? STATUS_FALLBACK["Available"],
-      value: allDepots.filter((d) => d.status === "Available").length,
+  const STATUS_CARD_STYLE: Partial<
+    Record<
+      DepotStatus,
+      { color: string; bg: string; Icon: typeof CheckCircle | string }
+    >
+  > = {
+    Created: {
+      color: "text-sky-600 dark:text-sky-400",
+      bg: "bg-sky-50 dark:bg-sky-950/30",
+      Icon: "tabler:plus",
+    },
+    PendingAssignment: {
+      color: "text-blue-600 dark:text-blue-400",
+      bg: "bg-blue-50 dark:bg-blue-950/30",
+      Icon: "fa7-solid:user-clock",
+    },
+    Available: {
       color: "text-emerald-600 dark:text-emerald-400",
       bg: "bg-emerald-50 dark:bg-emerald-950/30",
       Icon: CheckCircle,
     },
-    {
-      label: statusCfg["Full"]?.label ?? STATUS_FALLBACK["Full"],
-      value: allDepots.filter((d) => d.status === "Full").length,
-      color: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-50 dark:bg-amber-950/30",
-      Icon: Package,
+    Unavailable: {
+      color: "text-yellow-600 dark:text-yellow-400",
+      bg: "bg-yellow-50 dark:bg-yellow-950/30",
+      Icon: "uiw:stop",
     },
-    {
-      label:
-        statusCfg["PendingAssignment"]?.label ??
-        STATUS_FALLBACK["PendingAssignment"],
-      value: allDepots.filter((d) => d.status === "PendingAssignment").length,
-      color: "text-sky-600 dark:text-sky-400",
-      bg: "bg-sky-50 dark:bg-sky-950/30",
-      Icon: WarningCircle,
-    },
-    {
-      label:
-        statusCfg["UnderMaintenance"]?.label ??
-        STATUS_FALLBACK["UnderMaintenance"],
-      value: allDepots.filter((d) => d.status === "UnderMaintenance").length,
-      color: "text-purple-600 dark:text-purple-400",
-      bg: "bg-purple-50 dark:bg-purple-950/30",
-      Icon: Spinner,
-    },
-    {
-      label: statusCfg["Closing"]?.label ?? STATUS_FALLBACK["Closing"],
-      value: allDepots.filter((d) => d.status === "Closing").length,
-      color: "text-red-600 dark:text-red-400",
-      bg: "bg-red-50 dark:bg-red-950/30",
-      Icon: ProhibitInset,
-    },
-    {
-      label: statusCfg["Closed"]?.label ?? STATUS_FALLBACK["Closed"],
-      value: allDepots.filter((d) => d.status === "Closed").length,
+    Closed: {
       color: "text-zinc-500 dark:text-zinc-400",
       bg: "bg-zinc-50 dark:bg-zinc-950/30",
-      Icon: X,
+      Icon: "mingcute:lock-fill",
     },
-  ];
+    Closing: {
+      color: "text-red-600 dark:text-red-400",
+      bg: "bg-red-50 dark:bg-red-950/30",
+      Icon: "ic:round-close",
+    },
+  };
 
-  /* ── Status filter chips config ── */
-  const STATUS_KEYS: DepotStatus[] = [
-    "Available",
-    "Full",
-    "PendingAssignment",
-    "Closing",
-    "UnderMaintenance",
-    "Closed",
-  ];
+  const statsList = statusFilterKeys.map((status) => {
+    const cardStyle = STATUS_CARD_STYLE[status] ?? {
+      color: "text-muted-foreground",
+      bg: "bg-muted",
+      Icon: Warehouse,
+    };
+
+    return {
+      key: status,
+      label: statusCfg[status]?.label ?? STATUS_FALLBACK[status] ?? status,
+      value: allDepots.filter((d) => d.status === status).length,
+      ...cardStyle,
+    };
+  });
 
   function toggleStatus(s: DepotStatus) {
     setPage(1);
@@ -690,7 +685,7 @@ export default function DepotsPage() {
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <Button
-              className="gap-2 tracking-tight bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25"
+              className="gap-2 tracking-tighter bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25"
               onClick={() => {
                 setCreateOpen(true);
               }}
@@ -715,26 +710,35 @@ export default function DepotsPage() {
         </div>
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-3 gap-3">
-          {statsList.map(({ label, value, color, bg, Icon }) => (
-            <Card key={label} className="border border-border/50">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          {statsList.map(({ key, label, value, color, bg, Icon: StatIcon }) => (
+            <Card key={key} className="border border-border/50">
               <CardContent className="px-4 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm tracking-tight text-muted-foreground font-medium mb-0.5 truncate">
+                    <p className="text-sm tracking-tighter text-muted-foreground font-medium mb-0.5 truncate">
                       {label}
                     </p>
-                    <p className="text-xl tracking-tighter font-bold text-foreground">
+                    <p className="text-2xl tracking-tighter font-bold text-foreground">
                       {!allData ? "—" : value}
                     </p>
                   </div>
                   <div
                     className={cn(
-                      "h-9 w-9 rounded-lg flex items-center justify-center shrink-0",
+                      "h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
                       bg,
                     )}
                   >
-                    <Icon size={17} weight="fill" className={color} />
+                    {typeof StatIcon === "string" ? (
+                      <IconifyIcon
+                        icon={StatIcon}
+                        width={17}
+                        height={17}
+                        className={color}
+                      />
+                    ) : (
+                      <StatIcon size={17} weight="fill" className={color} />
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -785,13 +789,12 @@ export default function DepotsPage() {
               </Button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-48 p-1"
-              align="start"
+              className="w-56 max-h-72 overflow-y-auto p-1"
+              align="end"
+              side="bottom"
               sideOffset={4}
-              avoidCollisions
-              collisionPadding={16}
             >
-              {STATUS_KEYS.map((s) => {
+              {statusFilterKeys.map((s) => {
                 const checked = selectedStatuses.includes(s);
                 return (
                   <button
@@ -861,11 +864,11 @@ export default function DepotsPage() {
           {/* Pagination footer */}
           <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 bg-muted/20 flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground tracking-tight">
+              <span className="text-sm text-muted-foreground tracking-tighter">
                 Hiển thị
               </span>
               <Select value={String(pageSize)} onValueChange={changePageSize}>
-                <SelectTrigger className="h-8 w-16 text-sm tracking-tight">
+                <SelectTrigger className="h-8 w-16 text-sm tracking-tighter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -873,20 +876,20 @@ export default function DepotsPage() {
                     <SelectItem
                       key={n}
                       value={String(n)}
-                      className="text-sm tracking-tight"
+                      className="text-sm tracking-tighter"
                     >
                       {n}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <span className="text-sm text-muted-foreground tracking-tight">
+              <span className="text-sm text-muted-foreground tracking-tighter">
                 / {totalCount} kho
               </span>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground tracking-tight">
+              <span className="text-sm text-muted-foreground tracking-tighter">
                 Trang {page}/{totalPages}
               </span>
               <div className="flex gap-1">
@@ -997,7 +1000,7 @@ export default function DepotsPage() {
                   className="tracking-tighter"
                 />
                 {isResolvingAddress && (
-                  <p className="text-xs text-muted-foreground tracking-tight">
+                  <p className="text-xs text-muted-foreground tracking-tighter">
                     Đang đọc địa chỉ từ map...
                   </p>
                 )}
@@ -1019,7 +1022,7 @@ export default function DepotsPage() {
                           : "outline"
                       }
                       size="sm"
-                      className="h-8 text-sm tracking-tight"
+                      className="h-8 text-sm tracking-tighter"
                       onClick={() =>
                         setNewDepot((p) => ({
                           ...p,
@@ -1067,7 +1070,8 @@ export default function DepotsPage() {
                     <SelectItem value="__none">Chọn quản kho</SelectItem>
                     {availableManagers.map((manager) => (
                       <SelectItem key={manager.id} value={manager.id}>
-                        {manager.fullName} - {manager.phone}
+                        {manager.fullName} - {manager.phone} - Đang quản lý{" "}
+                        {manager.assignedDepotsCount} kho
                       </SelectItem>
                     ))}
                   </SelectContent>

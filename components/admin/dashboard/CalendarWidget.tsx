@@ -110,7 +110,7 @@ const CalendarWidget = ({ data }: CalendarWidgetProps) => {
             {weekDays.map((day) => (
               <div
                 key={day}
-                className="text-center text-xs font-medium text-muted-foreground py-2"
+                className="text-center text-sm tracking-tighter font-medium text-muted-foreground py-2"
               >
                 {day}
               </div>
@@ -151,7 +151,7 @@ const CalendarWidget = ({ data }: CalendarWidgetProps) => {
                   <div className="font-semibold text-sm mb-0.5 group-hover:text-primary transition-colors">
                     {meeting.title}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-sm tracking-tighter text-muted-foreground">
                     {meeting.time}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
@@ -162,7 +162,7 @@ const CalendarWidget = ({ data }: CalendarWidgetProps) => {
                         <div
                           key={i}
                           className={cn(
-                            "h-6 w-6 rounded-full border-2 border-background flex items-center justify-center text-xs font-medium ring-2 ring-background transition-transform group-hover:scale-110",
+                            "h-6 w-6 rounded-full border-2 border-background flex items-center justify-center text-sm tracking-tighter font-medium ring-2 ring-background transition-transform group-hover:scale-110",
                             i === 0 && "bg-violet-500 text-white",
                             i === 1 && "bg-pink-500 text-white",
                             i === 2 && "bg-amber-500 text-white",
@@ -174,7 +174,7 @@ const CalendarWidget = ({ data }: CalendarWidgetProps) => {
                       ))}
                     </div>
                     {meeting.participants > 3 && (
-                      <span className="text-xs text-muted-foreground font-medium bg-muted px-1.5 py-0.5 rounded-full">
+                      <span className="text-sm tracking-tighter text-muted-foreground font-medium bg-muted px-1.5 py-0.5 rounded-full">
                         +{meeting.participants - 3}
                       </span>
                     )}
@@ -184,7 +184,7 @@ const CalendarWidget = ({ data }: CalendarWidgetProps) => {
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "text-xs font-medium transition-all duration-200 group-hover:shadow-sm",
+                    "text-sm tracking-tighter font-medium transition-all duration-200 group-hover:shadow-sm",
                     getMeetingPlatformStyles(meeting.platform),
                   )}
                   onClick={() =>

@@ -3,6 +3,13 @@
 // Severity level
 export type ClusterSeverityLevel = "Low" | "Medium" | "High" | "Critical";
 
+// Cluster lifecycle status from backend
+export type ClusterLifecycleStatus =
+  | "Pending"
+  | "Suggested"
+  | "InProgress"
+  | "Completed";
+
 // SOS Cluster Entity
 export interface SOSClusterEntity {
   id: number;
@@ -17,7 +24,9 @@ export interface SOSClusterEntity {
   medicalUrgencyScore: number | null;
   sosRequestCount: number;
   sosRequestIds: number[];
-  isMissionCreated: boolean;
+  status: ClusterLifecycleStatus;
+  // Kept optional for compatibility with old payloads.
+  isMissionCreated?: boolean;
   createdAt: string;
   lastUpdatedAt: string;
 }
@@ -180,6 +189,43 @@ export interface ClusterRescueSuggestionResponse {
   needsManualReview: boolean;
   lowConfidenceWarning: string | null;
   multiDepotRecommended: boolean;
+}
+
+// ---- Alternative Depots ----
+
+export interface AlternativeDepotItemCoverage {
+  itemId: number | null;
+  itemName: string;
+  unit: string | null;
+  neededQuantity: number;
+  availableQuantity: number;
+  coveredQuantity: number;
+  remainingQuantity: number;
+  coverageStatus: "Full" | "Partial" | "None" | string;
+}
+
+export interface AlternativeDepot {
+  depotId: number;
+  depotName: string;
+  depotAddress: string;
+  latitude: number | null;
+  longitude: number | null;
+  distanceKm: number;
+  coversAllShortages: boolean;
+  coveredQuantity: number;
+  totalMissingQuantity: number;
+  coveragePercent: number;
+  reason: string;
+  itemCoverageDetails: AlternativeDepotItemCoverage[];
+}
+
+export interface AlternativeDepotsResponse {
+  clusterId: number;
+  selectedDepotId: number;
+  sourceSuggestionId: number;
+  totalShortageItems: number;
+  totalMissingQuantity: number;
+  alternativeDepots: AlternativeDepot[];
 }
 
 // ---- SSE Stream types ----

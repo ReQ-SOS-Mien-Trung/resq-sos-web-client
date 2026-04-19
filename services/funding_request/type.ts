@@ -19,6 +19,8 @@ export interface FundingRequestItem {
   expiredDate?: string | null;
   notes?: string;
   description?: string;
+  volumePerUnit?: number;
+  weightPerUnit?: number;
 }
 
 /* ── Funding Request Entity ── */
@@ -46,6 +48,7 @@ export interface FundingRequestEntity {
 export interface GetFundingRequestsParams {
   pageNumber?: number;
   pageSize?: number;
+  depotId?: number;
   depotIds?: number[];
   statuses?: string[];
 }
@@ -91,9 +94,12 @@ export interface CreateFundingRequestItem {
   targetGroup: string;
   notes?: string;
   description?: string;
+  volumePerUnit?: number;
+  weightPerUnit?: number;
 }
 
 export interface CreateFundingRequestPayload {
+  depotId: number;
   description: string;
   attachmentUrl?: string;
   items: CreateFundingRequestItem[];

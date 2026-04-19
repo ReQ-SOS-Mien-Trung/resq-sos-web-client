@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SOS_CLUSTERS_QUERY_KEY } from "@/services/sos_cluster/hooks";
+import { INVENTORY_KEYS } from "@/services/inventory/hooks";
 import {
   createActivity,
   createMission,
@@ -12,6 +13,7 @@ import {
   updateMissionStatus,
   getActivityRoute,
   getMissionTeamRoute,
+  confirmReturnSupplies,
 } from "./api";
 import {
   CreateActivityResponse,
@@ -33,6 +35,7 @@ import {
   GetActivityRouteParams,
   GetMissionTeamRouteParams,
   MissionTeamRouteResponse,
+  ConfirmReturnSuppliesRequest,
 } from "./type";
 
 export const MISSIONS_QUERY_KEY = ["missions"] as const;
@@ -71,11 +74,16 @@ export function useUpdateMission() {
     { missionId: number; request: UpdateMissionRequest }
   >({
     mutationFn: ({ missionId, request }) => updateMission(missionId, request),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
+      const missionId = data?.missionId ?? variables.missionId;
       queryClient.invalidateQueries({ queryKey: MISSIONS_QUERY_KEY });
       queryClient.invalidateQueries({
-        queryKey: [...MISSIONS_QUERY_KEY, data.missionId],
+        queryKey: [...MISSIONS_QUERY_KEY, missionId],
       });
+      queryClient.invalidateQueries({
+        queryKey: [...MISSION_ACTIVITIES_QUERY_KEY, missionId],
+      });
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
     },
   });
 }
@@ -140,6 +148,7 @@ export function useCreateActivity() {
       queryClient.invalidateQueries({
         queryKey: [...MISSION_ACTIVITIES_QUERY_KEY, variables.missionId],
       });
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
     },
   });
 }
@@ -163,6 +172,7 @@ export function useUpdateActivityStatus() {
       queryClient.invalidateQueries({
         queryKey: [...MISSION_ACTIVITIES_QUERY_KEY, variables.missionId],
       });
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
     },
   });
 }
@@ -186,6 +196,30 @@ export function useUpdateActivity() {
       queryClient.invalidateQueries({
         queryKey: [...MISSION_ACTIVITIES_QUERY_KEY, variables.missionId],
       });
+    },
+  });
+}
+
+export function useConfirmReturnSupplies() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    void,
+    Error,
+    {
+      missionId: number;
+      activityId: number;
+      request: ConfirmReturnSuppliesRequest;
+    }
+  >({
+    mutationFn: ({ missionId, activityId, request }) =>
+      confirmReturnSupplies(missionId, activityId, request),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: MISSIONS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...MISSION_ACTIVITIES_QUERY_KEY, variables.missionId],
+      });
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
     },
   });
 }

@@ -1,19 +1,19 @@
 "use client";
 
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { useState, useMemo, useRef, useCallback } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Table,
   TableBody,
@@ -45,11 +45,6 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
   MagnifyingGlass,
   FloppyDisk,
   Warehouse,
@@ -57,10 +52,7 @@ import {
   CheckCircle,
   XCircle,
   Receipt,
-  CurrencyDollar,
   CalendarBlank,
-  CaretDown,
-  Check,
   X,
   FileText,
   Package,
@@ -74,6 +66,7 @@ import {
   ArrowUp,
   List,
   HandCoinsIcon,
+  WarehouseIcon,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -93,7 +86,7 @@ import {
   useDepotFunds,
   useUpdateDepotAdvanceLimit,
 } from "@/services/depot/hooks";
-import type { DepotFund } from "@/services/depot/type";
+import type { DepotFund, DepotFundReferenceType } from "@/services/depot/type";
 import { useInventoryCategories } from "@/services/inventory/hooks";
 import {
   useCampaigns,
@@ -105,6 +98,8 @@ import {
   useDepotFundReferenceTypes,
 } from "@/services/transaction";
 import { useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { vi as viLocale } from "date-fns/locale";
 
 /* ── Status configs ───────────────────────────────────────── */
 
@@ -140,8 +135,101 @@ const STATUS_LABEL_MAP: Record<string, string> = {
 
 const PANEL_WIDTH = 480;
 
-function formatMoney(value: number) {
-  return value.toLocaleString("vi-VN") + "đ";
+const DEPOT_CARD_ACCENTS = [
+  {
+    border: "border-l-sky-500",
+    background: "bg-sky-50/45 hover:bg-sky-100/75",
+    hover:
+      "hover:border-sky-200 hover:shadow-[0_22px_44px_-32px_rgba(14,165,233,0.55)]",
+  },
+  {
+    border: "border-l-emerald-500",
+    background: "bg-emerald-50/45 hover:bg-emerald-100/75",
+    hover:
+      "hover:border-emerald-200 hover:shadow-[0_22px_44px_-32px_rgba(16,185,129,0.55)]",
+  },
+  {
+    border: "border-l-violet-500",
+    background: "bg-violet-50/45 hover:bg-violet-100/75",
+    hover:
+      "hover:border-violet-200 hover:shadow-[0_22px_44px_-32px_rgba(139,92,246,0.45)]",
+  },
+  {
+    border: "border-l-amber-500",
+    background: "bg-amber-50/45 hover:bg-amber-100/75",
+    hover:
+      "hover:border-amber-200 hover:shadow-[0_22px_44px_-32px_rgba(245,158,11,0.45)]",
+  },
+  {
+    border: "border-l-rose-500",
+    background: "bg-rose-50/45 hover:bg-rose-100/75",
+    hover:
+      "hover:border-rose-200 hover:shadow-[0_22px_44px_-32px_rgba(244,63,94,0.45)]",
+  },
+  {
+    border: "border-l-cyan-500",
+    background: "bg-cyan-50/45 hover:bg-cyan-100/75",
+    hover:
+      "hover:border-cyan-200 hover:shadow-[0_22px_44px_-32px_rgba(6,182,212,0.45)]",
+  },
+] as const;
+
+function formatMoney(
+  value: number | null | undefined,
+  options?: Intl.NumberFormatOptions,
+): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+
+  const formatted = value.toLocaleString("vi-VN", options);
+  return options?.style === "currency" ? formatted : `${formatted}đ`;
+}
+
+function formatMoneyInput(value: string | number): string {
+  const raw =
+    typeof value === "string"
+      ? value.replace(/\D/g, "")
+      : String(Math.round(value));
+  const parsed = Number(raw);
+  if (!raw || !Number.isFinite(parsed)) return "";
+  return parsed.toLocaleString("vi-VN");
+}
+
+function formatMeasurementNumber(value: number | null | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  return value.toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  });
+}
+
+function hasMeasurementValue(value: number | null | undefined): boolean {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function getDepotFundTotalBalance(fund: DepotFund | null | undefined): number {
+  if (!fund) return 0;
+
+  return fund.funds.reduce((sum, source) => {
+    const balance =
+      typeof source.balance === "number" && Number.isFinite(source.balance)
+        ? source.balance
+        : 0;
+    return sum + balance;
+  }, 0);
+}
+
+function getDepotFundLatestUpdatedAt(
+  fund: DepotFund | null | undefined,
+): string | null {
+  if (!fund?.funds.length) return null;
+
+  return fund.funds.reduce<string | null>((latest, source) => {
+    if (!source.lastUpdatedAt) return latest;
+    if (!latest) return source.lastUpdatedAt;
+    return new Date(source.lastUpdatedAt) > new Date(latest)
+      ? source.lastUpdatedAt
+      : latest;
+  }, null);
 }
 
 /* ── Advance Limit Section ───────────────────────────────── */
@@ -155,17 +243,13 @@ function AdvanceLimitModal({
 }) {
   const { data: depotMetadata = [], isLoading: loadingMeta } =
     useDepotMetadata();
-  const { data: depotFunds = [], isLoading: loadingFunds } = useDepotFunds();
+  const { data: depotFundsAll, isLoading: loadingFunds } = useDepotFunds({
+    pageSize: 999,
+  });
+  const depotFunds = useMemo(() => depotFundsAll?.items ?? [], [depotFundsAll]);
   const updateLimit = useUpdateDepotAdvanceLimit();
   const [selectedDepotId, setSelectedDepotId] = useState<string>("");
   const [limitInput, setLimitInput] = useState<string>("");
-
-  useEffect(() => {
-    if (open) {
-      setSelectedDepotId("");
-      setLimitInput("");
-    }
-  }, [open]);
 
   const currentFund = useMemo(
     () => depotFunds.find((f) => f.depotId === Number(selectedDepotId)),
@@ -175,7 +259,7 @@ function AdvanceLimitModal({
   const handleSelectDepot = (val: string) => {
     setSelectedDepotId(val);
     const fund = depotFunds.find((f) => f.depotId === Number(val));
-    setLimitInput(fund ? String(fund.maxAdvanceLimit) : "");
+    setLimitInput(fund ? String(fund.advanceLimit) : "");
   };
 
   const handleSaveLimit = () => {
@@ -207,7 +291,16 @@ function AdvanceLimitModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setSelectedDepotId("");
+          setLimitInput("");
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-md gap-3">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-1.5 mb-0 text-base tracking-tighter">
@@ -246,12 +339,12 @@ function AdvanceLimitModal({
                 Số dư hiện tại:{" "}
                 <span
                   className={
-                    currentFund.balance < 0
+                    getDepotFundTotalBalance(currentFund) < 0
                       ? "font-semibold text-red-600"
                       : "font-semibold text-emerald-600"
                   }
                 >
-                  {currentFund.balance.toLocaleString("vi-VN", {
+                  {formatMoney(getDepotFundTotalBalance(currentFund), {
                     style: "currency",
                     currency: "VND",
                   })}
@@ -260,7 +353,16 @@ function AdvanceLimitModal({
               <p className="text-muted-foreground">
                 Hạn mức hiện tại:{" "}
                 <span className="font-semibold">
-                  {currentFund.maxAdvanceLimit.toLocaleString("vi-VN", {
+                  {formatMoney(currentFund.advanceLimit, {
+                    style: "currency",
+                    currency: "VND",
+                  })}
+                </span>
+              </p>
+              <p className="text-muted-foreground">
+                Đang ứng nội bộ:{" "}
+                <span className="font-semibold text-amber-600">
+                  {formatMoney(currentFund.outstandingAdvanceAmount, {
                     style: "currency",
                     currency: "VND",
                   })}
@@ -307,10 +409,10 @@ export default function FundingRequestsPage() {
   const contentRef = useRef<HTMLDivElement>(null);
 
   const [search, setSearch] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [statusFilterOpen, setStatusFilterOpen] = useState(false);
-  const [selectedDepots, setSelectedDepots] = useState<number[]>([]);
-  const [depotFilterOpen, setDepotFilterOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<
+    "all" | FundingRequestStatus
+  >("all");
+  const [selectedDepotId, setSelectedDepotId] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -327,6 +429,29 @@ export default function FundingRequestsPage() {
   const [depotTxPanelOpen, setDepotTxPanelOpen] = useState(false);
   const [depotTxPage, setDepotTxPage] = useState(1);
   const [depotTxPageSize, setDepotTxPageSize] = useState(10);
+  const [depotTxSearchInput, setDepotTxSearchInput] = useState("");
+  const [depotTxSearch, setDepotTxSearch] = useState("");
+  const [depotTxReferenceType, setDepotTxReferenceType] = useState<
+    "all" | DepotFundReferenceType
+  >("all");
+  const [depotTxAppliedReferenceType, setDepotTxAppliedReferenceType] =
+    useState<"all" | DepotFundReferenceType>("all");
+  const [depotTxFromDate, setDepotTxFromDate] = useState<Date | undefined>();
+  const [depotTxToDate, setDepotTxToDate] = useState<Date | undefined>();
+  const [depotTxAppliedFromDate, setDepotTxAppliedFromDate] = useState<
+    Date | undefined
+  >();
+  const [depotTxAppliedToDate, setDepotTxAppliedToDate] = useState<
+    Date | undefined
+  >();
+  const [depotTxFromDateOpen, setDepotTxFromDateOpen] = useState(false);
+  const [depotTxToDateOpen, setDepotTxToDateOpen] = useState(false);
+  const [depotTxMinAmountInput, setDepotTxMinAmountInput] = useState("");
+  const [depotTxMaxAmountInput, setDepotTxMaxAmountInput] = useState("");
+  const [depotTxMinAmount, setDepotTxMinAmount] = useState("");
+  const [depotTxMaxAmount, setDepotTxMaxAmount] = useState("");
+  const [depotTxDateError, setDepotTxDateError] = useState("");
+  const [depotTxAmountError, setDepotTxAmountError] = useState("");
 
   // Review dialogs
   const [approveDialog, setApproveDialog] = useState<{
@@ -349,25 +474,67 @@ export default function FundingRequestsPage() {
 
   const [advanceLimitOpen, setAdvanceLimitOpen] = useState(false);
 
+  // Depot funds pagination + search
+  const [fundsSearch, setFundsSearch] = useState("");
+  const [fundsPage, setFundsPage] = useState(1);
+  const [fundsPageSize, setFundsPageSize] = useState(6);
+
   // API
   const { data, isLoading } = useFundingRequests({
-    params: { pageNumber: 1, pageSize: 500 },
+    params: {
+      pageNumber: page,
+      pageSize,
+      statuses: selectedStatus === "all" ? undefined : [selectedStatus],
+      depotId: selectedDepotId !== "all" ? Number(selectedDepotId) : undefined,
+    },
   });
   const { data: statusOptions = [] } = useFundingRequestStatuses();
   const { data: depotOptions = [] } = useDepotMetadata();
-  const { data: depotFunds = [], isLoading: loadingFunds } = useDepotFunds();
+  const { data: depotFundsData, isLoading: loadingFunds } = useDepotFunds({
+    pageNumber: fundsPage,
+    pageSize: fundsPageSize,
+    search: fundsSearch || undefined,
+  });
+  const depotFunds = depotFundsData?.items ?? [];
   const { data: campaignsData } = useCampaigns();
   const activeCampaigns = useMemo(
     () => campaignsData?.items ?? [],
     [campaignsData],
   );
   const { data: categoriesData } = useInventoryCategories();
-  const { data: depotTxData, isLoading: loadingDepotTx } =
-    useDepotFundTransactions({
+  const depotTxParams = useMemo(
+    () => ({
       depotId: selectedDepotFund?.depotId ?? 0,
       pageNumber: depotTxPage,
       pageSize: depotTxPageSize,
-    });
+      search: depotTxSearch || undefined,
+      fromDate: depotTxAppliedFromDate
+        ? format(depotTxAppliedFromDate, "yyyy-MM-dd")
+        : undefined,
+      toDate: depotTxAppliedToDate
+        ? format(depotTxAppliedToDate, "yyyy-MM-dd")
+        : undefined,
+      minAmount: depotTxMinAmount ? Number(depotTxMinAmount) : undefined,
+      maxAmount: depotTxMaxAmount ? Number(depotTxMaxAmount) : undefined,
+      referenceTypes:
+        depotTxAppliedReferenceType === "all"
+          ? undefined
+          : [depotTxAppliedReferenceType],
+    }),
+    [
+      depotTxAppliedFromDate,
+      depotTxAppliedReferenceType,
+      depotTxAppliedToDate,
+      depotTxMaxAmount,
+      depotTxMinAmount,
+      depotTxPage,
+      depotTxPageSize,
+      depotTxSearch,
+      selectedDepotFund?.depotId,
+    ],
+  );
+  const { data: depotTxData, isLoading: loadingDepotTx } =
+    useDepotFundTransactions(depotTxParams);
   const { data: txTypesMeta = [] } = useDepotFundTransactionTypes();
   const { data: refTypesMeta = [] } = useDepotFundReferenceTypes();
   const txTypeMap = useMemo(
@@ -376,6 +543,19 @@ export default function FundingRequestsPage() {
   );
   const refTypeMap = useMemo(
     () => Object.fromEntries(refTypesMeta.map((m) => [m.key, m.value])),
+    [refTypesMeta],
+  );
+  const depotTxReferenceTypeOptions = useMemo(
+    () =>
+      refTypesMeta.filter(
+        (
+          item,
+        ): item is {
+          key: DepotFundReferenceType;
+          value: string;
+        } =>
+          item.key === "CampaignDisbursement" || item.key === "VatInvoice",
+      ),
     [refTypesMeta],
   );
   const categoryMap = useMemo(
@@ -436,34 +616,14 @@ export default function FundingRequestsPage() {
           i.requestedByUserName.toLowerCase().includes(q),
       );
     }
-    if (selectedStatuses.length > 0) {
-      result = result.filter((i) => selectedStatuses.includes(i.status));
-    }
-    if (selectedDepots.length > 0) {
-      result = result.filter((i) => selectedDepots.includes(i.depotId));
-    }
     return result;
-  }, [items, search, selectedStatuses, selectedDepots]);
+  }, [items, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const startItem = filtered.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const endItem = Math.min(safePage * pageSize, filtered.length);
-
-  const toggleStatus = (val: string) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(val) ? prev.filter((s) => s !== val) : [...prev, val],
-    );
-    setPage(1);
-  };
-
-  const toggleDepot = (val: number) => {
-    setSelectedDepots((prev) =>
-      prev.includes(val) ? prev.filter((d) => d !== val) : [...prev, val],
-    );
-    setPage(1);
-  };
+  const totalPages = data?.totalPages ?? 1;
+  const safePage = data?.pageNumber ?? page;
+  const paged = filtered;
+  const startItem = items.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const endItem = paged.length === 0 ? 0 : startItem + paged.length - 1;
 
   // Allocate handler
   const isAllocateValid =
@@ -501,14 +661,60 @@ export default function FundingRequestsPage() {
 
   const hasFilters =
     search.trim() !== "" ||
-    selectedStatuses.length > 0 ||
-    selectedDepots.length > 0;
+    selectedStatus !== "all" ||
+    selectedDepotId !== "all";
   const clearFilters = () => {
     setSearch("");
-    setSelectedStatuses([]);
-    setSelectedDepots([]);
+    setSelectedStatus("all");
+    setSelectedDepotId("all");
     setPage(1);
   };
+
+  function resetDepotTxFilters() {
+    setDepotTxSearchInput("");
+    setDepotTxSearch("");
+    setDepotTxReferenceType("all");
+    setDepotTxAppliedReferenceType("all");
+    setDepotTxFromDate(undefined);
+    setDepotTxToDate(undefined);
+    setDepotTxAppliedFromDate(undefined);
+    setDepotTxAppliedToDate(undefined);
+    setDepotTxFromDateOpen(false);
+    setDepotTxToDateOpen(false);
+    setDepotTxMinAmountInput("");
+    setDepotTxMaxAmountInput("");
+    setDepotTxMinAmount("");
+    setDepotTxMaxAmount("");
+    setDepotTxDateError("");
+    setDepotTxAmountError("");
+    setDepotTxPage(1);
+  }
+
+  function applyDepotTxFilters() {
+    if (depotTxFromDate && depotTxToDate && depotTxFromDate > depotTxToDate) {
+      setDepotTxDateError("Ngày bắt đầu không được sau ngày kết thúc");
+      return;
+    }
+
+    setDepotTxDateError("");
+
+    const min = depotTxMinAmountInput ? Number(depotTxMinAmountInput) : undefined;
+    const max = depotTxMaxAmountInput ? Number(depotTxMaxAmountInput) : undefined;
+
+    if (min !== undefined && max !== undefined && min > max) {
+      setDepotTxAmountError("Số tiền tối thiểu không được lớn hơn tối đa");
+      return;
+    }
+
+    setDepotTxAmountError("");
+    setDepotTxSearch(depotTxSearchInput.trim());
+    setDepotTxAppliedReferenceType(depotTxReferenceType);
+    setDepotTxAppliedFromDate(depotTxFromDate);
+    setDepotTxAppliedToDate(depotTxToDate);
+    setDepotTxMinAmount(depotTxMinAmountInput);
+    setDepotTxMaxAmount(depotTxMaxAmountInput);
+    setDepotTxPage(1);
+  }
 
   // Open detail panel
   const openDetail = (item: FundingRequestEntity) => {
@@ -523,7 +729,7 @@ export default function FundingRequestsPage() {
   // Open depot fund transaction panel
   const openDepotFundPanel = (fund: DepotFund) => {
     setSelectedDepotFund(fund);
-    setDepotTxPage(1);
+    resetDepotTxFilters();
     if (panelOpen) {
       setPanelOpen(false);
       setSelectedItem(null);
@@ -594,7 +800,7 @@ export default function FundingRequestsPage() {
           <div>
             <div className="flex items-center gap-2.5 mb-1">
               <PiggyBankIcon size={24} className="text-foreground" />
-              <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
                 Tài chính
               </p>
             </div>
@@ -608,14 +814,14 @@ export default function FundingRequestsPage() {
           <div className="flex items-center gap-2">
             <Button
               onClick={() => setAdvanceLimitOpen(true)}
-              className="gap-2 tracking-tight bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25"
+              className="gap-2 tracking-tighter bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25"
             >
               <Warehouse size={16} />
               Cấu hình hạn mức
             </Button>
             <Button
               onClick={() => setAllocateOpen(true)}
-              className="gap-2 tracking-tight bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25"
+              className="gap-2 tracking-tighter bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25"
             >
               <Money size={16} weight="bold" />
               Cấp quỹ cho kho
@@ -700,22 +906,55 @@ export default function FundingRequestsPage() {
         {/* ── Depot Funds ──────────────────────────────── */}
         <Card className="border border-border/50">
           <CardContent className="px-5">
-            <div className="flex items-center justify-between mb-4">
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <h3 className="text-sm font-semibold tracking-tighter flex items-center gap-1.5">
                 <Storefront size={15} className="text-primary" />
-                Quỹ các kho ({depotFunds.length})
+                Quỹ các kho ({depotFundsData?.totalCount ?? 0})
               </h3>
-              <p className="text-xs text-muted-foreground tracking-tighter">
-                Tổng:{" "}
-                <span className="font-bold text-emerald-600 text-sm">
-                  {formatMoney(depotFunds.reduce((s, d) => s + d.balance, 0))}
-                </span>
-              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Search */}
+                <div className="relative">
+                  <Input
+                    placeholder="Tìm tên kho..."
+                    value={fundsSearch}
+                    onChange={(e) => {
+                      setFundsSearch(e.target.value);
+                      setFundsPage(1);
+                    }}
+                    className="pl-8 h-8 text-sm w-48"
+                    autoComplete="off"
+                  />
+                  <MagnifyingGlass
+                    size={13}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
+                </div>
+                {/* Page size */}
+                <Select
+                  value={String(fundsPageSize)}
+                  onValueChange={(v) => {
+                    setFundsPageSize(Number(v));
+                    setFundsPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-28 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[6, 9, 12, 15].map((s) => (
+                      <SelectItem key={s} value={String(s)}>
+                        {s} / trang
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {loadingFunds ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {Array.from({ length: fundsPageSize }).map((_, i) => (
+                  <Skeleton key={i} className="h-52 w-full rounded-2xl" />
                 ))}
               </div>
             ) : depotFunds.length === 0 ? (
@@ -723,47 +962,135 @@ export default function FundingRequestsPage() {
                 Chưa có dữ liệu quỹ
               </p>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-                {depotFunds.map((fund) => (
-                  <div
-                    key={fund.depotId}
-                    onClick={() => openDepotFundPanel(fund)}
-                    className={`rounded-xl border bg-background p-3.5 cursor-pointer transition-all active:scale-[0.97] ${
-                      selectedDepotFund?.depotId === fund.depotId &&
-                      depotTxPanelOpen
-                        ? "border-primary ring-1 ring-primary/30 shadow-sm"
-                        : "border-border/60 hover:bg-muted/30 hover:border-border"
-                    }`}
-                  >
-                    <p className="text-sm font-semibold tracking-tighter text-muted-foreground truncate mb-1.5">
-                      {fund.depotName}
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {depotFunds.map((fund, index) =>
+                    (() => {
+                      const accent =
+                        DEPOT_CARD_ACCENTS[index % DEPOT_CARD_ACCENTS.length];
+                      const primarySource = fund.funds[0];
+
+                      return (
+                        <div
+                          key={`${fund.depotId}-${fund.depotName}-${fund.funds.length}-${index}`}
+                          onClick={() => openDepotFundPanel(fund)}
+                          className={`rounded-2xl border border-l-[6px] p-4 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 ${accent.border} ${accent.background} ${accent.hover} ${
+                            selectedDepotFund?.depotId === fund.depotId &&
+                            depotTxPanelOpen
+                              ? "border-primary ring-1 ring-primary/30 shadow-sm"
+                              : "border-border/60 hover:border-border"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold tracking-tighter text-foreground line-clamp-2">
+                                {fund.depotName}
+                              </p>
+                              <p className="text-sm text-muted-foreground tracking-tighter mt-1">
+                                {fund.funds.length} quỹ nguồn
+                              </p>
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className="shrink-0 rounded-full px-2.5 py-1 text-sm tracking-tighter font-medium"
+                            >
+                              ID {fund.depotId}
+                            </Badge>
+                          </div>
+
+                          <p
+                            className={`text-2xl font-bold tracking-tighter ${
+                              getDepotFundTotalBalance(fund) < 0
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-emerald-600 dark:text-emerald-400"
+                            }`}
+                          >
+                            {formatMoney(getDepotFundTotalBalance(fund))}
+                          </p>
+
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+                              <p className="text-sm tracking-tighter font-medium text-muted-foreground">
+                                Hạn mức ứng
+                              </p>
+                              <p className="mt-1 text-sm font-semibold tracking-tighter">
+                                {formatMoney(fund.advanceLimit)}
+                              </p>
+                            </div>
+                            <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+                              <p className="text-sm tracking-tighter font-medium text-muted-foreground">
+                                Đang ứng
+                              </p>
+                              <p className="mt-1 text-sm font-semibold tracking-tighter text-blue-600">
+                                {formatMoney(fund.outstandingAdvanceAmount)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {primarySource && (
+                            <div className="mt-3 space-y-1.5">
+                              <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border/50 px-3 py-2">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium tracking-tighter truncate">
+                                    {primarySource.fundSourceName}
+                                  </p>
+                                </div>
+                                <span className="text-sm font-semibold tracking-tighter text-foreground shrink-0">
+                                  {formatMoney(primarySource.balance)}
+                                </span>
+                              </div>
+                              {fund.funds.length > 1 && (
+                                <p className="text-sm text-muted-foreground tracking-tighter">
+                                  Thêm {fund.funds.length - 1} nguồn quỹ khác
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          <p className="text-sm text-muted-foreground tracking-tighter mt-3">
+                            Cập nhật gần nhất:{" "}
+                            {getDepotFundLatestUpdatedAt(fund)
+                              ? new Date(
+                                  getDepotFundLatestUpdatedAt(fund) as string,
+                                ).toLocaleString("vi-VN")
+                              : "—"}
+                          </p>
+                        </div>
+                      );
+                    })(),
+                  )}
+                </div>
+                {/* Pagination */}
+                {(depotFundsData?.totalPages ?? 1) > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/40">
+                    <p className="text-sm text-muted-foreground tracking-tighter">
+                      Trang {fundsPage} / {depotFundsData?.totalPages ?? 1}{" "}
+                      &nbsp;·&nbsp; {depotFundsData?.totalCount ?? 0} kho
                     </p>
-                    <p
-                      className={`text-lg font-bold tracking-tighter ${
-                        fund.balance < 0
-                          ? "text-red-600 dark:text-red-400"
-                          : "text-emerald-600 dark:text-emerald-400"
-                      }`}
-                    >
-                      {formatMoney(fund.balance)}
-                    </p>
-                    {fund.balance < 0 && (
-                      <p className="text-xs text-red-500 tracking-tight font-medium mt-0.5">
-                        Ứng trước • Hạn mức: {formatMoney(fund.maxAdvanceLimit)}
-                      </p>
-                    )}
-                    {fund.balance >= 0 && (
-                      <p className="text-xs text-muted-foreground tracking-tight mt-0.5">
-                        Hạn ứng: {formatMoney(fund.maxAdvanceLimit)}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground tracking-tight mt-1">
-                      Cập nhật:{" "}
-                      {new Date(fund.lastUpdatedAt).toLocaleDateString("vi-VN")}
-                    </p>
+                    <div className="flex gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={fundsPage <= 1 || loadingFunds}
+                        onClick={() => setFundsPage((p) => p - 1)}
+                      >
+                        Trước
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          fundsPage >= (depotFundsData?.totalPages ?? 1) ||
+                          loadingFunds
+                        }
+                        onClick={() => setFundsPage((p) => p + 1)}
+                      >
+                        Sau
+                      </Button>
+                    </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -790,128 +1117,58 @@ export default function FundingRequestsPage() {
                 />
               </div>
 
-              {/* Status filter */}
-              <Popover
-                open={statusFilterOpen}
-                onOpenChange={setStatusFilterOpen}
+              <Select
+                value={selectedStatus}
+                onValueChange={(value) => {
+                  setSelectedStatus(value as "all" | FundingRequestStatus);
+                  setPage(1);
+                }}
               >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-1.5 font-normal text-sm"
-                  >
-                    Trạng thái
-                    {selectedStatuses.length > 0 ? (
-                      <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
-                        {selectedStatuses.length}
-                      </Badge>
-                    ) : (
-                      <CaretDown size={13} className="text-muted-foreground" />
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-48 p-1.5" align="start">
-                  {statusOptions.map((value) => {
-                    const checked = selectedStatuses.includes(value);
-                    return (
-                      <button
-                        key={value}
-                        onClick={() => toggleStatus(value)}
-                        className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
-                      >
-                        <span
-                          className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                            checked
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "border-border bg-background"
-                          }`}
-                        >
-                          {checked && <Check size={11} weight="bold" />}
-                        </span>
-                        <span className={checked ? "font-medium" : ""}>
-                          {STATUS_LABEL_MAP[value] ?? value}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {selectedStatuses.length > 0 && (
-                    <button
-                      onClick={() => {
-                        setSelectedStatuses([]);
-                        setPage(1);
-                      }}
-                      className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
-                    >
-                      <X size={11} />
-                      Xóa lọc
-                    </button>
-                  )}
-                </PopoverContent>
-              </Popover>
-
-              {/* Depot filter */}
-              <Popover open={depotFilterOpen} onOpenChange={setDepotFilterOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-1.5 font-normal text-sm"
-                  >
-                    <Storefront size={13} />
-                    Kho
-                    {selectedDepots.length > 0 ? (
-                      <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
-                        {selectedDepots.length}
-                      </Badge>
-                    ) : (
-                      <CaretDown size={13} className="text-muted-foreground" />
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-56 p-1.5 max-h-64 overflow-y-auto"
+                <SelectTrigger className="h-9 w-[150px] text-sm">
+                  <SelectValue placeholder="Trạng thái" />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
                   align="start"
+                  sideOffset={6}
                 >
-                  {depotOptions.map((depot) => {
-                    const checked = selectedDepots.includes(depot.key);
-                    return (
-                      <button
-                        key={depot.key}
-                        onClick={() => toggleDepot(depot.key)}
-                        className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
-                      >
-                        <span
-                          className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                            checked
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "border-border bg-background"
-                          }`}
-                        >
-                          {checked && <Check size={11} weight="bold" />}
-                        </span>
-                        <span
-                          className={`truncate ${checked ? "font-medium" : ""}`}
-                        >
-                          {depot.value}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {selectedDepots.length > 0 && (
-                    <button
-                      onClick={() => {
-                        setSelectedDepots([]);
-                        setPage(1);
-                      }}
-                      className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
-                    >
-                      <X size={11} />
-                      Xóa lọc
-                    </button>
-                  )}
-                </PopoverContent>
-              </Popover>
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  {statusOptions.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {STATUS_LABEL_MAP[value] ?? value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={selectedDepotId}
+                onValueChange={(value) => {
+                  setSelectedDepotId(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 w-[180px] text-sm">
+                  <div className="flex items-center gap-2 truncate">
+                    <Storefront size={13} />
+                    <SelectValue placeholder="Kho" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  sideOffset={6}
+                >
+                  <SelectItem value="all">Tất cả kho</SelectItem>
+                  {depotOptions.map((depot) => (
+                    <SelectItem key={depot.key} value={String(depot.key)}>
+                      {depot.value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {hasFilters && (
                 <Button
@@ -927,8 +1184,10 @@ export default function FundingRequestsPage() {
 
               <div className="ml-auto text-sm tracking-tighter text-muted-foreground whitespace-nowrap">
                 {hasFilters
-                  ? `${filtered.length} / ${items.length} yêu cầu`
-                  : `${items.length} yêu cầu`}
+                  ? `${filtered.length} / ${
+                      data?.totalCount ?? items.length
+                    } yêu cầu`
+                  : `${data?.totalCount ?? items.length} yêu cầu`}
               </div>
             </div>
 
@@ -1107,7 +1366,7 @@ export default function FundingRequestsPage() {
             <SheetTitle className="tracking-tighter text-xl">
               Chi tiết yêu cầu cấp quỹ
             </SheetTitle>
-            <SheetDescription className="tracking-tight text-sm">
+            <SheetDescription className="tracking-tighter text-sm">
               Xem chi tiết và duyệt yêu cầu cấp quỹ từ kho
             </SheetDescription>
           </SheetHeader>
@@ -1121,7 +1380,7 @@ export default function FundingRequestsPage() {
                     <h3 className="text-lg font-bold tracking-tighter">
                       {selectedItem.depotName}
                     </h3>
-                    <p className="text-sm text-muted-foreground tracking-tight">
+                    <p className="text-sm text-muted-foreground tracking-tighter">
                       Gửi bởi: {selectedItem.requestedByUserName}
                     </p>
                   </div>
@@ -1135,20 +1394,20 @@ export default function FundingRequestsPage() {
                 {/* Meta cards */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                    <p className="text-sm text-muted-foreground tracking-tight flex items-center gap-2 mb-1">
+                    <p className="text-sm text-muted-foreground tracking-tighter flex items-center gap-2 mb-1">
                       <HandCoinsIcon size={16} />
                       Tổng tiền
                     </p>
-                    <p className="text-base font-bold tracking-tight text-emerald-600">
+                    <p className="text-base font-bold tracking-tighter text-emerald-600">
                       {formatMoney(selectedItem.totalAmount)}
                     </p>
                   </div>
                   <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                    <p className="text-sm text-muted-foreground tracking-tight flex items-center gap-2 mb-1">
+                    <p className="text-sm text-muted-foreground tracking-tighter flex items-center gap-2 mb-1">
                       <CalendarBlank size={16} />
                       Ngày gửi
                     </p>
-                    <p className="text-base tracking-tight">
+                    <p className="text-base tracking-tighter">
                       {new Date(selectedItem.createdAt).toLocaleString("vi-VN")}
                     </p>
                   </div>
@@ -1156,11 +1415,11 @@ export default function FundingRequestsPage() {
 
                 {/* Description */}
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                  <p className="text-sm text-muted-foreground tracking-tight flex items-center gap-2 mb-1">
+                  <p className="text-sm text-muted-foreground tracking-tighter flex items-center gap-2 mb-1">
                     <FileText size={16} />
                     Mô tả
                   </p>
-                  <p className="text-base tracking-tight">
+                  <p className="text-base tracking-tighter">
                     {selectedItem.description || "Không có mô tả"}
                   </p>
                 </div>
@@ -1171,7 +1430,7 @@ export default function FundingRequestsPage() {
                     href={selectedItem.attachmentUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline tracking-tight"
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:underline tracking-tighter"
                   >
                     <FileText size={14} />
                     Xem tài liệu đính kèm
@@ -1182,14 +1441,14 @@ export default function FundingRequestsPage() {
                 {selectedItem.status === "Approved" &&
                   selectedItem.approvedCampaignName && (
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800 p-2.5">
-                      <p className="text-xs text-emerald-600 tracking-tight font-medium mb-1">
+                      <p className="text-sm text-emerald-600 tracking-tighter font-medium mb-1">
                         Quỹ được duyệt từ
                       </p>
-                      <p className="text-sm font-semibold tracking-tight text-emerald-700 dark:text-emerald-400">
+                      <p className="text-sm font-semibold tracking-tighter text-emerald-700 dark:text-emerald-400">
                         {selectedItem.approvedCampaignName}
                       </p>
                       {selectedItem.reviewedByUserName && (
-                        <p className="text-xs text-emerald-600/70 tracking-tight mt-1">
+                        <p className="text-sm text-emerald-600/70 tracking-tighter mt-1">
                           Duyệt bởi: {selectedItem.reviewedByUserName} ·{" "}
                           {selectedItem.reviewedAt
                             ? new Date(selectedItem.reviewedAt).toLocaleString(
@@ -1205,14 +1464,14 @@ export default function FundingRequestsPage() {
                 {selectedItem.status === "Rejected" &&
                   selectedItem.rejectionReason && (
                     <div className="rounded-lg border border-rose-200 bg-rose-50/50 dark:bg-rose-950/20 dark:border-rose-800 p-2.5">
-                      <p className="text-xs text-rose-600 tracking-tight font-medium mb-1">
+                      <p className="text-sm text-rose-600 tracking-tighter font-medium mb-1">
                         Lý do từ chối
                       </p>
-                      <p className="text-sm tracking-tight text-rose-700 dark:text-rose-400">
+                      <p className="text-sm tracking-tighter text-rose-700 dark:text-rose-400">
                         {selectedItem.rejectionReason}
                       </p>
                       {selectedItem.reviewedByUserName && (
-                        <p className="text-xs text-rose-600/70 tracking-tight mt-1">
+                        <p className="text-sm text-rose-600/70 tracking-tighter mt-1">
                           Từ chối bởi: {selectedItem.reviewedByUserName}
                         </p>
                       )}
@@ -1224,7 +1483,7 @@ export default function FundingRequestsPage() {
               <div>
                 <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
                   <Package size={15} className="text-primary" />
-                  Danh sách vật tư ({selectedRequestItems.length})
+                  Danh sách vật phẩm ({selectedRequestItems.length})
                 </h4>
                 {loadingSelectedItems ? (
                   <div className="space-y-2">
@@ -1238,8 +1497,8 @@ export default function FundingRequestsPage() {
                       size={28}
                       className="mx-auto text-muted-foreground/40 mb-2"
                     />
-                    <p className="text-sm text-muted-foreground tracking-tight">
-                      Không có danh sách vật tư
+                    <p className="text-sm text-muted-foreground tracking-tighter">
+                      Không có danh sách vật phẩm
                     </p>
                   </div>
                 ) : (
@@ -1264,6 +1523,18 @@ export default function FundingRequestsPage() {
                             SL: {item.quantity} {item.unit}
                           </span>
                           <span>Đơn giá: {formatMoney(item.unitPrice)}</span>
+                          {hasMeasurementValue(item.volumePerUnit) && (
+                            <span>
+                              Thể tích/đv:{" "}
+                              {formatMeasurementNumber(item.volumePerUnit)} dm3
+                            </span>
+                          )}
+                          {hasMeasurementValue(item.weightPerUnit) && (
+                            <span>
+                              Cân nặng/đv:{" "}
+                              {formatMeasurementNumber(item.weightPerUnit)} kg
+                            </span>
+                          )}
                           <span>
                             Danh mục:{" "}
                             {categoryMap[item.categoryCode] ??
@@ -1313,7 +1584,10 @@ export default function FundingRequestsPage() {
         open={depotTxPanelOpen}
         onOpenChange={(val) => {
           setDepotTxPanelOpen(val);
-          if (!val) setSelectedDepotFund(null);
+          if (!val) {
+            setSelectedDepotFund(null);
+            resetDepotTxFilters();
+          }
         }}
       >
         <SheetContent
@@ -1325,7 +1599,7 @@ export default function FundingRequestsPage() {
               <List size={18} className="text-primary" />
               Lịch sử giao dịch quỹ kho
             </SheetTitle>
-            <SheetDescription className="tracking-tight text-sm">
+            <SheetDescription className="tracking-tighter text-base">
               {selectedDepotFund?.depotName}
             </SheetDescription>
           </SheetHeader>
@@ -1333,29 +1607,88 @@ export default function FundingRequestsPage() {
           {selectedDepotFund && (
             <div className="space-y-4">
               {/* Fund summary */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                  <p className="text-xs text-muted-foreground tracking-tight mb-1">
-                    Số dư hiện tại
+                  <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
+                    Tổng số dư
                   </p>
                   <p
-                    className={`text-sm font-bold tracking-tight ${
-                      selectedDepotFund.balance < 0
+                    className={`text-xl font-bold tracking-tighter ${
+                      getDepotFundTotalBalance(selectedDepotFund) < 0
                         ? "text-red-600"
                         : "text-emerald-600"
                     }`}
                   >
-                    {formatMoney(selectedDepotFund.balance)}
+                    {formatMoney(getDepotFundTotalBalance(selectedDepotFund))}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                  <p className="text-xs text-muted-foreground tracking-tight mb-1">
+                  <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
                     Hạn mức ứng
                   </p>
-                  <p className="text-sm font-bold tracking-tight">
-                    {formatMoney(selectedDepotFund.maxAdvanceLimit)}
+                  <p className="text-xl font-bold tracking-tighter">
+                    {formatMoney(selectedDepotFund.advanceLimit)}
                   </p>
                 </div>
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                  <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
+                    Đang ứng nội bộ
+                  </p>
+                  <p className="text-xl font-bold tracking-tighter text-blue-600">
+                    {formatMoney(selectedDepotFund.outstandingAdvanceAmount)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                  <p className="text-sm text-muted-foreground tracking-tighter mb-0.5">
+                    Nguồn quỹ
+                  </p>
+                  <p className="text-xl font-bold tracking-tighter">
+                    {selectedDepotFund.funds.length}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
+                  <PiggyBankIcon size={14} className="text-primary" />
+                  Nguồn quỹ hiện tại
+                </h4>
+                {selectedDepotFund.funds.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
+                    <p className="text-sm text-muted-foreground tracking-tighter">
+                      Chưa có quỹ nguồn nào
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {selectedDepotFund.funds.map((fundSource) => (
+                      <div
+                        key={fundSource.id}
+                        className="rounded-xl border border-border/60 bg-background p-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-base font-semibold tracking-tighter truncate">
+                              {fundSource.fundSourceName}
+                            </p>
+                            <p className="text-sm text-muted-foreground tracking-tighter mt-1">
+                              {fundSource.fundSourceType}
+                            </p>
+                          </div>
+                          <span className="text-base font-bold tracking-tighter text-emerald-600 shrink-0">
+                            {formatMoney(fundSource.balance)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground tracking-tighter mt-3">
+                          Cập nhật:{" "}
+                          {new Date(fundSource.lastUpdatedAt).toLocaleString(
+                            "vi-VN",
+                          )}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Transaction list */}
@@ -1364,6 +1697,219 @@ export default function FundingRequestsPage() {
                   <Receipt size={14} className="text-primary" />
                   Giao dịch ({depotTxData?.totalCount ?? 0})
                 </h4>
+
+                <div className="mb-3 rounded-xl border border-border/60 bg-muted/20 p-3 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2 xl:flex-nowrap">
+                    <div className="min-w-[260px] flex-1">
+                      <Input
+                        className="h-8 text-xs tracking-tighter"
+                        placeholder="Tìm ghi chú, tên người nộp, số điện thoại..."
+                        value={depotTxSearchInput}
+                        onChange={(e) => setDepotTxSearchInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            applyDepotTxFilters();
+                          }
+                        }}
+                      />
+                    </div>
+                    <Select
+                      value={depotTxReferenceType}
+                      onValueChange={(value) =>
+                        setDepotTxReferenceType(
+                          value as "all" | DepotFundReferenceType,
+                        )
+                      }
+                    >
+                      <SelectTrigger className="h-8 min-w-[170px] shrink-0 text-xs tracking-tighter">
+                        <SelectValue placeholder="Loại tham chiếu" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tất cả</SelectItem>
+                        {depotTxReferenceTypeOptions.map((option) => (
+                          <SelectItem key={option.key} value={option.key}>
+                            {option.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Popover
+                        open={depotTxFromDateOpen}
+                        onOpenChange={setDepotTxFromDateOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 min-w-32 justify-start gap-1.5 px-2.5 text-xs font-normal"
+                          >
+                            <CalendarBlank size={14} />
+                            {depotTxFromDate ? (
+                              format(depotTxFromDate, "dd/MM/yyyy")
+                            ) : (
+                              <span className="text-muted-foreground">
+                                Từ ngày
+                              </span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={depotTxFromDate}
+                            onSelect={(date) => {
+                              if (date && depotTxToDate && date > depotTxToDate) {
+                                setDepotTxToDate(undefined);
+                              }
+                              setDepotTxFromDate(date);
+                              setDepotTxFromDateOpen(false);
+                            }}
+                            disabled={(date) =>
+                              depotTxToDate ? date > depotTxToDate : false
+                            }
+                            locale={viLocale}
+                            initialFocus
+                          />
+                          {depotTxFromDate && (
+                            <div className="border-t px-3 py-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-full text-xs text-muted-foreground"
+                                onClick={() => {
+                                  setDepotTxFromDate(undefined);
+                                  setDepotTxFromDateOpen(false);
+                                }}
+                              >
+                                Xóa
+                              </Button>
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
+                      <span className="text-xs text-muted-foreground">–</span>
+                      <Popover
+                        open={depotTxToDateOpen}
+                        onOpenChange={setDepotTxToDateOpen}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 min-w-32 justify-start gap-1.5 px-2.5 text-xs font-normal"
+                          >
+                            <CalendarBlank size={14} />
+                            {depotTxToDate ? (
+                              format(depotTxToDate, "dd/MM/yyyy")
+                            ) : (
+                              <span className="text-muted-foreground">
+                                Đến ngày
+                              </span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={depotTxToDate}
+                            onSelect={(date) => {
+                              if (
+                                date &&
+                                depotTxFromDate &&
+                                date < depotTxFromDate
+                              ) {
+                                setDepotTxFromDate(undefined);
+                              }
+                              setDepotTxToDate(date);
+                              setDepotTxToDateOpen(false);
+                            }}
+                            disabled={(date) =>
+                              depotTxFromDate ? date < depotTxFromDate : false
+                            }
+                            locale={viLocale}
+                            initialFocus
+                          />
+                          {depotTxToDate && (
+                            <div className="border-t px-3 py-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-full text-xs text-muted-foreground"
+                                onClick={() => {
+                                  setDepotTxToDate(undefined);
+                                  setDepotTxToDateOpen(false);
+                                }}
+                              >
+                                Xóa
+                              </Button>
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        className="h-8 w-[148px] text-xs tracking-tighter"
+                        placeholder="Tiền tối thiểu"
+                        value={formatMoneyInput(depotTxMinAmountInput)}
+                        onChange={(e) => {
+                          const rawValue = e.target.value.replace(/\D/g, "");
+                          setDepotTxMinAmountInput(rawValue);
+                          setDepotTxAmountError(
+                            depotTxMaxAmountInput &&
+                              Number(rawValue) > Number(depotTxMaxAmountInput)
+                              ? "Số tiền tối thiểu không được lớn hơn tối đa"
+                              : "",
+                          );
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground">–</span>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        className="h-8 w-[148px] text-xs tracking-tighter"
+                        placeholder="Tiền tối đa"
+                        value={formatMoneyInput(depotTxMaxAmountInput)}
+                        onChange={(e) => {
+                          const rawValue = e.target.value.replace(/\D/g, "");
+                          setDepotTxMaxAmountInput(rawValue);
+                          setDepotTxAmountError(
+                            depotTxMinAmountInput &&
+                              Number(rawValue) < Number(depotTxMinAmountInput)
+                              ? "Số tiền tối đa không được nhỏ hơn tối thiểu"
+                              : "",
+                          );
+                        }}
+                      />
+                    </div>
+                    <div className="flex w-full items-center gap-2 sm:w-[260px] xl:w-[280px]">
+                      <Button
+                        size="sm"
+                        className="h-8 flex-1 px-3 text-xs tracking-tighter"
+                        onClick={applyDepotTxFilters}
+                        disabled={!!depotTxDateError || !!depotTxAmountError}
+                      >
+                        Áp dụng bộ lọc
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 flex-1 px-3 text-xs tracking-tighter"
+                        onClick={resetDepotTxFilters}
+                      >
+                        Đặt lại
+                      </Button>
+                    </div>
+                  </div>
+                  {(depotTxDateError || depotTxAmountError) && (
+                    <p className="text-xs text-rose-500 tracking-tighter">
+                      {depotTxDateError || depotTxAmountError}
+                    </p>
+                  )}
+                </div>
 
                 {loadingDepotTx ? (
                   <div className="space-y-2">
@@ -1389,7 +1935,7 @@ export default function FundingRequestsPage() {
                       size={28}
                       className="mx-auto text-muted-foreground/40 mb-2"
                     />
-                    <p className="text-sm text-muted-foreground tracking-tight">
+                    <p className="text-sm text-muted-foreground tracking-tighter">
                       Chưa có giao dịch
                     </p>
                   </div>
@@ -1407,6 +1953,7 @@ export default function FundingRequestsPage() {
                           <TableHead className="text-sm">
                             Nguồn tham chiếu
                           </TableHead>
+                          <TableHead className="text-sm">Người ứng</TableHead>
                           <TableHead className="text-sm min-w-36">
                             Ghi chú
                           </TableHead>
@@ -1446,6 +1993,20 @@ export default function FundingRequestsPage() {
                                   ? `${refTypeMap[tx.referenceType] ?? tx.referenceType}${tx.referenceId ? ` #${tx.referenceId}` : ""}`
                                   : "—"}
                               </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {tx.contributorName ? (
+                                  <div className="leading-tight">
+                                    <p className="font-medium text-foreground">
+                                      {tx.contributorName}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground tracking-tighter">
+                                      {tx.phoneNumber || "—"}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  "—"
+                                )}
+                              </TableCell>
                               <TableCell className="text-sm text-muted-foreground max-w-48 truncate">
                                 {tx.note || "—"}
                               </TableCell>
@@ -1455,7 +2016,7 @@ export default function FundingRequestsPage() {
                                 }`}
                               >
                                 {isIn ? "+" : ""}
-                                {tx.amount.toLocaleString("vi-VN")}đ
+                                {formatMoney(tx.amount)}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground text-right whitespace-nowrap">
                                 {new Date(tx.createdAt).toLocaleString("vi-VN")}
@@ -1471,7 +2032,7 @@ export default function FundingRequestsPage() {
                 {/* Pagination */}
                 <div className="flex items-center justify-between pt-3 border-t border-border/40 mt-3">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm text-muted-foreground tracking-tight">
+                    <p className="text-sm text-muted-foreground tracking-tighter">
                       Trang {depotTxPage}/{depotTxData?.totalPages ?? 1}
                     </p>
                     <Select
@@ -1489,9 +2050,10 @@ export default function FundingRequestsPage() {
                         <SelectItem value="10">10</SelectItem>
                         <SelectItem value="20">20</SelectItem>
                         <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
                       </SelectContent>
                     </Select>
-                    <span className="text-sm text-muted-foreground tracking-tight">
+                    <span className="text-sm text-muted-foreground tracking-tighter">
                       / trang
                     </span>
                   </div>
@@ -1538,7 +2100,7 @@ export default function FundingRequestsPage() {
                 <DialogTitle className="tracking-tighter">
                   Phê duyệt yêu cầu
                 </DialogTitle>
-                <DialogDescription className="tracking-tight">
+                <DialogDescription className="tracking-tighter">
                   {approveDialog.item?.depotName} —{" "}
                   {approveDialog.item
                     ? formatMoney(approveDialog.item.totalAmount)
@@ -1549,7 +2111,7 @@ export default function FundingRequestsPage() {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
+              <label className="text-sm font-bold uppercase tracking-tighter text-muted-foreground mb-2 block">
                 Chọn quỹ để rút tiền
               </label>
               <Select
@@ -1570,12 +2132,12 @@ export default function FundingRequestsPage() {
                         <span className="truncate">{c.name}</span>
                         <div className="flex items-center gap-2 shrink-0">
                           {c.status !== "Active" && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-sm tracking-tighter text-muted-foreground">
                               [{c.status}]
                             </span>
                           )}
                           <span className="text-sm font-semibold text-emerald-600">
-                            {c.totalAmount.toLocaleString("vi-VN")}đ
+                            {formatMoney(c.currentBalance)}
                           </span>
                         </div>
                       </div>
@@ -1641,7 +2203,7 @@ export default function FundingRequestsPage() {
                 <DialogTitle className="tracking-tighter">
                   Từ chối yêu cầu
                 </DialogTitle>
-                <DialogDescription className="tracking-tight">
+                <DialogDescription className="tracking-tighter">
                   {rejectDialog.item?.depotName}
                 </DialogDescription>
               </div>
@@ -1649,7 +2211,7 @@ export default function FundingRequestsPage() {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
+              <label className="text-sm font-bold uppercase tracking-tighter text-muted-foreground mb-2 block">
                 Lý do từ chối
               </label>
               <Textarea
@@ -1715,7 +2277,7 @@ export default function FundingRequestsPage() {
                 <DialogTitle className="tracking-tighter">
                   Cấp quỹ cho kho
                 </DialogTitle>
-                <DialogDescription className="tracking-tight">
+                <DialogDescription className="tracking-tighter">
                   Phân bổ ngân sách từ chiến dịch quỹ cho các kho
                 </DialogDescription>
               </div>
@@ -1724,8 +2286,8 @@ export default function FundingRequestsPage() {
           <div className="space-y-4 py-2">
             {/* Campaign */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <PiggyBankIcon size={16} weight="bold" />
+              <label className="text-sm font-medium tracking-tighter mb-2 flex items-center gap-1.5">
+                <PiggyBankIcon size={20} weight="regular" />
                 Chiến dịch quỹ (nguồn rút tiền)
               </label>
               <Select
@@ -1746,19 +2308,19 @@ export default function FundingRequestsPage() {
                         <span className="truncate">{c.name}</span>
                         <div className="flex items-center gap-2 shrink-0">
                           {c.status !== "Active" && (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-sm tracking-tighter text-muted-foreground">
                               [{c.status}]
                             </span>
                           )}
                           <span className="text-sm font-semibold text-emerald-600">
-                            {c.totalAmount.toLocaleString("vi-VN")}đ
+                            {formatMoney(c.currentBalance)}
                           </span>
                         </div>
                       </div>
                     </SelectItem>
                   ))}
                   {activeCampaigns.length === 0 && (
-                    <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                    <div className="px-3 py-4 text-center text-sm tracking-tighter text-muted-foreground">
                       Không có chiến dịch quỹ nào
                     </div>
                   )}
@@ -1768,8 +2330,8 @@ export default function FundingRequestsPage() {
 
             {/* Depot */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <Storefront size={16} weight="bold" />
+              <label className="text-sm font-medium tracking-tighter mb-2 flex items-center gap-1.5">
+                <WarehouseIcon size={20} weight="regular" />
                 Kho nhận quỹ
               </label>
               <Select
@@ -1795,8 +2357,8 @@ export default function FundingRequestsPage() {
 
             {/* Amount */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <Money size={16} weight="bold" />
+              <label className="text-sm font-medium tracking-tighter mb-2 flex items-center gap-1.5">
+                <Money size={20} weight="regular" />
                 Số tiền (VNĐ)
               </label>
               <Input
@@ -1817,8 +2379,8 @@ export default function FundingRequestsPage() {
 
             {/* Purpose */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <FileText size={16} weight="bold" />
+              <label className="text-sm font-medium tracking-tighter mb-2 flex items-center gap-1.5">
+                <FileText size={20} weight="regular" />
                 Mục đích
               </label>
               <Textarea

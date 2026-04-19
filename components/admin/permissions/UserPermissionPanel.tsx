@@ -31,7 +31,7 @@ import { UserEntity } from "@/services/user/type";
 // ── Permission group labels ──────────────────────────────
 const PERMISSION_GROUP_LABELS: Record<string, string> = {
   system: "Hệ thống",
-  inventory: "Kho vật tư",
+  inventory: "Kho vật phẩm",
   personnel: "Nhân sự",
   mission: "Nhiệm vụ",
   activity: "Hoạt động",
@@ -60,10 +60,33 @@ function groupPermissions(
 }
 
 const ROLE_FILTERS = [
-  { id: ROLES.COORDINATOR, label: "Điều phối viên", activeClass: "bg-blue-500 text-white border-blue-500", baseClass: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" },
-  { id: ROLES.RESCUER,     label: "Cứu hộ viên",   activeClass: "bg-emerald-500 text-white border-emerald-500", baseClass: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" },
-  { id: ROLES.MANAGER,     label: "Quản lý kho",   activeClass: "bg-orange-500 text-white border-orange-500", baseClass: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100" },
-  { id: ROLES.VICTIM,      label: "Công dân",       activeClass: "bg-violet-500 text-white border-violet-500", baseClass: "bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100" },
+  {
+    id: ROLES.COORDINATOR,
+    label: "Điều phối viên",
+    activeClass: "bg-blue-500 text-white border-blue-500",
+    baseClass: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100",
+  },
+  {
+    id: ROLES.RESCUER,
+    label: "Cứu hộ viên",
+    activeClass: "bg-emerald-500 text-white border-emerald-500",
+    baseClass:
+      "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100",
+  },
+  {
+    id: ROLES.MANAGER,
+    label: "Quản lý kho",
+    activeClass: "bg-orange-500 text-white border-orange-500",
+    baseClass:
+      "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100",
+  },
+  {
+    id: ROLES.VICTIM,
+    label: "Công dân",
+    activeClass: "bg-violet-500 text-white border-violet-500",
+    baseClass:
+      "bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100",
+  },
 ];
 
 const UserPermissionPanel = () => {
@@ -110,8 +133,7 @@ const UserPermissionPanel = () => {
 
   // ── Derive checked IDs: local edits or server data ───────
   const checkedIds =
-    localCheckedIds ??
-    new Set(userData?.permissions?.map((p) => p.id) ?? []);
+    localCheckedIds ?? new Set(userData?.permissions?.map((p) => p.id) ?? []);
 
   // ── Server-filtered user list ──────────────────────────
   const filteredUsers = usersForPermission?.items ?? [];
@@ -213,7 +235,9 @@ const UserPermissionPanel = () => {
       {PERMISSION_GROUP_ORDER.filter((d) => grouped[d]).map((domain) => {
         const groupPerms = grouped[domain];
         const isExpanded = expandedGroups.has(domain);
-        const checkedCount = groupPerms.filter((p) => checkedIds.has(p.id)).length;
+        const checkedCount = groupPerms.filter((p) =>
+          checkedIds.has(p.id),
+        ).length;
         const allGroupChecked = checkedCount === groupPerms.length;
         return (
           <Card
@@ -224,20 +248,49 @@ const UserPermissionPanel = () => {
             )}
           >
             <button
-              onClick={(e) => { if (stopPropagation) e.stopPropagation(); toggleGroupExpand(domain); }}
+              onClick={(e) => {
+                if (stopPropagation) e.stopPropagation();
+                toggleGroupExpand(domain);
+              }}
               className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-accent/50 transition-colors"
             >
               <div className="flex items-center gap-2">
-                {isExpanded ? <CaretDown size={14} className="text-muted-foreground tracking-tighter" /> : <CaretRight size={14} className="text-muted-foreground tracking-tighter" />}
-                <span className="text-sm font-bold uppercase tracking-tight">{PERMISSION_GROUP_LABELS[domain] ?? domain}</span>
-                <Badge variant="secondary" className="text-xs tracking-tighter font-medium px-1.5 py-0">{checkedCount}/{groupPerms.length}</Badge>
+                {isExpanded ? (
+                  <CaretDown
+                    size={14}
+                    className="text-muted-foreground tracking-tighter"
+                  />
+                ) : (
+                  <CaretRight
+                    size={14}
+                    className="text-muted-foreground tracking-tighter"
+                  />
+                )}
+                <span className="text-sm font-bold uppercase tracking-tight">
+                  {PERMISSION_GROUP_LABELS[domain] ?? domain}
+                </span>
+                <Badge
+                  variant="secondary"
+                  className="text-xs tracking-tighter font-medium px-1.5 py-0"
+                >
+                  {checkedCount}/{groupPerms.length}
+                </Badge>
               </div>
               {isExpanded && (
                 <div
-                  onClick={(e) => { e.stopPropagation(); handleToggleGroup(groupPerms); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleGroup(groupPerms);
+                  }}
                   className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground tracking-tighter cursor-pointer transition-colors"
                 >
-                  {allGroupChecked && <CheckCircle size={14} weight="fill" className="text-green-500" />}
+                  {allGroupChecked && (
+                    <CheckCircle
+                      size={14}
+                      weight="fill"
+                      className="text-green-500"
+                    />
+                  )}
                   <span>{allGroupChecked ? "Bỏ chọn" : "Chọn hết"}</span>
                 </div>
               )}
@@ -247,13 +300,29 @@ const UserPermissionPanel = () => {
                 {groupPerms.map((perm, idx) => (
                   <label
                     key={perm.id}
-                    onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
-                    className={cn("flex items-start gap-3 px-4 py-2.5 cursor-pointer hover:bg-accent/30 transition-colors", idx < groupPerms.length - 1 && "border-b border-border/20")}
+                    onClick={
+                      stopPropagation ? (e) => e.stopPropagation() : undefined
+                    }
+                    className={cn(
+                      "flex items-start gap-3 px-4 py-2.5 cursor-pointer hover:bg-accent/30 transition-colors",
+                      idx < groupPerms.length - 1 &&
+                        "border-b border-border/20",
+                    )}
                   >
-                    <Checkbox checked={checkedIds.has(perm.id)} onCheckedChange={() => handleToggle(perm.id)} className="mt-0.5" />
+                    <Checkbox
+                      checked={checkedIds.has(perm.id)}
+                      onCheckedChange={() => handleToggle(perm.id)}
+                      className="mt-0.5"
+                    />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-medium tracking-tighter leading-tight">{perm.name}</p>
-                      {perm.description && <p className="text-[12px] text-muted-foreground tracking-tighter mt-0.5 leading-tight">{perm.description}</p>}
+                      <p className="text-[15px] font-medium tracking-tighter leading-tight">
+                        {perm.name}
+                      </p>
+                      {perm.description && (
+                        <p className="text-[12px] text-muted-foreground tracking-tighter mt-0.5 leading-tight">
+                          {perm.description}
+                        </p>
+                      )}
                     </div>
                   </label>
                 ))}
@@ -271,7 +340,9 @@ const UserPermissionPanel = () => {
       {/* ── Top bar: role badges + search ── */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm tracking-tighter text-muted-foreground font-medium shrink-0">Lọc theo vai trò:</span>
+          <span className="text-sm tracking-tighter text-muted-foreground font-medium shrink-0">
+            Lọc theo vai trò:
+          </span>
           {ROLE_FILTERS.map((role) => {
             const isActive = selectedRoleId === role.id;
             return (
@@ -297,19 +368,23 @@ const UserPermissionPanel = () => {
           })}
         </div>
 
-        
-
         {/* Search box */}
-        <div className="relative flex-1 min-w-50 max-w-xs">        
+        <div className="relative flex-1 min-w-50 max-w-xs">
           <Input
             placeholder="Tìm theo tên, username..."
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setShowDropdown(true); }}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setShowDropdown(true);
+            }}
             onFocus={() => setShowDropdown(true)}
             onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
             className="pl-9 h-9 text-sm border-border/60"
           />
-          <MagnifyingGlass size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <MagnifyingGlass
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+          />
           {showDropdown && debouncedSearch.trim() && !selectedRoleId && (
             <div className="absolute top-full left-0 mt-1 w-full min-w-72 bg-popover border border-border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
               {loadingUsers ? (
@@ -325,7 +400,9 @@ const UserPermissionPanel = () => {
                   ))}
                 </div>
               ) : filteredUsers.length === 0 ? (
-                <div className="p-4 text-center tracking-tighter text-sm text-muted-foreground">Không tìm thấy người dùng</div>
+                <div className="p-4 text-center tracking-tighter text-sm text-muted-foreground">
+                  Không tìm thấy người dùng
+                </div>
               ) : (
                 filteredUsers.map((user) => (
                   <button
@@ -334,11 +411,16 @@ const UserPermissionPanel = () => {
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors text-left border-b border-border/20 last:border-0"
                   >
                     <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold tracking-tighter shrink-0">
-                      {user.lastName?.[0]}{user.firstName?.[0]}
+                      {user.lastName?.[0]}
+                      {user.firstName?.[0]}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm tracking-tighter font-medium truncate">{user.lastName} {user.firstName}</p>
-                      <p className="text-xs tracking-tighter text-muted-foreground truncate">@{user.username} · {user.phone}</p>
+                      <p className="text-sm tracking-tighter font-medium truncate">
+                        {user.lastName} {user.firstName}
+                      </p>
+                      <p className="text-xs tracking-tighter text-muted-foreground truncate">
+                        @{user.username} · {user.phone}
+                      </p>
                     </div>
                     <Badge variant="secondary" className="text-xs shrink-0">
                       {ROLE_NAMES[user.roleId as RoleId] ?? "Unknown"}
@@ -353,8 +435,13 @@ const UserPermissionPanel = () => {
         {/* Selected user chip (search mode) */}
         {selectedUser && selectedRoleId === null && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5 text-sm">
-            <span className="font-medium tracking-tighter text-primary">{selectedUser.lastName} {selectedUser.firstName}</span>
-            <button onClick={handleClearUser} className="text-primary/60 hover:text-primary">
+            <span className="font-medium tracking-tighter text-primary">
+              {selectedUser.lastName} {selectedUser.firstName}
+            </span>
+            <button
+              onClick={handleClearUser}
+              className="text-primary/60 hover:text-primary"
+            >
               <X size={13} />
             </button>
           </div>
@@ -365,14 +452,26 @@ const UserPermissionPanel = () => {
       {selectedRoleId !== null && (
         <div className="flex gap-5 items-start">
           {/* Left: user list — shrinks to 2 cols when a user is selected */}
-          <div className={cn(
-            "shrink-0 transition-all duration-500 ease-in-out",
-            selectedUser ? "w-56" : "w-full",
-          )}>
+          <div
+            className={cn(
+              "shrink-0 transition-all duration-500 ease-in-out",
+              selectedUser ? "w-56" : "w-full",
+            )}
+          >
             {loadingUsers ? (
-              <div className={cn("grid gap-2.5", selectedUser ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5")}>
+              <div
+                className={cn(
+                  "grid gap-2.5",
+                  selectedUser
+                    ? "grid-cols-1"
+                    : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+                )}
+              >
                 {Array.from({ length: selectedUser ? 4 : 10 }).map((_, i) => (
-                  <div key={i} className="p-3 rounded-xl border border-border/40 bg-card space-y-2">
+                  <div
+                    key={i}
+                    className="p-3 rounded-xl border border-border/40 bg-card space-y-2"
+                  >
                     <Skeleton className="h-10 w-10 rounded-full mx-auto" />
                     <Skeleton className="h-3.5 w-3/4 mx-auto" />
                     <Skeleton className="h-3 w-1/2 mx-auto" />
@@ -382,19 +481,29 @@ const UserPermissionPanel = () => {
             ) : filteredUsers.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                 <UserIcon size={36} className="opacity-20 mb-2" />
-                <p className="text-sm tracking-tighter">Không có người dùng trong nhóm này</p>
+                <p className="text-sm tracking-tighter">
+                  Không có người dùng trong nhóm này
+                </p>
               </div>
             ) : (
-              <div className={cn(
-                "grid gap-2.5 transition-all duration-500",
-                selectedUser ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
-              )}>
+              <div
+                className={cn(
+                  "grid gap-2.5 transition-all duration-500",
+                  selectedUser
+                    ? "grid-cols-1"
+                    : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
+                )}
+              >
                 {filteredUsers.map((user) => {
                   const isSelected = selectedUser?.id === user.id;
                   return (
                     <button
                       key={user.id}
-                      onClick={() => isSelected ? setSelectedUser(null) : handleSelectUser(user)}
+                      onClick={() =>
+                        isSelected
+                          ? setSelectedUser(null)
+                          : handleSelectUser(user)
+                      }
                       className={cn(
                         "rounded-xl border bg-card text-center transition-all duration-300 group",
                         selectedUser ? "p-3" : "p-4",
@@ -403,26 +512,35 @@ const UserPermissionPanel = () => {
                           : "border-border/50 hover:border-primary/40 hover:shadow-sm",
                       )}
                     >
-                      <div className={cn(
-                        "rounded-full flex items-center justify-center font-bold tracking-tighter mx-auto transition-all duration-300",
-                        selectedUser ? "w-9 h-9 text-sm mb-1.5" : "w-12 h-12 text-base mb-2.5",
-                        isSelected
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary",
-                      )}>
-                        {user.lastName?.[0]}{user.firstName?.[0]}
+                      <div
+                        className={cn(
+                          "rounded-full flex items-center justify-center font-bold tracking-tighter mx-auto transition-all duration-300",
+                          selectedUser
+                            ? "w-9 h-9 text-sm mb-1.5"
+                            : "w-12 h-12 text-base mb-2.5",
+                          isSelected
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary",
+                        )}
+                      >
+                        {user.lastName?.[0]}
+                        {user.firstName?.[0]}
                       </div>
-                      <p className={cn(
-                        "font-semibold tracking-tighter truncate transition-colors",
-                        selectedUser ? "text-[14px]" : "text-sm",
-                        isSelected && "text-primary",
-                      )}>
+                      <p
+                        className={cn(
+                          "font-semibold tracking-tighter truncate transition-colors",
+                          selectedUser ? "text-[14px]" : "text-sm",
+                          isSelected && "text-primary",
+                        )}
+                      >
                         {user.lastName} {user.firstName}
                       </p>
-                      <p className={cn(
-                        "text-muted-foreground tracking-tighter truncate",
-                        selectedUser ? "text-[14px]" : "text-sm",
-                      )}>
+                      <p
+                        className={cn(
+                          "text-muted-foreground tracking-tighter truncate",
+                          selectedUser ? "text-[14px]" : "text-sm",
+                        )}
+                      >
                         @{user.username}
                       </p>
                     </button>
@@ -438,7 +556,8 @@ const UserPermissionPanel = () => {
             style={{
               display: "grid",
               gridTemplateColumns: selectedUser ? "1fr" : "0fr",
-              transition: "grid-template-columns 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+              transition:
+                "grid-template-columns 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
             <div className="overflow-hidden">
@@ -447,16 +566,30 @@ const UserPermissionPanel = () => {
                   {/* Slim action bar */}
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground tracking-tighter">
-                      Đã chọn <span className="font-semibold tracking-tighter text-foreground">{checkedIds.size}</span>/{allPermissions?.length ?? 0} quyền
+                      Đã chọn{" "}
+                      <span className="font-semibold tracking-tighter text-foreground">
+                        {checkedIds.size}
+                      </span>
+                      /{allPermissions?.length ?? 0} quyền
                     </p>
                     <div className="flex items-center gap-2">
                       {hasChanges && (
-                        <Button onClick={handleSave} disabled={updateMutation.isPending} size="sm" className="h-7 px-2.5 track text-xs gap-1">
+                        <Button
+                          onClick={handleSave}
+                          disabled={updateMutation.isPending}
+                          size="sm"
+                          className="h-7 px-2.5 track text-xs gap-1"
+                        >
                           <FloppyDisk size={13} weight="bold" />
-                          {updateMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
+                          {updateMutation.isPending
+                            ? "Đang lưu..."
+                            : "Lưu thay đổi"}
                         </Button>
                       )}
-                      <button onClick={() => setSelectedUser(null)} className="p-1 hover:bg-muted rounded-md transition-colors">
+                      <button
+                        onClick={() => setSelectedUser(null)}
+                        className="p-1 hover:bg-muted rounded-md transition-colors"
+                      >
                         <X size={14} className="text-muted-foreground" />
                       </button>
                     </div>
@@ -480,25 +613,33 @@ const UserPermissionPanel = () => {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs tracking-tighter text-muted-foreground">
-              Đã chọn <span className="font-semibold tracking-tighter text-foreground">{checkedIds.size}</span>/{allPermissions?.length ?? 0} quyền
+              Đã chọn{" "}
+              <span className="font-semibold tracking-tighter text-foreground">
+                {checkedIds.size}
+              </span>
+              /{allPermissions?.length ?? 0} quyền
             </p>
             <div className="flex items-center gap-2">
               {hasChanges && (
-                <Button onClick={handleSave} disabled={updateMutation.isPending} size="sm" className="h-7 px-2.5 text-xs gap-1">
+                <Button
+                  onClick={handleSave}
+                  disabled={updateMutation.isPending}
+                  size="sm"
+                  className="h-7 px-2.5 text-xs gap-1"
+                >
                   <FloppyDisk size={13} weight="bold" />
                   {updateMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
                 </Button>
               )}
-              <button onClick={handleClearUser} className="p-1 hover:bg-muted rounded-md transition-colors">
+              <button
+                onClick={handleClearUser}
+                className="p-1 hover:bg-muted rounded-md transition-colors"
+              >
                 <X size={14} className="text-muted-foreground" />
               </button>
             </div>
           </div>
-          {isLoading ? (
-            <PermissionSkeleton />
-          ) : (
-            renderPermissionGroups()
-          )}
+          {isLoading ? <PermissionSkeleton /> : renderPermissionGroups()}
         </div>
       )}
 
@@ -506,14 +647,17 @@ const UserPermissionPanel = () => {
       {selectedRoleId === null && !selectedUser && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <UserIcon size={44} className="text-muted-foreground/20 mb-3" />
-          <p className="text-base font-semibold tracking-tighter text-muted-foreground">Chọn vai trò để xem danh sách người dùng</p>
-          <p className="text-sm tracking-tighter text-muted-foreground/60 mt-1">hoặc tìm kiếm theo tên, username ở trên</p>
+          <p className="text-base font-semibold tracking-tighter text-muted-foreground">
+            Chọn vai trò để xem danh sách người dùng
+          </p>
+          <p className="text-sm tracking-tighter text-muted-foreground/60 mt-1">
+            hoặc tìm kiếm theo tên, username ở trên
+          </p>
         </div>
       )}
     </div>
   );
 };
-
 
 function PermissionSkeleton() {
   return (

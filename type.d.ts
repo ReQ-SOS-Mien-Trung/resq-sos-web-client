@@ -1,9 +1,4 @@
-import type {
-  PromptEntity,
-  PromptDetailEntity,
-  CreatePromptRequest,
-  UpdatePromptRequest,
-} from "@/services/prompt/type";
+import type { PromptType } from "@/services/prompt/type";
 import type {
   MedicalSupportNeedType,
   SOSClothingPerson,
@@ -303,44 +298,12 @@ export type PromptTextField = "system_prompt" | "user_prompt_template";
 
 export interface PromptFormData {
   name: string;
+  prompt_type: PromptType;
   purpose: string;
   system_prompt: string;
   user_prompt_template: string;
-  model: string;
-  temperature: number;
-  max_tokens: number;
   version: string;
-  api_url: string;
   is_active: boolean;
-}
-
-export interface PromptEditorProps {
-  prompt?: PromptDetailEntity | null;
-  isSubmitting?: boolean;
-  onSave: (data: CreatePromptRequest | UpdatePromptRequest) => void;
-  onCancel: () => void;
-}
-
-export interface PromptListProps {
-  prompts: PromptEntity[];
-  isLoading: boolean;
-  selectedId: number | null;
-  onSelect: (prompt: PromptEntity) => void;
-  onEdit: (prompt: PromptEntity) => void;
-  onDelete: (prompt: PromptEntity) => void;
-}
-
-export interface PromptDetailPanelProps {
-  prompt: PromptDetailEntity | null;
-  isLoading: boolean;
-}
-
-export interface DeletePromptDialogProps {
-  prompt: PromptEntity | null;
-  open: boolean;
-  isDeleting: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
 }
 
 export interface ChatRoomListProps {
@@ -590,6 +553,13 @@ export interface UserTableProps {
   onViewDetail?: (userId: string) => void;
   isLoading?: boolean;
   totalCount?: number;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  roleOptions?: Array<{ value: string; label: string }>;
+  selectedRoleId?: string;
+  onRoleIdChange?: (value: string) => void;
+  selectedBanFilter?: "all" | "active" | "banned";
+  onBanFilterChange?: (value: "all" | "active" | "banned") => void;
   serverPagination?: {
     totalCount: number;
     totalPages: number;
@@ -849,6 +819,8 @@ export interface SOSDetailsPanelProps {
   /** SOS requests in the same auto-cluster (within 1 km) */
   nearbySOSRequests: SOSRequest[];
   allSOSRequests: SOSRequest[];
+  /** Hide footer processing CTA when this panel is used in read-only flows */
+  hideProcessAction?: boolean;
 }
 
 export interface TeamIncidentDetailsPanelProps {
@@ -872,6 +844,8 @@ export interface RescuePlanPanelProps {
   onShowRoute?: (coords: [number, number][]) => void;
   /** Which tab to show when the panel opens */
   defaultTab?: "plan" | "missions";
+  /** True to disable all mutate actions and keep this panel in view-only mode */
+  readOnly?: boolean;
 }
 
 export interface ActivityTypeConfig {
@@ -892,39 +866,8 @@ export interface CoordinatorMapProps {
   selectedTeamIncident?:
     | import("@/services/team_incidents/type").TeamIncidentEntity
     | null;
-  // DepotEntity from backend
-  depots: {
-    id: number;
-    name: string;
-    address: string;
-    latitude: number;
-    longitude: number;
-    capacity: number;
-    currentUtilization: number;
-    status: "Available" | "Full" | "PendingAssignment" | "Closed";
-    imageUrl?: string | null;
-    manager: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string | null;
-      phone: string | null;
-      fullName?: string | null;
-    } | null;
-    lastUpdatedAt: string;
-  }[];
-  // AssemblyPointEntity from backend
-  assemblyPoints?: {
-    id: number;
-    code: string;
-    name: string;
-    latitude: number;
-    longitude: number;
-    maxCapacity: number;
-    status: "Created" | "Active" | "Overloaded" | "UnderMaintenance" | "Closed";
-    lastUpdatedAt: string | null;
-    hasActiveEvent?: boolean;
-  }[];
+  depots: import("@/services/depot/type").DepotEntity[];
+  assemblyPoints?: import("@/services/assembly_points/type").AssemblyPointEntity[];
   // SOS Clusters from backend
   clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
   /** Client-side auto-clusters (groups of nearby PENDING SOS) */
@@ -971,7 +914,7 @@ export interface AssemblyPoint {
   latitude: number;
   longitude: number;
   maxCapacity: number;
-  status: "Created" | "Active" | "Overloaded" | "UnderMaintenance" | "Closed";
+  status: "Created" | "Active" | "Unavailable" | "Closed";
   lastUpdatedAt: string | null;
   hasActiveEvent?: boolean;
 }
@@ -1339,27 +1282,7 @@ export interface MapViewState {
 export interface WindyLeafletMapProps {
   sosRequests?: SOSRequest[];
   rescuers?: Rescuer[];
-  // DepotEntity from backend
-  depots?: {
-    id: number;
-    name: string;
-    address: string;
-    latitude: number;
-    longitude: number;
-    capacity: number;
-    currentUtilization: number;
-    status: "Available" | "Full" | "PendingAssignment" | "Closed";
-    imageUrl?: string | null;
-    manager: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string | null;
-      phone: string | null;
-      fullName?: string | null;
-    } | null;
-    lastUpdatedAt: string;
-  }[];
+  depots?: import("@/services/depot/type").DepotEntity[];
   selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
   onSOSSelect?: (sos: SOSRequest) => void;

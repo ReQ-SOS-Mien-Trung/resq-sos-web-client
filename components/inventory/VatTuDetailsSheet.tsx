@@ -24,6 +24,7 @@ import {
   ClockCountdown,
 } from "@phosphor-icons/react";
 import { InventoryItemEntity } from "@/services/inventory/type";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { useInventoryItemTypes, useInventoryTargetGroups, useInventoryLots } from "@/services/inventory/hooks";
 import {
   getInventoryAvailable,
@@ -40,10 +41,14 @@ interface VatTuDetailsSheetProps {
 }
 
 export function VatTuDetailsSheet({ item, open, onOpenChange }: VatTuDetailsSheetProps) {
+  const { selectedDepotId } = useManagerDepot();
   const { data: itemTypesData } = useInventoryItemTypes();
   const { data: targetGroupsData } = useInventoryTargetGroups();
   const { data: lotsData, isLoading: loadingLots } = useInventoryLots(
-    item?.itemModelId ?? 0,
+    {
+      itemModelId: item?.itemModelId ?? 0,
+      depotId: selectedDepotId ?? 0,
+    },
     { enabled: open && item?.itemType === "Consumable" && !!item?.itemModelId },
   );
 

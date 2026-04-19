@@ -12,7 +12,49 @@ import {
   GetAdminUserByIdResponse,
   GetUsersForPermissionParams,
   GetUsersForPermissionResponse,
+  RoleMetadataOption,
+  AbilityCategoryMetadataOption,
+  AdminCreateUserResponse,
 } from "./type";
+
+type AbilityCategoryMetadataApiItem = {
+  key?: string;
+  value?: string;
+  code?: string;
+  name?: string;
+  description?: string;
+  categoryCode?: string;
+  categoryDescription?: string;
+};
+
+type AbilityCategoryMetadataApiResponse =
+  | AbilityCategoryMetadataApiItem[]
+  | {
+      data?: AbilityCategoryMetadataApiItem[];
+      items?: AbilityCategoryMetadataApiItem[];
+    };
+
+function normalizeAbilityCategoryMetadataItem(
+  item: AbilityCategoryMetadataApiItem,
+): AbilityCategoryMetadataOption | null {
+  const rawKey = item.key ?? item.code ?? item.categoryCode;
+  const normalizedKey = String(rawKey ?? "")
+    .trim()
+    .toUpperCase();
+
+  if (!normalizedKey) {
+    return null;
+  }
+
+  const rawValue =
+    item.value ?? item.description ?? item.name ?? item.categoryDescription;
+  const normalizedValue = String(rawValue ?? "").trim() || normalizedKey;
+
+  return {
+    key: normalizedKey,
+    value: normalizedValue,
+  };
+}
 
 export async function getUserMe(): Promise<UserMeResponse> {
   const { data } = await api.get("/identity/user/me");
@@ -63,7 +105,7 @@ export async function getAdminUserById(
 
 export async function adminCreateUser(
   data: AdminCreateUserRequest,
-): Promise<any> {
+): Promise<AdminCreateUserResponse> {
   const response = await api.post("/identity/admin/users", data);
   return response.data;
 }
@@ -83,4 +125,41 @@ export async function getUsersForPermission(
     params,
   });
   return data;
+}
+
+export async function getRoleMetadata(): Promise<RoleMetadataOption[]> {
+  const { data } = await api.get("/identity/roles/metadata");
+  return data;
+}
+
+export async function getAbilityCategoryMetadata(): Promise<
+  AbilityCategoryMetadataOption[]
+> {
+  const { data } = await api.get<AbilityCategoryMetadataApiResponse>(
+    "/identity/ability-categories/metadata",
+  );
+
+  const rawItems = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : Array.isArray(data?.items)
+        ? data.items
+        : [];
+
+  const deduplicated = new Map<string, string>();
+
+  rawItems.forEach((item) => {
+    const normalized = normalizeAbilityCategoryMetadataItem(item);
+    if (!normalized) {
+      return;
+    }
+
+    deduplicated.set(normalized.key, normalized.value);
+  });
+
+  return Array.from(deduplicated.entries()).map(([key, value]) => ({
+    key,
+    value,
+  }));
 }

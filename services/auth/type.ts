@@ -1,3 +1,11 @@
+export interface ManagedDepotSummary {
+  depotId: number;
+  depotName: string;
+  status: string;
+  address: string;
+  imageUrl?: string | null;
+}
+
 // Login Request Payload
 export interface LoginPayload {
   username: string;
@@ -24,8 +32,9 @@ export interface LoginResponse {
   fullName: string;
   roleId: number;
   permissions: string[];
-  depotId: number | null;
-  depotName: string | null;
+  managedDepots?: ManagedDepotSummary[];
+  depotId?: number | null;
+  depotName?: string | null;
 }
 
 // Logout Response

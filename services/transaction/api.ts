@@ -45,6 +45,7 @@ export async function getDepotFundTransactions(
     `/finance/depot-funds/${depotId}/transactions`,
     {
       params: query,
+      paramsSerializer: { indexes: null },
     },
   );
   return data;

@@ -29,18 +29,28 @@ import {
 // ─── Helpers ───
 
 const MONTH_SHORT = [
-  "Th1", "Th2", "Th3", "Th4", "Th5", "Th6",
-  "Th7", "Th8", "Th9", "Th10", "Th11", "Th12",
+  "Th1",
+  "Th2",
+  "Th3",
+  "Th4",
+  "Th5",
+  "Th6",
+  "Th7",
+  "Th8",
+  "Th9",
+  "Th10",
+  "Th11",
+  "Th12",
 ];
 
 interface MonthlyData {
   month: string;
   monthIndex: number;
   year: number;
-  total: number;        // cumulative total at end of month
-  newCount: number;     // joined this month
-  core: number;         // new core this month
-  volunteer: number;    // new volunteer this month
+  total: number; // cumulative total at end of month
+  newCount: number; // joined this month
+  core: number; // new core this month
+  volunteer: number; // new volunteer this month
 }
 
 function buildMonthlyStats(rescuers: UserEntity[]): MonthlyData[] {
@@ -96,7 +106,12 @@ function ChartTooltip({
   label,
 }: {
   active?: boolean;
-  payload?: Array<{ value: number; dataKey: string; color: string; payload?: MonthlyData }>;
+  payload?: Array<{
+    value: number;
+    dataKey: string;
+    color: string;
+    payload?: MonthlyData;
+  }>;
   label?: string;
 }) {
   if (!active || !payload?.length) return null;
@@ -104,7 +119,7 @@ function ChartTooltip({
   const data = payload[0]?.payload as MonthlyData;
   return (
     <div className="bg-card border border-border/60 p-3 shadow-xl min-w-45">
-      <p className="text-xs tracking-tighter font-bold uppercase text-muted-foreground mb-2">
+      <p className="text-sm tracking-tighter font-bold uppercase text-muted-foreground mb-2">
         {label} / {data?.year}
       </p>
       <div className="space-y-1.5">
@@ -120,11 +135,11 @@ function ChartTooltip({
           <span className="font-bold text-[#FF5722]">+{data?.newCount}</span>
         </div>
         <div className="h-px bg-border/50 my-1" />
-        <div className="flex items-center justify-between text-xs tracking-tighter">
+        <div className="flex items-center justify-between text-sm tracking-tighter">
           <span className="text-muted-foreground">Hệ thống</span>
           <span className="font-semibold">+{data?.core}</span>
         </div>
-        <div className="flex items-center justify-between text-xs tracking-tighter">
+        <div className="flex items-center justify-between text-sm tracking-tighter">
           <span className="text-muted-foreground">Tình nguyện</span>
           <span className="font-semibold">+{data?.volunteer}</span>
         </div>
@@ -151,7 +166,7 @@ function StatCell({
   return (
     <div className="p-4 flex flex-col justify-between h-full">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[11px] tracking-tighter font-bold uppercase text-muted-foreground">
+        <span className="text-sm tracking-tighter font-bold uppercase text-muted-foreground">
           {label}
         </span>
         <div className={cn("h-8 w-8 flex items-center justify-center", accent)}>
@@ -159,9 +174,13 @@ function StatCell({
         </div>
       </div>
       <div>
-        <p className="text-3xl font-black tracking-tighter leading-none">{value}</p>
+        <p className="text-3xl font-black tracking-tighter leading-none">
+          {value}
+        </p>
         {sub && (
-          <p className="text-xs tracking-tighter text-muted-foreground mt-1.5">{sub}</p>
+          <p className="text-sm tracking-tighter text-muted-foreground mt-1.5">
+            {sub}
+          </p>
         )}
       </div>
     </div>
@@ -194,13 +213,17 @@ export default function RescuerOverview() {
 
     let growthPercent = 0;
     if (newPrevMonth > 0) {
-      growthPercent = Math.round(((newThisMonth - newPrevMonth) / newPrevMonth) * 100);
+      growthPercent = Math.round(
+        ((newThisMonth - newPrevMonth) / newPrevMonth) * 100,
+      );
     } else if (newThisMonth > 0) {
       growthPercent = 100;
     }
 
     // Peak month
-    const peakMonth = [...monthlyData].sort((a, b) => b.newCount - a.newCount)[0];
+    const peakMonth = [...monthlyData].sort(
+      (a, b) => b.newCount - a.newCount,
+    )[0];
 
     return {
       total,
@@ -232,7 +255,7 @@ export default function RescuerOverview() {
             <h2 className="text-sm font-bold tracking-tighter uppercase">
               Cứu hộ viên
             </h2>
-            <p className="text-[11px] tracking-tighter text-muted-foreground">
+            <p className="text-sm tracking-tighter text-muted-foreground">
               Thống kê 12 tháng gần nhất
             </p>
           </div>
@@ -240,7 +263,7 @@ export default function RescuerOverview() {
         <div className="flex items-center gap-2">
           <div
             className={cn(
-              "flex items-center gap-1 px-2.5 py-1 text-xs font-bold tracking-tighter",
+              "flex items-center gap-1 px-2.5 py-1 text-sm font-bold tracking-tighter",
               isGrowth
                 ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400"
                 : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400",
@@ -266,7 +289,7 @@ export default function RescuerOverview() {
           {/* Chart title row */}
           <div className="flex items-end justify-between mb-4">
             <div>
-              <p className="text-[11px] tracking-tighter font-bold uppercase text-muted-foreground">
+              <p className="text-sm tracking-tighter font-bold uppercase text-muted-foreground">
                 Biến động nhân sự
               </p>
               <div className="flex items-baseline gap-2 mt-1">
@@ -278,7 +301,7 @@ export default function RescuerOverview() {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-4 text-[11px] tracking-tighter text-muted-foreground">
+            <div className="flex items-center gap-4 text-sm tracking-tighter text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-0.5 bg-[#FF5722]" />
                 <span>Mới gia nhập</span>
@@ -293,15 +316,38 @@ export default function RescuerOverview() {
           {/* Chart */}
           <div className="flex-1 min-h-44 -ml-2">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <AreaChart
+                data={monthlyData}
+                margin={{ top: 5, right: 5, left: -20, bottom: 0 }}
+              >
                 <defs>
-                  <linearGradient id="rescuerGradient" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient
+                    id="rescuerGradient"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
                     <stop offset="0%" stopColor="#FF5722" stopOpacity={0.25} />
-                    <stop offset="100%" stopColor="#FF5722" stopOpacity={0.02} />
+                    <stop
+                      offset="100%"
+                      stopColor="#FF5722"
+                      stopOpacity={0.02}
+                    />
                   </linearGradient>
-                  <linearGradient id="rescuerNewGradient" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient
+                    id="rescuerNewGradient"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
                     <stop offset="0%" stopColor="#FF5722" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="#FF5722" stopOpacity={0.05} />
+                    <stop
+                      offset="100%"
+                      stopColor="#FF5722"
+                      stopOpacity={0.05}
+                    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -379,7 +425,7 @@ export default function RescuerOverview() {
           <div className="border-b border-r lg:border-r-0 border-border/40">
             <div className="p-4 flex flex-col justify-between h-full">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] tracking-tighter font-bold uppercase text-muted-foreground">
+                <span className="text-sm tracking-tighter font-bold uppercase text-muted-foreground">
                   Tháng này
                 </span>
                 <div className="h-8 w-8 bg-[#FF5722]/10 flex items-center justify-center">
@@ -393,7 +439,7 @@ export default function RescuerOverview() {
                   </p>
                   <div
                     className={cn(
-                      "flex items-center gap-0.5 text-[11px] font-bold tracking-tighter",
+                      "flex items-center gap-0.5 text-sm font-bold tracking-tighter",
                       isGrowth
                         ? "text-emerald-600 dark:text-emerald-400"
                         : "text-rose-600 dark:text-rose-400",
@@ -407,7 +453,7 @@ export default function RescuerOverview() {
                     {Math.abs(stats.growthPercent)}%
                   </div>
                 </div>
-                <p className="text-xs tracking-tighter text-muted-foreground mt-1">
+                <p className="text-sm tracking-tighter text-muted-foreground mt-1">
                   vs {stats.newPrevMonth} tháng trước
                 </p>
               </div>
@@ -440,19 +486,23 @@ export default function RescuerOverview() {
           <div>
             <div className="p-4 flex flex-col justify-between h-full">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] tracking-tighter font-bold uppercase text-muted-foreground">
+                <span className="text-sm tracking-tighter font-bold uppercase text-muted-foreground">
                   Tháng cao điểm
                 </span>
                 <div className="h-8 w-8 bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center">
-                  <Pulse className="h-4 w-4 text-amber-600 dark:text-amber-400" weight="bold" />
+                  <Pulse
+                    className="h-4 w-4 text-amber-600 dark:text-amber-400"
+                    weight="bold"
+                  />
                 </div>
               </div>
               <div>
                 <p className="text-3xl font-black tracking-tighter leading-none">
                   {stats.peakMonth?.month}
                 </p>
-                <p className="text-xs tracking-tighter text-muted-foreground mt-1">
-                  {stats.peakMonth?.newCount} người gia nhập · {stats.peakMonth?.year}
+                <p className="text-sm tracking-tighter text-muted-foreground mt-1">
+                  {stats.peakMonth?.newCount} người gia nhập ·{" "}
+                  {stats.peakMonth?.year}
                 </p>
               </div>
             </div>
@@ -464,16 +514,24 @@ export default function RescuerOverview() {
       <div className="flex items-center justify-between px-5 py-3 border-t border-border/40 bg-muted/20">
         <div className="flex items-center gap-4">
           {/* Mini stats */}
-          <div className="flex items-center gap-1.5 text-xs tracking-tighter text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-sm tracking-tighter text-muted-foreground">
             <div className="w-1.5 h-1.5 bg-emerald-500" />
-            <span>Hoạt động: <strong className="text-foreground">{stats.total - stats.banned}</strong></span>
+            <span>
+              Hoạt động:{" "}
+              <strong className="text-foreground">
+                {stats.total - stats.banned}
+              </strong>
+            </span>
           </div>
-          <div className="flex items-center gap-1.5 text-xs tracking-tighter text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-sm tracking-tighter text-muted-foreground">
             <div className="w-1.5 h-1.5 bg-rose-500" />
-            <span>Bị cấm: <strong className="text-foreground">{stats.banned}</strong></span>
+            <span>
+              Bị cấm:{" "}
+              <strong className="text-foreground">{stats.banned}</strong>
+            </span>
           </div>
         </div>
-        <button className="flex items-center gap-1 text-xs tracking-tighter font-bold text-[#FF5722] hover:underline underline-offset-2 transition-all">
+        <button className="flex items-center gap-1 text-sm tracking-tighter font-bold text-[#FF5722] hover:underline underline-offset-2 transition-all">
           Xem chi tiết
           <ArrowRight className="h-3 w-3" weight="bold" />
         </button>

@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +35,7 @@ import {
   useConfirmSupplyRequest,
   useRejectSupplyRequest,
 } from "@/services/inventory/hooks";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
 import { toast } from "sonner";
 import { ResponseCountdown } from "./ResponseCountdown";
 
@@ -102,7 +108,8 @@ function getCurrentStepIndex(req: SupplyRequestListItem): number {
   const { sourceStatus, requestingStatus } = req;
   if (sourceStatus === "Rejected" || requestingStatus === "Rejected") return -1;
   if (requestingStatus === "Received") return 5;
-  if (sourceStatus === "Completed" && requestingStatus === "InTransit") return 4;
+  if (sourceStatus === "Completed" && requestingStatus === "InTransit")
+    return 4;
   if (sourceStatus === "Shipping") return 3;
   if (sourceStatus === "Preparing") return 2;
   if (sourceStatus === "Accepted") return 1;
@@ -124,23 +131,41 @@ function getStepState(
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function SupplyRequestTracker({ request, open, onOpenChange, onActionSuccess }: Props) {
+export function SupplyRequestTracker({
+  request,
+  open,
+  onOpenChange,
+  onActionSuccess,
+}: Props) {
+  const { selectedDepotId } = useManagerDepot();
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const { mutate: acceptMutation, isPending: isAccepting } = useAcceptSupplyRequest();
-  const { mutate: prepareMutation, isPending: isPreparing } = usePrepareSupplyRequest();
-  const { mutate: shipMutation, isPending: isShipping } = useShipSupplyRequest();
-  const { mutate: completeMutation, isPending: isCompleting } = useCompleteSupplyRequest();
-  const { mutate: confirmMutation, isPending: isConfirming } = useConfirmSupplyRequest();
-  const { mutate: rejectMutation, isPending: isRejecting } = useRejectSupplyRequest();
+  const { mutate: acceptMutation, isPending: isAccepting } =
+    useAcceptSupplyRequest();
+  const { mutate: prepareMutation, isPending: isPreparing } =
+    usePrepareSupplyRequest();
+  const { mutate: shipMutation, isPending: isShipping } =
+    useShipSupplyRequest();
+  const { mutate: completeMutation, isPending: isCompleting } =
+    useCompleteSupplyRequest();
+  const { mutate: confirmMutation, isPending: isConfirming } =
+    useConfirmSupplyRequest();
+  const { mutate: rejectMutation, isPending: isRejecting } =
+    useRejectSupplyRequest();
 
   if (!request) return null;
 
   const currentStepIndex = getCurrentStepIndex(request);
   const isRejected = currentStepIndex === -1;
   const isDone = request.requestingStatus === "Received";
-  const isAnyPending = isAccepting || isPreparing || isShipping || isCompleting || isConfirming || isRejecting;
+  const isAnyPending =
+    isAccepting ||
+    isPreparing ||
+    isShipping ||
+    isCompleting ||
+    isConfirming ||
+    isRejecting;
 
   const makeOpts = (label: string) => ({
     onSuccess: () => {
@@ -152,18 +177,41 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
     },
   });
 
-  const handleAccept = () => acceptMutation(request.id, makeOpts("Đã chấp nhận yêu cầu tiếp tế"));
-  const handlePrepare = () => prepareMutation(request.id, makeOpts("Đã bắt đầu đóng gói hàng hóa"));
-  const handleShip = () => shipMutation(request.id, makeOpts("Đã xuất kho — đang vận chuyển"));
-  const handleComplete = () => completeMutation(request.id, makeOpts("Đã xác nhận giao hàng thành công"));
-  const handleConfirm = () => confirmMutation(request.id, makeOpts("Đã xác nhận nhận hàng — tồn kho đã cập nhật"));
+  const handleAccept = () =>
+    acceptMutation(
+      { id: request.id, depotId: selectedDepotId ?? 0 },
+      makeOpts("Đã chấp nhận yêu cầu tiếp tế"),
+    );
+  const handlePrepare = () =>
+    prepareMutation(
+      { id: request.id, depotId: selectedDepotId ?? 0 },
+      makeOpts("Đã bắt đầu đóng gói hàng hóa"),
+    );
+  const handleShip = () =>
+    shipMutation(
+      { id: request.id, depotId: selectedDepotId ?? 0 },
+      makeOpts("Đã xuất kho — đang vận chuyển"),
+    );
+  const handleComplete = () =>
+    completeMutation(
+      { id: request.id, depotId: selectedDepotId ?? 0 },
+      makeOpts("Đã xác nhận giao hàng thành công"),
+    );
+  const handleConfirm = () =>
+    confirmMutation(
+      { id: request.id, depotId: selectedDepotId ?? 0 },
+      makeOpts("Đã xác nhận nhận hàng — tồn kho đã cập nhật"),
+    );
   const handleReject = () => {
     if (!rejectReason.trim()) {
       toast.error("Vui lòng nhập lý do từ chối");
       return;
     }
     rejectMutation(
-      { id: request.id, payload: { reason: rejectReason.trim() } },
+      {
+        params: { id: request.id, depotId: selectedDepotId ?? 0 },
+        payload: { reason: rejectReason.trim() },
+      },
       {
         onSuccess: () => {
           toast.success("Đã từ chối yêu cầu");
@@ -232,7 +280,6 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
               disabled={isAnyPending}
             >
               {isAccepting && <Spinner className="h-4 w-4 animate-spin" />}
-              
               Chấp nhận
             </Button>
             <Button
@@ -241,7 +288,6 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
               onClick={() => setShowRejectForm(true)}
               disabled={isAnyPending}
             >
-              
               Từ chối
             </Button>
           </div>
@@ -322,7 +368,6 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
       }}
     >
       <SheetContent className="w-125 sm:max-w-125 overflow-y-auto flex flex-col p-0">
-
         {/* ── Sticky header ── */}
         <SheetHeader className="px-6 pt-5 pb-4 border-b sticky top-0 bg-background z-10">
           <div className="flex items-center justify-between gap-2">
@@ -336,7 +381,9 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                 </SheetTitle>
                 <p className="text-sm text-muted-foreground tracking-tighter">
                   Đơn yêu cầu số{" "}
-                  <span className="font-semibold text-foreground">{request.id}</span>
+                  <span className="font-semibold text-foreground">
+                    {request.id}
+                  </span>
                 </p>
               </div>
             </div>
@@ -348,7 +395,6 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
 
         {/* ── Scrollable body ── */}
         <div className="flex-1 overflow-y-auto px-6 pt-2 pb-4 space-y-6">
-
           {/* Info card */}
           <div className="rounded-xl border bg-card p-4 space-y-4">
             {/* Depot route */}
@@ -358,7 +404,10 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                   Kho nguồn
                 </p>
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-orange-500 shrink-0" weight="fill" />
+                  <MapPin
+                    className="h-4 w-4 text-orange-500 shrink-0"
+                    weight="fill"
+                  />
                   <p className="font-semibold text-sm tracking-tighter leading-snug">
                     {request.sourceDepotName}
                   </p>
@@ -381,7 +430,10 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                   <p className="font-semibold text-sm tracking-tighter leading-snug">
                     {request.requestingDepotName}
                   </p>
-                  <MapPin className="h-4 w-4 text-blue-500 shrink-0" weight="fill" />
+                  <MapPin
+                    className="h-4 w-4 text-blue-500 shrink-0"
+                    weight="fill"
+                  />
                 </div>
               </div>
             </div>
@@ -393,7 +445,9 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
               <div className="flex items-center gap-2">
                 <CalendarBlank className="h-5 w-5 text-muted-foreground shrink-0" />
                 <div>
-                  <p className="text-xs mb-1 text-muted-foreground uppercase tracking-tight">Thời gian tạo</p>
+                  <p className="text-xs mb-1 text-muted-foreground uppercase tracking-tight">
+                    Thời gian tạo
+                  </p>
                   <p className="text-sm tracking-tight font-medium">
                     {new Date(request.createdAt).toLocaleString("vi-VN")}
                   </p>
@@ -402,7 +456,9 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div>
-                  <p className="text-xs mb-1 text-muted-foreground uppercase tracking-tight">Vai trò</p>
+                  <p className="text-xs mb-1 text-muted-foreground uppercase tracking-tight">
+                    Vai trò
+                  </p>
                   <Badge
                     variant="outline"
                     className={cn(
@@ -450,7 +506,12 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
             ) : (
               <div>
                 {STEPS.map((step, index) => {
-                  const stepState = getStepState(index, currentStepIndex, isRejected, isDone);
+                  const stepState = getStepState(
+                    index,
+                    currentStepIndex,
+                    isRejected,
+                    isDone,
+                  );
                   const isLast = index === STEPS.length - 1;
                   const StepIcon = step.Icon;
 
@@ -481,7 +542,10 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                           {stepState === "current" ? (
                             <div className="h-3 w-3 rounded-full bg-orange-500 animate-pulse" />
                           ) : stepState === "completed" ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" weight="fill" />
+                            <CheckCircle
+                              className="h-4 w-4 text-green-500"
+                              weight="fill"
+                            />
                           ) : (
                             <StepIcon className="h-4 w-4" />
                           )}
@@ -503,15 +567,22 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                       </div>
 
                       {/* Content column */}
-                      <div className={cn("flex-1 min-w-0", isLast ? "pb-0" : "pb-5")}>
+                      <div
+                        className={cn(
+                          "flex-1 min-w-0",
+                          isLast ? "pb-0" : "pb-5",
+                        )}
+                      >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p
                                 className={cn(
                                   "font-semibold text-sm tracking-tighter",
-                                  stepState === "pending" && "text-muted-foreground/60",
-                                  stepState === "completed" && "text-foreground",
+                                  stepState === "pending" &&
+                                    "text-muted-foreground/60",
+                                  stepState === "completed" &&
+                                    "text-foreground",
                                   stepState === "current" && "text-orange-700",
                                 )}
                               >
@@ -522,11 +593,13 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                                   Đang thực hiện
                                 </span>
                               )}
-                              {stepState === "completed" && isDone && index === STEPS.length - 1 && (
-                                <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700 tracking-tighter">
-                                  Hoàn tất
-                                </span>
-                              )}
+                              {stepState === "completed" &&
+                                isDone &&
+                                index === STEPS.length - 1 && (
+                                  <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700 tracking-tighter">
+                                    Hoàn tất
+                                  </span>
+                                )}
                             </div>
                             <p
                               className={cn(
@@ -556,7 +629,7 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
           {/* ── Items list ── */}
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-              Vật tư trong yêu cầu ({request.items.length})
+              Vật phẩm trong yêu cầu ({request.items.length})
             </p>
             <div className="rounded-xl border bg-card overflow-hidden divide-y">
               {request.items.map((item) => (
@@ -566,13 +639,20 @@ export function SupplyRequestTracker({ request, open, onOpenChange, onActionSucc
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                      <Package className="h-3.5 w-3.5 text-primary" weight="fill" />
+                      <Package
+                        className="h-3.5 w-3.5 text-primary"
+                        weight="fill"
+                      />
                     </div>
-                    <span className="tracking-tighter">{item.itemModelName}</span>
+                    <span className="tracking-tighter">
+                      {item.itemModelName}
+                    </span>
                   </div>
                   <span className="font-semibold tracking-tighter text-primary tabular-nums">
                     {item.quantity.toLocaleString("vi-VN")}{" "}
-                    <span className="font-normal text-muted-foreground">{item.unit}</span>
+                    <span className="font-normal text-muted-foreground">
+                      {item.unit}
+                    </span>
                   </span>
                 </div>
               ))}

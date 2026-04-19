@@ -22,11 +22,15 @@ import {
   ShieldWarning,
   ArrowFatLinesRight,
 } from "@phosphor-icons/react";
+import { DepotSidebarProps, InventoryItem, SupplyRequest } from "@/type";
+import { useMyDepotLowStock } from "@/services/inventory/hooks";
 import {
-  DepotSidebarProps,
-  InventoryItem,
-  SupplyRequest,
-} from "@/type";
+  getLowStockWarningLevel,
+  compareLowStockItems,
+} from "@/services/inventory/utils";
+import { LowStockItem } from "@/services/inventory/type";
+import { useManagerDepot } from "@/hooks/use-manager-depot";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // ── Main component ────────────────────────────────────────────────────────────
 const DepotSidebar = ({
@@ -44,7 +48,22 @@ const DepotSidebar = ({
 }: DepotSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
 
-  // ── Derived data ─────────────────────────────────────────────────────────
+  // ── Real low-stock data ───────────────────────────────────────────────
+  const { selectedDepotId } = useManagerDepot();
+  const { data: lowStockData, isLoading: loadingLowStock } = useMyDepotLowStock(
+    selectedDepotId ? { depotId: selectedDepotId } : undefined,
+  );
+
+  const urgentItems: LowStockItem[] = (lowStockData?.items ?? [])
+    .filter((item) => getLowStockWarningLevel(item) !== "OK")
+    .filter((item) =>
+      searchQuery
+        ? item.itemModelName.toLowerCase().includes(searchQuery.toLowerCase())
+        : true,
+    )
+    .sort(compareLowStockItems);
+
+  // ── Derived data (normal items from prop) ────────────────────────────
   const filteredItems = inventoryItems.filter((item) => {
     const matchesSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -55,19 +74,23 @@ const DepotSidebar = ({
     return matchesSearch && matchesCategory;
   });
 
-  const criticalItems = filteredItems.filter((i) => i.stockLevel === "CRITICAL");
-  const lowStockItems = filteredItems.filter((i) => i.stockLevel === "LOW");
   const normalItems = filteredItems.filter(
     (i) => i.stockLevel === "NORMAL" || i.stockLevel === "OVERSTOCKED",
   );
 
-  const pendingRequestsAll = supplyRequests.filter((r) => r.status === "PENDING");
-  const inProgressRequestsAll = supplyRequests.filter((r) => r.status === "IN_TRANSIT");
+  const pendingRequestsAll = supplyRequests.filter(
+    (r) => r.status === "PENDING",
+  );
+  const inProgressRequestsAll = supplyRequests.filter(
+    (r) => r.status === "IN_TRANSIT",
+  );
 
   // "Tiếp nhận yêu cầu" dot — show when there are cards in that section
   // (Source role = all statuses, Requester+InTransit)
   const hasIncomingItems = supplyRequests.some(
-    (r) => r.type === "OUTBOUND" || (r.type === "INBOUND" && r.status === "IN_TRANSIT"),
+    (r) =>
+      r.type === "OUTBOUND" ||
+      (r.type === "INBOUND" && r.status === "IN_TRANSIT"),
   );
   // "Theo dõi tiến trình" dot — show when any requests exist in the table
   const hasAnyRequests = supplyRequests.length > 0;
@@ -80,12 +103,10 @@ const DepotSidebar = ({
     .sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime())
     .slice(0, 2);
 
-  const hasUrgent = criticalItems.length > 0 || lowStockItems.length > 0;
-  const hasPendingReqs = pendingRequestsAll.length > 0;
+  const hasUrgent = urgentItems.length > 0;
 
   return (
     <div className="h-full flex flex-col bg-sidebar border-r border-sidebar-border overflow-hidden">
-
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="relative px-4 pt-4 pb-3 border-b border-sidebar-border bg-sidebar shrink-0">
         <div className="flex items-start gap-3">
@@ -145,14 +166,31 @@ const DepotSidebar = ({
         className="flex-1 flex flex-col overflow-hidden min-h-0"
       >
         <TabsList className="w-full mt-2 flex flex-col h-auto bg-transparent p-0 px-3 rounded-none shrink-0 gap-0">
-          <TabTriggerWithDot value="inventory" dot={hasUrgent} label="Kho hàng" icon={<ChartBar className="h-4 w-4" />} />
-          <TabTriggerWithDot value="vattu" dot={false} label="Vật tư" icon={<Cube className="h-4 w-4" />} />
-          <TabTriggerWithDot value="requests" dot={hasPendingReqs} label="Tạo yêu cầu" icon={<ClipboardText className="h-4 w-4" />} />
-          <TabTriggerWithDot value="supply-management" dot={hasIncomingItems || hasAnyRequests} label="Quản lý tiếp tế" icon={<Truck className="h-4 w-4" />} />
+          <TabTriggerWithDot
+            value="inventory"
+            dot={hasUrgent}
+            label="Kho hàng"
+            icon={<ChartBar className="h-4 w-4" />}
+          />
+          <TabTriggerWithDot
+            value="vattu"
+            dot={false}
+            label="Vật phẩm"
+            icon={<Cube className="h-4 w-4" />}
+          />
+          <TabTriggerWithDot
+            value="supply-management"
+            dot={hasIncomingItems || hasAnyRequests}
+            label="Quản lý tiếp tế"
+            icon={<Truck className="h-4 w-4" />}
+          />
         </TabsList>
 
         {/* ── Inventory Tab ─────────────────────────────────────────────── */}
-        <TabsContent value="inventory" className="flex-1 overflow-hidden m-0 flex flex-col min-h-0">
+        <TabsContent
+          value="inventory"
+          className="flex-1 overflow-hidden m-0 flex flex-col min-h-0"
+        >
           <div className="px-3 pt-2 pb-2 shrink-0">
             <div className="relative">
               <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -167,21 +205,24 @@ const DepotSidebar = ({
 
           <ScrollArea className="flex-1 min-h-0">
             <div className="px-3 pb-4 space-y-4">
-              {(criticalItems.length > 0 || lowStockItems.length > 0) && (
+              {loadingLowStock && (
+                <div className="space-y-2">
+                  <Skeleton className="h-3 w-28" />
+                  <Skeleton className="h-14 w-full rounded-lg" />
+                  <Skeleton className="h-14 w-full rounded-lg" />
+                </div>
+              )}
+
+              {!loadingLowStock && urgentItems.length > 0 && (
                 <div>
                   <SectionHeader
-                    label={`Cần bổ sung (${criticalItems.length + lowStockItems.length})`}
+                    label={`Cần bổ sung (${urgentItems.length})`}
                     color="text-red-500"
                     icon={<ShieldWarning className="h-3 w-3" weight="fill" />}
                   />
                   <div className="space-y-1.5 mt-2">
-                    {[...criticalItems, ...lowStockItems].map((item) => (
-                      <InventoryItemRow
-                        key={item.id}
-                        item={item}
-                        isSelected={selectedItem?.id === item.id}
-                        onClick={() => onItemSelect(item)}
-                      />
+                    {urgentItems.map((item) => (
+                      <LowStockItemRow key={item.itemModelId} item={item} />
                     ))}
                   </div>
                 </div>
@@ -191,7 +232,7 @@ const DepotSidebar = ({
                 <div>
                   <SectionHeader
                     label={`Bình thường (${normalItems.length})`}
-                    color="text-muted-foreground"
+                    color="text-green-600"
                     icon={<CheckCircle className="h-3 w-3" weight="fill" />}
                   />
                   <div className="space-y-1.5 mt-2">
@@ -208,14 +249,20 @@ const DepotSidebar = ({
               )}
 
               {filteredItems.length === 0 && (
-                <EmptyState icon={<Package className="h-7 w-7" />} label="Không tìm thấy hàng hóa" />
+                <EmptyState
+                  icon={<Package className="h-7 w-7" />}
+                  label="Không tìm thấy hàng hóa"
+                />
               )}
             </div>
           </ScrollArea>
         </TabsContent>
 
         {/* ── Requests Tab ──────────────────────────────────────────────── */}
-        <TabsContent value="requests" className="flex-1 overflow-hidden m-0 min-h-0">
+        <TabsContent
+          value="requests"
+          className="flex-1 overflow-hidden m-0 min-h-0"
+        >
           <ScrollArea className="h-full">
             <div className="px-3 py-3 space-y-4">
               {pendingRequests.length > 0 && (
@@ -261,20 +308,28 @@ const DepotSidebar = ({
               )}
 
               {supplyRequests.length === 0 && (
-                <EmptyState icon={<ClipboardText className="h-7 w-7" />} label="Không có yêu cầu nào" />
+                <EmptyState
+                  icon={<ClipboardText className="h-7 w-7" />}
+                  label="Không có yêu cầu nào"
+                />
               )}
             </div>
           </ScrollArea>
         </TabsContent>
 
         {/* ── Supply Management Tab (merged incoming + shipments) ────── */}
-        <TabsContent value="supply-management" className="flex-1 m-0 min-h-0 flex flex-col items-center justify-center p-6 text-center">
+        <TabsContent
+          value="supply-management"
+          className="flex-1 m-0 min-h-0 flex flex-col items-center justify-center p-6 text-center"
+        >
           <div className="flex flex-col items-center gap-3">
             <div className="h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
               <Truck className="h-6 w-6 text-primary" weight="fill" />
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-tighter">Quản lý tiếp tế</p>
+              <p className="text-sm font-semibold tracking-tighter">
+                Quản lý tiếp tế
+              </p>
               <p className="text-xs text-muted-foreground tracking-tighter mt-1 leading-relaxed">
                 Xem đơn đến và đơn đã gửi tại khu vực bên phải
               </p>
@@ -287,15 +342,20 @@ const DepotSidebar = ({
         </TabsContent>
 
         {/* ── Vattu Tab ─────────────────────────────────────────────────── */}
-        <TabsContent value="vattu" className="flex-1 m-0 min-h-0 flex flex-col items-center justify-center p-6 text-center">
+        <TabsContent
+          value="vattu"
+          className="flex-1 m-0 min-h-0 flex flex-col items-center justify-center p-6 text-center"
+        >
           <div className="flex flex-col items-center gap-3">
             <div className="h-14 w-14 rounded-2xl bg-muted/60 border flex items-center justify-center">
               <Cube className="h-6 w-6 text-muted-foreground" weight="fill" />
             </div>
             <div>
-              <p className="text-sm font-semibold tracking-tighter">Chi tiết vật tư</p>
+              <p className="text-sm font-semibold tracking-tighter">
+                Chi tiết vật phẩm
+              </p>
               <p className="text-xs text-muted-foreground tracking-tighter mt-1 leading-relaxed">
-                Thông tin vật tư đang hiển thị tại khu vực bên phải
+                Thông tin vật phẩm đang hiển thị tại khu vực bên phải
               </p>
             </div>
             <div className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground tracking-wide uppercase mt-1">
@@ -304,7 +364,6 @@ const DepotSidebar = ({
             </div>
           </div>
         </TabsContent>
-
       </Tabs>
     </div>
   );
@@ -332,7 +391,12 @@ function KpiCell({
   pulse?: boolean;
 }) {
   return (
-    <div className={cn("flex flex-col items-center py-3 gap-0.5 relative", border && "border-l border-border/50")}>
+    <div
+      className={cn(
+        "flex flex-col items-center py-3 gap-0.5 relative",
+        border && "border-l border-border/50",
+      )}
+    >
       <div className={cn("flex items-center gap-1", iconClass)}>
         {icon}
         {pulse && value > 0 && (
@@ -342,10 +406,17 @@ function KpiCell({
           </span>
         )}
       </div>
-      <span className={cn("text-xl tracking-tighter font-bold leading-tight tabular-nums", valueClass)}>
+      <span
+        className={cn(
+          "text-xl tracking-tighter font-bold leading-tight tabular-nums",
+          valueClass,
+        )}
+      >
         {value}
       </span>
-      <span className="text-[12px] tracking-tighter font-semibold text-muted-foreground">{label}</span>
+      <span className="text-[12px] tracking-tighter font-semibold text-muted-foreground">
+        {label}
+      </span>
     </div>
   );
 }
@@ -394,7 +465,12 @@ function SectionHeader({
   icon: React.ReactNode;
 }) {
   return (
-    <div className={cn("flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest", color)}>
+    <div
+      className={cn(
+        "flex items-center gap-1.5 text-xs font-semibold tracking-tighter",
+        color,
+      )}
+    >
       {icon}
       <span>{label}</span>
       <div className="flex-1 h-px bg-current opacity-20 ml-1" />
@@ -404,7 +480,7 @@ function SectionHeader({
 
 function EmptyState({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-10 text-muted-foreground/50 gap-2">
+    <div className="flex flex-col tracking-tighter items-center justify-center py-10 text-muted-foreground/50 gap-2">
       <div className="opacity-40">{icon}</div>
       <p className="text-xs tracking-tighter">{label}</p>
     </div>
@@ -448,10 +524,12 @@ function InventoryItemRow({
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold tracking-tighter truncate flex-1">{item.name}</p>
+        <p className="text-sm font-semibold tracking-tighter truncate flex-1">
+          {item.name}
+        </p>
         <span
           className={cn(
-            "text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0",
+            "text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0",
             item.stockLevel === "CRITICAL"
               ? "bg-red-100 text-red-600"
               : item.stockLevel === "LOW"
@@ -460,7 +538,10 @@ function InventoryItemRow({
           )}
         >
           {item.quantity}
-          <span className="font-normal opacity-70"> {item.unit}</span>
+          <span className="font-normal tracking-tighter opacity-70">
+            {" "}
+            {item.unit}
+          </span>
         </span>
       </div>
       <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
@@ -469,10 +550,63 @@ function InventoryItemRow({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-[10px] text-muted-foreground mt-1 tracking-tighter">
+      <p className="text-xs text-muted-foreground mt-1.5 tracking-tighter">
         {item.sku} · {item.location}
       </p>
     </button>
+  );
+}
+
+function LowStockItemRow({ item }: { item: LowStockItem }) {
+  const level = getLowStockWarningLevel(item);
+  const isCritical = level === "CRITICAL" || level === "DANGER";
+  const pct =
+    item.minimumThreshold && item.minimumThreshold > 0
+      ? Math.min((item.availableQuantity / item.minimumThreshold) * 100, 100)
+      : 0;
+  const barColor = isCritical ? "bg-red-500" : "bg-orange-400";
+  const borderColor = isCritical ? "border-l-red-500" : "border-l-orange-400";
+  const badgeClass = isCritical
+    ? "bg-red-100 text-red-600"
+    : "bg-orange-100 text-orange-600";
+
+  return (
+    <div
+      className={cn(
+        "w-full text-left rounded-lg border bg-card px-3 py-2.5 border-l-2",
+        borderColor,
+      )}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold tracking-tighter truncate flex-1">
+          {item.itemModelName}
+        </p>
+        <span
+          className={cn(
+            "text-xs tracking-tighter font-bold px-1.5 py-0.5 rounded-full shrink-0",
+            badgeClass,
+          )}
+        >
+          {item.availableQuantity}
+          <span className="font-normal tracking-tighter opacity-70">
+            {" "}
+            {item.unit}
+          </span>
+        </span>
+      </div>
+      <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
+        <div
+          className={cn("h-full rounded-full transition-all", barColor)}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {item.minimumThreshold !== null &&
+        item.minimumThreshold !== undefined && (
+          <p className="text-xs text-muted-foreground mt-1.5 tracking-tighter">
+            Tối thiểu: {item.minimumThreshold} {item.unit}
+          </p>
+        )}
+    </div>
   );
 }
 
@@ -502,9 +636,15 @@ function RequestRow({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           {isInbound ? (
-            <ArrowLineDown className="h-3.5 w-3.5 text-green-500 shrink-0" weight="bold" />
+            <ArrowLineDown
+              className="h-3.5 w-3.5 text-green-500 shrink-0"
+              weight="bold"
+            />
           ) : (
-            <ArrowLineUp className="h-3.5 w-3.5 text-blue-500 shrink-0" weight="bold" />
+            <ArrowLineUp
+              className="h-3.5 w-3.5 text-blue-500 shrink-0"
+              weight="bold"
+            />
           )}
           <p className="text-xs font-semibold tracking-tighter truncate">
             {isInbound ? "Nhập kho" : "Xuất kho"}
@@ -516,7 +656,9 @@ function RequestRow({
         {request.requestedBy}
       </p>
       <div className="flex items-center justify-between mt-1.5">
-        <span className="text-[10px] text-muted-foreground">{request.items.length} mặt hàng</span>
+        <span className="text-[10px] text-muted-foreground">
+          {request.items.length} mặt hàng
+        </span>
         {request.notes && (
           <span className="text-[10px] text-muted-foreground truncate max-w-24">
             {request.notes.substring(0, 20)}…
