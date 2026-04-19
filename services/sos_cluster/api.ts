@@ -2,6 +2,8 @@ import api from "@/config/axios";
 import { useAuthStore } from "@/stores/auth.store";
 import {
   GetSOSClustersResponse,
+  GetSOSClustersParams,
+  SOSClusterEntity,
   CreateSOSClusterRequest,
   CreateSOSClusterResponse,
   GetMissionSuggestionsResponse,
@@ -9,6 +11,21 @@ import {
   AlternativeDepotsResponse,
   SseMissionEvent,
 } from "./type";
+
+type RawSOSClustersResponse = {
+  clusters?: SOSClusterEntity[];
+  items?: SOSClusterEntity[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+};
+
+const DEFAULT_PAGINATED_PAGE_SIZE = 10;
+const AGGREGATED_PAGE_SIZE = 100;
+const MAX_AGGREGATED_PAGES = 50;
 
 const GENERIC_AI_ERROR_MESSAGES = new Set([
   "lỗi",
@@ -138,6 +155,70 @@ function isGenericMessage(message: string): boolean {
   return GENERIC_AI_ERROR_MESSAGES.has(normalized);
 }
 
+function toPositiveInteger(value: unknown): number | null {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : Number.NaN;
+
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  const normalized = Math.floor(parsed);
+  return normalized > 0 ? normalized : null;
+}
+
+function extractClustersFromRawResponse(
+  payload: RawSOSClustersResponse,
+): SOSClusterEntity[] {
+  if (Array.isArray(payload.clusters)) {
+    return payload.clusters;
+  }
+
+  if (Array.isArray(payload.items)) {
+    return payload.items;
+  }
+
+  return [];
+}
+
+function deduplicateClusters(clusters: SOSClusterEntity[]): SOSClusterEntity[] {
+  return Array.from(
+    new Map(clusters.map((cluster) => [cluster.id, cluster])).values(),
+  );
+}
+
+function normalizeSOSClustersPage(
+  payload: RawSOSClustersResponse,
+  fallbackPageNumber: number,
+  fallbackPageSize: number,
+): GetSOSClustersResponse {
+  const clusters = deduplicateClusters(extractClustersFromRawResponse(payload));
+  const pageNumber =
+    toPositiveInteger(payload.pageNumber) ?? fallbackPageNumber;
+  const pageSize = toPositiveInteger(payload.pageSize) ?? fallbackPageSize;
+  const totalPages = toPositiveInteger(payload.totalPages);
+  const totalCount = toPositiveInteger(payload.totalCount);
+  const hasPreviousPage =
+    payload.hasPreviousPage === true || (totalPages != null && pageNumber > 1);
+  const hasNextPage =
+    payload.hasNextPage === true ||
+    (totalPages != null && pageNumber < totalPages);
+
+  return {
+    clusters,
+    pageNumber,
+    pageSize,
+    totalCount: totalCount ?? clusters.length,
+    totalPages,
+    hasPreviousPage,
+    hasNextPage,
+  };
+}
+
 export function formatAiAnalysisErrorMessage(
   rawError: unknown,
   statusCode?: number,
@@ -185,9 +266,89 @@ export function formatAiAnalysisErrorMessage(
  * Get all SOS clusters
  * GET /emergency/sos-clusters
  */
-export async function getSOSClusters(): Promise<GetSOSClustersResponse> {
-  const { data } = await api.get("/emergency/sos-clusters");
-  return data;
+export async function getSOSClusters(
+  params?: GetSOSClustersParams,
+): Promise<GetSOSClustersResponse> {
+  const requestedPageNumber = toPositiveInteger(params?.pageNumber);
+  const requestedPageSize = toPositiveInteger(params?.pageSize);
+  const requestedSOSRequestId = toPositiveInteger(params?.sosRequestId);
+  const shouldUseSinglePageRequest =
+    requestedPageNumber != null ||
+    requestedPageSize != null ||
+    requestedSOSRequestId != null;
+
+  if (shouldUseSinglePageRequest) {
+    const pageNumber = requestedPageNumber ?? 1;
+    const pageSize = requestedPageSize ?? DEFAULT_PAGINATED_PAGE_SIZE;
+    const { data } = await api.get("/emergency/sos-clusters", {
+      params: {
+        pageNumber,
+        pageSize,
+        sosRequestId: requestedSOSRequestId,
+      },
+    });
+
+    return normalizeSOSClustersPage(
+      data as RawSOSClustersResponse,
+      pageNumber,
+      pageSize,
+    );
+  }
+
+  const collectedClusters: SOSClusterEntity[] = [];
+
+  let nextPageNumber = 1;
+  let lastKnownTotalPages: number | undefined;
+  let lastKnownTotalCount: number | undefined;
+  let lastKnownPageNumber = 1;
+  let lastKnownHasPreviousPage = false;
+  let lastKnownHasNextPage = false;
+
+  for (let loop = 0; loop < MAX_AGGREGATED_PAGES; loop += 1) {
+    const { data } = await api.get("/emergency/sos-clusters", {
+      params: {
+        pageNumber: nextPageNumber,
+        pageSize: AGGREGATED_PAGE_SIZE,
+      },
+    });
+
+    const payload = data as RawSOSClustersResponse;
+    const pageClusters = extractClustersFromRawResponse(payload);
+    collectedClusters.push(...pageClusters);
+
+    const responsePageNumber = toPositiveInteger(payload.pageNumber);
+    const responseTotalPages = toPositiveInteger(payload.totalPages);
+    const responseTotalCount = toPositiveInteger(payload.totalCount);
+
+    lastKnownPageNumber = responsePageNumber ?? nextPageNumber;
+    lastKnownTotalPages = responseTotalPages ?? lastKnownTotalPages;
+    lastKnownTotalCount = responseTotalCount ?? lastKnownTotalCount;
+    lastKnownHasPreviousPage = Boolean(payload.hasPreviousPage);
+
+    const hasNextByFlag = payload.hasNextPage === true;
+    const hasNextByTotalPages =
+      lastKnownTotalPages != null && lastKnownPageNumber < lastKnownTotalPages;
+    const hasNextPage = hasNextByFlag || hasNextByTotalPages;
+    lastKnownHasNextPage = hasNextPage;
+
+    if (!hasNextPage) {
+      break;
+    }
+
+    nextPageNumber = lastKnownPageNumber + 1;
+  }
+
+  const deduplicatedClusters = deduplicateClusters(collectedClusters);
+
+  return {
+    clusters: deduplicatedClusters,
+    pageNumber: 1,
+    pageSize: AGGREGATED_PAGE_SIZE,
+    totalCount: lastKnownTotalCount ?? deduplicatedClusters.length,
+    totalPages: lastKnownTotalPages,
+    hasPreviousPage: lastKnownHasPreviousPage,
+    hasNextPage: lastKnownHasNextPage,
+  };
 }
 
 /**

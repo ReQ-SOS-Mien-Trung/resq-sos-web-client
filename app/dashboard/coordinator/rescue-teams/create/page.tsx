@@ -683,9 +683,11 @@ function CreateRescueTeamForm({
   const eligibleRescuers = useMemo(() => {
     if (isEventScopedTeamCreation) {
       const checkedInRescuers = checkedInRescuersData?.items ?? [];
-      return checkedInRescuers.map((rescuer) =>
-        mapCheckedInRescuerToRescuerEntity(rescuer, lockedAssemblyPointId),
-      );
+      return checkedInRescuers
+        .filter((rescuer) => !rescuer.isInTeam)
+        .map((rescuer) =>
+          mapCheckedInRescuerToRescuerEntity(rescuer, lockedAssemblyPointId),
+        );
     }
 
     if (!usersData?.pages) return [];

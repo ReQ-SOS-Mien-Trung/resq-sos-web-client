@@ -34,6 +34,19 @@ export interface SOSClusterEntity {
 // GET /emergency/sos-clusters response
 export interface GetSOSClustersResponse {
   clusters: SOSClusterEntity[];
+  pageNumber?: number;
+  pageSize?: number;
+  totalCount?: number;
+  totalPages?: number;
+  hasPreviousPage?: boolean;
+  hasNextPage?: boolean;
+}
+
+// GET /emergency/sos-clusters query params
+export interface GetSOSClustersParams {
+  pageNumber?: number;
+  pageSize?: number;
+  sosRequestId?: number;
 }
 
 // POST /emergency/sos-clusters request
@@ -64,11 +77,53 @@ export type ClusterActivityType =
   | "MIXED";
 
 // Supply collection details
+export interface ClusterSupplyLotAllocation {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate: string;
+  expiredDate: string;
+  remainingQuantityAfterExecution: number;
+}
+
+export interface ClusterSupplyReusableUnit {
+  reusableItemId?: number | null;
+  itemModelId?: number | null;
+  itemName?: string | null;
+  serialNumber?: string | null;
+  condition?: string | null;
+  note?: string | null;
+  [key: string]: unknown;
+}
+
 export interface ClusterSupplyCollection {
-  itemId: number;
+  itemId: number | null;
   itemName: string;
+  itemType?: string | null;
+  imageUrl?: string | null;
   quantity: number;
   unit: string;
+  plannedPickupLotAllocations?: ClusterSupplyLotAllocation[] | null;
+  plannedPickupReusableUnits?: ClusterSupplyReusableUnit[] | null;
+  pickupLotAllocations?: ClusterSupplyLotAllocation[] | null;
+  pickedReusableUnits?: ClusterSupplyReusableUnit[] | null;
+  availableDeliveryLotAllocations?: ClusterSupplyLotAllocation[] | null;
+  availableDeliveryReusableUnits?: ClusterSupplyReusableUnit[] | null;
+  deliveredLotAllocations?: ClusterSupplyLotAllocation[] | null;
+  deliveredReusableUnits?: ClusterSupplyReusableUnit[] | null;
+  expectedReturnLotAllocations?: ClusterSupplyLotAllocation[] | null;
+  expectedReturnUnits?: ClusterSupplyReusableUnit[] | null;
+  returnedLotAllocations?: ClusterSupplyLotAllocation[] | null;
+  returnedReusableUnits?: ClusterSupplyReusableUnit[] | null;
+  actualReturnedQuantity?: number | null;
+  bufferRatio?: number | null;
+  bufferQuantity?: number | null;
+  bufferUsedQuantity?: number | null;
+  bufferUsedReason?: string | null;
+  actualDeliveredQuantity?: number | null;
+}
+
+export interface ClusterTargetVictim {
+  [key: string]: unknown;
 }
 
 // Suggested team info (shape may expand from backend over time)
@@ -77,11 +132,13 @@ export interface ClusterSuggestedTeam {
   teamName?: string | null;
   teamType?: string | null;
   reason?: string | null;
+  assemblyPointId?: number | null;
   assemblyPointName?: string | null;
   latitude?: number | string | null;
   longitude?: number | string | null;
   contactPhone?: string | null;
   estimatedEtaMinutes?: number | null;
+  distanceKm?: number | null;
   [key: string]: unknown;
 }
 
@@ -90,8 +147,10 @@ export interface ClusterSuggestedActivity {
   step: number;
   activityType: ClusterActivityType;
   description: string;
-  priority: string;
-  estimatedTime: string;
+  targetVictimSummary?: string | null;
+  targetVictims?: ClusterTargetVictim[];
+  priority: string | null;
+  estimatedTime: string | null;
   executionMode?: string | null;
   requiredTeamCount?: number | null;
   coordinationGroupKey?: string | null;
@@ -104,6 +163,9 @@ export interface ClusterSuggestedActivity {
   assemblyPointName?: string | null;
   assemblyPointLatitude?: number | null;
   assemblyPointLongitude?: number | null;
+  destinationName?: string | null;
+  destinationLatitude?: number | null;
+  destinationLongitude?: number | null;
   suppliesToCollect: ClusterSupplyCollection[] | null;
   suggestedTeam?: ClusterSuggestedTeam | null;
 }
@@ -114,21 +176,45 @@ export interface MissionSuggestionActivity {
   activityType: ClusterActivityType;
   suggestionPhase: string;
   suggestedActivities: ClusterSuggestedActivity[];
-  confidenceScore: number;
-  createdAt: string;
+  confidenceScore: number | null;
+  createdAt: string | null;
+}
+
+export interface ClusterSupplyShortage {
+  sosRequestId: number | null;
+  itemId: number | null;
+  itemName: string;
+  unit: string | null;
+  selectedDepotId: number | null;
+  selectedDepotName: string | null;
+  neededQuantity: number;
+  availableQuantity: number;
+  missingQuantity: number;
+  notes: string | null;
 }
 
 // Mission suggestion entity
 export interface MissionSuggestionEntity {
   id: number;
-  clusterId: number;
-  modelName: string;
-  analysisType: string;
-  suggestedMissionTitle: string;
-  suggestedPriorityScore: number;
-  confidenceScore: number;
+  clusterId: number | null;
+  modelName: string | null;
+  analysisType: string | null;
+  suggestedMissionTitle: string | null;
+  suggestedMissionType: ClusterMissionType | string | null;
+  suggestedPriorityScore: number | null;
+  suggestedSeverityLevel: ClusterSeverityLevel | string | null;
+  confidenceScore: number | null;
+  overallAssessment: string | null;
+  estimatedDuration: string | null;
+  specialNotes: string | null;
+  mixedRescueReliefWarning: string;
+  needsManualReview: boolean;
+  lowConfidenceWarning: string | null;
+  needsAdditionalDepot: boolean;
+  supplyShortages: ClusterSupplyShortage[];
+  suggestedResources: ClusterSuggestedResource[];
   suggestionScope: string | null;
-  createdAt: string;
+  createdAt: string | null;
   activities: MissionSuggestionActivity[];
 }
 
@@ -170,21 +256,24 @@ export type ClusterMissionType =
 
 // POST /emergency/sos-clusters/{clusterId}/rescue-suggestion response
 export interface ClusterRescueSuggestionResponse {
-  suggestionId: number;
+  suggestionId: number | null;
   isSuccess: boolean;
   errorMessage: string | null;
-  modelName: string;
+  modelName: string | null;
   responseTimeMs: number;
   sosRequestCount: number;
-  suggestedMissionTitle: string;
-  suggestedMissionType: ClusterMissionType;
-  suggestedPriorityScore: number;
-  suggestedSeverityLevel: ClusterSeverityLevel;
-  overallAssessment: string;
+  suggestedMissionTitle: string | null;
+  suggestedMissionType: ClusterMissionType | string | null;
+  suggestedPriorityScore: number | null;
+  suggestedSeverityLevel: ClusterSeverityLevel | string | null;
+  overallAssessment: string | null;
   suggestedActivities: ClusterSuggestedActivity[];
   suggestedResources: ClusterSuggestedResource[];
-  estimatedDuration: string;
+  estimatedDuration: string | null;
   specialNotes: string | null;
+  mixedRescueReliefWarning: string;
+  needsAdditionalDepot: boolean;
+  supplyShortages: ClusterSupplyShortage[];
   confidenceScore: number;
   needsManualReview: boolean;
   lowConfidenceWarning: string | null;

@@ -837,6 +837,7 @@ export interface RescuePlanPanelProps {
   rescueSuggestion:
     | import("@/services/sos_cluster/type").ClusterRescueSuggestionResponse
     | null;
+  preferSplitSuggestion?: boolean;
   onApprove: () => void;
   onReAnalyze: () => void;
   isReAnalyzing: boolean;

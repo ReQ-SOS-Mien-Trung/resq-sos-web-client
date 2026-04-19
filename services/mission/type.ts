@@ -1,6 +1,7 @@
 import type {
   ClusterSuggestedActivity,
   ClusterSuggestedResource,
+  ClusterSupplyShortage,
 } from "@/services/sos_cluster/type";
 
 export type MissionType = "RESCUE" | "RESCUER" | "RELIEF" | "MIXED" | string;
@@ -60,6 +61,9 @@ export interface MissionSupplyItem {
   itemName: string | null;
   quantity: number;
   unit: string;
+  plannedPickupLotAllocations?: MissionSupplyLotAllocationRequest[] | null;
+  pickupLotAllocations?: MissionSupplyLotAllocationRequest[] | null;
+  actualDeliveredQuantity?: number | null;
 }
 
 export interface MissionActivity {
@@ -118,6 +122,9 @@ export interface MissionEntity {
   overallAssessment?: string | null;
   estimatedDuration?: string | null;
   specialNotes?: string | null;
+  mixedRescueReliefWarning?: string | null;
+  needsAdditionalDepot?: boolean | null;
+  supplyShortages?: ClusterSupplyShortage[] | null;
   suggestedActivities?: ClusterSuggestedActivity[] | null;
   suggestedResources?: ClusterSuggestedResource[];
   aiCreatedAt?: string | null;
@@ -238,10 +245,13 @@ export type CreateActivityResponse = MissionActivity;
 
 export interface CreateMissionRequest {
   clusterId: number;
+  aiSuggestionId?: number | null;
   missionType: MissionType;
   priorityScore: number;
   startTime: string;
   expectedEndTime: string;
+  ignoreMixedMissionWarning?: boolean;
+  overrideReason?: string | null;
   activities: CreateMissionActivityRequest[];
 }
 
@@ -285,9 +295,19 @@ export interface UpdateActivityResponse {
   status: ActivityStatus;
 }
 
+export interface ConfirmReturnConsumableLotAllocationRequest {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate: string;
+  expiredDate: string;
+  remainingQuantityAfterExecution: number;
+}
+
 export interface ConfirmReturnConsumableItemRequest {
   itemModelId: number;
   quantity: number;
+  lotAllocations: ConfirmReturnConsumableLotAllocationRequest[];
+  expiredDate: string | null;
 }
 
 export interface ConfirmReturnReusableUnitRequest {

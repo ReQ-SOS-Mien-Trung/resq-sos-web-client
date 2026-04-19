@@ -44,6 +44,14 @@ import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import {
   DropdownMenu,
@@ -68,6 +76,7 @@ import {
   Phone,
   UsersThree,
   ChatCircleDots,
+  Warning,
 } from "@phosphor-icons/react";
 import {
   SOSDetailsPanel,
@@ -292,8 +301,11 @@ const CoordinatorDashboardContent = () => {
   const [rescuePlanDefaultTab, setRescuePlanDefaultTab] = useState<
     "plan" | "missions" | undefined
   >(undefined);
+  const [rescuePlanPreferSplitSuggestion, setRescuePlanPreferSplitSuggestion] =
+    useState(false);
   const [rescueSuggestion, setRescueSuggestion] =
     useState<ClusterRescueSuggestionResponse | null>(null);
+  const [mixedWarningDialogOpen, setMixedWarningDialogOpen] = useState(false);
   const [activeClusterId, setActiveClusterId] = useState<number | null>(null);
   // Cache of rescue suggestions per cluster ID
   const suggestionCacheRef = useRef<
@@ -413,8 +425,8 @@ const CoordinatorDashboardContent = () => {
     : isConnecting
       ? "Đang kết nối realtime"
       : isReconnecting
-      ? "Đang kết nối lại"
-      : "Mất kết nối";
+        ? "Đang kết nối lại"
+        : "Mất kết nối";
 
   const autoClusters = useMemo(
     () => buildAutoClusters(sosRequests, clusters),
@@ -562,6 +574,7 @@ const CoordinatorDashboardContent = () => {
           const cachedSuggestion = suggestionCacheRef.current.get(cluster.id);
           setRescueSuggestion(cachedSuggestion ?? null);
           setRescuePlanDefaultTab(planTab);
+          setRescuePlanPreferSplitSuggestion(false);
           setRescuePlanOpen(true);
           setSOSDetailOpen(false);
           setLocationPanelOpen(false);
@@ -667,10 +680,53 @@ const CoordinatorDashboardContent = () => {
   const handleRescuePlanOpenChange = useCallback(
     (nextOpen: boolean) => {
       setRescuePlanOpen(nextOpen);
+      if (!nextOpen) {
+        setRescuePlanPreferSplitSuggestion(false);
+      }
       syncRescuePlanUrlState(nextOpen, activeClusterId, rescuePlanDefaultTab);
     },
     [activeClusterId, rescuePlanDefaultTab, syncRescuePlanUrlState],
   );
+
+  const openRescuePlanFromAiResult = useCallback(
+    (preferSplit: boolean) => {
+      const targetClusterId = activeClusterId ?? aiStreamClusterId;
+      if (!targetClusterId) {
+        return;
+      }
+      const latestSuggestion = aiStream.result ?? rescueSuggestion;
+
+      setMixedWarningDialogOpen(false);
+      setAiStreamOpen(false);
+      if (latestSuggestion) {
+        setRescueSuggestion(latestSuggestion);
+        suggestionCacheRef.current.set(targetClusterId, latestSuggestion);
+      }
+      setRescuePlanDefaultTab("plan");
+      setRescuePlanPreferSplitSuggestion(preferSplit);
+      setRescuePlanOpen(true);
+      syncRescuePlanUrlState(true, targetClusterId, "plan");
+    },
+    [
+      activeClusterId,
+      aiStream.result,
+      aiStreamClusterId,
+      rescueSuggestion,
+      syncRescuePlanUrlState,
+    ],
+  );
+
+  const handleAiStreamPrimaryAction = useCallback(() => {
+    const mixedWarningMessage =
+      aiStream.result?.mixedRescueReliefWarning?.trim() ?? "";
+
+    if (mixedWarningMessage) {
+      setMixedWarningDialogOpen(true);
+      return;
+    }
+
+    openRescuePlanFromAiResult(false);
+  }, [aiStream.result?.mixedRescueReliefWarning, openRescuePlanFromAiResult]);
 
   const handleSOSSelect = useCallback(
     (sos: SOSRequest) => {
@@ -766,6 +822,7 @@ const CoordinatorDashboardContent = () => {
       const cached = suggestionCacheRef.current.get(clusterId);
       setRescueSuggestion(cached ?? null);
       setRescuePlanDefaultTab(undefined);
+      setRescuePlanPreferSplitSuggestion(false);
       setRescuePlanOpen(true);
       syncRescuePlanUrlState(true, clusterId);
       setSOSDetailOpen(false);
@@ -842,6 +899,7 @@ const CoordinatorDashboardContent = () => {
             setActiveClusterId(clusterData.clusterId);
             setAnalyzingClusterId(clusterData.clusterId);
             setAiStreamClusterId(clusterData.clusterId);
+            setRescuePlanPreferSplitSuggestion(false);
             setAiStreamOpen(true);
             aiStream.startStream(clusterData.clusterId);
             setProcessingClusterIndex(null);
@@ -864,6 +922,7 @@ const CoordinatorDashboardContent = () => {
       setAnalyzingClusterId(clusterId);
       setActiveClusterId(clusterId);
       setAiStreamClusterId(clusterId);
+      setRescuePlanPreferSplitSuggestion(false);
       setAiStreamOpen(true);
       aiStream.startStream(clusterId);
     },
@@ -898,6 +957,7 @@ const CoordinatorDashboardContent = () => {
     setSOSDetailOpen(false);
     setSelectedSOS(null);
     setRescueSuggestion(null);
+    setRescuePlanPreferSplitSuggestion(false);
     setActiveClusterId(null);
     clearSelection();
   }, [clearSelection]);
@@ -939,6 +999,7 @@ const CoordinatorDashboardContent = () => {
     setAiStreamClusterId(activeClusterId);
     setAiStreamOpen(true);
     setRescuePlanOpen(false);
+    setRescuePlanPreferSplitSuggestion(false);
     syncRescuePlanUrlState(false, activeClusterId);
     aiStream.startStream(activeClusterId);
   }, [activeClusterId, aiStream, syncRescuePlanUrlState]);
@@ -1302,6 +1363,7 @@ const CoordinatorDashboardContent = () => {
                 clusterSOSRequests={rescuePlanSOSRequests}
                 clusterId={activeClusterId}
                 rescueSuggestion={rescueSuggestion}
+                preferSplitSuggestion={rescuePlanPreferSplitSuggestion}
                 onApprove={handleApproveDecision}
                 onReAnalyze={handleReAnalyze}
                 isReAnalyzing={isFetchingSuggestion || aiStream.loading}
@@ -1330,17 +1392,37 @@ const CoordinatorDashboardContent = () => {
                     aiStream.startStream(aiStreamClusterId);
                   }
                 }}
-                onViewPlan={() => {
-                  setAiStreamOpen(false);
-                  setRescuePlanDefaultTab("plan");
-                  setRescuePlanOpen(true);
-                  syncRescuePlanUrlState(
-                    true,
-                    activeClusterId ?? aiStreamClusterId,
-                    "plan",
-                  );
-                }}
+                onViewPlan={() => openRescuePlanFromAiResult(false)}
+                onPrimaryAction={handleAiStreamPrimaryAction}
               />
+
+              <Dialog
+                open={mixedWarningDialogOpen}
+                onOpenChange={setMixedWarningDialogOpen}
+              >
+                <DialogContent className="sm:max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Warning
+                        className="h-5 w-5 text-rose-500"
+                        weight="fill"
+                      />
+                      Cảnh báo gộp cứu hộ và cứu trợ
+                    </DialogTitle>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => openRescuePlanFromAiResult(true)}
+                    >
+                      Tách thành nhiệm vụ riêng
+                    </Button>
+                    <Button onClick={() => openRescuePlanFromAiResult(false)}>
+                      Tiếp tục chỉnh sửa nhiệm vụ
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               {/* Location Details Panel */}
               <LocationDetailsPanel

@@ -158,10 +158,22 @@ function compareSOS(left: SOSRequestEntity, right: SOSRequestEntity): number {
   return Date.parse(right.createdAt) - Date.parse(left.createdAt);
 }
 
+export interface ServerPaginationProps {
+  totalCount: number;
+  totalPages: number;
+  page: number;
+  pageSize: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}
+
 export interface SOSClusterTableProps {
   clusters: SOSClusterEntity[];
   isLoading?: boolean;
   isRefetching?: boolean;
+  serverPagination?: ServerPaginationProps;
   expandedClusterIds: Set<number>;
   onToggleCluster: (clusterId: number) => void;
   clusterSOSMap: Map<number, SOSRequestEntity[]>;
@@ -175,6 +187,7 @@ const SOSClusterTable = ({
   clusters,
   isLoading = false,
   isRefetching = false,
+  serverPagination,
   expandedClusterIds,
   onToggleCluster,
   clusterSOSMap,
@@ -185,6 +198,14 @@ const SOSClusterTable = ({
 }: SOSClusterTableProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const isServerMode = Boolean(serverPagination);
+  const currentPage = isServerMode ? serverPagination!.page : 1;
+  const currentPageSize = isServerMode ? serverPagination!.pageSize : 10;
+  const totalPages = isServerMode
+    ? Math.max(1, serverPagination!.totalPages)
+    : 1;
+  const safePage = Math.min(currentPage, totalPages);
 
   const visibleClusters = useMemo(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -229,6 +250,30 @@ const SOSClusterTable = ({
       });
   }, [clusters, searchQuery, statusFilter]);
 
+  const hasFilters = searchQuery.trim().length > 0 || statusFilter !== "all";
+  const displayTotalCount = isServerMode
+    ? serverPagination!.totalCount
+    : visibleClusters.length;
+  const startItem =
+    displayTotalCount === 0 ? 0 : (safePage - 1) * currentPageSize + 1;
+  const endItem = Math.min(safePage * currentPageSize, displayTotalCount);
+
+  const setPage = (page: number) => {
+    if (!isServerMode) {
+      return;
+    }
+
+    serverPagination!.onPageChange(page);
+  };
+
+  const setPageSize = (size: number) => {
+    if (!isServerMode) {
+      return;
+    }
+
+    serverPagination!.onPageSizeChange(size);
+  };
+
   return (
     <Card className="border border-border/50 shadow-none">
       <CardContent className="p-4">
@@ -259,7 +304,11 @@ const SOSClusterTable = ({
             {isRefetching ? (
               <ArrowsClockwise className="h-4 w-4 animate-spin" />
             ) : null}
-            <span>{visibleClusters.length} cụm</span>
+            <span>
+              {hasFilters && isServerMode
+                ? `${visibleClusters.length} / ${displayTotalCount.toLocaleString("vi-VN")} cụm`
+                : `${displayTotalCount.toLocaleString("vi-VN")} cụm`}
+            </span>
           </div>
         </div>
 
@@ -611,6 +660,98 @@ const SOSClusterTable = ({
           Bấm vào cụm để mở danh sách SOS bên trong. Với cụm đã hoàn thành, dùng
           nút Xem nhiệm vụ để mở kế hoạch ở chế độ chỉ xem.
         </p>
+
+        {isServerMode ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-4">
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-muted-foreground">
+                Hiển thị {startItem}–{endItem} trong{" "}
+                {displayTotalCount.toLocaleString("vi-VN")} cụm
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Select
+                  value={String(currentPageSize)}
+                  onValueChange={(value) => setPageSize(Number(value))}
+                >
+                  <SelectTrigger className="h-8 w-16 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-muted-foreground">/ trang</span>
+              </div>
+            </div>
+
+            {totalPages > 1 ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(Math.max(1, safePage - 1))}
+                  disabled={!serverPagination!.hasPreviousPage || isLoading}
+                >
+                  Trước
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, index) => index + 1)
+                    .filter(
+                      (page) =>
+                        page === 1 ||
+                        page === totalPages ||
+                        Math.abs(page - safePage) <= 1,
+                    )
+                    .reduce<(number | "...")[]>((acc, page, index, arr) => {
+                      if (
+                        index > 0 &&
+                        typeof arr[index - 1] === "number" &&
+                        page - arr[index - 1] > 1
+                      ) {
+                        acc.push("...");
+                      }
+
+                      acc.push(page);
+                      return acc;
+                    }, [])
+                    .map((page, index) =>
+                      page === "..." ? (
+                        <span
+                          key={`ellipsis-${index}`}
+                          className="px-1 text-sm text-muted-foreground"
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <Button
+                          key={page}
+                          variant={page === safePage ? "default" : "outline"}
+                          size="sm"
+                          className="min-w-9"
+                          onClick={() => setPage(page)}
+                          disabled={isLoading}
+                        >
+                          {page}
+                        </Button>
+                      ),
+                    )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(Math.min(totalPages, safePage + 1))}
+                  disabled={!serverPagination!.hasNextPage || isLoading}
+                >
+                  Sau
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
