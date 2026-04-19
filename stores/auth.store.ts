@@ -75,13 +75,20 @@ export const useAuthStore = create<AuthState>()(
 
         updateTokens: (data: RefreshTokenResponse) =>
           set(
-            {
+            (state) => ({
               accessToken: data.accessToken,
               refreshToken: data.refreshToken,
               expiresIn: data.expiresIn,
               tokenType: data.tokenType,
               tokenObtainedAt: Date.now(),
-            },
+              isAuthenticated: true,
+              user: state.user
+                ? {
+                    ...state.user,
+                    permissions: data.permissions ?? state.user.permissions,
+                  }
+                : state.user,
+            }),
             false,
             "auth/updateTokens",
           ),

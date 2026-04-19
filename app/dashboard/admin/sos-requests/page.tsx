@@ -46,14 +46,37 @@ const SOSRequestsPage = () => {
   >(null);
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
   const [selectedSOS, setSelectedSOS] = useState<SOSRequestEntity | null>(null);
+  const [clusterPage, setClusterPage] = useState(1);
+  const [clusterPageSize, setClusterPageSize] = useState(10);
+
+  const clusterQueryParams = useMemo(
+    () => ({
+      pageNumber: clusterPage,
+      pageSize: clusterPageSize,
+    }),
+    [clusterPage, clusterPageSize],
+  );
 
   const {
     data: clustersData,
     isLoading: isClustersLoading,
     isRefetching: isClustersRefetching,
-  } = useSOSClusters();
+  } = useSOSClusters({ params: clusterQueryParams });
+
+  const { data: allClustersStatsData } = useSOSClusters();
 
   const clusters = useMemo(() => clustersData?.clusters ?? [], [clustersData]);
+  const statsClusters = useMemo(
+    () => allClustersStatsData?.clusters ?? clusters,
+    [allClustersStatsData, clusters],
+  );
+
+  useEffect(() => {
+    const totalPages = clustersData?.totalPages ?? 1;
+    if (clusterPage > totalPages) {
+      setClusterPage(totalPages);
+    }
+  }, [clusterPage, clustersData?.totalPages]);
 
   const requestedClusterIds = useMemo(() => {
     const next = new Set<number>(expandedClusterIds);
@@ -144,27 +167,30 @@ const SOSRequestsPage = () => {
   }, [clusters, failedSOSIdSet, requestedClusterIds]);
 
   const stats = useMemo(() => {
-    const pending = clusters.filter(
+    const pending = statsClusters.filter(
       (cluster) => resolveClusterStatus(cluster.status) === "Pending",
     ).length;
-    const inProgress = clusters.filter(
+    const inProgress = statsClusters.filter(
       (cluster) => resolveClusterStatus(cluster.status) === "InProgress",
     ).length;
-    const suggested = clusters.filter(
+    const suggested = statsClusters.filter(
       (cluster) => resolveClusterStatus(cluster.status) === "Suggested",
     ).length;
-    const completed = clusters.filter(
+    const completed = statsClusters.filter(
       (cluster) => resolveClusterStatus(cluster.status) === "Completed",
     ).length;
 
     return {
-      total: clusters.length,
+      total:
+        allClustersStatsData?.totalCount ??
+        clustersData?.totalCount ??
+        statsClusters.length,
       pending,
       inProgress,
       completed,
       cancelled: suggested,
     };
-  }, [clusters]);
+  }, [allClustersStatsData, clustersData?.totalCount, statsClusters]);
 
   const selectedSOSModel = useMemo(
     () => (selectedSOS ? mapSOSRequestEntityToSOS(selectedSOS) : null),
@@ -273,6 +299,24 @@ const SOSRequestsPage = () => {
           clusters={clusters}
           isLoading={isClustersLoading}
           isRefetching={isClustersRefetching}
+          serverPagination={{
+            totalCount: clustersData?.totalCount ?? 0,
+            totalPages: clustersData?.totalPages ?? 1,
+            page: clustersData?.pageNumber ?? clusterPage,
+            pageSize: clustersData?.pageSize ?? clusterPageSize,
+            hasPreviousPage:
+              clustersData?.hasPreviousPage ??
+              (clustersData?.pageNumber ?? clusterPage) > 1,
+            hasNextPage:
+              clustersData?.hasNextPage ??
+              (clustersData?.totalPages ?? 1) >
+                (clustersData?.pageNumber ?? clusterPage),
+            onPageChange: setClusterPage,
+            onPageSizeChange: (size) => {
+              setClusterPageSize(size);
+              setClusterPage(1);
+            },
+          }}
           expandedClusterIds={expandedClusterIds}
           onToggleCluster={handleToggleCluster}
           clusterSOSMap={clusterSOSMap}

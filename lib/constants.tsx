@@ -285,10 +285,6 @@ export const AI_PROVIDER_OPTIONS = [
       "Dùng Google AI Studio API key hoặc default Gemini config của server.",
     models: [
       {
-        label: "Gemini 3.1 Pro Preview",
-        code: "gemini-3.1-pro-preview",
-      },
-      {
         label: "Gemini 3.1 Flash Lite Preview",
         code: "gemini-3.1-flash-lite-preview",
       },
@@ -300,10 +296,7 @@ export const AI_PROVIDER_OPTIONS = [
         label: "Gemini 2.5 Flash",
         code: "gemini-2.5-flash",
       },
-      {
-        label: "Gemini 2.5 Pro",
-        code: "gemini-2.5-pro",
-      },
+
       {
         label: "Gemini 2 Flash",
         code: "gemini-2-flash",
@@ -311,14 +304,6 @@ export const AI_PROVIDER_OPTIONS = [
       {
         label: "Gemini 2 Flash Lite",
         code: "gemini-2-flash-lite",
-      },
-      {
-        label: "Gemini 2.5 Flash TTS",
-        code: "gemini-2.5-flash-tts",
-      },
-      {
-        label: "Gemini 2.5 Pro TTS",
-        code: "gemini-2.5-pro-tts",
       },
     ],
   },

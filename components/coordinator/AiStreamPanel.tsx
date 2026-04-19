@@ -1160,15 +1160,17 @@ function MissionBanner({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-foreground truncate mb-1">
-            {result.suggestedMissionTitle}
+            {result.suggestedMissionTitle || "Kế hoạch AI chưa có tiêu đề"}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             <Badge className="text-sm bg-primary text-white border-primary hover:bg-primary/90">
-              {severityConfig[result.suggestedSeverityLevel]?.label ||
-                result.suggestedSeverityLevel}
+              {result.suggestedSeverityLevel
+                ? (severityConfig[result.suggestedSeverityLevel]?.label ||
+                  result.suggestedSeverityLevel)
+                : "Chưa rõ mức độ"}
             </Badge>
             <span className="text-sm font-mono text-muted-foreground">
-              {result.modelName} • {result.responseTimeMs}ms
+              {(result.modelName || "AI")} • {result.responseTimeMs}ms
             </span>
           </div>
         </div>
@@ -1211,13 +1213,16 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
     {
       icon: Lightning,
       label: "Ưu tiên",
-      value: result.suggestedPriorityScore.toFixed(1),
+      value:
+        typeof result.suggestedPriorityScore === "number"
+          ? result.suggestedPriorityScore.toFixed(1)
+          : "N/A",
       color: "text-orange-400",
     },
     {
       icon: Clock,
       label: "Thời gian",
-      value: result.estimatedDuration,
+      value: result.estimatedDuration || "Chưa rõ",
       color: "text-blue-400",
     },
     {
@@ -1684,12 +1689,28 @@ function WarningsBlock({
   if (
     !result.needsManualReview &&
     !result.multiDepotRecommended &&
-    !result.specialNotes
+    !result.specialNotes &&
+    !(result.mixedRescueReliefWarning || "").trim() &&
+    !result.needsAdditionalDepot &&
+    (result.supplyShortages?.length ?? 0) === 0
   )
     return null;
 
   return (
     <div className="space-y-2">
+      {(result.mixedRescueReliefWarning || "").trim() ? (
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/[0.06] border border-rose-500/15">
+          <Warning className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" weight="fill" />
+          <div>
+            <p className="text-sm font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-0.5">
+              Cảnh báo tách nhiệm vụ
+            </p>
+            <p className="text-sm text-rose-600/80 dark:text-rose-400/80 leading-relaxed">
+              {result.mixedRescueReliefWarning}
+            </p>
+          </div>
+        </div>
+      ) : null}
       {result.needsManualReview && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/[0.06] border border-yellow-500/15">
           <Warning className="h-4 w-4 text-yellow-500 shrink-0" weight="fill" />
@@ -1708,6 +1729,39 @@ function WarningsBlock({
           <p className="text-sm text-blue-600 dark:text-blue-400/80">
             Kế hoạch yêu cầu phối hợp nhiều kho tiếp tế.
           </p>
+        </div>
+      )}
+      {(result.needsAdditionalDepot ||
+        (result.supplyShortages?.length ?? 0) > 0) && (
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/[0.06] border border-sky-500/15">
+          <Storefront
+            className="h-4 w-4 text-sky-500 dark:text-sky-400 shrink-0 mt-0.5"
+            weight="fill"
+          />
+          <div>
+            <p className="text-sm font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-0.5">
+              Thiếu vật phẩm / cần thêm kho
+            </p>
+            {result.supplyShortages?.length ? (
+              <div className="space-y-0.5">
+                {result.supplyShortages.map((shortage, index) => (
+                  <p
+                    key={`warning-shortage-${index}`}
+                    className="text-sm text-sky-600/80 dark:text-sky-400/80 leading-relaxed"
+                  >
+                    {`${shortage.itemName} thiếu x${shortage.missingQuantity}${shortage.unit ? ` ${shortage.unit}` : ""}`}
+                    {shortage.selectedDepotName
+                      ? ` • Kho chính: ${shortage.selectedDepotName}`
+                      : ""}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-sky-600/80 dark:text-sky-400/80 leading-relaxed">
+                Kho hiện tại chưa đủ vật phẩm để đáp ứng toàn bộ kế hoạch.
+              </p>
+            )}
+          </div>
         </div>
       )}
       {result.specialNotes && (

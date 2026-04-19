@@ -10,6 +10,7 @@ import {
 } from "./api";
 import {
   GetSOSClustersResponse,
+  GetSOSClustersParams,
   CreateSOSClusterRequest,
   CreateSOSClusterResponse,
   GetMissionSuggestionsResponse,
@@ -29,13 +30,23 @@ export interface UseAlternativeDepotsOptions {
   enabled?: boolean;
 }
 
+export interface UseSOSClustersOptions {
+  params?: GetSOSClustersParams;
+  enabled?: boolean;
+}
+
 /**
  * Hook to fetch all SOS clusters
  */
-export function useSOSClusters() {
+export function useSOSClusters(options?: UseSOSClustersOptions) {
+  const queryKey = options?.params
+    ? [...SOS_CLUSTERS_QUERY_KEY, options.params]
+    : SOS_CLUSTERS_QUERY_KEY;
+
   return useQuery<GetSOSClustersResponse>({
-    queryKey: SOS_CLUSTERS_QUERY_KEY,
-    queryFn: getSOSClusters,
+    queryKey,
+    queryFn: () => getSOSClusters(options?.params),
+    enabled: options?.enabled ?? true,
   });
 }
 
