@@ -229,6 +229,8 @@ export interface GetSOSRequestsResponse {
 export interface GetSOSRequestsParams {
   pageNumber?: number;
   pageSize?: number;
+  Statuses?: SOSRequestStatus[];
+  PriorityLevels?: SOSPriorityLevel[];
 }
 
 export interface GetSOSRequestsInBoundsParams {

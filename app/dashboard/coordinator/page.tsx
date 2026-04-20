@@ -21,12 +21,10 @@ import {
 } from "@/type";
 import type { MapViewState } from "@/hooks/useMapUrlSync";
 import {
+  useSOSRequests,
   useSOSRequestsInBounds,
 } from "@/services/sos_request/hooks";
-import type {
-  SOSPriorityLevel,
-  SOSRequestStatus,
-} from "@/services/sos_request/type";
+import type { SOSRequestStatus } from "@/services/sos_request/type";
 import {
   useCreateSOSCluster,
   useClusterRescueSuggestion,
@@ -409,6 +407,7 @@ function mapRescueTeamToRescuer(
 }
 
 const SERVICE_ZONE_MIN_ZOOM = 12;
+const SIDEBAR_SOS_PAGE_SIZE = 8;
 
 // ── Main Dashboard Content ──
 
@@ -442,9 +441,7 @@ const CoordinatorDashboardContent = () => {
   const [selectedSOSStatuses, setSelectedSOSStatuses] = useState<
     SOSRequestStatus[]
   >([]);
-  const [selectedSOSPriorityLevels, setSelectedSOSPriorityLevels] = useState<
-    SOSPriorityLevel[]
-  >([]);
+  const [sidebarSOSPage, setSidebarSOSPage] = useState(1);
   const [serviceZoneQueryEnabled, setServiceZoneQueryEnabled] = useState(
     (urlState.view?.zoom ?? 13) >= SERVICE_ZONE_MIN_ZOOM,
   );
@@ -496,20 +493,28 @@ const CoordinatorDashboardContent = () => {
   const sidebarBeforeRescuePlanRef = useRef(true);
   const lastAppliedSelectionSignatureRef = useRef<string | null>(null);
 
+  const statusQueryFilter = useMemo(
+    () => (selectedSOSStatuses.length > 0 ? selectedSOSStatuses : undefined),
+    [selectedSOSStatuses],
+  );
+
   // ─── Data Fetching ───
+  const { data: sidebarSosData, isLoading: isSidebarSosLoading } =
+    useSOSRequests({
+      params: {
+        pageNumber: sidebarSOSPage,
+        pageSize: SIDEBAR_SOS_PAGE_SIZE,
+        Statuses: statusQueryFilter,
+      },
+    });
   const { data: mapSosData } = useSOSRequestsInBounds({
     params: mapFetchBounds
-        ? {
+      ? {
           MinLat: mapFetchBounds.south,
           MaxLat: mapFetchBounds.north,
           MinLng: mapFetchBounds.west,
           MaxLng: mapFetchBounds.east,
-          Statuses:
-            selectedSOSStatuses.length > 0 ? selectedSOSStatuses : undefined,
-          PriorityLevels:
-            selectedSOSPriorityLevels.length > 0
-              ? selectedSOSPriorityLevels
-              : undefined,
+          Statuses: statusQueryFilter,
         }
       : undefined,
     enabled: !isWeatherMode && !!mapFetchBounds,
@@ -533,33 +538,33 @@ const CoordinatorDashboardContent = () => {
     () => mapSOSRequestEntitiesToSOS(mapSosData ?? []),
     [mapSosData],
   );
+  const sidebarSOSRequests = useMemo(
+    () => mapSOSRequestEntitiesToSOS(sidebarSosData?.items ?? []),
+    [sidebarSosData],
+  );
 
   useEffect(() => {
     if (!selectedSOS) {
       return;
     }
 
-    if (
-      selectedSOSStatuses.length === 0 &&
-      selectedSOSPriorityLevels.length === 0
-    ) {
+    if (selectedSOSStatuses.length === 0) {
       return;
     }
 
-    const nextSelected = sosRequests.find((sos) => sos.id === selectedSOS.id);
-    if (nextSelected) {
-      setSelectedSOS(nextSelected);
-      return;
-    }
+    const matchesStatus =
+      selectedSOS.rawStatus != null &&
+      selectedSOSStatuses.includes(selectedSOS.rawStatus);
 
-    setSelectedSOS(null);
-    setSOSDetailOpen(false);
-  }, [
-    selectedSOS,
-    selectedSOSPriorityLevels,
-    selectedSOSStatuses,
-    sosRequests,
-  ]);
+    if (!matchesStatus) {
+      setSelectedSOS(null);
+      setSOSDetailOpen(false);
+    }
+  }, [selectedSOS, selectedSOSStatuses]);
+
+  useEffect(() => {
+    setSidebarSOSPage(1);
+  }, [selectedSOSStatuses]);
   const depots = useMemo<DepotEntity[]>(
     () => depotsData?.items ?? [],
     [depotsData],
@@ -644,7 +649,12 @@ const CoordinatorDashboardContent = () => {
       clusterGroupingStatus === "success"
         ? buildAutoClusters(sosRequests, clusters, maximumAutoClusterDistanceKm)
         : [],
-    [clusterGroupingStatus, clusters, maximumAutoClusterDistanceKm, sosRequests],
+    [
+      clusterGroupingStatus,
+      clusters,
+      maximumAutoClusterDistanceKm,
+      sosRequests,
+    ],
   );
 
   useEffect(() => {
@@ -662,7 +672,10 @@ const CoordinatorDashboardContent = () => {
     }
 
     setMapFetchBounds((currentBounds) => {
-      if (currentBounds && isMapBoundsWithinBuffer(visibleBounds, currentBounds)) {
+      if (
+        currentBounds &&
+        isMapBoundsWithinBuffer(visibleBounds, currentBounds)
+      ) {
         return currentBounds;
       }
 
@@ -1097,7 +1110,6 @@ const CoordinatorDashboardContent = () => {
       const total = validClusterGroups.length;
 
       validClusterGroups.forEach((ids) => {
-
         createCluster(
           { sosRequestIds: ids },
           {
@@ -1512,6 +1524,14 @@ const CoordinatorDashboardContent = () => {
           {sidebarOpen && (
             <SOSSidebar
               sosRequests={sosRequests}
+              incomingRequests={sidebarSOSRequests}
+              incomingPagination={{
+                page: sidebarSosData?.pageNumber ?? sidebarSOSPage,
+                pageSize: sidebarSosData?.pageSize ?? SIDEBAR_SOS_PAGE_SIZE,
+                totalCount: sidebarSosData?.totalCount ?? 0,
+                onPageChange: setSidebarSOSPage,
+              }}
+              isIncomingRequestsLoading={isSidebarSosLoading}
               rescuers={rescuers}
               teamIncidents={teamIncidents}
               missions={sidebarMissions}
@@ -1536,8 +1556,6 @@ const CoordinatorDashboardContent = () => {
               onViewMission={handleViewMission}
               selectedStatuses={selectedSOSStatuses}
               onSelectedStatusesChange={setSelectedSOSStatuses}
-              selectedPriorityLevels={selectedSOSPriorityLevels}
-              onSelectedPriorityLevelsChange={setSelectedSOSPriorityLevels}
             />
           )}
         </aside>

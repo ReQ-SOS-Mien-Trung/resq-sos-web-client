@@ -47,6 +47,7 @@ export interface GetSOSClustersParams {
   pageNumber?: number;
   pageSize?: number;
   sosRequestId?: number;
+  statuses?: ClusterLifecycleStatus[];
 }
 
 // POST /emergency/sos-clusters request

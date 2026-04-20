@@ -59,14 +59,17 @@ export interface Location {
 export interface SOSRequest {
   id: string;
   groupId: string;
+  clusterId?: number | null;
   location: Location;
   priority: Priority;
+  rawPriorityLevel?: SOSPriorityLevel | null;
   needs: {
     medical: boolean;
     food: boolean;
     boat: boolean;
   };
   status: SOSStatus;
+  rawStatus?: SOSRequestStatus;
   message: string;
   createdAt: Date;
   receivedAt?: Date | null;
@@ -935,6 +938,14 @@ export interface AssemblyPoint {
 
 export interface SOSSidebarProps {
   sosRequests: SOSRequest[];
+  incomingRequests?: SOSRequest[];
+  incomingPagination?: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    onPageChange: (page: number) => void;
+  };
+  isIncomingRequestsLoading?: boolean;
   rescuers: Rescuer[];
   teamIncidents?: import("@/services/team_incidents/type").TeamIncidentEntity[];
   missions: Mission[];
@@ -973,10 +984,6 @@ export interface SOSSidebarProps {
   onViewMission?: (clusterId: number, missionId: number) => void;
   selectedStatuses?: SOSRequestStatus[];
   onSelectedStatusesChange?: (statuses: SOSRequestStatus[]) => void;
-  selectedPriorityLevels?: SOSPriorityLevel[];
-  onSelectedPriorityLevelsChange?: (
-    priorityLevels: SOSPriorityLevel[],
-  ) => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";

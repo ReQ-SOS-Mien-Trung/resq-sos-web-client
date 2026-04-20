@@ -174,6 +174,8 @@ export interface SOSClusterTableProps {
   isLoading?: boolean;
   isRefetching?: boolean;
   serverPagination?: ServerPaginationProps;
+  statusFilter?: "all" | ClusterLifecycleStatus;
+  onStatusFilterChange?: (value: "all" | ClusterLifecycleStatus) => void;
   expandedClusterIds: Set<number>;
   onToggleCluster: (clusterId: number) => void;
   clusterSOSMap: Map<number, SOSRequestEntity[]>;
@@ -188,6 +190,8 @@ const SOSClusterTable = ({
   isLoading = false,
   isRefetching = false,
   serverPagination,
+  statusFilter = "all",
+  onStatusFilterChange,
   expandedClusterIds,
   onToggleCluster,
   clusterSOSMap,
@@ -197,7 +201,6 @@ const SOSClusterTable = ({
   onViewCompletedClusterPlan,
 }: SOSClusterTableProps) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const isServerMode = Boolean(serverPagination);
   const currentPage = isServerMode ? serverPagination!.page : 1;
@@ -212,12 +215,6 @@ const SOSClusterTable = ({
 
     return [...clusters]
       .filter((cluster) => {
-        const clusterStatus = resolveClusterStatus(cluster);
-
-        if (statusFilter !== "all" && clusterStatus !== statusFilter) {
-          return false;
-        }
-
         if (!normalizedSearch) {
           return true;
         }
@@ -248,9 +245,9 @@ const SOSClusterTable = ({
 
         return Date.parse(right.lastUpdatedAt) - Date.parse(left.lastUpdatedAt);
       });
-  }, [clusters, searchQuery, statusFilter]);
+  }, [clusters, searchQuery]);
 
-  const hasFilters = searchQuery.trim().length > 0 || statusFilter !== "all";
+  const hasLocalFilters = searchQuery.trim().length > 0;
   const displayTotalCount = isServerMode
     ? serverPagination!.totalCount
     : visibleClusters.length;
@@ -287,7 +284,20 @@ const SOSClusterTable = ({
             />
           </div>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select
+            value={statusFilter}
+            onValueChange={(nextValue) => {
+              const normalizedValue: "all" | ClusterLifecycleStatus =
+                nextValue === "Pending" ||
+                nextValue === "Suggested" ||
+                nextValue === "InProgress" ||
+                nextValue === "Completed"
+                  ? nextValue
+                  : "all";
+
+              onStatusFilterChange?.(normalizedValue);
+            }}
+          >
             <SelectTrigger className="h-9 w-52">
               <SelectValue placeholder="Lọc trạng thái cụm" />
             </SelectTrigger>
@@ -305,7 +315,7 @@ const SOSClusterTable = ({
               <ArrowsClockwise className="h-4 w-4 animate-spin" />
             ) : null}
             <span>
-              {hasFilters && isServerMode
+              {hasLocalFilters && isServerMode
                 ? `${visibleClusters.length} / ${displayTotalCount.toLocaleString("vi-VN")} cụm`
                 : `${displayTotalCount.toLocaleString("vi-VN")} cụm`}
             </span>

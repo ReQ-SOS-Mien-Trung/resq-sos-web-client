@@ -57,11 +57,28 @@ type SOSRequestsByIdsQueryData = {
  */
 export function useSOSRequests(options?: UseSOSRequestsOptions) {
   const params = options?.params;
+  const normalizedStatuses = useMemo(
+    () =>
+      Array.from(new Set((params?.Statuses ?? []).filter(Boolean))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [params?.Statuses],
+  );
+  const normalizedPriorityLevels = useMemo(
+    () =>
+      Array.from(new Set((params?.PriorityLevels ?? []).filter(Boolean))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [params?.PriorityLevels],
+  );
+
   return useQuery<GetSOSRequestsResponse>({
     queryKey: [
       ...SOS_REQUESTS_QUERY_KEY,
       params?.pageNumber ?? 1,
       params?.pageSize ?? 10,
+      normalizedStatuses.join(","),
+      normalizedPriorityLevels.join(","),
     ],
     queryFn: () => getSOSRequests(params),
   });

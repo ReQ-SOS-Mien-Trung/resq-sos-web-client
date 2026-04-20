@@ -22,6 +22,11 @@ export async function getSOSRequests(
     params: {
       pageNumber: params?.pageNumber ?? 1,
       pageSize: params?.pageSize ?? 10,
+      Statuses: params?.Statuses,
+      PriorityLevels: params?.PriorityLevels,
+    },
+    paramsSerializer: {
+      indexes: null,
     },
   });
   return data;

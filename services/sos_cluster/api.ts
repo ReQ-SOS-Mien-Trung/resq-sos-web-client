@@ -272,10 +272,19 @@ export async function getSOSClusters(
   const requestedPageNumber = toPositiveInteger(params?.pageNumber);
   const requestedPageSize = toPositiveInteger(params?.pageSize);
   const requestedSOSRequestId = toPositiveInteger(params?.sosRequestId);
+  const requestedStatuses = Array.from(
+    new Set(
+      (params?.statuses ?? [])
+        .filter((status): status is string => typeof status === "string")
+        .map((status) => status.trim())
+        .filter((status) => status.length > 0),
+    ),
+  );
   const shouldUseSinglePageRequest =
     requestedPageNumber != null ||
     requestedPageSize != null ||
-    requestedSOSRequestId != null;
+    requestedSOSRequestId != null ||
+    requestedStatuses.length > 0;
 
   if (shouldUseSinglePageRequest) {
     const pageNumber = requestedPageNumber ?? 1;
@@ -285,7 +294,9 @@ export async function getSOSClusters(
         pageNumber,
         pageSize,
         sosRequestId: requestedSOSRequestId,
+        statuses: requestedStatuses.length > 0 ? requestedStatuses : undefined,
       },
+      paramsSerializer: { indexes: null },
     });
 
     return normalizeSOSClustersPage(

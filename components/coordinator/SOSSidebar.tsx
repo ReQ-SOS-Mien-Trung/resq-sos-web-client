@@ -5,12 +5,7 @@ import { SOSRequest, SOSSidebarProps } from "@/type";
 import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
 import { useRemoveSOSRequestFromCluster } from "@/services/sos_cluster/hooks";
-import { useSOSPriorityLevels } from "@/services/sos_request/hooks";
-import type {
-  SOSPriorityLevel,
-  SOSPriorityLevelOption,
-  SOSRequestStatus,
-} from "@/services/sos_request/type";
+import type { SOSRequestStatus } from "@/services/sos_request/type";
 import {
   PRIORITY_BADGE_VARIANT,
   PRIORITY_BORDER_COLOR,
@@ -22,7 +17,6 @@ import type {
   SOSClusterEntity,
 } from "@/services/sos_cluster/type";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -306,6 +300,10 @@ function getSOSStatusBadgeVariant(
   return "outline";
 }
 
+function canCreateClusterFromSOS(sos: SOSRequest): boolean {
+  return getSOSStatusBucket(sos.status) === "pending" && !sos.clusterId;
+}
+
 const STANDALONE_REQUESTS_PAGE_SIZE = 8;
 const BACKEND_CLUSTERS_PAGE_SIZE = 6;
 const AUTO_CLUSTERS_PAGE_SIZE = 4;
@@ -345,13 +343,6 @@ const SOS_STATUS_FILTER_OPTIONS: Array<{
   { key: "Incident", value: "Có sự cố" },
   { key: "Resolved", value: "Đã xử lý" },
   { key: "Cancelled", value: "Đã hủy" },
-];
-
-const FALLBACK_PRIORITY_FILTER_OPTIONS: SOSPriorityLevelOption[] = [
-  { key: "Critical", value: "Rất Nghiêm trọng" },
-  { key: "High", value: "Nghiêm trọng" },
-  { key: "Medium", value: "Trung bình" },
-  { key: "Low", value: "Thấp" },
 ];
 
 function PaginationControls({
@@ -411,6 +402,9 @@ function PaginationControls({
 
 const SOSSidebar = ({
   sosRequests,
+  incomingRequests,
+  incomingPagination,
+  isIncomingRequestsLoading = false,
   rescuers,
   onSOSSelect,
   selectedSOS,
@@ -429,8 +423,6 @@ const SOSSidebar = ({
   onViewClusterPlan,
   selectedStatuses = [],
   onSelectedStatusesChange,
-  selectedPriorityLevels = [],
-  onSelectedPriorityLevelsChange,
 }: SOSSidebarProps) => {
   const [activeTab, setActiveTab] = useState<SidebarTabValue>("incoming");
   const [manualTabSelectionKey, setManualTabSelectionKey] = useState<
@@ -456,26 +448,12 @@ const SOSSidebar = ({
     useState<ClusterSOSRemoveCandidate | null>(null);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
-  const [priorityFilterOpen, setPriorityFilterOpen] = useState(false);
 
   const {
     mutate: removeSOSRequestFromCluster,
     isPending: isRemovingSOSRequestFromCluster,
   } = useRemoveSOSRequestFromCluster();
-  const {
-    data: priorityLevelMetadata = [],
-    isLoading: isPriorityLevelsLoading,
-  } = useSOSPriorityLevels();
-
-  const priorityFilterOptions = useMemo(
-    () =>
-      priorityLevelMetadata.length > 0
-        ? priorityLevelMetadata
-        : FALLBACK_PRIORITY_FILTER_OPTIONS,
-    [priorityLevelMetadata],
-  );
-  const hasSOSFiltersApplied =
-    selectedStatuses.length > 0 || selectedPriorityLevels.length > 0;
+  const hasSOSFiltersApplied = selectedStatuses.length > 0;
 
   const toggleStatusFilter = (status: SOSRequestStatus) => {
     if (!onSelectedStatusesChange) {
@@ -489,22 +467,10 @@ const SOSSidebar = ({
     );
   };
 
-  const togglePriorityFilter = (priorityLevel: SOSPriorityLevel) => {
-    if (!onSelectedPriorityLevelsChange) {
-      return;
-    }
-
-    onSelectedPriorityLevelsChange(
-      selectedPriorityLevels.includes(priorityLevel)
-        ? selectedPriorityLevels.filter((item) => item !== priorityLevel)
-        : [...selectedPriorityLevels, priorityLevel],
-    );
-  };
-
   const clearSOSFilters = () => {
     onSelectedStatusesChange?.([]);
-    onSelectedPriorityLevelsChange?.([]);
   };
+  const hasIncomingServerPagination = !!incomingPagination;
 
   const openRemoveSOSDialog = (clusterId: number, sos: SOSRequest) => {
     const sosRequestId = toPositiveSOSRequestId(sos.id);
@@ -753,6 +719,21 @@ const SOSSidebar = ({
       startIndex + STANDALONE_REQUESTS_PAGE_SIZE,
     );
   }, [currentStandalonePage, standaloneRequests]);
+  const visibleIncomingRequests = hasIncomingServerPagination
+    ? (incomingRequests ?? [])
+    : paginatedStandaloneRequests;
+  const incomingTotalCount = hasIncomingServerPagination
+    ? (incomingPagination?.totalCount ?? 0)
+    : standaloneRequests.length;
+  const incomingCurrentPage = hasIncomingServerPagination
+    ? (incomingPagination?.page ?? 1)
+    : currentStandalonePage;
+  const incomingPageSize = hasIncomingServerPagination
+    ? (incomingPagination?.pageSize ?? STANDALONE_REQUESTS_PAGE_SIZE)
+    : STANDALONE_REQUESTS_PAGE_SIZE;
+  const incomingSectionTitle = hasIncomingServerPagination
+    ? `Danh sách SOS (${incomingTotalCount})`
+    : `SOS chưa gom cụm (${standaloneRequests.length})`;
 
   const filteredClustersTotalPages = useMemo(
     () =>
@@ -886,9 +867,9 @@ const SOSSidebar = ({
         {/* Incoming SOS Tab */}
         <TabsContent
           value="incoming"
-          className="px-5 m-0 mt-1 flex min-h-0 flex-1 flex-col overflow-hidden"
+          className="m-0 mt-1 flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className="border-b bg-background/80">
+          <div className="border-b bg-background/80 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <Popover
                 open={statusFilterOpen}
@@ -950,68 +931,6 @@ const SOSSidebar = ({
                 </PopoverContent>
               </Popover>
 
-              <Popover
-                open={priorityFilterOpen}
-                onOpenChange={setPriorityFilterOpen}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 gap-1.5 text-[14px] font-normal"
-                  >
-                    Mức ưu tiên
-                    {selectedPriorityLevels.length > 0 ? (
-                      <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
-                        {selectedPriorityLevels.length}
-                      </Badge>
-                    ) : isPriorityLevelsLoading ? (
-                      <Spinner className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                    ) : (
-                      <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-1.5" align="start">
-                  {priorityFilterOptions.map((option) => {
-                    const checked = selectedPriorityLevels.includes(option.key);
-
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => togglePriorityFilter(option.key)}
-                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
-                      >
-                        <span
-                          className={cn(
-                            "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                            checked
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "border-border bg-background text-transparent",
-                          )}
-                        >
-                          <Check className="h-2.5 w-2.5" weight="bold" />
-                        </span>
-                        <span className={checked ? "font-medium" : undefined}>
-                          {option.value}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {selectedPriorityLevels.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => onSelectedPriorityLevelsChange?.([])}
-                      className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <X className="h-3 w-3" />
-                      Xóa lọc mức ưu tiên
-                    </button>
-                  ) : null}
-                </PopoverContent>
-              </Popover>
-
               {hasSOSFiltersApplied ? (
                 <Button
                   variant="ghost"
@@ -1027,25 +946,35 @@ const SOSSidebar = ({
             <p className="mt-2 text-[12px] text-muted-foreground">
               {sosRequests.length} SOS trong vùng bản đồ hiện tại
             </p>
+            {hasIncomingServerPagination ? (
+              <p className="mt-1 text-[12px] text-muted-foreground">
+                {incomingTotalCount} SOS trong danh sách phân trang
+              </p>
+            ) : null}
           </div>
 
-          <ScrollArea className="h-full min-h-0 flex-1">
+          <div className="h-full min-h-0 flex-1 overflow-y-auto">
             <div className="p-3 space-y-3">
-              {standaloneRequests.length > 0 && (
+              {visibleIncomingRequests.length > 0 && (
                 <>
                   <div className="text-[15px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    SOS chưa gom cụm ({standaloneRequests.length})
+                    {incomingSectionTitle}
                   </div>
                   <PaginationControls
-                    page={currentStandalonePage}
-                    totalItems={standaloneRequests.length}
-                    pageSize={STANDALONE_REQUESTS_PAGE_SIZE}
+                    page={incomingCurrentPage}
+                    totalItems={incomingTotalCount}
+                    pageSize={incomingPageSize}
                     onPageChange={(nextPage) => {
+                      if (hasIncomingServerPagination) {
+                        incomingPagination?.onPageChange(nextPage);
+                        return;
+                      }
+
                       setStandalonePage(nextPage);
                       setManualStandalonePageSelectionKey(selectedSOSId);
                     }}
                   />
-                  {paginatedStandaloneRequests.map((sos) => (
+                  {visibleIncomingRequests.map((sos) => (
                     <div
                       key={sos.id}
                       className={cn(
@@ -1074,11 +1003,19 @@ const SOSSidebar = ({
                                 {PRIORITY_LABELS[sos.priority]}
                               </Badge>
                               <Badge
-                                variant="warning"
+                                variant={getSOSStatusBadgeVariant(sos.status)}
                                 className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
                               >
-                                Chờ
+                                {getSOSStatusLabel(sos.status)}
                               </Badge>
+                              {sos.clusterId ? (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[14px] h-6 px-2 leading-none whitespace-nowrap shrink-0"
+                                >
+                                  Cụm #{sos.clusterId}
+                                </Badge>
+                              ) : null}
                             </div>
                           </div>
                           <div className="flex items-center gap-1 text-[14px] text-muted-foreground self-end sm:self-auto whitespace-nowrap">
@@ -1091,35 +1028,45 @@ const SOSSidebar = ({
                         </p>
                       </div>
                       <div className="px-3 py-2 border-t border-inherit space-y-1.5">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="w-full h-9 text-[14px] bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onCreateCluster([sos.id]);
-                          }}
-                          disabled={
-                            processingSosId === sos.id ||
-                            isCreatingCluster ||
-                            isAnalyzingCluster
-                          }
-                        >
-                          {processingSosId === sos.id ? (
-                            <>
-                              <Spinner className="h-3 w-3 mr-1 animate-spin" />
-                              Đang xử lý...
-                            </>
-                          ) : (
-                            <>
-                              <Lightning
-                                className="h-3 w-3 mr-1"
-                                weight="fill"
-                              />
-                              Gom & AI Phân tích
-                            </>
-                          )}
-                        </Button>
+                        {canCreateClusterFromSOS(sos) ? (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="w-full h-9 text-[14px] bg-linear-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onCreateCluster([sos.id]);
+                            }}
+                            disabled={
+                              processingSosId === sos.id ||
+                              isCreatingCluster ||
+                              isAnalyzingCluster
+                            }
+                          >
+                            {processingSosId === sos.id ? (
+                              <>
+                                <Spinner className="h-3 w-3 mr-1 animate-spin" />
+                                Đang xử lý...
+                              </>
+                            ) : (
+                              <>
+                                <Lightning
+                                  className="h-3 w-3 mr-1"
+                                  weight="fill"
+                                />
+                                Gom & AI Phân tích
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          <div className="rounded-lg border border-dashed border-border/60 px-3 py-2 text-[13px] text-muted-foreground">
+                            {sos.clusterId
+                              ? `SOS này đã thuộc cụm #${sos.clusterId}.`
+                              : `SOS đang ở trạng thái ${getSOSStatusLabel(
+                                  sos.status,
+                                ).toLowerCase()}.`}
+                          </div>
+                        )}
                         {onManualMission && (
                           <Button
                             variant="outline"
@@ -1140,20 +1087,31 @@ const SOSSidebar = ({
                 </>
               )}
 
-              {standaloneRequests.length === 0 ? (
+              {visibleIncomingRequests.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
-                  <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-[15px]">
-                    {pendingRequests.length > 0 ||
-                    activeClusters.length > 0 ||
-                    autoClusters.length > 0
-                      ? "Không còn SOS lẻ. Chuyển sang tab Cụm SOS để xử lý theo cụm."
-                      : "Không có yêu cầu SOS nào"}
-                  </p>
+                  {isIncomingRequestsLoading ? (
+                    <>
+                      <Spinner className="h-8 w-8 mx-auto mb-2 animate-spin opacity-70" />
+                      <p className="text-[15px]">Đang tải danh sách SOS...</p>
+                    </>
+                  ) : (
+                    <>
+                      <Pulse className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-[15px]">
+                        {hasIncomingServerPagination
+                          ? "Không có yêu cầu SOS phù hợp với bộ lọc hiện tại."
+                          : pendingRequests.length > 0 ||
+                              activeClusters.length > 0 ||
+                              autoClusters.length > 0
+                            ? "Không còn SOS lẻ. Chuyển sang tab Cụm SOS để xử lý theo cụm."
+                            : "Không có yêu cầu SOS nào"}
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : null}
             </div>
-          </ScrollArea>
+          </div>
         </TabsContent>
 
         {/* SOS Clusters Tab */}
@@ -1161,7 +1119,7 @@ const SOSSidebar = ({
           value="clusters"
           className="m-0 mt-3 flex min-h-0 flex-1 overflow-hidden"
         >
-          <ScrollArea className="h-full min-h-0">
+          <div className="h-full min-h-0 flex-1 overflow-y-auto">
             <div className="p-3 space-y-3">
               {/* Auto-cluster all nearby groups button */}
               {autoClusters.length > 0 && (
@@ -1683,7 +1641,7 @@ const SOSSidebar = ({
                 </div>
               ) : null}
             </div>
-          </ScrollArea>
+          </div>
         </TabsContent>
       </Tabs>
 
