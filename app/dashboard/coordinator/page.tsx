@@ -39,7 +39,7 @@ import type {
 import { useDepots } from "@/services/depot/hooks";
 import { useAssemblyPoints } from "@/services/assembly_points/hooks";
 import { useRescueTeams } from "@/services/rescue_teams/hooks";
-import { useActiveServiceZone } from "@/services/map/hooks";
+import { useAllServiceZones } from "@/services/map/hooks";
 import type { DepotEntity } from "@/services/depot/type";
 import type { AssemblyPointEntity } from "@/services/assembly_points/type";
 import type { ServiceZoneEntity } from "@/services/map/type";
@@ -406,7 +406,6 @@ function mapRescueTeamToRescuer(
   };
 }
 
-const SERVICE_ZONE_MIN_ZOOM = 12;
 const SIDEBAR_SOS_PAGE_SIZE = 8;
 
 // ── Main Dashboard Content ──
@@ -442,9 +441,6 @@ const CoordinatorDashboardContent = () => {
     SOSRequestStatus[]
   >([]);
   const [sidebarSOSPage, setSidebarSOSPage] = useState(1);
-  const [serviceZoneQueryEnabled, setServiceZoneQueryEnabled] = useState(
-    (urlState.view?.zoom ?? 13) >= SERVICE_ZONE_MIN_ZOOM,
-  );
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
@@ -529,8 +525,8 @@ const CoordinatorDashboardContent = () => {
   });
   const { data: clustersData } = useSOSClusters();
   const sosClusterGroupingConfigQuery = useSosClusterGroupingConfig();
-  const { data: activeServiceZonesData } = useActiveServiceZone({
-    enabled: serviceZoneQueryEnabled,
+  const { data: serviceZonesData } = useAllServiceZones({
+    enabled: !isWeatherMode,
     staleTime: 5 * 60_000,
   });
 
@@ -594,8 +590,8 @@ const CoordinatorDashboardContent = () => {
     [clustersData],
   );
   const serviceZones = useMemo<ServiceZoneEntity[]>(
-    () => activeServiceZonesData ?? [],
-    [activeServiceZonesData],
+    () => serviceZonesData ?? [],
+    [serviceZonesData],
   );
   const activeRealtimeDepotId = useMemo(() => {
     if (!locationPanelOpen || locationPanelData?.type !== "depot") {
@@ -665,10 +661,6 @@ const CoordinatorDashboardContent = () => {
     const visibleBounds = mapViewState?.bounds;
     if (!visibleBounds) {
       return;
-    }
-
-    if (mapViewState.zoom >= SERVICE_ZONE_MIN_ZOOM) {
-      setServiceZoneQueryEnabled(true);
     }
 
     setMapFetchBounds((currentBounds) => {

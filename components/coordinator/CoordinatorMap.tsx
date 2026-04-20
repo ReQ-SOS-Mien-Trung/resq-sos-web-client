@@ -39,10 +39,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { PRIORITY_ORDER } from "@/lib/priority";
-import {
-  getServiceZoneDisplayTotal,
-  getServiceZoneLabelPosition,
-} from "@/lib/coordinator-map-utils";
+import { getServiceZoneLabelPosition } from "@/lib/coordinator-map-utils";
 
 // Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
 // and the isMounted guard inside this component.
@@ -53,7 +50,6 @@ import {
   Polygon,
   Popup,
   Polyline,
-  Tooltip as LeafletTooltip,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -338,9 +334,15 @@ const CoordinatorMap = ({
     setCurrentZoom(zoom);
   }, []);
 
-  // Zoom threshold: >= 12 = zoomed in (show individual SOS), < 12 = zoomed out (show clusters)
+  // Zoom thresholds:
+  // - >= 12: detailed view (individual SOS + markers)
+  // - 10-11: intermediate view (cluster-focused)
+  // - < 10: service-zone overview only
   const CLUSTER_ZOOM_THRESHOLD = 12;
+  const SERVICE_ZONE_OVERVIEW_ZOOM_THRESHOLD = 10;
   const isZoomedIn = currentZoom >= CLUSTER_ZOOM_THRESHOLD;
+  const isServiceZoneOverview =
+    currentZoom < SERVICE_ZONE_OVERVIEW_ZOOM_THRESHOLD;
 
   // Build a set of SOS IDs that belong to a backend cluster
   const clusteredSOSIds = useMemo(() => {
@@ -618,8 +620,7 @@ const CoordinatorMap = ({
     () => Object.values(layerFilter).filter(Boolean).length,
     [layerFilter],
   );
-  const showServiceZones =
-    currentZoom >= CLUSTER_ZOOM_THRESHOLD && layerFilter.serviceZones;
+  const showServiceZones = isServiceZoneOverview && layerFilter.serviceZones;
 
   const toggleLayer = useCallback((layer: LayerFilterKey) => {
     setLayerFilter((current) => ({
@@ -1173,7 +1174,8 @@ const CoordinatorMap = ({
           ))}
 
         {/* SOS Request Markers */}
-        {layerFilter.sos &&
+        {!isServiceZoneOverview &&
+          layerFilter.sos &&
           visibleSOSRequests.map((sos) => (
             <SOSRequestMarker
               key={sos.id}
@@ -1184,7 +1186,8 @@ const CoordinatorMap = ({
           ))}
 
         {/* Rescuer Markers */}
-        {layerFilter.rescueTeams &&
+        {!isServiceZoneOverview &&
+          layerFilter.rescueTeams &&
           visibleRescuers.map((rescuer) => (
             <RescuerMarker
               key={rescuer.id}
@@ -1195,7 +1198,8 @@ const CoordinatorMap = ({
           ))}
 
         {/* Team Incident Markers */}
-        {layerFilter.teamIncidents &&
+        {!isServiceZoneOverview &&
+          layerFilter.teamIncidents &&
           validTeamIncidents.map((incident) => (
             <TeamIncidentMarker
               key={incident.incidentId}
@@ -1208,7 +1212,8 @@ const CoordinatorMap = ({
           ))}
 
         {/* Depot Markers */}
-        {layerFilter.depots &&
+        {!isServiceZoneOverview &&
+          layerFilter.depots &&
           depots.map((depot) => (
             <DepotMarker
               key={depot.id}
@@ -1224,11 +1229,11 @@ const CoordinatorMap = ({
           ))}
 
         {/* Assembly Point Markers */}
-        {layerFilter.assemblyPoints &&
+        {!isServiceZoneOverview &&
+          layerFilter.assemblyPoints &&
           assemblyPoints.map((point) => (
             <AssemblyPointMarker
               key={point.id}
-              assemblyPoint={point}
               position={
                 markerDisplayPositions.assemblyPointPositions.get(point.id) ?? [
                   point.latitude,
@@ -1241,6 +1246,7 @@ const CoordinatorMap = ({
 
         {/* Auto-Cluster Markers (client-side suggested clusters) */}
         {layerFilter.clusters &&
+          !isServiceZoneOverview &&
           !isZoomedIn &&
           autoClusters.map((group, idx) => (
             <AutoClusterMarker
@@ -1265,6 +1271,7 @@ const CoordinatorMap = ({
 
         {/* Cluster Markers */}
         {layerFilter.clusters &&
+          !isServiceZoneOverview &&
           visibleClusters.map((cluster) => (
             <ClusterMarker
               key={`cluster-${cluster.id}-${cluster._isMerged}`}
@@ -1290,7 +1297,9 @@ const CoordinatorMap = ({
           ))}
 
         {/* User Location Marker */}
-        {userLocation && <UserLocationMarker location={userLocation} />}
+        {!isServiceZoneOverview && userLocation && (
+          <UserLocationMarker location={userLocation} />
+        )}
 
         {/* Mission Route Polyline */}
         {routePoints.length > 1 && (
@@ -1383,10 +1392,7 @@ function ServiceZoneOverlay({ zone }: { zone: ServiceZoneEntity }) {
     () => getServiceZoneLabelPosition(zone),
     [zone],
   );
-  const total = useMemo(
-    () => getServiceZoneDisplayTotal(zone.counts),
-    [zone.counts],
-  );
+  const pendingSosCount = Number(zone.counts.pendingSosRequestCount ?? 0);
 
   const icon = useMemo(() => {
     if (typeof window === "undefined" || !labelPosition) return undefined;
@@ -1399,14 +1405,14 @@ function ServiceZoneOverlay({ zone }: { zone: ServiceZoneEntity }) {
         <div style="display:flex;align-items:center;justify-content:center;min-width:54px;padding:0 10px;height:34px;border-radius:9999px;background:rgba(14,116,144,0.92);border:2px solid rgba(255,255,255,0.96);box-shadow:0 6px 18px rgba(8,47,73,0.28);color:white;">
           <div style="display:flex;flex-direction:column;align-items:center;line-height:1;">
             <span style="font-size:10px;font-weight:700;opacity:0.9;text-transform:uppercase;letter-spacing:0.03em;">Zone</span>
-            <span style="font-size:14px;font-weight:800;margin-top:2px;">${total}</span>
+            <span style="font-size:14px;font-weight:800;margin-top:2px;">${pendingSosCount}</span>
           </div>
         </div>
       `,
       iconSize: [54, 34],
       iconAnchor: [27, 17],
     });
-  }, [labelPosition, total]);
+  }, [labelPosition, pendingSosCount]);
 
   if (positions.length < 3) {
     return null;
@@ -1424,22 +1430,13 @@ function ServiceZoneOverlay({ zone }: { zone: ServiceZoneEntity }) {
           fillOpacity: 0.14,
         }}
       >
-        <LeafletTooltip sticky direction="top" offset={[0, -8]}>
-          <div className="space-y-1 text-xs">
-            <p className="font-semibold">{zone.name}</p>
-            <p>Tổng hiển thị: {total}</p>
-            <p>Pending SOS: {zone.counts.pendingSosRequestCount}</p>
-            <p>Incident SOS: {zone.counts.incidentSosRequestCount}</p>
-            <p>Sự cố đội: {zone.counts.teamIncidentCount}</p>
-            <p>Điểm tập kết: {zone.counts.assemblyPointCount}</p>
-            <p>Kho: {zone.counts.depotCount}</p>
-          </div>
-        </LeafletTooltip>
         <Popup>
           <div className="space-y-2 text-sm">
             <div>
               <p className="font-semibold">{zone.name}</p>
-              <p className="text-muted-foreground">Tổng hiển thị: {total}</p>
+              <p className="text-muted-foreground">
+                SOS chờ xử lý: {pendingSosCount}
+              </p>
             </div>
             <div className="space-y-1 text-muted-foreground">
               <p>Pending SOS: {zone.counts.pendingSosRequestCount}</p>
@@ -1454,22 +1451,13 @@ function ServiceZoneOverlay({ zone }: { zone: ServiceZoneEntity }) {
 
       {labelPosition && icon ? (
         <Marker position={labelPosition} icon={icon} zIndexOffset={700}>
-          <LeafletTooltip direction="top" offset={[0, -16]}>
-            <div className="space-y-1 text-xs">
-              <p className="font-semibold">{zone.name}</p>
-              <p>Tổng hiển thị: {total}</p>
-              <p>Pending SOS: {zone.counts.pendingSosRequestCount}</p>
-              <p>Incident SOS: {zone.counts.incidentSosRequestCount}</p>
-              <p>Sự cố đội: {zone.counts.teamIncidentCount}</p>
-              <p>Điểm tập kết: {zone.counts.assemblyPointCount}</p>
-              <p>Kho: {zone.counts.depotCount}</p>
-            </div>
-          </LeafletTooltip>
           <Popup>
             <div className="space-y-2 text-sm">
               <div>
                 <p className="font-semibold">{zone.name}</p>
-                <p className="text-muted-foreground">Tổng hiển thị: {total}</p>
+                <p className="text-muted-foreground">
+                  SOS chờ xử lý: {pendingSosCount}
+                </p>
               </div>
               <div className="space-y-1 text-muted-foreground">
                 <p>Pending SOS: {zone.counts.pendingSosRequestCount}</p>
