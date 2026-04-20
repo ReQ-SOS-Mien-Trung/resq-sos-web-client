@@ -655,12 +655,6 @@ const SOSClusterTable = ({
           </table>
         </div>
 
-        <p className="mt-3 text-sm text-muted-foreground">
-          <WarningCircle className="mr-1 inline h-4 w-4" />
-          Bấm vào cụm để mở danh sách SOS bên trong. Với cụm đã hoàn thành, dùng
-          nút Xem nhiệm vụ để mở kế hoạch ở chế độ chỉ xem.
-        </p>
-
         {isServerMode ? (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-4">
             <div className="flex items-center gap-3">

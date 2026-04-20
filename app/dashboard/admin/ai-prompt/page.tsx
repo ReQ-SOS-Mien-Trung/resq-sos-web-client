@@ -50,6 +50,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { AI_PROVIDER_OPTIONS, PROMPT_TYPE_OPTIONS } from "@/lib/constants";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { cn } from "@/lib/utils";
@@ -1180,9 +1186,53 @@ const AIPromptPage = () => {
       <div className="animate-in slide-in-from-bottom-4 space-y-6 duration-500">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Cấu hình mẫu lệnh AI
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-foreground">
+                Cấu hình mẫu lệnh AI
+              </h1>
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Xem hướng dẫn nhanh cấu hình mẫu lệnh AI"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-orange-300 bg-orange-50 text-sm font-bold leading-none text-orange-700 transition-colors hover:border-orange-400 hover:bg-orange-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
+                    >
+                      !
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="right"
+                    sideOffset={8}
+                    className="max-w-md space-y-2 text-sm leading-relaxed"
+                  >
+                    <p className="font-semibold text-foreground">
+                      Hướng dẫn nhanh cấu hình AI
+                    </p>
+                    <p>
+                      1) Chọn một phiên bản trong danh sách bên dưới để dùng cho
+                      chạy thử mẫu lệnh.
+                    </p>
+                    <p>
+                      2) Muốn chỉnh sửa: bấm{" "}
+                      <strong>Tạo bản nháp để chỉnh sửa</strong>, sau đó{" "}
+                      <strong>Mở bản nháp</strong> để cập nhật model, nhiệt độ,
+                      token hoặc API.
+                    </p>
+                    <p>
+                      3) Hoàn tất thì bấm <strong>Kích hoạt bản đã chọn</strong>
+                      để chạy thật. Nếu có lỗi, bấm{" "}
+                      <strong>Khôi phục bản đã chọn</strong>
+                      để quay về bản ổn định.
+                    </p>
+                    <p>
+                      4) Chỉ <strong>bản nháp</strong> mới xóa trực tiếp được
+                      bằng nút <strong>Xóa bản nháp</strong>.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <p className="mt-1 text-base text-muted-foreground">
               Đồng bộ vòng đời mẫu lệnh với phiên bản cấu hình AI trên máy chủ.
             </p>
@@ -1288,101 +1338,6 @@ const AIPromptPage = () => {
           </CardHeader>
 
           <CardContent className="space-y-4 pt-0">
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-              <p className="text-sm font-semibold text-foreground">
-                Cách dùng nhanh
-              </p>
-              <div className="mt-3 grid gap-3 lg:grid-cols-3">
-                <div className="rounded-lg border border-border/60 bg-background px-3 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-                    Bước 1
-                  </p>
-                  <p className="mt-1 text-sm text-foreground">
-                    Chọn một phiên bản cấu hình AI ở danh sách bên dưới để xem
-                    lại và dùng phiên bản đó khi chạy thử mẫu lệnh.
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/60 bg-background px-3 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-                    Bước 2
-                  </p>
-                  <p className="mt-1 text-sm text-foreground">
-                    Muốn chỉnh sửa thì tạo bản nháp. Chỉ bản nháp mới sửa hoặc
-                    xóa trực tiếp được.
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/60 bg-background px-3 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-                    Bước 3
-                  </p>
-                  <p className="mt-1 text-sm text-foreground">
-                    Kích hoạt để chạy thật. Khôi phục để quay về phiên bản cũ
-                    khi phiên bản mới có vấn đề.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
-                <p className="text-sm text-muted-foreground">
-                  Đang chọn để chạy thử mẫu lệnh
-                </p>
-                <p className="mt-1 text-sm font-semibold text-foreground">
-                  {selectedAiConfig?.name ?? "Chưa có cấu hình"}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {selectedAiConfig
-                    ? `${getStatusLabel(selectedAiConfig.status)} • ${selectedAiConfig.version || "—"}`
-                    : "—"}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
-                <p className="text-sm text-muted-foreground">
-                  Đang chạy trên hệ thống
-                </p>
-                <p className="mt-1 text-sm font-semibold text-foreground">
-                  {activeAiConfig?.name ?? "Chưa có bản đang chạy"}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {activeAiConfig
-                    ? `${activeAiConfig.version || "—"} • ${activeAiConfig.provider} • ${activeAiConfig.model}`
-                    : "Các mẫu lệnh chưa có cấu hình để vận hành thực tế."}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
-                <p className="text-sm text-muted-foreground">
-                  Mô hình của bản đang chọn
-                </p>
-                <p className="mt-1 break-all text-sm font-semibold text-foreground">
-                  {selectedAiConfig
-                    ? `${selectedAiConfig.provider} • ${selectedAiConfig.model}`
-                    : "—"}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Nhiệt độ {selectedAiConfig?.temperature ?? "—"} • Số token tối
-                  đa {selectedAiConfig?.maxTokens?.toLocaleString() ?? "—"}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border/70 bg-background px-3 py-2.5">
-                <p className="text-sm text-muted-foreground">
-                  Địa chỉ API / Khóa API
-                </p>
-                <p className="mt-1 break-all text-sm font-semibold text-foreground">
-                  {selectedAiConfig?.apiUrl ||
-                    "Dùng điểm cuối mặc định của máy chủ"}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-foreground">
-                  {selectedAiConfig?.hasApiKey
-                    ? selectedAiConfig.apiKeyMasked || "Đã cấu hình"
-                    : "Chưa cấu hình"}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Cập nhật: {formatDate(selectedAiConfig?.updatedAt ?? null)}
-                </p>
-              </div>
-            </div>
-
             {aiConfigVersions.length > 0 ? (
               <div className="space-y-3">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -1412,9 +1367,14 @@ const AIPromptPage = () => {
                           <p className="font-semibold text-foreground">
                             {config.name}
                           </p>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {config.provider} • {config.model}
-                          </p>
+                          <div className="mt-2 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2">
+                            <p className="text-sm font-semibold text-primary">
+                              Model AI
+                            </p>
+                            <p className="mt-1 break-all text-base font-semibold text-foreground">
+                              {config.provider} • {config.model}
+                            </p>
+                          </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <Badge
@@ -1435,7 +1395,9 @@ const AIPromptPage = () => {
                         <span>Phiên bản: {config.version || "—"}</span>
                         <span>
                           Khóa API:{" "}
-                          {config.hasApiKey ? "Đã cấu hình" : "Chưa cấu hình"}
+                          {config.hasApiKey
+                            ? config.apiKeyMasked || "Đã cấu hình"
+                            : "Chưa cấu hình"}
                         </span>
                         <span>Cập nhật: {formatDate(config.updatedAt)}</span>
                       </div>

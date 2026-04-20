@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
+  AdminMissionSheet,
   SOSClusterTable,
   SOSRequestStats,
 } from "@/components/admin/sos-requests";
 import SOSDetailsPanel from "@/components/coordinator/SOSDetailsPanel";
-import RescuePlanPanel from "@/components/coordinator/RescuePlanPanel";
 import { useSOSRequestsByIds } from "@/services/sos_request/hooks";
 import { useSOSClusters } from "@/services/sos_cluster/hooks";
 import type { SOSRequestEntity } from "@/services/sos_request/type";
@@ -81,16 +81,12 @@ const SOSRequestsPage = () => {
   const requestedClusterIds = useMemo(() => {
     const next = new Set<number>(expandedClusterIds);
 
-    if (rescuePlanOpen && selectedPlanClusterId != null) {
-      next.add(selectedPlanClusterId);
-    }
-
     if (selectedSOS?.clusterId != null) {
       next.add(selectedSOS.clusterId);
     }
 
     return next;
-  }, [expandedClusterIds, rescuePlanOpen, selectedPlanClusterId, selectedSOS]);
+  }, [expandedClusterIds, selectedSOS]);
 
   const requestedSOSIds = useMemo(() => {
     const ids = new Set<number>();
@@ -221,26 +217,6 @@ const SOSRequestsPage = () => {
     [loadedSOSItems],
   );
 
-  const selectedPlanCluster = useMemo(
-    () =>
-      selectedPlanClusterId == null
-        ? null
-        : (clusters.find((cluster) => cluster.id === selectedPlanClusterId) ??
-          null),
-    [clusters, selectedPlanClusterId],
-  );
-
-  const rescuePlanClusterSOSRequests = useMemo(() => {
-    if (!selectedPlanCluster) {
-      return [];
-    }
-
-    return selectedPlanCluster.sosRequestIds
-      .map((sosId) => loadedSOSById.get(sosId))
-      .filter((item): item is SOSRequestEntity => item != null)
-      .map(mapSOSRequestEntityToSOS);
-  }, [selectedPlanCluster, loadedSOSById]);
-
   const handleToggleCluster = (clusterId: number) => {
     setExpandedClusterIds((previous) => {
       const next = new Set(previous);
@@ -259,6 +235,14 @@ const SOSRequestsPage = () => {
     setSelectedSOS(null);
     setSelectedPlanClusterId(clusterId);
     setRescuePlanOpen(true);
+  };
+
+  const handleMissionSheetOpenChange = (open: boolean) => {
+    setRescuePlanOpen(open);
+
+    if (!open) {
+      setSelectedPlanClusterId(null);
+    }
   };
 
   return (
@@ -343,21 +327,10 @@ const SOSRequestsPage = () => {
           hideProcessAction
         />
 
-        <RescuePlanPanel
+        <AdminMissionSheet
           open={rescuePlanOpen}
-          onOpenChange={setRescuePlanOpen}
-          clusterSOSRequests={rescuePlanClusterSOSRequests}
+          onOpenChange={handleMissionSheetOpenChange}
           clusterId={selectedPlanClusterId}
-          rescueSuggestion={null}
-          onApprove={() => {
-            setRescuePlanOpen(false);
-          }}
-          onReAnalyze={() => {
-            // Admin view is read-only for completed mission plans.
-          }}
-          isReAnalyzing={false}
-          defaultTab="missions"
-          readOnly
         />
       </div>
     </DashboardLayout>

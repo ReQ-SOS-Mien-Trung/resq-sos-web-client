@@ -47,7 +47,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -96,6 +95,7 @@ import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
 import { mapSOSRequestEntityToSOS } from "@/lib/sos-request-mapper";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
+import { useSosClusterGroupingConfig } from "@/services/config/hooks";
 
 // ── Lazy-loaded map components ──
 
@@ -143,59 +143,196 @@ function haversine(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/** Group nearby PENDING SOS requests within 10km using Union-Find */
+const AUTO_CLUSTER_MAX_SIZE = 3;
+const AUTO_CLUSTER_RADIUS_STEP_KM = 1;
+const SOS_PRIORITY_ORDER: Record<SOSRequest["priority"], number> = {
+  P1: 0,
+  P2: 1,
+  P3: 2,
+  P4: 3,
+};
+
+function getSortTime(value: Date): number {
+  const timestamp = value.getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function compareSOSIds(leftId: string, rightId: string): number {
+  const leftNumber = Number(leftId);
+  const rightNumber = Number(rightId);
+
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+    return leftNumber - rightNumber;
+  }
+
+  return leftId.localeCompare(rightId);
+}
+
+function compareSOSSeeds(left: SOSRequest, right: SOSRequest): number {
+  const priorityDelta =
+    SOS_PRIORITY_ORDER[left.priority] - SOS_PRIORITY_ORDER[right.priority];
+
+  if (priorityDelta !== 0) {
+    return priorityDelta;
+  }
+
+  const createdAtDelta =
+    getSortTime(left.createdAt) - getSortTime(right.createdAt);
+  if (createdAtDelta !== 0) {
+    return createdAtDelta;
+  }
+
+  return compareSOSIds(left.id, right.id);
+}
+
+function buildRadiusScanSteps(maximumDistanceKm: number): number[] {
+  if (!Number.isFinite(maximumDistanceKm) || maximumDistanceKm <= 0) {
+    return [];
+  }
+
+  const normalizedMaximumDistanceKm = Math.max(maximumDistanceKm, 0);
+  const steps: number[] = [];
+  const wholeKilometers = Math.floor(normalizedMaximumDistanceKm);
+
+  for (
+    let kilometer = AUTO_CLUSTER_RADIUS_STEP_KM;
+    kilometer <= wholeKilometers;
+    kilometer += AUTO_CLUSTER_RADIUS_STEP_KM
+  ) {
+    steps.push(kilometer);
+  }
+
+  if (
+    steps.length === 0 ||
+    steps[steps.length - 1] < normalizedMaximumDistanceKm
+  ) {
+    steps.push(normalizedMaximumDistanceKm);
+  }
+
+  return steps;
+}
+
+type AutoClusterCandidate = {
+  request: SOSRequest;
+  distanceKm: number;
+};
+
+function compareAutoClusterCandidates(
+  left: AutoClusterCandidate,
+  right: AutoClusterCandidate,
+): number {
+  const distanceDelta = left.distanceKm - right.distanceKm;
+  if (distanceDelta !== 0) {
+    return distanceDelta;
+  }
+
+  const priorityDelta =
+    SOS_PRIORITY_ORDER[left.request.priority] -
+    SOS_PRIORITY_ORDER[right.request.priority];
+  if (priorityDelta !== 0) {
+    return priorityDelta;
+  }
+
+  const createdAtDelta =
+    getSortTime(left.request.createdAt) - getSortTime(right.request.createdAt);
+  if (createdAtDelta !== 0) {
+    return createdAtDelta;
+  }
+
+  return compareSOSIds(left.request.id, right.request.id);
+}
+
+/** Build client-side auto-clusters using config-driven incremental radius scans. */
 function buildAutoClusters(
   sosRequests: SOSRequest[],
   backendClusters: SOSClusterEntity[],
+  maximumDistanceKm: number,
 ): SOSRequest[][] {
+  if (!Number.isFinite(maximumDistanceKm) || maximumDistanceKm <= 0) {
+    return [];
+  }
+
   const backendClusteredIds = new Set(
     backendClusters.flatMap((cluster) =>
       cluster.sosRequestIds.map((id) => String(id)),
     ),
   );
-  const pending = sosRequests.filter(
-    (s) =>
-      s.status === "PENDING" &&
-      s.groupId === s.id &&
-      !backendClusteredIds.has(String(s.id)),
-  );
-  const n = pending.length;
-  if (n < 2) return [];
 
-  const parent = Array.from({ length: n }, (_, i) => i);
-  const find = (x: number): number =>
-    parent[x] === x ? x : (parent[x] = find(parent[x]));
-  const union = (a: number, b: number) => {
-    parent[find(a)] = find(b);
-  };
+  const pending = sosRequests
+    .filter(
+      (s) =>
+        s.status === "PENDING" &&
+        s.groupId === s.id &&
+        !backendClusteredIds.has(String(s.id)) &&
+        Number.isFinite(s.location.lat) &&
+        Number.isFinite(s.location.lng),
+    )
+    .sort(compareSOSSeeds);
 
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const d = haversine(
-        pending[i].location.lat,
-        pending[i].location.lng,
-        pending[j].location.lat,
-        pending[j].location.lng,
-      );
-      if (d <= 10) union(i, j);
+  if (pending.length < 2) return [];
+
+  const radiusSteps = buildRadiusScanSteps(maximumDistanceKm);
+  if (radiusSteps.length === 0) return [];
+
+  const clusteredIds = new Set<string>();
+  const clusters: SOSRequest[][] = [];
+
+  for (const seed of pending) {
+    if (clusteredIds.has(seed.id)) {
+      continue;
     }
+
+    let selectedNeighbors: AutoClusterCandidate[] = [];
+    let hasFoundNeighbor = false;
+
+    for (const radiusKm of radiusSteps) {
+      const neighborsWithinRadius = pending
+        .filter(
+          (candidate) =>
+            candidate.id !== seed.id && !clusteredIds.has(candidate.id),
+        )
+        .map((candidate) => ({
+          request: candidate,
+          distanceKm: haversine(
+            seed.location.lat,
+            seed.location.lng,
+            candidate.location.lat,
+            candidate.location.lng,
+          ),
+        }))
+        .filter((candidate) => candidate.distanceKm <= radiusKm)
+        .sort(compareAutoClusterCandidates)
+        .slice(0, AUTO_CLUSTER_MAX_SIZE - 1);
+
+      if (neighborsWithinRadius.length > 0) {
+        hasFoundNeighbor = true;
+        selectedNeighbors = neighborsWithinRadius;
+      }
+
+      if (
+        hasFoundNeighbor &&
+        selectedNeighbors.length >= AUTO_CLUSTER_MAX_SIZE - 1
+      ) {
+        break;
+      }
+    }
+
+    if (!hasFoundNeighbor) {
+      continue;
+    }
+
+    const cluster = [
+      seed,
+      ...selectedNeighbors.map((candidate) => candidate.request),
+    ];
+
+    cluster.forEach((request) => {
+      clusteredIds.add(request.id);
+    });
+    clusters.push(cluster);
   }
 
-  const groups = new Map<number, SOSRequest[]>();
-  for (let i = 0; i < n; i++) {
-    const root = find(i);
-    if (!groups.has(root)) groups.set(root, []);
-    groups.get(root)!.push(pending[i]);
-  }
-
-  const priorityOrder = { P1: 0, P2: 1, P3: 2, P4: 3 };
-  return Array.from(groups.values())
-    .filter((g) => g.length >= 2)
-    .sort(
-      (a, b) =>
-        Math.min(...a.map((s) => priorityOrder[s.priority])) -
-        Math.min(...b.map((s) => priorityOrder[s.priority])),
-    );
+  return clusters;
 }
 
 /** Get SOS requests belonging to a specific cluster */
@@ -351,6 +488,7 @@ const CoordinatorDashboardContent = () => {
     params: { pageSize: 200 },
   });
   const { data: clustersData } = useSOSClusters();
+  const sosClusterGroupingConfigQuery = useSosClusterGroupingConfig();
 
   const sosRequests = useMemo(
     () => sosData?.items?.map(mapSOSRequestEntityToSOS) ?? [],
@@ -427,10 +565,16 @@ const CoordinatorDashboardContent = () => {
       : isReconnecting
         ? "Đang kết nối lại"
         : "Mất kết nối";
+  const clusterGroupingStatus = sosClusterGroupingConfigQuery.status;
+  const maximumAutoClusterDistanceKm =
+    sosClusterGroupingConfigQuery.data?.maximumDistanceKm ?? 0;
 
   const autoClusters = useMemo(
-    () => buildAutoClusters(sosRequests, clusters),
-    [sosRequests, clusters],
+    () =>
+      clusterGroupingStatus === "success"
+        ? buildAutoClusters(sosRequests, clusters, maximumAutoClusterDistanceKm)
+        : [],
+    [clusterGroupingStatus, clusters, maximumAutoClusterDistanceKm, sosRequests],
   );
 
   // ─── Auth ───

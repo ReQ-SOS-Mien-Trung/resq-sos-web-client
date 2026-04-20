@@ -816,7 +816,7 @@ export interface SOSDetailsPanelProps {
   sosRequest: SOSRequest | null;
   onProcessSOS: (sosIds: string[]) => void;
   isProcessing?: boolean;
-  /** SOS requests in the same auto-cluster (within 1 km) */
+  /** SOS requests in the same config-driven auto-cluster suggestion */
   nearbySOSRequests: SOSRequest[];
   allSOSRequests: SOSRequest[];
   /** Hide footer processing CTA when this panel is used in read-only flows */
@@ -871,7 +871,7 @@ export interface CoordinatorMapProps {
   assemblyPoints?: import("@/services/assembly_points/type").AssemblyPointEntity[];
   // SOS Clusters from backend
   clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
-  /** Client-side auto-clusters (groups of nearby PENDING SOS) */
+  /** Client-side auto-clusters for nearby PENDING SOS, capped at 3 SOS each */
   autoClusters?: SOSRequest[][];
   selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
@@ -934,7 +934,7 @@ export interface SOSSidebarProps {
   selectedTeamIncident?:
     | import("@/services/team_incidents/type").TeamIncidentEntity
     | null;
-  /** Auto-detected clusters of nearby PENDING SOS requests (within 10 km) */
+  /** Config-driven auto-clusters of nearby PENDING SOS requests, max 3 SOS each */
   autoClusters: SOSRequest[][];
   onCreateCluster: (sosIds: string[]) => void;
   onClusterOnly: (clusterGroups: SOSRequest[][]) => void;

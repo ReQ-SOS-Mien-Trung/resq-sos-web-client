@@ -363,6 +363,19 @@ export async function createSOSCluster(
 }
 
 /**
+ * Remove a SOS request from a cluster
+ * DELETE /emergency/sos-clusters/{clusterId}/sos-requests/{sosRequestId}
+ */
+export async function removeSOSRequestFromCluster(
+  clusterId: number,
+  sosRequestId: number,
+): Promise<void> {
+  await api.delete(
+    `/emergency/sos-clusters/${clusterId}/sos-requests/${sosRequestId}`,
+  );
+}
+
+/**
  * Get mission suggestions for a SOS cluster
  * GET /emergency/sos-clusters/{clusterId}/mission-suggestions
  */

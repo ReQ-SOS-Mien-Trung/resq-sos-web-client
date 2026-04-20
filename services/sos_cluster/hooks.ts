@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSOSClusters,
   createSOSCluster,
+  removeSOSRequestFromCluster,
   getMissionSuggestions,
   getAlternativeDepots,
   getClusterRescueSuggestion,
@@ -17,6 +18,7 @@ import {
   ClusterRescueSuggestionResponse,
   AlternativeDepotsResponse,
 } from "./type";
+import { SOS_REQUESTS_QUERY_KEY } from "@/services/sos_request/hooks";
 
 export const SOS_CLUSTERS_QUERY_KEY = ["sos-clusters"] as const;
 export const MISSION_SUGGESTIONS_QUERY_KEY = ["mission-suggestions"] as const;
@@ -56,6 +58,22 @@ export function useSOSClusters(options?: UseSOSClustersOptions) {
 export function useCreateSOSCluster() {
   return useMutation<CreateSOSClusterResponse, Error, CreateSOSClusterRequest>({
     mutationFn: createSOSCluster,
+  });
+}
+
+/**
+ * Hook to remove a SOS request from an existing cluster (mutation)
+ */
+export function useRemoveSOSRequestFromCluster() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, { clusterId: number; sosRequestId: number }>({
+    mutationFn: ({ clusterId, sosRequestId }) =>
+      removeSOSRequestFromCluster(clusterId, sosRequestId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SOS_CLUSTERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: SOS_REQUESTS_QUERY_KEY });
+    },
   });
 }
 

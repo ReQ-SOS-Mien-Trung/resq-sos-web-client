@@ -556,14 +556,69 @@ function trimToNull(value?: string | null): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function getMissionSuggestionPhasePriority(phase?: string | null): number {
+  const normalized = (phase ?? "").trim().toLowerCase();
+
+  if (normalized === "validated") {
+    return 0;
+  }
+
+  if (normalized === "draft") {
+    return 1;
+  }
+
+  return 2;
+}
+
+function pickPreferredMissionSuggestionActivityGroup(
+  suggestion: MissionSuggestionEntity,
+): MissionSuggestionEntity["activities"][number] | null {
+  const nonEmptyGroups = suggestion.activities.filter(
+    (activityGroup) =>
+      Array.isArray(activityGroup.suggestedActivities) &&
+      activityGroup.suggestedActivities.length > 0,
+  );
+
+  if (nonEmptyGroups.length === 0) {
+    return null;
+  }
+
+  const rankedGroups = [...nonEmptyGroups].sort((left, right) => {
+    const phasePriorityDelta =
+      getMissionSuggestionPhasePriority(left.suggestionPhase) -
+      getMissionSuggestionPhasePriority(right.suggestionPhase);
+
+    if (phasePriorityDelta !== 0) {
+      return phasePriorityDelta;
+    }
+
+    const leftCreatedAt = Date.parse(left.createdAt ?? "");
+    const rightCreatedAt = Date.parse(right.createdAt ?? "");
+    const hasLeftCreatedAt = Number.isFinite(leftCreatedAt);
+    const hasRightCreatedAt = Number.isFinite(rightCreatedAt);
+
+    if (hasLeftCreatedAt && hasRightCreatedAt && leftCreatedAt !== rightCreatedAt) {
+      return rightCreatedAt - leftCreatedAt;
+    }
+
+    if (hasLeftCreatedAt !== hasRightCreatedAt) {
+      return hasLeftCreatedAt ? -1 : 1;
+    }
+
+    return right.id - left.id;
+  });
+
+  return rankedGroups[0] ?? null;
+}
+
 function flattenMissionSuggestionActivities(
   suggestion: MissionSuggestionEntity,
 ): ClusterSuggestedActivity[] {
-  return suggestion.activities.flatMap((activityGroup) =>
-    Array.isArray(activityGroup.suggestedActivities)
-      ? activityGroup.suggestedActivities
-      : [],
-  );
+  const preferredGroup = pickPreferredMissionSuggestionActivityGroup(suggestion);
+
+  return Array.isArray(preferredGroup?.suggestedActivities)
+    ? preferredGroup.suggestedActivities
+    : [];
 }
 
 function hasRenderableMissionSuggestion(
@@ -6892,9 +6947,21 @@ const RescuePlanPanel = ({
         );
 
         if (!collectorActivity || collectorTeamId == null) {
+          const hasAutoAssignedCollectorReason =
+            typeof activity.suggestedTeam?.reason === "string" &&
+            activity.suggestedTeam.reason.startsWith(
+              "Tự động gán theo đội thu gom Vật phẩm ở Bước ",
+            );
+          const nextSuggestedTeam = hasAutoAssignedCollectorReason
+            ? null
+            : activity.suggestedTeam ?? null;
+
           if (
-            activity.suggestedTeam == null &&
-            haveMatchingSupplyCollections(currentSupplies, null)
+            nextSuggestedTeam === activity.suggestedTeam &&
+            haveMatchingSupplyCollections(
+              currentSupplies,
+              activity.suppliesToCollect,
+            )
           ) {
             nextActivities.push(activity);
             continue;
@@ -6902,8 +6969,8 @@ const RescuePlanPanel = ({
 
           nextActivities.push({
             ...activity,
-            suggestedTeam: null,
-            suppliesToCollect: null,
+            suggestedTeam: nextSuggestedTeam,
+            suppliesToCollect: currentSupplies,
           });
           continue;
         }

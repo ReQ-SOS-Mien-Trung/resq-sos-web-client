@@ -516,18 +516,6 @@ export const navigationItems = [
         label: "Cấu hình AI Prompt",
         href: "/dashboard/admin/ai-prompt",
       },
-      {
-        icon: ({ className }: { size?: number; className?: string }) => (
-          <IconifyIcon
-            icon="proicons:chat"
-            width={20}
-            height={20}
-            className={className}
-          />
-        ),
-        label: "Cấu hình phòng chat",
-        href: "/dashboard/admin/chat-config",
-      },
     ],
   },
   {

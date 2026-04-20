@@ -200,7 +200,7 @@ function MemberCard({
   const rescuerTypeBadge =
     member.rescuerType === "Core"
       ? {
-          label: "Nhân viên cố định",
+          label: "Nhân viên nòng cốt",
           className: "border-sky-500 bg-sky-100 text-sky-900",
         }
       : {
