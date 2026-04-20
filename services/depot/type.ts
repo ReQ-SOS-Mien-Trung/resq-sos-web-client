@@ -9,7 +9,7 @@ export type DepotStatus =
   | "Closing"
   | "UnderMaintenance";
 
-export type ChangeableDepotStatus = "Available" | "Unavailable" | "Closing";
+export type ChangeableDepotStatus = "Available" | "Unavailable";
 
 // Depot Status Metadata (from /logistics/depot/metadata/depot-statuses)
 export interface DepotStatusMetadata {
@@ -170,6 +170,17 @@ export interface UpdateDepotStatusRequest {
 export interface UpdateDepotStatusResponse {
   id: number;
   status: ChangeableDepotStatus;
+  message: string;
+}
+
+export interface InitiateDepotClosingRequest {
+  id: number;
+}
+
+export interface InitiateDepotClosingResponse {
+  depotId: number;
+  closureId: number;
+  status: DepotStatus | string;
   message: string;
 }
 

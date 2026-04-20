@@ -32,6 +32,12 @@ export interface GetRescuerApplicationsParams {
   pageSize?: number;
   status?: string;
   rescuerType?: string;
+  search?: string;
+}
+
+export interface RescuerApplicationStatusMetadataOption {
+  key: string;
+  value: string;
 }
 
 // ─── Detail (GET /identity/admin/rescuer-applications/{id}) ───

@@ -7,11 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -27,10 +22,11 @@ import {
   ArrowsDownUp,
   MagnifyingGlass,
   X,
-  Check,
-  CaretDown,
 } from "@phosphor-icons/react";
-import { UserEntity } from "@/services/user/type";
+import {
+  RescuerTypeMetadataOption,
+  UserEntity,
+} from "@/services/user/type";
 import {
   Select,
   SelectContent,
@@ -42,16 +38,6 @@ import {
 type SortColumn = "name" | "email" | "rescuerType" | "region" | "status" | "createdAt";
 type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
-
-const RESCUER_TYPE_OPTIONS: { value: string; label: string; subLabel: string }[] = [
-  { value: "Core", label: "Core", subLabel: "Core" },
-  { value: "Volunteer", label: "Volunteer", subLabel: "Volunteer" },
-];
-
-const STATUS_OPTIONS: { value: "active" | "banned"; label: string }[] = [
-  { value: "active", label: "Hoạt động" },
-  { value: "banned", label: "Bị cấm" },
-];
 
 export interface ServerPaginationProps {
   totalCount: number;
@@ -66,6 +52,14 @@ export interface ServerPaginationProps {
 
 export interface RescuerTableProps {
   rescuers: UserEntity[];
+  search: string;
+  onSearchChange: (value: string) => void;
+  rescuerTypeFilter: string;
+  onRescuerTypeFilterChange: (value: string) => void;
+  isBannedFilter: "all" | "true" | "false";
+  onIsBannedFilterChange: (value: "all" | "true" | "false") => void;
+  rescuerTypeOptions: RescuerTypeMetadataOption[];
+  rescuerTypeLabelMap?: Record<string, string>;
   onEdit?: (rescuer: UserEntity) => void;
   onBan?: (rescuer: UserEntity) => void;
   onActivate?: (rescuer: UserEntity) => void;
@@ -76,19 +70,22 @@ export interface RescuerTableProps {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const getRescuerTypeBadge = (type: string | null) => {
+const getRescuerTypeBadge = (
+  type: string | null,
+  labelMap?: Record<string, string>,
+) => {
   if (type === "Core")
     return {
-      label: "Core",
+      label: labelMap?.Core ?? "Core",
       className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     };
   if (type === "Volunteer")
     return {
-      label: "Volunteer",
+      label: labelMap?.Volunteer ?? "Volunteer",
       className: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
     };
   return {
-    label: type ?? "—",
+    label: (type && labelMap?.[type]) || type || "—",
     className: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
   };
 };
@@ -139,6 +136,14 @@ const SortHeader = ({
 
 const RescuerTable = ({
   rescuers,
+  search,
+  onSearchChange,
+  rescuerTypeFilter,
+  onRescuerTypeFilterChange,
+  isBannedFilter,
+  onIsBannedFilterChange,
+  rescuerTypeOptions,
+  rescuerTypeLabelMap,
   onEdit,
   onBan,
   onActivate,
@@ -171,11 +176,6 @@ const RescuerTable = ({
       _setPage(1);
     }
   };
-  const [search, setSearch] = useState("");
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<("active" | "banned")[]>([]);
-  const [typeOpen, setTypeOpen] = useState(false);
-  const [statusOpen, setStatusOpen] = useState(false);
 
   const handleSort = (column: SortColumn) => {
     setPage(1);
@@ -186,53 +186,19 @@ const RescuerTable = ({
     });
   };
 
-  const toggleType = (type: string) => {
-    setPage(1);
-    setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
-  };
-
-  const toggleStatus = (status: "active" | "banned") => {
-    setPage(1);
-    setSelectedStatuses((prev) =>
-      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
-    );
-  };
-
-  const hasFilters = !!(search || selectedTypes.length > 0 || selectedStatuses.length > 0);
+  const hasFilters =
+    !!search.trim() || rescuerTypeFilter !== "all" || isBannedFilter !== "all";
 
   const clearFilters = () => {
-    setSearch("");
-    setSelectedTypes([]);
-    setSelectedStatuses([]);
+    onSearchChange("");
+    onRescuerTypeFilterChange("all");
+    onIsBannedFilterChange("all");
     setPage(1);
   };
 
-  // ── Client-side filter + sort ─────────────────────────────────────────────
+  // ── Client-side sort only (filters run on API) ───────────────────────────
   const filteredAndSorted = useMemo(() => {
     let result = rescuers;
-
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      result = result.filter(
-        (u) =>
-          `${u.lastName} ${u.firstName}`.toLowerCase().includes(q) ||
-          (u.email && u.email.toLowerCase().includes(q)) ||
-          u.phone.toLowerCase().includes(q)
-      );
-    }
-
-    if (selectedTypes.length > 0) {
-      result = result.filter((u) => u.rescuerType && selectedTypes.includes(u.rescuerType));
-    }
-
-    if (selectedStatuses.length > 0) {
-      result = result.filter((u) => {
-        const status = u.isBanned ? "banned" : "active";
-        return selectedStatuses.includes(status);
-      });
-    }
 
     if (sort) {
       result = [...result].sort((a, b) => {
@@ -255,7 +221,7 @@ const RescuerTable = ({
     }
 
     return result;
-  }, [rescuers, search, selectedTypes, selectedStatuses, sort]);
+  }, [rescuers, sort]);
 
   // ── Pagination ────────────────────────────────────────────────────────────
   const displayTotalCount = isServerMode ? serverPagination!.totalCount : filteredAndSorted.length;
@@ -279,7 +245,10 @@ const RescuerTable = ({
             <Input
               placeholder="Tìm theo tên, email, số điện thoại..."
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => {
+                onSearchChange(e.target.value);
+                setPage(1);
+              }}
               className="pl-9 h-9 text-sm"
               autoComplete="off"
             />
@@ -289,99 +258,42 @@ const RescuerTable = ({
             />
           </div>
 
-          {/* Rescuer type filter */}
-          <Popover open={typeOpen} onOpenChange={setTypeOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-1.5 font-normal text-sm">
-                Loại cứu hộ
-                {selectedTypes.length > 0 ? (
-                  <Badge className="h-4.5 px-1.5 text-xs tracking-tighter rounded-full bg-primary text-primary-foreground">
-                    {selectedTypes.length}
-                  </Badge>
-                ) : (
-                  <CaretDown size={13} className="text-muted-foreground" />
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-1.5" align="start">
-              {RESCUER_TYPE_OPTIONS.map(({ value, label }) => {
-                const checked = selectedTypes.includes(value);
-                return (
-                  <button
-                    key={value}
-                    onClick={() => toggleType(value)}
-                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
-                  >
-                    <span
-                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
-                          ? "bg-primary border-primary tracking-tighter text-primary-foreground"
-                          : "border-border bg-background"
-                        }`}
-                    >
-                      {checked && <Check size={11} weight="bold" />}
-                    </span>
-                    <span className={checked ? "font-medium tracking-tighter" : ""}>{label}</span>
-                  </button>
-                );
-              })}
-              {selectedTypes.length > 0 && (
-                <button
-                  onClick={() => { setSelectedTypes([]); setPage(1); }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
-                >
-                  <X size={11} />
-                  Xóa lọc loại
-                </button>
-              )}
-            </PopoverContent>
-          </Popover>
+          <Select
+            value={rescuerTypeFilter}
+            onValueChange={(value) => {
+              onRescuerTypeFilterChange(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-9 min-w-44 text-sm tracking-tighter">
+              <SelectValue placeholder="Loại cứu hộ" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả loại cứu hộ</SelectItem>
+              {rescuerTypeOptions.map((option) => (
+                <SelectItem key={option.key} value={option.key}>
+                  {option.value}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          {/* Status filter */}
-          <Popover open={statusOpen} onOpenChange={setStatusOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-1.5 font-normal text-sm">
-                Trạng thái
-                {selectedStatuses.length > 0 ? (
-                  <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
-                    {selectedStatuses.length}
-                  </Badge>
-                ) : (
-                  <CaretDown size={13} className="text-muted-foreground" />
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-44 p-1.5" align="start">
-              {STATUS_OPTIONS.map(({ value, label }) => {
-                const checked = selectedStatuses.includes(value);
-                return (
-                  <button
-                    key={value}
-                    onClick={() => toggleStatus(value)}
-                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
-                  >
-                    <span
-                      className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${checked
-                          ? "bg-primary border-primary text-primary-foreground"
-                          : "border-border bg-background"
-                        }`}
-                    >
-                      {checked && <Check size={11} weight="bold" />}
-                    </span>
-                    <span className={checked ? "font-medium" : ""}>{label}</span>
-                  </button>
-                );
-              })}
-              {selectedStatuses.length > 0 && (
-                <button
-                  onClick={() => { setSelectedStatuses([]); setPage(1); }}
-                  className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs tracking-tighter text-muted-foreground border-t border-border/40 hover:text-foreground transition-colors"
-                >
-                  <X size={11} />
-                  Xóa lọc trạng thái
-                </button>
-              )}
-            </PopoverContent>
-          </Popover>
+          <Select
+            value={isBannedFilter}
+            onValueChange={(value: "all" | "true" | "false") => {
+              onIsBannedFilterChange(value);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-9 min-w-36 text-sm tracking-tighter">
+              <SelectValue placeholder="Trạng thái" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả trạng thái</SelectItem>
+              <SelectItem value="false">Hoạt động</SelectItem>
+              <SelectItem value="true">Bị cấm</SelectItem>
+            </SelectContent>
+          </Select>
 
           {hasFilters && (
             <Button
@@ -391,14 +303,12 @@ const RescuerTable = ({
               className="h-9 text-muted-foreground gap-1 text-sm"
             >
               <X size={13} />
-              Xóa bộ lọc
+              Đặt lại
             </Button>
           )}
 
           <div className="ml-auto text-sm tracking-tighter text-muted-foreground whitespace-nowrap">
-            {hasFilters && !isServerMode
-              ? `${filteredAndSorted.length} / ${displayTotalCount.toLocaleString("vi-VN")} cứu hộ viên`
-              : `${displayTotalCount.toLocaleString("vi-VN")} cứu hộ viên`}
+            {displayTotalCount.toLocaleString("vi-VN")} cứu hộ viên
           </div>
         </div>
 
@@ -451,7 +361,10 @@ const RescuerTable = ({
                 </tr>
               ) : (
                 paginated.map((rescuer) => {
-                  const typeBadge = getRescuerTypeBadge(rescuer.rescuerType);
+                  const typeBadge = getRescuerTypeBadge(
+                    rescuer.rescuerType,
+                    rescuerTypeLabelMap,
+                  );
                   const statusBadge = getStatusBadge(rescuer.isBanned);
                   const fullName = `${rescuer.lastName} ${rescuer.firstName}`;
                   return (
@@ -532,9 +445,11 @@ const RescuerTable = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
                   <SelectItem value="10">10</SelectItem>
                   <SelectItem value="20">20</SelectItem>
                   <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
                 </SelectContent>
               </Select>
               <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>

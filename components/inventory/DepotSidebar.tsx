@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,6 +22,8 @@ import {
   Cube,
   ShieldWarning,
   ArrowFatLinesRight,
+  Wallet,
+  LockSimple,
 } from "@phosphor-icons/react";
 import { DepotSidebarProps, InventoryItem, SupplyRequest } from "@/type";
 import { useMyDepotLowStock } from "@/services/inventory/hooks";
@@ -47,6 +50,7 @@ const DepotSidebar = ({
   onActiveTabChange,
 }: DepotSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
 
   // ── Real low-stock data ───────────────────────────────────────────────
   const { selectedDepotId } = useManagerDepot();
@@ -184,79 +188,98 @@ const DepotSidebar = ({
             label="Quản lý tiếp tế"
             icon={<Truck className="h-4 w-4" />}
           />
+          {/* Navigation shortcuts – styled to match tabs */}
+          <TabsTrigger
+            value="depot-closure"
+            className="relative w-full flex flex-row items-center gap-3 px-3 py-2.5 text-sm font-medium tracking-tighter text-left justify-start rounded-none
+              text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1 transition-all duration-200
+              data-[state=active]:bg-linear-to-r data-[state=active]:from-red-500/10 data-[state=active]:to-orange-500/10
+              data-[state=active]:text-red-600 dark:data-[state=active]:text-red-400
+              data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-red-500/10
+              data-[state=inactive]:border data-[state=inactive]:border-transparent
+              leading-none shadow-none"
+          >
+            <span className="shrink-0">
+              <LockSimple className="h-4 w-4" />
+            </span>
+            <span className="flex-1">Đóng kho</span>
+          </TabsTrigger>
         </TabsList>
 
-        {/* ── Inventory Tab ─────────────────────────────────────────────── */}
-        <TabsContent
-          value="inventory"
-          className="flex-1 overflow-hidden m-0 flex flex-col min-h-0"
-        >
-          <div className="px-3 pt-2 pb-2 shrink-0">
-            <div className="relative">
-              <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm hàng hóa..."
-                className="pl-8 h-8 text-xs bg-muted/30 border-border/50 focus-visible:ring-primary/30"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="px-3 pb-4 space-y-4">
-              {loadingLowStock && (
-                <div className="space-y-2">
-                  <Skeleton className="h-3 w-28" />
-                  <Skeleton className="h-14 w-full rounded-lg" />
-                  <Skeleton className="h-14 w-full rounded-lg" />
-                </div>
-              )}
-
-              {!loadingLowStock && urgentItems.length > 0 && (
-                <div>
-                  <SectionHeader
-                    label={`Cần bổ sung (${urgentItems.length})`}
-                    color="text-red-500"
-                    icon={<ShieldWarning className="h-3 w-3" weight="fill" />}
-                  />
-                  <div className="space-y-1.5 mt-2">
-                    {urgentItems.map((item) => (
-                      <LowStockItemRow key={item.itemModelId} item={item} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {normalItems.length > 0 && (
-                <div>
-                  <SectionHeader
-                    label={`Bình thường (${normalItems.length})`}
-                    color="text-green-600"
-                    icon={<CheckCircle className="h-3 w-3" weight="fill" />}
-                  />
-                  <div className="space-y-1.5 mt-2">
-                    {normalItems.map((item) => (
-                      <InventoryItemRow
-                        key={item.id}
-                        item={item}
-                        isSelected={selectedItem?.id === item.id}
-                        onClick={() => onItemSelect(item)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {filteredItems.length === 0 && (
-                <EmptyState
-                  icon={<Package className="h-7 w-7" />}
-                  label="Không tìm thấy hàng hóa"
+        {/* ── Inventory Tab + Depot Closure tab share the same sidebar content ── */}
+        {["inventory", "depot-closure"].map((tabValue) => (
+          <TabsContent
+            key={tabValue}
+            value={tabValue}
+            className="flex-1 overflow-hidden m-0 flex flex-col min-h-0"
+          >
+            <div className="px-3 pt-2 pb-2 shrink-0">
+              <div className="relative">
+                <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm kiếm hàng hóa..."
+                  className="pl-8 h-8 text-xs bg-muted/30 border-border/50 focus-visible:ring-primary/30"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
-              )}
+              </div>
             </div>
-          </ScrollArea>
-        </TabsContent>
+
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="px-3 pb-4 space-y-4">
+                {loadingLowStock && (
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-14 w-full rounded-lg" />
+                    <Skeleton className="h-14 w-full rounded-lg" />
+                  </div>
+                )}
+
+                {!loadingLowStock && urgentItems.length > 0 && (
+                  <div>
+                    <SectionHeader
+                      label={`Cần bổ sung (${urgentItems.length})`}
+                      color="text-red-500"
+                      icon={<ShieldWarning className="h-3 w-3" weight="fill" />}
+                    />
+                    <div className="space-y-1.5 mt-2">
+                      {urgentItems.map((item) => (
+                        <LowStockItemRow key={item.itemModelId} item={item} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {normalItems.length > 0 && (
+                  <div>
+                    <SectionHeader
+                      label={`Bình thường (${normalItems.length})`}
+                      color="text-green-600"
+                      icon={<CheckCircle className="h-3 w-3" weight="fill" />}
+                    />
+                    <div className="space-y-1.5 mt-2">
+                      {normalItems.map((item) => (
+                        <InventoryItemRow
+                          key={item.id}
+                          item={item}
+                          isSelected={selectedItem?.id === item.id}
+                          onClick={() => onItemSelect(item)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {filteredItems.length === 0 && (
+                  <EmptyState
+                    icon={<Package className="h-7 w-7" />}
+                    label="Không tìm thấy hàng hóa"
+                  />
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        ))}
 
         {/* ── Requests Tab ──────────────────────────────────────────────── */}
         <TabsContent
@@ -452,6 +475,29 @@ function TabTriggerWithDot({
         </span>
       )}
     </TabsTrigger>
+  );
+}
+
+function NavButton({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative w-full flex flex-row items-center gap-3 px-3 py-2.5 text-sm font-medium tracking-tighter text-left justify-start rounded-none
+        text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1 transition-all duration-200
+        border border-transparent leading-none"
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="flex-1">{label}</span>
+    </button>
   );
 }
 

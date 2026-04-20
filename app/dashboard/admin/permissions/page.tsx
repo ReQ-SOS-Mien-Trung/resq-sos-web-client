@@ -39,8 +39,8 @@ const PermissionsPage = () => {
       }
     >
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
+        {/* Header & Tab Switcher */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 mb-4">
           <div>
             <div className="flex items-center gap-2.5 mb-1">
               <LockKey size={24} className="text-foreground" />
@@ -55,24 +55,23 @@ const PermissionsPage = () => {
               Quản lý quyền hạn cho từng vai trò và người dùng trong hệ thống
             </p>
           </div>
-        </div>
 
-        {/* Tab Switcher */}
-        <div className="flex gap-1 border-b border-border/60">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "px-5 py-3 text-[16px] font-semibold tracking-tighter transition-all duration-200 border-b-2 -mb-px",
-                activeTab === tab.id
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
+          <div className="inline-flex shrink-0 flex-wrap gap-1 rounded-2xl border border-border/60 bg-card/80 p-1 shadow-sm">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "rounded-xl px-5 py-2.5 text-sm font-semibold tracking-tighter transition-all duration-200",
+                  activeTab === tab.id
+                    ? "bg-foreground text-background shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Tab Content */}

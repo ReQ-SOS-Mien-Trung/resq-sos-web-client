@@ -29,6 +29,8 @@ import { useLogout } from "@/services/auth/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { useSystemFund } from "@/services/system_fund";
+import { Icon } from "@iconify/react";
+import Image from "next/image";
 
 function formatMoney(value: number) {
   return value.toLocaleString("vi-VN") + "đ";
@@ -82,9 +84,16 @@ const Header = ({
         </Button>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/50">
-            <SquaresFour size={16} className="text-red-500" />
-            <span className="text-sm font-semibold text-foreground">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10">
+            <Image
+              src="/icons/logo.svg"
+              alt="ResQ SOS"
+              width={100}
+              height={100}
+              className="dark:invert h-8 w-auto object-contain"
+              priority
+            />
+            <span className="text-base tracking-tighter font-semibold text-foreground">
               Tổng quan
             </span>
           </div>

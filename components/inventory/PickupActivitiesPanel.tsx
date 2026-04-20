@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   ArrowsClockwise,
   ClipboardText,
@@ -30,10 +31,8 @@ import {
   Package,
   Users,
   CalendarBlank,
-  ArrowDown,
   Warning,
   Shield,
-  Flag,
   CaretLeft,
   CaretRight,
   CaretUp,
@@ -45,6 +44,7 @@ import {
   FloppyDisk,
   SpinnerGap,
   ClockCounterClockwiseIcon,
+  Eye,
 } from "@phosphor-icons/react";
 import {
   useMyDepotUpcomingPickups,
@@ -62,7 +62,9 @@ import type {
   UpcomingReturnItem,
   ReturnReusableUnit,
   ReusableItemCondition,
+  PickupLotAllocation,
 } from "@/services/inventory/type";
+import type { ConfirmReturnResponse } from "@/services/mission/type";
 import { toast } from "sonner";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
 
@@ -167,6 +169,8 @@ interface ConfirmReturnConsumableDraft {
   expectedQuantity: number;
   reportedQuantity: number;
   quantity: string;
+  expiredDate?: string | null;
+  lotAllocations: PickupLotAllocation[];
 }
 
 interface ConfirmReturnReusableUnitDraft {
@@ -222,133 +226,129 @@ function buildDiscrepancyNotePayload(
 
 const PRIORITY_MAP: Record<
   string,
-  { label: string; cls: string; dot: string; icon: React.ReactNode }
+  { label: string; cls: string; dot: string }
 > = {
   Critical: {
     label: "Khẩn cấp",
-    cls: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400",
+    cls: "bg-red-500/10 text-red-700 dark:text-red-400",
     dot: "bg-red-500",
-    icon: <Shield className="h-3 w-3" weight="fill" />,
   },
   High: {
     label: "Cao",
-    cls: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400",
+    cls: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
     dot: "bg-orange-500",
-    icon: <Warning className="h-3 w-3" weight="fill" />,
   },
   Medium: {
     label: "Trung bình",
-    cls: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400",
+    cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
     dot: "bg-amber-500",
-    icon: <Flag className="h-3 w-3" weight="fill" />,
   },
   Low: {
     label: "Thấp",
-    cls: "bg-green-100 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400",
+    cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     dot: "bg-green-500",
-    icon: <ArrowDown className="h-3 w-3" weight="bold" />,
   },
 };
 
 const MISSION_STATUS_MAP: Record<string, { label: string; cls: string }> = {
   Active: {
     label: "Đang hoạt động",
-    cls: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400",
+    cls: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
   },
   Planned: {
     label: "Đã lên kế hoạch",
-    cls: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400",
+    cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   },
   OnGoing: {
     label: "Đang diễn ra",
-    cls: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400",
+    cls: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
   },
   Pending: {
     label: "Chờ xử lý",
-    cls: "bg-amber-100 text-amber-700 border-amber-200",
+    cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   },
   PendingConfirmation: {
     label: "Chờ xác nhận",
-    cls: "bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-400",
+    cls: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
   },
   Completed: {
     label: "Hoàn thành",
-    cls: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",
+    cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   },
   Succeed: {
     label: "Thành công",
-    cls: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",
+    cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   },
   completed: {
     label: "Hoàn thành",
-    cls: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",
+    cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   },
   succeed: {
     label: "Thành công",
-    cls: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",
+    cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   },
   Failed: {
     label: "Thất bại",
-    cls: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400",
+    cls: "bg-red-500/10 text-red-700 dark:text-red-400",
   },
   Cancelled: {
     label: "Đã hủy",
-    cls: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400",
+    cls: "bg-red-500/10 text-red-700 dark:text-red-400",
   },
   InProgress: {
     label: "Đang tiến hành",
-    cls: "bg-blue-100 text-blue-700 border-blue-200",
+    cls: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
   },
 };
 
 const ACTIVITY_STATUS_MAP: Record<string, { label: string; cls: string }> = {
   Planned: {
     label: "Đã lên kế hoạch",
-    cls: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400",
+    cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   },
   Pending: {
     label: "Chờ lấy hàng",
-    cls: "bg-amber-100 text-amber-700 border-amber-200",
+    cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
   },
   Assigned: {
     label: "Đã phân công",
-    cls: "bg-violet-100 text-violet-700 border-violet-200",
+    cls: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
   },
   InProgress: {
     label: "Đang thực hiện",
-    cls: "bg-blue-100 text-blue-700 border-blue-200",
+    cls: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
   },
   OnGoing: {
     label: "Đang trên đường về kho",
-    cls: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400",
+    cls: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
   },
   PendingConfirmation: {
     label: "Chờ kho xác nhận",
-    cls: "bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-400",
+    cls: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
   },
   Completed: {
     label: "Đã lấy hàng",
-    cls: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   },
   Succeed: {
     label: "Hoàn tất",
-    cls: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400",
+    cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   },
   completed: {
     label: "Đã lấy hàng",
-    cls: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   },
   succeed: {
     label: "Thành công",
-    cls: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    cls: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
   },
   Failed: {
     label: "Thất bại",
-    cls: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400",
+    cls: "bg-red-500/10 text-red-700 dark:text-red-400",
   },
   Cancelled: {
     label: "Đã hủy",
-    cls: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400",
+    cls: "bg-red-500/10 text-red-700 dark:text-red-400",
   },
 };
 
@@ -426,6 +426,85 @@ function resolveReturnItemModelId(item: UpcomingReturnItem): number {
   return getReturnItemUnitCandidates(item)[0]?.itemModelId ?? item.itemId;
 }
 
+function getExpectedReturnLotAllocations(
+  item: Pick<
+    UpcomingReturnItem,
+    "expectedReturnLotAllocations" | "pickupLotAllocations"
+  >,
+): PickupLotAllocation[] {
+  return item.expectedReturnLotAllocations ?? item.pickupLotAllocations ?? [];
+}
+
+function getResolvedItemExpiredDate(
+  item: Pick<
+    UpcomingReturnItem,
+    "expiredDate" | "expectedReturnLotAllocations" | "pickupLotAllocations"
+  >,
+): string | null {
+  return (
+    item.expiredDate ??
+    getExpectedReturnLotAllocations(item).find((lot) =>
+      Boolean(lot.expiredDate),
+    )?.expiredDate ??
+    null
+  );
+}
+
+function buildConfirmReturnLotAllocations(row: ConfirmReturnConsumableDraft): {
+  lotAllocations: PickupLotAllocation[];
+  expiredDate: string | null;
+} {
+  const confirmedQuantity = Number.parseInt(row.quantity || "0", 10) || 0;
+  const normalizedLots = row.lotAllocations
+    .filter((lot) => getSafeNumericValue(lot.quantityTaken, 0) > 0)
+    .map((lot) => ({
+      lotId: lot.lotId,
+      quantityTaken: getSafeNumericValue(lot.quantityTaken, 0),
+      receivedDate: lot.receivedDate ?? null,
+      expiredDate: lot.expiredDate ?? null,
+    }));
+
+  if (confirmedQuantity <= 0 || normalizedLots.length === 0) {
+    return {
+      lotAllocations: [],
+      expiredDate: row.expiredDate ?? normalizedLots[0]?.expiredDate ?? null,
+    };
+  }
+
+  const totalLotQuantity = normalizedLots.reduce(
+    (sum, lot) => sum + lot.quantityTaken,
+    0,
+  );
+
+  if (confirmedQuantity > totalLotQuantity) {
+    throw new Error(
+      `Số lượng xác nhận của "${row.itemName}" vượt tổng số lượng các lô dự kiến (${totalLotQuantity.toLocaleString("vi-VN")} ${row.unit}).`,
+    );
+  }
+
+  let remainingQuantity = confirmedQuantity;
+  const allocatedLots = normalizedLots
+    .map((lot) => {
+      if (remainingQuantity <= 0) {
+        return null;
+      }
+
+      const nextQuantity = Math.min(remainingQuantity, lot.quantityTaken);
+      remainingQuantity -= nextQuantity;
+
+      return {
+        ...lot,
+        quantityTaken: nextQuantity,
+      };
+    })
+    .filter((lot): lot is NonNullable<typeof lot> => Boolean(lot));
+
+  return {
+    lotAllocations: allocatedLots,
+    expiredDate: row.expiredDate ?? allocatedLots[0]?.expiredDate ?? null,
+  };
+}
+
 function buildConfirmReturnFormState(
   activity: UpcomingReturnEntity,
 ): ConfirmReturnFormState {
@@ -476,6 +555,8 @@ function buildConfirmReturnFormState(
       expectedQuantity,
       reportedQuantity,
       quantity: String(reportedQuantity),
+      expiredDate: getResolvedItemExpiredDate(item),
+      lotAllocations: getExpectedReturnLotAllocations(item),
     };
     consumableItems.push(consumableDraft);
   }
@@ -490,18 +571,16 @@ function buildConfirmReturnFormState(
 function PriorityBadge({ priority }: { priority: string }) {
   const cfg = PRIORITY_MAP[priority] ?? {
     label: priority,
-    cls: "bg-gray-100 text-gray-700 border-gray-200",
+    cls: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
     dot: "bg-gray-400",
-    icon: null,
   };
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 text-sm font-semibold px-2 py-0.5 rounded-full border tracking-tighter",
+        "inline-flex items-center rounded-md px-2.5 py-1.5 text-[13px] font-semibold tracking-tighter",
         cfg.cls,
       )}
     >
-      {cfg.icon}
       {cfg.label}
     </span>
   );
@@ -516,12 +595,12 @@ function StatusBadge({
 }) {
   const cfg = map[status] ?? {
     label: status,
-    cls: "bg-gray-100 text-gray-700 border-gray-200",
+    cls: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
   };
   return (
     <span
       className={cn(
-        "inline-flex items-center text-sm font-semibold px-2 py-0.5 rounded-full border tracking-tighter",
+        "inline-flex items-center rounded-md px-2.5 py-1.5 text-[13px] font-semibold tracking-tighter",
         cfg.cls,
       )}
     >
@@ -713,174 +792,6 @@ function InfoKV({
   );
 }
 
-function ReusableUnitGrid({
-  title,
-  units,
-  tone,
-}: {
-  title: string;
-  units: ReturnReusableUnit[];
-  tone: "amber" | "emerald";
-}) {
-  if (units.length === 0) return null;
-
-  const toneCls =
-    tone === "amber"
-      ? "border-amber-200/70 bg-amber-50/80 dark:border-amber-800/60 dark:bg-amber-950/20"
-      : "border-emerald-200/70 bg-emerald-50/80 dark:border-emerald-800/60 dark:bg-emerald-950/20";
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          {title}
-        </span>
-        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-background/80 px-1.5 text-[11px] font-bold text-foreground">
-          {units.length}
-        </span>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        {units.map((unit) => (
-          <div
-            key={`${title}-${unit.reusableItemId}-${unit.serialNumber}`}
-            className={cn("rounded-lg border px-3 py-2 space-y-1", toneCls)}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold tracking-tighter">
-                {unit.itemName}
-              </span>
-              <span className="rounded-full border border-current/15 px-2 py-0.5 text-[11px] font-semibold tracking-tighter text-muted-foreground">
-                #{unit.reusableItemId}
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground tracking-tighter space-y-0.5">
-              <p>
-                Serial:{" "}
-                <span className="font-medium text-foreground/85">
-                  {unit.serialNumber || "—"}
-                </span>
-              </p>
-              <p>
-                Tình trạng:{" "}
-                <span className="font-medium text-foreground/85">
-                  {unit.condition || "—"}
-                </span>
-              </p>
-              {unit.note && (
-                <p>
-                  Ghi chú:{" "}
-                  <span className="font-medium text-foreground/85">
-                    {unit.note}
-                  </span>
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ReturnItemCard({
-  item,
-  index,
-}: {
-  item: UpcomingReturnItem;
-  index: number;
-}) {
-  const expectedQuantity = Number.isFinite(item.quantity) ? item.quantity : 0;
-  const actualReturnedQuantity = Number.isFinite(item.actualReturnedQuantity)
-    ? item.actualReturnedQuantity
-    : 0;
-  const expectedReturnUnits = item.expectedReturnUnits ?? [];
-  const returnedReusableUnits = item.returnedReusableUnits ?? [];
-
-  return (
-    <motion.div
-      className="rounded-xl border border-border/60 bg-muted/30 hover:bg-sky-50/60 dark:hover:bg-sky-950/20 transition-colors px-3 py-3 space-y-3"
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{
-        delay: 0.04 + index * 0.03,
-        type: "spring",
-        stiffness: 260,
-        damping: 22,
-      }}
-    >
-      <div className="flex items-start gap-3">
-        {item.imageUrl ? (
-          <img
-            src={item.imageUrl}
-            alt={item.itemName}
-            className="h-16 w-16 rounded-lg object-cover border border-border/60 shrink-0"
-            loading="lazy"
-          />
-        ) : (
-          <div className="h-16 w-16 rounded-lg bg-muted flex items-center justify-center border border-border/60 shrink-0">
-            <Package className="h-7 w-7 text-muted-foreground" weight="fill" />
-          </div>
-        )}
-
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-base font-semibold tracking-tight leading-snug">
-                {item.itemName}
-              </p>
-              <p className="text-xs text-muted-foreground tracking-tighter">
-                Mã vật phẩm #{item.itemId}
-              </p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                Dự kiến
-              </p>
-              <p className="text-sm font-bold tracking-tighter text-amber-600 dark:text-amber-300">
-                {expectedQuantity.toLocaleString("vi-VN")} {item.unit}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div className="rounded-lg border border-amber-200/70 bg-amber-50/70 px-3 py-2 dark:border-amber-800/60 dark:bg-amber-950/20">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-amber-700 dark:text-amber-300">
-                Dự kiến hoàn trả
-              </p>
-              <p className="text-sm font-semibold tracking-tighter text-amber-800 dark:text-amber-200">
-                {expectedQuantity.toLocaleString("vi-VN")} {item.unit}
-              </p>
-            </div>
-            <div className="rounded-lg border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 dark:border-emerald-800/60 dark:bg-emerald-950/20">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
-                Đã trả thực tế
-              </p>
-              <p className="text-sm font-semibold tracking-tighter text-emerald-800 dark:text-emerald-200">
-                {actualReturnedQuantity.toLocaleString("vi-VN")} {item.unit}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {(expectedReturnUnits.length > 0 || returnedReusableUnits.length > 0) && (
-        <div className="space-y-3 border-t border-border/50 pt-3">
-          <ReusableUnitGrid
-            title="Đơn vị dự kiến trả"
-            units={expectedReturnUnits}
-            tone="amber"
-          />
-          <ReusableUnitGrid
-            title="Đơn vị đã trả"
-            units={returnedReusableUnits}
-            tone="emerald"
-          />
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
 function ConfirmReturnFormSection({
   activity,
   onConfirmed,
@@ -894,6 +805,8 @@ function ConfirmReturnFormSection({
   const [form, setForm] = useState<ConfirmReturnFormState>(() =>
     buildConfirmReturnFormState(activity),
   );
+  const [confirmResult, setConfirmResult] =
+    useState<ConfirmReturnResponse | null>(null);
 
   useEffect(() => {
     setForm(buildConfirmReturnFormState(activity));
@@ -1032,17 +945,25 @@ function ConfirmReturnFormSection({
       }
 
       try {
-        await confirmReturnMutation.mutateAsync({
+        const result = await confirmReturnMutation.mutateAsync({
           missionId: activity.missionId,
           activityId: activity.activityId,
           request: {
             discrepancyNote: buildDiscrepancyNotePayload(
               form.discrepancyFields,
             ),
-            consumableItems: form.consumableItems.map((row) => ({
-              itemModelId: row.itemModelId,
-              quantity: Number.parseInt(row.quantity || "0", 10) || 0,
-            })),
+            consumableItems: form.consumableItems.map((row) => {
+              const quantity = Number.parseInt(row.quantity || "0", 10) || 0;
+              const { lotAllocations, expiredDate } =
+                buildConfirmReturnLotAllocations(row);
+
+              return {
+                itemModelId: row.itemModelId,
+                quantity,
+                lotAllocations,
+                expiredDate,
+              };
+            }),
             reusableItems: form.reusableItems.map((row) => ({
               itemModelId: row.itemModelId,
               quantity: Number.parseInt(row.quantity || "0", 10) || 0,
@@ -1059,7 +980,8 @@ function ConfirmReturnFormSection({
           },
         });
 
-        toast.success("Đã xác nhận team đã trả đồ về kho.");
+        setConfirmResult(result);
+        toast.success(result.message || "Đã xác nhận team đã trả đồ về kho.");
         onConfirmed();
       } catch (error) {
         const message =
@@ -1081,48 +1003,67 @@ function ConfirmReturnFormSection({
 
   const hasConsumableItems = form.consumableItems.length > 0;
   const hasReusableItems = form.reusableItems.length > 0;
-  const hasSingleItemTypeSection = hasConsumableItems !== hasReusableItems;
+
+  const isFormReady =
+    form.consumableItems.every((row) => {
+      const v = Number.parseInt(row.quantity || "0", 10);
+      return Number.isFinite(v) && v > 0;
+    }) &&
+    form.reusableItems.every(
+      (row) =>
+        Number.parseInt(row.quantity || "0", 10) > 0 &&
+        row.units.every((u) => !!u.condition),
+    );
 
   const consumableSection = hasConsumableItems ? (
-    <div className="space-y-3">
+    <div className="space-y-2 rounded-xl border border-dashed border-orange-200/60 bg-orange-50/30 p-3 dark:border-orange-900/40 dark:bg-orange-950/10">
       <div className="flex items-center gap-2">
-        <span className="inline-flex h-7 items-center rounded-full bg-orange-100 px-3 text-sm font-medium tracking-tighter text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
+        <span className="inline-flex h-6 items-center rounded-full bg-orange-100 px-2.5 text-sm font-medium tracking-tighter text-orange-700 dark:bg-orange-950/40 dark:text-orange-300">
           Vật phẩm tiêu thụ
         </span>
-        <span className="text-sm tracking-tighter text-muted-foreground">
-          Xác nhận số lượng thực kho nhận
-        </span>
       </div>
-
-      <div className="space-y-3">
-        {form.consumableItems.map((row) => (
-          <div
-            key={row.itemId}
-            className="rounded-xl border border-border/60 bg-background/90 p-4"
-          >
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
-              <div className="min-w-0 space-y-1">
-                <p className="text-base font-semibold tracking-tight">
-                  {row.itemName}
-                </p>
-                <p className="text-xs tracking-tighter text-muted-foreground">
-                  itemModelId gửi lên: {row.itemModelId}
-                </p>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 dark:border-amber-800/60 dark:bg-amber-950/20">
-                  <p className="text-sm uppercase tracking-[0.14em] text-amber-700 dark:text-amber-300">
-                    Ban đầu
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border/50">
+              <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground">
+                Tên vật phẩm
+              </th>
+              <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
+                Dự kiến
+              </th>
+              <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap w-36">
+                Số lượng kho xác nhận
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {form.consumableItems.map((row) => (
+              <tr
+                key={row.itemId}
+                className="border-b border-border/30 hover:bg-muted/30 transition-colors"
+              >
+                <td className="p-3">
+                  <p className="text-sm font-medium tracking-tighter">
+                    {row.itemName}
                   </p>
-                  <p className="text-sm font-semibold tracking-tighter text-amber-900 dark:text-amber-100">
+                  {row.lotAllocations.length > 0 && (
+                    <p className="text-[13px] tracking-tighter mt-0.5">
+                      {row.lotAllocations
+                        .map(
+                          (lot) =>
+                            `Lô #${lot.lotId} — ${lot.quantityTaken.toLocaleString("vi-VN")} ${row.unit}${lot.expiredDate ? ` · HSD: ${new Date(lot.expiredDate).toLocaleDateString("vi-VN")}` : ""}`,
+                        )
+                        .join(" · ")}
+                    </p>
+                  )}
+                </td>
+                <td className="p-3 text-right">
+                  <span className="text-sm font-semibold tracking-tighter text-amber-700 dark:text-amber-300">
                     {row.expectedQuantity.toLocaleString("vi-VN")} {row.unit}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Kho xác nhận
-                  </label>
+                  </span>
+                </td>
+                <td className="p-3 text-right">
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -1133,253 +1074,433 @@ function ConfirmReturnFormSection({
                         event.target.value,
                       )
                     }
-                    className="h-10 bg-background"
+                    className="h-8 bg-background text-right w-full"
                   />
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   ) : null;
 
   const reusableSection = hasReusableItems ? (
-    <div className="space-y-3">
-      <div className="flex items-center">
-        <span className="inline-flex h-7 items-center rounded-full bg-emerald-100 px-3 text-sm font-medium tracking-tighter text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+    <div className="space-y-2 rounded-xl border border-dashed border-emerald-200/60 bg-emerald-50/30 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/10">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex h-8 items-center rounded-lg bg-emerald-100 px-2.5 text-sm font-medium tracking-tighter text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
           Vật phẩm tái sử dụng
         </span>
       </div>
 
       {!isConditionsLoading && conditionOptions.length === 0 && (
-        <div className="rounded-xl border border-red-200/70 bg-red-50/80 px-3 py-2 text-sm tracking-tighter text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
-          Chưa tải được danh sách tình trạng vật phẩm tái sử dụng. Bạn vẫn có
-          thể xem danh sách, nhưng cần có tình trạng để xác nhận.
+        <div className="rounded-lg border border-dashed border-red-200/70 bg-red-50/80 px-3 py-2 text-xs tracking-tighter text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
+          Chưa tải được tình trạng vật phẩm tái sử dụng — cần có tình trạng để
+          xác nhận.
         </div>
       )}
 
-      <div className="space-y-4">
-        {form.reusableItems.map((row) => (
-          <div
-            key={row.itemId}
-            className="rounded-xl border border-border/60 bg-background/90 p-4 shadow-sm"
-          >
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_200px_minmax(320px,380px)] lg:items-start">
-              <div className="min-w-0 space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-base font-semibold tracking-tight">
-                    {row.itemName}
-                  </p>
-                  <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/40 px-2 py-0.5 text-[11px] font-medium tracking-tighter text-muted-foreground">
-                    itemModelId #{row.itemModelId}
-                  </span>
-                </div>
-                <p className="text-sm tracking-tighter text-muted-foreground">
-                  Kiểm tra từng serial bên dưới rồi nhập số kho thực nhận.
-                </p>
-              </div>
-
-              <div className="min-w-0 rounded-xl border border-amber-200/70 bg-amber-50 px-4 py-3 dark:border-amber-800/60 dark:bg-amber-950/20">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
-                  Ban đầu
-                </p>
-                <p className="mt-1 text-xl font-semibold tracking-tight text-amber-900 dark:text-amber-100">
-                  {row.expectedQuantity.toLocaleString("vi-VN")} {row.unit}
-                </p>
-              </div>
-
-              <div className="min-w-0 grid grid-cols-[max-content_minmax(0,1fr)] items-center gap-3">
-                <label className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Kho xác nhận
-                </label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  value={row.quantity}
-                  onChange={(event) =>
-                    handleReusableQuantityChange(row.itemId, event.target.value)
-                  }
-                  className="h-10 w-full bg-background shadow-none"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {row.units.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm tracking-tighter text-muted-foreground">
-                  Chưa có danh sách reusable unit để đối chiếu.
-                </div>
-              ) : (
-                row.units.map((unit) => (
-                  <div
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border/50">
+              <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground">
+                Tên vật phẩm / Serial
+              </th>
+              <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
+                Dự kiến
+              </th>
+              <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap w-32">
+                Số lượng kho xác nhận
+              </th>
+              <th className="p-3 text-sm font-semibold tracking-tighter text-foreground w-44">
+                Tình trạng
+              </th>
+              <th className="p-3 text-sm font-semibold tracking-tighter text-foreground">
+                Ghi chú
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {form.reusableItems.map((row) => (
+              <>
+                {/* Item header row */}
+                <tr
+                  key={`item-${row.itemId}`}
+                  className="border-b border-border/40 bg-muted/20"
+                >
+                  <td className="p-3">
+                    <p className="text-sm font-medium tracking-tighter">
+                      {row.itemName}
+                    </p>
+                  </td>
+                  <td className="p-3 text-right">
+                    <span className="text-sm font-semibold tracking-tighter text-amber-700 dark:text-amber-300">
+                      {row.expectedQuantity.toLocaleString("vi-VN")} {row.unit}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={row.quantity}
+                      onChange={(event) =>
+                        handleReusableQuantityChange(
+                          row.itemId,
+                          event.target.value,
+                        )
+                      }
+                      className="h-8 bg-background text-right w-full"
+                    />
+                  </td>
+                  <td className="p-3" />
+                  <td className="p-3" />
+                </tr>
+                {/* Serial sub-rows */}
+                {row.units.map((unit) => (
+                  <tr
                     key={`${row.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
-                    className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3"
+                    className="border-b border-border/20 hover:bg-muted/20 transition-colors"
                   >
-                    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px_minmax(260px,1fr)] lg:items-end">
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold tracking-tight">
-                            {unit.itemName || row.itemName}
-                          </p>
-                          <span className="inline-flex items-center rounded-full border border-border/70 bg-background/80 px-2 py-0.5 text-[11px] font-medium tracking-tighter text-muted-foreground">
-                            ID #{unit.reusableItemId}
-                          </span>
-                        </div>
-                        <p className="text-xs tracking-tighter text-muted-foreground">
-                          Serial:{" "}
-                          <span className="font-medium text-foreground/90">
-                            {unit.serialNumber || "—"}
-                          </span>
-                        </p>
-                      </div>
-
-                      <div className="min-w-0 space-y-1">
-                        <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                          Tình trạng
-                        </label>
-                        <Select
-                          value={unit.condition}
-                          onValueChange={(value) =>
-                            handleReusableUnitFieldChange(
-                              row.itemId,
-                              unit.reusableItemId,
-                              "condition",
-                              value,
-                            )
-                          }
-                        >
-                          <SelectTrigger className="h-10 w-full min-w-0 bg-background shadow-none">
-                            <SelectValue placeholder="Chọn tình trạng" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {conditionOptions.map((condition) => (
-                              <SelectItem
-                                key={condition.key}
-                                value={condition.key}
-                              >
-                                {condition.value}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="min-w-0 space-y-1">
-                        <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                          Ghi chú unit
-                        </label>
-                        <Input
-                          value={unit.note}
-                          onChange={(event) =>
-                            handleReusableUnitFieldChange(
-                              row.itemId,
-                              unit.reusableItemId,
-                              "note",
-                              event.target.value,
-                            )
-                          }
-                          placeholder="VD: trầy nhẹ vỏ ngoài"
-                          className="h-10 w-full min-w-0 bg-background shadow-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        ))}
+                    <td className="p-3 pl-6">
+                      <p className="text-sm font-medium tracking-tighter">
+                        {unit.serialNumber || "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground tracking-tighter">
+                        Mã số {unit.reusableItemId}
+                      </p>
+                    </td>
+                    <td className="p-3" />
+                    <td className="p-3" />
+                    <td className="p-3">
+                      <Select
+                        value={unit.condition}
+                        onValueChange={(value) =>
+                          handleReusableUnitFieldChange(
+                            row.itemId,
+                            unit.reusableItemId,
+                            "condition",
+                            value,
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-full bg-background text-sm">
+                          <SelectValue placeholder="Chọn" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {conditionOptions.map((condition) => (
+                            <SelectItem
+                              key={condition.key}
+                              value={condition.key}
+                            >
+                              {condition.value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="p-3">
+                      <Input
+                        value={unit.note}
+                        onChange={(event) =>
+                          handleReusableUnitFieldChange(
+                            row.itemId,
+                            unit.reusableItemId,
+                            "note",
+                            event.target.value,
+                          )
+                        }
+                        placeholder="Ghi chú..."
+                        className="h-8 bg-background text-sm"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   ) : null;
 
-  const singleItemTypeSection = hasConsumableItems
-    ? consumableSection
-    : reusableSection;
-
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-blue-200/70 bg-blue-50/40 p-4 shadow-sm dark:border-blue-900/50 dark:bg-blue-950/10 md:p-5"
+      className="rounded-xl border border-blue-200/60 bg-blue-50/30 p-4 dark:border-blue-900/40 dark:bg-blue-950/10"
     >
-      <div className="space-y-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-0.5">
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3">
+          <div>
             <h3 className="text-2xl font-bold tracking-tight text-blue-900 dark:text-blue-100">
-              Biên bản đối soát - xác nhận team đã trả đồ
+              Biên bản đối soát
             </h3>
             <p className="text-sm tracking-tighter text-muted-foreground">
-              Kiểm tra số lượng thực nhận, tình trạng từng thiết bị tái sử dụng
-              và ghi chú chênh lệch trước khi xác nhận hoàn tất.
+              Xác nhận số lượng thực nhận và tình trạng thiết bị trước khi hoàn
+              tất.
             </p>
           </div>
-          {/* <div className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold tracking-tight text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
-            Chỉ khả dụng khi trạng thái là PendingConfirmation
-          </div> */}
-        </div>
-
-        <div
-          className={cn(
-            "grid gap-5",
-            hasSingleItemTypeSection
-              ? "xl:grid-cols-2"
-              : "xl:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)]",
-          )}
-        >
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-base font-semibold tracking-tighter text-foreground">
-                Nội dung báo cáo sai lệch
-              </label>
-              <div className="space-y-3 rounded-xl border border-border/60 bg-background/90 p-3">
-                {RETURN_DISCREPANCY_FIELDS.map((field) => (
-                  <div
-                    key={field.key}
-                    className="grid gap-2 md:grid-cols-[220px_minmax(0,1fr)] md:items-center"
-                  >
-                    <div className="rounded-lg bg-muted/60 px-3 py-2 text-sm font-medium tracking-tight text-foreground">
-                      - {field.label}:
-                    </div>
-                    <Input
-                      value={form.discrepancyFields[field.key]}
-                      onChange={(event) =>
-                        handleDiscrepancyFieldChange(
-                          field.key,
-                          event.target.value,
-                        )
-                      }
-                      placeholder={field.placeholder}
-                      className="bg-background"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {!hasSingleItemTypeSection && consumableSection}
-          </div>
-
-          <div className="space-y-5">
-            {hasSingleItemTypeSection ? singleItemTypeSection : reusableSection}
-          </div>
-        </div>
-
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
           <Button
             type="submit"
-            className="gap-2"
-            disabled={confirmReturnMutation.isPending || isConditionsLoading}
+            size="sm"
+            className="gap-1.5 shrink-0"
+            disabled={
+              confirmReturnMutation.isPending ||
+              isConditionsLoading ||
+              !isFormReady
+            }
           >
             {confirmReturnMutation.isPending ? (
-              <SpinnerGap className="h-4 w-4 animate-spin" />
+              <SpinnerGap className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <FloppyDisk className="h-4 w-4" weight="fill" />
+              <FloppyDisk className="h-3.5 w-3.5" weight="fill" />
             )}
-            Xác nhận team đã trả đồ
+            Xác nhận nhận đồ
           </Button>
         </div>
+
+        {/* Discrepancy note */}
+        <div className="space-y-1.5">
+          <div className="flex gap-2 overflow-x-auto pb-0.5 px-0.5">
+            {RETURN_DISCREPANCY_FIELDS.map((field) => (
+              <div
+                key={field.key}
+                className="flex flex-col gap-1 min-w-36 flex-1"
+              >
+                <label className="text-sm font-medium tracking-tighter whitespace-nowrap">
+                  - {field.label}
+                </label>
+                <Input
+                  value={form.discrepancyFields[field.key]}
+                  onChange={(event) =>
+                    handleDiscrepancyFieldChange(field.key, event.target.value)
+                  }
+                  placeholder={field.placeholder}
+                  className="h-10 bg-background text-sm"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Items */}
+        {hasConsumableItems && hasReusableItems ? (
+          <div className="grid grid-cols-[2fr_3fr] gap-4">
+            {consumableSection}
+            {reusableSection}
+          </div>
+        ) : (
+          <>
+            {consumableSection}
+            {reusableSection}
+          </>
+        )}
       </div>
+
+      {/* ── Confirm Result ── */}
+      {confirmResult && (
+        <div className="mt-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/60 dark:border-emerald-800/50 dark:bg-emerald-950/20 p-4 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle
+                className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0"
+                weight="fill"
+              />
+              <span className="text-base font-bold tracking-tight text-emerald-800 dark:text-emerald-200">
+                Xác nhận hoàn tất
+              </span>
+              {confirmResult.discrepancyRecorded && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                  <Warning className="h-3 w-3" weight="fill" />
+                  Có sai lệch đã ghi nhận
+                </span>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3 text-muted-foreground"
+              onClick={onConfirmed}
+            >
+              Đóng
+            </Button>
+          </div>
+
+          <p className="text-sm tracking-tighter text-emerald-700 dark:text-emerald-300">
+            {confirmResult.message}
+          </p>
+
+          {confirmResult.restoredItems.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Vật phẩm đã nhập lại kho ({confirmResult.restoredItems.length})
+              </p>
+              <div className="space-y-2">
+                {confirmResult.restoredItems.map((restoredItem) => {
+                  const hasDiscrepancy =
+                    restoredItem.actualQuantity !==
+                    restoredItem.expectedQuantity;
+                  return (
+                    <div
+                      key={restoredItem.itemModelId}
+                      className={cn(
+                        "rounded-xl border px-4 py-3 space-y-2",
+                        hasDiscrepancy
+                          ? "border-amber-200/70 bg-amber-50/60 dark:border-amber-800/60 dark:bg-amber-950/20"
+                          : "border-border/60 bg-background/80",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold tracking-tight">
+                          {restoredItem.itemName}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs tracking-tighter text-muted-foreground">
+                            Dự kiến:{" "}
+                            <strong>
+                              {restoredItem.expectedQuantity.toLocaleString(
+                                "vi-VN",
+                              )}{" "}
+                              {restoredItem.unit}
+                            </strong>
+                          </span>
+                          <span className="text-xs text-muted-foreground/50">
+                            →
+                          </span>
+                          <span
+                            className={cn(
+                              "text-sm font-bold tracking-tighter",
+                              hasDiscrepancy
+                                ? "text-amber-700 dark:text-amber-300"
+                                : "text-emerald-700 dark:text-emerald-300",
+                            )}
+                          >
+                            Thực nhận:{" "}
+                            {restoredItem.actualQuantity.toLocaleString(
+                              "vi-VN",
+                            )}{" "}
+                            {restoredItem.unit}
+                          </span>
+                        </div>
+                      </div>
+
+                      {(restoredItem.expectedReturnLotAllocations.length > 0 ||
+                        restoredItem.returnedLotAllocations.length > 0) && (
+                        <div className="grid gap-3 lg:grid-cols-2">
+                          {restoredItem.expectedReturnLotAllocations.length >
+                            0 && (
+                            <div className="space-y-1">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                Lô dự kiến trả
+                              </p>
+                              <div className="grid grid-cols-1 gap-1.5">
+                                {restoredItem.expectedReturnLotAllocations.map(
+                                  (lot) => (
+                                    <div
+                                      key={`expected-${restoredItem.itemModelId}-${lot.lotId}`}
+                                      className="rounded-lg border border-amber-200/60 bg-amber-50/50 px-3 py-1.5 text-xs tracking-tighter dark:border-amber-800/40 dark:bg-amber-950/20"
+                                    >
+                                      <p className="font-semibold">
+                                        Lô #{lot.lotId} —{" "}
+                                        {lot.quantityTaken.toLocaleString(
+                                          "vi-VN",
+                                        )}{" "}
+                                        {restoredItem.unit}
+                                      </p>
+                                      <p className="text-muted-foreground">
+                                        HSD:{" "}
+                                        {lot.expiredDate
+                                          ? new Date(
+                                              lot.expiredDate,
+                                            ).toLocaleDateString("vi-VN")
+                                          : "—"}
+                                      </p>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {restoredItem.returnedLotAllocations.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                Lô được nhập lại
+                              </p>
+                              <div className="grid grid-cols-1 gap-1.5">
+                                {restoredItem.returnedLotAllocations.map(
+                                  (lot) => (
+                                    <div
+                                      key={`returned-${restoredItem.itemModelId}-${lot.lotId}`}
+                                      className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5 text-xs tracking-tighter"
+                                    >
+                                      <p className="font-semibold">
+                                        Lô #{lot.lotId} —{" "}
+                                        {lot.quantityTaken.toLocaleString(
+                                          "vi-VN",
+                                        )}{" "}
+                                        {restoredItem.unit}
+                                      </p>
+                                      <p className="text-muted-foreground">
+                                        Tồn kho mới:{" "}
+                                        {lot.remainingQuantityAfterExecution.toLocaleString(
+                                          "vi-VN",
+                                        )}
+                                      </p>
+                                      <p className="text-muted-foreground">
+                                        HSD:{" "}
+                                        {lot.expiredDate
+                                          ? new Date(
+                                              lot.expiredDate,
+                                            ).toLocaleDateString("vi-VN")
+                                          : "—"}
+                                      </p>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {restoredItem.returnedReusableUnits.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                            Thiết bị tái sử dụng đã nhận lại
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {restoredItem.returnedReusableUnits.map((unit) => (
+                              <div
+                                key={unit.reusableItemId}
+                                className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5 text-xs tracking-tighter"
+                              >
+                                <p className="font-semibold">
+                                  #{unit.reusableItemId} · {unit.serialNumber}
+                                </p>
+                                <p className="text-muted-foreground">
+                                  Tình trạng: {unit.condition || "—"}
+                                </p>
+                                {unit.note && (
+                                  <p className="text-muted-foreground">
+                                    Ghi chú: {unit.note}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </form>
   );
 }
@@ -1390,6 +1511,7 @@ interface DetailPanelProps {
   item: ActivityEntity | null;
   open: boolean;
   onClose: () => void;
+  onConfirmed?: () => void;
   mode: TabType;
   activityKind: ActivityKind;
 }
@@ -1398,6 +1520,7 @@ function DetailPanel({
   item,
   open,
   onClose,
+  onConfirmed,
   mode,
   activityKind,
 }: DetailPanelProps) {
@@ -1408,6 +1531,7 @@ function DetailPanel({
 
   const [panelHeight, setPanelHeight] = useState(DEFAULT_PANEL_HEIGHT);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(0);
   const isDragging = useRef(false);
@@ -1456,240 +1580,365 @@ function DetailPanel({
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            key="bd"
-            className="fixed inset-0 bg-black/25 backdrop-blur-[1.5px] z-40"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={onClose}
-          />
+    <>
+      <AnimatePresence>
+        {open && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="bd"
+              className="fixed inset-0 bg-black/25 backdrop-blur-[1.5px] z-40"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              onClick={onClose}
+            />
 
-          {/* Panel */}
-          <motion.div
-            key="panel"
-            className={cn(
-              "fixed z-50 bg-background shadow-2xl flex flex-col",
-              isFullscreen
-                ? "inset-0 rounded-none border-0"
-                : "bottom-0 left-0 right-0 rounded-t-2xl border-t border-border/60",
-            )}
-            style={isFullscreen ? undefined : { height: panelHeight }}
-            initial={{ y: DEFAULT_PANEL_HEIGHT + 80 }}
-            animate={{ y: 0 }}
-            exit={{ y: DEFAULT_PANEL_HEIGHT + 80 }}
-            transition={{
-              type: "spring",
-              stiffness: 340,
-              damping: 34,
-              mass: 0.85,
-            }}
-          >
-            {/* ── Drag Handle ─────────────────────────────────────────────── */}
-            {!isFullscreen && (
-              <div
-                className="flex flex-col items-center pt-2.5 pb-1 shrink-0 cursor-ns-resize select-none group touch-none"
-                onPointerDown={handlePointerDown}
-              >
-                <div className="h-1.5 w-14 rounded-full bg-border group-hover:bg-primary/50 group-active:bg-primary/70 transition-colors duration-150" />
-                <span className="text-xs text-muted-foreground/80 mt-1 group-hover:text-muted-foreground/70 transition-colors flex items-center gap-0.5 tracking-tighter">
-                  <DotsSixVertical className="h-3 w-3" />
-                  kéo để thay đổi kích cỡ
-                </span>
-              </div>
-            )}
-
-            {/* ── Header ──────────────────────────────────────────────────── */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border/50 shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
+            {/* Panel */}
+            <motion.div
+              key="panel"
+              className={cn(
+                "fixed z-50 bg-background shadow-2xl flex flex-col",
+                isFullscreen
+                  ? "inset-0 rounded-none border-0"
+                  : "bottom-0 left-0 right-0 rounded-t-2xl border-t border-border/60",
+              )}
+              style={isFullscreen ? undefined : { height: panelHeight }}
+              initial={{ y: DEFAULT_PANEL_HEIGHT + 80 }}
+              animate={{ y: 0 }}
+              exit={{ y: DEFAULT_PANEL_HEIGHT + 80 }}
+              transition={{
+                type: "spring",
+                stiffness: 340,
+                damping: 34,
+                mass: 0.85,
+              }}
+            >
+              {/* ── Drag Handle ─────────────────────────────────────────────── */}
+              {!isFullscreen && (
                 <div
-                  className={cn(
-                    "h-2.5 w-2.5 rounded-full shrink-0",
-                    priorityCfg.dot,
-                  )}
-                />
-                <div className="min-w-0">
-                  <div className="flex items-center flex-wrap">
-                    <span className="font-bold text-xl tracking-tighter">
-                      {getActivityDisplayCode(item)}
-                    </span>
-                  </div>
-                  <p className="text-sm tracking-tighter mt-0.5">
-                    Loại: {item.activityType} · Hoạt động số{" "}
-                    <strong>{item.activityId}</strong>
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <PriorityBadge priority={item.priority} />
-                <StatusBadge status={item.status} map={ACTIVITY_STATUS_MAP} />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 text-muted-foreground"
-                  onClick={() => setIsFullscreen((prev) => !prev)}
+                  className="flex flex-col items-center pt-2.5 pb-1 shrink-0 cursor-ns-resize select-none group touch-none"
+                  onPointerDown={handlePointerDown}
                 >
-                  {isFullscreen ? (
-                    <ArrowsIn className="h-4 w-4" />
-                  ) : (
-                    <ArrowsOut className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 text-muted-foreground"
-                  onClick={onClose}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* ── Scrollable Body ──────────────────────────────────────────── */}
-            <div className="flex-1 overflow-y-auto min-h-0">
-              <div className="p-5 space-y-5">
-                {/* 3-column info */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <InfoCard
-                    title="Thông tin nhiệm vụ"
-                    color="blue"
-                    icon={<Shield className="h-3.5 w-3.5" weight="fill" />}
-                  >
-                    <InfoKV label="Loại nhiệm vụ" value={item.missionType} />
-                    <InfoKV
-                      label="Trạng thái"
-                      value={
-                        <StatusBadge
-                          status={item.missionStatus}
-                          map={MISSION_STATUS_MAP}
-                        />
-                      }
-                    />
-                    <InfoKV
-                      label="Bắt đầu"
-                      value={formatDate(item.missionStartTime)}
-                    />
-                    <InfoKV
-                      label="Dự kiến kết thúc"
-                      value={formatDate(item.missionExpectedEndTime)}
-                    />
-                  </InfoCard>
-
-                  <InfoCard
-                    title={copy.detailCardTitle}
-                    color="violet"
-                    icon={
-                      <ClipboardText className="h-3.5 w-3.5" weight="fill" />
-                    }
-                  >
-                    <InfoKV
-                      label="Mã hoạt động"
-                      value={getActivityDisplayCode(item)}
-                      mono
-                    />
-                    <InfoKV label="Loại hoạt động" value={item.activityType} />
-                    <InfoKV
-                      label="Thời gian ước tính"
-                      value={formatDuration(item.estimatedTime)}
-                    />
-                    {isReturnActivity && (
-                      <>
-                        <InfoKV label="Kho xác nhận" value={item.depotName} />
-                        {"depotAddress" in item && item.depotAddress && (
-                          <InfoKV
-                            label="Địa chỉ kho"
-                            value={item.depotAddress}
-                          />
-                        )}
-                      </>
-                    )}
-                    {item.description && (
-                      <div className="pt-1.5 border-t border-border/30">
-                        <p className="text-sm font-medium leading-relaxed tracking-tighter">
-                          {item.description}
-                        </p>
-                      </div>
-                    )}
-                  </InfoCard>
-
-                  <InfoCard
-                    title="Đội cứu hộ"
-                    color="emerald"
-                    icon={<Users className="h-3.5 w-3.5" weight="fill" />}
-                  >
-                    <InfoKV
-                      label="Tên đội"
-                      value={
-                        <span className="font-semibold tracking-tighter">
-                          {item.rescueTeamName}
-                          <span className="text-muted-foreground font-normal">
-                            {" "}
-                            ({item.teamType})
-                          </span>
-                        </span>
-                      }
-                    />
-                    <InfoKV
-                      label="Phân công lúc"
-                      value={formatDate(item.assignedAt)}
-                    />
-                    {isHistory && hist && (
-                      <>
-                        <InfoKV
-                          label="Hoàn thành lúc"
-                          value={formatDate(hist.completedAt)}
-                        />
-                        <InfoKV
-                          label="Thực hiện bởi"
-                          value={hist.completedByName || "—"}
-                          bold
-                        />
-                      </>
-                    )}
-                  </InfoCard>
+                  <div className="h-1.5 w-14 rounded-full bg-border group-hover:bg-primary/50 group-active:bg-primary/70 transition-colors duration-150" />
+                  <span className="text-xs text-muted-foreground/80 mt-1 group-hover:text-muted-foreground/70 transition-colors flex items-center gap-0.5 tracking-tighter">
+                    <DotsSixVertical className="h-3 w-3" />
+                    kéo để thay đổi kích cỡ
+                  </span>
                 </div>
+              )}
 
-                {/* Items grid */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="h-6 w-6 rounded-md bg-orange-100 dark:bg-orange-950/40 flex items-center justify-center shrink-0">
-                      <Package
-                        className="h-5 w-5 text-orange-500"
-                        weight="fill"
-                      />
+              {/* ── Header ──────────────────────────────────────────────────── */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-border/50 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={cn(
+                      "h-2.5 w-2.5 rounded-full shrink-0",
+                      priorityCfg.dot,
+                    )}
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center flex-wrap">
+                      <span className="font-bold text-xl tracking-tighter">
+                        {getActivityDisplayCode(item)}
+                      </span>
                     </div>
-                    <span className="text-xl font-semibold tracking-tight">
-                      {isHistory
-                        ? copy.historyItemsLabel
-                        : copy.upcomingItemsLabel}
-                    </span>
-                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-100 text-orange-700 text-xs font-bold px-1.5 dark:bg-orange-950/50 dark:text-orange-400">
-                      {item.items.length}
-                    </span>
-                  </div>
-                  {item.items.length === 0 ? (
-                    <p className="text-sm text-muted-foreground tracking-tighter py-2">
-                      Không có vật phẩm
+                    <p className="text-sm tracking-tighter mt-0.5">
+                      Loại: {item.activityType} · Hoạt động số{" "}
+                      <strong>{item.activityId}</strong>
                     </p>
-                  ) : (
-                    <div className="flex flex-col gap-1.5">
-                      {isReturnActivity
-                        ? (item.items as UpcomingReturnItem[]).map(
-                            (it, idx) => (
-                              <ReturnItemCard
-                                key={it.itemId}
-                                item={it}
-                                index={idx}
-                              />
-                            ),
-                          )
-                        : item.items.map((it, idx) => (
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <PriorityBadge priority={item.priority} />
+                  <StatusBadge status={item.status} map={ACTIVITY_STATUS_MAP} />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground"
+                    onClick={() => setIsFullscreen((prev) => !prev)}
+                  >
+                    {isFullscreen ? (
+                      <ArrowsIn className="h-4 w-4" />
+                    ) : (
+                      <ArrowsOut className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-muted-foreground"
+                    onClick={onClose}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* ── Scrollable Body ──────────────────────────────────────────── */}
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="p-5 space-y-5">
+                  {/* 3-column info */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <InfoCard
+                      title="Thông tin nhiệm vụ"
+                      color="blue"
+                      icon={<Shield className="h-3.5 w-3.5" weight="fill" />}
+                    >
+                      <InfoKV label="Loại nhiệm vụ" value={item.missionType} />
+                      <InfoKV
+                        label="Trạng thái"
+                        value={
+                          <StatusBadge
+                            status={item.missionStatus}
+                            map={MISSION_STATUS_MAP}
+                          />
+                        }
+                      />
+                      <InfoKV
+                        label="Bắt đầu"
+                        value={formatDate(item.missionStartTime)}
+                      />
+                      <InfoKV
+                        label="Dự kiến kết thúc"
+                        value={formatDate(item.missionExpectedEndTime)}
+                      />
+                    </InfoCard>
+
+                    <InfoCard
+                      title={copy.detailCardTitle}
+                      color="violet"
+                      icon={
+                        <ClipboardText className="h-3.5 w-3.5" weight="fill" />
+                      }
+                    >
+                      <InfoKV
+                        label="Mã hoạt động"
+                        value={getActivityDisplayCode(item)}
+                        mono
+                      />
+                      <InfoKV
+                        label="Loại hoạt động"
+                        value={item.activityType}
+                      />
+                      <InfoKV
+                        label="Thời gian ước tính"
+                        value={formatDuration(item.estimatedTime)}
+                      />
+                      {isReturnActivity && (
+                        <>
+                          <InfoKV label="Kho xác nhận" value={item.depotName} />
+                          {"depotAddress" in item && item.depotAddress && (
+                            <InfoKV
+                              label="Địa chỉ kho"
+                              value={item.depotAddress}
+                            />
+                          )}
+                        </>
+                      )}
+                      {item.description && (
+                        <div className="pt-1.5 border-t border-border/30">
+                          <p className="text-sm font-medium leading-relaxed tracking-tighter">
+                            {item.description}
+                          </p>
+                        </div>
+                      )}
+                    </InfoCard>
+
+                    <InfoCard
+                      title="Đội cứu hộ"
+                      color="emerald"
+                      icon={<Users className="h-3.5 w-3.5" weight="fill" />}
+                    >
+                      <InfoKV
+                        label="Tên đội"
+                        value={
+                          <span className="font-semibold tracking-tighter">
+                            {item.rescueTeamName}
+                            <span className="text-muted-foreground font-normal">
+                              {" "}
+                              ({item.teamType})
+                            </span>
+                          </span>
+                        }
+                      />
+                      <InfoKV
+                        label="Phân công lúc"
+                        value={formatDate(item.assignedAt)}
+                      />
+                      {isHistory && hist && (
+                        <>
+                          <InfoKV
+                            label="Hoàn thành lúc"
+                            value={formatDate(hist.completedAt)}
+                          />
+                          <InfoKV
+                            label="Thực hiện bởi"
+                            value={hist.completedByName || "—"}
+                            bold
+                          />
+                        </>
+                      )}
+                    </InfoCard>
+                  </div>
+
+                  {/* Items grid */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-6 w-6 rounded-md bg-orange-100 dark:bg-orange-950/40 flex items-center justify-center shrink-0">
+                        <Package
+                          className="h-5 w-5 text-orange-500"
+                          weight="fill"
+                        />
+                      </div>
+                      <span className="text-xl font-semibold tracking-tight">
+                        {isHistory
+                          ? copy.historyItemsLabel
+                          : copy.upcomingItemsLabel}
+                      </span>
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-100 text-orange-700 text-xs font-bold px-1.5 dark:bg-orange-950/50 dark:text-orange-400">
+                        {item.items.length}
+                      </span>
+                    </div>
+                    {item.items.length === 0 ? (
+                      <p className="text-sm text-muted-foreground tracking-tighter py-2">
+                        Không có vật phẩm
+                      </p>
+                    ) : (
+                      <div
+                        className={
+                          isReturnActivity
+                            ? "overflow-x-auto"
+                            : "flex flex-col gap-1.5"
+                        }
+                      >
+                        {isReturnActivity ? (
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b border-border/50">
+                                <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground w-12"></th>
+                                <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground">
+                                  Tên vật phẩm
+                                </th>
+                                <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
+                                  Dự kiến hoàn trả
+                                </th>
+                                <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
+                                  Đã trả thực tế
+                                </th>
+                                <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground">
+                                  Lô dự kiến trả
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(item.items as UpcomingReturnItem[]).map(
+                                (it) => {
+                                  const expectedQty = Number.isFinite(
+                                    it.quantity,
+                                  )
+                                    ? it.quantity
+                                    : 0;
+                                  const actualQty = Number.isFinite(
+                                    it.actualReturnedQuantity,
+                                  )
+                                    ? it.actualReturnedQuantity
+                                    : 0;
+                                  const lots =
+                                    getExpectedReturnLotAllocations(it);
+                                  return (
+                                    <tr
+                                      key={it.itemId}
+                                      className="border-b border-border/30 hover:bg-muted/30 transition-colors"
+                                    >
+                                      <td className="p-3 w-10">
+                                        {it.imageUrl ? (
+                                          <button
+                                            onClick={() =>
+                                              setPreviewUrl(it.imageUrl!)
+                                            }
+                                            className="inline-flex items-center justify-center h-8 w-8 rounded transition-colors"
+                                            title="Xem ảnh"
+                                          >
+                                            <Eye className="h-4 w-4 text-muted-foreground" />
+                                          </button>
+                                        ) : (
+                                          <div className="inline-flex items-center justify-center h-8 w-8">
+                                            <Package
+                                              className="h-4 w-4 text-muted-foreground/30"
+                                              weight="fill"
+                                            />
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td className="p-3">
+                                        <p className="text-sm font-medium tracking-tighter">
+                                          {it.itemName}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground tracking-tighter">
+                                          Mã vật phẩm số {it.itemId}
+                                        </p>
+                                      </td>
+                                      <td className="p-3 text-right">
+                                        <span className="text-sm font-semibold tracking-tighter text-blue-600 dark:text-blue-300">
+                                          {expectedQty.toLocaleString("vi-VN")}{" "}
+                                          {it.unit}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-right">
+                                        <span className="text-sm font-semibold tracking-tighter text-emerald-600 dark:text-emerald-300">
+                                          {actualQty.toLocaleString("vi-VN")}{" "}
+                                          {it.unit}
+                                        </span>
+                                      </td>
+                                      <td className="p-3">
+                                        {lots.length === 0 ? (
+                                          <span className="text-sm text-muted-foreground tracking-tighter">
+                                            —
+                                          </span>
+                                        ) : (
+                                          <div className="flex flex-col gap-1">
+                                            {lots.map((lot) => (
+                                              <div
+                                                key={lot.lotId}
+                                                className="text-sm tracking-tighter leading-snug"
+                                              >
+                                                <span className="font-semibold text-foreground">
+                                                  Lô số {lot.lotId}
+                                                </span>
+                                                <span className="text-muted-foreground">
+                                                  {" "}
+                                                  —{" "}
+                                                  {lot.quantityTaken.toLocaleString(
+                                                    "vi-VN",
+                                                  )}{" "}
+                                                  {it.unit}
+                                                </span>
+                                                {lot.expiredDate && (
+                                                  <span className="text-muted-foreground">
+                                                    {" "}
+                                                    · HSD:{" "}
+                                                    {new Date(
+                                                      lot.expiredDate,
+                                                    ).toLocaleDateString(
+                                                      "vi-VN",
+                                                    )}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                },
+                              )}
+                            </tbody>
+                          </table>
+                        ) : (
+                          item.items.map((it, idx) => (
                             <motion.div
                               key={it.itemId}
                               className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 hover:bg-orange-50/60 dark:hover:bg-orange-950/20 transition-colors px-3 py-2.5"
@@ -1729,23 +1978,41 @@ function DetailPanel({
                                 </span>
                               </div>
                             </motion.div>
-                          ))}
-                    </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {canConfirmReturn && (
+                    <ConfirmReturnFormSection
+                      activity={item as UpcomingReturnEntity}
+                      onConfirmed={onConfirmed ?? onClose}
+                    />
                   )}
                 </div>
-
-                {canConfirmReturn && (
-                  <ConfirmReturnFormSection
-                    activity={item as UpcomingReturnEntity}
-                    onConfirmed={onClose}
-                  />
-                )}
               </div>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Image preview dialog */}
+      <Dialog
+        open={!!previewUrl}
+        onOpenChange={(open) => !open && setPreviewUrl(null)}
+      >
+        <DialogContent className="max-w-2xl p-2 bg-black/90 border-0">
+          {previewUrl && (
+            <img
+              src={previewUrl}
+              alt="Xem ảnh vật phẩm"
+              className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -2691,6 +2958,10 @@ function ActivityOperationsPanel({
         item={selectedItem}
         open={panelOpen}
         onClose={handleClose}
+        onConfirmed={() => {
+          handleClose();
+          setActiveTab("history");
+        }}
         mode={activeTab}
         activityKind={activityKind}
       />

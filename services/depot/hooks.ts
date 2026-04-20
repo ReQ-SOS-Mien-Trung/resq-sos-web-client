@@ -17,6 +17,7 @@ import {
   createDepot,
   updateDepot,
   updateDepotStatus,
+  initiateDepotClosing,
   assignDepotManager,
   unassignDepotManager,
   updateDepotAdvanceLimit,
@@ -56,11 +57,12 @@ import {
   AvailableDepotManager,
   DepotActiveManager,
   ManagedDepotSummary,
-  DepotFund,
   MyDepotFund,
   UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
+  InitiateDepotClosingRequest,
+  InitiateDepotClosingResponse,
   AssignDepotManagerRequest,
   UnassignDepotManagerRequest,
   DepotManagerAssignmentResponse,
@@ -443,6 +445,33 @@ export function useUpdateDepotStatus() {
       queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
       queryClient.invalidateQueries({
         queryKey: [...DEPOTS_QUERY_KEY, variables.id],
+      });
+    },
+  });
+}
+
+/**
+ * Hook to move a depot into Closing status before the closure workflow starts
+ */
+export function useInitiateDepotClosing() {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    InitiateDepotClosingResponse,
+    Error,
+    InitiateDepotClosingRequest
+  >({
+    mutationFn: initiateDepotClosing,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOTS_QUERY_KEY, variables.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_CLOSURE_BY_DEPOT_QUERY_KEY, variables.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [...DEPOT_CLOSURE_DETAIL_BY_DEPOT_QUERY_KEY, variables.id],
       });
     },
   });

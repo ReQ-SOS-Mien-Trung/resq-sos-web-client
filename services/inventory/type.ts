@@ -568,6 +568,14 @@ export interface ReturnReusableUnit {
   note: string | null;
 }
 
+export interface PickupLotAllocation {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate?: string | null;
+  expiredDate?: string | null;
+  remainingQuantityAfterExecution?: number | null;
+}
+
 export interface UpcomingReturnItem {
   itemId: number;
   itemName: string;
@@ -575,8 +583,11 @@ export interface UpcomingReturnItem {
   quantity: number;
   unit: string;
   actualReturnedQuantity: number;
+  expiredDate?: string | null;
   expectedReturnUnits: ReturnReusableUnit[];
   returnedReusableUnits: ReturnReusableUnit[];
+  expectedReturnLotAllocations?: PickupLotAllocation[];
+  pickupLotAllocations?: PickupLotAllocation[];
 }
 
 interface ReturnActivityEntityBase {
@@ -791,3 +802,56 @@ export interface UpdateSupplyRequestPriorityConfigPayload {
 }
 
 export type SupplyRequestPriorityLevel = InventoryCategory;
+
+// ─── Disposal / Decommission ───
+
+export interface ExpiringLotItem {
+  lotId: number;
+  itemModelId: number;
+  itemModelName: string;
+  remainingQuantity: number;
+  expiredDate: string;
+  receivedDate: string;
+  sourceType: string;
+  isExpired: boolean;
+}
+
+export interface GetExpiringLotsParams {
+  depotId: number;
+  daysAhead?: number;
+}
+
+export type GetExpiringLotsResponse = ExpiringLotItem[];
+
+export interface DisposeLotPayload {
+  lotId: number;
+  quantity: number;
+  reason: string;
+  note?: string;
+}
+
+export interface DisposeLotParams {
+  depotId: number;
+  lotId: number;
+  payload: DisposeLotPayload;
+}
+
+export interface DisposeLotResponse {
+  message: string;
+}
+
+export interface DecommissionReusablePayload {
+  note: string;
+}
+
+export interface DecommissionReusableParams {
+  depotId: number;
+  itemId: number;
+  payload: DecommissionReusablePayload;
+}
+
+export interface DecommissionReusableResponse {
+  message: string;
+}
+
+export type ReusableItemStatus = InventoryCategory;

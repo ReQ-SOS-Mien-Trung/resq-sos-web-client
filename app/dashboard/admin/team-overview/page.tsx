@@ -31,10 +31,7 @@ import {
   useRescueTeamStatuses,
   useRescueTeamTypes,
 } from "@/services/rescue_teams/hooks";
-import {
-  TeamDetailPanel,
-  getStatusBadge,
-} from "@/components/admin/team-overview/TeamDetailPanel";
+import { TeamDetailPanel } from "@/components/admin/team-overview/TeamDetailPanel";
 
 type SortColumn =
   | "name"
@@ -45,12 +42,17 @@ type SortColumn =
 type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
 
-const TEAM_TYPE_BADGE_CLASS: Record<string, string> = {
-  Rescue: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
-  Medical: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
-  Transportation: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-  Mixed: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
-};
+const STATUS_BADGE_TONES = [
+  "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+  "bg-violet-500/10 text-violet-700 dark:text-violet-400",
+  "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+  "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400",
+  "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+  "bg-slate-500/10 text-slate-700 dark:text-slate-400",
+  "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400",
+];
 
 const SortIcon = ({
   column,
@@ -117,25 +119,31 @@ const TeamOverviewPage = () => {
   const rescueTeamStatusMap = Object.fromEntries(
     rescueTeamStatuses.map((status) => [status.key, status.value]),
   );
+  const rescueTeamStatusBadgeMap = Object.fromEntries(
+    rescueTeamStatuses.map((status, idx) => [
+      status.key,
+      STATUS_BADGE_TONES[idx % STATUS_BADGE_TONES.length],
+    ]),
+  );
   const rescueTeamTypeMap = Object.fromEntries(
     rescueTeamTypes.map((type) => [type.key, type.value]),
   );
 
   const sortedTeams = sort
     ? [...teams].sort((a, b) => {
-        let cmp = 0;
-        if (sort.column === "name") cmp = a.name.localeCompare(b.name, "vi");
-        else if (sort.column === "status")
-          cmp = a.status.localeCompare(b.status);
-        else if (sort.column === "teamType")
-          cmp = a.teamType.localeCompare(b.teamType);
-        else if (sort.column === "currentMemberCount")
-          cmp = a.currentMemberCount - b.currentMemberCount;
-        else if (sort.column === "updatedAt")
-          cmp =
-            new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-        return sort.dir === "asc" ? cmp : -cmp;
-      })
+      let cmp = 0;
+      if (sort.column === "name") cmp = a.name.localeCompare(b.name, "vi");
+      else if (sort.column === "status")
+        cmp = a.status.localeCompare(b.status);
+      else if (sort.column === "teamType")
+        cmp = a.teamType.localeCompare(b.teamType);
+      else if (sort.column === "currentMemberCount")
+        cmp = a.currentMemberCount - b.currentMemberCount;
+      else if (sort.column === "updatedAt")
+        cmp =
+          new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      return sort.dir === "asc" ? cmp : -cmp;
+    })
     : teams;
 
   const handleSort = (column: SortColumn) => {
@@ -282,14 +290,13 @@ const TeamOverviewPage = () => {
                       sortedTeams.map(
                         (team: RescueTeamOverviewItem, rowIdx: number) => {
                           const isExpanded = expandedTeamId === team.id;
-                          const statusBadge = getStatusBadge(team.status);
                           const statusLabel =
                             rescueTeamStatusMap[team.status] ?? team.status;
+                          const statusBadgeClass =
+                            rescueTeamStatusBadgeMap[team.status] ??
+                            "bg-muted text-muted-foreground";
                           const teamTypeLabel =
                             rescueTeamTypeMap[team.teamType] ?? team.teamType;
-                          const teamTypeBadgeClass =
-                            TEAM_TYPE_BADGE_CLASS[team.teamType] ??
-                            "border-border/60 bg-background text-foreground";
                           return (
                             <React.Fragment key={team.id}>
                               <tr
@@ -324,15 +331,13 @@ const TeamOverviewPage = () => {
                                   </span>
                                 </td>
                                 <td className="p-3">
-                                  <Badge
-                                    className={`text-sm tracking-tighter ${teamTypeBadgeClass}`}
-                                  >
+                                  <span className="text-sm font-medium tracking-tighter text-foreground/80">
                                     {teamTypeLabel}
-                                  </Badge>
+                                  </span>
                                 </td>
                                 <td className="p-3">
                                   <Badge
-                                    className={`text-sm ${statusBadge.className}`}
+                                    className={`text-[13px] ${statusBadgeClass}`}
                                   >
                                     {statusLabel}
                                   </Badge>

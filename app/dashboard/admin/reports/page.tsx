@@ -67,6 +67,8 @@ import {
   List,
   HandCoinsIcon,
   WarehouseIcon,
+  ArrowsOut,
+  ArrowsIn,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/admin/dashboard";
@@ -84,6 +86,7 @@ import type {
 import {
   useDepotMetadata,
   useDepotFunds,
+  useDepotFundTransactionsByFundId,
   useUpdateDepotAdvanceLimit,
 } from "@/services/depot/hooks";
 import type { DepotFund, DepotFundReferenceType } from "@/services/depot/type";
@@ -134,45 +137,6 @@ const STATUS_LABEL_MAP: Record<string, string> = {
 };
 
 const PANEL_WIDTH = 480;
-
-const DEPOT_CARD_ACCENTS = [
-  {
-    border: "border-l-sky-500",
-    background: "bg-sky-50/45 hover:bg-sky-100/75",
-    hover:
-      "hover:border-sky-200 hover:shadow-[0_22px_44px_-32px_rgba(14,165,233,0.55)]",
-  },
-  {
-    border: "border-l-emerald-500",
-    background: "bg-emerald-50/45 hover:bg-emerald-100/75",
-    hover:
-      "hover:border-emerald-200 hover:shadow-[0_22px_44px_-32px_rgba(16,185,129,0.55)]",
-  },
-  {
-    border: "border-l-violet-500",
-    background: "bg-violet-50/45 hover:bg-violet-100/75",
-    hover:
-      "hover:border-violet-200 hover:shadow-[0_22px_44px_-32px_rgba(139,92,246,0.45)]",
-  },
-  {
-    border: "border-l-amber-500",
-    background: "bg-amber-50/45 hover:bg-amber-100/75",
-    hover:
-      "hover:border-amber-200 hover:shadow-[0_22px_44px_-32px_rgba(245,158,11,0.45)]",
-  },
-  {
-    border: "border-l-rose-500",
-    background: "bg-rose-50/45 hover:bg-rose-100/75",
-    hover:
-      "hover:border-rose-200 hover:shadow-[0_22px_44px_-32px_rgba(244,63,94,0.45)]",
-  },
-  {
-    border: "border-l-cyan-500",
-    background: "bg-cyan-50/45 hover:bg-cyan-100/75",
-    hover:
-      "hover:border-cyan-200 hover:shadow-[0_22px_44px_-32px_rgba(6,182,212,0.45)]",
-  },
-] as const;
 
 function formatMoney(
   value: number | null | undefined,
@@ -426,32 +390,23 @@ export default function FundingRequestsPage() {
   const [selectedDepotFund, setSelectedDepotFund] = useState<DepotFund | null>(
     null,
   );
+  const [selectedFundSourceId, setSelectedFundSourceId] = useState<
+    number | null
+  >(null);
   const [depotTxPanelOpen, setDepotTxPanelOpen] = useState(false);
+  const [depotTxFullscreen, setDepotTxFullscreen] = useState(false);
   const [depotTxPage, setDepotTxPage] = useState(1);
   const [depotTxPageSize, setDepotTxPageSize] = useState(10);
   const [depotTxSearchInput, setDepotTxSearchInput] = useState("");
-  const [depotTxSearch, setDepotTxSearch] = useState("");
   const [depotTxReferenceType, setDepotTxReferenceType] = useState<
     "all" | DepotFundReferenceType
   >("all");
-  const [depotTxAppliedReferenceType, setDepotTxAppliedReferenceType] =
-    useState<"all" | DepotFundReferenceType>("all");
   const [depotTxFromDate, setDepotTxFromDate] = useState<Date | undefined>();
   const [depotTxToDate, setDepotTxToDate] = useState<Date | undefined>();
-  const [depotTxAppliedFromDate, setDepotTxAppliedFromDate] = useState<
-    Date | undefined
-  >();
-  const [depotTxAppliedToDate, setDepotTxAppliedToDate] = useState<
-    Date | undefined
-  >();
   const [depotTxFromDateOpen, setDepotTxFromDateOpen] = useState(false);
   const [depotTxToDateOpen, setDepotTxToDateOpen] = useState(false);
   const [depotTxMinAmountInput, setDepotTxMinAmountInput] = useState("");
   const [depotTxMaxAmountInput, setDepotTxMaxAmountInput] = useState("");
-  const [depotTxMinAmount, setDepotTxMinAmount] = useState("");
-  const [depotTxMaxAmount, setDepotTxMaxAmount] = useState("");
-  const [depotTxDateError, setDepotTxDateError] = useState("");
-  const [depotTxAmountError, setDepotTxAmountError] = useState("");
 
   // Review dialogs
   const [approveDialog, setApproveDialog] = useState<{
@@ -502,39 +457,142 @@ export default function FundingRequestsPage() {
     [campaignsData],
   );
   const { data: categoriesData } = useInventoryCategories();
+  const depotTxSearch = useMemo(
+    () => depotTxSearchInput.trim(),
+    [depotTxSearchInput],
+  );
+  const depotTxDateError = useMemo(
+    () =>
+      depotTxFromDate && depotTxToDate && depotTxFromDate > depotTxToDate
+        ? "Ngày bắt đầu không được sau ngày kết thúc"
+        : "",
+    [depotTxFromDate, depotTxToDate],
+  );
+  const depotTxAmountError = useMemo(() => {
+    const min = depotTxMinAmountInput
+      ? Number(depotTxMinAmountInput)
+      : undefined;
+    const max = depotTxMaxAmountInput
+      ? Number(depotTxMaxAmountInput)
+      : undefined;
+
+    if (min !== undefined && max !== undefined && min > max) {
+      return "Số tiền tối thiểu không được lớn hơn tối đa";
+    }
+
+    return "";
+  }, [depotTxMaxAmountInput, depotTxMinAmountInput]);
+  const depotTxMinAmount = useMemo(
+    () =>
+      depotTxAmountError || !depotTxMinAmountInput
+        ? undefined
+        : Number(depotTxMinAmountInput),
+    [depotTxAmountError, depotTxMinAmountInput],
+  );
+  const depotTxMaxAmount = useMemo(
+    () =>
+      depotTxAmountError || !depotTxMaxAmountInput
+        ? undefined
+        : Number(depotTxMaxAmountInput),
+    [depotTxAmountError, depotTxMaxAmountInput],
+  );
+  const depotTxApiFromDate = useMemo(
+    () => (depotTxDateError ? undefined : depotTxFromDate),
+    [depotTxDateError, depotTxFromDate],
+  );
+  const depotTxApiToDate = useMemo(
+    () => (depotTxDateError ? undefined : depotTxToDate),
+    [depotTxDateError, depotTxToDate],
+  );
   const depotTxParams = useMemo(
     () => ({
       depotId: selectedDepotFund?.depotId ?? 0,
       pageNumber: depotTxPage,
       pageSize: depotTxPageSize,
       search: depotTxSearch || undefined,
-      fromDate: depotTxAppliedFromDate
-        ? format(depotTxAppliedFromDate, "yyyy-MM-dd")
+      fromDate: depotTxApiFromDate
+        ? format(depotTxApiFromDate, "yyyy-MM-dd")
         : undefined,
-      toDate: depotTxAppliedToDate
-        ? format(depotTxAppliedToDate, "yyyy-MM-dd")
+      toDate: depotTxApiToDate
+        ? format(depotTxApiToDate, "yyyy-MM-dd")
         : undefined,
-      minAmount: depotTxMinAmount ? Number(depotTxMinAmount) : undefined,
-      maxAmount: depotTxMaxAmount ? Number(depotTxMaxAmount) : undefined,
+      minAmount: depotTxMinAmount,
+      maxAmount: depotTxMaxAmount,
       referenceTypes:
-        depotTxAppliedReferenceType === "all"
-          ? undefined
-          : [depotTxAppliedReferenceType],
+        depotTxReferenceType === "all" ? undefined : [depotTxReferenceType],
     }),
     [
-      depotTxAppliedFromDate,
-      depotTxAppliedReferenceType,
-      depotTxAppliedToDate,
+      depotTxApiFromDate,
+      depotTxApiToDate,
       depotTxMaxAmount,
       depotTxMinAmount,
       depotTxPage,
       depotTxPageSize,
+      depotTxReferenceType,
       depotTxSearch,
       selectedDepotFund?.depotId,
     ],
   );
   const { data: depotTxData, isLoading: loadingDepotTx } =
-    useDepotFundTransactions(depotTxParams);
+    useDepotFundTransactions(depotTxParams, {
+      enabled:
+        depotTxPanelOpen &&
+        !!selectedDepotFund?.depotId &&
+        selectedFundSourceId === null,
+    });
+  const { data: fundTxByIdData, isLoading: loadingFundTxById } =
+    useDepotFundTransactionsByFundId(
+      selectedFundSourceId ?? undefined,
+      {
+        depotId: selectedDepotFund?.depotId ?? 0,
+        pageNumber: depotTxPage,
+        pageSize: depotTxPageSize,
+        search: depotTxSearch || undefined,
+        fromDate: depotTxApiFromDate
+          ? format(depotTxApiFromDate, "yyyy-MM-dd")
+          : undefined,
+        toDate: depotTxApiToDate
+          ? format(depotTxApiToDate, "yyyy-MM-dd")
+          : undefined,
+        minAmount: depotTxMinAmount,
+        maxAmount: depotTxMaxAmount,
+        referenceTypes:
+          depotTxReferenceType === "all" ? undefined : [depotTxReferenceType],
+      },
+      {
+        enabled:
+          depotTxPanelOpen &&
+          !!selectedDepotFund?.depotId &&
+          selectedFundSourceId !== null,
+      },
+    );
+  const activeDepotTxData = useMemo(
+    () => (selectedFundSourceId !== null ? fundTxByIdData : depotTxData),
+    [depotTxData, fundTxByIdData, selectedFundSourceId],
+  );
+  const loadingActiveDepotTx =
+    selectedFundSourceId !== null ? loadingFundTxById : loadingDepotTx;
+  const selectedFundSource = useMemo(
+    () =>
+      selectedDepotFund?.funds.find(
+        (fund) => fund.id === selectedFundSourceId,
+      ) ?? null,
+    [selectedDepotFund?.funds, selectedFundSourceId],
+  );
+  const activeDepotTxItems = useMemo(
+    () =>
+      (activeDepotTxData?.items ?? []).map((tx) => ({
+        ...tx,
+        phoneNumber:
+          "phoneNumber" in tx ? tx.phoneNumber : tx.contributorPhoneNumber,
+      })),
+    [activeDepotTxData],
+  );
+  const activeDepotTxTotalCount = activeDepotTxData?.totalCount ?? 0;
+  const activeDepotTxTotalPages = activeDepotTxData?.totalPages ?? 1;
+  const activeDepotTxHasPreviousPage =
+    activeDepotTxData?.hasPreviousPage ?? false;
+  const activeDepotTxHasNextPage = activeDepotTxData?.hasNextPage ?? false;
   const { data: txTypesMeta = [] } = useDepotFundTransactionTypes();
   const { data: refTypesMeta = [] } = useDepotFundReferenceTypes();
   const txTypeMap = useMemo(
@@ -564,6 +622,7 @@ export default function FundingRequestsPage() {
       ) as Record<string, string>,
     [categoriesData],
   );
+
   const { mutate: approve, isPending: isApproving } =
     useApproveFundingRequest();
   const { mutate: reject, isPending: isRejecting } = useRejectFundingRequest();
@@ -671,51 +730,13 @@ export default function FundingRequestsPage() {
 
   function resetDepotTxFilters() {
     setDepotTxSearchInput("");
-    setDepotTxSearch("");
     setDepotTxReferenceType("all");
-    setDepotTxAppliedReferenceType("all");
     setDepotTxFromDate(undefined);
     setDepotTxToDate(undefined);
-    setDepotTxAppliedFromDate(undefined);
-    setDepotTxAppliedToDate(undefined);
     setDepotTxFromDateOpen(false);
     setDepotTxToDateOpen(false);
     setDepotTxMinAmountInput("");
     setDepotTxMaxAmountInput("");
-    setDepotTxMinAmount("");
-    setDepotTxMaxAmount("");
-    setDepotTxDateError("");
-    setDepotTxAmountError("");
-    setDepotTxPage(1);
-  }
-
-  function applyDepotTxFilters() {
-    if (depotTxFromDate && depotTxToDate && depotTxFromDate > depotTxToDate) {
-      setDepotTxDateError("Ngày bắt đầu không được sau ngày kết thúc");
-      return;
-    }
-
-    setDepotTxDateError("");
-
-    const min = depotTxMinAmountInput
-      ? Number(depotTxMinAmountInput)
-      : undefined;
-    const max = depotTxMaxAmountInput
-      ? Number(depotTxMaxAmountInput)
-      : undefined;
-
-    if (min !== undefined && max !== undefined && min > max) {
-      setDepotTxAmountError("Số tiền tối thiểu không được lớn hơn tối đa");
-      return;
-    }
-
-    setDepotTxAmountError("");
-    setDepotTxSearch(depotTxSearchInput.trim());
-    setDepotTxAppliedReferenceType(depotTxReferenceType);
-    setDepotTxAppliedFromDate(depotTxFromDate);
-    setDepotTxAppliedToDate(depotTxToDate);
-    setDepotTxMinAmount(depotTxMinAmountInput);
-    setDepotTxMaxAmount(depotTxMaxAmountInput);
     setDepotTxPage(1);
   }
 
@@ -732,6 +753,7 @@ export default function FundingRequestsPage() {
   // Open depot fund transaction panel
   const openDepotFundPanel = (fund: DepotFund) => {
     setSelectedDepotFund(fund);
+    setSelectedFundSourceId(null);
     resetDepotTxFilters();
     if (panelOpen) {
       setPanelOpen(false);
@@ -969,62 +991,52 @@ export default function FundingRequestsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {depotFunds.map((fund, index) =>
                     (() => {
-                      const accent =
-                        DEPOT_CARD_ACCENTS[index % DEPOT_CARD_ACCENTS.length];
                       const primarySource = fund.funds[0];
 
                       return (
                         <div
                           key={`${fund.depotId}-${fund.depotName}-${fund.funds.length}-${index}`}
                           onClick={() => openDepotFundPanel(fund)}
-                          className={`rounded-2xl border border-l-[6px] p-4 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 ${accent.border} ${accent.background} ${accent.hover} ${
-                            selectedDepotFund?.depotId === fund.depotId &&
+                          className={`rounded-2xl border bg-card p-4 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 hover:border-border hover:bg-muted/10 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.22)] ${selectedDepotFund?.depotId === fund.depotId &&
                             depotTxPanelOpen
-                              ? "border-primary ring-1 ring-primary/30 shadow-sm"
-                              : "border-border/60 hover:border-border"
-                          }`}
+                            ? "border-primary ring-1 ring-primary/25 shadow-sm"
+                            : "border-border/60"
+                            }`}
                         >
-                          <div className="flex items-start justify-between gap-3 mb-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold tracking-tighter text-foreground line-clamp-2">
+                          <div className="mb-2 flex w-full items-start">
+                            <div className="min-w-0 w-full pr-2">
+                              <p className="line-clamp-2 text-xl font-semibold leading-tight tracking-tighter text-foreground">
                                 {fund.depotName}
                               </p>
-                              <p className="text-sm text-muted-foreground tracking-tighter mt-1">
-                                {fund.funds.length} quỹ nguồn
+                              <p className="text-sm text-muted-foreground tracking-tighter">
+                                ID {fund.depotId}
                               </p>
                             </div>
-                            <Badge
-                              variant="secondary"
-                              className="shrink-0 rounded-full px-2.5 py-1 text-sm tracking-tighter font-medium"
-                            >
-                              ID {fund.depotId}
-                            </Badge>
                           </div>
 
                           <p
-                            className={`text-2xl font-bold tracking-tighter ${
-                              getDepotFundTotalBalance(fund) < 0
-                                ? "text-red-600 dark:text-red-400"
-                                : "text-emerald-600 dark:text-emerald-400"
-                            }`}
+                            className={`text-3xl font-bold tracking-tighter ${getDepotFundTotalBalance(fund) < 0
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                              }`}
                           >
                             {formatMoney(getDepotFundTotalBalance(fund))}
                           </p>
 
-                          <div className="mt-3 grid grid-cols-2 gap-2">
-                            <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+                          <div className="mt-1 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2">
+                            <div className="rounded-xl border border-dashed border-border/90 bg-muted/20 px-3 py-2">
                               <p className="text-sm tracking-tighter font-medium text-muted-foreground">
                                 Hạn mức ứng
                               </p>
-                              <p className="mt-1 text-sm font-semibold tracking-tighter">
+                              <p className="text-base font-semibold tracking-tighter">
                                 {formatMoney(fund.advanceLimit)}
                               </p>
                             </div>
-                            <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+                            <div className="rounded-xl border border-dashed border-border/90 bg-muted/20 px-3 py-2">
                               <p className="text-sm tracking-tighter font-medium text-muted-foreground">
                                 Đang ứng
                               </p>
-                              <p className="mt-1 text-sm font-semibold tracking-tighter text-blue-600">
+                              <p className="text-base font-semibold tracking-tighter text-blue-600">
                                 {formatMoney(fund.outstandingAdvanceAmount)}
                               </p>
                             </div>
@@ -1032,7 +1044,7 @@ export default function FundingRequestsPage() {
 
                           {primarySource && (
                             <div className="mt-3 space-y-1.5">
-                              <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border/50 px-3 py-2">
+                              <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border/90 px-3 py-2">
                                 <div className="min-w-0">
                                   <p className="text-sm font-medium tracking-tighter truncate">
                                     {primarySource.fundSourceName}
@@ -1043,19 +1055,19 @@ export default function FundingRequestsPage() {
                                 </span>
                               </div>
                               {fund.funds.length > 1 && (
-                                <p className="text-sm text-muted-foreground tracking-tighter">
+                                <p className="text-xs italic text-muted-foreground tracking-tighter">
                                   Thêm {fund.funds.length - 1} nguồn quỹ khác
                                 </p>
                               )}
                             </div>
                           )}
 
-                          <p className="text-sm text-muted-foreground tracking-tighter mt-3">
+                          <p className="mt-1 text-right text-xs tracking-tighter text-muted-foreground">
                             Cập nhật gần nhất:{" "}
                             {getDepotFundLatestUpdatedAt(fund)
                               ? new Date(
-                                  getDepotFundLatestUpdatedAt(fund) as string,
-                                ).toLocaleString("vi-VN")
+                                getDepotFundLatestUpdatedAt(fund) as string,
+                              ).toLocaleString("vi-VN")
                               : "—"}
                           </p>
                         </div>
@@ -1187,9 +1199,8 @@ export default function FundingRequestsPage() {
 
               <div className="ml-auto text-sm tracking-tighter text-muted-foreground whitespace-nowrap">
                 {hasFilters
-                  ? `${filtered.length} / ${
-                      data?.totalCount ?? items.length
-                    } yêu cầu`
+                  ? `${filtered.length} / ${data?.totalCount ?? items.length
+                  } yêu cầu`
                   : `${data?.totalCount ?? items.length} yêu cầu`}
               </div>
             </div>
@@ -1260,10 +1271,7 @@ export default function FundingRequestsPage() {
                             {formatMoney(item.totalAmount)}
                           </td>
                           <td className="p-3">
-                            <Badge className={`${st.className} border gap-1`}>
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${st.dotColor}`}
-                              />
+                            <Badge className={`${st.className} border px-2 py-0.5 text-[13px] font-medium`}>
                               {st.label}
                             </Badge>
                           </td>
@@ -1313,6 +1321,7 @@ export default function FundingRequestsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
                         <SelectItem value="10">10</SelectItem>
                         <SelectItem value="20">20</SelectItem>
                         <SelectItem value="50">50</SelectItem>
@@ -1455,8 +1464,8 @@ export default function FundingRequestsPage() {
                           Duyệt bởi: {selectedItem.reviewedByUserName} ·{" "}
                           {selectedItem.reviewedAt
                             ? new Date(selectedItem.reviewedAt).toLocaleString(
-                                "vi-VN",
-                              )
+                              "vi-VN",
+                            )
                             : ""}
                         </p>
                       )}
@@ -1523,7 +1532,7 @@ export default function FundingRequestsPage() {
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground tracking-tighter">
                           <span>
-                            SL: {item.quantity} {item.unit}
+                            Số lượng: {item.quantity} {item.unit}
                           </span>
                           <span>Đơn giá: {formatMoney(item.unitPrice)}</span>
                           {hasMeasurementValue(item.volumePerUnit) && (
@@ -1589,15 +1598,53 @@ export default function FundingRequestsPage() {
           setDepotTxPanelOpen(val);
           if (!val) {
             setSelectedDepotFund(null);
+            setSelectedFundSourceId(null);
+            setDepotTxFullscreen(false);
             resetDepotTxFilters();
           }
         }}
       >
         <SheetContent
           side="bottom"
-          className="h-[85vh] overflow-y-auto rounded-t-2xl p-6"
+          showClose={false}
+          className={`overflow-y-auto p-6 transition-all ${depotTxFullscreen ? "h-dvh rounded-none" : "h-[85vh] rounded-t-2xl"
+            }`}
         >
-          <SheetHeader className="pb-4 border-b mb-4">
+          <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground"
+              onClick={() => setDepotTxFullscreen((prev) => !prev)}
+            >
+              {depotTxFullscreen ? (
+                <ArrowsIn size={16} weight="bold" />
+              ) : (
+                <ArrowsOut size={16} weight="bold" />
+              )}
+              <span className="sr-only">
+                {depotTxFullscreen ? "Thu gọn panel" : "Mở rộng toàn màn hình"}
+              </span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground"
+              onClick={() => {
+                setDepotTxPanelOpen(false);
+                setSelectedDepotFund(null);
+                setSelectedFundSourceId(null);
+                setDepotTxFullscreen(false);
+                resetDepotTxFilters();
+              }}
+            >
+              <X size={18} weight="bold" />
+              <span className="sr-only">Đóng panel</span>
+            </Button>
+          </div>
+          <SheetHeader className="mb-4 border-b pb-4 pr-24">
             <SheetTitle className="tracking-tighter text-xl flex items-center gap-2">
               <List size={18} className="text-primary" />
               Lịch sử giao dịch quỹ kho
@@ -1616,11 +1663,10 @@ export default function FundingRequestsPage() {
                     Tổng số dư
                   </p>
                   <p
-                    className={`text-xl font-bold tracking-tighter ${
-                      getDepotFundTotalBalance(selectedDepotFund) < 0
-                        ? "text-red-600"
-                        : "text-emerald-600"
-                    }`}
+                    className={`text-xl font-bold tracking-tighter ${getDepotFundTotalBalance(selectedDepotFund) < 0
+                      ? "text-red-600"
+                      : "text-emerald-600"
+                      }`}
                   >
                     {formatMoney(getDepotFundTotalBalance(selectedDepotFund))}
                   </p>
@@ -1652,10 +1698,25 @@ export default function FundingRequestsPage() {
               </div>
 
               <div>
-                <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
-                  <PiggyBankIcon size={14} className="text-primary" />
-                  Nguồn quỹ hiện tại
-                </h4>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-base font-semibold tracking-tighter flex items-center gap-1.5">
+                    <PiggyBankIcon size={14} className="text-primary" />
+                    Nguồn quỹ hiện tại
+                  </h4>
+                  <Button
+                    variant={
+                      selectedFundSourceId === null ? "default" : "outline"
+                    }
+                    size="sm"
+                    className="h-8 px-3 text-xs tracking-tighter"
+                    onClick={() => {
+                      setSelectedFundSourceId(null);
+                      setDepotTxPage(1);
+                    }}
+                  >
+                    Xem tất cả
+                  </Button>
+                </div>
                 {selectedDepotFund.funds.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
                     <p className="text-sm text-muted-foreground tracking-tighter">
@@ -1665,30 +1726,35 @@ export default function FundingRequestsPage() {
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                     {selectedDepotFund.funds.map((fundSource) => (
-                      <div
+                      <button
                         key={fundSource.id}
-                        className="rounded-xl border border-border/60 bg-background p-3"
+                        type="button"
+                        onClick={() => {
+                          setSelectedFundSourceId(fundSource.id);
+                          setDepotTxPage(1);
+                        }}
+                        className={`rounded-xl border p-3 text-left transition-all ${selectedFundSourceId === fundSource.id
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/20 shadow-sm"
+                          : "border-border/60 bg-background hover:border-primary/40 hover:bg-muted/20"
+                          }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="text-base font-semibold tracking-tighter truncate">
                               {fundSource.fundSourceName}
                             </p>
-                            <p className="text-sm text-muted-foreground tracking-tighter mt-1">
-                              {fundSource.fundSourceType}
-                            </p>
                           </div>
                           <span className="text-base font-bold tracking-tighter text-emerald-600 shrink-0">
                             {formatMoney(fundSource.balance)}
                           </span>
                         </div>
-                        <p className="text-sm text-muted-foreground tracking-tighter mt-3">
+                        <p className="text-sm text-muted-foreground tracking-tighter mt-1">
                           Cập nhật:{" "}
                           {new Date(fundSource.lastUpdatedAt).toLocaleString(
                             "vi-VN",
                           )}
                         </p>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -1698,33 +1764,34 @@ export default function FundingRequestsPage() {
               <div>
                 <h4 className="text-sm font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
                   <Receipt size={14} className="text-primary" />
-                  Giao dịch ({depotTxData?.totalCount ?? 0})
+                  {selectedFundSource
+                    ? `Giao dịch quỹ: ${selectedFundSource.fundSourceName} (${activeDepotTxTotalCount})`
+                    : `Giao dịch (${activeDepotTxTotalCount})`}
                 </h4>
 
                 <div className="mb-3 rounded-xl border border-border/60 bg-muted/20 p-3 space-y-3">
                   <div className="flex flex-wrap items-center gap-2 xl:flex-nowrap">
-                    <div className="min-w-[260px] flex-1">
+                    <div className="min-w-65 flex-1">
                       <Input
-                        className="h-8 text-xs tracking-tighter"
+                        className="h-8 text-sm tracking-tighter"
                         placeholder="Tìm ghi chú, tên người nộp, số điện thoại..."
                         value={depotTxSearchInput}
-                        onChange={(e) => setDepotTxSearchInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            applyDepotTxFilters();
-                          }
+                        onChange={(e) => {
+                          setDepotTxSearchInput(e.target.value);
+                          setDepotTxPage(1);
                         }}
                       />
                     </div>
                     <Select
                       value={depotTxReferenceType}
-                      onValueChange={(value) =>
+                      onValueChange={(value) => {
                         setDepotTxReferenceType(
                           value as "all" | DepotFundReferenceType,
-                        )
-                      }
+                        );
+                        setDepotTxPage(1);
+                      }}
                     >
-                      <SelectTrigger className="h-8 min-w-[170px] shrink-0 text-xs tracking-tighter">
+                      <SelectTrigger className="h-8 min-w-42.5 shrink-0 text-sm tracking-tighter">
                         <SelectValue placeholder="Loại tham chiếu" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1745,7 +1812,7 @@ export default function FundingRequestsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 min-w-32 justify-start gap-1.5 px-2.5 text-xs font-normal"
+                            className="h-8 min-w-32 justify-start gap-1.5 px-2.5 text-sm font-normal"
                           >
                             <CalendarBlank size={14} />
                             {depotTxFromDate ? (
@@ -1757,7 +1824,10 @@ export default function FundingRequestsPage() {
                             )}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
+                        <PopoverContent
+                          className="z-120 w-auto p-0"
+                          align="start"
+                        >
                           <Calendar
                             mode="single"
                             selected={depotTxFromDate}
@@ -1770,6 +1840,7 @@ export default function FundingRequestsPage() {
                                 setDepotTxToDate(undefined);
                               }
                               setDepotTxFromDate(date);
+                              setDepotTxPage(1);
                               setDepotTxFromDateOpen(false);
                             }}
                             disabled={(date) =>
@@ -1783,9 +1854,10 @@ export default function FundingRequestsPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 w-full text-xs text-muted-foreground"
+                                className="h-7 w-full text-sm text-muted-foreground"
                                 onClick={() => {
                                   setDepotTxFromDate(undefined);
+                                  setDepotTxPage(1);
                                   setDepotTxFromDateOpen(false);
                                 }}
                               >
@@ -1795,7 +1867,7 @@ export default function FundingRequestsPage() {
                           )}
                         </PopoverContent>
                       </Popover>
-                      <span className="text-xs text-muted-foreground">–</span>
+                      <span className="text-sm text-muted-foreground">–</span>
                       <Popover
                         open={depotTxToDateOpen}
                         onOpenChange={setDepotTxToDateOpen}
@@ -1804,7 +1876,7 @@ export default function FundingRequestsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 min-w-32 justify-start gap-1.5 px-2.5 text-xs font-normal"
+                            className="h-8 min-w-32 justify-start gap-1.5 px-2.5 text-sm font-normal"
                           >
                             <CalendarBlank size={14} />
                             {depotTxToDate ? (
@@ -1816,7 +1888,10 @@ export default function FundingRequestsPage() {
                             )}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
+                        <PopoverContent
+                          className="z-120 w-auto p-0"
+                          align="start"
+                        >
                           <Calendar
                             mode="single"
                             selected={depotTxToDate}
@@ -1829,6 +1904,7 @@ export default function FundingRequestsPage() {
                                 setDepotTxFromDate(undefined);
                               }
                               setDepotTxToDate(date);
+                              setDepotTxPage(1);
                               setDepotTxToDateOpen(false);
                             }}
                             disabled={(date) =>
@@ -1842,9 +1918,10 @@ export default function FundingRequestsPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 w-full text-xs text-muted-foreground"
+                                className="h-7 w-full text-sm text-muted-foreground"
                                 onClick={() => {
                                   setDepotTxToDate(undefined);
+                                  setDepotTxPage(1);
                                   setDepotTxToDateOpen(false);
                                 }}
                               >
@@ -1859,66 +1936,50 @@ export default function FundingRequestsPage() {
                       <Input
                         type="text"
                         inputMode="numeric"
-                        className="h-8 w-[148px] text-xs tracking-tighter"
+                        className="h-8 w-37 text-sm tracking-tighter"
                         placeholder="Tiền tối thiểu"
                         value={formatMoneyInput(depotTxMinAmountInput)}
                         onChange={(e) => {
                           const rawValue = e.target.value.replace(/\D/g, "");
                           setDepotTxMinAmountInput(rawValue);
-                          setDepotTxAmountError(
-                            depotTxMaxAmountInput &&
-                              Number(rawValue) > Number(depotTxMaxAmountInput)
-                              ? "Số tiền tối thiểu không được lớn hơn tối đa"
-                              : "",
-                          );
+                          setDepotTxPage(1);
                         }}
                       />
-                      <span className="text-xs text-muted-foreground">–</span>
+                      <span className="text-sm text-muted-foreground">–</span>
                       <Input
                         type="text"
                         inputMode="numeric"
-                        className="h-8 w-[148px] text-xs tracking-tighter"
+                        className="h-8 w-37 text-sm tracking-tighter"
                         placeholder="Tiền tối đa"
                         value={formatMoneyInput(depotTxMaxAmountInput)}
                         onChange={(e) => {
                           const rawValue = e.target.value.replace(/\D/g, "");
                           setDepotTxMaxAmountInput(rawValue);
-                          setDepotTxAmountError(
-                            depotTxMinAmountInput &&
-                              Number(rawValue) < Number(depotTxMinAmountInput)
-                              ? "Số tiền tối đa không được nhỏ hơn tối thiểu"
-                              : "",
-                          );
+                          setDepotTxPage(1);
                         }}
                       />
                     </div>
-                    <div className="flex w-full items-center gap-2 sm:w-[260px] xl:w-[280px]">
-                      <Button
-                        size="sm"
-                        className="h-8 flex-1 px-3 text-xs tracking-tighter"
-                        onClick={applyDepotTxFilters}
-                        disabled={!!depotTxDateError || !!depotTxAmountError}
-                      >
-                        Áp dụng bộ lọc
-                      </Button>
+                    <div className="flex w-full items-center justify-end sm:w-auto">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 flex-1 px-3 text-xs tracking-tighter"
+                        className="h-8 w-8 p-0"
                         onClick={resetDepotTxFilters}
+                        aria-label="Đặt lại bộ lọc"
+                        title="Đặt lại bộ lọc"
                       >
-                        Đặt lại
+                        <X size={16} />
                       </Button>
                     </div>
                   </div>
                   {(depotTxDateError || depotTxAmountError) && (
-                    <p className="text-xs text-rose-500 tracking-tighter">
+                    <p className="text-sm text-rose-500 tracking-tighter">
                       {depotTxDateError || depotTxAmountError}
                     </p>
                   )}
                 </div>
 
-                {loadingDepotTx ? (
+                {loadingActiveDepotTx ? (
                   <div className="space-y-2">
                     {Array.from({ length: 5 }).map((_, i) => (
                       <div
@@ -1936,7 +1997,7 @@ export default function FundingRequestsPage() {
                       </div>
                     ))}
                   </div>
-                ) : (depotTxData?.items ?? []).length === 0 ? (
+                ) : activeDepotTxItems.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border/60 p-8 text-center">
                     <Receipt
                       size={28}
@@ -1973,7 +2034,7 @@ export default function FundingRequestsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {(depotTxData?.items ?? []).map((tx, idx) => {
+                        {activeDepotTxItems.map((tx, idx) => {
                           const isIn = tx.amount >= 0;
                           return (
                             <TableRow key={tx.id}>
@@ -1982,9 +2043,8 @@ export default function FundingRequestsPage() {
                               </TableCell>
                               <TableCell className="text-sm font-medium">
                                 <span
-                                  className={`inline-flex items-center gap-1 ${
-                                    isIn ? "text-emerald-600" : "text-rose-600"
-                                  }`}
+                                  className={`inline-flex items-center gap-1 ${isIn ? "text-emerald-600" : "text-rose-600"
+                                    }`}
                                 >
                                   {isIn ? (
                                     <ArrowUp size={12} weight="bold" />
@@ -2018,9 +2078,8 @@ export default function FundingRequestsPage() {
                                 {tx.note || "—"}
                               </TableCell>
                               <TableCell
-                                className={`text-sm font-bold text-right ${
-                                  isIn ? "text-emerald-600" : "text-rose-600"
-                                }`}
+                                className={`text-sm font-bold text-right ${isIn ? "text-emerald-600" : "text-rose-600"
+                                  }`}
                               >
                                 {isIn ? "+" : ""}
                                 {formatMoney(tx.amount)}
@@ -2040,7 +2099,7 @@ export default function FundingRequestsPage() {
                 <div className="flex items-center justify-between pt-3 border-t border-border/40 mt-3">
                   <div className="flex items-center gap-2">
                     <p className="text-sm text-muted-foreground tracking-tighter">
-                      Trang {depotTxPage}/{depotTxData?.totalPages ?? 1}
+                      Trang {depotTxPage}/{activeDepotTxTotalPages}
                     </p>
                     <Select
                       value={String(depotTxPageSize)}
@@ -2067,14 +2126,14 @@ export default function FundingRequestsPage() {
                   <div className="flex gap-1.5">
                     <button
                       onClick={() => setDepotTxPage((p) => Math.max(1, p - 1))}
-                      disabled={!depotTxData?.hasPreviousPage}
+                      disabled={!activeDepotTxHasPreviousPage}
                       className="px-2.5 py-1 text-sm rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
                     >
                       Trước
                     </button>
                     <button
                       onClick={() => setDepotTxPage((p) => p + 1)}
-                      disabled={!depotTxData?.hasNextPage}
+                      disabled={!activeDepotTxHasNextPage}
                       className="px-2.5 py-1 text-sm rounded-md border border-border/60 disabled:opacity-40 hover:bg-muted/50 transition-colors"
                     >
                       Sau
