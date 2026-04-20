@@ -1,6 +1,8 @@
 import type { PromptType } from "@/services/prompt/type";
 import type {
   MedicalSupportNeedType,
+  SOSPriorityLevel,
+  SOSRequestStatus,
   SOSClothingPerson,
   SOSSpecialDietPerson,
   SOSStructuredData,
@@ -869,6 +871,7 @@ export interface CoordinatorMapProps {
     | null;
   depots: import("@/services/depot/type").DepotEntity[];
   assemblyPoints?: import("@/services/assembly_points/type").AssemblyPointEntity[];
+  serviceZones?: import("@/services/map/type").ServiceZoneEntity[];
   // SOS Clusters from backend
   clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
   /** Client-side auto-clusters for nearby PENDING SOS, capped at 3 SOS each */
@@ -895,8 +898,18 @@ export interface CoordinatorMapProps {
   userLocation?: Location | null;
   /** Used to trigger map resize when side panel opens/closes */
   panelOpen?: boolean;
-  /** Called when map view changes (pan/zoom) with center + zoom */
-  onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
+  /** Called when map view changes (pan/zoom) with center, zoom, and visible bounds */
+  onViewChange?: (view: {
+    lat: number;
+    lng: number;
+    zoom: number;
+    bounds?: {
+      south: number;
+      north: number;
+      west: number;
+      east: number;
+    };
+  }) => void;
   /** Whether the map is in a mode where the user is allowed to pick a location */
   isPickingLocation?: boolean;
   /** Callback when the user clicks on the map */
@@ -958,6 +971,12 @@ export interface SOSSidebarProps {
   onViewClusterPlan?: (clusterId: number) => void;
   /** View/edit an existing mission in the builder */
   onViewMission?: (clusterId: number, missionId: number) => void;
+  selectedStatuses?: SOSRequestStatus[];
+  onSelectedStatusesChange?: (statuses: SOSRequestStatus[]) => void;
+  selectedPriorityLevels?: SOSPriorityLevel[];
+  onSelectedPriorityLevelsChange?: (
+    priorityLevels: SOSPriorityLevel[],
+  ) => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";

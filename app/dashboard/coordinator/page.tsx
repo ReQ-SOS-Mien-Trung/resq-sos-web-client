@@ -19,7 +19,14 @@ import {
   LocationPanelData,
   Mission,
 } from "@/type";
-import { useSOSRequests } from "@/services/sos_request/hooks";
+import type { MapViewState } from "@/hooks/useMapUrlSync";
+import {
+  useSOSRequestsInBounds,
+} from "@/services/sos_request/hooks";
+import type {
+  SOSPriorityLevel,
+  SOSRequestStatus,
+} from "@/services/sos_request/type";
 import {
   useCreateSOSCluster,
   useClusterRescueSuggestion,
@@ -34,8 +41,10 @@ import type {
 import { useDepots } from "@/services/depot/hooks";
 import { useAssemblyPoints } from "@/services/assembly_points/hooks";
 import { useRescueTeams } from "@/services/rescue_teams/hooks";
+import { useActiveServiceZone } from "@/services/map/hooks";
 import type { DepotEntity } from "@/services/depot/type";
 import type { AssemblyPointEntity } from "@/services/assembly_points/type";
+import type { ServiceZoneEntity } from "@/services/map/type";
 import type {
   RescueTeamEntity,
   RescueTeamTypeKey,
@@ -93,7 +102,12 @@ import { useThemeStore } from "@/stores/theme.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
-import { mapSOSRequestEntityToSOS } from "@/lib/sos-request-mapper";
+import {
+  expandMapBounds,
+  getMapBoundsCacheKey,
+  isMapBoundsWithinBuffer,
+} from "@/lib/coordinator-map-utils";
+import { mapSOSRequestEntitiesToSOS } from "@/lib/sos-request-mapper";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { useSosClusterGroupingConfig } from "@/services/config/hooks";
 
@@ -401,6 +415,8 @@ function mapRescueTeamToRescuer(
   };
 }
 
+const SERVICE_ZONE_MIN_ZOOM = 12;
+
 // ── Main Dashboard Content ──
 
 const CoordinatorDashboardContent = () => {
@@ -426,6 +442,19 @@ const CoordinatorDashboardContent = () => {
   const [flyToLocation, setFlyToLocation] = useState<Location | null>(null);
   const [flyToZoom, setFlyToZoom] = useState<number | undefined>(undefined);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
+  const [mapViewState, setMapViewState] = useState<MapViewState | null>(null);
+  const [mapFetchBounds, setMapFetchBounds] = useState<
+    MapViewState["bounds"] | null
+  >(null);
+  const [selectedSOSStatuses, setSelectedSOSStatuses] = useState<
+    SOSRequestStatus[]
+  >([]);
+  const [selectedSOSPriorityLevels, setSelectedSOSPriorityLevels] = useState<
+    SOSPriorityLevel[]
+  >([]);
+  const [serviceZoneQueryEnabled, setServiceZoneQueryEnabled] = useState(
+    (urlState.view?.zoom ?? 13) >= SERVICE_ZONE_MIN_ZOOM,
+  );
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
@@ -475,9 +504,22 @@ const CoordinatorDashboardContent = () => {
   const lastAppliedSelectionSignatureRef = useRef<string | null>(null);
 
   // ─── Data Fetching ───
-  const { data: sosData } = useSOSRequests({
-    // Keep enough rows in-memory so cluster cards can resolve sosRequestIds.
-    params: { pageSize: 1000 },
+  const { data: mapSosData } = useSOSRequestsInBounds({
+    params: mapFetchBounds
+        ? {
+          MinLat: mapFetchBounds.south,
+          MaxLat: mapFetchBounds.north,
+          MinLng: mapFetchBounds.west,
+          MaxLng: mapFetchBounds.east,
+          Statuses:
+            selectedSOSStatuses.length > 0 ? selectedSOSStatuses : undefined,
+          PriorityLevels:
+            selectedSOSPriorityLevels.length > 0
+              ? selectedSOSPriorityLevels
+              : undefined,
+        }
+      : undefined,
+    enabled: !isWeatherMode && !!mapFetchBounds,
   });
   const { data: depotsData } = useDepots({ params: { pageSize: 100 } });
   const { data: assemblyPointsData } = useAssemblyPoints({
@@ -489,11 +531,42 @@ const CoordinatorDashboardContent = () => {
   });
   const { data: clustersData } = useSOSClusters();
   const sosClusterGroupingConfigQuery = useSosClusterGroupingConfig();
+  const { data: activeServiceZonesData } = useActiveServiceZone({
+    enabled: serviceZoneQueryEnabled,
+    staleTime: 5 * 60_000,
+  });
 
   const sosRequests = useMemo(
-    () => sosData?.items?.map(mapSOSRequestEntityToSOS) ?? [],
-    [sosData],
+    () => mapSOSRequestEntitiesToSOS(mapSosData ?? []),
+    [mapSosData],
   );
+
+  useEffect(() => {
+    if (!selectedSOS) {
+      return;
+    }
+
+    if (
+      selectedSOSStatuses.length === 0 &&
+      selectedSOSPriorityLevels.length === 0
+    ) {
+      return;
+    }
+
+    const nextSelected = sosRequests.find((sos) => sos.id === selectedSOS.id);
+    if (nextSelected) {
+      setSelectedSOS(nextSelected);
+      return;
+    }
+
+    setSelectedSOS(null);
+    setSOSDetailOpen(false);
+  }, [
+    selectedSOS,
+    selectedSOSPriorityLevels,
+    selectedSOSStatuses,
+    sosRequests,
+  ]);
   const depots = useMemo<DepotEntity[]>(
     () => depotsData?.items ?? [],
     [depotsData],
@@ -521,6 +594,10 @@ const CoordinatorDashboardContent = () => {
   const clusters = useMemo<SOSClusterEntity[]>(
     () => clustersData?.clusters ?? [],
     [clustersData],
+  );
+  const serviceZones = useMemo<ServiceZoneEntity[]>(
+    () => activeServiceZonesData ?? [],
+    [activeServiceZonesData],
   );
   const activeRealtimeDepotId = useMemo(() => {
     if (!locationPanelOpen || locationPanelData?.type !== "depot") {
@@ -576,6 +653,37 @@ const CoordinatorDashboardContent = () => {
         : [],
     [clusterGroupingStatus, clusters, maximumAutoClusterDistanceKm, sosRequests],
   );
+
+  useEffect(() => {
+    if (isWeatherMode) {
+      return;
+    }
+
+    const visibleBounds = mapViewState?.bounds;
+    if (!visibleBounds) {
+      return;
+    }
+
+    if (mapViewState.zoom >= SERVICE_ZONE_MIN_ZOOM) {
+      setServiceZoneQueryEnabled(true);
+    }
+
+    setMapFetchBounds((currentBounds) => {
+      if (currentBounds && isMapBoundsWithinBuffer(visibleBounds, currentBounds)) {
+        return currentBounds;
+      }
+
+      const nextBounds = expandMapBounds(visibleBounds, 2);
+      if (
+        currentBounds &&
+        getMapBoundsCacheKey(currentBounds) === getMapBoundsCacheKey(nextBounds)
+      ) {
+        return currentBounds;
+      }
+
+      return nextBounds;
+    });
+  }, [isWeatherMode, mapViewState]);
 
   // ─── Auth ───
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -1185,6 +1293,14 @@ const CoordinatorDashboardContent = () => {
     };
   }, []);
 
+  const handleCoordinatorMapViewChange = useCallback(
+    (view: MapViewState) => {
+      handleMapViewChange(view);
+      setMapViewState(view);
+    },
+    [handleMapViewChange],
+  );
+
   // ── Render ──
 
   return (
@@ -1416,6 +1532,10 @@ const CoordinatorDashboardContent = () => {
               onManualMission={handleOpenManualMission}
               onViewClusterPlan={handleViewClusterPlan}
               onViewMission={handleViewMission}
+              selectedStatuses={selectedSOSStatuses}
+              onSelectedStatusesChange={setSelectedSOSStatuses}
+              selectedPriorityLevels={selectedSOSPriorityLevels}
+              onSelectedPriorityLevelsChange={setSelectedSOSPriorityLevels}
             />
           )}
         </aside>
@@ -1443,6 +1563,7 @@ const CoordinatorDashboardContent = () => {
                 selectedTeamIncident={selectedTeamIncident}
                 depots={depots}
                 assemblyPoints={assemblyPoints}
+                serviceZones={serviceZones}
                 clusters={clusters}
                 autoClusters={autoClusters}
                 selectedSOS={selectedSOS}
@@ -1458,7 +1579,7 @@ const CoordinatorDashboardContent = () => {
                 flyToZoom={flyToZoom}
                 userLocation={userLocation}
                 panelOpen={aiStreamOpen}
-                onViewChange={handleMapViewChange}
+                onViewChange={handleCoordinatorMapViewChange}
                 routeOverlay={routeOverlay}
               />
 

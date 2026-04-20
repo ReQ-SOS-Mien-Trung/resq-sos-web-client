@@ -11,6 +11,13 @@ export type SOSRequestStatus =
 // SOS Request Priority Level
 export type SOSPriorityLevel = "Low" | "Medium" | "High" | "Critical";
 
+export interface SOSMetadataOption<T extends string = string> {
+  key: T;
+  value: string;
+}
+
+export type SOSPriorityLevelOption = SOSMetadataOption<SOSPriorityLevel>;
+
 // SOS Situation Type
 export type SOSSituation =
   | "FLOODING"
@@ -222,6 +229,15 @@ export interface GetSOSRequestsResponse {
 export interface GetSOSRequestsParams {
   pageNumber?: number;
   pageSize?: number;
+}
+
+export interface GetSOSRequestsInBoundsParams {
+  MinLat: number;
+  MaxLat: number;
+  MinLng: number;
+  MaxLng: number;
+  Statuses?: SOSRequestStatus[];
+  PriorityLevels?: SOSPriorityLevel[];
 }
 
 // Get SOS Request By ID Response

@@ -9,6 +9,12 @@ export interface MapViewState {
   lat: number;
   lng: number;
   zoom: number;
+  bounds?: {
+    south: number;
+    north: number;
+    west: number;
+    east: number;
+  };
 }
 
 export type SelectedEntity =
