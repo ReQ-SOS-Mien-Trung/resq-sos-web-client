@@ -874,7 +874,7 @@ export interface CoordinatorMapProps {
   serviceZones?: import("@/services/map/type").ServiceZoneEntity[];
   // SOS Clusters from backend
   clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
-  /** Client-side auto-clusters for nearby PENDING SOS, capped at 3 SOS each */
+  /** Client-side auto-clusters for PENDING SOS, containing 1-3 SOS each */
   autoClusters?: SOSRequest[][];
   selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
@@ -947,7 +947,7 @@ export interface SOSSidebarProps {
   selectedTeamIncident?:
     | import("@/services/team_incidents/type").TeamIncidentEntity
     | null;
-  /** Config-driven auto-clusters of nearby PENDING SOS requests, max 3 SOS each */
+  /** Config-driven auto-clusters of PENDING SOS requests, containing 1-3 SOS each */
   autoClusters: SOSRequest[][];
   onCreateCluster: (sosIds: string[]) => void;
   onClusterOnly: (clusterGroups: SOSRequest[][]) => void;

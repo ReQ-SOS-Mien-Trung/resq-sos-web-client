@@ -462,8 +462,10 @@ const SOSSidebar = ({
     mutate: removeSOSRequestFromCluster,
     isPending: isRemovingSOSRequestFromCluster,
   } = useRemoveSOSRequestFromCluster();
-  const { data: priorityLevelMetadata = [], isLoading: isPriorityLevelsLoading } =
-    useSOSPriorityLevels();
+  const {
+    data: priorityLevelMetadata = [],
+    isLoading: isPriorityLevelsLoading,
+  } = useSOSPriorityLevels();
 
   const priorityFilterOptions = useMemo(
     () =>
@@ -695,6 +697,17 @@ const SOSSidebar = ({
 
     return matchedCluster?.id ?? null;
   }, [activeClusters, selectedSOSId]);
+  const selectedAutoClusterIndex = useMemo(() => {
+    if (!selectedSOSId) return null;
+
+    const matchedIndex = autoClusters.findIndex((cluster) =>
+      cluster.some(
+        (request) => normalizeSOSRequestId(request.id) === selectedSOSId,
+      ),
+    );
+
+    return matchedIndex >= 0 ? matchedIndex : null;
+  }, [autoClusters, selectedSOSId]);
 
   const currentSelectionClusterKey =
     selectedClusterId != null && selectedSOSId != null
@@ -803,7 +816,7 @@ const SOSSidebar = ({
 
   const currentTab: SidebarTabValue =
     selectedSOSId != null && manualTabSelectionKey !== selectedSOSId
-      ? selectedClusterId != null
+      ? selectedClusterId != null || selectedAutoClusterIndex != null
         ? "clusters"
         : "incoming"
       : activeTab;
@@ -843,144 +856,6 @@ const SOSSidebar = ({
         </div>
       </div>
 
-      <div className="border-b bg-background/80 p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Popover open={statusFilterOpen} onOpenChange={setStatusFilterOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 text-[14px] font-normal"
-              >
-                Trạng thái
-                {selectedStatuses.length > 0 ? (
-                  <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
-                    {selectedStatuses.length}
-                  </Badge>
-                ) : (
-                  <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-1.5" align="start">
-              {SOS_STATUS_FILTER_OPTIONS.map((option) => {
-                const checked = selectedStatuses.includes(option.key);
-
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => toggleStatusFilter(option.key)}
-                    className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
-                  >
-                    <span
-                      className={cn(
-                        "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                        checked
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-background text-transparent",
-                      )}
-                    >
-                      <Check className="h-2.5 w-2.5" weight="bold" />
-                    </span>
-                    <span className={checked ? "font-medium" : undefined}>
-                      {option.value}
-                    </span>
-                  </button>
-                );
-              })}
-              {selectedStatuses.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => onSelectedStatusesChange?.([])}
-                  className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <X className="h-3 w-3" />
-                  Xóa lọc trạng thái
-                </button>
-              ) : null}
-            </PopoverContent>
-          </Popover>
-
-          <Popover
-            open={priorityFilterOpen}
-            onOpenChange={setPriorityFilterOpen}
-          >
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 text-[14px] font-normal"
-              >
-                Mức ưu tiên
-                {selectedPriorityLevels.length > 0 ? (
-                  <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
-                    {selectedPriorityLevels.length}
-                  </Badge>
-                ) : isPriorityLevelsLoading ? (
-                  <Spinner className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                ) : (
-                  <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-1.5" align="start">
-              {priorityFilterOptions.map((option) => {
-                const checked = selectedPriorityLevels.includes(option.key);
-
-                return (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => togglePriorityFilter(option.key)}
-                    className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
-                  >
-                    <span
-                      className={cn(
-                        "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                        checked
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-background text-transparent",
-                      )}
-                    >
-                      <Check className="h-2.5 w-2.5" weight="bold" />
-                    </span>
-                    <span className={checked ? "font-medium" : undefined}>
-                      {option.value}
-                    </span>
-                  </button>
-                );
-              })}
-              {selectedPriorityLevels.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => onSelectedPriorityLevelsChange?.([])}
-                  className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <X className="h-3 w-3" />
-                  Xóa lọc mức ưu tiên
-                </button>
-              ) : null}
-            </PopoverContent>
-          </Popover>
-
-          {hasSOSFiltersApplied ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 gap-1.5 px-2 text-[13px] text-muted-foreground"
-              onClick={clearSOSFilters}
-            >
-              <X className="h-3.5 w-3.5" />
-              Xóa bộ lọc
-            </Button>
-          ) : null}
-        </div>
-        <p className="mt-2 text-[12px] text-muted-foreground">
-          {sosRequests.length} SOS trong vùng bản đồ hiện tại
-        </p>
-      </div>
-
       {/* Tabs */}
       <Tabs
         value={currentTab}
@@ -1011,9 +886,150 @@ const SOSSidebar = ({
         {/* Incoming SOS Tab */}
         <TabsContent
           value="incoming"
-          className="m-0 mt-3 flex min-h-0 flex-1 overflow-hidden"
+          className="px-5 m-0 mt-1 flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <ScrollArea className="h-full min-h-0">
+          <div className="border-b bg-background/80">
+            <div className="flex flex-wrap items-center gap-2">
+              <Popover
+                open={statusFilterOpen}
+                onOpenChange={setStatusFilterOpen}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1.5 text-[14px] font-normal"
+                  >
+                    Trạng thái
+                    {selectedStatuses.length > 0 ? (
+                      <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
+                        {selectedStatuses.length}
+                      </Badge>
+                    ) : (
+                      <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-1.5" align="start">
+                  {SOS_STATUS_FILTER_OPTIONS.map((option) => {
+                    const checked = selectedStatuses.includes(option.key);
+
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => toggleStatusFilter(option.key)}
+                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
+                      >
+                        <span
+                          className={cn(
+                            "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                            checked
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-background text-transparent",
+                          )}
+                        >
+                          <Check className="h-2.5 w-2.5" weight="bold" />
+                        </span>
+                        <span className={checked ? "font-medium" : undefined}>
+                          {option.value}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {selectedStatuses.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => onSelectedStatusesChange?.([])}
+                      className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                      Xóa lọc trạng thái
+                    </button>
+                  ) : null}
+                </PopoverContent>
+              </Popover>
+
+              <Popover
+                open={priorityFilterOpen}
+                onOpenChange={setPriorityFilterOpen}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1.5 text-[14px] font-normal"
+                  >
+                    Mức ưu tiên
+                    {selectedPriorityLevels.length > 0 ? (
+                      <Badge className="h-4.5 rounded-full px-1.5 text-[11px]">
+                        {selectedPriorityLevels.length}
+                      </Badge>
+                    ) : isPriorityLevelsLoading ? (
+                      <Spinner className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <CaretDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-1.5" align="start">
+                  {priorityFilterOptions.map((option) => {
+                    const checked = selectedPriorityLevels.includes(option.key);
+
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => togglePriorityFilter(option.key)}
+                        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[14px] transition-colors hover:bg-muted/60"
+                      >
+                        <span
+                          className={cn(
+                            "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                            checked
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-background text-transparent",
+                          )}
+                        >
+                          <Check className="h-2.5 w-2.5" weight="bold" />
+                        </span>
+                        <span className={checked ? "font-medium" : undefined}>
+                          {option.value}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {selectedPriorityLevels.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => onSelectedPriorityLevelsChange?.([])}
+                      className="mt-1 flex w-full items-center gap-2 border-t border-border/40 px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                      Xóa lọc mức ưu tiên
+                    </button>
+                  ) : null}
+                </PopoverContent>
+              </Popover>
+
+              {hasSOSFiltersApplied ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 gap-1.5 px-2 text-[13px] text-muted-foreground"
+                  onClick={clearSOSFilters}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Xóa bộ lọc
+                </Button>
+              ) : null}
+            </div>
+            <p className="mt-2 text-[12px] text-muted-foreground">
+              {sosRequests.length} SOS trong vùng bản đồ hiện tại
+            </p>
+          </div>
+
+          <ScrollArea className="h-full min-h-0 flex-1">
             <div className="p-3 space-y-3">
               {standaloneRequests.length > 0 && (
                 <>

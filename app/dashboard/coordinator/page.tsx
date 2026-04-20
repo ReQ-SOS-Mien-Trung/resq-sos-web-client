@@ -283,8 +283,6 @@ function buildAutoClusters(
     )
     .sort(compareSOSSeeds);
 
-  if (pending.length < 2) return [];
-
   const radiusSteps = buildRadiusScanSteps(maximumDistanceKm);
   if (radiusSteps.length === 0) return [];
 
@@ -331,14 +329,9 @@ function buildAutoClusters(
       }
     }
 
-    if (!hasFoundNeighbor) {
-      continue;
-    }
-
-    const cluster = [
-      seed,
-      ...selectedNeighbors.map((candidate) => candidate.request),
-    ];
+    const cluster = hasFoundNeighbor
+      ? [seed, ...selectedNeighbors.map((candidate) => candidate.request)]
+      : [seed];
 
     cluster.forEach((request) => {
       clusteredIds.add(request.id);
@@ -1085,16 +1078,25 @@ const CoordinatorDashboardContent = () => {
 
   const handleClusterOnly = useCallback(
     (clusterGroups: SOSRequest[][]) => {
+      const validClusterGroups = clusterGroups
+        .map((group) =>
+          group
+            .filter((s) => s.status === "PENDING")
+            .map((s) => Number(s.id))
+            .filter(Boolean),
+        )
+        .filter((ids) => ids.length > 0);
+
+      if (validClusterGroups.length === 0) {
+        toast.error("Không còn SOS chờ xử lý để gom cụm.");
+        return;
+      }
+
       let created = 0;
       let failed = 0;
-      const total = clusterGroups.length;
+      const total = validClusterGroups.length;
 
-      clusterGroups.forEach((group) => {
-        const ids = group
-          .filter((s) => s.status === "PENDING")
-          .map((s) => Number(s.id))
-          .filter(Boolean);
-        if (ids.length < 2) return;
+      validClusterGroups.forEach((ids) => {
 
         createCluster(
           { sosRequestIds: ids },

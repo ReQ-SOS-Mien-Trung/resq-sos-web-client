@@ -14,14 +14,29 @@ import {
   Plus,
   Minus,
   Crosshair,
+  Eye,
+  EyeSlash,
   FunnelSimple,
   Command,
   NavigationArrow,
+  Siren,
+  SquaresFour,
+  UsersThree,
+  WarningCircle,
+  MapTrifold,
 } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { PRIORITY_ORDER } from "@/lib/priority";
 import {
@@ -38,7 +53,7 @@ import {
   Polygon,
   Popup,
   Polyline,
-  Tooltip,
+  Tooltip as LeafletTooltip,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -63,6 +78,40 @@ const DEFAULT_LAYER_FILTER: Record<LayerFilterKey, boolean> = {
   assemblyPoints: true,
   serviceZones: true,
 };
+
+function LayerFilterIcon({
+  layerKey,
+  className,
+}: {
+  layerKey: LayerFilterKey;
+  className?: string;
+}) {
+  if (layerKey === "sos") {
+    return <Siren size={16} weight="fill" className={className} />;
+  }
+
+  if (layerKey === "clusters") {
+    return <SquaresFour size={16} weight="fill" className={className} />;
+  }
+
+  if (layerKey === "rescueTeams") {
+    return <UsersThree size={16} weight="fill" className={className} />;
+  }
+
+  if (layerKey === "teamIncidents") {
+    return <WarningCircle size={16} weight="fill" className={className} />;
+  }
+
+  if (layerKey === "depots") {
+    return <Factory size={16} weight="fill" className={className} />;
+  }
+
+  if (layerKey === "assemblyPoints") {
+    return <MapPin size={16} weight="fill" className={className} />;
+  }
+
+  return <MapTrifold size={16} weight="fill" className={className} />;
+}
 
 const RouteOverlayFitBounds = ({ points }: { points: [number, number][] }) => {
   const map = useMap();
@@ -491,11 +540,13 @@ const CoordinatorMap = ({
 
   const validServiceZones = useMemo(
     () =>
-      serviceZones.filter((zone) =>
-        (zone.coordinates ?? []).filter(
-          (point) =>
-            Number.isFinite(point.latitude) && Number.isFinite(point.longitude),
-        ).length >= 3,
+      serviceZones.filter(
+        (zone) =>
+          (zone.coordinates ?? []).filter(
+            (point) =>
+              Number.isFinite(point.latitude) &&
+              Number.isFinite(point.longitude),
+          ).length >= 3,
       ),
     [serviceZones],
   );
@@ -506,7 +557,8 @@ const CoordinatorMap = ({
         key: "sos" as const,
         label: "SOS",
         count: visibleSOSRequests.length,
-        badgeClass: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+        badgeClass:
+          "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
       },
       {
         key: "clusters" as const,
@@ -533,7 +585,8 @@ const CoordinatorMap = ({
         key: "depots" as const,
         label: "Kho",
         count: depots.length,
-        badgeClass: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+        badgeClass:
+          "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
       },
       {
         key: "assemblyPoints" as const,
@@ -706,7 +759,7 @@ const CoordinatorMap = ({
       <div
         ref={searchContainerRef}
         className={cn(
-          "absolute top-3 left-3 z-[1000] transition-all duration-200",
+          "absolute top-3 left-3 z-1000 transition-all duration-200",
           "w-[min(17rem,calc(100vw-1.5rem))] sm:w-72",
           panelOpen && "pointer-events-none opacity-0 -translate-y-1",
         )}
@@ -917,81 +970,161 @@ const CoordinatorMap = ({
 
       <div
         className={cn(
-          "absolute top-[4.35rem] left-3 z-[1000] transition-all duration-200",
+          "absolute top-3 right-3 z-1000 transition-all duration-200",
           panelOpen && "pointer-events-none opacity-0 -translate-y-1",
         )}
       >
         <Popover>
-          <PopoverTrigger asChild>
-            <button className="h-10 px-3 rounded-2xl bg-background/95 backdrop-blur-md border border-border/60 shadow-xl flex items-center gap-2 text-sm font-medium text-foreground hover:bg-accent/70 transition-colors">
-              <FunnelSimple size={16} weight="bold" />
-              <span>Lớp hiển thị</span>
-              <Badge variant="secondary" className="px-1.5 py-0">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Lớp hiển thị"
+                  title="Lớp hiển thị"
+                  className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-background/95 text-foreground shadow-xl backdrop-blur-md transition-colors hover:bg-accent/70"
+                >
+                  <SquaresFour size={18} weight="fill" />
+                  <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground shadow-sm">
+                    {enabledLayerCount}
+                  </span>
+                </button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="text-xs">
+              Mở bộ lọc lớp hiển thị
+            </TooltipContent>
+          </Tooltip>
+          <PopoverContent
+            align="end"
+            sideOffset={8}
+            className="w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-border/60 bg-background/95 p-3 shadow-xl backdrop-blur-md"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <FunnelSimple size={14} weight="bold" />
+                <span>Lớp hiển thị</span>
+              </div>
+              <Badge variant="outline" className="text-[11px]">
                 {enabledLayerCount}/{layerOptions.length}
               </Badge>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            className="w-[20rem] rounded-2xl border border-border/60 bg-background/95 backdrop-blur-md p-3 shadow-xl"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold">Lọc marker và lớp bản đồ</p>
-                <p className="text-xs text-muted-foreground">
-                  Bật đúng những gì bạn muốn nhìn trên bản đồ.
-                </p>
-              </div>
-              <Badge variant="outline">{enabledLayerCount} bật</Badge>
             </div>
 
             <div className="mt-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setAllLayers(true)}
-                className="px-2.5 py-1.5 rounded-full text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-              >
-                Bật tất cả
-              </button>
-              <button
-                type="button"
-                onClick={() => setAllLayers(false)}
-                className="px-2.5 py-1.5 rounded-full text-xs font-medium bg-muted text-muted-foreground hover:bg-accent transition-colors"
-              >
-                Tắt tất cả
-              </button>
-            </div>
-
-            <div className="mt-3 space-y-2">
-              {layerOptions.map((layer) => (
-                <div
-                  key={layer.key}
-                  className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/20 px-2.5 py-2"
-                >
-                  <Checkbox
-                    checked={layerFilter[layer.key]}
-                    onCheckedChange={() => toggleLayer(layer.key)}
-                    aria-label={`Hiển thị ${layer.label}`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium">
-                        {layer.label}
-                      </span>
-                      <Badge className={cn("px-1.5 py-0", layer.badgeClass)}>
-                        {layer.count}
-                      </Badge>
-                    </div>
-                  </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <button
                     type="button"
-                    onClick={() => showOnlyLayer(layer.key)}
-                    className="shrink-0 rounded-full border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    onClick={() => setAllLayers(true)}
+                    aria-label="Hiện tất cả lớp"
+                    title="Hiện tất cả lớp"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90"
                   >
-                    Chỉ hiện
+                    <Eye size={14} weight="bold" />
                   </button>
-                </div>
-              ))}
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Hiện tất cả lớp
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setAllLayers(false)}
+                    aria-label="Ẩn tất cả lớp"
+                    title="Ẩn tất cả lớp"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <EyeSlash size={14} weight="bold" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Ẩn tất cả lớp
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {layerOptions.map((layer) => {
+                const isEnabled = layerFilter[layer.key];
+
+                return (
+                  <div
+                    key={layer.key}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-xl border px-2 py-1.5",
+                      isEnabled
+                        ? "border-primary/40 bg-primary/5"
+                        : "border-border/50 bg-muted/20",
+                    )}
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label={`${isEnabled ? "Ẩn" : "Hiện"} ${layer.label}`}
+                          title={`${isEnabled ? "Ẩn" : "Hiện"} ${layer.label}`}
+                          aria-pressed={isEnabled}
+                          onClick={() => toggleLayer(layer.key)}
+                          className={cn(
+                            "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                            isEnabled
+                              ? "bg-background text-foreground"
+                              : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                          )}
+                        >
+                          <LayerFilterIcon
+                            layerKey={layer.key}
+                            className={cn(
+                              "h-4 w-4",
+                              isEnabled
+                                ? "text-foreground"
+                                : "text-muted-foreground",
+                            )}
+                          />
+                          <span className="sr-only">{layer.label}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        {isEnabled
+                          ? `Ẩn lớp ${layer.label}`
+                          : `Hiện lớp ${layer.label}`}
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Badge
+                      className={cn(
+                        "px-1.5 py-0 text-[10px]",
+                        layer.badgeClass,
+                      )}
+                    >
+                      {layer.count}
+                    </Badge>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => showOnlyLayer(layer.key)}
+                          aria-label={`Chỉ hiện ${layer.label}`}
+                          title={`Chỉ hiện ${layer.label}`}
+                          className="ml-auto flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        >
+                          <Crosshair size={12} weight="bold" />
+                          <span className="sr-only">
+                            Chỉ hiện {layer.label}
+                          </span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        Chỉ hiện lớp {layer.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                );
+              })}
             </div>
           </PopoverContent>
         </Popover>
@@ -1191,7 +1324,7 @@ const CoordinatorMap = ({
       </MapContainer>
 
       {/* Custom Zoom Controls - bottom right */}
-      <div className="absolute bottom-6 right-4 z-[1000] flex flex-col gap-2">
+      <div className="absolute bottom-6 right-4 z-1000 flex flex-col gap-2">
         <button
           onClick={() => mapControls?.zoomIn()}
           className="w-10 h-10 rounded-full bg-background/95 backdrop-blur-md border border-border/60 shadow-lg flex items-center justify-center text-foreground hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-150"
@@ -1236,11 +1369,7 @@ const CoordinatorMap = ({
 
 export default CoordinatorMap;
 
-function ServiceZoneOverlay({
-  zone,
-}: {
-  zone: ServiceZoneEntity;
-}) {
+function ServiceZoneOverlay({ zone }: { zone: ServiceZoneEntity }) {
   const positions = useMemo(
     () =>
       zone.coordinates
@@ -1295,7 +1424,7 @@ function ServiceZoneOverlay({
           fillOpacity: 0.14,
         }}
       >
-        <Tooltip sticky direction="top" offset={[0, -8]}>
+        <LeafletTooltip sticky direction="top" offset={[0, -8]}>
           <div className="space-y-1 text-xs">
             <p className="font-semibold">{zone.name}</p>
             <p>Tổng hiển thị: {total}</p>
@@ -1305,7 +1434,7 @@ function ServiceZoneOverlay({
             <p>Điểm tập kết: {zone.counts.assemblyPointCount}</p>
             <p>Kho: {zone.counts.depotCount}</p>
           </div>
-        </Tooltip>
+        </LeafletTooltip>
         <Popup>
           <div className="space-y-2 text-sm">
             <div>
@@ -1325,7 +1454,7 @@ function ServiceZoneOverlay({
 
       {labelPosition && icon ? (
         <Marker position={labelPosition} icon={icon} zIndexOffset={700}>
-          <Tooltip direction="top" offset={[0, -16]}>
+          <LeafletTooltip direction="top" offset={[0, -16]}>
             <div className="space-y-1 text-xs">
               <p className="font-semibold">{zone.name}</p>
               <p>Tổng hiển thị: {total}</p>
@@ -1335,7 +1464,7 @@ function ServiceZoneOverlay({
               <p>Điểm tập kết: {zone.counts.assemblyPointCount}</p>
               <p>Kho: {zone.counts.depotCount}</p>
             </div>
-          </Tooltip>
+          </LeafletTooltip>
           <Popup>
             <div className="space-y-2 text-sm">
               <div>
@@ -1745,13 +1874,7 @@ function ClusterMarker({
       iconSize: [ringSize, ringSize],
       iconAnchor: [ringSize / 2, ringSize / 2],
     });
-  }, [
-    cluster.sosRequestCount,
-    cluster.id,
-    isMerged,
-    color,
-    size,
-  ]);
+  }, [cluster.sosRequestCount, cluster.id, isMerged, color, size]);
 
   if (!iconEl) return null;
 
