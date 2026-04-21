@@ -420,6 +420,37 @@ function getInventoryQuantities(item: InventoryItemEntity): {
   return { total, reserved, available };
 }
 
+function summarizeInventoryItems(items: InventoryItemEntity[]): {
+  totalStock: number | null;
+  reservedStock: number | null;
+  availableStock: number | null;
+} {
+  if (!items.length) {
+    return {
+      totalStock: null,
+      reservedStock: null,
+      availableStock: null,
+    };
+  }
+
+  return items.reduce(
+    (summary, item) => {
+      const quantities = getInventoryQuantities(item);
+
+      summary.totalStock += quantities.total;
+      summary.reservedStock += quantities.reserved;
+      summary.availableStock += quantities.available;
+
+      return summary;
+    },
+    {
+      totalStock: 0,
+      reservedStock: 0,
+      availableStock: 0,
+    },
+  );
+}
+
 function getDepotManagerDisplayName(manager: DepotEntity["manager"]): string {
   if (!manager) return "Chưa có quản lý";
   if (manager.fullName?.trim()) return manager.fullName.trim();
@@ -606,17 +637,93 @@ function DepotDetails({
   const depotImageUrl = depot.imageUrl?.trim() || null;
   const depotManagerName = getDepotManagerDisplayName(depot.manager);
 
+  const backendInventorySummary = useMemo(
+    () => getBackendInventorySummary(inventoryData),
+    [inventoryData],
+  );
+
+  const shouldFetchInventorySummaryFromItems = useMemo(() => {
+    if (!inventoryData?.items?.length) return false;
+
+    const hasCompleteBackendValues =
+      backendInventorySummary.totalStock !== null &&
+      backendInventorySummary.reservedStock !== null &&
+      backendInventorySummary.availableStock !== null;
+
+    if (hasCompleteBackendValues) return false;
+
+    return inventoryData.totalCount > inventoryData.items.length;
+  }, [backendInventorySummary, inventoryData]);
+
+  const inventorySummaryPageSize = useMemo(() => {
+    const totalCount = inventoryData?.totalCount ?? 0;
+    return Math.max(totalCount, INVENTORY_PAGE_SIZE);
+  }, [inventoryData]);
+
+  const {
+    data: inventorySummaryData,
+  } = useDepotInventory(
+    {
+      depotId: depot.id,
+      pageNumber: 1,
+      pageSize: inventorySummaryPageSize,
+    },
+    {
+      enabled: shouldFetchInventorySummaryFromItems,
+    },
+  );
+
+  const inventoryItemsForSummary = useMemo(() => {
+    if (!inventoryData?.items?.length) return [];
+
+    if (inventoryData.totalCount <= inventoryData.items.length) {
+      return inventoryData.items;
+    }
+
+    if (
+      inventorySummaryData?.items &&
+      inventorySummaryData.items.length >= inventoryData.totalCount
+    ) {
+      return inventorySummaryData.items;
+    }
+
+    return [];
+  }, [inventoryData, inventorySummaryData]);
+
   const inventorySummary = useMemo(() => {
-    const summary = getBackendInventorySummary(inventoryData);
+    const hasCompleteBackendValues =
+      backendInventorySummary.totalStock !== null &&
+      backendInventorySummary.reservedStock !== null &&
+      backendInventorySummary.availableStock !== null;
+
+    if (hasCompleteBackendValues) {
+      return {
+        ...backendInventorySummary,
+        hasCompleteValues: true,
+        source: "backend" as const,
+      };
+    }
+
+    const derivedSummary = summarizeInventoryItems(inventoryItemsForSummary);
+    const hasDerivedValues =
+      derivedSummary.totalStock !== null &&
+      derivedSummary.reservedStock !== null &&
+      derivedSummary.availableStock !== null;
+
+    if (hasDerivedValues) {
+      return {
+        ...derivedSummary,
+        hasCompleteValues: true,
+        source: "derived" as const,
+      };
+    }
 
     return {
-      ...summary,
-      hasCompleteValues:
-        summary.totalStock !== null &&
-        summary.reservedStock !== null &&
-        summary.availableStock !== null,
+      ...backendInventorySummary,
+      hasCompleteValues: false,
+      source: "incomplete" as const,
     };
-  }, [inventoryData]);
+  }, [backendInventorySummary, inventoryItemsForSummary]);
 
   const inventoryRange = useMemo(() => {
     if (!inventoryData || inventoryData.totalCount === 0) {
@@ -862,12 +969,7 @@ function DepotDetails({
                     </p>
                   </div>
                 </div>
-              ) : (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                  Backend chưa trả số liệu tổng kho, đang hiển thị chi tiết theo
-                  từng vật phẩm.
-                </div>
-              )}
+              ) : null}
 
               {inventoryData.items.map((item) => {
                 const qty = getInventoryQuantities(item);

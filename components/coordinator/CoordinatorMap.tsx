@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
-import type { AssemblyPointEntity } from "@/services/assembly_points/type";
+import type { ServiceZoneEntity } from "@/services/map/type";
 import type { SOSClusterEntity } from "@/services/sos_cluster/type";
 import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import {
@@ -14,14 +14,32 @@ import {
   Plus,
   Minus,
   Crosshair,
+  Eye,
+  EyeSlash,
   FunnelSimple,
   Command,
   NavigationArrow,
+  Siren,
+  SquaresFour,
+  UsersThree,
+  WarningCircle,
+  MapTrifold,
 } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { PRIORITY_ORDER } from "@/lib/priority";
+import { getServiceZoneLabelPosition } from "@/lib/coordinator-map-utils";
 
 // Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
 // and the isMounted guard inside this component.
@@ -29,12 +47,67 @@ import {
   MapContainer,
   TileLayer,
   Marker,
+  Polygon,
+  Popup,
   Polyline,
   useMap,
   useMapEvents,
 } from "react-leaflet";
 import { FlyToHandler } from "./FlyToHandler";
 import { MapZoomHandler } from "./MapZoomHandler";
+
+type LayerFilterKey =
+  | "sos"
+  | "clusters"
+  | "rescueTeams"
+  | "teamIncidents"
+  | "depots"
+  | "assemblyPoints"
+  | "serviceZones";
+
+const DEFAULT_LAYER_FILTER: Record<LayerFilterKey, boolean> = {
+  sos: true,
+  clusters: true,
+  rescueTeams: true,
+  teamIncidents: true,
+  depots: true,
+  assemblyPoints: true,
+  serviceZones: true,
+};
+
+function LayerFilterIcon({
+  layerKey,
+  className,
+}: {
+  layerKey: LayerFilterKey;
+  className?: string;
+}) {
+  if (layerKey === "sos") {
+    return <Siren size={16} weight="fill" className={className} />;
+  }
+
+  if (layerKey === "clusters") {
+    return <SquaresFour size={16} weight="fill" className={className} />;
+  }
+
+  if (layerKey === "rescueTeams") {
+    return <UsersThree size={16} weight="fill" className={className} />;
+  }
+
+  if (layerKey === "teamIncidents") {
+    return <WarningCircle size={16} weight="fill" className={className} />;
+  }
+
+  if (layerKey === "depots") {
+    return <Factory size={16} weight="fill" className={className} />;
+  }
+
+  if (layerKey === "assemblyPoints") {
+    return <MapPin size={16} weight="fill" className={className} />;
+  }
+
+  return <MapTrifold size={16} weight="fill" className={className} />;
+}
 
 const RouteOverlayFitBounds = ({ points }: { points: [number, number][] }) => {
   const map = useMap();
@@ -57,6 +130,7 @@ const CoordinatorMap = ({
   selectedTeamIncident,
   depots,
   assemblyPoints = [],
+  serviceZones = [],
   clusters = [],
   autoClusters = [],
   selectedSOS,
@@ -104,6 +178,7 @@ const CoordinatorMap = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [currentZoom, setCurrentZoom] = useState(13);
+  const [layerFilter, setLayerFilter] = useState(DEFAULT_LAYER_FILTER);
 
   const markerDisplayPositions = useMemo(() => {
     type MarkerSeed = {
@@ -259,9 +334,15 @@ const CoordinatorMap = ({
     setCurrentZoom(zoom);
   }, []);
 
-  // Zoom threshold: >= 12 = zoomed in (show individual SOS), < 12 = zoomed out (show clusters)
+  // Zoom thresholds:
+  // - >= 12: detailed view (individual SOS + markers)
+  // - 10-11: intermediate view (cluster-focused)
+  // - < 10: service-zone overview only
   const CLUSTER_ZOOM_THRESHOLD = 12;
+  const SERVICE_ZONE_OVERVIEW_ZOOM_THRESHOLD = 10;
   const isZoomedIn = currentZoom >= CLUSTER_ZOOM_THRESHOLD;
+  const isServiceZoneOverview =
+    currentZoom < SERVICE_ZONE_OVERVIEW_ZOOM_THRESHOLD;
 
   // Build a set of SOS IDs that belong to a backend cluster
   const clusteredSOSIds = useMemo(() => {
@@ -459,6 +540,120 @@ const CoordinatorMap = ({
     });
   }, [clusters, isZoomedIn, currentZoom, CLUSTER_ZOOM_THRESHOLD]);
 
+  const validServiceZones = useMemo(
+    () =>
+      serviceZones.filter(
+        (zone) =>
+          (zone.coordinates ?? []).filter(
+            (point) =>
+              Number.isFinite(point.latitude) &&
+              Number.isFinite(point.longitude),
+          ).length >= 3,
+      ),
+    [serviceZones],
+  );
+
+  const layerOptions = useMemo(
+    () => [
+      {
+        key: "sos" as const,
+        label: "SOS",
+        count: visibleSOSRequests.length,
+        badgeClass:
+          "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+      },
+      {
+        key: "clusters" as const,
+        label: "Cụm",
+        count: visibleClusters.length + autoClusters.length,
+        badgeClass:
+          "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+      },
+      {
+        key: "rescueTeams" as const,
+        label: "Đội cứu hộ",
+        count: visibleRescuers.length,
+        badgeClass:
+          "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+      },
+      {
+        key: "teamIncidents" as const,
+        label: "Sự cố đội",
+        count: validTeamIncidents.length,
+        badgeClass:
+          "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+      },
+      {
+        key: "depots" as const,
+        label: "Kho",
+        count: depots.length,
+        badgeClass:
+          "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+      },
+      {
+        key: "assemblyPoints" as const,
+        label: "Điểm tập kết",
+        count: assemblyPoints.length,
+        badgeClass:
+          "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+      },
+      {
+        key: "serviceZones" as const,
+        label: "Vùng phục vụ",
+        count: validServiceZones.length,
+        badgeClass:
+          "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300",
+      },
+    ],
+    [
+      assemblyPoints.length,
+      autoClusters.length,
+      depots.length,
+      validServiceZones.length,
+      validTeamIncidents.length,
+      visibleClusters.length,
+      visibleRescuers.length,
+      visibleSOSRequests.length,
+    ],
+  );
+  const enabledLayerCount = useMemo(
+    () => Object.values(layerFilter).filter(Boolean).length,
+    [layerFilter],
+  );
+  const showServiceZones = isServiceZoneOverview && layerFilter.serviceZones;
+
+  const toggleLayer = useCallback((layer: LayerFilterKey) => {
+    setLayerFilter((current) => ({
+      ...current,
+      [layer]: !current[layer],
+    }));
+  }, []);
+
+  const showOnlyLayer = useCallback((layer: LayerFilterKey) => {
+    setLayerFilter({
+      sos: false,
+      clusters: false,
+      rescueTeams: false,
+      teamIncidents: false,
+      depots: false,
+      assemblyPoints: false,
+      serviceZones: false,
+      [layer]: true,
+    });
+  }, []);
+
+  const setAllLayers = useCallback((value: boolean) => {
+    setLayerFilter({
+      sos: value,
+      clusters: value,
+      rescueTeams: value,
+      teamIncidents: value,
+      depots: value,
+      assemblyPoints: value,
+      serviceZones: value,
+    });
+  }, []);
+
   // Total counts for search categories
   const depotCount = depots.length;
   const assemblyPointCount = assemblyPoints.length;
@@ -565,7 +760,7 @@ const CoordinatorMap = ({
       <div
         ref={searchContainerRef}
         className={cn(
-          "absolute top-3 left-3 z-[1000] transition-all duration-200",
+          "absolute top-3 left-3 z-1000 transition-all duration-200",
           "w-[min(17rem,calc(100vw-1.5rem))] sm:w-72",
           panelOpen && "pointer-events-none opacity-0 -translate-y-1",
         )}
@@ -774,6 +969,168 @@ const CoordinatorMap = ({
         )}
       </div>
 
+      <div
+        className={cn(
+          "absolute top-3 right-3 z-1000 transition-all duration-200",
+          panelOpen && "pointer-events-none opacity-0 -translate-y-1",
+        )}
+      >
+        <Popover>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Lớp hiển thị"
+                  title="Lớp hiển thị"
+                  className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-background/95 text-foreground shadow-xl backdrop-blur-md transition-colors hover:bg-accent/70"
+                >
+                  <SquaresFour size={18} weight="fill" />
+                  <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground shadow-sm">
+                    {enabledLayerCount}
+                  </span>
+                </button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="text-xs">
+              Mở bộ lọc lớp hiển thị
+            </TooltipContent>
+          </Tooltip>
+          <PopoverContent
+            align="end"
+            sideOffset={8}
+            className="w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-border/60 bg-background/95 p-3 shadow-xl backdrop-blur-md"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <FunnelSimple size={14} weight="bold" />
+                <span>Lớp hiển thị</span>
+              </div>
+              <Badge variant="outline" className="text-[11px]">
+                {enabledLayerCount}/{layerOptions.length}
+              </Badge>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setAllLayers(true)}
+                    aria-label="Hiện tất cả lớp"
+                    title="Hiện tất cả lớp"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90"
+                  >
+                    <Eye size={14} weight="bold" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Hiện tất cả lớp
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setAllLayers(false)}
+                    aria-label="Ẩn tất cả lớp"
+                    title="Ẩn tất cả lớp"
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <EyeSlash size={14} weight="bold" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Ẩn tất cả lớp
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {layerOptions.map((layer) => {
+                const isEnabled = layerFilter[layer.key];
+
+                return (
+                  <div
+                    key={layer.key}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-xl border px-2 py-1.5",
+                      isEnabled
+                        ? "border-primary/40 bg-primary/5"
+                        : "border-border/50 bg-muted/20",
+                    )}
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label={`${isEnabled ? "Ẩn" : "Hiện"} ${layer.label}`}
+                          title={`${isEnabled ? "Ẩn" : "Hiện"} ${layer.label}`}
+                          aria-pressed={isEnabled}
+                          onClick={() => toggleLayer(layer.key)}
+                          className={cn(
+                            "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                            isEnabled
+                              ? "bg-background text-foreground"
+                              : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                          )}
+                        >
+                          <LayerFilterIcon
+                            layerKey={layer.key}
+                            className={cn(
+                              "h-4 w-4",
+                              isEnabled
+                                ? "text-foreground"
+                                : "text-muted-foreground",
+                            )}
+                          />
+                          <span className="sr-only">{layer.label}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        {isEnabled
+                          ? `Ẩn lớp ${layer.label}`
+                          : `Hiện lớp ${layer.label}`}
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <Badge
+                      className={cn(
+                        "px-1.5 py-0 text-[10px]",
+                        layer.badgeClass,
+                      )}
+                    >
+                      {layer.count}
+                    </Badge>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => showOnlyLayer(layer.key)}
+                          aria-label={`Chỉ hiện ${layer.label}`}
+                          title={`Chỉ hiện ${layer.label}`}
+                          className="ml-auto flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        >
+                          <Crosshair size={12} weight="bold" />
+                          <span className="sr-only">
+                            Chỉ hiện {layer.label}
+                          </span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="text-xs">
+                        Chỉ hiện lớp {layer.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
       <MapContainer
         key={mapKey}
         center={
@@ -810,70 +1167,87 @@ const CoordinatorMap = ({
           onMapClick={onMapClick}
         />
 
+        {/* Service Zone Polygons and totals */}
+        {showServiceZones &&
+          validServiceZones.map((zone) => (
+            <ServiceZoneOverlay key={zone.id} zone={zone} />
+          ))}
+
         {/* SOS Request Markers */}
-        {visibleSOSRequests.map((sos) => (
-          <SOSRequestMarker
-            key={sos.id}
-            sos={sos}
-            isSelected={selectedSOS?.id === sos.id}
-            onClick={() => onSOSSelect(sos)}
-          />
-        ))}
+        {!isServiceZoneOverview &&
+          layerFilter.sos &&
+          visibleSOSRequests.map((sos) => (
+            <SOSRequestMarker
+              key={sos.id}
+              sos={sos}
+              isSelected={selectedSOS?.id === sos.id}
+              onClick={() => onSOSSelect(sos)}
+            />
+          ))}
 
         {/* Rescuer Markers */}
-        {visibleRescuers.map((rescuer) => (
-          <RescuerMarker
-            key={rescuer.id}
-            rescuer={rescuer}
-            isSelected={selectedRescuer?.id === rescuer.id}
-            onClick={() => onRescuerSelect(rescuer)}
-          />
-        ))}
+        {!isServiceZoneOverview &&
+          layerFilter.rescueTeams &&
+          visibleRescuers.map((rescuer) => (
+            <RescuerMarker
+              key={rescuer.id}
+              rescuer={rescuer}
+              isSelected={selectedRescuer?.id === rescuer.id}
+              onClick={() => onRescuerSelect(rescuer)}
+            />
+          ))}
 
         {/* Team Incident Markers */}
-        {validTeamIncidents.map((incident) => (
-          <TeamIncidentMarker
-            key={incident.incidentId}
-            incident={incident}
-            isSelected={
-              selectedTeamIncident?.incidentId === incident.incidentId
-            }
-            onClick={() => onTeamIncidentSelect?.(incident)}
-          />
-        ))}
+        {!isServiceZoneOverview &&
+          layerFilter.teamIncidents &&
+          validTeamIncidents.map((incident) => (
+            <TeamIncidentMarker
+              key={incident.incidentId}
+              incident={incident}
+              isSelected={
+                selectedTeamIncident?.incidentId === incident.incidentId
+              }
+              onClick={() => onTeamIncidentSelect?.(incident)}
+            />
+          ))}
 
         {/* Depot Markers */}
-        {depots.map((depot) => (
-          <DepotMarker
-            key={depot.id}
-            depot={depot}
-            position={
-              markerDisplayPositions.depotPositions.get(depot.id) ?? [
-                depot.latitude,
-                depot.longitude,
-              ]
-            }
-            onClick={() => onDepotSelect?.(depot)}
-          />
-        ))}
+        {!isServiceZoneOverview &&
+          layerFilter.depots &&
+          depots.map((depot) => (
+            <DepotMarker
+              key={depot.id}
+              depot={depot}
+              position={
+                markerDisplayPositions.depotPositions.get(depot.id) ?? [
+                  depot.latitude,
+                  depot.longitude,
+                ]
+              }
+              onClick={() => onDepotSelect?.(depot)}
+            />
+          ))}
 
         {/* Assembly Point Markers */}
-        {assemblyPoints.map((point) => (
-          <AssemblyPointMarker
-            key={point.id}
-            assemblyPoint={point}
-            position={
-              markerDisplayPositions.assemblyPointPositions.get(point.id) ?? [
-                point.latitude,
-                point.longitude,
-              ]
-            }
-            onClick={() => onAssemblyPointSelect?.(point)}
-          />
-        ))}
+        {!isServiceZoneOverview &&
+          layerFilter.assemblyPoints &&
+          assemblyPoints.map((point) => (
+            <AssemblyPointMarker
+              key={point.id}
+              position={
+                markerDisplayPositions.assemblyPointPositions.get(point.id) ?? [
+                  point.latitude,
+                  point.longitude,
+                ]
+              }
+              onClick={() => onAssemblyPointSelect?.(point)}
+            />
+          ))}
 
         {/* Auto-Cluster Markers (client-side suggested clusters) */}
-        {!isZoomedIn &&
+        {layerFilter.clusters &&
+          !isServiceZoneOverview &&
+          !isZoomedIn &&
           autoClusters.map((group, idx) => (
             <AutoClusterMarker
               key={`auto-cluster-${idx}`}
@@ -896,32 +1270,36 @@ const CoordinatorMap = ({
           ))}
 
         {/* Cluster Markers */}
-        {visibleClusters.map((cluster) => (
-          <ClusterMarker
-            key={`cluster-${cluster.id}-${cluster._isMerged}`}
-            cluster={cluster}
-            isMerged={cluster._isMerged}
-            onClick={() => {
-              if (cluster._isMerged) {
-                // For virtual merged clusters, just fly/zoom in to break them apart
-                const targetZoom = Math.max(
-                  currentZoom + 2,
-                  CLUSTER_ZOOM_THRESHOLD,
-                );
-                setSearchFlyToLocation({
-                  lat: Number(cluster.centerLatitude),
-                  lng: Number(cluster.centerLongitude),
-                });
-                setSearchFlyToZoom(targetZoom);
-              } else {
-                onClusterSelect?.(cluster);
-              }
-            }}
-          />
-        ))}
+        {layerFilter.clusters &&
+          !isServiceZoneOverview &&
+          visibleClusters.map((cluster) => (
+            <ClusterMarker
+              key={`cluster-${cluster.id}-${cluster._isMerged}`}
+              cluster={cluster}
+              isMerged={cluster._isMerged}
+              onClick={() => {
+                if (cluster._isMerged) {
+                  // For virtual merged clusters, just fly/zoom in to break them apart
+                  const targetZoom = Math.max(
+                    currentZoom + 2,
+                    CLUSTER_ZOOM_THRESHOLD,
+                  );
+                  setSearchFlyToLocation({
+                    lat: Number(cluster.centerLatitude),
+                    lng: Number(cluster.centerLongitude),
+                  });
+                  setSearchFlyToZoom(targetZoom);
+                } else {
+                  onClusterSelect?.(cluster);
+                }
+              }}
+            />
+          ))}
 
         {/* User Location Marker */}
-        {userLocation && <UserLocationMarker location={userLocation} />}
+        {!isServiceZoneOverview && userLocation && (
+          <UserLocationMarker location={userLocation} />
+        )}
 
         {/* Mission Route Polyline */}
         {routePoints.length > 1 && (
@@ -955,7 +1333,7 @@ const CoordinatorMap = ({
       </MapContainer>
 
       {/* Custom Zoom Controls - bottom right */}
-      <div className="absolute bottom-6 right-4 z-[1000] flex flex-col gap-2">
+      <div className="absolute bottom-6 right-4 z-1000 flex flex-col gap-2">
         <button
           onClick={() => mapControls?.zoomIn()}
           className="w-10 h-10 rounded-full bg-background/95 backdrop-blur-md border border-border/60 shadow-lg flex items-center justify-center text-foreground hover:bg-accent hover:scale-105 active:scale-95 transition-all duration-150"
@@ -999,6 +1377,102 @@ const CoordinatorMap = ({
 };
 
 export default CoordinatorMap;
+
+function ServiceZoneOverlay({ zone }: { zone: ServiceZoneEntity }) {
+  const positions = useMemo(
+    () =>
+      zone.coordinates
+        .map((point) => [point.latitude, point.longitude] as [number, number])
+        .filter(
+          (point) => Number.isFinite(point[0]) && Number.isFinite(point[1]),
+        ),
+    [zone.coordinates],
+  );
+  const labelPosition = useMemo(
+    () => getServiceZoneLabelPosition(zone),
+    [zone],
+  );
+  const pendingSosCount = Number(zone.counts.pendingSosRequestCount ?? 0);
+
+  const icon = useMemo(() => {
+    if (typeof window === "undefined" || !labelPosition) return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const L = require("leaflet");
+
+    return L.divIcon({
+      className: "custom-service-zone-marker",
+      html: `
+        <div style="display:flex;align-items:center;justify-content:center;min-width:54px;padding:0 10px;height:34px;border-radius:9999px;background:rgba(14,116,144,0.92);border:2px solid rgba(255,255,255,0.96);box-shadow:0 6px 18px rgba(8,47,73,0.28);color:white;">
+          <div style="display:flex;flex-direction:column;align-items:center;line-height:1;">
+            <span style="font-size:10px;font-weight:700;opacity:0.9;text-transform:uppercase;letter-spacing:0.03em;">Zone</span>
+            <span style="font-size:14px;font-weight:800;margin-top:2px;">${pendingSosCount}</span>
+          </div>
+        </div>
+      `,
+      iconSize: [54, 34],
+      iconAnchor: [27, 17],
+    });
+  }, [labelPosition, pendingSosCount]);
+
+  if (positions.length < 3) {
+    return null;
+  }
+
+  return (
+    <>
+      <Polygon
+        positions={positions}
+        pathOptions={{
+          color: "#0ea5e9",
+          weight: 2,
+          opacity: 0.95,
+          fillColor: "#38bdf8",
+          fillOpacity: 0.14,
+        }}
+      >
+        <Popup>
+          <div className="space-y-2 text-sm">
+            <div>
+              <p className="font-semibold">{zone.name}</p>
+              <p className="text-muted-foreground">
+                SOS chờ xử lý: {pendingSosCount}
+              </p>
+            </div>
+            <div className="space-y-1 text-muted-foreground">
+              <p>Pending SOS: {zone.counts.pendingSosRequestCount}</p>
+              <p>Incident SOS: {zone.counts.incidentSosRequestCount}</p>
+              <p>Sự cố đội: {zone.counts.teamIncidentCount}</p>
+              <p>Điểm tập kết: {zone.counts.assemblyPointCount}</p>
+              <p>Kho: {zone.counts.depotCount}</p>
+            </div>
+          </div>
+        </Popup>
+      </Polygon>
+
+      {labelPosition && icon ? (
+        <Marker position={labelPosition} icon={icon} zIndexOffset={700}>
+          <Popup>
+            <div className="space-y-2 text-sm">
+              <div>
+                <p className="font-semibold">{zone.name}</p>
+                <p className="text-muted-foreground">
+                  SOS chờ xử lý: {pendingSosCount}
+                </p>
+              </div>
+              <div className="space-y-1 text-muted-foreground">
+                <p>Pending SOS: {zone.counts.pendingSosRequestCount}</p>
+                <p>Incident SOS: {zone.counts.incidentSosRequestCount}</p>
+                <p>Sự cố đội: {zone.counts.teamIncidentCount}</p>
+                <p>Điểm tập kết: {zone.counts.assemblyPointCount}</p>
+                <p>Kho: {zone.counts.depotCount}</p>
+              </div>
+            </div>
+          </Popup>
+        </Marker>
+      ) : null}
+    </>
+  );
+}
 
 // SOS Request Marker Component
 function SOSRequestMarker({
@@ -1141,13 +1615,6 @@ function DepotMarker({
     Closed: "#ef4444", // red-500
   };
 
-  const statusLabels = {
-    Available: "Có sẵn",
-    Full: "Đầy",
-    PendingAssignment: "Chờ phân công",
-    Closed: "Đóng cửa",
-  };
-
   const color = statusColors[depot.status];
 
   const iconEl = useMemo(() => {
@@ -1185,11 +1652,9 @@ function DepotMarker({
 
 // Assembly Point Marker Component
 function AssemblyPointMarker({
-  assemblyPoint,
   position,
   onClick,
 }: {
-  assemblyPoint: AssemblyPointEntity;
   position: [number, number];
   onClick?: () => void;
 }) {
@@ -1261,7 +1726,7 @@ function TeamIncidentMarker({
       iconSize: [markerSize, markerSize],
       iconAnchor: [markerSize / 2, markerSize / 2],
     });
-  }, [isSelected, markerColor, markerSize]);
+  }, [markerColor, markerSize]);
 
   if (!iconEl) return null;
 
@@ -1360,15 +1825,7 @@ function ClusterMarker({
     Low: "#14b8a6",
   };
 
-  const severityLabels: Record<string, string> = {
-    Critical: "Nghiêm trọng",
-    High: "Cao",
-    Medium: "Trung bình",
-    Low: "Thấp",
-  };
-
   const color = severityColors[cluster.severityLevel] || "#14b8a6";
-  const label = severityLabels[cluster.severityLevel] || cluster.severityLevel;
   // Scale size based on SOS count for visual weight
   const baseSize = 56;
   const size = Math.min(baseSize + cluster.sosRequestCount * 4, 80);
@@ -1405,14 +1862,7 @@ function ClusterMarker({
       iconSize: [ringSize, ringSize],
       iconAnchor: [ringSize / 2, ringSize / 2],
     });
-  }, [
-    cluster.severityLevel,
-    cluster.sosRequestCount,
-    cluster.id,
-    isMerged,
-    color,
-    size,
-  ]);
+  }, [cluster.sosRequestCount, cluster.id, isMerged, color, size]);
 
   if (!iconEl) return null;
 

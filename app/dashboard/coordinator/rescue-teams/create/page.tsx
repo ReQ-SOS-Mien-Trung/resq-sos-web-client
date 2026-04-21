@@ -333,7 +333,7 @@ function RescuerCard({
                 className="text-sm font-medium h-5 px-1.5"
               >
                 {user.rescuerType === "Core"
-                  ? "Nhân viên cố định"
+                  ? "Nhân viên nòng cốt"
                   : "Tình nguyện"}
               </Badge>
             )}
@@ -382,7 +382,7 @@ function RescuerCard({
                 className="mt-1 h-6 border border-black px-1.5 text-sm font-medium"
               >
                 {user.rescuerType === "Core"
-                  ? "Nhân viên cố định"
+                  ? "Nhân viên nòng cốt"
                   : "Tình nguyện"}
               </Badge>
             </div>
@@ -683,9 +683,11 @@ function CreateRescueTeamForm({
   const eligibleRescuers = useMemo(() => {
     if (isEventScopedTeamCreation) {
       const checkedInRescuers = checkedInRescuersData?.items ?? [];
-      return checkedInRescuers.map((rescuer) =>
-        mapCheckedInRescuerToRescuerEntity(rescuer, lockedAssemblyPointId),
-      );
+      return checkedInRescuers
+        .filter((rescuer) => !rescuer.isInTeam)
+        .map((rescuer) =>
+          mapCheckedInRescuerToRescuerEntity(rescuer, lockedAssemblyPointId),
+        );
     }
 
     if (!usersData?.pages) return [];
@@ -788,7 +790,7 @@ function CreateRescueTeamForm({
   const toggleLeader = (userId: string) => {
     const user = eligibleRescuers.find((u) => u.id === userId);
     if (user?.rescuerType !== "Core") {
-      toast.error("Chỉ  Nhân viên cố định mới có thể làm đội trưởng.");
+      toast.error("Chỉ  Nhân viên nòng cốt mới có thể làm đội trưởng.");
       return;
     }
 
@@ -1163,7 +1165,7 @@ function CreateRescueTeamForm({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Tất cả vai trò</SelectItem>
-                      <SelectItem value="Core">Nhân viên cố định</SelectItem>
+                      <SelectItem value="Core">Nhân viên nòng cốt</SelectItem>
                       <SelectItem value="Volunteer">Tình nguyện</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1258,7 +1260,7 @@ function CreateRescueTeamForm({
                     />
                     <p className="text-sm leading-snug text-[#c2410c]">
                       Vui lòng <strong>Chọn làm đội trưởng</strong> cho một
-                      thành viên <strong>nhân viên cố định</strong> trong nhóm.
+                      thành viên <strong>nhân viên nòng cốt</strong> trong nhóm.
                     </p>
                   </div>
                 )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -60,6 +60,7 @@ import type {
   UpcomingReturnEntity,
   ReturnHistoryEntity,
   UpcomingReturnItem,
+  ReturnConsumableLotAllocation,
   ReturnReusableUnit,
   ReusableItemCondition,
   PickupLotAllocation,
@@ -160,6 +161,14 @@ type ReturnDiscrepancyFieldKey =
   (typeof RETURN_DISCREPANCY_FIELDS)[number]["key"];
 
 type ConfirmReturnDiscrepancyFields = Record<ReturnDiscrepancyFieldKey, string>;
+
+interface ConfirmReturnConsumableLotAllocationDraft {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate: string;
+  expiredDate: string;
+  remainingQuantityAfterExecution: number;
+}
 
 interface ConfirmReturnConsumableDraft {
   itemId: number;
@@ -409,6 +418,15 @@ function normalizeRequestNote(rawNote: string): string {
   return rawNote.trim();
 }
 
+function sumReturnLotAllocationQuantity(
+  lotAllocations: ConfirmReturnConsumableLotAllocationDraft[],
+): number {
+  return lotAllocations.reduce(
+    (sum, allocation) => sum + getSafeNumericValue(allocation.quantityTaken, 0),
+    0,
+  );
+}
+
 function getReturnItemUnitCandidates(
   item: UpcomingReturnItem,
 ): ReturnReusableUnit[] {
@@ -423,7 +441,75 @@ function isReusableReturnItem(item: UpcomingReturnItem): boolean {
 }
 
 function resolveReturnItemModelId(item: UpcomingReturnItem): number {
-  return getReturnItemUnitCandidates(item)[0]?.itemModelId ?? item.itemId;
+  return (
+    item.itemModelId ??
+    getReturnItemUnitCandidates(item)[0]?.itemModelId ??
+    item.itemId
+  );
+}
+
+function normalizeReturnConsumableLotAllocations(
+  allocations: ReturnConsumableLotAllocation[] | null | undefined,
+): ConfirmReturnConsumableLotAllocationDraft[] {
+  if (!Array.isArray(allocations)) {
+    return [];
+  }
+
+  return allocations
+    .map((allocation) => ({
+      lotId: getSafeNumericValue(allocation.lotId, 0),
+      quantityTaken: getSafeNumericValue(allocation.quantityTaken, 0),
+      receivedDate:
+        typeof allocation.receivedDate === "string"
+          ? allocation.receivedDate
+          : "",
+      expiredDate:
+        typeof allocation.expiredDate === "string"
+          ? allocation.expiredDate
+          : "",
+      remainingQuantityAfterExecution: getSafeNumericValue(
+        allocation.remainingQuantityAfterExecution,
+        0,
+      ),
+    }))
+    .filter((allocation) => allocation.lotId > 0);
+}
+
+function resolveReturnConsumableLotAllocations(
+  item: UpcomingReturnItem,
+): ConfirmReturnConsumableLotAllocationDraft[] {
+  const returnedLots = normalizeReturnConsumableLotAllocations(
+    item.returnedLotAllocations,
+  );
+
+  if (returnedLots.length > 0) {
+    return returnedLots;
+  }
+
+  const expectedLots = normalizeReturnConsumableLotAllocations(
+    item.expectedReturnLotAllocations,
+  );
+
+  if (expectedLots.length > 0) {
+    return expectedLots;
+  }
+
+  return normalizeReturnConsumableLotAllocations(item.pickupLotAllocations);
+}
+
+function resolveReturnConsumableExpiredDate(
+  item: UpcomingReturnItem,
+  lotAllocations: ConfirmReturnConsumableLotAllocationDraft[],
+): string | null {
+  if (typeof item.expiredDate === "string" && item.expiredDate.trim()) {
+    return item.expiredDate.trim();
+  }
+
+  const firstLotWithExpiry = lotAllocations.find(
+    (allocation) => allocation.expiredDate.trim().length > 0,
+  );
+
+  return firstLotWithExpiry?.expiredDate ?? null;
 }
 
 function getExpectedReturnLotAllocations(
@@ -546,6 +632,9 @@ function buildConfirmReturnFormState(
       reusableItems.push(reusableDraft);
       continue;
     }
+
+    const lotAllocations = resolveReturnConsumableLotAllocations(item);
+    const lotQuantity = sumReturnLotAllocationQuantity(lotAllocations);
 
     const consumableDraft: ConfirmReturnConsumableDraft = {
       itemId: item.itemId,
@@ -808,42 +897,6 @@ function ConfirmReturnFormSection({
   const [confirmResult, setConfirmResult] =
     useState<ConfirmReturnResponse | null>(null);
 
-  useEffect(() => {
-    setForm(buildConfirmReturnFormState(activity));
-  }, [activity]);
-
-  useEffect(() => {
-    if (conditionOptions.length === 0) {
-      return;
-    }
-
-    setForm((prev) => {
-      let hasChanged = false;
-
-      const reusableItems = prev.reusableItems.map((row) => ({
-        ...row,
-        units: row.units.map((unit) => {
-          const normalizedCondition = normalizeReusableConditionKey(
-            unit.condition,
-            conditionOptions,
-          );
-
-          if (normalizedCondition !== unit.condition) {
-            hasChanged = true;
-            return {
-              ...unit,
-              condition: normalizedCondition,
-            };
-          }
-
-          return unit;
-        }),
-      }));
-
-      return hasChanged ? { ...prev, reusableItems } : prev;
-    });
-  }, [conditionOptions]);
-
   const handleConsumableQuantityChange = useCallback(
     (itemId: number, value: string) => {
       const nextValue = sanitizeIntegerInput(value);
@@ -883,7 +936,7 @@ function ConfirmReturnFormSection({
           row.itemId === itemId
             ? {
                 ...row,
-                units: row.units.map((unit) =>
+                units: (row.units ?? []).map((unit) =>
                   unit.reusableItemId === reusableItemId
                     ? { ...unit, [field]: value }
                     : unit,
@@ -967,7 +1020,7 @@ function ConfirmReturnFormSection({
             reusableItems: form.reusableItems.map((row) => ({
               itemModelId: row.itemModelId,
               quantity: Number.parseInt(row.quantity || "0", 10) || 0,
-              units: row.units.map((unit) => ({
+              units: (row.units ?? []).map((unit) => ({
                 reusableItemId: unit.reusableItemId,
                 serialNumber: unit.serialNumber,
                 condition: normalizeReusableConditionKey(
@@ -1068,6 +1121,7 @@ function ConfirmReturnFormSection({
                     type="text"
                     inputMode="numeric"
                     value={row.quantity}
+                    disabled={row.lockQuantityToLots}
                     onChange={(event) =>
                       handleConsumableQuantityChange(
                         row.itemId,

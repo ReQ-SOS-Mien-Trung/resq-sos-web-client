@@ -1878,7 +1878,7 @@ export default function CoordinatorRescuerManagementPage() {
                     )}
                   >
                     {rescuer.rescuerType === "Core"
-                      ? "Nhân viên cố định"
+                      ? "Nhân viên cốt cán"
                       : "Tình nguyện"}
                   </Badge>
                 ) : null}
@@ -2118,7 +2118,7 @@ export default function CoordinatorRescuerManagementPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả loại</SelectItem>
-                <SelectItem value="Core">Nhân viên cố định</SelectItem>
+                <SelectItem value="Core">Nhân viên nòng cốt</SelectItem>
                 <SelectItem value="Volunteer">Tình nguyện</SelectItem>
               </SelectContent>
             </Select>

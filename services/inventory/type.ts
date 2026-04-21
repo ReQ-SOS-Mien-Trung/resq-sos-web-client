@@ -578,6 +578,7 @@ export interface PickupLotAllocation {
 
 export interface UpcomingReturnItem {
   itemId: number;
+  itemModelId?: number | null;
   itemName: string;
   imageUrl: string | null;
   quantity: number;
