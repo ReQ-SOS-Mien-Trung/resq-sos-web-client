@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { Icon } from "@iconify/react";
@@ -196,9 +196,138 @@ function getBreakdownNumber(
 }
 
 function compactFormulaDetails(
-  lines: Array<string | null | undefined | false>,
-): string[] {
-  return lines.filter((line): line is string => Boolean(line));
+  lines: Array<ReactNode | null | undefined | false>,
+): ReactNode[] {
+  return lines.filter((line): line is ReactNode => Boolean(line));
+}
+
+const PRIORITY_SYMBOL_LABELS: Record<string, string> = {
+  K: "hệ số tình huống",
+  M: "điểm y tế",
+  R: "điểm cứu trợ",
+  S: "điểm tổng",
+  T: "điểm loại yêu cầu",
+};
+
+function FormulaVar({
+  name,
+  subscript,
+}: {
+  name: string;
+  subscript?: ReactNode;
+}) {
+  return (
+    <span className="font-serif italic text-foreground">
+      {name}
+      {subscript ? (
+        <sub className="ml-0.5 text-[0.55em] leading-none">{subscript}</sub>
+      ) : null}
+    </span>
+  );
+}
+
+function SigmaSymbol() {
+  return (
+    <span className="relative mx-1 inline-flex h-9 w-8 items-center justify-center align-middle font-serif text-3xl leading-none text-foreground">
+      <span className="absolute -top-0.5 text-[10px] leading-none">n</span>
+      <span>Σ</span>
+      <span className="absolute -bottom-0.5 text-[10px] leading-none">
+        i=1
+      </span>
+    </span>
+  );
+}
+
+function MathWord({ children }: { children: ReactNode }) {
+  return (
+    <span className="font-sans text-[0.78em] not-italic text-foreground">
+      {children}
+    </span>
+  );
+}
+
+function FormulaOperator({ children }: { children: ReactNode }) {
+  return <span className="mx-2 text-muted-foreground">{children}</span>;
+}
+
+function PriorityFormulaNotation({
+  additiveSymbols,
+  includeSituationMultiplier,
+  totalScore,
+}: {
+  additiveSymbols: string[];
+  includeSituationMultiplier: boolean;
+  totalScore: string;
+}) {
+  const symbols =
+    additiveSymbols.length > 0 ? additiveSymbols : ["M", "R"];
+
+  return (
+    <div className="min-w-max font-serif text-2xl leading-none tracking-normal text-foreground">
+      <FormulaVar name="S" />
+      <FormulaOperator>=</FormulaOperator>
+      <MathWord>làm tròn</MathWord>
+      <span className="mx-1">(</span>
+      <span className="mx-1">(</span>
+      {symbols.map((symbol, index) => (
+        <span key={`${symbol}-${index}`} className="inline-flex items-center">
+          {index > 0 ? <FormulaOperator>+</FormulaOperator> : null}
+          <FormulaVar name={symbol} />
+        </span>
+      ))}
+      <span className="mx-1">)</span>
+      {includeSituationMultiplier ? (
+        <>
+          <FormulaOperator>×</FormulaOperator>
+          <FormulaVar name="K" />
+        </>
+      ) : null}
+      <span className="mx-1">)</span>
+      <FormulaOperator>≈</FormulaOperator>
+      <span className="font-sans text-[0.9em] not-italic">{totalScore}</span>
+    </div>
+  );
+}
+
+function InlineMedicalFormula() {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <FormulaVar name="M" />
+      <span>=</span>
+      <SigmaSymbol />
+      <span>(</span>
+      <FormulaVar name="W" subscript="i" />
+      <span>×</span>
+      <FormulaVar name="A" subscript="i" />
+      <span>)</span>
+    </span>
+  );
+}
+
+function InlineReliefFormula() {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <FormulaVar name="R" />
+      <span>=</span>
+      <FormulaVar name="U" />
+      <span>+</span>
+      <FormulaVar name="V" />
+    </span>
+  );
+}
+
+function formatPrioritySymbolValues(
+  values: Array<[symbol: string, value: unknown]>,
+): string {
+  return `Giá trị hiện tại: ${values
+    .map(([symbol, value]) => `${symbol} = ${formatScoreValue(value)}`)
+    .join("; ")}`;
+}
+
+function formatPrioritySymbols(symbols: string[]): string {
+  return symbols
+    .map((symbol) => `${symbol} là ${PRIORITY_SYMBOL_LABELS[symbol]}`)
+    .join(", ");
 }
 
 function ParsedMessage({
@@ -391,24 +520,29 @@ function ParsedMessage({
 function FormulaTooltip({
   title,
   formula,
+  description,
   details,
 }: {
   title: string;
-  formula: string;
-  details?: string[];
+  formula: ReactNode;
+  description?: string;
+  details?: ReactNode[];
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  const tooltipWidth = 480;
+  const viewportPadding = 12;
+
+  const getTooltipLeft = (rect: DOMRect) => {
+    const maxLeft = window.innerWidth - tooltipWidth - viewportPadding;
+    return Math.max(viewportPadding, Math.min(rect.left, maxLeft));
+  };
 
   const handleEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const tooltipWidth = 320;
-    const viewportPadding = 12;
-    const maxLeft = window.innerWidth - tooltipWidth - viewportPadding;
-    const left = Math.max(viewportPadding, Math.min(rect.left, maxLeft));
     setPos({
       top: rect.bottom + 8,
-      left,
+      left: getTooltipLeft(rect),
     });
     setOpen(true);
   };
@@ -423,7 +557,7 @@ function FormulaTooltip({
         onMouseLeave={() => setOpen(false)}
         onFocus={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
-          setPos({ top: rect.bottom + 8, left: Math.max(12, rect.left) });
+          setPos({ top: rect.bottom + 8, left: getTooltipLeft(rect) });
           setOpen(true);
         }}
         onBlur={() => setOpen(false)}
@@ -434,19 +568,27 @@ function FormulaTooltip({
         open &&
         createPortal(
           <div
-            className="fixed z-[9999] w-80 max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-3 text-sm leading-relaxed shadow-md"
+            className="fixed z-[9999] w-[30rem] max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-4 text-sm leading-relaxed shadow-md"
             style={{ top: pos.top, left: pos.left }}
             onMouseEnter={() => setOpen(true)}
             onMouseLeave={() => setOpen(false)}
           >
             <p className="font-semibold text-foreground">{title}</p>
-            <p className="mt-1 text-muted-foreground whitespace-normal break-words">
+            {description ? (
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {description}
+              </p>
+            ) : null}
+            <div className="mt-3 overflow-x-auto rounded-md border bg-background px-4 py-4 shadow-inner">
               {formula}
-            </p>
+            </div>
             {details && details.length > 0 && (
-              <div className="mt-2 space-y-1 text-muted-foreground whitespace-normal break-words">
+              <div className="mt-3 space-y-2 text-xs leading-relaxed text-muted-foreground">
                 {details.map((line, idx) => (
-                  <p key={idx}>- {line}</p>
+                  <div key={idx} className="flex gap-2">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
+                    <div className="min-w-0">{line}</div>
+                  </div>
                 ))}
               </div>
             )}
@@ -717,17 +859,6 @@ const SOSDetailsPanel = ({
     "relief_score",
     ruleEvaluation?.foodScore ?? 0,
   );
-  const supplyUrgencyScoreValue = getBreakdownNumber(
-    ruleBreakdown,
-    "supply_urgency_score",
-    ruleEvaluation?.injuryScore ?? 0,
-  );
-  const vulnerabilityScoreValue = getBreakdownNumber(
-    ruleBreakdown,
-    "vulnerability_score",
-    ruleEvaluation?.mobilityScore ?? 0,
-  );
-
   // Calculate local factors to match BE Rule 3.0 (for display in tooltip)
   let requestTypeScore = 10;
   const sosTypeStr = ((sosRequest as any).sosType || "").toLowerCase();
@@ -769,34 +900,74 @@ const SOSDetailsPanel = ({
       : "ROUND((medical_score + relief_score) * situation_multiplier)");
   const priorityFormulaUsesRequestType =
     priorityConfigFormula.includes("request_type_score");
-  const priorityFormulaText = `${priorityConfigFormula} ≈ ${displayedTotalScore.toFixed(1)}`;
+  const priorityFormulaUsesMedical =
+    priorityConfigFormula.includes("medical_score");
+  const priorityFormulaUsesRelief =
+    priorityConfigFormula.includes("relief_score");
+  const priorityFormulaUsesSituation =
+    priorityConfigFormula.includes("situation_multiplier");
+  const priorityFormulaSymbols = [
+    priorityFormulaUsesRequestType ? "T" : null,
+    priorityFormulaUsesMedical ? "M" : null,
+    priorityFormulaUsesRelief ? "R" : null,
+  ].filter((symbol): symbol is string => Boolean(symbol));
+  const priorityValueEntries: Array<[symbol: string, value: unknown]> = [
+    priorityFormulaUsesRequestType ? ["T", requestTypeScoreValue] : null,
+    priorityFormulaUsesMedical ? ["M", medicalScoreValue] : null,
+    priorityFormulaUsesRelief ? ["R", reliefScoreValue] : null,
+    priorityFormulaUsesSituation ? ["K", situationMultiplierValue] : null,
+  ].filter((entry): entry is [symbol: string, value: unknown] =>
+    Boolean(entry),
+  );
+  const priorityFormulaContent = (
+    <PriorityFormulaNotation
+      additiveSymbols={priorityFormulaSymbols}
+      includeSituationMultiplier={priorityFormulaUsesSituation}
+      totalScore={displayedTotalScore.toFixed(1)}
+    />
+  );
+  const priorityLevelConfig = priorityRuleConfig?.priority_level;
+  const priorityThresholdText = priorityLevelConfig
+    ? [
+        `Ngưỡng ưu tiên: P1 ≥ ${priorityLevelConfig.P1_THRESHOLD}, P2 ≥ ${priorityLevelConfig.P2_THRESHOLD}, P3 ≥ ${priorityLevelConfig.P3_THRESHOLD}.`,
+        priorityLevelConfig.rule.includes("has_severe_flag")
+          ? "P1/P2 cần có ca nặng để tránh đẩy ưu tiên quá cao."
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : null;
+  const priorityReadableSymbols = [
+    "S",
+    ...priorityFormulaSymbols,
+    priorityFormulaUsesSituation ? "K" : null,
+  ].filter((symbol): symbol is string => Boolean(symbol));
+  const priorityFormulaDescription =
+    "Công thức rút gọn để đọc nhanh cách hệ thống cộng điểm và nhân hệ số tình huống.";
   const priorityFormulaDetails = compactFormulaDetails([
     priorityRuleConfig?.config_version
-      ? `Version config: ${priorityRuleConfig.config_version}`
+      ? `Phiên bản config: ${priorityRuleConfig.config_version}`
       : ruleEvaluation?.configVersion
-        ? `Version config: ${ruleEvaluation.configVersion}`
+        ? `Phiên bản config: ${ruleEvaluation.configVersion}`
         : null,
     isLoadingPriorityRuleConfig
       ? "Đang tải công thức active từ backend..."
       : null,
-    priorityFormulaUsesRequestType
-      ? `Giá trị áp dụng: request_type_score=${formatScoreValue(requestTypeScoreValue)}, medical_score=${formatScoreValue(medicalScoreValue)}, relief_score=${formatScoreValue(reliefScoreValue)}, situation_multiplier=${formatScoreValue(situationMultiplierValue)}`
-      : `Giá trị áp dụng: medical_score=${formatScoreValue(medicalScoreValue)}, relief_score=${formatScoreValue(reliefScoreValue)}, situation_multiplier=${formatScoreValue(situationMultiplierValue)}`,
-    priorityRuleConfig?.medical_score?.formula
-      ? `medical_score: ${priorityRuleConfig.medical_score.formula}`
-      : null,
-    priorityRuleConfig?.relief_score?.formula
-      ? `relief_score: ${priorityRuleConfig.relief_score.formula}`
-      : null,
-    priorityRuleConfig?.relief_score?.supply_urgency_score?.formula
-      ? `supply_urgency_score: ${priorityRuleConfig.relief_score.supply_urgency_score.formula} = ${formatScoreValue(supplyUrgencyScoreValue)}`
-      : null,
-    priorityRuleConfig?.relief_score?.vulnerability_score?.formula
-      ? `vulnerability_score: ${priorityRuleConfig.relief_score.vulnerability_score.formula} = ${formatScoreValue(vulnerabilityScoreValue)}`
-      : null,
-    priorityRuleConfig?.priority_level
-      ? `Ngưỡng ưu tiên: P1 >= ${priorityRuleConfig.priority_level.P1_THRESHOLD}, P2 >= ${priorityRuleConfig.priority_level.P2_THRESHOLD}, P3 >= ${priorityRuleConfig.priority_level.P3_THRESHOLD}. ${priorityRuleConfig.priority_level.rule}`
-      : null,
+    formatPrioritySymbols(priorityReadableSymbols),
+    formatPrioritySymbolValues(priorityValueEntries),
+    priorityFormulaUsesMedical ? (
+      <span>
+        <InlineMedicalFormula />: W là mức độ y tế, A là hệ số tuổi của từng
+        người.
+      </span>
+    ) : null,
+    priorityFormulaUsesRelief ? (
+      <span>
+        <InlineReliefFormula />: điểm cứu trợ gồm nhu yếu phẩm khẩn cấp và mức
+        dễ tổn thương.
+      </span>
+    ) : null,
+    priorityThresholdText,
   ]);
 
   // Filter out 0-value factors for v3.0
@@ -1430,7 +1601,8 @@ const SOSDetailsPanel = ({
                             Điểm rủi ro tổng hợp:
                             <FormulaTooltip
                               title="Công thức tính chuẩn hóa"
-                              formula={priorityFormulaText}
+                              description={priorityFormulaDescription}
+                              formula={priorityFormulaContent}
                               details={priorityFormulaDetails}
                             />
                           </span>

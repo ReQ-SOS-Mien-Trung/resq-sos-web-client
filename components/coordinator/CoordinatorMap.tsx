@@ -1004,14 +1004,17 @@ const CoordinatorMap = ({
           <PopoverContent
             align="end"
             sideOffset={8}
-            className="w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl border border-border/60 bg-background/95 p-3 shadow-xl backdrop-blur-md"
+            className="w-[min(16rem,calc(100vw-1.5rem))] rounded-2xl border border-border/60 bg-background/95 p-3 shadow-xl backdrop-blur-md"
           >
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <FunnelSimple size={14} weight="bold" />
                 <span>Lớp hiển thị</span>
               </div>
-              <Badge variant="outline" className="text-[11px]">
+              <Badge
+                variant="outline"
+                className="h-5 min-w-8 px-1.5 text-[10px] leading-none"
+              >
                 {enabledLayerCount}/{layerOptions.length}
               </Badge>
             </div>
@@ -1052,7 +1055,7 @@ const CoordinatorMap = ({
               </Tooltip>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 flex flex-col gap-2">
               {layerOptions.map((layer) => {
                 const isEnabled = layerFilter[layer.key];
 
@@ -1060,7 +1063,7 @@ const CoordinatorMap = ({
                   <div
                     key={layer.key}
                     className={cn(
-                      "flex items-center gap-1.5 rounded-xl border px-2 py-1.5",
+                      "grid w-full grid-cols-[1.75rem_minmax(2rem,1fr)_1.75rem] items-center gap-2 rounded-xl border px-2 py-1.5",
                       isEnabled
                         ? "border-primary/40 bg-primary/5"
                         : "border-border/50 bg-muted/20",
@@ -1075,7 +1078,7 @@ const CoordinatorMap = ({
                           aria-pressed={isEnabled}
                           onClick={() => toggleLayer(layer.key)}
                           className={cn(
-                            "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                            "flex h-6 w-6 items-center justify-center rounded-md transition-colors",
                             isEnabled
                               ? "bg-background text-foreground"
                               : "text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -1102,7 +1105,7 @@ const CoordinatorMap = ({
 
                     <Badge
                       className={cn(
-                        "px-1.5 py-0 text-[10px]",
+                        "h-6 min-w-7 justify-center px-1 py-0 text-[10px] font-semibold",
                         layer.badgeClass,
                       )}
                     >
@@ -1116,7 +1119,7 @@ const CoordinatorMap = ({
                           onClick={() => showOnlyLayer(layer.key)}
                           aria-label={`Chỉ hiện ${layer.label}`}
                           title={`Chỉ hiện ${layer.label}`}
-                          className="ml-auto flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                         >
                           <Crosshair size={12} weight="bold" />
                           <span className="sr-only">

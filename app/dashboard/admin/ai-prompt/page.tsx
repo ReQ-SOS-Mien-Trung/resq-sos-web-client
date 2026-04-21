@@ -1351,66 +1351,69 @@ const AIPromptPage = () => {
                   </p>
                 </div>
                 <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-                  {aiConfigVersions.map((config) => (
-                    <button
-                      key={config.id}
-                      type="button"
-                      onClick={() => setSelectedAiConfigId(config.id)}
-                      className={cn(
-                        "rounded-xl border p-4 text-left transition-all",
-                        effectiveSelectedAiConfigId === config.id
-                          ? "border-primary/50 bg-primary/5 shadow-sm"
-                          : "border-border/60 hover:border-border hover:bg-muted/20",
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-semibold text-foreground">
-                            {config.name}
-                          </p>
-                          <div className="mt-2 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2">
-                            <p className="text-sm font-semibold text-primary">
-                              Model AI
+                  {aiConfigVersions.map((config) => {
+                    const isSelected =
+                      effectiveSelectedAiConfigId === config.id;
+                    const isActive =
+                      config.id === activeAiConfig?.id ||
+                      config.status === "Active";
+
+                    return (
+                      <button
+                        key={config.id}
+                        type="button"
+                        onClick={() => setSelectedAiConfigId(config.id)}
+                        className={cn(
+                          "rounded-xl border p-4 text-left transition-all",
+                          isSelected
+                            ? "border-primary/50 bg-primary/5 shadow-sm"
+                            : "border-border/60 hover:border-border hover:bg-muted/20",
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-foreground">
+                              {config.name}
                             </p>
-                            <p className="mt-1 break-all text-base font-semibold text-foreground">
-                              {config.provider} • {config.model}
-                            </p>
+                            <div className="mt-2 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2">
+                              <p className="text-sm font-semibold text-primary">
+                                Model AI
+                              </p>
+                              <p className="mt-1 break-all text-base font-semibold text-foreground">
+                                {config.provider} • {config.model}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isActive ? (
+                              <span
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"
+                                title="Đang hoạt động"
+                                aria-label="Đang hoạt động"
+                              >
+                                <CheckCircle weight="fill" size={16} />
+                              </span>
+                            ) : null}
+                            {!isActive ? (
+                              <Badge variant="outline">
+                                {getStatusLabel(config.status)}
+                              </Badge>
+                            ) : null}
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <Badge
-                            variant={
-                              config.status === "Active" ? "success" : "outline"
-                            }
-                          >
-                            {getStatusLabel(config.status)}
-                          </Badge>
-                          {effectiveSelectedAiConfigId === config.id ? (
-                            <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                              Đang chọn
-                            </span>
-                          ) : null}
+                        <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-muted-foreground">
+                          <span>Phiên bản: {config.version || "—"}</span>
+                          <span>
+                            Khóa API:{" "}
+                            {config.hasApiKey
+                              ? config.apiKeyMasked || "Đã cấu hình"
+                              : "Chưa cấu hình"}
+                          </span>
+                          <span>Cập nhật: {formatDate(config.updatedAt)}</span>
                         </div>
-                      </div>
-                      <div className="mt-3 grid grid-cols-1 gap-2 text-sm text-muted-foreground">
-                        <span>Phiên bản: {config.version || "—"}</span>
-                        <span>
-                          Khóa API:{" "}
-                          {config.hasApiKey
-                            ? config.apiKeyMasked || "Đã cấu hình"
-                            : "Chưa cấu hình"}
-                        </span>
-                        <span>Cập nhật: {formatDate(config.updatedAt)}</span>
-                      </div>
-                      <p className="mt-3 text-xs text-muted-foreground">
-                        {config.id === activeAiConfig?.id
-                          ? "Đây là bản đang chạy thật trên hệ thống."
-                          : effectiveSelectedAiConfigId === config.id
-                            ? "Mẫu lệnh sẽ chạy thử bằng phiên bản này."
-                            : "Bấm để chọn phiên bản này khi chạy thử mẫu lệnh."}
-                      </p>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ) : null}
@@ -1783,29 +1786,31 @@ const AIPromptPage = () => {
 
             <div className="space-y-1.5">
               <Label htmlFor="ai_config_version">Phiên bản</Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-muted-foreground/70">
-                  v
-                </span>
-                <Input
-                  id="ai_config_version"
-                  value={aiConfigForm.version}
-                  maxLength={20}
-                  disabled={aiConfigDialogMode === "edit"}
-                  className={cn(
-                    "pl-6",
-                    aiConfigFormErrors.version && INVALID_FIELD_CLASSNAME,
-                  )}
-                  onChange={(event) =>
-                    setAiConfigForm((previous) => ({
-                      ...previous,
-                      version: event.target.value.replace(
-                        /[^0-9.a-zA-Z-]/g,
-                        "",
-                      ),
-                    }))
-                  }
-                />
+              <div className="space-y-1.5">
+                <div className="relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 inline-flex items-center text-sm leading-none text-muted-foreground/70">
+                    v
+                  </span>
+                  <Input
+                    id="ai_config_version"
+                    value={aiConfigForm.version}
+                    maxLength={20}
+                    disabled={aiConfigDialogMode === "edit"}
+                    className={cn(
+                      "pl-7",
+                      aiConfigFormErrors.version && INVALID_FIELD_CLASSNAME,
+                    )}
+                    onChange={(event) =>
+                      setAiConfigForm((previous) => ({
+                        ...previous,
+                        version: event.target.value.replace(
+                          /[^0-9.a-zA-Z-]/g,
+                          "",
+                        ),
+                      }))
+                    }
+                  />
+                </div>
                 {aiConfigDialogMode === "edit" &&
                 !aiConfigFormErrors.version ? (
                   <p className="text-sm text-muted-foreground">
