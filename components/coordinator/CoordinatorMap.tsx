@@ -150,6 +150,7 @@ const CoordinatorMap = ({
   onMapClick,
   panelOpen,
   routeOverlay,
+  risingSOSMarkerIds = [],
 }: CoordinatorMapProps) => {
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0);
@@ -179,6 +180,10 @@ const CoordinatorMap = ({
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [currentZoom, setCurrentZoom] = useState(13);
   const [layerFilter, setLayerFilter] = useState(DEFAULT_LAYER_FILTER);
+  const risingSOSMarkerIdSet = useMemo(
+    () => new Set(risingSOSMarkerIds),
+    [risingSOSMarkerIds],
+  );
 
   const markerDisplayPositions = useMemo(() => {
     type MarkerSeed = {
@@ -1181,6 +1186,7 @@ const CoordinatorMap = ({
               key={sos.id}
               sos={sos}
               isSelected={selectedSOS?.id === sos.id}
+              shouldRise={risingSOSMarkerIdSet.has(sos.id)}
               onClick={() => onSOSSelect(sos)}
             />
           ))}
@@ -1478,10 +1484,12 @@ function ServiceZoneOverlay({ zone }: { zone: ServiceZoneEntity }) {
 function SOSRequestMarker({
   sos,
   isSelected,
+  shouldRise,
   onClick,
 }: {
   sos: SOSRequest;
   isSelected: boolean;
+  shouldRise: boolean;
   onClick: () => void;
 }) {
   const priorityColors = {
@@ -1505,7 +1513,7 @@ function SOSRequestMarker({
     return L.divIcon({
       className: "custom-sos-marker",
       html: `
-        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;">
+        <div class="${shouldRise ? "map-marker-rise" : ""}" style="position:relative;display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;">
           ${sos.status === "PENDING" ? `<div class="absolute inset-0 rounded-full animate-ping opacity-75" style="background-color: ${color};"></div>` : ""}
           <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${badgeSize}px;height:${badgeSize}px;border-radius:9999px;overflow:hidden;background-color:${color};border:2px solid #ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
             <span style="display:block;color:#ffffff;font-family:Arial,'Helvetica Neue',sans-serif;font-size:${labelFontSize}px;font-weight:800;line-height:1;letter-spacing:-0.04em;text-transform:uppercase;white-space:nowrap;transform:translateY(-0.5px);">
@@ -1526,6 +1534,7 @@ function SOSRequestMarker({
     sos.priority,
     sos.status,
     isSelected,
+    shouldRise,
   ]);
 
   if (!icon) return null;

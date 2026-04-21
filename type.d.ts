@@ -919,6 +919,8 @@ export interface CoordinatorMapProps {
   onMapClick?: (lat: number, lng: number) => void;
   /** Decoded polyline coords [lat, lng][] to draw as a rescue route overlay */
   routeOverlay?: [number, number][];
+  /** SOS marker IDs that should briefly play rise-in animation after map-bound fetch updates */
+  risingSOSMarkerIds?: string[];
   /** Called when route overlay should be cleared */
   onClearRouteOverlay?: () => void;
 }
