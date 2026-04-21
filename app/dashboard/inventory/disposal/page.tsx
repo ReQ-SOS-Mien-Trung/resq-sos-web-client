@@ -28,13 +28,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   ArrowLeft,
   CalendarX,
   SpinnerGap,
@@ -42,15 +35,8 @@ import {
   CaretDown,
   CaretRight,
 } from "@phosphor-icons/react";
-import {
-  useDisposeLot,
-  useExpiringLots,
-  useInventoryLots,
-} from "@/services/inventory/hooks";
-import type {
-  ExpiringLotItem,
-  InventoryLotItem,
-} from "@/services/inventory/type";
+import { useDisposeLot, useExpiringLots } from "@/services/inventory/hooks";
+import type { ExpiringLotItem } from "@/services/inventory/type";
 
 // ─── Constants ───
 
@@ -86,59 +72,71 @@ function ExpiringLotsTab({ depotId }: { depotId: number }) {
     daysAhead,
   });
 
-  const [expandedItemModelId, setExpandedItemModelId] = useState<number | null>(
-    null,
-  );
-
-  // Dispose dialog
-  const [disposeOpen, setDisposeOpen] = useState(false);
-  const [disposeLot, setDisposeLot] = useState<ExpiringLotItem | null>(null);
-  const [disposeQuantity, setDisposeQuantity] = useState("");
-  const [disposeNote, setDisposeNote] = useState("");
+  const [expandedLotId, setExpandedLotId] = useState<number | null>(null);
+  const [expandedQuantity, setExpandedQuantity] = useState("");
+  const [expandedNote, setExpandedNote] = useState("");
   const disposeMutation = useDisposeLot();
 
-  const openDispose = useCallback((lot: ExpiringLotItem) => {
-    setDisposeLot(lot);
-    setDisposeQuantity(String(lot.remainingQuantity));
-    setDisposeNote("");
-    setDisposeOpen(true);
+  const handleToggleExpand = useCallback((lot: ExpiringLotItem) => {
+    setExpandedLotId((prev) => {
+      if (prev === lot.lotId) {
+        setExpandedQuantity("");
+        return null;
+      }
+      setExpandedQuantity(String(lot.remainingQuantity));
+      setExpandedNote("");
+      return lot.lotId;
+    });
   }, []);
 
-  const handleDispose = useCallback(async () => {
-    if (!disposeLot) return;
-    const qty = Number(disposeQuantity);
-    if (!Number.isInteger(qty) || qty <= 0) {
-      toast.error("Số lượng phải là số nguyên lớn hơn 0");
-      return;
-    }
-    if (qty > disposeLot.remainingQuantity) {
-      toast.error(
-        `Số lượng tiêu hủy (${qty}) vượt quá số lượng còn lại (${disposeLot.remainingQuantity})`,
-      );
-      return;
-    }
+  const handleDispose = useCallback(
+    async (lot: ExpiringLotItem) => {
+      const quantity = lot.isExpired
+        ? lot.remainingQuantity
+        : Number(expandedQuantity);
 
-    try {
-      const res = await disposeMutation.mutateAsync({
-        depotId,
-        lotId: disposeLot.lotId,
-        payload: {
-          lotId: disposeLot.lotId,
-          quantity: qty,
-          reason: "Expired",
-          note:
-            disposeNote.trim() || "Lô đã hết hạn, quản kho xác nhận tiêu hủy.",
-        },
-      });
-      toast.success(res.message);
-      setDisposeOpen(false);
-    } catch (error: unknown) {
-      const err = error as {
-        response?: { data?: { message?: string }; status?: number };
-      };
-      toast.error(err.response?.data?.message ?? "Không thể tiêu hủy lô hàng.");
-    }
-  }, [depotId, disposeLot, disposeMutation, disposeNote, disposeQuantity]);
+      if (!lot.isExpired) {
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          toast.error("Số lượng tiêu hủy phải là số nguyên lớn hơn 0.");
+          return;
+        }
+
+        if (quantity > lot.remainingQuantity) {
+          toast.error(
+            `Số lượng tiêu hủy (${quantity}) vượt quá số lượng còn lại (${lot.remainingQuantity}).`,
+          );
+          return;
+        }
+      }
+
+      try {
+        const res = await disposeMutation.mutateAsync({
+          depotId,
+          lotId: lot.lotId,
+          payload: {
+            lotId: lot.lotId,
+            quantity,
+            reason: "Expired",
+            note:
+              expandedNote.trim() ||
+              "Lô đã hết hạn, quản kho xác nhận tiêu hủy.",
+          },
+        });
+        toast.success(res.message);
+        setExpandedLotId(null);
+        setExpandedQuantity("");
+        setExpandedNote("");
+      } catch (error: unknown) {
+        const err = error as {
+          response?: { data?: { message?: string }; status?: number };
+        };
+        toast.error(
+          err.response?.data?.message ?? "Không thể tiêu hủy lô hàng.",
+        );
+      }
+    },
+    [depotId, disposeMutation, expandedNote, expandedQuantity],
+  );
 
   const expiredCount = lots?.filter((l) => l.isExpired).length ?? 0;
   const expiringCount = (lots?.length ?? 0) - expiredCount;
@@ -245,19 +243,20 @@ function ExpiringLotsTab({ depotId }: { depotId: number }) {
                 <TableRow>
                   <TableHead className="w-10">#</TableHead>
                   <TableHead>Vật phẩm</TableHead>
-                  <TableHead>Lô #</TableHead>
+                  <TableHead>Lô</TableHead>
                   <TableHead>Nguồn</TableHead>
-                  <TableHead className="text-right">SL còn lại</TableHead>
+                  <TableHead className="text-right">Số lượng còn lại</TableHead>
                   <TableHead>Ngày nhập</TableHead>
                   <TableHead>Hạn sử dụng</TableHead>
                   <TableHead>Trạng thái</TableHead>
-                  <TableHead className="w-28 text-center">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {lots.map((lot, idx) => {
                   const days = daysUntil(lot.expiredDate);
-                  const isExpanded = expandedItemModelId === lot.lotId;
+                  const isExpanded = expandedLotId === lot.lotId;
+                  const isPending =
+                    disposeMutation.isPending && expandedLotId === lot.lotId;
 
                   return (
                     <React.Fragment key={lot.lotId}>
@@ -270,35 +269,29 @@ function ExpiringLotsTab({ depotId }: { depotId: number }) {
                           ease: MOTION_EASE,
                         }}
                         className={cn(
-                          "border-b transition-colors hover:bg-muted/50",
+                          "border-b transition-colors cursor-pointer select-none",
                           lot.isExpired
-                            ? "bg-red-50/60"
+                            ? "bg-red-50/60 hover:bg-red-100/60"
                             : days <= 7
-                              ? "bg-amber-50/60"
-                              : "",
+                              ? "bg-amber-50/60 hover:bg-amber-100/60"
+                              : "hover:bg-muted/50",
                         )}
+                        onClick={() => handleToggleExpand(lot)}
                       >
                         <TableCell className="text-muted-foreground">
                           {idx + 1}
                         </TableCell>
                         <TableCell className="font-medium">
-                          <button
-                            className="flex items-center gap-1 hover:underline"
-                            onClick={() =>
-                              setExpandedItemModelId(
-                                isExpanded ? null : lot.lotId,
-                              )
-                            }
-                          >
+                          <span className="flex items-center gap-1">
                             {isExpanded ? (
-                              <CaretDown className="h-3 w-3" />
+                              <CaretDown className="h-3 w-3 shrink-0" />
                             ) : (
-                              <CaretRight className="h-3 w-3" />
+                              <CaretRight className="h-3 w-3 shrink-0" />
                             )}
                             {lot.itemModelName}
-                          </button>
+                          </span>
                         </TableCell>
-                        <TableCell>#{lot.lotId}</TableCell>
+                        <TableCell>Lô số {lot.lotId}</TableCell>
                         <TableCell>{lot.sourceType}</TableCell>
                         <TableCell className="text-right font-medium">
                           {formatNumber(lot.remainingQuantity)}
@@ -316,17 +309,6 @@ function ExpiringLotsTab({ depotId }: { depotId: number }) {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-center">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="gap-1.5 h-7"
-                            onClick={() => openDispose(lot)}
-                          >
-                            <Trash className="h-3.5 w-3.5" />
-                            Tiêu hủy
-                          </Button>
-                        </TableCell>
                       </motion.tr>
                       <AnimatePresence>
                         {isExpanded && (
@@ -338,16 +320,94 @@ function ExpiringLotsTab({ depotId }: { depotId: number }) {
                             transition={{ duration: 0.3, ease: MOTION_EASE }}
                             className="overflow-hidden"
                           >
-                            <TableCell colSpan={9} className="p-0">
+                            <TableCell colSpan={8} className="p-0">
                               <motion.div
                                 initial={{ opacity: 0, y: -8 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.25, delay: 0.1 }}
+                                className="bg-muted/30 px-8 py-4"
                               >
-                                <LotDetailInline
-                                  itemModelId={lot.itemModelId}
-                                  depotId={depotId}
-                                />
+                                <div className="flex flex-wrap items-start gap-4">
+                                  <div className="space-y-1.5">
+                                    <Label className="text-sm font-medium">
+                                      Số lượng tiêu hủy
+                                    </Label>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      max={lot.remainingQuantity}
+                                      readOnly={lot.isExpired}
+                                      value={
+                                        lot.isExpired
+                                          ? String(lot.remainingQuantity)
+                                          : expandedQuantity
+                                      }
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val === "") {
+                                          setExpandedQuantity("");
+                                          return;
+                                        }
+                                        const num = Number(val);
+                                        if (num > lot.remainingQuantity) {
+                                          setExpandedQuantity(
+                                            String(lot.remainingQuantity),
+                                          );
+                                        } else {
+                                          setExpandedQuantity(val);
+                                        }
+                                      }}
+                                      className={cn(
+                                        "w-36 bg-background",
+                                        lot.isExpired &&
+                                          "cursor-not-allowed bg-muted",
+                                      )}
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5 flex-1 min-w-48">
+                                    <Label className="text-sm font-medium">
+                                      Ghi chú (tùy chọn)
+                                    </Label>
+                                    <Textarea
+                                      placeholder="Lý do tiêu hủy..."
+                                      value={expandedNote}
+                                      onChange={(e) =>
+                                        setExpandedNote(e.target.value)
+                                      }
+                                      rows={1}
+                                      className="resize-none"
+                                    />
+                                  </div>
+                                  <div className="flex gap-2 self-start mt-6.5">
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      disabled={isPending}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDispose(lot);
+                                      }}
+                                    >
+                                      {isPending ? (
+                                        <SpinnerGap className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Trash className="mr-2 h-3.5 w-3.5" />
+                                      )}
+                                      Xử lý hết hạn
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={isPending}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleExpand(lot);
+                                      }}
+                                    >
+                                      Hủy
+                                    </Button>
+                                  </div>
+                                </div>
                               </motion.div>
                             </TableCell>
                           </motion.tr>
@@ -361,169 +421,7 @@ function ExpiringLotsTab({ depotId }: { depotId: number }) {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Dispose Dialog */}
-      <Dialog open={disposeOpen} onOpenChange={setDisposeOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <Trash className="h-5 w-5" />
-              Tiêu hủy lô hết hạn
-            </DialogTitle>
-          </DialogHeader>
-          {disposeLot && (
-            <div className="space-y-4 py-2">
-              <div className="rounded-lg border bg-red-50/50 p-3 text-sm space-y-1">
-                <p>
-                  <span className="font-medium">Vật phẩm:</span>{" "}
-                  {disposeLot.itemModelName}
-                </p>
-                <p>
-                  <span className="font-medium">Lô:</span> #{disposeLot.lotId}
-                </p>
-                <p>
-                  <span className="font-medium">SL còn lại:</span>{" "}
-                  {formatNumber(disposeLot.remainingQuantity)}
-                </p>
-                <p>
-                  <span className="font-medium">Hạn sử dụng:</span>{" "}
-                  {formatDate(disposeLot.expiredDate)}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Số lượng tiêu hủy</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={disposeLot.remainingQuantity}
-                  value={disposeQuantity}
-                  onChange={(e) => setDisposeQuantity(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Ghi chú (tùy chọn)
-                </Label>
-                <Textarea
-                  placeholder="Lý do tiêu hủy..."
-                  value={disposeNote}
-                  onChange={(e) => setDisposeNote(e.target.value)}
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDisposeOpen(false)}>
-              Hủy
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={disposeMutation.isPending}
-              onClick={handleDispose}
-            >
-              {disposeMutation.isPending ? (
-                <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Trash className="mr-2 h-4 w-4" />
-              )}
-              Xác nhận tiêu hủy
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
-  );
-}
-
-// ─── Inline Lot Detail (expand row) ───
-
-function LotDetailInline({
-  itemModelId,
-  depotId,
-}: {
-  itemModelId: number;
-  depotId: number;
-}) {
-  const { data, isLoading } = useInventoryLots({
-    itemModelId,
-    depotId,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="px-6 py-3 space-y-2">
-        <Skeleton className="h-4 w-64" />
-        <Skeleton className="h-4 w-48" />
-      </div>
-    );
-  }
-
-  const items =
-    (data as { items?: InventoryLotItem[] })?.items ??
-    (Array.isArray(data) ? data : []);
-
-  if (!items.length) {
-    return (
-      <div className="px-6 py-3 text-sm text-muted-foreground">
-        Không có dữ liệu lô cho vật phẩm này.
-      </div>
-    );
-  }
-
-  return (
-    <motion.div
-      className="bg-muted/30 px-8 py-3"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.3 }}
-    >
-      <p className="text-xs font-semibold text-muted-foreground mb-2 tracking-tighter uppercase">
-        Tất cả lô của vật phẩm này
-      </p>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-muted-foreground text-xs">
-            <th className="pb-1 pr-4">Lô #</th>
-            <th className="pb-1 pr-4">SL ban đầu</th>
-            <th className="pb-1 pr-4">SL còn lại</th>
-            <th className="pb-1 pr-4">Nguồn</th>
-            <th className="pb-1 pr-4">Ngày nhập</th>
-            <th className="pb-1 pr-4">Hạn SD</th>
-            <th className="pb-1">Trạng thái</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((lot: InventoryLotItem) => (
-            <tr key={lot.lotId} className="border-t border-border/40">
-              <td className="py-1.5 pr-4">#{lot.lotId}</td>
-              <td className="py-1.5 pr-4">{formatNumber(lot.quantity)}</td>
-              <td className="py-1.5 pr-4 font-medium">
-                {formatNumber(lot.remainingQuantity)}
-              </td>
-              <td className="py-1.5 pr-4">{lot.sourceType}</td>
-              <td className="py-1.5 pr-4">{formatDate(lot.receivedDate)}</td>
-              <td className="py-1.5 pr-4">{formatDate(lot.expiredDate)}</td>
-              <td className="py-1.5">
-                {lot.isExpired ? (
-                  <Badge className="border-0 bg-red-100 text-red-700 shadow-none text-xs">
-                    Hết hạn
-                  </Badge>
-                ) : lot.isExpiringSoon ? (
-                  <Badge className="border-0 bg-amber-100 text-amber-700 shadow-none text-xs">
-                    Sắp hết hạn
-                  </Badge>
-                ) : (
-                  <Badge className="border-0 bg-green-100 text-green-700 shadow-none text-xs">
-                    Còn hạn
-                  </Badge>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </motion.div>
   );
 }
 
@@ -565,7 +463,7 @@ export default function DisposalPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tighter text-foreground">
-              Xử lý hư hỏng & hết hạn
+              Xử lý vật phẩm hết hạn
             </h1>
             <p className="text-sm tracking-tighter text-muted-foreground">
               Tiêu hủy lô hết hạn hoặc sắp hết hạn trong kho

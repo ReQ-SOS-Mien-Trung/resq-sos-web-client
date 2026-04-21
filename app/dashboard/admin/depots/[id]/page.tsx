@@ -112,6 +112,14 @@ function useCountdown(deadline: string | null | undefined): string {
   return computeCountdown(deadline);
 }
 
+function formatDepotMetric(value: number | null | undefined, unit: string): string {
+  const safeValue = Number.isFinite(value) ? Number(value) : 0;
+  return `${safeValue.toLocaleString("vi-VN", {
+    minimumFractionDigits: safeValue % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 1,
+  })} ${unit}`;
+}
+
 interface TransferAssignmentItemDraft {
   itemKey: string;
   quantity: string;
@@ -2032,11 +2040,31 @@ export default function DepotDetailPage() {
           Math.round((depot.currentUtilization / depot.capacity) * 100),
         )
       : 0;
+  const weightPct =
+    (depot.weightCapacity ?? 0) > 0
+      ? Math.min(
+          100,
+          Math.round(
+            (((depot.currentWeightUtilization ?? 0) / (depot.weightCapacity ?? 1)) *
+              100),
+          ),
+        )
+      : 0;
   const barColor =
     pct > 80 ? "bg-red-500" : pct > 50 ? "bg-amber-500" : "bg-emerald-500";
+  const weightBarColor =
+    weightPct > 80
+      ? "bg-red-500"
+      : weightPct > 50
+        ? "bg-amber-500"
+        : "bg-emerald-500";
   const availableCapacity = Math.max(
     0,
     depot.capacity - depot.currentUtilization,
+  );
+  const availableWeightCapacity = Math.max(
+    0,
+    (depot.weightCapacity ?? 0) - (depot.currentWeightUtilization ?? 0),
   );
   const closingBannerTheme =
     activeClosureStatus === "Processing" ||
@@ -2418,10 +2446,10 @@ export default function DepotDetailPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
-                    Tồn kho
+                    Thể tích hiện tại
                   </p>
                   <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-                    {depot.currentUtilization.toLocaleString("vi-VN")}
+                    {formatDepotMetric(depot.currentUtilization, "dm3")}
                   </p>
                 </div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-4xl bg-emerald-50 text-emerald-600">
@@ -2441,7 +2469,7 @@ export default function DepotDetailPage() {
                 <div className="flex items-center justify-between text-sm tracking-tighter">
                   <span className="text-slate-500">Sức chứa tối đa</span>
                   <span className="font-semibold text-slate-900">
-                    {depot.capacity.toLocaleString("vi-VN")}
+                    {formatDepotMetric(depot.capacity, "dm3")}
                   </span>
                 </div>
               </div>
@@ -2453,10 +2481,48 @@ export default function DepotDetailPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
-                    Còn trống
+                    Khối lượng hiện tại
                   </p>
                   <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-                    {availableCapacity.toLocaleString("vi-VN")}
+                    {formatDepotMetric(
+                      depot.currentWeightUtilization ?? 0,
+                      "kg",
+                    )}
+                  </p>
+                </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-4xl bg-sky-50 text-sky-600">
+                  <WarehouseIcon size={20} weight="duotone" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-2 rounded-full bg-slate-100">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      weightBarColor,
+                    )}
+                    style={{ width: `${weightPct}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-sm tracking-tighter">
+                  <span className="text-slate-500">Sức chứa tối đa</span>
+                  <span className="font-semibold text-slate-900">
+                    {formatDepotMetric(depot.weightCapacity ?? 0, "kg")}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden rounded-2xl border border-border/60 bg-background py-0">
+            <CardContent className="space-y-3 px-5 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
+                    Thể tích tối đa
+                  </p>
+                  <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+                    {formatDepotMetric(depot.capacity, "dm3")}
                   </p>
                 </div>
                 <div className="flex h-11 w-11 items-center justify-center rounded-4xl bg-orange-50 text-orange-600">
@@ -2464,9 +2530,28 @@ export default function DepotDetailPage() {
                 </div>
               </div>
               <p className="text-sm tracking-tighter leading-6">
-                {pct > 80
-                  ? "Kho đang khá đầy, nên chuẩn bị phương án điều phối."
-                  : "Kho vẫn còn không gian để tiếp nhận vật phẩm mới."}
+                Còn trống {formatDepotMetric(availableCapacity, "dm3")}.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden rounded-2xl border border-border/60 bg-background py-0">
+            <CardContent className="space-y-3 px-5 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-tighter text-muted-foreground">
+                    Khối lượng tối đa
+                  </p>
+                  <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+                    {formatDepotMetric(depot.weightCapacity ?? 0, "kg")}
+                  </p>
+                </div>
+                <div className="flex h-11 w-11 items-center justify-center rounded-4xl bg-violet-50 text-violet-600">
+                  <Truck size={20} weight="duotone" />
+                </div>
+              </div>
+              <p className="text-sm tracking-tighter leading-6">
+                Còn trống {formatDepotMetric(availableWeightCapacity, "kg")}.
               </p>
             </CardContent>
           </Card>

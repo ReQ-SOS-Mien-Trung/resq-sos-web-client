@@ -55,11 +55,15 @@ function buildCoordinatorChatRoute(
 }
 
 function buildInventoryRequestRoute(
-  tab: "incoming" | "shipments",
+  subtab: "incoming" | "outgoing" | null,
   data?: NotificationRouteData | null,
 ): string {
   const requestId = toPositiveInt(data?.requestId ?? data?.supplyRequestId);
-  const params = new URLSearchParams({ tab });
+  const params = new URLSearchParams({ tab: "supply-management" });
+
+  if (subtab) {
+    params.set("subtab", subtab);
+  }
 
   if (requestId) {
     params.set("requestId", String(requestId));
@@ -136,7 +140,7 @@ export function resolveNotificationRoute(
     normalizedType === "supply_shipped" ||
     normalizedType === "supply_completed"
   ) {
-    return buildInventoryRequestRoute("shipments", data);
+    return buildInventoryRequestRoute("outgoing", data);
   }
 
   if (
@@ -167,6 +171,25 @@ export function resolveNotificationRoute(
     normalizedType === "evacuation"
   ) {
     return resolveFloodRouteByRole(roleId);
+  }
+
+  if (
+    normalizedType === "inventory_maintenance_alert" ||
+    normalizedType === "inventory_maintenance"
+  ) {
+    return "/dashboard/inventory?tab=inventory";
+  }
+
+  if (
+    normalizedType === "sos_request_new" ||
+    normalizedType === "sos_request_assigned" ||
+    normalizedType === "sos_request_resolved"
+  ) {
+    const sosRequestId = toPositiveInt(data?.sosRequestId);
+    if (sosRequestId) {
+      return `/dashboard/coordinator?sosRequestId=${sosRequestId}`;
+    }
+    return "/dashboard/coordinator";
   }
 
   return getDashboardPathByRole(roleId ?? 0) ?? "/";

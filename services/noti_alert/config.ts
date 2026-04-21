@@ -76,6 +76,11 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   flood_warning: "Cảnh báo lũ",
   flood_emergency: "Cảnh báo lũ khẩn cấp",
   evacuation: "Lệnh sơ tán",
+  inventory_maintenance_alert: "Cảnh báo bảo trì kho",
+  inventory_maintenance: "Bảo trì kho",
+  sos_request_new: "Yêu cầu SOS mới",
+  sos_request_assigned: "Yêu cầu SOS được phân công",
+  sos_request_resolved: "Yêu cầu SOS đã giải quyết",
 };
 
 export type NotificationTone =
@@ -113,6 +118,11 @@ const NOTIFICATION_TYPE_TONES: Record<string, NotificationTone> = {
   flood_warning: "warning",
   flood_emergency: "danger",
   evacuation: "danger",
+  inventory_maintenance_alert: "warning",
+  inventory_maintenance: "warning",
+  sos_request_new: "danger",
+  sos_request_assigned: "info",
+  sos_request_resolved: "success",
 };
 
 function toTitleCase(value: string): string {

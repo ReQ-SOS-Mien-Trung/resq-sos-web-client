@@ -53,6 +53,9 @@ import {
   decommissionReusable,
   getReusableItemStatuses,
   getInventoryItemModels,
+  searchDepotReusableUnits,
+  setReusableMaintenance,
+  setReusableAvailable,
 } from "./api";
 import {
   GetDepotInventoryParams,
@@ -112,6 +115,10 @@ import {
   DecommissionReusableParams,
   DecommissionReusableResponse,
   ReusableItemStatus,
+  SearchDepotReusableUnitsParams,
+  SearchDepotReusableUnitsResponse,
+  UpdateReusableStatusParams,
+  UpdateReusableStatusResponse,
 } from "./type";
 
 export const INVENTORY_KEYS = {
@@ -168,6 +175,8 @@ export const INVENTORY_KEYS = {
   reusableItemStatuses: () =>
     [...INVENTORY_KEYS.all, "reusableItemStatuses"] as const,
   itemModels: () => [...INVENTORY_KEYS.all, "itemModels"] as const,
+  reusableUnitSearch: (params: SearchDepotReusableUnitsParams) =>
+    [...INVENTORY_KEYS.all, "reusableUnitSearch", params] as const,
 };
 
 export function useDepotInventory(
@@ -811,5 +820,52 @@ export function useInventoryItemModels(
     queryFn: getInventoryItemModels,
     staleTime: Infinity,
     ...options,
+  });
+}
+
+export function useSearchDepotReusableUnits(
+  params: SearchDepotReusableUnitsParams,
+  options?: Omit<
+    UseQueryOptions<SearchDepotReusableUnitsResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<SearchDepotReusableUnitsResponse>({
+    queryKey: INVENTORY_KEYS.reusableUnitSearch(params),
+    queryFn: () => searchDepotReusableUnits(params),
+    enabled:
+      Number.isFinite(params.depotId) &&
+      params.depotId > 0 &&
+      Number.isFinite(params.itemModelId) &&
+      params.itemModelId > 0,
+    ...options,
+  });
+}
+
+export function useSetReusableMaintenance() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    UpdateReusableStatusResponse,
+    Error,
+    UpdateReusableStatusParams
+  >({
+    mutationFn: setReusableMaintenance,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function useSetReusableAvailable() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    UpdateReusableStatusResponse,
+    Error,
+    UpdateReusableStatusParams
+  >({
+    mutationFn: setReusableAvailable,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
   });
 }

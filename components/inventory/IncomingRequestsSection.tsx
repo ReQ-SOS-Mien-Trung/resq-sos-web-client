@@ -140,6 +140,16 @@ function getStatusInfo(r: SupplyRequestListItem): {
   };
 }
 
+function isInteractiveKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+
+  return Boolean(
+    target.closest(
+      'input, textarea, select, button, a, [role="button"], [contenteditable="true"], [data-prevent-card-toggle="true"]',
+    ),
+  );
+}
+
 function getRoleInfo(role: "Source" | "Requester"): {
   label: string;
   className: string;
@@ -224,10 +234,7 @@ export default function IncomingRequestsSection() {
   // ── Card pagination ──
   const [cardsPerPage, setCardsPerPage] = useState(6);
   const [cardPage, setCardPage] = useState(1);
-  const totalCardPages = Math.max(
-    1,
-    Math.ceil(allItems.length / cardsPerPage),
-  );
+  const totalCardPages = Math.max(1, Math.ceil(allItems.length / cardsPerPage));
   const currentCardPage = Math.min(cardPage, totalCardPages);
   const pagedItems = allItems.slice(
     (currentCardPage - 1) * cardsPerPage,
@@ -538,15 +545,15 @@ function RequestCard({
   const needsAction = requestBucket === "needs_action";
   const isInTransit = requestBucket === "in_transit";
 
-  const topStrip = isRejected
-    ? "bg-slate-300"
+  const accentBorderClass = isRejected
+    ? "border-l-slate-300"
     : isDone
-      ? "bg-emerald-400"
+      ? "border-l-emerald-400"
       : needsAction
-        ? "bg-orange-400"
+        ? "border-l-orange-400"
         : isInTransit
-          ? "bg-blue-400"
-          : "bg-border";
+          ? "border-l-blue-400"
+          : "border-l-border";
 
   const formattedTime = new Date(request.createdAt).toLocaleString("vi-VN", {
     hour: "2-digit",
@@ -562,18 +569,21 @@ function RequestCard({
       tabIndex={0}
       onClick={onViewDetail}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onViewDetail();
+        if (isInteractiveKeyboardTarget(e.target)) return;
+
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onViewDetail();
+        }
       }}
       className={cn(
-        "rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer flex flex-col group",
+        "rounded-xl border border-border/60 border-l-4 bg-card shadow-sm overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer flex flex-col group",
+        accentBorderClass,
         isRejected && "opacity-60 grayscale-[40%]",
       )}
     >
-      {/* ── Colored top strip ── */}
-      <div className={cn("h-1 w-full shrink-0", topStrip)} />
-
       {/* ── Card body ── */}
-      <div className="p-4 flex flex-col gap-2 flex-1">
+      <div className="px-4 py-2 flex flex-col gap-2 flex-1">
         {/* Row 1: Badges left | ID right */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -600,8 +610,8 @@ function RequestCard({
               </span>
             )}
           </div>
-          <p className="text-xs font-bold tracking-tight shrink-0">
-            #{request.id}
+          <p className="text-[13px] font-bold tracking-tighter shrink-0">
+            Đơn số {request.id}
           </p>
         </div>
 
@@ -630,10 +640,6 @@ function RequestCard({
 
         {/* Items */}
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-1 mb-2">
-            <Package className="h-3 w-3" />
-            {request.items.length} vật phẩm
-          </p>
           {request.items[0] && (
             <div className="divide-y divide-dashed divide-border/50">
               <div className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0">

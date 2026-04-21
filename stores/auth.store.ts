@@ -93,23 +93,28 @@ export const useAuthStore = create<AuthState>()(
             "auth/updateTokens",
           ),
 
-        logout: () =>
-          {
-            useManagerDepotStore.getState().clearSelection();
-            set(
-              {
-                accessToken: null,
-                refreshToken: null,
-                expiresIn: null,
-                tokenType: null,
-                tokenObtainedAt: null,
-                user: null,
-                isAuthenticated: false,
-              },
-              false,
-              "auth/logout", // Action name hiển thị trong Redux DevTools
-            );
-          },
+        logout: () => {
+          useManagerDepotStore.getState().clearSelection();
+          // Clear all React Query cache so the next user gets fresh data
+          if (typeof window !== "undefined") {
+            (
+              window as Window & { __queryClient?: { clear: () => void } }
+            ).__queryClient?.clear();
+          }
+          set(
+            {
+              accessToken: null,
+              refreshToken: null,
+              expiresIn: null,
+              tokenType: null,
+              tokenObtainedAt: null,
+              user: null,
+              isAuthenticated: false,
+            },
+            false,
+            "auth/logout", // Action name hiển thị trong Redux DevTools
+          );
+        },
       }),
       {
         name: "auth-storage", // key trong localStorage

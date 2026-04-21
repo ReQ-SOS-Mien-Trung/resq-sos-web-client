@@ -111,6 +111,7 @@ export interface DepotEntity {
   capacity: number;
   weightCapacity?: number;
   currentUtilization: number;
+  currentWeightUtilization?: number;
   status: DepotStatus;
   imageUrl?: string | null;
   manager: DepotManager | null;

@@ -55,6 +55,7 @@ import {
 } from "@/services/inventory/type";
 import {
   INVENTORY_KEYS,
+  useMyDepotLowStock,
   useMyDepotQuantityByCategory,
   useSupplyRequests,
 } from "@/services/inventory/hooks";
@@ -80,6 +81,8 @@ const mapDepotEntityToInfo = (
   depot: DepotEntity,
   managerName: string,
   totalCategories: number,
+  criticalAlerts: number,
+  lowStockAlerts: number,
   pendingRequests: number,
 ): DepotInfo => ({
   id: String(depot.id),
@@ -89,10 +92,8 @@ const mapDepotEntityToInfo = (
   manager: managerName,
   totalItems: mockInventoryItems.length,
   totalCategories,
-  criticalAlerts: mockInventoryItems.filter((i) => i.stockLevel === "CRITICAL")
-    .length,
-  lowStockAlerts: mockInventoryItems.filter((i) => i.stockLevel === "LOW")
-    .length,
+  criticalAlerts,
+  lowStockAlerts,
   pendingRequests,
   activeShipments: mockShipments.filter(
     (s) => s.status === "PREPARING" || s.status === "IN_TRANSIT",
@@ -323,6 +324,28 @@ const InventoryDashboardPage = () => {
       { enabled: Boolean(selectedDepotId) },
     );
 
+  const { data: criticalLowStockData, refetch: refetchCriticalLowStock } =
+    useMyDepotLowStock(
+      {
+        depotId: selectedDepotId ?? 0,
+        warningLevel: "CRITICAL",
+        pageNumber: 1,
+        pageSize: 1,
+      },
+      { enabled: Boolean(selectedDepotId) },
+    );
+
+  const { data: mediumLowStockData, refetch: refetchMediumLowStock } =
+    useMyDepotLowStock(
+      {
+        depotId: selectedDepotId ?? 0,
+        warningLevel: "MEDIUM",
+        pageNumber: 1,
+        pageSize: 1,
+      },
+      { enabled: Boolean(selectedDepotId) },
+    );
+
   const {
     data: supplyRequestsData,
     isLoading: isSupplyRequestsLoading,
@@ -330,6 +353,23 @@ const InventoryDashboardPage = () => {
     refetch: refetchSupplyRequests,
   } = useSupplyRequests(
     { depotId: selectedDepotId ?? 0, pageNumber: 1, pageSize: 10 },
+    {
+      refetchInterval: 10_000,
+      refetchOnWindowFocus: true,
+      enabled: Boolean(selectedDepotId),
+    },
+  );
+
+  const {
+    data: waitingApprovalRequestsData,
+    refetch: refetchWaitingApprovalRequests,
+  } = useSupplyRequests(
+    {
+      depotId: selectedDepotId ?? 0,
+      requestingStatus: "WaitingForApproval",
+      pageNumber: 1,
+      pageSize: 1,
+    },
     {
       refetchInterval: 10_000,
       refetchOnWindowFocus: true,
@@ -379,11 +419,16 @@ const InventoryDashboardPage = () => {
   const depotInfo = useMemo<DepotInfo | null>(() => {
     if (!currentDepot && !selectedDepot) return null;
 
-    const pendingCount = (supplyRequestsData?.items ?? []).filter(
-      (request) =>
-        request.sourceStatus === "Pending" &&
-        request.requestingStatus === "WaitingForApproval",
-    ).length;
+    const criticalCount =
+      criticalLowStockData?.totalCount ??
+      criticalLowStockData?.items?.length ??
+      0;
+    const mediumCount =
+      mediumLowStockData?.totalCount ?? mediumLowStockData?.items?.length ?? 0;
+    const pendingCount =
+      waitingApprovalRequestsData?.totalCount ??
+      waitingApprovalRequestsData?.items?.length ??
+      0;
 
     const resolvedName = selectedDepot?.depotName ?? currentDepot?.name ?? "—";
 
@@ -392,6 +437,8 @@ const InventoryDashboardPage = () => {
         currentDepot,
         displayName,
         totalCategories,
+        criticalCount,
+        mediumCount,
         pendingCount,
       );
       return { ...info, name: resolvedName };
@@ -406,17 +453,19 @@ const InventoryDashboardPage = () => {
       manager: displayName,
       totalItems: 0,
       totalCategories,
-      criticalAlerts: 0,
-      lowStockAlerts: 0,
+      criticalAlerts: criticalCount,
+      lowStockAlerts: mediumCount,
       pendingRequests: pendingCount,
       activeShipments: 0,
     };
   }, [
+    criticalLowStockData,
     currentDepot,
     selectedDepot,
     displayName,
+    mediumLowStockData,
     totalCategories,
-    supplyRequestsData,
+    waitingApprovalRequestsData,
   ]);
 
   const sidebarSupplyRequests = useMemo(
@@ -469,6 +518,11 @@ const InventoryDashboardPage = () => {
     refetchDepots();
     refetchCategories();
     refetchQuantityByCategory();
+    refetchSupplyRequests();
+    refetchAllRequests();
+    refetchCriticalLowStock();
+    refetchMediumLowStock();
+    refetchWaitingApprovalRequests();
     queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
     setVatTuRefreshNonce((prev) => prev + 1);
   }, [
@@ -476,6 +530,11 @@ const InventoryDashboardPage = () => {
     refetchDepots,
     refetchCategories,
     refetchQuantityByCategory,
+    refetchSupplyRequests,
+    refetchAllRequests,
+    refetchCriticalLowStock,
+    refetchMediumLowStock,
+    refetchWaitingApprovalRequests,
   ]);
 
   // ── Loading state ──
@@ -694,7 +753,7 @@ const InventoryDashboardPage = () => {
             }
           >
             <WarehouseIcon className="h-4 w-4" />
-            Xử lý hư hỏng
+            Xử lý hết hạn
           </Button>
 
           {/* Notifications */}
@@ -1066,6 +1125,7 @@ const InventoryDashboardPage = () => {
 
       {/* Vat Tu Details Sheet - rendered at page level for full overlay */}
       <VatTuDetailsSheet
+        key={vatTuSelectedItem?.itemModelId ?? "empty-vattu-sheet"}
         item={vatTuSelectedItem}
         open={vatTuSheetOpen}
         onOpenChange={setVatTuSheetOpen}
