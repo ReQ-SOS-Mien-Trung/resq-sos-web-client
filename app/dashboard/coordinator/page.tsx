@@ -100,11 +100,7 @@ import { useThemeStore } from "@/stores/theme.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
-import {
-  expandMapBounds,
-  getMapBoundsCacheKey,
-  isMapBoundsWithinBuffer,
-} from "@/lib/coordinator-map-utils";
+import { getMapBoundsCacheKey } from "@/lib/coordinator-map-utils";
 import { mapSOSRequestEntitiesToSOS } from "@/lib/sos-request-mapper";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { useSosClusterGroupingConfig } from "@/services/config/hooks";
@@ -437,6 +433,7 @@ const CoordinatorDashboardContent = () => {
   const [mapFetchBounds, setMapFetchBounds] = useState<
     MapViewState["bounds"] | null
   >(null);
+  const [risingSOSMarkerIds, setRisingSOSMarkerIds] = useState<string[]>([]);
   const [selectedSOSStatuses, setSelectedSOSStatuses] = useState<
     SOSRequestStatus[]
   >([]);
@@ -488,6 +485,10 @@ const CoordinatorDashboardContent = () => {
   // ─── Refs ───
   const sidebarBeforeRescuePlanRef = useRef(true);
   const lastAppliedSelectionSignatureRef = useRef<string | null>(null);
+  const previousMapSosIdsRef = useRef<Set<string> | null>(null);
+  const risingMarkerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const statusQueryFilter = useMemo(
     () => (selectedSOSStatuses.length > 0 ? selectedSOSStatuses : undefined),
@@ -534,6 +535,55 @@ const CoordinatorDashboardContent = () => {
     () => mapSOSRequestEntitiesToSOS(mapSosData ?? []),
     [mapSosData],
   );
+
+  useEffect(() => {
+    const nextIds = new Set(sosRequests.map((sos) => sos.id));
+
+    if (!previousMapSosIdsRef.current) {
+      previousMapSosIdsRef.current = nextIds;
+      return;
+    }
+
+    const previousIds = previousMapSosIdsRef.current;
+    previousMapSosIdsRef.current = nextIds;
+
+    if (nextIds.size === 0) {
+      setRisingSOSMarkerIds([]);
+      return;
+    }
+
+    const enteringIds: string[] = [];
+    nextIds.forEach((id) => {
+      if (!previousIds.has(id)) {
+        enteringIds.push(id);
+      }
+    });
+
+    if (enteringIds.length === 0) {
+      return;
+    }
+
+    setRisingSOSMarkerIds(enteringIds);
+
+    if (risingMarkerTimeoutRef.current) {
+      clearTimeout(risingMarkerTimeoutRef.current);
+    }
+
+    risingMarkerTimeoutRef.current = setTimeout(() => {
+      setRisingSOSMarkerIds([]);
+      risingMarkerTimeoutRef.current = null;
+    }, 380);
+  }, [sosRequests]);
+
+  useEffect(
+    () => () => {
+      if (risingMarkerTimeoutRef.current) {
+        clearTimeout(risingMarkerTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
   const sidebarSOSRequests = useMemo(
     () => mapSOSRequestEntitiesToSOS(sidebarSosData?.items ?? []),
     [sidebarSosData],
@@ -666,20 +716,13 @@ const CoordinatorDashboardContent = () => {
     setMapFetchBounds((currentBounds) => {
       if (
         currentBounds &&
-        isMapBoundsWithinBuffer(visibleBounds, currentBounds)
+        getMapBoundsCacheKey(currentBounds) ===
+          getMapBoundsCacheKey(visibleBounds)
       ) {
         return currentBounds;
       }
 
-      const nextBounds = expandMapBounds(visibleBounds, 2);
-      if (
-        currentBounds &&
-        getMapBoundsCacheKey(currentBounds) === getMapBoundsCacheKey(nextBounds)
-      ) {
-        return currentBounds;
-      }
-
-      return nextBounds;
+      return visibleBounds;
     });
   }, [isWeatherMode, mapViewState]);
 
@@ -1593,6 +1636,7 @@ const CoordinatorDashboardContent = () => {
                 panelOpen={aiStreamOpen}
                 onViewChange={handleCoordinatorMapViewChange}
                 routeOverlay={routeOverlay}
+                risingSOSMarkerIds={risingSOSMarkerIds}
               />
 
               {/* Floating Action Buttons */}
