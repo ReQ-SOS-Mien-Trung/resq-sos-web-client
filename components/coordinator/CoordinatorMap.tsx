@@ -1178,7 +1178,7 @@ const CoordinatorMap = ({
         {/* Service Zone Polygons and totals */}
         {showServiceZones &&
           validServiceZones.map((zone) => (
-            <ServiceZoneOverlay key={zone.id} zone={zone} />
+            <ServiceZoneOverlay key={zone.id} zone={zone} currentZoom={currentZoom} />
           ))}
 
         {/* SOS Request Markers */}
@@ -1387,7 +1387,7 @@ const CoordinatorMap = ({
 
 export default CoordinatorMap;
 
-function ServiceZoneOverlay({ zone }: { zone: ServiceZoneEntity }) {
+function ServiceZoneOverlay({ zone, currentZoom }: { zone: ServiceZoneEntity; currentZoom: number }) {
   const positions = useMemo(
     () =>
       zone.coordinates
@@ -1401,27 +1401,111 @@ function ServiceZoneOverlay({ zone }: { zone: ServiceZoneEntity }) {
     () => getServiceZoneLabelPosition(zone),
     [zone],
   );
-  const pendingSosCount = Number(zone.counts.pendingSosRequestCount ?? 0);
 
-  const icon = useMemo(() => {
+  // Zoom modes within service zone overview (zoom < 10):
+  // - zoom < 8: show zone NAME in center
+  // - zoom 8–9: show zone NAME in center + corner stat badges
+  const CORNER_STATS_ZOOM = 8;
+  const showCornerStats = currentZoom >= CORNER_STATS_ZOOM;
+  const counts = zone.counts;
+
+  // Corner positions derived from actual polygon vertices to stay inside the zone
+  const cornerPositions = useMemo(() => {
+    if (positions.length < 3) return null;
+
+    // Compute centroid of the polygon
+    const centerLat = positions.reduce((s, p) => s + p[0], 0) / positions.length;
+    const centerLng = positions.reduce((s, p) => s + p[1], 0) / positions.length;
+
+    // Group vertices into 4 quadrants relative to centroid
+    const quads: Record<string, [number, number][]> = { nw: [], ne: [], sw: [], se: [] };
+    for (const p of positions) {
+      const ns = p[0] >= centerLat ? "n" : "s";
+      const ew = p[1] <= centerLng ? "w" : "e";
+      quads[ns + ew].push(p);
+    }
+
+    // Pick the vertex furthest from center in each quadrant
+    const pickFurthest = (verts: [number, number][]): [number, number] | null => {
+      if (verts.length === 0) return null;
+      return verts.reduce((best, v) => {
+        const d = (v[0] - centerLat) ** 2 + (v[1] - centerLng) ** 2;
+        const bd = (best[0] - centerLat) ** 2 + (best[1] - centerLng) ** 2;
+        return d > bd ? v : best;
+      });
+    };
+
+    // Pull the vertex 20% toward center so the badge sits well inside the polygon
+    const inset = (v: [number, number]): [number, number] => [
+      v[0] + (centerLat - v[0]) * 0.20,
+      v[1] + (centerLng - v[1]) * 0.20,
+    ];
+
+    const nw = pickFurthest(quads.nw);
+    const ne = pickFurthest(quads.ne);
+    const sw = pickFurthest(quads.sw);
+    const se = pickFurthest(quads.se);
+
+    // Fallback: offset slightly from center if a quadrant has no vertices
+    const fallback = (latDir: number, lngDir: number): [number, number] => {
+      const lats = positions.map((p) => p[0]);
+      const lngs = positions.map((p) => p[1]);
+      const spread = Math.max(Math.max(...lats) - Math.min(...lats), Math.max(...lngs) - Math.min(...lngs));
+      return [centerLat + latDir * spread * 0.15, centerLng + lngDir * spread * 0.15];
+    };
+
+    return {
+      nw: nw ? inset(nw) : fallback(1, -1),
+      ne: ne ? inset(ne) : fallback(1, 1),
+      sw: sw ? inset(sw) : fallback(-1, -1),
+      se: se ? inset(se) : fallback(-1, 1),
+    };
+  }, [positions]);
+
+  // Center label – always shows zone name
+  const centerIcon = useMemo(() => {
     if (typeof window === "undefined" || !labelPosition) return undefined;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const L = require("leaflet");
-
     return L.divIcon({
       className: "custom-service-zone-marker",
       html: `
-        <div style="display:flex;align-items:center;justify-content:center;min-width:54px;padding:0 10px;height:34px;border-radius:9999px;background:rgba(14,116,144,0.92);border:2px solid rgba(255,255,255,0.96);box-shadow:0 6px 18px rgba(8,47,73,0.28);color:white;">
-          <div style="display:flex;flex-direction:column;align-items:center;line-height:1;">
-            <span style="font-size:10px;font-weight:700;opacity:0.9;text-transform:uppercase;letter-spacing:0.03em;">Zone</span>
-            <span style="font-size:14px;font-weight:800;margin-top:2px;">${pendingSosCount}</span>
-          </div>
+        <div style="transform:translate(-50%,-50%);display:inline-flex;align-items:center;justify-content:center;padding:5px 14px;border-radius:20px;background:rgba(14,116,144,0.92);border:2px solid rgba(255,255,255,0.95);box-shadow:0 4px 14px rgba(8,47,73,0.3);color:#fff;white-space:nowrap;font-family:system-ui,-apple-system,sans-serif;">
+          <span style="font-size:12px;font-weight:700;letter-spacing:0.02em;">${zone.name}</span>
         </div>
       `,
-      iconSize: [54, 34],
-      iconAnchor: [27, 17],
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
     });
-  }, [labelPosition, pendingSosCount]);
+  }, [labelPosition, zone.name]);
+
+  // Corner stat badge icons
+  const cornerIcons = useMemo(() => {
+    if (typeof window === "undefined" || !showCornerStats || !cornerPositions) return null;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const L = require("leaflet");
+
+    const makeBadge = (emoji: string, label: string, count: number, bg: string) =>
+      L.divIcon({
+        className: "",
+        html: `
+          <div style="transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:12px;background:${bg};border:1.5px solid rgba(255,255,255,0.92);box-shadow:0 2px 8px rgba(0,0,0,0.18);color:#fff;white-space:nowrap;font-family:system-ui,-apple-system,sans-serif;">
+            <span style="font-size:10px;line-height:1;">${emoji}</span>
+            <span style="font-size:10px;font-weight:700;line-height:1;">${count}</span>
+            <span style="font-size:9px;font-weight:500;opacity:0.85;line-height:1;">${label}</span>
+          </div>
+        `,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      });
+
+    return {
+      nw: makeBadge("🚨", "SOS chờ", Number(counts.pendingSosRequestCount ?? 0), "rgba(239,68,68,0.88)"),
+      ne: makeBadge("⚡", "Sự cố SOS", Number(counts.incidentSosRequestCount ?? 0), "rgba(249,115,22,0.88)"),
+      sw: makeBadge("⚠️", "Sự cố đội", Number(counts.teamIncidentCount ?? 0), "rgba(202,138,4,0.88)"),
+      se: makeBadge("📍", "TK/Kho", Number(counts.assemblyPointCount ?? 0) + Number(counts.depotCount ?? 0), "rgba(99,102,241,0.88)"),
+    };
+  }, [showCornerStats, cornerPositions, counts]);
 
   if (positions.length < 3) {
     return null;
@@ -1443,41 +1527,31 @@ function ServiceZoneOverlay({ zone }: { zone: ServiceZoneEntity }) {
           <div className="space-y-2 text-sm">
             <div>
               <p className="font-semibold">{zone.name}</p>
-              <p className="text-muted-foreground">
-                SOS chờ xử lý: {pendingSosCount}
-              </p>
             </div>
             <div className="space-y-1 text-muted-foreground">
-              <p>Pending SOS: {zone.counts.pendingSosRequestCount}</p>
-              <p>Incident SOS: {zone.counts.incidentSosRequestCount}</p>
-              <p>Sự cố đội: {zone.counts.teamIncidentCount}</p>
-              <p>Điểm tập kết: {zone.counts.assemblyPointCount}</p>
-              <p>Kho: {zone.counts.depotCount}</p>
+              <p>SOS chờ xử lý: {counts.pendingSosRequestCount}</p>
+              <p>SOS sự cố: {counts.incidentSosRequestCount}</p>
+              <p>Sự cố đội: {counts.teamIncidentCount}</p>
+              <p>Điểm tập kết: {counts.assemblyPointCount}</p>
+              <p>Kho: {counts.depotCount}</p>
             </div>
           </div>
         </Popup>
       </Polygon>
 
-      {labelPosition && icon ? (
-        <Marker position={labelPosition} icon={icon} zIndexOffset={700}>
-          <Popup>
-            <div className="space-y-2 text-sm">
-              <div>
-                <p className="font-semibold">{zone.name}</p>
-                <p className="text-muted-foreground">
-                  SOS chờ xử lý: {pendingSosCount}
-                </p>
-              </div>
-              <div className="space-y-1 text-muted-foreground">
-                <p>Pending SOS: {zone.counts.pendingSosRequestCount}</p>
-                <p>Incident SOS: {zone.counts.incidentSosRequestCount}</p>
-                <p>Sự cố đội: {zone.counts.teamIncidentCount}</p>
-                <p>Điểm tập kết: {zone.counts.assemblyPointCount}</p>
-                <p>Kho: {zone.counts.depotCount}</p>
-              </div>
-            </div>
-          </Popup>
-        </Marker>
+      {/* Center label – zone name */}
+      {labelPosition && centerIcon ? (
+        <Marker position={labelPosition} icon={centerIcon} zIndexOffset={700} />
+      ) : null}
+
+      {/* Corner stat badges – visible when zoomed in enough */}
+      {showCornerStats && cornerPositions && cornerIcons ? (
+        <>
+          <Marker position={cornerPositions.nw} icon={cornerIcons.nw} zIndexOffset={600} />
+          <Marker position={cornerPositions.ne} icon={cornerIcons.ne} zIndexOffset={600} />
+          <Marker position={cornerPositions.sw} icon={cornerIcons.sw} zIndexOffset={600} />
+          <Marker position={cornerPositions.se} icon={cornerIcons.se} zIndexOffset={600} />
+        </>
       ) : null}
     </>
   );
