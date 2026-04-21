@@ -1202,8 +1202,9 @@ const AIPromptPage = () => {
                     </button>
                   </TooltipTrigger>
                   <TooltipContent
-                    side="right"
+                    side="bottom"
                     sideOffset={8}
+                    avoidCollisions={false}
                     className="max-w-md space-y-2 text-sm leading-relaxed"
                   >
                     <p className="font-semibold text-foreground">

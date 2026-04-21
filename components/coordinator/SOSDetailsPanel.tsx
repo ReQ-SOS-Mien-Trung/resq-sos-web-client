@@ -31,6 +31,7 @@ import {
   Info,
 } from "@phosphor-icons/react";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
+import { useSosFormPriorityRuleConfig } from "@/services/config/hooks";
 import { useAuthStore } from "@/stores/auth.store";
 import {
   getClothingGenderLabel,
@@ -168,6 +169,36 @@ function getMedicalIssueColorClass(code: string): string {
   }
 
   return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
+}
+
+function formatScoreValue(value: unknown, fallback = "N/A"): string {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toFixed(1);
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  return fallback;
+}
+
+function getBreakdownNumber(
+  breakdown: Record<string, unknown> | null | undefined,
+  key: string,
+  fallback = 0,
+): number {
+  const value = breakdown?.[key];
+
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : fallback;
+}
+
+function compactFormulaDetails(
+  lines: Array<string | null | undefined | false>,
+): string[] {
+  return lines.filter((line): line is string => Boolean(line));
 }
 
 function ParsedMessage({
@@ -471,6 +502,8 @@ const SOSDetailsPanel = ({
     useSOSRequestAnalysis(Number(sosRequest?.id) || 0, {
       enabled: !!sosRequest?.id && open,
     });
+  const { data: priorityRuleConfig, isLoading: isLoadingPriorityRuleConfig } =
+    useSosFormPriorityRuleConfig(open);
 
   if (!sosRequest && !open) return null;
 
@@ -673,6 +706,27 @@ const SOSDetailsPanel = ({
   const displayedTotalScore = ruleEvaluation?.totalScore ?? 0;
 
   const isV3 = ruleEvaluation?.ruleVersion?.startsWith("3");
+  const ruleBreakdown = ruleEvaluation?.breakdown ?? null;
+  const medicalScoreValue = getBreakdownNumber(
+    ruleBreakdown,
+    "medical_score",
+    ruleEvaluation?.medicalScore ?? 0,
+  );
+  const reliefScoreValue = getBreakdownNumber(
+    ruleBreakdown,
+    "relief_score",
+    ruleEvaluation?.foodScore ?? 0,
+  );
+  const supplyUrgencyScoreValue = getBreakdownNumber(
+    ruleBreakdown,
+    "supply_urgency_score",
+    ruleEvaluation?.injuryScore ?? 0,
+  );
+  const vulnerabilityScoreValue = getBreakdownNumber(
+    ruleBreakdown,
+    "vulnerability_score",
+    ruleEvaluation?.mobilityScore ?? 0,
+  );
 
   // Calculate local factors to match BE Rule 3.0 (for display in tooltip)
   let requestTypeScore = 10;
@@ -697,6 +751,53 @@ const SOSDetailsPanel = ({
   } else if (sitStr.includes("cannot_move") || sosRequest.canMove === false) {
     situationMultiplier = 1.2;
   }
+
+  const requestTypeScoreValue = getBreakdownNumber(
+    ruleBreakdown,
+    "request_type_score",
+    requestTypeScore,
+  );
+  const situationMultiplierValue = getBreakdownNumber(
+    ruleBreakdown,
+    "situation_multiplier",
+    ruleEvaluation?.environmentScore ?? situationMultiplier,
+  );
+  const priorityConfigFormula =
+    priorityRuleConfig?.priority_score?.formula?.trim() ||
+    (isV3
+      ? "ROUND((request_type_score + medical_score) * situation_multiplier)"
+      : "ROUND((medical_score + relief_score) * situation_multiplier)");
+  const priorityFormulaUsesRequestType =
+    priorityConfigFormula.includes("request_type_score");
+  const priorityFormulaText = `${priorityConfigFormula} ≈ ${displayedTotalScore.toFixed(1)}`;
+  const priorityFormulaDetails = compactFormulaDetails([
+    priorityRuleConfig?.config_version
+      ? `Version config: ${priorityRuleConfig.config_version}`
+      : ruleEvaluation?.configVersion
+        ? `Version config: ${ruleEvaluation.configVersion}`
+        : null,
+    isLoadingPriorityRuleConfig
+      ? "Đang tải công thức active từ backend..."
+      : null,
+    priorityFormulaUsesRequestType
+      ? `Giá trị áp dụng: request_type_score=${formatScoreValue(requestTypeScoreValue)}, medical_score=${formatScoreValue(medicalScoreValue)}, relief_score=${formatScoreValue(reliefScoreValue)}, situation_multiplier=${formatScoreValue(situationMultiplierValue)}`
+      : `Giá trị áp dụng: medical_score=${formatScoreValue(medicalScoreValue)}, relief_score=${formatScoreValue(reliefScoreValue)}, situation_multiplier=${formatScoreValue(situationMultiplierValue)}`,
+    priorityRuleConfig?.medical_score?.formula
+      ? `medical_score: ${priorityRuleConfig.medical_score.formula}`
+      : null,
+    priorityRuleConfig?.relief_score?.formula
+      ? `relief_score: ${priorityRuleConfig.relief_score.formula}`
+      : null,
+    priorityRuleConfig?.relief_score?.supply_urgency_score?.formula
+      ? `supply_urgency_score: ${priorityRuleConfig.relief_score.supply_urgency_score.formula} = ${formatScoreValue(supplyUrgencyScoreValue)}`
+      : null,
+    priorityRuleConfig?.relief_score?.vulnerability_score?.formula
+      ? `vulnerability_score: ${priorityRuleConfig.relief_score.vulnerability_score.formula} = ${formatScoreValue(vulnerabilityScoreValue)}`
+      : null,
+    priorityRuleConfig?.priority_level
+      ? `Ngưỡng ưu tiên: P1 >= ${priorityRuleConfig.priority_level.P1_THRESHOLD}, P2 >= ${priorityRuleConfig.priority_level.P2_THRESHOLD}, P3 >= ${priorityRuleConfig.priority_level.P3_THRESHOLD}. ${priorityRuleConfig.priority_level.rule}`
+      : null,
+  ]);
 
   // Filter out 0-value factors for v3.0
   const displayScoreRows = isV3
@@ -1329,11 +1430,8 @@ const SOSDetailsPanel = ({
                             Điểm rủi ro tổng hợp:
                             <FormulaTooltip
                               title="Công thức tính chuẩn hóa"
-                              formula={
-                                isV3
-                                  ? `Tổng điểm = (Loại yêu cầu + Điểm y tế) × Hệ số tình trạng = (${requestTypeScore} + ${ruleEvaluation.medicalScore.toFixed(1)}) × ${situationMultiplier} ≈ ${displayedTotalScore.toFixed(1)}`
-                                  : `Tổng điểm = (Y tế × 0.3) + (Chấn thương × 0.25) + (Di chuyển × 0.15) + (Môi trường × 0.20) + (Thực phẩm × 0.10) ≈ ${displayedTotalScore.toFixed(1)}`
-                              }
+                              formula={priorityFormulaText}
+                              details={priorityFormulaDetails}
                             />
                           </span>
                           <div className="flex items-center gap-2">

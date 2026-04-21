@@ -455,7 +455,7 @@ function getDepotManagerDisplayName(manager: DepotEntity["manager"]): string {
   if (!manager) return "Chưa có quản lý";
   if (manager.fullName?.trim()) return manager.fullName.trim();
 
-  const fullName = [manager.firstName, manager.lastName]
+  const fullName = [manager.lastName, manager.firstName]
     .map((part) => part?.trim())
     .filter(Boolean)
     .join(" ");
@@ -660,9 +660,7 @@ function DepotDetails({
     return Math.max(totalCount, INVENTORY_PAGE_SIZE);
   }, [inventoryData]);
 
-  const {
-    data: inventorySummaryData,
-  } = useDepotInventory(
+  const { data: inventorySummaryData } = useDepotInventory(
     {
       depotId: depot.id,
       pageNumber: 1,
@@ -1390,7 +1388,9 @@ function AssemblyPointDetails({
                   Đổi trạng thái lúc
                 </p>
                 <p className="mt-1">
-                  {formatOptionalDateTimeVi(displayAssemblyPoint.statusChangedAt)}
+                  {formatOptionalDateTimeVi(
+                    displayAssemblyPoint.statusChangedAt,
+                  )}
                 </p>
               </div>
               <div className="rounded-lg border border-border/60 bg-background px-2.5 py-2">
@@ -1547,7 +1547,7 @@ function AssemblyPointDetails({
             </Badge>
           </div>
 
-              {isAssemblyPointEventsLoading ? (
+          {isAssemblyPointEventsLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-9 w-full rounded-md" />
               <Skeleton className="h-20 w-full rounded-lg" />
@@ -1758,7 +1758,7 @@ function AssemblyPointDetails({
                           >
                             <div className="min-w-0">
                               <p className="text-xs font-medium truncate">
-                                {member.firstName} {member.lastName}
+                                {member.lastName} {member.firstName}
                               </p>
                               <p className="text-xs text-muted-foreground truncate">
                                 {memberRoleLabel[member.roleInTeam]}

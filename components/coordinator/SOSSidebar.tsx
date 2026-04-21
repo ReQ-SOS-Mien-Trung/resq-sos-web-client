@@ -943,14 +943,6 @@ const SOSSidebar = ({
                 </Button>
               ) : null}
             </div>
-            <p className="mt-2 text-[12px] text-muted-foreground">
-              {sosRequests.length} SOS trong vùng bản đồ hiện tại
-            </p>
-            {hasIncomingServerPagination ? (
-              <p className="mt-1 text-[12px] text-muted-foreground">
-                {incomingTotalCount} SOS trong danh sách phân trang
-              </p>
-            ) : null}
           </div>
 
           <div className="h-full min-h-0 flex-1 overflow-y-auto">
@@ -1156,10 +1148,7 @@ const SOSSidebar = ({
                       Cụm đã gom ({filteredActiveClusters.length}/
                       {activeClusters.length})
                     </div>
-                    <p className="text-[13px] text-muted-foreground">
-                      Icon tách chỉ hiện khi cụm/SOS đang ở trạng thái Pending
-                      hoặc Suggested.
-                    </p>
+
                     <div className="relative">
                       <Icon
                         icon="ph:magnifying-glass"

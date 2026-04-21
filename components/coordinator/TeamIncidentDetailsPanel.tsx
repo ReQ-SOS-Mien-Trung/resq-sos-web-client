@@ -38,7 +38,7 @@ function getIncidentReporterName(
   if (!reportedBy) return "Chưa rõ người báo cáo";
   if (typeof reportedBy === "string") return reportedBy;
 
-  const fullName = [reportedBy.firstName, reportedBy.lastName]
+  const fullName = [reportedBy.lastName, reportedBy.firstName]
     .map((part) => part?.trim())
     .filter(Boolean)
     .join(" ");

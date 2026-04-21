@@ -59,7 +59,7 @@ type SplitRowLayout = {
 };
 
 function getInitials(firstName?: string, lastName?: string) {
-  return `${firstName?.[0] ?? ""}${lastName?.[0] ?? ""}`.toUpperCase() || "?";
+  return `${lastName?.[0] ?? ""}${firstName?.[0] ?? ""}`.toUpperCase() || "?";
 }
 
 function isRescuerPresenceConfirmed(rescuer: RescuerEntity) {
@@ -1973,10 +1973,6 @@ export default function CoordinatorRescuerManagementPage() {
             <h1 className="mt-1 text-2xl font-semibold tracking-tight">
               Quản lý người cứu hộ theo điểm tập kết
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Gán hoặc bỏ gán người cứu hộ vào điểm tập kết bằng dữ liệu thời
-              gian thực.
-            </p>
           </div>
 
           <Button asChild variant="outline" className="gap-2">
