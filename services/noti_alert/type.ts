@@ -41,6 +41,12 @@ export interface NotificationRouteData {
   sourceDepotId?: string | number | null;
   closureId?: string | number | null;
   transferId?: string | number | null;
+  conversationId?: string | number | null;
+  requestId?: string | number | null;
+  supplyRequestId?: string | number | null;
+  assemblyPointId?: string | number | null;
+  sosRequestId?: string | number | null;
+  depotId?: string | number | null;
   [key: string]: unknown;
 }
 

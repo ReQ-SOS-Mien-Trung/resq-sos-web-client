@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   SheetHeader,
   SheetTitle,
@@ -43,10 +43,6 @@ import {
 function formatLastUpdated(date: string | null) {
   if (!date) return "Chưa cập nhật";
   return new Date(date).toLocaleString("vi-VN");
-}
-
-function formatStatusActor(actor: string | null) {
-  return actor?.trim() || "Không có dữ liệu";
 }
 
 const teamTypeConfig: Record<
@@ -128,12 +124,15 @@ function getRescueTeamStatusMeta(
   const configuredLabel = normalizedStatus
     ? configuredLabels?.get(normalizedStatus)
     : undefined;
-  const fallbackLabel = status ? rescueTeamStatusFallbackLabels[status] : undefined;
+  const fallbackLabel = status
+    ? rescueTeamStatusFallbackLabels[status]
+    : undefined;
 
   return {
     label: configuredLabel || fallbackLabel || status || "Chưa rõ",
     className: normalizedStatus
-      ? (rescueTeamStatusTextColors[normalizedStatus] ?? "text-muted-foreground")
+      ? (rescueTeamStatusTextColors[normalizedStatus] ??
+        "text-muted-foreground")
       : "text-muted-foreground",
   };
 }
@@ -190,7 +189,8 @@ function MemberFloatingTooltip({
         <div className="space-y-1.5 max-w-56">
           {members.map((m) => (
             <div key={m.userId} className="flex items-center gap-2">
-              <Avatar className="h-6 w-6 text-xs">
+              <Avatar className="h-6 w-6 text-xs border border-border/50">
+                {m.avatarUrl && <AvatarImage src={m.avatarUrl} alt={m.firstName || ""} />}
                 <AvatarFallback
                   className={cn(m.isLeader && "bg-amber-100 text-amber-800")}
                 >
@@ -258,9 +258,7 @@ function TeamCard({
 
   return (
     <>
-      <motion.div
-        layout
-        transition={{ type: "spring", stiffness: 320, damping: 28, mass: 0.7 }}
+      <div
         className={cn(
           "rounded-xl border border-border/60 bg-background cursor-default hover:border-primary/30 hover:shadow-sm transition-all",
           compact ? "p-3" : "p-3.5",
@@ -352,10 +350,9 @@ function TeamCard({
               <span className="text-foreground font-medium truncate">
                 {leader.lastName} {leader.firstName}
               </span>
-              <span className="text-muted-foreground">· Đội trưởng</span>
             </div>
           ))}
-      </motion.div>
+      </div>
 
       {/* Cursor-following tooltip — portal to body to escape Sheet contain/transform */}
       {hovered &&
@@ -410,7 +407,9 @@ export function AssemblyPointDetailSheet({
     () => buildRescueTeamStatusLabelMap(rescueTeamStatusOptions),
     [rescueTeamStatusOptions],
   );
-  const st = data ? getAssemblyPointStatusConfig(data.status, statusConfig) : null;
+  const st = data
+    ? getAssemblyPointStatusConfig(data.status, statusConfig)
+    : null;
   const resolvedPanelWidth = isFullscreen ? "100vw" : DEFAULT_PANEL_WIDTH;
 
   const handleOpenChange = useCallback(
@@ -475,18 +474,19 @@ export function AssemblyPointDetailSheet({
             transition={{
               x: { type: "spring", stiffness: 320, damping: 32, mass: 0.82 },
               width: {
-                type: "spring",
-                stiffness: 220,
-                damping: 30,
-                mass: 0.95,
+                type: "tween",
+                duration: 0.38,
+                ease: [0.32, 0, 0.67, 0],
               },
               borderTopLeftRadius: {
-                duration: isFullscreen ? 0.16 : 0.24,
-                ease: [0.22, 1, 0.36, 1],
+                type: "tween",
+                duration: 0.38,
+                ease: [0.32, 0, 0.67, 0],
               },
               borderBottomLeftRadius: {
-                duration: isFullscreen ? 0.16 : 0.24,
-                ease: [0.22, 1, 0.36, 1],
+                type: "tween",
+                duration: 0.38,
+                ease: [0.32, 0, 0.67, 0],
               },
             }}
             className={cn(
@@ -495,211 +495,205 @@ export function AssemblyPointDetailSheet({
             )}
             style={{ transformOrigin: "right center" }}
           >
-          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-muted-foreground"
-              onClick={() => setIsFullscreen((prev) => !prev)}
-            >
-              {isFullscreen ? (
-                <ArrowsIn size={16} weight="bold" />
-              ) : (
-                <ArrowsOut size={16} weight="bold" />
-              )}
-              <span className="sr-only">
-                {isFullscreen ? "Thu gọn panel" : "Mở rộng toàn màn hình"}
-              </span>
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-muted-foreground"
-              onClick={() => handleOpenChange(false)}
-            >
-              <X size={16} weight="bold" />
-              <span className="sr-only">Đóng</span>
-            </Button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6">
-            <motion.div
-              layout
-              transition={{ type: "spring", stiffness: 260, damping: 28, mass: 0.8 }}
-              className="space-y-5"
-            >
-              <SheetHeader className="pb-4 pr-24 border-b mb-4">
-                <SheetTitle className="tracking-tighter font-bold mb-0 text-xl">
-                  Chi tiết điểm tập kết
-                </SheetTitle>
-                <SheetDescription className="tracking-tight text-sm">
-                  Xem thông tin và danh sách đội tại điểm tập kết
-                </SheetDescription>
-              </SheetHeader>
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-muted-foreground"
+                onClick={() => setIsFullscreen((prev) => !prev)}
+              >
+                {isFullscreen ? (
+                  <ArrowsIn size={16} weight="bold" />
+                ) : (
+                  <ArrowsOut size={16} weight="bold" />
+                )}
+                <span className="sr-only">
+                  {isFullscreen ? "Thu gọn panel" : "Mở rộng toàn màn hình"}
+                </span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 text-muted-foreground"
+                onClick={() => handleOpenChange(false)}
+              >
+                <X size={16} weight="bold" />
+                <span className="sr-only">Đóng</span>
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <motion.div
+                layout
+                transition={{
+                  type: "spring",
+                  stiffness: 260,
+                  damping: 28,
+                  mass: 0.8,
+                }}
+                className="space-y-5"
+              >
+                <SheetHeader className="pb-4 pr-24 border-b mb-4">
+                  <SheetTitle className="tracking-tighter font-bold mb-0 text-xl">
+                    Chi tiết điểm tập kết
+                  </SheetTitle>
+                  <SheetDescription className="tracking-tight text-sm">
+                    Xem thông tin và danh sách đội tại điểm tập kết
+                  </SheetDescription>
+                </SheetHeader>
 
-              {isLoading && (
-                <div className="space-y-4">
-                  <Skeleton className="h-6 w-48" />
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-24 w-full rounded-xl" />
-                  <Skeleton className="h-24 w-full rounded-xl" />
-                </div>
-              )}
+                {isLoading && (
+                  <div className="space-y-4">
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-24 w-full rounded-xl" />
+                    <Skeleton className="h-24 w-full rounded-xl" />
+                  </div>
+                )}
 
-              {data && (
-                <div className="space-y-5">
-                  {/* Header info */}
-                  <motion.div layout className="space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-lg font-bold tracking-tighter">
-                          {data.name}
-                        </h3>
-                        <p className="text-sm text-muted-foreground font-regular tracking-tight">
-                          {data.code}
-                        </p>
+                {data && (
+                  <div className="space-y-5">
+                    {/* Header info */}
+                    <motion.div layout className="space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-bold tracking-tighter">
+                            {data.name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground font-medium tracking-tighter">
+                            {data.code}
+                          </p>
+                        </div>
+                        {st && (
+                          <Badge
+                            variant="outline"
+                            className={cn("text-sm", st.className)}
+                          >
+                            {st.label}
+                          </Badge>
+                        )}
                       </div>
-                      {st && (
-                        <Badge
-                          variant="outline"
-                          className={cn("text-sm", st.className)}
+
+                      {/* Meta cards */}
+                      <motion.div
+                        layout
+                        className={cn(
+                          "mt-3 grid gap-2",
+                          isFullscreen 
+                            ? (data.statusChangedAt ? "grid-cols-4" : "grid-cols-3")
+                            : "grid-cols-2",
+                        )}
+                      >
+                        <motion.div
+                          layout
+                          className="rounded-lg border border-dashed border-border/90 bg-muted/20 p-2.5"
                         >
-                          {st.label}
-                        </Badge>
+                          <p className="text-sm font-semibold tracking-tighter flex items-center gap-1 mb-1">
+                            <MapPin size={16} className="text-red-500" />
+                            Tọa độ
+                          </p>
+                          <p className="text-sm tracking-tighter">
+                            {data.latitude.toFixed(5)},{" "}
+                            {data.longitude.toFixed(5)}
+                          </p>
+                        </motion.div>
+                        <motion.div
+                          layout
+                          className="rounded-lg border border-dashed border-border/90 bg-muted/20 p-2.5"
+                        >
+                          <p className="text-sm font-semibold tracking-tighter flex items-center gap-1 mb-1">
+                            <UsersThree size={16} className="text-blue-500" />
+                            Sức chứa
+                          </p>
+                          <p className="text-sm tracking-tighter">
+                            {data.teams.length}/{data.maxCapacity} người
+                          </p>
+                        </motion.div>
+                        <motion.div
+                          layout
+                          className={cn(
+                            "rounded-lg border border-dashed border-border/90 bg-muted/20 p-2.5",
+                            !data.statusChangedAt && "col-span-full",
+                          )}
+                        >
+                          <p className="text-sm font-semibold tracking-tighter flex items-center gap-1 mb-1">
+                            Cập nhật lần cuối
+                          </p>
+                          <p className="text-sm tracking-tighter">
+                            {formatLastUpdated(data.lastUpdatedAt)}
+                          </p>
+                        </motion.div>
+                        {data.statusChangedAt && (
+                          <motion.div
+                            layout
+                            className="rounded-lg border border-dashed border-border/90 bg-muted/20 p-2.5"
+                          >
+                            <p className="text-sm font-semibold tracking-tighter flex items-center gap-1 mb-1">
+                              Đổi trạng thái lúc
+                            </p>
+                            <p className="text-sm tracking-tighter">
+                              {formatLastUpdated(data.statusChangedAt)}
+                            </p>
+                          </motion.div>
+                        )}
+                        {data.statusReason?.trim() && (
+                          <motion.div
+                            layout
+                            className="col-span-full rounded-lg border border-dashed border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/5 p-2.5 text-amber-900 dark:text-amber-200"
+                          >
+                            <p className="text-sm font-semibold tracking-tighter flex items-center gap-1 mb-1 text-amber-700 dark:text-amber-400">
+                              Lý do trạng thái
+                            </p>
+                            <p className="text-sm tracking-tighter">
+                              {data.statusReason.trim()}
+                            </p>
+                          </motion.div>
+                        )}
+                      </motion.div>
+                    </motion.div>
+
+                    {/* Teams */}
+                    <div>
+                      <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
+                        <UsersThree size={16} className="text-blue-500" />
+                        Danh sách đội ({data.teams.length})
+                      </h4>
+
+                      {data.teams.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
+                          <User
+                            size={28}
+                            className="mx-auto text-muted-foreground/40 mb-2"
+                          />
+                          <p className="text-sm text-muted-foreground tracking-tight">
+                            Chưa có đội nào tại điểm tập kết này
+                          </p>
+                        </div>
+                      ) : (
+                        <div
+                          className={cn(
+                            isFullscreen
+                              ? "grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4"
+                              : "space-y-2",
+                          )}
+                        >
+                          {data.teams.map((team) => (
+                            <TeamCard
+                              key={team.id}
+                              team={team}
+                              compact={isFullscreen}
+                              statusLabels={rescueTeamStatusLabels}
+                            />
+                          ))}
+                        </div>
                       )}
                     </div>
-
-                    {/* Meta cards */}
-                    <motion.div
-                      layout
-                      className={cn(
-                        "mt-3 grid gap-2",
-                        isFullscreen ? "grid-cols-3" : "grid-cols-2",
-                      )}
-                    >
-                      <motion.div layout className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                        <p className="text-xs text-muted-foreground tracking-tight flex items-center gap-1 mb-1">
-                          <MapPin size={11} />
-                          Tọa độ
-                        </p>
-                        <p className="text-sm font-semibold tracking-tight">
-                          {data.latitude.toFixed(5)}, {data.longitude.toFixed(5)}
-                        </p>
-                      </motion.div>
-                      <motion.div layout className="rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                        <p className="text-xs text-muted-foreground tracking-tight flex items-center gap-1 mb-1">
-                          <UsersThree size={11} />
-                          Sức chứa
-                        </p>
-                        <p className="text-sm font-semibold tracking-tight">
-                          {data.teams.length}/{data.maxCapacity} người
-                        </p>
-                      </motion.div>
-                      <motion.div
-                        layout
-                        className={cn(
-                          "rounded-lg border border-border/60 bg-muted/20 p-2.5",
-                          !isFullscreen && "col-span-full",
-                        )}
-                      >
-                        <p className="text-xs text-muted-foreground tracking-tight flex items-center gap-1 mb-1">
-                          <Clock size={11} />
-                          Cập nhật lần cuối
-                        </p>
-                        <p className="text-sm tracking-tight">
-                          {formatLastUpdated(data.lastUpdatedAt)}
-                        </p>
-                      </motion.div>
-                      {data.statusReason?.trim() && (
-                        <motion.div layout className="col-span-full rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                          <p className="text-xs text-muted-foreground tracking-tight mb-1">
-                            Lý do trạng thái
-                          </p>
-                          <p className="text-sm tracking-tight">
-                            {data.statusReason.trim()}
-                          </p>
-                        </motion.div>
-                      )}
-                      {data.statusChangedAt && (
-                        <motion.div
-                          layout
-                          className={cn(
-                            "rounded-lg border border-border/60 bg-muted/20 p-2.5",
-                            !data.statusChangedBy && "col-span-full",
-                            data.statusChangedBy && isFullscreen && "col-span-2",
-                          )}
-                        >
-                          <p className="text-xs text-muted-foreground tracking-tight mb-1">
-                            Đổi trạng thái lúc
-                          </p>
-                          <p className="text-sm tracking-tight">
-                            {formatLastUpdated(data.statusChangedAt)}
-                          </p>
-                        </motion.div>
-                      )}
-                      {data.statusChangedBy?.trim() && (
-                        <motion.div
-                          layout
-                          className={cn(
-                            "rounded-lg border border-border/60 bg-muted/20 p-2.5",
-                            !data.statusChangedAt && "col-span-full",
-                            data.statusChangedAt && isFullscreen && "col-span-2",
-                          )}
-                        >
-                          <p className="text-xs text-muted-foreground tracking-tight mb-1">
-                            Đổi trạng thái bởi
-                          </p>
-                          <p className="text-sm tracking-tight break-all">
-                            {formatStatusActor(data.statusChangedBy)}
-                          </p>
-                        </motion.div>
-                      )}
-                    </motion.div>
-                  </motion.div>
-
-                  {/* Teams */}
-                  <motion.div layout>
-                    <h4 className="text-base font-semibold tracking-tighter mb-3 flex items-center gap-1.5">
-                      <UsersThree size={15} className="text-primary" />
-                      Danh sách đội ({data.teams.length})
-                    </h4>
-
-                    {data.teams.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-border/60 p-6 text-center">
-                        <User
-                          size={28}
-                          className="mx-auto text-muted-foreground/40 mb-2"
-                        />
-                        <p className="text-sm text-muted-foreground tracking-tight">
-                          Chưa có đội nào tại điểm tập kết này
-                        </p>
-                      </div>
-                    ) : (
-                      <motion.div
-                        layout
-                        className={cn(
-                          isFullscreen
-                            ? "grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4"
-                            : "space-y-2",
-                        )}
-                      >
-                        {data.teams.map((team) => (
-                          <TeamCard
-                            key={team.id}
-                            team={team}
-                            compact={isFullscreen}
-                            statusLabels={rescueTeamStatusLabels}
-                          />
-                        ))}
-                      </motion.div>
-                    )}
-                  </motion.div>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        </motion.div>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          </motion.div>
         </div>
       )}
     </AnimatePresence>,

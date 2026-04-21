@@ -20,7 +20,9 @@ export interface UpdateRolePermissionsPayload {
 // ── GET /identity/admin/users/{userId}/permissions ───────
 export interface UserPermissionsResponse {
   userId: string;
+  roleId: number;
   permissions: PermissionEntity[];
+  rolePermissions: PermissionEntity[];
 }
 
 // ── PUT /identity/admin/users/{userId}/permissions ───────

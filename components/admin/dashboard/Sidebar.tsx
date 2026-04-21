@@ -88,25 +88,15 @@ const Sidebar = ({ favorites, projects, isOpen = true }: SidebarProps) => {
       {isOpen && (
         <div className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-300">
           {/* Logo & Brand Section */}
-          <div className="p-4 border-b border-sidebar-border">
-            <div className="flex items-center gap-2.5">
-              <Image
-                src="/icons/logo.svg"
-                alt="ResQ Logo"
-                width={36}
-                height={36}
-                className="shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <Image
-                  src="/icons/resq_typo_logo.svg"
-                  alt="ResQ SOS"
-                  width={80}
-                  height={40}
-                  className="dark:invert h-auto w-auto object-contain"
-                />
-              </div>
-            </div>
+          <div className="flex items-center justify-center px-4 border-b border-sidebar-border">
+            <Image
+              src="/icons/resq_typo_logo.svg"
+              alt="ResQ SOS"
+              width={200}
+              height={200}
+              className="dark:invert h-24 w-auto object-contain"
+              priority
+            />
           </div>
 
           {/* Navigation Menu */}

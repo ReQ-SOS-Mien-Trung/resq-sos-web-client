@@ -36,6 +36,7 @@ import {
   GetMissionTeamRouteParams,
   MissionTeamRouteResponse,
   ConfirmReturnSuppliesRequest,
+  ConfirmReturnResponse,
 } from "./type";
 
 export const MISSIONS_QUERY_KEY = ["missions"] as const;
@@ -204,16 +205,16 @@ export function useConfirmReturnSupplies() {
   const queryClient = useQueryClient();
 
   return useMutation<
-    void,
+    ConfirmReturnResponse,
     Error,
     {
-      missionId: number;
       activityId: number;
+      missionId: number;
       request: ConfirmReturnSuppliesRequest;
     }
   >({
-    mutationFn: ({ missionId, activityId, request }) =>
-      confirmReturnSupplies(missionId, activityId, request),
+    mutationFn: ({ activityId, request }) =>
+      confirmReturnSupplies(activityId, request),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: MISSIONS_QUERY_KEY });
       queryClient.invalidateQueries({

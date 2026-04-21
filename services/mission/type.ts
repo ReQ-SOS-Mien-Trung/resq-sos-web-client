@@ -295,19 +295,18 @@ export interface UpdateActivityResponse {
   status: ActivityStatus;
 }
 
-export interface ConfirmReturnConsumableLotAllocationRequest {
+export interface ConfirmReturnLotAllocationRequest {
   lotId: number;
   quantityTaken: number;
-  receivedDate: string;
-  expiredDate: string;
-  remainingQuantityAfterExecution: number;
+  receivedDate?: string | null;
+  expiredDate?: string | null;
 }
 
 export interface ConfirmReturnConsumableItemRequest {
   itemModelId: number;
   quantity: number;
-  lotAllocations: ConfirmReturnConsumableLotAllocationRequest[];
-  expiredDate: string | null;
+  lotAllocations: ConfirmReturnLotAllocationRequest[];
+  expiredDate?: string | null;
 }
 
 export interface ConfirmReturnReusableUnitRequest {
@@ -327,6 +326,43 @@ export interface ConfirmReturnSuppliesRequest {
   discrepancyNote?: string | null;
   consumableItems: ConfirmReturnConsumableItemRequest[];
   reusableItems: ConfirmReturnReusableItemRequest[];
+}
+
+export interface ConfirmReturnRestoredLotAllocation {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate: string;
+  expiredDate: string;
+  remainingQuantityAfterExecution: number;
+}
+
+export interface ConfirmReturnRestoredReusableUnit {
+  reusableItemId: number;
+  serialNumber: string;
+  condition: string;
+  note: string | null;
+}
+
+export interface ConfirmReturnRestoredItem {
+  itemModelId: number;
+  itemName: string;
+  unit: string;
+  expectedQuantity: number;
+  actualQuantity: number;
+  expectedReturnLotAllocations: ConfirmReturnRestoredLotAllocation[];
+  returnedLotAllocations: ConfirmReturnRestoredLotAllocation[];
+  expectedReusableUnits: ConfirmReturnRestoredReusableUnit[];
+  returnedReusableUnits: ConfirmReturnRestoredReusableUnit[];
+}
+
+export interface ConfirmReturnResponse {
+  activityId: number;
+  missionId: number;
+  depotId: number;
+  message: string;
+  usedLegacyFallback: boolean;
+  discrepancyRecorded: boolean;
+  restoredItems: ConfirmReturnRestoredItem[];
 }
 
 // ── Route types ──

@@ -12,6 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -73,8 +80,6 @@ import type {
   AssemblyPointEntity,
   AssemblyPointStatus,
 } from "@/services/assembly_points";
-
-const ITEMS_PER_PAGE = 12;
 
 type AssemblyPointActionType =
   | "activate"
@@ -197,6 +202,7 @@ export default function AssemblyPointsPage() {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<AssemblyPointStatus | null>(
     null,
@@ -234,8 +240,8 @@ export default function AssemblyPointsPage() {
   });
   const { data, isLoading } = useAssemblyPoints({
     params: {
-      pageNumber: 1,
-      pageSize: 200,
+      pageNumber: page,
+      pageSize,
       status: selectedStatus ?? undefined,
     },
   });
@@ -272,11 +278,10 @@ export default function AssemblyPointsPage() {
     return result;
   }, [items, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-  const paged = filtered.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE,
-  );
+  const totalPages = Math.max(1, data?.totalPages ?? 1);
+  const totalCount = data?.totalCount ?? 0;
+  const hasPreviousPage = data?.hasPreviousPage ?? false;
+  const hasNextPage = data?.hasNextPage ?? false;
 
   const availableCount = allItems.filter((i) => i.status === "Available").length;
   const createdCount = allItems.filter((i) => i.status === "Created").length;
@@ -556,6 +561,25 @@ export default function AssemblyPointsPage() {
             </PopoverContent>
           </Popover>
 
+          <Select
+            value={String(pageSize)}
+            onValueChange={(value) => {
+              setPageSize(Number(value));
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-8 w-[110px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[6, 12, 24, 48].map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size} / trang
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {(search || selectedStatus) && (
             <Button
               variant="ghost"
@@ -586,7 +610,7 @@ export default function AssemblyPointsPage() {
               </Card>
             ))}
           </div>
-        ) : paged.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <Card>
             <CardContent className="py-16 text-center">
               <FlagBanner
@@ -602,7 +626,7 @@ export default function AssemblyPointsPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {paged.map((point) => {
+            {filtered.map((point) => {
               const statusConfig = getAssemblyPointStatusConfig(
                 point.status,
                 assemblyPointStatusConfig,
@@ -620,71 +644,75 @@ export default function AssemblyPointsPage() {
                   role="button"
                   onClick={() => openDetail(point.id)}
                 >
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-base font-bold tracking-tighter truncate">
-                          {point.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground font-mono tracking-tight mt-0.5">
-                          {point.code}
-                        </p>
+                  <CardContent className="flex h-full flex-col p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-base font-bold tracking-tighter truncate">
+                            {point.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground font-mono tracking-tight mt-0.5">
+                            {point.code}
+                          </p>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-xs shrink-0",
+                            statusConfig.bg,
+                            statusConfig.color,
+                          )}
+                        >
+                          {statusConfig.icon}
+                          <span className="ml-1">{statusConfig.label}</span>
+                        </Badge>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs shrink-0",
-                          statusConfig.bg,
-                          statusConfig.color,
-                        )}
-                      >
-                        {statusConfig.icon}
-                        <span className="ml-1">{statusConfig.label}</span>
-                      </Badge>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-sm tracking-tighter">
-                        <MapPin size={13} className="text-red-500 shrink-0" />
-                        <span className="font-medium truncate">
-                          {point.latitude.toFixed(5)},{" "}
-                          {point.longitude.toFixed(5)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-sm tracking-tighter">
-                        <UsersThree
-                          size={13}
-                          className="text-blue-500 shrink-0"
-                        />
-                        <span>
-                          Sức chứa:{" "}
-                          <span className="font-bold text-primary">
-                            {point.maxCapacity}
-                          </span>{" "}
-                          người
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-sm tracking-tighter">
-                        <Clock size={13} className="shrink-0" />
-                        Cập nhật lần cuối:{" "}
-                        <span>{formatLastUpdated(point.lastUpdatedAt)}</span>
-                      </div>
-                      {point.statusChangedAt && (
-                        <div className="flex items-center gap-1.5 text-sm tracking-tighter text-muted-foreground">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-sm tracking-tighter">
+                          <MapPin size={13} className="text-red-500 shrink-0" />
+                          <span className="font-medium truncate">
+                            {point.latitude.toFixed(5)},{" "}
+                            {point.longitude.toFixed(5)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm tracking-tighter">
+                          <UsersThree
+                            size={13}
+                            className="text-blue-500 shrink-0"
+                          />
+                          <span>
+                            Sức chứa:{" "}
+                            <span className="font-bold text-primary">
+                              {point.maxCapacity}
+                            </span>{" "}
+                            người
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm tracking-tighter">
                           <Clock size={13} className="shrink-0" />
-                          Đổi trạng thái:{" "}
-                          <span>{formatLastUpdated(point.statusChangedAt)}</span>
+                          Cập nhật lần cuối:{" "}
+                          <span>{formatLastUpdated(point.lastUpdatedAt)}</span>
                         </div>
-                      )}
-                      {point.statusReason && (
-                        <div className="rounded-md border border-amber-200/70 bg-amber-50/70 px-2.5 py-2 text-sm tracking-tight text-amber-900">
-                          <span className="font-medium">Lý do:</span>{" "}
-                          {point.statusReason}
-                        </div>
-                      )}
+                        {point.statusChangedAt && (
+                          <div className="flex items-center gap-1.5 text-sm tracking-tighter text-muted-foreground">
+                            <Clock size={13} className="shrink-0" />
+                            Đổi trạng thái:{" "}
+                            <span>
+                              {formatLastUpdated(point.statusChangedAt)}
+                            </span>
+                          </div>
+                        )}
+                        {point.statusReason && (
+                          <div className="rounded-md border border-amber-200/70 bg-amber-50/70 px-2.5 py-2 text-sm tracking-tight text-amber-900">
+                            <span className="font-medium">Lý do:</span>{" "}
+                            {point.statusReason}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex gap-2 pt-1">
+                    <div className="mt-auto flex gap-2 pt-3">
                       <Button
                         variant="outline"
                         size="sm"
@@ -762,28 +790,30 @@ export default function AssemblyPointsPage() {
         )}
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0"
-              disabled={page <= 1}
-              onClick={() => setPage((currentPage) => currentPage - 1)}
-            >
-              <CaretLeft size={14} />
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
             <span className="text-sm text-muted-foreground tracking-tight">
-              Trang {page} / {totalPages}
+              Trang {page} / {totalPages} · {totalCount} điểm tập kết
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0"
-              disabled={page >= totalPages}
-              onClick={() => setPage((currentPage) => currentPage + 1)}
-            >
-              <CaretRight size={14} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                disabled={!hasPreviousPage}
+                onClick={() => setPage((currentPage) => currentPage - 1)}
+              >
+                <CaretLeft size={14} />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0"
+                disabled={!hasNextPage}
+                onClick={() => setPage((currentPage) => currentPage + 1)}
+              >
+                <CaretRight size={14} />
+              </Button>
+            </div>
           </div>
         )}
       </div>

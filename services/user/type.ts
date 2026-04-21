@@ -155,10 +155,12 @@ export interface GetRescuersParams {
   pageSize?: number;
   isBanned?: boolean;
   search?: string;
+  rescuerType?: string;
 }
 
 // For permission assignment search
 export interface GetUsersForPermissionParams {
+  pageNumber?: number;
   search?: string;
   pageSize?: number;
   roleId?: number;
@@ -166,10 +168,20 @@ export interface GetUsersForPermissionParams {
 
 export interface GetUsersForPermissionResponse {
   items: UserEntity[];
+  pageNumber: number;
+  pageSize: number;
   totalCount: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
 export interface RoleMetadataOption {
+  key: string;
+  value: string;
+}
+
+export interface RescuerTypeMetadataOption {
   key: string;
   value: string;
 }

@@ -13,6 +13,7 @@ import {
   GetUsersForPermissionParams,
   GetUsersForPermissionResponse,
   RoleMetadataOption,
+  RescuerTypeMetadataOption,
   AbilityCategoryMetadataOption,
   AdminCreateUserResponse,
 } from "./type";
@@ -121,14 +122,38 @@ export async function updateAdminUser(
 export async function getUsersForPermission(
   params?: GetUsersForPermissionParams,
 ): Promise<GetUsersForPermissionResponse> {
+  const searchTerm = params?.search?.trim();
+  const normalizedPhone = searchTerm?.replace(/[^\d+]/g, "") ?? "";
+  const isEmailSearch = !!searchTerm && searchTerm.includes("@");
+  const isPhoneSearch =
+    !!normalizedPhone && /^\+?\d{6,}$/.test(normalizedPhone);
+
   const { data } = await api.get("/identity/admin/users/for-permission", {
-    params,
+    params: {
+      pageNumber: params?.pageNumber ?? 1,
+      pageSize: params?.pageSize ?? 50,
+      ...(params?.roleId ? { roleId: params.roleId } : {}),
+      ...(searchTerm
+        ? isEmailSearch
+          ? { email: searchTerm }
+          : isPhoneSearch
+            ? { phone: normalizedPhone }
+            : { name: searchTerm }
+        : {}),
+    },
   });
   return data;
 }
 
 export async function getRoleMetadata(): Promise<RoleMetadataOption[]> {
   const { data } = await api.get("/identity/roles/metadata");
+  return data;
+}
+
+export async function getRescuerTypeMetadata(): Promise<
+  RescuerTypeMetadataOption[]
+> {
+  const { data } = await api.get("/identity/user/rescuer/metadata/types");
   return data;
 }
 

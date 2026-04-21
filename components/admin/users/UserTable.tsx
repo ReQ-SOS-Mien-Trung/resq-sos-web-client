@@ -206,9 +206,9 @@ const UserTable = ({
   const paginatedUsers = isServerMode
     ? filteredAndSorted
     : filteredAndSorted.slice(
-    (safePage - 1) * pageSize,
-    safePage * pageSize
-  );
+      (safePage - 1) * pageSize,
+      safePage * pageSize
+    );
   const startItem = displayTotalCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const endItem = Math.min(safePage * pageSize, displayTotalCount);
   const displayTotal = totalCount ?? displayTotalCount;
@@ -335,7 +335,7 @@ const UserTable = ({
                       className="border-b border-border/30 hover:bg-muted/30 transition-colors cursor-pointer"
                     >
                       <td className="p-3">
-                        <div className="text-sm font-medium text-foreground">{user.name}</div>
+                        <div className="text-sm font-medium tracking-tighter text-foreground">{user.name}</div>
                       </td>
                       <td className="p-3 text-sm tracking-tighter text-foreground/70">{user.email}</td>
                       <td className="p-3 text-sm tracking-tighter text-foreground/80">{user.phone || "—"}</td>
@@ -397,9 +397,11 @@ const UserTable = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
                   <SelectItem value="10">10</SelectItem>
                   <SelectItem value="20">20</SelectItem>
                   <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
                 </SelectContent>
               </Select>
               <span className="text-sm text-muted-foreground tracking-tighter">/ trang</span>

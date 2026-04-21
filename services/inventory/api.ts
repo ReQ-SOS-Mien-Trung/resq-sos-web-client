@@ -53,6 +53,15 @@ import {
   GetReturnHistoryParams,
   GetReturnHistoryResponse,
   UpcomingReturnEntity,
+  PickupLotAllocation,
+  UpcomingReturnItem,
+  GetExpiringLotsParams,
+  GetExpiringLotsResponse,
+  DisposeLotParams,
+  DisposeLotResponse,
+  DecommissionReusableParams,
+  DecommissionReusableResponse,
+  ReusableItemStatus,
 } from "./type";
 
 type InventoryItemLike = Partial<InventoryItemEntity> & {
@@ -75,6 +84,12 @@ function toFiniteNumber(value: unknown, fallback = 0): number {
         ? Number(value)
         : Number.NaN;
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toTrimmedStringOrNull(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function isReusableItemType(value: unknown): boolean {
@@ -115,8 +130,8 @@ function normalizeInventoryItem(item: InventoryItemLike): InventoryItemEntity {
   const quantity = toFiniteNumber(item.quantity ?? item.unit, 0);
   const reservedQuantity = toFiniteNumber(
     item.reservedQuantity ??
-    item.totalReservedQuantity ??
-    item.reservedForMissionQuantity,
+      item.totalReservedQuantity ??
+      item.reservedForMissionQuantity,
     0,
   );
   const availableQuantity = toFiniteNumber(
@@ -131,6 +146,76 @@ function normalizeInventoryItem(item: InventoryItemLike): InventoryItemEntity {
     reservedQuantity,
     availableQuantity,
   } as InventoryItemEntity;
+}
+
+function normalizePickupLotAllocation(
+  allocation: Partial<PickupLotAllocation> | null | undefined,
+): PickupLotAllocation {
+  return {
+    lotId: toFiniteNumber(allocation?.lotId, 0),
+    quantityTaken: toFiniteNumber(allocation?.quantityTaken, 0),
+    receivedDate: toTrimmedStringOrNull(allocation?.receivedDate),
+    expiredDate: toTrimmedStringOrNull(allocation?.expiredDate),
+    remainingQuantityAfterExecution:
+      allocation?.remainingQuantityAfterExecution == null
+        ? null
+        : toFiniteNumber(allocation.remainingQuantityAfterExecution, 0),
+  };
+}
+
+function normalizeUpcomingReturnItem(
+  item: Partial<UpcomingReturnItem> | null | undefined,
+): UpcomingReturnItem {
+  const expectedReturnLotAllocations = (
+    item?.expectedReturnLotAllocations ??
+    item?.pickupLotAllocations ??
+    []
+  ).map((allocation) => normalizePickupLotAllocation(allocation));
+  const returnedLotAllocations = (item?.returnedLotAllocations ?? []).map(
+    (allocation) => normalizePickupLotAllocation(allocation),
+  );
+  const pickupLotAllocations = (
+    item?.pickupLotAllocations ??
+    item?.expectedReturnLotAllocations ??
+    []
+  ).map((allocation) => normalizePickupLotAllocation(allocation));
+
+  return {
+    ...(item as UpcomingReturnItem),
+    itemId: toFiniteNumber(item?.itemId, 0),
+    itemModelId:
+      item?.itemModelId == null ? null : toFiniteNumber(item.itemModelId, 0),
+    quantity: toFiniteNumber(item?.quantity, 0),
+    actualReturnedQuantity: toFiniteNumber(item?.actualReturnedQuantity, 0),
+    expiredDate: toTrimmedStringOrNull(item?.expiredDate),
+    expectedReturnUnits: item?.expectedReturnUnits ?? [],
+    returnedReusableUnits: item?.returnedReusableUnits ?? [],
+    expectedReturnLotAllocations,
+    returnedLotAllocations,
+    pickupLotAllocations,
+  };
+}
+
+function normalizeUpcomingReturnEntity(
+  entity: Partial<UpcomingReturnEntity> | null | undefined,
+): UpcomingReturnEntity {
+  return {
+    ...(entity as UpcomingReturnEntity),
+    items: (entity?.items ?? []).map((item) =>
+      normalizeUpcomingReturnItem(item),
+    ),
+  };
+}
+
+function normalizeUpcomingReturnsResponse(
+  response: GetUpcomingReturnsResponse,
+): GetUpcomingReturnsResponse {
+  return {
+    ...response,
+    items: (response?.items ?? []).map((item) =>
+      normalizeUpcomingReturnEntity(item),
+    ),
+  };
 }
 
 function normalizeInventoryResponse<T extends { items?: unknown[] }>(
@@ -268,6 +353,17 @@ export async function getInventorySourceTypes(): Promise<
 }
 
 /**
+ * Get all item models (id & name)
+ * GET /logistics/inventory/metadata/item-models
+ */
+export async function getInventoryItemModels(): Promise<
+  { key: string; value: string }[]
+> {
+  const { data } = await api.get("/logistics/inventory/metadata/item-models");
+  return data;
+}
+
+/**
  * Get list of relief items by category code
  * GET /logistics/inventory/metadata/relief-items/category/{categoryCode}
  */
@@ -388,7 +484,7 @@ export async function getMyDepotUpcomingReturns(
       },
     },
   );
-  return data;
+  return normalizeUpcomingReturnsResponse(data);
 }
 
 const UPCOMING_RETURNS_BATCH_SIZE = 100;
@@ -597,11 +693,14 @@ export async function getDepotStockMovements(
 export async function getInventoryLots(
   params: GetInventoryLotsParams,
 ): Promise<GetInventoryLotsResponse> {
-  const { data } = await api.get(`/logistics/inventory/${params.itemModelId}/lots`, {
-    params: {
-      depotId: params.depotId,
+  const { data } = await api.get(
+    `/logistics/inventory/${params.itemModelId}/lots`,
+    {
+      params: {
+        depotId: params.depotId,
+      },
     },
-  });
+  );
   return data;
 }
 
@@ -873,6 +972,65 @@ export async function getSupplyRequestPriorityLevels(): Promise<
 > {
   const { data } = await api.get(
     "/logistics/inventory/metadata/supply-request-priority-levels",
+  );
+  return data;
+}
+
+// ─── Disposal / Decommission ───
+
+/**
+ * Get expiring / expired lots for my depot
+ * GET /logistics/inventory/my-depot/expiring-lots
+ */
+export async function getExpiringLots(
+  params: GetExpiringLotsParams,
+): Promise<GetExpiringLotsResponse> {
+  const { data } = await api.get(
+    "/logistics/inventory/my-depot/expiring-lots",
+    { params },
+  );
+  return data;
+}
+
+/**
+ * Dispose (destroy) a lot partially or fully
+ * POST /logistics/inventory/my-depot/lots/{lotId}/dispose
+ */
+export async function disposeLot(
+  params: DisposeLotParams,
+): Promise<DisposeLotResponse> {
+  const { depotId, lotId, payload } = params;
+  const { data } = await api.post(
+    `/logistics/inventory/my-depot/lots/${lotId}/dispose`,
+    payload,
+    { params: { depotId } },
+  );
+  return data;
+}
+
+/**
+ * Decommission a reusable item
+ * POST /logistics/inventory/my-depot/reusables/{itemId}/decommission
+ */
+export async function decommissionReusable(
+  params: DecommissionReusableParams,
+): Promise<DecommissionReusableResponse> {
+  const { depotId, itemId, payload } = params;
+  const { data } = await api.post(
+    `/logistics/inventory/my-depot/reusables/${itemId}/decommission`,
+    payload,
+    { params: { depotId } },
+  );
+  return data;
+}
+
+/**
+ * Get reusable item statuses metadata
+ * GET /logistics/inventory/metadata/reusable-item-statuses
+ */
+export async function getReusableItemStatuses(): Promise<ReusableItemStatus[]> {
+  const { data } = await api.get(
+    "/logistics/inventory/metadata/reusable-item-statuses",
   );
   return data;
 }

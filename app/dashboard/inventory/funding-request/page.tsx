@@ -2452,11 +2452,8 @@ export default function FundingRequestPage() {
                                   </TableCell>
                                   <TableCell>
                                     <Badge
-                                      className={`${st.className} border gap-1.5 px-2 py-0.5 text-sm`}
+                                      className={`${st.className} border px-2 py-0.5 text-sm font-medium`}
                                     >
-                                      <span
-                                        className={`w-1.5 h-1.5 rounded-full ${st.dotColor}`}
-                                      />
                                       {st.label}
                                     </Badge>
                                   </TableCell>

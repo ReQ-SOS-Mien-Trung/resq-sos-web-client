@@ -12,6 +12,7 @@ import {
   useBanUser,
   useUnbanUser,
   ADMIN_RESCUERS_QUERY_KEY,
+  useRescuerTypeMetadata,
 } from "@/services/user/hooks";
 import { UserEntity } from "@/services/user/type";
 import {
@@ -52,13 +53,47 @@ const RescuersPage = () => {
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [rescuerTypeFilter, setRescuerTypeFilter] = useState<string>("all");
+  const [isBannedFilter, setIsBannedFilter] = useState<"all" | "true" | "false">(
+    "all",
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const { data: rescuerTypeMetadata = [] } = useRescuerTypeMetadata();
 
   const { data: rescuersData, isLoading } = useAdminRescuers({
     pageNumber: page,
     pageSize,
+    search: debouncedSearch || undefined,
+    rescuerType:
+      rescuerTypeFilter !== "all" ? rescuerTypeFilter : undefined,
+    isBanned:
+      isBannedFilter === "all"
+        ? undefined
+        : isBannedFilter === "true",
   });
 
   const items = rescuersData?.items ?? [];
+
+  const typeLabelMap = rescuerTypeMetadata.reduce<Record<string, string>>(
+    (acc, option) => {
+      acc[option.key] = option.value;
+      return acc;
+    },
+    {},
+  );
+
+  const coreLabel = typeLabelMap.Core ?? "Core";
+  const volunteerLabel = typeLabelMap.Volunteer ?? "Volunteer";
 
   const stats = {
     total: rescuersData?.totalCount ?? 0,
@@ -144,10 +179,24 @@ const RescuersPage = () => {
           </div>
         </div>
 
-        <RescuerStats stats={stats} />
+        <RescuerStats
+          stats={stats}
+          labels={{
+            core: coreLabel,
+            volunteer: volunteerLabel,
+          }}
+        />
 
         <RescuerTable
           rescuers={items}
+          search={search}
+          onSearchChange={setSearch}
+          rescuerTypeFilter={rescuerTypeFilter}
+          onRescuerTypeFilterChange={setRescuerTypeFilter}
+          isBannedFilter={isBannedFilter}
+          onIsBannedFilterChange={setIsBannedFilter}
+          rescuerTypeOptions={rescuerTypeMetadata}
+          rescuerTypeLabelMap={typeLabelMap}
           onEdit={handleEditClick}
           onBan={handleBanClick}
           onActivate={handleActivateClick}

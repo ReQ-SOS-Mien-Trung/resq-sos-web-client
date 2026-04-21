@@ -5,6 +5,7 @@ import {
   RescuerApplicationDetail,
   ReviewRescuerApplicationRequest,
   ReviewRescuerApplicationResponse,
+  RescuerApplicationStatusMetadataOption,
 } from "./type";
 
 /**
@@ -20,8 +21,18 @@ export async function getRescuerApplications(
       pageSize: params?.pageSize ?? 10,
       ...(params?.status ? { status: params.status } : {}),
       ...(params?.rescuerType ? { rescuerType: params.rescuerType } : {}),
+      ...(params?.search ? { search: params.search } : {}),
     },
   });
+  return data;
+}
+
+export async function getRescuerApplicationStatusMetadata(): Promise<
+  RescuerApplicationStatusMetadataOption[]
+> {
+  const { data } = await api.get(
+    "/identity/admin/rescuer-applications/metadata/statuses",
+  );
   return data;
 }
 

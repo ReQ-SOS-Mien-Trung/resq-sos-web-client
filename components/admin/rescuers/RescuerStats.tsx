@@ -10,7 +10,18 @@ export interface RescuerStatsData {
   banned: number;
 }
 
-const RescuerStats = ({ stats }: { stats: RescuerStatsData }) => {
+export interface RescuerStatsLabels {
+  core: string;
+  volunteer: string;
+}
+
+const RescuerStats = ({
+  stats,
+  labels,
+}: {
+  stats: RescuerStatsData;
+  labels?: RescuerStatsLabels;
+}) => {
   const statItems = [
     {
       label: "Tổng cứu hộ viên",
@@ -20,14 +31,14 @@ const RescuerStats = ({ stats }: { stats: RescuerStatsData }) => {
       bgColor: "bg-blue-50 dark:bg-blue-950/30",
     },
     {
-      label: "Core",
+      label: labels?.core ?? "Core",
       value: stats.core,
       icon: ShieldCheck,
       color: "text-emerald-600 dark:text-emerald-400",
       bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
     },
     {
-      label: "Volunteer",
+      label: labels?.volunteer ?? "Volunteer",
       value: stats.volunteer,
       icon: Handshake,
       color: "text-violet-600 dark:text-violet-400",

@@ -52,7 +52,6 @@ import { toast } from "sonner";
 import {
   useDepotById,
   useDepots,
-  useDepotChangeableStatuses,
   useDepotAvailableManagers,
   useDepotActiveManagers,
   useDepotClosureResolutionMetadata,
@@ -61,6 +60,7 @@ import {
   useAssignDepotManager,
   useUnassignDepotManager,
   useUpdateDepotStatus,
+  useInitiateDepotClosing,
   useInitiateDepotClosure,
   useMarkDepotClosureExternal,
   useInitiateDepotClosureTransfer,
@@ -71,6 +71,7 @@ import {
 import { useDepotManagers } from "@/services/depot_manager";
 import { useInventoryItemTypes } from "@/services/inventory/hooks";
 import type {
+  InitiateDepotClosureResponse,
   DepotClosureRemainingInventoryItem,
   DepotClosureSuggestedTransfer,
   DepotStatus,
@@ -194,6 +195,10 @@ function createTransferAssignmentDraft(
       existingItems,
     ),
   };
+}
+
+function normalizeDepotName(value: string | null | undefined): string {
+  return value?.trim().toLocaleLowerCase("vi") ?? "";
 }
 
 function normalizeClosureInventoryItems(
@@ -421,9 +426,11 @@ export default function DepotDetailPage() {
   const { data: closureResolutionMetadata = [] } =
     useDepotClosureResolutionMetadata();
   const { data: statusMetadata } = useDepotStatuses();
+  const canUpdateOperationalStatus =
+    depot?.status === "Available" || depot?.status === "Unavailable";
+  const canInitiateClosure = canUpdateOperationalStatus;
   const canManageDepotManager =
     depot?.status !== "Closed" && depot?.status !== "Closing";
-  const { data: changeableStatusMetadata } = useDepotChangeableStatuses();
   const [managerDialogOpen, setManagerDialogOpen] = useState(false);
   const [removeManagerDialogOpen, setRemoveManagerDialogOpen] = useState(false);
   const { data: availableManagers = [] } = useDepotAvailableManagers({
@@ -468,45 +475,11 @@ export default function DepotDetailPage() {
     (managerHistoryData?.hasNextPage ?? false) ||
     (managerHistoryTotalPages > 0 &&
       managerHistoryCurrentPage < managerHistoryTotalPages);
-  const changeableStatusOptions = useMemo<
-    Array<{ key: "Available" | "Unavailable" | "Closing"; value: string }>
-  >(() => {
-    const filtered =
-      changeableStatusMetadata?.filter(
-        (option) =>
-          option.key === "Available" ||
-          option.key === "Unavailable" ||
-          option.key === "Closing",
-      ) ?? [];
-
-    const closingLabel =
-      statusMetadata?.find((status) => status.key === "Closing")?.value ??
-      "Đang đóng kho";
-
-    if (filtered.length > 0) {
-      const normalized = filtered as Array<{
-        key: "Available" | "Unavailable" | "Closing";
-        value: string;
-      }>;
-
-      return normalized.some((option) => option.key === "Closing")
-        ? normalized
-        : [...normalized, { key: "Closing", value: closingLabel }];
-    }
-
-    return [
-      { key: "Available", value: "Đang hoạt động" },
-      { key: "Unavailable", value: "Ngưng hoạt động" },
-      { key: "Closing", value: closingLabel },
-    ];
-  }, [changeableStatusMetadata, statusMetadata]);
-
   const statusCfg = buildStatusCfg(statusMetadata);
   const listDepot = allDepotsData?.items.find((d) => d.id === depotId);
   const requests = listDepot?.requests ?? depot?.requests ?? [];
 
   /* ── State ── */
-  const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [initiateOpen, setInitiateOpen] = useState(false);
   const [initiateStep, setInitiateStep] = useState<1 | 2>(1);
@@ -550,6 +523,7 @@ export default function DepotDetailPage() {
   const markExternalMutation = useMarkDepotClosureExternal();
   const initiateTransferMutation = useInitiateDepotClosureTransfer();
   const updateStatusMutation = useUpdateDepotStatus();
+  const initiateClosingMutation = useInitiateDepotClosing();
   const assignManagerMutation = useAssignDepotManager();
   const unassignManagerMutation = useUnassignDepotManager();
   const { data: activeClosureSummary, refetch: refetchActiveClosureSummary } =
@@ -608,7 +582,7 @@ export default function DepotDetailPage() {
           },
           {
             key: "ExternalResolution",
-            value: "Tự xử lý bên ngoài (admin ghi chú cách xử lý)",
+            value: "Tự xử lý bên ngoài (quản trị viên ghi chú cách xử lý)",
           },
         ];
   const resolveActionPending =
@@ -630,10 +604,19 @@ export default function DepotDetailPage() {
     () => new Map(closureInventoryItems.map((item) => [item.itemKey, item])),
     [closureInventoryItems],
   );
+  const currentDepotName = useMemo(
+    () => normalizeDepotName(depot?.name ?? ""),
+    [depot?.name],
+  );
+  const isCurrentDepotChoice = useCallback(
+    (option: { key: number; value: string }) =>
+      option.key === (depot?.id ?? depotId) ||
+      normalizeDepotName(option.value) === currentDepotName,
+    [currentDepotName, depot?.id, depotId],
+  );
   const targetDepotChoices = useMemo(
-    () =>
-      depotOptions.filter((option) => option.key !== (depot?.id ?? depotId)),
-    [depot?.id, depotId, depotOptions],
+    () => depotOptions.filter((option) => !isCurrentDepotChoice(option)),
+    [depotOptions, isCurrentDepotChoice],
   );
 
   const shouldLoadTransferSuggestions =
@@ -689,10 +672,16 @@ export default function DepotDetailPage() {
       }
     }
 
-    return Array.from(map.values()).sort((a, b) =>
-      a.value.localeCompare(b.value, "vi"),
-    );
-  }, [depot?.id, depotId, targetDepotChoices, transferSuggestions]);
+    return Array.from(map.values())
+      .filter((option) => !isCurrentDepotChoice(option))
+      .sort((a, b) => a.value.localeCompare(b.value, "vi"));
+  }, [
+    depot?.id,
+    depotId,
+    isCurrentDepotChoice,
+    targetDepotChoices,
+    transferSuggestions,
+  ]);
 
   const resetTransferAssignments = useCallback(
     (inventoryItems: ClosureInventoryOption[] = closureInventoryItems) => {
@@ -1011,44 +1000,43 @@ export default function DepotDetailPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {transferSuggestionsFetching && (
+                {transferSuggestionsFetching ? (
                   <Badge variant="outline" className="gap-1.5 tracking-tighter">
                     <Spinner size={12} className="animate-spin" />
                     Đang lấy gợi ý
                   </Badge>
+                ) : (
+                  <>
+                    <Badge variant="outline" className="tracking-tighter">
+                      {closureInventoryItems.length} vật phẩm nguồn
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 tracking-tighter"
+                      disabled={!closureInventoryItems.length}
+                      onClick={async () => {
+                        const result = await refetchTransferSuggestions();
+                        if (result.data) {
+                          applyTransferSuggestionsToAssignments(
+                            result.data.suggestedTransfers,
+                          );
+                          toast.success(
+                            "Đã lấy lại gợi ý phân bổ từ hệ thống.",
+                          );
+                        } else {
+                          toast.error(
+                            "Chưa lấy được gợi ý, có thể phân bổ thủ công.",
+                          );
+                        }
+                      }}
+                    >
+                      <ArrowClockwise size={13} />
+                      Lấy gợi ý từ hệ thống
+                    </Button>
+                  </>
                 )}
-                <Badge variant="outline" className="tracking-tighter">
-                  {closureInventoryItems.length} vật phẩm nguồn
-                </Badge>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 tracking-tighter"
-                  disabled={
-                    transferSuggestionsFetching || !closureInventoryItems.length
-                  }
-                  onClick={async () => {
-                    const result = await refetchTransferSuggestions();
-                    if (result.data) {
-                      applyTransferSuggestionsToAssignments(
-                        result.data.suggestedTransfers,
-                      );
-                      toast.success("Đã lấy lại gợi ý phân bổ từ hệ thống.");
-                    } else {
-                      toast.error(
-                        "Chưa lấy được gợi ý. Bạn vẫn có thể phân bổ thủ công.",
-                      );
-                    }
-                  }}
-                >
-                  {transferSuggestionsFetching ? (
-                    <Spinner size={13} className="animate-spin" />
-                  ) : (
-                    <ArrowClockwise size={13} />
-                  )}
-                  Lấy gợi ý từ hệ thống
-                </Button>
               </div>
             </div>
           </div>
@@ -1228,8 +1216,8 @@ export default function DepotDetailPage() {
 
           {transferSuggestionsError && (
             <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-3 text-sm tracking-tighter text-amber-800">
-              Không lấy được gợi ý từ hệ thống. Bạn vẫn có thể phân bổ thủ công
-              bằng form bên dưới.
+              Không lấy được gợi ý từ hệ thống, có thể phân bổ thủ công bằng
+              form bên dưới.
             </div>
           )}
 
@@ -1319,8 +1307,12 @@ export default function DepotDetailPage() {
                         mergedTargetDepotChoices
                           .filter(
                             (option) =>
-                              String(option.key) === assignment.targetDepotId ||
-                              !selectedTargetDepotIds.has(String(option.key)),
+                              !isCurrentDepotChoice(option) &&
+                              (String(option.key) ===
+                                assignment.targetDepotId ||
+                                !selectedTargetDepotIds.has(
+                                  String(option.key),
+                                )),
                           )
                           .map(
                             (option) => [String(option.key), option] as const,
@@ -1413,15 +1405,19 @@ export default function DepotDetailPage() {
                                   avoidCollisions={false}
                                   className="z-[10000] w-(--radix-select-trigger-width)"
                                 >
-                                  {availableTargetDepotChoices.map((option) => (
-                                    <SelectItem
-                                      key={option.key}
-                                      value={String(option.key)}
-                                      className="text-sm tracking-tighter"
-                                    >
-                                      {option.value}
-                                    </SelectItem>
-                                  ))}
+                                  {availableTargetDepotChoices
+                                    .filter(
+                                      (option) => !isCurrentDepotChoice(option),
+                                    )
+                                    .map((option) => (
+                                      <SelectItem
+                                        key={option.key}
+                                        value={String(option.key)}
+                                        className="text-sm tracking-tighter"
+                                      >
+                                        {option.value}
+                                      </SelectItem>
+                                    ))}
                                 </SelectContent>
                               </Select>
                             </div>
@@ -1588,6 +1584,7 @@ export default function DepotDetailPage() {
       closureInventoryItems,
       getAssignedQuantityExcludingRow,
       hasUnallocatedSuggestion,
+      isCurrentDepotChoice,
       itemTypes,
       mergedTargetDepotChoices,
       removeTransferAssignment,
@@ -1703,7 +1700,7 @@ export default function DepotDetailPage() {
   }
 
   async function handleDepotStatusChange(
-    nextStatus: "Available" | "Unavailable" | "Closing",
+    nextStatus: "Available" | "Unavailable",
   ) {
     if (!depot || depot.status === nextStatus) return;
 
@@ -1715,9 +1712,7 @@ export default function DepotDetailPage() {
       toast.success(
         nextStatus === "Unavailable"
           ? "Đã chuyển kho sang trạng thái ngưng hoạt động."
-          : nextStatus === "Closing"
-            ? "Đã chuyển kho sang trạng thái đang đóng kho."
-            : "Đã mở lại trạng thái hoạt động cho kho.",
+          : "Đã mở lại trạng thái hoạt động cho kho.",
       );
       handleRefresh();
     } catch (err) {
@@ -1725,73 +1720,163 @@ export default function DepotDetailPage() {
     }
   }
 
-  function handleInitiate() {
+  async function handleInitiate() {
     if (!depot || !initiateReason.trim()) return;
-    initiateMutation.mutate(
-      { id: depot.id, reason: initiateReason.trim() },
-      {
-        onSuccess: (res) => {
-          const requiresResolution =
-            res.httpStatus === 409 || Boolean(res.requiresResolution);
-          const closureStatus =
-            res.closureStatus ??
-            (requiresResolution ? "InProgress" : "Completed");
-          const closingTimeoutAt =
-            res.closingTimeoutAt ?? res.timeoutAt ?? null;
+    try {
+      await initiateClosingMutation.mutateAsync({ id: depot.id });
+    } catch (err) {
+      toast.error(
+        getApiError(err, "Không thể chuyển kho sang trạng thái đang đóng."),
+      );
+      return;
+    }
 
-          if (requiresResolution) {
-            const normalizedRemainingInventoryItems =
-              normalizeClosureInventoryItems(
-                res.remainingInventoryItems ?? res.remainingItems ?? [],
-              );
-            setInitiateResult({
-              closureId: res.closureId ?? 0,
-              closureStatus,
-              closingTimeoutAt,
-              timeoutAt: res.timeoutAt ?? null,
-              inventorySummary: res.inventorySummary ?? null,
-              remainingInventoryItems:
-                res.remainingInventoryItems ?? res.remainingItems ?? [],
-            });
-            setResolutionType("TransferToDepot");
-            resetTransferAssignments(normalizedRemainingInventoryItems);
-            setExternalNote("");
-            setIsTransferDialogExpanded(false);
-            setInitiateStep(2);
-            handleRefresh();
-          } else {
-            setInitiateOpen(false);
-            setInitiateStep(1);
-            setInitiateResult(null);
-            setIsTransferDialogExpanded(false);
+    try {
+      const res = await initiateMutation.mutateAsync({
+        id: depot.id,
+        reason: initiateReason.trim(),
+      });
 
-            if (closureStatus === "Processing") {
-              toast.info(
-                "Hệ thống đang xử lý phiên đóng kho. Màn hình sẽ cập nhật ngay khi sẵn sàng.",
-              );
-            } else if (closureStatus === "TransferPending") {
-              toast.success(
-                "Đã chọn chuyển kho. Đang chờ hai bên quản lý kho xác nhận giao nhận.",
-              );
-            } else if (closureStatus === "Completed") {
-              toast.success("Kho trống — đã đóng thành công!");
-            } else if (closureStatus === "Cancelled") {
-              toast.error("Phiên đóng kho hiện tại đã bị hủy.");
-            } else if (closureStatus === "TimedOut") {
-              toast.error(
-                "Phiên đóng kho đã hết thời hạn và kho đã tự khôi phục.",
-              );
-            } else {
-              toast.success(res.message || "Đã cập nhật trạng thái đóng kho.");
-            }
+      const requiresResolution =
+        res.httpStatus === 409 || Boolean(res.requiresResolution);
+      const closureStatus =
+        res.closureStatus ?? (requiresResolution ? "InProgress" : "Completed");
+      const closingTimeoutAt = res.closingTimeoutAt ?? res.timeoutAt ?? null;
 
-            handleRefresh();
-          }
-        },
-        onError: (err) =>
-          toast.error(getApiError(err, "Không thể khởi tạo đóng kho.")),
-      },
+      if (requiresResolution) {
+        const normalizedRemainingInventoryItems =
+          normalizeClosureInventoryItems(
+            res.remainingInventoryItems ?? res.remainingItems ?? [],
+          );
+        setInitiateResult({
+          closureId: res.closureId ?? 0,
+          closureStatus,
+          closingTimeoutAt,
+          timeoutAt: res.timeoutAt ?? null,
+          inventorySummary: res.inventorySummary ?? null,
+          remainingInventoryItems:
+            res.remainingInventoryItems ?? res.remainingItems ?? [],
+        });
+        setResolutionType("TransferToDepot");
+        resetTransferAssignments(normalizedRemainingInventoryItems);
+        setExternalNote("");
+        setIsTransferDialogExpanded(false);
+        setInitiateStep(2);
+        handleRefresh();
+        return;
+      }
+
+      setInitiateOpen(false);
+      setInitiateStep(1);
+      setInitiateResult(null);
+      setIsTransferDialogExpanded(false);
+
+      if (closureStatus === "Processing") {
+        toast.info(
+          "Hệ thống đang xử lý phiên đóng kho. Màn hình sẽ cập nhật ngay khi sẵn sàng.",
+        );
+      } else if (closureStatus === "TransferPending") {
+        toast.success(
+          "Đã chọn chuyển kho. Đang chờ hai bên quản lý kho xác nhận giao nhận.",
+        );
+      } else if (closureStatus === "Completed") {
+        toast.success("Kho trống — đã đóng thành công!");
+      } else if (closureStatus === "Cancelled") {
+        toast.error("Phiên đóng kho hiện tại đã bị hủy.");
+      } else if (closureStatus === "TimedOut") {
+        toast.error("Phiên đóng kho đã hết thời hạn và kho đã tự khôi phục.");
+      } else {
+        toast.success(res.message || "Đã cập nhật trạng thái đóng kho.");
+      }
+
+      handleRefresh();
+    } catch (err) {
+      handleRefresh();
+      toast.error(getApiError(err, "Không thể khởi tạo đóng kho."));
+    }
+  }
+
+  function hydrateClosureResolutionFromResponse(
+    res: InitiateDepotClosureResponse,
+  ): boolean {
+    const requiresResolution =
+      res.httpStatus === 409 || Boolean(res.requiresResolution);
+
+    if (!requiresResolution) {
+      return false;
+    }
+
+    const closureStatus = res.closureStatus ?? "InProgress";
+    const closingTimeoutAt = res.closingTimeoutAt ?? res.timeoutAt ?? null;
+    const normalizedRemainingInventoryItems = normalizeClosureInventoryItems(
+      res.remainingInventoryItems ?? res.remainingItems ?? [],
     );
+
+    setInitiateResult({
+      closureId: res.closureId ?? 0,
+      closureStatus,
+      closingTimeoutAt,
+      timeoutAt: res.timeoutAt ?? null,
+      inventorySummary: res.inventorySummary ?? null,
+      remainingInventoryItems:
+        res.remainingInventoryItems ?? res.remainingItems ?? [],
+    });
+    setResolutionType("TransferToDepot");
+    resetTransferAssignments(normalizedRemainingInventoryItems);
+    setExternalNote("");
+    setIsTransferDialogExpanded(false);
+
+    return true;
+  }
+
+  async function handleResumeClosureResolution() {
+    if (!depot) return;
+
+    const resumeReason =
+      activeClosure?.closeReason?.trim() ||
+      initiateReason.trim() ||
+      "Đóng kho và điều phối hàng tồn sang kho đích";
+
+    try {
+      const res = await initiateMutation.mutateAsync({
+        id: depot.id,
+        reason: resumeReason,
+      });
+
+      const restored = hydrateClosureResolutionFromResponse(res);
+      handleRefresh();
+
+      if (!restored) {
+        toast.info(
+          res.message ||
+            "Phiên đóng kho hiện tại không còn ở bước chọn phương án xử lý tồn kho.",
+        );
+        return;
+      }
+
+      setInitiateReason(resumeReason);
+      setInitiateOpen(false);
+      setInitiateStep(1);
+      setResolveOpen(true);
+    } catch (err) {
+      toast.error(
+        getApiError(err, "Không thể khôi phục dữ liệu xử lý tồn kho."),
+      );
+    }
+  }
+
+  async function handleOpenResolveDialog() {
+    setResolutionType("TransferToDepot");
+    setExternalNote("");
+    setIsTransferDialogExpanded(false);
+
+    if (closureInventoryItems.length > 0) {
+      resetTransferAssignments();
+      setResolveOpen(true);
+      return;
+    }
+
+    await handleResumeClosureResolution();
   }
 
   function handleResolve() {
@@ -2185,64 +2270,28 @@ export default function DepotDetailPage() {
               </div>
 
               <div className="p-5 xl:mt-auto">
-                {depot.status !== "Closed" && (
+                {canUpdateOperationalStatus && (
                   <div>
                     <p className="pb-2 font-semibold text-sm uppercase tracking-tighter text-muted-foreground">
                       Chuyển trạng thái kho
                     </p>
                     <div className="flex items-center gap-2">
-                      <Select
-                        value={selectedStatus || depot.status}
-                        onValueChange={setSelectedStatus}
-                        disabled={updateStatusMutation.isPending}
-                      >
-                        <SelectTrigger className="h-11! flex-1 rounded-md shadow-none font-medium bg-background border-border/60 py-0">
-                          <SelectValue placeholder="Chọn trạng thái" />
-                        </SelectTrigger>
-                        <SelectContent
-                          position="popper"
-                          side="bottom"
-                          avoidCollisions={false}
-                        >
-                          {changeableStatusOptions.map((option) => (
-                            <SelectItem
-                              key={option.key}
-                              value={option.key}
-                              className="cursor-pointer"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={cn(
-                                    "w-2 h-2 rounded-full",
-                                    option.key === "Available"
-                                      ? "bg-emerald-500"
-                                      : option.key === "Closing"
-                                        ? "bg-red-500"
-                                        : "bg-yellow-500",
-                                  )}
-                                />
-                                {option.value}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                       <Button
-                        className="h-11 px-6 font-semibold tracking-tighter shadow-none shrink-0"
+                        className={cn(
+                          "h-11 w-full px-6 font-semibold tracking-tighter shadow-none",
+                          depot.status === "Available"
+                            ? "bg-amber-500 text-white hover:bg-amber-600"
+                            : "bg-emerald-600 text-white hover:bg-emerald-700",
+                        )}
                         variant="default"
-                        disabled={
-                          updateStatusMutation.isPending ||
-                          (selectedStatus || depot.status) === depot.status ||
-                          !selectedStatus
+                        disabled={updateStatusMutation.isPending}
+                        onClick={() =>
+                          handleDepotStatusChange(
+                            depot.status === "Available"
+                              ? "Unavailable"
+                              : "Available",
+                          )
                         }
-                        onClick={() => {
-                          if (
-                            selectedStatus &&
-                            selectedStatus !== depot.status
-                          ) {
-                            handleDepotStatusChange(selectedStatus as any);
-                          }
-                        }}
                       >
                         {updateStatusMutation.isPending && (
                           <Icon
@@ -2252,7 +2301,9 @@ export default function DepotDetailPage() {
                             className="mr-2"
                           />
                         )}
-                        Thực hiện
+                        {depot.status === "Available"
+                          ? "Tạm ngưng hoạt động"
+                          : "Kích hoạt"}
                       </Button>
                     </div>
                   </div>
@@ -2304,8 +2355,7 @@ export default function DepotDetailPage() {
                     </>
                   )}
 
-                  {(depot.status === "Unavailable" ||
-                    depot.status === "Closing") && (
+                  {canInitiateClosure && (
                     <Button
                       className="h-12 w-full rounded-md border border-red-700 bg-red-600 px-5 text-base font-bold text-white transition-colors hover:border-red-800 hover:bg-red-700 hover:text-white shadow-none"
                       variant="outline"
@@ -2317,28 +2367,31 @@ export default function DepotDetailPage() {
                       }}
                     >
                       <LockIcon size={24} />
-                      Bắt đầu đóng kho
+                      Đóng kho
                     </Button>
                   )}
 
                   {depot.status === "Closing" && shouldShowResolveButton && (
                     <Button
                       className="h-12 w-full rounded-md bg-foreground px-5 text-base font-semibold text-background hover:bg-foreground/90 shadow-none"
+                      disabled={initiateMutation.isPending}
                       onClick={() => {
-                        setResolutionType("TransferToDepot");
-                        resetTransferAssignments();
-                        setExternalNote("");
-                        setIsTransferDialogExpanded(false);
-                        setResolveOpen(true);
+                        void handleOpenResolveDialog();
                       }}
                     >
-                      <Icon
-                        icon="lsicon:goods-outline"
-                        width="18"
-                        height="18"
-                        className="mr-2"
-                      />
-                      Chọn phương án xử lý tồn kho
+                      {initiateMutation.isPending ? (
+                        <Spinner size={18} className="mr-2 animate-spin" />
+                      ) : (
+                        <Icon
+                          icon="lsicon:goods-outline"
+                          width="18"
+                          height="18"
+                          className="mr-2"
+                        />
+                      )}
+                      {closureInventoryItems.length > 0
+                        ? "Chọn phương án xử lý tồn kho"
+                        : "Khôi phục dữ liệu xử lý tồn kho"}
                     </Button>
                   )}
 
@@ -2620,14 +2673,14 @@ export default function DepotDetailPage() {
                     const s = currentTransferStatus;
                     const cls =
                       s === "AwaitingPreparation"
-                        ? "bg-zinc-100 border-zinc-300 text-zinc-600 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400"
+                        ? "bg-zinc-500/10 text-zinc-600 dark:text-zinc-400"
                         : s === "Preparing"
-                          ? "bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-950/40 dark:border-amber-700 dark:text-amber-300"
+                          ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
                           : s === "Shipping"
-                            ? "bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-600 dark:text-blue-300"
+                            ? "bg-blue-500/10 text-blue-700 dark:text-blue-300"
                             : s === "Completed"
-                              ? "bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-300"
-                              : "bg-muted border-border text-muted-foreground";
+                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                              : "bg-muted/60 text-muted-foreground";
                     const lbl: Record<string, string> = {
                       AwaitingPreparation: "Chờ chuẩn bị",
                       Preparing: "Đang chuẩn bị",
@@ -2637,7 +2690,7 @@ export default function DepotDetailPage() {
                     return (
                       <span
                         className={cn(
-                          "text-sm font-semibold tracking-tighter px-2 py-1 rounded-md border",
+                          "inline-flex items-center rounded-md px-2.5 py-1.5 text-[13px] font-semibold tracking-tighter",
                           cls,
                         )}
                       >
@@ -3262,10 +3315,11 @@ export default function DepotDetailPage() {
                   Xác nhận đóng kho
                 </DialogTitle>
                 <DialogDescription className="tracking-tighter">
-                  Kho:{" "}
+                  Bạn có chắc chắn muốn đóng kho{" "}
                   <span className="text-primary font-semibold">
                     {depot.name}
                   </span>
+                  ?
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-1">
@@ -3281,19 +3335,19 @@ export default function DepotDetailPage() {
                     {depot.capacity.toLocaleString("vi-VN")}
                   </span>
                 </div>
-                {/* {depot.currentUtilization > 0 && (
-                  <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-                    <WarningCircle
-                      size={15}
-                      className="text-amber-500 shrink-0 mt-0.5"
-                      weight="fill"
-                    />
-                    <p className="text-sm text-amber-800 dark:text-amber-300 tracking-tighter leading-relaxed">
-                      Kho đang có hàng — sau khi xác nhận sẽ chuyển sang{" "}
-                      <strong>Đang đóng</strong>.
-                    </p>
-                  </div>
-                )} */}
+                <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
+                  <WarningCircle
+                    size={16}
+                    className="mt-0.5 shrink-0 text-amber-500"
+                    weight="fill"
+                  />
+                  <p className="text-sm leading-relaxed tracking-tighter text-amber-800 dark:text-amber-300">
+                    Sau khi xác nhận, hệ thống sẽ chuyển kho sang trạng thái{" "}
+                    <strong>Đóng kho</strong> và bắt đầu quy trình đóng kho. Kho
+                    sẽ không thể hoạt động lại như trước, nên mọi thao tác tiếp
+                    theo đều có thể ảnh hưởng đến toàn hệ thống.
+                  </p>
+                </div>
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="initiate-reason"
@@ -3323,11 +3377,14 @@ export default function DepotDetailPage() {
                   variant="destructive"
                   className="tracking-tighter gap-1.5"
                   disabled={
-                    !initiateReason.trim() || initiateMutation.isPending
+                    !initiateReason.trim() ||
+                    initiateClosingMutation.isPending ||
+                    initiateMutation.isPending
                   }
                   onClick={handleInitiate}
                 >
-                  {initiateMutation.isPending && (
+                  {(initiateClosingMutation.isPending ||
+                    initiateMutation.isPending) && (
                     <Spinner size={13} className="animate-spin" />
                   )}
                   Xác nhận đóng kho
@@ -3422,7 +3479,7 @@ export default function DepotDetailPage() {
                       <Label className="text-sm font-semibold tracking-tighter">
                         Phương án xử lý <span className="text-red-500">*</span>
                       </Label>
-                      <div className="grid gap-2 mt-1">
+                      <div className="mt-1 grid gap-2 md:grid-cols-2">
                         {resolutionTypes.map((opt) => (
                           <button
                             key={opt.key}
@@ -3433,7 +3490,7 @@ export default function DepotDetailPage() {
                               )
                             }
                             className={cn(
-                              "flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
+                              "flex h-full items-center gap-3 rounded-xl border p-3 text-left transition-all",
                               resolutionType === opt.key
                                 ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                                 : "border-border/60 hover:border-border hover:bg-muted/30",
@@ -3560,7 +3617,7 @@ export default function DepotDetailPage() {
           className={
             resolutionType === "TransferToDepot"
               ? transferDialogClassName
-              : "sm:max-w-lg"
+              : "w-[min(100vw-2rem,960px)] sm:max-w-[960px]"
           }
         >
           {resolutionType === "TransferToDepot" && (
@@ -3600,7 +3657,7 @@ export default function DepotDetailPage() {
                   <Label className="text-sm font-semibold tracking-tighter">
                     Phương án xử lý <span className="text-red-500">*</span>
                   </Label>
-                  <div className="grid gap-2">
+                  <div className="grid gap-2 md:grid-cols-2">
                     {resolutionTypes.map((opt) => (
                       <button
                         key={opt.key}
@@ -3609,7 +3666,7 @@ export default function DepotDetailPage() {
                           setResolutionType(opt.key as typeof resolutionType)
                         }
                         className={cn(
-                          "flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all",
+                          "flex h-full items-center gap-3 rounded-xl border p-3.5 text-left transition-all",
                           resolutionType === opt.key
                             ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                             : "border-border/60 hover:border-border hover:bg-muted/30",

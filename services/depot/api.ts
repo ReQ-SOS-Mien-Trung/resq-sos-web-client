@@ -14,11 +14,12 @@ import {
   GetAvailableDepotManagersParams,
   DepotActiveManager,
   ManagedDepotSummary,
-  DepotFund,
   MyDepotFund,
   UpdateDepotRequest,
   UpdateDepotStatusRequest,
   UpdateDepotStatusResponse,
+  InitiateDepotClosingRequest,
+  InitiateDepotClosingResponse,
   AssignDepotManagerRequest,
   UnassignDepotManagerRequest,
   DepotManagerAssignmentResponse,
@@ -260,6 +261,19 @@ export async function updateDepotStatus(
     {
       params: { Status: request.status },
     },
+  );
+  return data;
+}
+
+/**
+ * Move depot to Closing status before starting the closure workflow
+ * POST /logistics/depot/{id}/status/closing
+ */
+export async function initiateDepotClosing(
+  request: InitiateDepotClosingRequest,
+): Promise<InitiateDepotClosingResponse> {
+  const { data } = await api.post(
+    `/logistics/depot/${request.id}/status/closing`,
   );
   return data;
 }

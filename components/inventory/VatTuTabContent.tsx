@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   useMyDepotInventory,
@@ -20,10 +20,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { InventoryItemEntity } from "@/services/inventory/type";
 
 interface VatTuSectionProps {
+  refreshNonce?: number;
   onItemSelect?: (item: InventoryItemEntity) => void;
 }
 
-export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
+export function VatTuSection({
+  refreshNonce = 0,
+  onItemSelect,
+}: VatTuSectionProps) {
   const { selectedDepotId } = useManagerDepot();
   const [page, setPage] = useState(1);
   const [selectedCategoryCodes, setSelectedCategoryCodes] = useState<string[]>(
@@ -44,6 +48,7 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
     data: inventoryData,
     isLoading,
     isError,
+    refetch: refetchInventory,
   } = useMyDepotInventory({
     depotId: selectedDepotId ?? 0,
     pageNumber: page,
@@ -55,6 +60,14 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
   }, {
     enabled: Boolean(selectedDepotId),
   });
+
+  useEffect(() => {
+    if (!selectedDepotId) {
+      return;
+    }
+
+    refetchInventory();
+  }, [refreshNonce, refetchInventory, selectedDepotId]);
 
   const toggleCategory = (code: string) => {
     setSelectedCategoryCodes((prev) =>

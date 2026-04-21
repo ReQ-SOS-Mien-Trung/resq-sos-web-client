@@ -4,6 +4,10 @@ import type { NotificationRouteData } from "./type";
 function normalizeType(type: string): string {
   return String(type ?? "")
     .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_")
     .toLowerCase();
 }
 
@@ -39,6 +43,40 @@ export function buildDepotClosureTransferRoute(
   return `/dashboard/inventory/depot-closure?${params.toString()}`;
 }
 
+function buildCoordinatorChatRoute(
+  data?: NotificationRouteData | null,
+): string | null {
+  const conversationId = toPositiveInt(data?.conversationId);
+  if (!conversationId) {
+    return null;
+  }
+
+  return `/dashboard/coordinator/chat?conversationId=${conversationId}`;
+}
+
+function buildInventoryRequestRoute(
+  tab: "incoming" | "shipments",
+  data?: NotificationRouteData | null,
+): string {
+  const requestId = toPositiveInt(data?.requestId ?? data?.supplyRequestId);
+  const params = new URLSearchParams({ tab });
+
+  if (requestId) {
+    params.set("requestId", String(requestId));
+  }
+
+  return `/dashboard/inventory?${params.toString()}`;
+}
+
+function buildAssemblyPointRoute(data?: NotificationRouteData | null): string {
+  const assemblyPointId = toPositiveInt(data?.assemblyPointId);
+  if (!assemblyPointId) {
+    return "/dashboard/admin/assembly-points";
+  }
+
+  return `/dashboard/admin/assembly-points?assemblyPointId=${assemblyPointId}`;
+}
+
 function resolveFloodRouteByRole(roleId?: number): string {
   if (roleId === ROLES.ADMIN) {
     return "/dashboard/admin/weather-flood";
@@ -61,6 +99,11 @@ export function resolveNotificationRoute(
     return explicitUrl;
   }
 
+  const coordinatorChatRoute = buildCoordinatorChatRoute(data);
+  if (coordinatorChatRoute) {
+    return coordinatorChatRoute;
+  }
+
   const depotClosureRoute = buildDepotClosureTransferRoute(data);
   if (depotClosureRoute) {
     return depotClosureRoute;
@@ -69,7 +112,7 @@ export function resolveNotificationRoute(
   const normalizedType = normalizeType(type);
 
   if (normalizedType === "chat_message") {
-    return "/dashboard/coordinator/chat";
+    return buildCoordinatorChatRoute(data) ?? "/dashboard/coordinator/chat";
   }
 
   if (normalizedType === "fund_allocation") {
@@ -83,7 +126,7 @@ export function resolveNotificationRoute(
     normalizedType === "supply_request_urgent_escalation" ||
     normalizedType === "supply_request_auto_rejected"
   ) {
-    return "/dashboard/inventory?tab=incoming";
+    return buildInventoryRequestRoute("incoming", data);
   }
 
   if (
@@ -93,7 +136,28 @@ export function resolveNotificationRoute(
     normalizedType === "supply_shipped" ||
     normalizedType === "supply_completed"
   ) {
-    return "/dashboard/inventory?tab=shipments";
+    return buildInventoryRequestRoute("shipments", data);
+  }
+
+  if (
+    normalizedType === "depot_closure_transfer_assigned" ||
+    normalizedType === "depot_closure_transfer_ready" ||
+    normalizedType === "depot_closure_transfer_completed" ||
+    normalizedType === "depot_closure_transfer_received" ||
+    normalizedType === "depot_closure_processing_required" ||
+    normalizedType === "depot_closure_processing" ||
+    normalizedType === "depot_closure_completed"
+  ) {
+    return depotClosureRoute ?? "/dashboard/inventory/depot-closure";
+  }
+
+  if (
+    normalizedType === "assembly_checkin" ||
+    normalizedType === "assembly_checkout" ||
+    normalizedType === "assembly_gathering" ||
+    normalizedType === "assembly_point_assignment"
+  ) {
+    return buildAssemblyPointRoute(data);
   }
 
   if (

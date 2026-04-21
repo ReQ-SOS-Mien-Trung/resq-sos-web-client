@@ -34,7 +34,6 @@ import {
   Warehouse,
   X,
   CheckCircle,
-  WarningCircle,
   ArrowClockwise,
   CaretLeft,
   CaretRight,
@@ -46,6 +45,7 @@ import {
   MapPin,
   Users,
   ImageSquare,
+  UserIcon,
 } from "@phosphor-icons/react";
 import { Icon as IconifyIcon } from "@iconify/react";
 import { toast } from "sonner";
@@ -154,7 +154,7 @@ function buildStatusCfg(apiStatuses?: DepotStatusMetadata[]): StatusCfgMap {
 }
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
-const CAPACITY_PRESETS = [1000000, 2000000, 5000000];
+const CAPACITY_PRESETS = [500, 1000, 2000, 5000, 10000];
 
 function formatAmountWithDot(raw: string): string {
   const digits = raw.replace(/\D/g, "");
@@ -400,6 +400,7 @@ export default function DepotsPage() {
     name: "",
     address: "",
     capacity: "",
+    weightCapacity: "",
     latitude: "",
     longitude: "",
     managerId: "",
@@ -547,6 +548,42 @@ export default function DepotsPage() {
     }
   }
 
+  async function geocodeAddressFromInput() {
+    const query = newDepot.address.trim();
+    if (!query) {
+      toast.error("Vui lòng nhập địa chỉ cần xác định.");
+      return;
+    }
+
+    setIsResolvingAddress(true);
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error("geocode failed");
+
+      const json = (await res.json()) as {
+        results?: Array<{ lat: string; lon: string; display_name: string }>;
+      };
+      const firstResult = json.results?.[0];
+
+      if (!firstResult) {
+        toast.error("Không tìm thấy địa chỉ phù hợp.");
+        return;
+      }
+
+      setNewDepot((prev) => ({
+        ...prev,
+        address: firstResult.display_name || query,
+        latitude: Number(firstResult.lat).toFixed(6),
+        longitude: Number(firstResult.lon).toFixed(6),
+      }));
+      toast.success("Đã xác định địa chỉ và cập nhật vị trí trên bản đồ.");
+    } catch {
+      toast.error("Không thể xác định địa chỉ, vui lòng thử lại.");
+    } finally {
+      setIsResolvingAddress(false);
+    }
+  }
+
   function handleMapPick(lat: number, lng: number) {
     setNewDepot((prev) => ({
       ...prev,
@@ -581,6 +618,7 @@ export default function DepotsPage() {
       name: "",
       address: "",
       capacity: "",
+      weightCapacity: "",
       latitude: "",
       longitude: "",
       managerId: "",
@@ -596,6 +634,7 @@ export default function DepotsPage() {
     const name = newDepot.name.trim();
     const address = newDepot.address.trim();
     const capacity = Number(newDepot.capacity.replaceAll(".", ""));
+    const weightCapacity = Number(newDepot.weightCapacity.replaceAll(".", ""));
     const latitude = Number(newDepot.latitude);
     const longitude = Number(newDepot.longitude);
 
@@ -604,7 +643,11 @@ export default function DepotsPage() {
       return;
     }
     if (!Number.isFinite(capacity) || capacity <= 0) {
-      toast.error("Sức chứa phải lớn hơn 0.");
+      toast.error("Sức chứa thể tích phải lớn hơn 0.");
+      return;
+    }
+    if (!Number.isFinite(weightCapacity) || weightCapacity <= 0) {
+      toast.error("Sức chứa khối lượng phải lớn hơn 0.");
       return;
     }
     if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
@@ -638,6 +681,7 @@ export default function DepotsPage() {
       name,
       address,
       capacity,
+      weightCapacity,
       latitude,
       longitude,
       ...(newDepot.managerId ? { managerId: newDepot.managerId } : {}),
@@ -924,7 +968,7 @@ export default function DepotsPage() {
           if (!open) resetCreateForm();
         }}
       >
-        <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="tracking-tighter text-2xl">
               Tạo kho mới
@@ -943,7 +987,7 @@ export default function DepotsPage() {
                   newDepot.longitude ? Number(newDepot.longitude) : undefined
                 }
                 onPick={handleMapPick}
-                height={310}
+                height={385}
               />
 
               <div className="grid grid-cols-2 gap-3">
@@ -996,12 +1040,18 @@ export default function DepotsPage() {
                   onChange={(e) =>
                     setNewDepot((p) => ({ ...p, address: e.target.value }))
                   }
-                  placeholder="Chọn điểm trên bản đồ để lấy địa chỉ"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void geocodeAddressFromInput();
+                    }
+                  }}
+                  placeholder="Nhập địa chỉ rồi nhấn Enter để định vị"
                   className="tracking-tighter"
                 />
                 {isResolvingAddress && (
                   <p className="text-xs text-muted-foreground tracking-tighter">
-                    Đang đọc địa chỉ từ map...
+                    Đang xác định địa chỉ và tọa độ...
                   </p>
                 )}
               </div>
@@ -1009,7 +1059,7 @@ export default function DepotsPage() {
               <div className="space-y-1.5">
                 <Label className="tracking-tighter flex items-center gap-1.5">
                   <Users size={14} className="text-blue-500" />
-                  Mức tồn kho tối đa
+                  Sức chứa thể tích (dm³)
                 </Label>
                 <div className="flex flex-wrap gap-2">
                   {CAPACITY_PRESETS.map((preset) => (
@@ -1044,13 +1094,36 @@ export default function DepotsPage() {
                       capacity: formatAmountWithDot(e.target.value),
                     }))
                   }
-                  placeholder="Ví dụ: 1.000.000"
+                  placeholder="Ví dụ: 1.000"
                   className="tracking-tighter"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="tracking-tighter">Quản kho</Label>
+                <Label className="tracking-tighter flex items-center gap-1.5">
+                  <Users size={14} className="text-emerald-500" />
+                  Sức chứa khối lượng (kg)
+                </Label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={newDepot.weightCapacity}
+                  onChange={(e) =>
+                    setNewDepot((p) => ({
+                      ...p,
+                      weightCapacity: formatAmountWithDot(e.target.value),
+                    }))
+                  }
+                  placeholder="Ví dụ: 10.000"
+                  className="tracking-tighter"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="tracking-tighter flex items-center gap-1.5">
+                  <UserIcon size={14} className="text-orange-500" />
+                  Quản kho
+                </Label>
                 <Select
                   value={newDepot.managerId || "__none"}
                   onValueChange={(value) =>

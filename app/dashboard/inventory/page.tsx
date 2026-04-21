@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import { mockInventoryItems, mockShipments } from "@/lib/mock-data";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { cn } from "@/lib/utils";
@@ -35,7 +36,6 @@ import {
   WalletIcon,
   SunIcon,
   MoonIcon,
-  LockIcon,
   WarehouseIcon,
 } from "@phosphor-icons/react";
 import {
@@ -48,11 +48,13 @@ import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
 import SupplyRequestTracker from "@/components/inventory/SupplyRequestTracker";
 import DepotChartsSection from "@/components/inventory/DepotChartsSection";
+import { DepotClosurePanel } from "@/components/inventory";
 import {
   InventoryItemEntity,
   SupplyRequestListItem,
 } from "@/services/inventory/type";
 import {
+  INVENTORY_KEYS,
   useMyDepotQuantityByCategory,
   useSupplyRequests,
 } from "@/services/inventory/hooks";
@@ -180,6 +182,7 @@ const INVENTORY_TABS = new Set([
   "vattu",
   "shipments",
   "supply-management",
+  "depot-closure",
 ]);
 
 function resolveInventoryTab(rawTab: string | null): string {
@@ -206,6 +209,7 @@ const InventoryDashboardPage = () => {
   const [vatTuSelectedItem, setVatTuSelectedItem] =
     useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
+  const [vatTuRefreshNonce, setVatTuRefreshNonce] = useState(0);
   const [requestsPageNumber, setRequestsPageNumber] = useState(1);
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
@@ -214,6 +218,7 @@ const InventoryDashboardPage = () => {
   const sidebarRef = useRef<HTMLElement>(null);
 
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const handleActiveTabChange = useCallback(
     (tab: string) => {
@@ -241,6 +246,23 @@ const InventoryDashboardPage = () => {
       );
     },
     [router, searchParams],
+  );
+
+  const navigateFromInventory = useCallback(
+    (destination: string) => {
+      if (activeTab === "depot-closure" && typeof window !== "undefined") {
+        window.history.replaceState(
+          window.history.state,
+          "",
+          "/dashboard/inventory",
+        );
+        window.location.assign(destination);
+        return;
+      }
+
+      router.push(destination);
+    },
+    [activeTab, router],
   );
 
   // ── Auth ──
@@ -447,7 +469,14 @@ const InventoryDashboardPage = () => {
     refetchDepots();
     refetchCategories();
     refetchQuantityByCategory();
-  }, [refetchDepots, refetchCategories, refetchQuantityByCategory]);
+    queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    setVatTuRefreshNonce((prev) => prev + 1);
+  }, [
+    queryClient,
+    refetchDepots,
+    refetchCategories,
+    refetchQuantityByCategory,
+  ]);
 
   // ── Loading state ──
   if (isDepotsLoading || isCategoriesLoading || isSupplyRequestsLoading) {
@@ -594,7 +623,9 @@ const InventoryDashboardPage = () => {
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem
                 className="gap-2 cursor-pointer tracking-tighter"
-                onClick={() => router.push("/dashboard/inventory/import")}
+                onClick={() =>
+                  navigateFromInventory("/dashboard/inventory/import")
+                }
               >
                 <BuildingsIcon className="h-4 w-4" />
                 Nhập kho từ thiện
@@ -602,7 +633,7 @@ const InventoryDashboardPage = () => {
               <DropdownMenuItem
                 className="gap-2 cursor-pointer tracking-tighter"
                 onClick={() =>
-                  router.push("/dashboard/inventory/import-regular")
+                  navigateFromInventory("/dashboard/inventory/import-regular")
                 }
               >
                 <PackageIcon className="h-4 w-4" />
@@ -614,7 +645,9 @@ const InventoryDashboardPage = () => {
             variant="outline"
             size="sm"
             className="hidden md:flex gap-2"
-            onClick={() => router.push("/dashboard/inventory/export-report")}
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/export-report")
+            }
           >
             <FileArrowDownIcon className="h-4 w-4" />
             Xuất báo cáo
@@ -623,7 +656,9 @@ const InventoryDashboardPage = () => {
             variant="outline"
             size="sm"
             className="hidden md:flex gap-2"
-            onClick={() => router.push("/dashboard/inventory/stock-movements")}
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/stock-movements")
+            }
           >
             <FileTextIcon className="h-4 w-4" />
             Xem biến động kho
@@ -631,8 +666,10 @@ const InventoryDashboardPage = () => {
           <Button
             variant="outline"
             size="sm"
-            className="hidden md:flex gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
-            onClick={() => router.push("/dashboard/inventory/pickups")}
+            className="hidden md:flex gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/pickups")
+            }
           >
             <TruckIcon className="h-4 w-4" />
             Quản lý giao nhận
@@ -640,8 +677,10 @@ const InventoryDashboardPage = () => {
           <Button
             variant="outline"
             size="sm"
-            className="hidden md:flex gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
-            onClick={() => router.push("/dashboard/inventory/funding-request")}
+            className="hidden md:flex gap-2 border-green-200 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-950/30"
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/funding-request")
+            }
           >
             <WalletIcon className="h-4 w-4" />
             Quản lý quỹ kho
@@ -649,11 +688,13 @@ const InventoryDashboardPage = () => {
           <Button
             variant="outline"
             size="sm"
-            className="hidden md:flex gap-2 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
-            onClick={() => router.push("/dashboard/inventory/depot-closure")}
+            className="hidden md:flex gap-2 border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-950/30"
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/disposal")
+            }
           >
-            <LockIcon className="h-4 w-4" />
-            Đóng kho
+            <WarehouseIcon className="h-4 w-4" />
+            Xử lý hư hỏng
           </Button>
 
           {/* Notifications */}
@@ -804,12 +845,32 @@ const InventoryDashboardPage = () => {
               </div>
             )}
 
+            {/* Depot Closure overlay — floats above the category overview */}
+            <AnimatePresence>
+              {activeTab === "depot-closure" && (
+                <motion.div
+                  key="depot-closure-panel"
+                  initial={{ opacity: 0, y: -16, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -12, scale: 0.98 }}
+                  transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+                  className="relative z-10 -mt-2"
+                >
+                  <DepotClosurePanel
+                    showHeader={false}
+                    onClose={() => handleActiveTabChange("inventory")}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {activeTab === "supply-management" ? (
               <SupplyRequestManagement
                 onPanelOpenChange={(open) => setSidebarOpen(!open)}
               />
             ) : activeTab === "vattu" ? (
               <VatTuSection
+                refreshNonce={vatTuRefreshNonce}
                 onItemSelect={(item) => {
                   setVatTuSelectedItem(item);
                   setVatTuSheetOpen(true);

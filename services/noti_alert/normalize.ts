@@ -8,6 +8,10 @@ const MARKDOWN_IMAGE_ONLY_REGEX = /^!\[[^\]]*\]\([^\)]+\)$/;
 function normalizeType(type: unknown): string {
   return String(type ?? "general")
     .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_")
     .toLowerCase();
 }
 
@@ -150,6 +154,35 @@ function pickFirstString(...values: unknown[]): string {
   return "";
 }
 
+function pickFirstObject<T extends Record<string, unknown>>(
+  ...values: unknown[]
+): T | null {
+  for (const value of values) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value as T;
+    }
+  }
+
+  return null;
+}
+
+function pickFirstRouteValue(...values: unknown[]): string | number | null {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+
+  return null;
+}
+
 export function toFiniteNumber(value: unknown, fallback: number): number {
   const parsed =
     typeof value === "number"
@@ -170,6 +203,9 @@ export function normalizeNotificationItem(
     message?: string;
     content?: string;
     readAt?: string | null;
+    payload?: Record<string, unknown> | null;
+    metadata?: Record<string, unknown> | null;
+    additionalData?: Record<string, unknown> | null;
   };
 
   const userNotificationId = toFiniteNumber(
@@ -185,6 +221,82 @@ export function normalizeNotificationItem(
   const typeLabel = getNotificationTypeLabel(type);
   const rawTitle = pickFirstString(record.title);
   const rawBody = pickFirstString(record.body, record.content, record.message);
+  const routeDataSources = [
+    pickFirstObject<Record<string, unknown>>(
+      record.data,
+      record.payload,
+      record.metadata,
+      record.additionalData,
+    ),
+    record as unknown as Record<string, unknown>,
+  ].filter(Boolean) as Record<string, unknown>[];
+
+  const normalizedRouteData = routeDataSources.reduce<Record<string, unknown>>(
+    (acc, source) => {
+      const url = pickFirstRouteValue(source.url, source.link, source.path);
+      if (url && acc.url == null) {
+        acc.url = url;
+      }
+
+      const closureId = pickFirstRouteValue(
+        source.closureId,
+        source.depotClosureId,
+      );
+      if (closureId && acc.closureId == null) {
+        acc.closureId = closureId;
+      }
+
+      const transferId = pickFirstRouteValue(
+        source.transferId,
+        source.depotTransferId,
+      );
+      if (transferId && acc.transferId == null) {
+        acc.transferId = transferId;
+      }
+
+      const conversationId = pickFirstRouteValue(
+        source.conversationId,
+        source.chatConversationId,
+      );
+      if (conversationId && acc.conversationId == null) {
+        acc.conversationId = conversationId;
+      }
+
+      const requestId = pickFirstRouteValue(
+        source.requestId,
+        source.supplyRequestId,
+        source.referenceId,
+      );
+      if (requestId && acc.requestId == null) {
+        acc.requestId = requestId;
+      }
+
+      const assemblyPointId = pickFirstRouteValue(source.assemblyPointId);
+      if (assemblyPointId && acc.assemblyPointId == null) {
+        acc.assemblyPointId = assemblyPointId;
+      }
+
+      const sosRequestId = pickFirstRouteValue(
+        source.sosRequestId,
+        source.sosId,
+      );
+      if (sosRequestId && acc.sosRequestId == null) {
+        acc.sosRequestId = sosRequestId;
+      }
+
+      const depotId = pickFirstRouteValue(
+        source.depotId,
+        source.sourceDepotId,
+        source.targetDepotId,
+      );
+      if (depotId && acc.depotId == null) {
+        acc.depotId = depotId;
+      }
+
+      return acc;
+    },
+    {},
+  );
 
   return {
     userNotificationId,
@@ -196,6 +308,9 @@ export function normalizeNotificationItem(
         ? record.isRead
         : Boolean(record.readAt),
     createdAt: String(record.createdAt ?? new Date().toISOString()),
-    data: record.data && typeof record.data === "object" ? record.data : null,
+    data:
+      Object.keys(normalizedRouteData).length > 0
+        ? normalizedRouteData
+        : null,
   };
 }

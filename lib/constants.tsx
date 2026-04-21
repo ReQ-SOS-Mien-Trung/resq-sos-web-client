@@ -448,7 +448,14 @@ export const timeFrames: Array<"1D" | "1W" | "1M" | "6M" | "1Y" | "ALL"> = [
 
 export const navigationItems = [
   {
-    icon: SquaresFour,
+    icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon
+        icon="fluent-mdl2:b-i-dashboard"
+        width={20}
+        height={20}
+        className={className}
+      />
+    ),
     label: "Tổng quan",
     href: "/dashboard/admin",
   },
@@ -693,15 +700,15 @@ export const WINDY_LAYERS: {
   label: string;
   icon: React.ReactNode;
 }[] = [
-  { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
-  { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
-  {
-    id: "rain",
-    label: "Mưa",
-    icon: <Drop className="h-4 w-4" weight="fill" />,
-  },
-  { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
-];
+    { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
+    { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
+    {
+      id: "rain",
+      label: "Mưa",
+      icon: <Drop className="h-4 w-4" weight="fill" />,
+    },
+    { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
+  ];
 
 // ════════════════════════════════
 // Location Details Panel - Status Configs

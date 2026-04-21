@@ -147,7 +147,7 @@ const SummaryCard = ({
         )}
       />
 
-      <CardContent className="p-5 relative flex flex-col min-h-36">
+      <CardContent className="px-5 py-2 relative flex flex-col min-h-36">
         {/* Top Row */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -159,7 +159,7 @@ const SummaryCard = ({
             >
               <Icon size={20} className={theme.iconColor} />
             </div>
-            <span className="text-sm font-semibold text-foreground leading-tight truncate">
+            <span className="text-base tracking-tighter font-semibold text-foreground leading-tight truncate">
               {card.label}
             </span>
           </div>
@@ -172,7 +172,7 @@ const SummaryCard = ({
         </div>
 
         {/* Animated number */}
-        <div className="flex items-baseline gap-2.5 mb-4 flex-1 min-h-12">
+        <div className="flex items-baseline gap-2.5 mb-2 flex-1 min-h-12">
           <div className="text-4xl font-bold tracking-tighter text-foreground leading-none tabular-nums">
             {displayValue}
           </div>
