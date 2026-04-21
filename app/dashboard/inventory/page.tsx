@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import { mockInventoryItems, mockShipments } from "@/lib/mock-data";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,7 @@ import {
   SupplyRequestListItem,
 } from "@/services/inventory/type";
 import {
+  INVENTORY_KEYS,
   useMyDepotQuantityByCategory,
   useSupplyRequests,
 } from "@/services/inventory/hooks";
@@ -207,6 +209,7 @@ const InventoryDashboardPage = () => {
   const [vatTuSelectedItem, setVatTuSelectedItem] =
     useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
+  const [vatTuRefreshNonce, setVatTuRefreshNonce] = useState(0);
   const [requestsPageNumber, setRequestsPageNumber] = useState(1);
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
@@ -215,6 +218,7 @@ const InventoryDashboardPage = () => {
   const sidebarRef = useRef<HTMLElement>(null);
 
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const handleActiveTabChange = useCallback(
     (tab: string) => {
@@ -465,7 +469,14 @@ const InventoryDashboardPage = () => {
     refetchDepots();
     refetchCategories();
     refetchQuantityByCategory();
-  }, [refetchDepots, refetchCategories, refetchQuantityByCategory]);
+    queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    setVatTuRefreshNonce((prev) => prev + 1);
+  }, [
+    queryClient,
+    refetchDepots,
+    refetchCategories,
+    refetchQuantityByCategory,
+  ]);
 
   // ── Loading state ──
   if (isDepotsLoading || isCategoriesLoading || isSupplyRequestsLoading) {
@@ -859,6 +870,7 @@ const InventoryDashboardPage = () => {
               />
             ) : activeTab === "vattu" ? (
               <VatTuSection
+                refreshNonce={vatTuRefreshNonce}
                 onItemSelect={(item) => {
                   setVatTuSelectedItem(item);
                   setVatTuSheetOpen(true);

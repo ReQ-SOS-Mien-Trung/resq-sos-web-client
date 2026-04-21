@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo } from "react";
+import { Fragment, useState, useCallback, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -60,7 +60,6 @@ import type {
   UpcomingReturnEntity,
   ReturnHistoryEntity,
   UpcomingReturnItem,
-  ReturnConsumableLotAllocation,
   ReturnReusableUnit,
   ReusableItemCondition,
   PickupLotAllocation,
@@ -161,14 +160,6 @@ type ReturnDiscrepancyFieldKey =
   (typeof RETURN_DISCREPANCY_FIELDS)[number]["key"];
 
 type ConfirmReturnDiscrepancyFields = Record<ReturnDiscrepancyFieldKey, string>;
-
-interface ConfirmReturnConsumableLotAllocationDraft {
-  lotId: number;
-  quantityTaken: number;
-  receivedDate: string;
-  expiredDate: string;
-  remainingQuantityAfterExecution: number;
-}
 
 interface ConfirmReturnConsumableDraft {
   itemId: number;
@@ -395,6 +386,25 @@ function sanitizeIntegerInput(value: string): string {
   return value.replace(/[^\d]/g, "");
 }
 
+function clampQuantityInput(value: string, max: number): string {
+  const sanitized = sanitizeIntegerInput(value);
+
+  if (!sanitized) {
+    return "";
+  }
+
+  const parsed = Number.parseInt(sanitized, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return sanitized;
+  }
+
+  return String(Math.min(parsed, Math.max(max, 0)));
+}
+
+function formatDraftQuantityInput(value: number): string {
+  return value > 0 ? String(value) : "";
+}
+
 function normalizeReusableConditionKey(
   rawCondition: string,
   conditionOptions: ReusableItemCondition[],
@@ -418,15 +428,6 @@ function normalizeRequestNote(rawNote: string): string {
   return rawNote.trim();
 }
 
-function sumReturnLotAllocationQuantity(
-  lotAllocations: ConfirmReturnConsumableLotAllocationDraft[],
-): number {
-  return lotAllocations.reduce(
-    (sum, allocation) => sum + getSafeNumericValue(allocation.quantityTaken, 0),
-    0,
-  );
-}
-
 function getReturnItemUnitCandidates(
   item: UpcomingReturnItem,
 ): ReturnReusableUnit[] {
@@ -446,70 +447,6 @@ function resolveReturnItemModelId(item: UpcomingReturnItem): number {
     getReturnItemUnitCandidates(item)[0]?.itemModelId ??
     item.itemId
   );
-}
-
-function normalizeReturnConsumableLotAllocations(
-  allocations: ReturnConsumableLotAllocation[] | null | undefined,
-): ConfirmReturnConsumableLotAllocationDraft[] {
-  if (!Array.isArray(allocations)) {
-    return [];
-  }
-
-  return allocations
-    .map((allocation) => ({
-      lotId: getSafeNumericValue(allocation.lotId, 0),
-      quantityTaken: getSafeNumericValue(allocation.quantityTaken, 0),
-      receivedDate:
-        typeof allocation.receivedDate === "string"
-          ? allocation.receivedDate
-          : "",
-      expiredDate:
-        typeof allocation.expiredDate === "string"
-          ? allocation.expiredDate
-          : "",
-      remainingQuantityAfterExecution: getSafeNumericValue(
-        allocation.remainingQuantityAfterExecution,
-        0,
-      ),
-    }))
-    .filter((allocation) => allocation.lotId > 0);
-}
-
-function resolveReturnConsumableLotAllocations(
-  item: UpcomingReturnItem,
-): ConfirmReturnConsumableLotAllocationDraft[] {
-  const returnedLots = normalizeReturnConsumableLotAllocations(
-    item.returnedLotAllocations,
-  );
-
-  if (returnedLots.length > 0) {
-    return returnedLots;
-  }
-
-  const expectedLots = normalizeReturnConsumableLotAllocations(
-    item.expectedReturnLotAllocations,
-  );
-
-  if (expectedLots.length > 0) {
-    return expectedLots;
-  }
-
-  return normalizeReturnConsumableLotAllocations(item.pickupLotAllocations);
-}
-
-function resolveReturnConsumableExpiredDate(
-  item: UpcomingReturnItem,
-  lotAllocations: ConfirmReturnConsumableLotAllocationDraft[],
-): string | null {
-  if (typeof item.expiredDate === "string" && item.expiredDate.trim()) {
-    return item.expiredDate.trim();
-  }
-
-  const firstLotWithExpiry = lotAllocations.find(
-    (allocation) => allocation.expiredDate.trim().length > 0,
-  );
-
-  return firstLotWithExpiry?.expiredDate ?? null;
 }
 
 function getExpectedReturnLotAllocations(
@@ -618,7 +555,7 @@ function buildConfirmReturnFormState(
         unit: item.unit,
         expectedQuantity,
         reportedQuantity,
-        quantity: String(inferredQuantity),
+        quantity: formatDraftQuantityInput(inferredQuantity),
         lockQuantityToUnits: false,
         units: unitsSource.map((unit) => ({
           reusableItemId: unit.reusableItemId,
@@ -626,15 +563,12 @@ function buildConfirmReturnFormState(
           itemName: unit.itemName || item.itemName,
           serialNumber: unit.serialNumber || "",
           condition: unit.condition || "",
-          note: unit.note || "",
+          note: "",
         })),
       };
       reusableItems.push(reusableDraft);
       continue;
     }
-
-    const lotAllocations = resolveReturnConsumableLotAllocations(item);
-    const lotQuantity = sumReturnLotAllocationQuantity(lotAllocations);
 
     const consumableDraft: ConfirmReturnConsumableDraft = {
       itemId: item.itemId,
@@ -643,7 +577,7 @@ function buildConfirmReturnFormState(
       unit: item.unit,
       expectedQuantity,
       reportedQuantity,
-      quantity: String(reportedQuantity),
+      quantity: formatDraftQuantityInput(reportedQuantity),
       expiredDate: getResolvedItemExpiredDate(item),
       lotAllocations: getExpectedReturnLotAllocations(item),
     };
@@ -891,6 +825,11 @@ function ConfirmReturnFormSection({
   const confirmReturnMutation = useConfirmReturnSupplies();
   const { data: conditionOptions = [], isLoading: isConditionsLoading } =
     useReusableItemConditions();
+  const resolveConditionLabel = useCallback(
+    (key: string | null | undefined) =>
+      conditionOptions.find((c) => c.key === key)?.value ?? key ?? "—",
+    [conditionOptions],
+  );
   const [form, setForm] = useState<ConfirmReturnFormState>(() =>
     buildConfirmReturnFormState(activity),
   );
@@ -899,11 +838,15 @@ function ConfirmReturnFormSection({
 
   const handleConsumableQuantityChange = useCallback(
     (itemId: number, value: string) => {
-      const nextValue = sanitizeIntegerInput(value);
       setForm((prev) => ({
         ...prev,
         consumableItems: prev.consumableItems.map((row) =>
-          row.itemId === itemId ? { ...row, quantity: nextValue } : row,
+          row.itemId === itemId
+            ? {
+                ...row,
+                quantity: clampQuantityInput(value, row.expectedQuantity),
+              }
+            : row,
         ),
       }));
     },
@@ -912,11 +855,15 @@ function ConfirmReturnFormSection({
 
   const handleReusableQuantityChange = useCallback(
     (itemId: number, value: string) => {
-      const nextValue = sanitizeIntegerInput(value);
       setForm((prev) => ({
         ...prev,
         reusableItems: prev.reusableItems.map((row) =>
-          row.itemId === itemId ? { ...row, quantity: nextValue } : row,
+          row.itemId === itemId
+            ? {
+                ...row,
+                quantity: clampQuantityInput(value, row.expectedQuantity),
+              }
+            : row,
         ),
       }));
     },
@@ -972,6 +919,13 @@ function ConfirmReturnFormSection({
           toast.error(`Số lượng xác nhận của "${row.itemName}" chưa hợp lệ.`);
           return;
         }
+
+        if (parsed > row.expectedQuantity) {
+          toast.error(
+            `Số lượng xác nhận của "${row.itemName}" không được vượt quá số dự kiến (${row.expectedQuantity.toLocaleString("vi-VN")} ${row.unit}).`,
+          );
+          return;
+        }
       }
 
       for (const row of form.reusableItems) {
@@ -979,6 +933,13 @@ function ConfirmReturnFormSection({
 
         if (!Number.isFinite(parsed) || parsed < 0) {
           toast.error(`Số lượng xác nhận của "${row.itemName}" chưa hợp lệ.`);
+          return;
+        }
+
+        if (parsed > row.expectedQuantity) {
+          toast.error(
+            `Số lượng xác nhận của "${row.itemName}" không được vượt quá số dự kiến (${row.expectedQuantity.toLocaleString("vi-VN")} ${row.unit}).`,
+          );
           return;
         }
 
@@ -1060,11 +1021,12 @@ function ConfirmReturnFormSection({
   const isFormReady =
     form.consumableItems.every((row) => {
       const v = Number.parseInt(row.quantity || "0", 10);
-      return Number.isFinite(v) && v > 0;
+      return Number.isFinite(v) && v > 0 && v <= row.expectedQuantity;
     }) &&
     form.reusableItems.every(
       (row) =>
         Number.parseInt(row.quantity || "0", 10) > 0 &&
+        Number.parseInt(row.quantity || "0", 10) <= row.expectedQuantity &&
         row.units.every((u) => !!u.condition),
     );
 
@@ -1121,6 +1083,7 @@ function ConfirmReturnFormSection({
                     type="text"
                     inputMode="numeric"
                     value={row.quantity}
+                    placeholder="Nhập"
                     disabled={row.lockQuantityToLots}
                     onChange={(event) =>
                       handleConsumableQuantityChange(
@@ -1177,7 +1140,7 @@ function ConfirmReturnFormSection({
           </thead>
           <tbody>
             {form.reusableItems.map((row) => (
-              <>
+              <Fragment key={`group-${row.itemId}`}>
                 {/* Item header row */}
                 <tr
                   key={`item-${row.itemId}`}
@@ -1198,6 +1161,7 @@ function ConfirmReturnFormSection({
                       type="text"
                       inputMode="numeric"
                       value={row.quantity}
+                      placeholder="Nhập"
                       onChange={(event) =>
                         handleReusableQuantityChange(
                           row.itemId,
@@ -1270,7 +1234,7 @@ function ConfirmReturnFormSection({
                     </td>
                   </tr>
                 ))}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -1446,7 +1410,7 @@ function ConfirmReturnFormSection({
                           {restoredItem.expectedReturnLotAllocations.length >
                             0 && (
                             <div className="space-y-1">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                              <p className="text-xs font-semibold tracking-tighter text-muted-foreground">
                                 Lô dự kiến trả
                               </p>
                               <div className="grid grid-cols-1 gap-1.5">
@@ -1535,7 +1499,8 @@ function ConfirmReturnFormSection({
                                   #{unit.reusableItemId} · {unit.serialNumber}
                                 </p>
                                 <p className="text-muted-foreground">
-                                  Tình trạng: {unit.condition || "—"}
+                                  Tình trạng:{" "}
+                                  {resolveConditionLabel(unit.condition)}
                                 </p>
                                 {unit.note && (
                                   <p className="text-muted-foreground">
@@ -1583,6 +1548,12 @@ function DetailPanel({
   const isReturnActivity = activityKind === "return";
   const copy = ACTIVITY_COPY[activityKind];
 
+  const { data: conditionOptions = [] } = useReusableItemConditions();
+  const resolveConditionLabel = useCallback(
+    (key: string | null | undefined) =>
+      conditionOptions.find((c) => c.key === key)?.value ?? key ?? "—",
+    [conditionOptions],
+  );
   const [panelHeight, setPanelHeight] = useState(DEFAULT_PANEL_HEIGHT);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -1868,129 +1839,379 @@ function DetailPanel({
                         }
                       >
                         {isReturnActivity ? (
-                          <table className="w-full">
-                            <thead>
-                              <tr className="border-b border-border/50">
-                                <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground w-12"></th>
-                                <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground">
-                                  Tên vật phẩm
-                                </th>
-                                <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
-                                  Dự kiến hoàn trả
-                                </th>
-                                <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
-                                  Đã trả thực tế
-                                </th>
-                                <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground">
-                                  Lô dự kiến trả
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(item.items as UpcomingReturnItem[]).map(
-                                (it) => {
-                                  const expectedQty = Number.isFinite(
-                                    it.quantity,
-                                  )
-                                    ? it.quantity
-                                    : 0;
-                                  const actualQty = Number.isFinite(
-                                    it.actualReturnedQuantity,
-                                  )
-                                    ? it.actualReturnedQuantity
-                                    : 0;
-                                  const lots =
-                                    getExpectedReturnLotAllocations(it);
-                                  return (
-                                    <tr
-                                      key={it.itemId}
-                                      className="border-b border-border/30 hover:bg-muted/30 transition-colors"
+                          (() => {
+                            const returnItems = item.items as UpcomingReturnItem[];
+                            const hasAnyActualReturnData = returnItems.some(
+                              (returnItem) =>
+                                getSafeNumericValue(
+                                  returnItem.actualReturnedQuantity,
+                                  0,
+                                ) > 0 ||
+                                (returnItem.returnedLotAllocations?.length ?? 0) >
+                                  0 ||
+                                (returnItem.returnedReusableUnits?.length ?? 0) >
+                                  0,
+                            );
+
+                            return (
+                              <table className="w-full">
+                                <thead>
+                                  <tr className="border-b border-border/50">
+                                    <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground w-12"></th>
+                                    <th className="text-left p-3 text-sm font-semibold tracking-tighter text-foreground">
+                                      Tên vật phẩm
+                                    </th>
+                                    <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
+                                      Dự kiến hoàn trả
+                                    </th>
+                                    {hasAnyActualReturnData && (
+                                      <th className="text-right p-3 text-sm font-semibold tracking-tighter text-foreground whitespace-nowrap">
+                                        Đã trả thực tế
+                                      </th>
+                                    )}
+                                    <th
+                                      className={cn(
+                                        "text-left p-3 text-sm font-semibold tracking-tighter text-foreground",
+                                        !hasAnyActualReturnData &&
+                                          "min-w-[34rem] w-[52%]",
+                                      )}
                                     >
-                                      <td className="p-3 w-10">
-                                        {it.imageUrl ? (
-                                          <button
-                                            onClick={() =>
-                                              setPreviewUrl(it.imageUrl!)
-                                            }
-                                            className="inline-flex items-center justify-center h-8 w-8 rounded transition-colors"
-                                            title="Xem ảnh"
-                                          >
-                                            <Eye className="h-4 w-4 text-muted-foreground" />
-                                          </button>
-                                        ) : (
-                                          <div className="inline-flex items-center justify-center h-8 w-8">
-                                            <Package
-                                              className="h-4 w-4 text-muted-foreground/30"
-                                              weight="fill"
-                                            />
-                                          </div>
+                                      Chi tiết lô / serial
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {returnItems.map((it) => {
+                                    const expectedQty = Number.isFinite(
+                                      it.quantity,
+                                    )
+                                      ? it.quantity
+                                      : 0;
+                                    const actualQty = Number.isFinite(
+                                      it.actualReturnedQuantity,
+                                    )
+                                      ? it.actualReturnedQuantity
+                                      : 0;
+                                    const expectedLots =
+                                      getExpectedReturnLotAllocations(it);
+                                    const returnedLots =
+                                      it.returnedLotAllocations ?? [];
+                                    const pickupLots =
+                                      it.pickupLotAllocations ?? [];
+                                    const expectedUnits =
+                                      it.expectedReturnUnits ?? [];
+                                    const returnedUnits =
+                                      it.returnedReusableUnits ?? [];
+                                    return (
+                                      <tr
+                                        key={it.itemId}
+                                        className="border-b border-border/30 hover:bg-muted/30 transition-colors"
+                                      >
+                                        <td className="p-3 w-10">
+                                          {it.imageUrl ? (
+                                            <button
+                                              onClick={() =>
+                                                setPreviewUrl(it.imageUrl!)
+                                              }
+                                              className="inline-flex items-center justify-center h-8 w-8 rounded transition-colors"
+                                              title="Xem ảnh"
+                                            >
+                                              <Eye className="h-4 w-4 text-muted-foreground" />
+                                            </button>
+                                          ) : (
+                                            <div className="inline-flex items-center justify-center h-8 w-8">
+                                              <Package
+                                                className="h-4 w-4 text-muted-foreground/30"
+                                                weight="fill"
+                                              />
+                                            </div>
+                                          )}
+                                        </td>
+                                        <td className="p-3">
+                                          <p className="text-sm font-medium tracking-tighter">
+                                            {it.itemName}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground tracking-tighter">
+                                            Mã vật phẩm số {it.itemId}
+                                          </p>
+                                        </td>
+                                        <td className="p-3 text-right">
+                                          <span className="text-sm font-semibold tracking-tighter text-blue-600 dark:text-blue-300">
+                                            {expectedQty.toLocaleString("vi-VN")}{" "}
+                                            {it.unit}
+                                          </span>
+                                        </td>
+                                        {hasAnyActualReturnData && (
+                                          <td className="p-3 text-right">
+                                            <span className="text-sm font-semibold tracking-tighter text-emerald-600 dark:text-emerald-300">
+                                              {actualQty.toLocaleString("vi-VN")}{" "}
+                                              {it.unit}
+                                            </span>
+                                          </td>
                                         )}
-                                      </td>
-                                      <td className="p-3">
-                                        <p className="text-sm font-medium tracking-tighter">
-                                          {it.itemName}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground tracking-tighter">
-                                          Mã vật phẩm số {it.itemId}
-                                        </p>
-                                      </td>
-                                      <td className="p-3 text-right">
-                                        <span className="text-sm font-semibold tracking-tighter text-blue-600 dark:text-blue-300">
-                                          {expectedQty.toLocaleString("vi-VN")}{" "}
-                                          {it.unit}
-                                        </span>
-                                      </td>
-                                      <td className="p-3 text-right">
-                                        <span className="text-sm font-semibold tracking-tighter text-emerald-600 dark:text-emerald-300">
-                                          {actualQty.toLocaleString("vi-VN")}{" "}
-                                          {it.unit}
-                                        </span>
-                                      </td>
-                                      <td className="p-3">
-                                        {lots.length === 0 ? (
+                                        <td
+                                          className={cn(
+                                            "p-3",
+                                            !hasAnyActualReturnData &&
+                                              "min-w-[34rem]",
+                                          )}
+                                        >
+                                        {expectedLots.length === 0 &&
+                                        returnedLots.length === 0 &&
+                                        pickupLots.length === 0 &&
+                                        expectedUnits.length === 0 &&
+                                        returnedUnits.length === 0 ? (
                                           <span className="text-sm text-muted-foreground tracking-tighter">
                                             —
                                           </span>
                                         ) : (
-                                          <div className="flex flex-col gap-1">
-                                            {lots.map((lot) => (
+                                          <div className="flex flex-col gap-2">
+                                            {pickupLots.length > 0 && (
+                                              <div className="space-y-1">
+                                                <p className="text-[13px] font-medium tracking-tighter">
+                                                  Lô đã xuất khi lấy
+                                                </p>
+                                                <div className="flex flex-col gap-1">
+                                                  {pickupLots.map((lot) => (
+                                                    <div
+                                                      key={`pickup-${it.itemId}-${lot.lotId}`}
+                                                      className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 text-sm tracking-tighter dark:border-slate-800/40 dark:bg-slate-900/20"
+                                                    >
+                                                      <span className="font-semibold text-foreground">
+                                                        Lô số {lot.lotId}
+                                                      </span>
+                                                      <span className="text-muted-foreground">
+                                                        {" "}
+                                                        —{" "}
+                                                        {lot.quantityTaken.toLocaleString(
+                                                          "vi-VN",
+                                                        )}{" "}
+                                                        {it.unit}
+                                                      </span>
+                                                      {lot.expiredDate && (
+                                                        <span className="text-muted-foreground">
+                                                          {" "}
+                                                          · HSD:{" "}
+                                                          {new Date(
+                                                            lot.expiredDate,
+                                                          ).toLocaleDateString(
+                                                            "vi-VN",
+                                                          )}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            {(expectedLots.length > 0 ||
+                                              returnedLots.length > 0) && (
                                               <div
-                                                key={lot.lotId}
-                                                className="text-sm tracking-tighter leading-snug"
+                                                className={cn(
+                                                  "grid gap-2",
+                                                  expectedLots.length > 0 &&
+                                                    returnedLots.length > 0
+                                                    ? "grid-cols-2"
+                                                    : "grid-cols-1",
+                                                )}
                                               >
-                                                <span className="font-semibold text-foreground">
-                                                  Lô số {lot.lotId}
-                                                </span>
-                                                <span className="text-muted-foreground">
-                                                  {" "}
-                                                  —{" "}
-                                                  {lot.quantityTaken.toLocaleString(
-                                                    "vi-VN",
-                                                  )}{" "}
-                                                  {it.unit}
-                                                </span>
-                                                {lot.expiredDate && (
-                                                  <span className="text-muted-foreground">
-                                                    {" "}
-                                                    · HSD:{" "}
-                                                    {new Date(
-                                                      lot.expiredDate,
-                                                    ).toLocaleDateString(
-                                                      "vi-VN",
-                                                    )}
-                                                  </span>
+                                                {expectedLots.length > 0 && (
+                                                  <div className="space-y-1">
+                                                    <p className="text-[13px] font-medium tracking-tighter">
+                                                      Lô dự kiến trả
+                                                    </p>
+                                                    <div className="flex flex-col gap-1">
+                                                      {expectedLots.map(
+                                                        (lot) => (
+                                                          <div
+                                                            key={`expected-lot-${it.itemId}-${lot.lotId}`}
+                                                            className="rounded-lg border border-amber-200/60 bg-amber-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-amber-800/40 dark:bg-amber-950/20"
+                                                          >
+                                                            <span className="font-semibold text-foreground">
+                                                              Lô số {lot.lotId}
+                                                            </span>
+                                                            <span className="text-muted-foreground">
+                                                              {" "}
+                                                              —{" "}
+                                                              {lot.quantityTaken.toLocaleString(
+                                                                "vi-VN",
+                                                              )}{" "}
+                                                              {it.unit}
+                                                            </span>
+                                                            {lot.expiredDate && (
+                                                              <span className="text-muted-foreground">
+                                                                {" "}
+                                                                · HSD:{" "}
+                                                                {new Date(
+                                                                  lot.expiredDate,
+                                                                ).toLocaleDateString(
+                                                                  "vi-VN",
+                                                                )}
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                        ),
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+                                                {returnedLots.length > 0 && (
+                                                  <div className="space-y-1">
+                                                    <p className="text-[13px] font-medium tracking-tighter">
+                                                      Lô đã trả thực tế
+                                                    </p>
+                                                    <div className="flex flex-col gap-1">
+                                                      {returnedLots.map(
+                                                        (lot) => (
+                                                          <div
+                                                            key={`returned-lot-${it.itemId}-${lot.lotId}`}
+                                                            className="rounded-lg border border-emerald-200/60 bg-emerald-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-emerald-800/40 dark:bg-emerald-950/20"
+                                                          >
+                                                            <span className="font-semibold text-foreground">
+                                                              Lô số {lot.lotId}
+                                                            </span>
+                                                            <span className="text-muted-foreground">
+                                                              {" "}
+                                                              —{" "}
+                                                              {lot.quantityTaken.toLocaleString(
+                                                                "vi-VN",
+                                                              )}{" "}
+                                                              {it.unit}
+                                                            </span>
+                                                            {lot.expiredDate && (
+                                                              <span className="text-muted-foreground">
+                                                                {" "}
+                                                                · HSD:{" "}
+                                                                {new Date(
+                                                                  lot.expiredDate,
+                                                                ).toLocaleDateString(
+                                                                  "vi-VN",
+                                                                )}
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                        ),
+                                                      )}
+                                                    </div>
+                                                  </div>
                                                 )}
                                               </div>
-                                            ))}
+                                            )}
+
+                                            {(expectedUnits.length > 0 ||
+                                              returnedUnits.length > 0) && (
+                                              <div
+                                                className={cn(
+                                                  "grid gap-2",
+                                                  expectedUnits.length > 0 &&
+                                                    returnedUnits.length > 0
+                                                    ? "grid-cols-2"
+                                                    : "grid-cols-1",
+                                                )}
+                                              >
+                                                {expectedUnits.length > 0 && (
+                                                  <div className="space-y-1">
+                                                    <p className="text-[13px] font-medium tracking-tighter">
+                                                      Thiết bị dự kiến trả
+                                                    </p>
+                                                    <div className="flex flex-col gap-1">
+                                                      {expectedUnits.map(
+                                                        (unit) => (
+                                                          <div
+                                                            key={`expected-unit-${it.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
+                                                            className="rounded-lg border border-blue-200/60 bg-blue-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-blue-800/40 dark:bg-blue-950/20"
+                                                          >
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                              <span className="font-semibold text-foreground">
+                                                                {unit.serialNumber ||
+                                                                  `Thiết bị #${unit.reusableItemId}`}
+                                                              </span>
+                                                              <span className="text-muted-foreground">
+                                                                Mã số{" "}
+                                                                {
+                                                                  unit.reusableItemId
+                                                                }
+                                                              </span>
+                                                              {unit.condition && (
+                                                                <span className="text-muted-foreground">
+                                                                  · Tình trạng:{" "}
+                                                                  {resolveConditionLabel(
+                                                                    unit.condition,
+                                                                  )}
+                                                                </span>
+                                                              )}
+                                                            </div>
+                                                            {unit.note && (
+                                                              <p className="mt-1 text-blue-700 dark:text-blue-300">
+                                                                Ghi chú từ đội:{" "}
+                                                                {unit.note}
+                                                              </p>
+                                                            )}
+                                                          </div>
+                                                        ),
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                )}
+
+                                                {returnedUnits.length > 0 && (
+                                                  <div className="space-y-1">
+                                                    <p className="text-[13px] font-medium tracking-tighter">
+                                                      Thiết bị đã trả thực tế
+                                                    </p>
+                                                    <div className="flex flex-col gap-1">
+                                                      {returnedUnits.map(
+                                                        (unit) => (
+                                                          <div
+                                                            key={`returned-unit-${it.itemId}-${unit.reusableItemId}-${unit.serialNumber}`}
+                                                            className="rounded-lg border border-emerald-200/60 bg-emerald-50/50 px-2.5 py-2 text-sm tracking-tighter dark:border-emerald-800/40 dark:bg-emerald-950/20"
+                                                          >
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                              <span className="font-semibold text-foreground">
+                                                                {unit.serialNumber ||
+                                                                  `Thiết bị #${unit.reusableItemId}`}
+                                                              </span>
+                                                              <span className="text-muted-foreground">
+                                                                Mã số{" "}
+                                                                {
+                                                                  unit.reusableItemId
+                                                                }
+                                                              </span>
+                                                              {unit.condition && (
+                                                                <span className="text-muted-foreground">
+                                                                  · Tình trạng:{" "}
+                                                                  {resolveConditionLabel(
+                                                                    unit.condition,
+                                                                  )}
+                                                                </span>
+                                                              )}
+                                                            </div>
+                                                            {unit.note && (
+                                                              <p className="mt-1 text-emerald-700 dark:text-emerald-300">
+                                                                Ghi chú:{" "}
+                                                                {unit.note}
+                                                              </p>
+                                                            )}
+                                                          </div>
+                                                        ),
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
                                           </div>
                                         )}
-                                      </td>
-                                    </tr>
-                                  );
-                                },
-                              )}
-                            </tbody>
-                          </table>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            );
+                          })()
                         ) : (
                           item.items.map((it, idx) => (
                             <motion.div

@@ -588,6 +588,7 @@ export interface UpcomingReturnItem {
   expectedReturnUnits: ReturnReusableUnit[];
   returnedReusableUnits: ReturnReusableUnit[];
   expectedReturnLotAllocations?: PickupLotAllocation[];
+  returnedLotAllocations?: PickupLotAllocation[];
   pickupLotAllocations?: PickupLotAllocation[];
 }
 

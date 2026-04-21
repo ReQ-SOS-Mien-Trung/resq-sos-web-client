@@ -171,17 +171,28 @@ function normalizeUpcomingReturnItem(
     item?.pickupLotAllocations ??
     []
   ).map((allocation) => normalizePickupLotAllocation(allocation));
+  const returnedLotAllocations = (item?.returnedLotAllocations ?? []).map(
+    (allocation) => normalizePickupLotAllocation(allocation),
+  );
+  const pickupLotAllocations = (
+    item?.pickupLotAllocations ??
+    item?.expectedReturnLotAllocations ??
+    []
+  ).map((allocation) => normalizePickupLotAllocation(allocation));
 
   return {
     ...(item as UpcomingReturnItem),
     itemId: toFiniteNumber(item?.itemId, 0),
+    itemModelId:
+      item?.itemModelId == null ? null : toFiniteNumber(item.itemModelId, 0),
     quantity: toFiniteNumber(item?.quantity, 0),
     actualReturnedQuantity: toFiniteNumber(item?.actualReturnedQuantity, 0),
     expiredDate: toTrimmedStringOrNull(item?.expiredDate),
     expectedReturnUnits: item?.expectedReturnUnits ?? [],
     returnedReusableUnits: item?.returnedReusableUnits ?? [],
     expectedReturnLotAllocations,
-    pickupLotAllocations: expectedReturnLotAllocations,
+    returnedLotAllocations,
+    pickupLotAllocations,
   };
 }
 
