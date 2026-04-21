@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { SOSRequest, Rescuer, CoordinatorMapProps } from "@/type";
 import type { DepotEntity } from "@/services/depot/type";
 import type { ServiceZoneEntity } from "@/services/map/type";
-import type { SOSClusterEntity } from "@/services/sos_cluster/type";
 import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import {
   MagnifyingGlass,
@@ -38,8 +37,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { PRIORITY_ORDER } from "@/lib/priority";
-import { getServiceZoneLabelPosition } from "@/lib/coordinator-map-utils";
+import {
+  getServiceZoneLabelPosition,
+  getServiceZoneStatBadgePositions,
+} from "@/lib/coordinator-map-utils";
 
 // Direct imports — SSR safety is handled by the parent's dynamic(() => import(...), { ssr: false })
 // and the isMounted guard inside this component.
@@ -58,7 +59,6 @@ import { MapZoomHandler } from "./MapZoomHandler";
 
 type LayerFilterKey =
   | "sos"
-  | "clusters"
   | "rescueTeams"
   | "teamIncidents"
   | "depots"
@@ -67,7 +67,6 @@ type LayerFilterKey =
 
 const DEFAULT_LAYER_FILTER: Record<LayerFilterKey, boolean> = {
   sos: true,
-  clusters: true,
   rescueTeams: true,
   teamIncidents: true,
   depots: true,
@@ -84,10 +83,6 @@ function LayerFilterIcon({
 }) {
   if (layerKey === "sos") {
     return <Siren size={16} weight="fill" className={className} />;
-  }
-
-  if (layerKey === "clusters") {
-    return <SquaresFour size={16} weight="fill" className={className} />;
   }
 
   if (layerKey === "rescueTeams") {
@@ -131,8 +126,6 @@ const CoordinatorMap = ({
   depots,
   assemblyPoints = [],
   serviceZones = [],
-  clusters = [],
-  autoClusters = [],
   selectedSOS,
   selectedRescuer,
   aiDecision,
@@ -141,7 +134,6 @@ const CoordinatorMap = ({
   onTeamIncidentSelect,
   onDepotSelect,
   onAssemblyPointSelect,
-  onClusterSelect,
   flyToLocation,
   flyToZoom,
   userLocation,
@@ -339,39 +331,13 @@ const CoordinatorMap = ({
     setCurrentZoom(zoom);
   }, []);
 
-  // Zoom thresholds:
-  // - >= 12: detailed view (individual SOS + markers)
-  // - 10-11: intermediate view (cluster-focused)
+  // Zoom threshold:
   // - < 10: service-zone overview only
-  const CLUSTER_ZOOM_THRESHOLD = 12;
   const SERVICE_ZONE_OVERVIEW_ZOOM_THRESHOLD = 10;
-  const isZoomedIn = currentZoom >= CLUSTER_ZOOM_THRESHOLD;
   const isServiceZoneOverview =
     currentZoom < SERVICE_ZONE_OVERVIEW_ZOOM_THRESHOLD;
 
-  // Build a set of SOS IDs that belong to a backend cluster
-  const clusteredSOSIds = useMemo(() => {
-    const ids = new Set<string>();
-    clusters.forEach((c) =>
-      c.sosRequestIds.forEach((id) => ids.add(String(id))),
-    );
-    return ids;
-  }, [clusters]);
-
-  // Build a set of SOS IDs that belong to an auto-cluster
-  const autoClusteredSOSIds = useMemo(() => {
-    const ids = new Set<string>();
-    autoClusters.forEach((group) => group.forEach((s) => ids.add(s.id)));
-    return ids;
-  }, [autoClusters]);
-
-  // When zoomed in: show all SOS. When zoomed out: hide SOS that belong to a backend or auto cluster.
-  const visibleSOSRequests = useMemo(() => {
-    if (isZoomedIn) return sosRequests;
-    return sosRequests.filter(
-      (s) => !clusteredSOSIds.has(s.id) && !autoClusteredSOSIds.has(s.id),
-    );
-  }, [sosRequests, isZoomedIn, clusteredSOSIds, autoClusteredSOSIds]);
+  const visibleSOSRequests = useMemo(() => sosRequests, [sosRequests]);
 
   const validTeamIncidents = useMemo(
     () =>
@@ -435,116 +401,6 @@ const CoordinatorMap = ({
     });
   }, [rescuers, assemblyPoints]);
 
-  // When zoomed in: hide clusters. When zoomed out: merge nearby clusters based on zoom.
-  type ClusterWithMergeFlag = SOSClusterEntity & { _isMerged: boolean };
-  const visibleClusters = useMemo((): ClusterWithMergeFlag[] => {
-    if (isZoomedIn) return [];
-    if (clusters.length <= 1)
-      return clusters.map((c) => ({ ...c, _isMerged: false }));
-
-    // Merge radius grows as zoom decreases (further out = bigger merge radius)
-    // zoom 11 → ~15km, zoom 10 → ~30km, zoom 9 → ~60km, zoom 8 → ~120km ...
-    const mergeRadiusKm =
-      10 * Math.pow(2, CLUSTER_ZOOM_THRESHOLD - 1 - currentZoom);
-
-    const haversine = (
-      lat1: number,
-      lng1: number,
-      lat2: number,
-      lng2: number,
-    ) => {
-      const R = 6371;
-      const dLat = ((lat2 - lat1) * Math.PI) / 180;
-      const dLng = ((lng2 - lng1) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos((lat1 * Math.PI) / 180) *
-          Math.cos((lat2 * Math.PI) / 180) *
-          Math.sin(dLng / 2) ** 2;
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    };
-
-    const n = clusters.length;
-    const parent = Array.from({ length: n }, (_, i) => i);
-    const find = (x: number): number =>
-      parent[x] === x ? x : (parent[x] = find(parent[x]));
-    const union = (a: number, b: number) => {
-      parent[find(a)] = find(b);
-    };
-
-    for (let i = 0; i < n; i++) {
-      for (let j = i + 1; j < n; j++) {
-        const d = haversine(
-          clusters[i].centerLatitude,
-          clusters[i].centerLongitude,
-          clusters[j].centerLatitude,
-          clusters[j].centerLongitude,
-        );
-        if (d <= mergeRadiusKm) union(i, j);
-      }
-    }
-
-    const groups = new Map<number, number[]>();
-    for (let i = 0; i < n; i++) {
-      const root = find(i);
-      if (!groups.has(root)) groups.set(root, []);
-      groups.get(root)!.push(i);
-    }
-
-    // Merge groups into virtual clusters
-    return Array.from(groups.values()).map((indices) => {
-      if (indices.length === 1)
-        return { ...clusters[indices[0]], _isMerged: false as const };
-      // Weighted center by SOS count
-      let totalSOS = 0;
-      let latSum = 0;
-      let lngSum = 0;
-      let allIds: number[] = [];
-      let highestSeverity = "Low";
-      const severityOrder: Record<string, number> = {
-        Low: 0,
-        Medium: 1,
-        High: 2,
-        Critical: 3,
-      };
-      let totalVictims = 0;
-
-      for (const idx of indices) {
-        const c = clusters[idx];
-        const count = c.sosRequestCount || c.sosRequestIds.length;
-        totalSOS += count;
-        latSum += c.centerLatitude * count;
-        lngSum += c.centerLongitude * count;
-        allIds = allIds.concat(c.sosRequestIds);
-        totalVictims += c.victimEstimated ?? 0;
-        if (
-          (severityOrder[c.severityLevel] ?? 0) >
-          (severityOrder[highestSeverity] ?? 0)
-        ) {
-          highestSeverity = c.severityLevel;
-        }
-      }
-
-      // Return a merged virtual cluster (uses first cluster's id as base)
-      return {
-        ...clusters[indices[0]],
-        centerLatitude:
-          totalSOS > 0
-            ? latSum / totalSOS
-            : clusters[indices[0]].centerLatitude,
-        centerLongitude:
-          totalSOS > 0
-            ? lngSum / totalSOS
-            : clusters[indices[0]].centerLongitude,
-        sosRequestCount: totalSOS,
-        sosRequestIds: allIds,
-        severityLevel: highestSeverity as (typeof clusters)[0]["severityLevel"],
-        victimEstimated: totalVictims || null,
-        _isMerged: true as const,
-      };
-    });
-  }, [clusters, isZoomedIn, currentZoom, CLUSTER_ZOOM_THRESHOLD]);
-
   const validServiceZones = useMemo(
     () =>
       serviceZones.filter(
@@ -566,13 +422,6 @@ const CoordinatorMap = ({
         count: visibleSOSRequests.length,
         badgeClass:
           "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-      },
-      {
-        key: "clusters" as const,
-        label: "Cụm",
-        count: visibleClusters.length + autoClusters.length,
-        badgeClass:
-          "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
       },
       {
         key: "rescueTeams" as const,
@@ -612,11 +461,9 @@ const CoordinatorMap = ({
     ],
     [
       assemblyPoints.length,
-      autoClusters.length,
       depots.length,
       validServiceZones.length,
       validTeamIncidents.length,
-      visibleClusters.length,
       visibleRescuers.length,
       visibleSOSRequests.length,
     ],
@@ -637,7 +484,6 @@ const CoordinatorMap = ({
   const showOnlyLayer = useCallback((layer: LayerFilterKey) => {
     setLayerFilter({
       sos: false,
-      clusters: false,
       rescueTeams: false,
       teamIncidents: false,
       depots: false,
@@ -650,7 +496,6 @@ const CoordinatorMap = ({
   const setAllLayers = useCallback((value: boolean) => {
     setLayerFilter({
       sos: value,
-      clusters: value,
       rescueTeams: value,
       teamIncidents: value,
       depots: value,
@@ -1178,7 +1023,11 @@ const CoordinatorMap = ({
         {/* Service Zone Polygons and totals */}
         {showServiceZones &&
           validServiceZones.map((zone) => (
-            <ServiceZoneOverlay key={zone.id} zone={zone} currentZoom={currentZoom} />
+            <ServiceZoneOverlay
+              key={zone.id}
+              zone={zone}
+              currentZoom={currentZoom}
+            />
           ))}
 
         {/* SOS Request Markers */}
@@ -1250,58 +1099,6 @@ const CoordinatorMap = ({
                 ]
               }
               onClick={() => onAssemblyPointSelect?.(point)}
-            />
-          ))}
-
-        {/* Auto-Cluster Markers (client-side suggested clusters) */}
-        {layerFilter.clusters &&
-          !isServiceZoneOverview &&
-          !isZoomedIn &&
-          autoClusters.map((group, idx) => (
-            <AutoClusterMarker
-              key={`auto-cluster-${idx}`}
-              group={group}
-              index={idx}
-              onClick={() => {
-                // Fly to the auto-cluster center on click
-                const lat =
-                  group.reduce((sum, s) => sum + s.location.lat, 0) /
-                  group.length;
-                const lng =
-                  group.reduce((sum, s) => sum + s.location.lng, 0) /
-                  group.length;
-                setSearchFlyToLocation({ lat, lng });
-                setSearchFlyToZoom(
-                  Math.max(currentZoom + 2, CLUSTER_ZOOM_THRESHOLD),
-                );
-              }}
-            />
-          ))}
-
-        {/* Cluster Markers */}
-        {layerFilter.clusters &&
-          !isServiceZoneOverview &&
-          visibleClusters.map((cluster) => (
-            <ClusterMarker
-              key={`cluster-${cluster.id}-${cluster._isMerged}`}
-              cluster={cluster}
-              isMerged={cluster._isMerged}
-              onClick={() => {
-                if (cluster._isMerged) {
-                  // For virtual merged clusters, just fly/zoom in to break them apart
-                  const targetZoom = Math.max(
-                    currentZoom + 2,
-                    CLUSTER_ZOOM_THRESHOLD,
-                  );
-                  setSearchFlyToLocation({
-                    lat: Number(cluster.centerLatitude),
-                    lng: Number(cluster.centerLongitude),
-                  });
-                  setSearchFlyToZoom(targetZoom);
-                } else {
-                  onClusterSelect?.(cluster);
-                }
-              }}
             />
           ))}
 
@@ -1387,7 +1184,13 @@ const CoordinatorMap = ({
 
 export default CoordinatorMap;
 
-function ServiceZoneOverlay({ zone, currentZoom }: { zone: ServiceZoneEntity; currentZoom: number }) {
+function ServiceZoneOverlay({
+  zone,
+  currentZoom,
+}: {
+  zone: ServiceZoneEntity;
+  currentZoom: number;
+}) {
   const positions = useMemo(
     () =>
       zone.coordinates
@@ -1409,58 +1212,10 @@ function ServiceZoneOverlay({ zone, currentZoom }: { zone: ServiceZoneEntity; cu
   const showCornerStats = currentZoom >= CORNER_STATS_ZOOM;
   const counts = zone.counts;
 
-  // Corner positions derived from actual polygon vertices to stay inside the zone
+  // Compute four stat-badge anchors and clamp each one inside the polygon.
   const cornerPositions = useMemo(() => {
-    if (positions.length < 3) return null;
-
-    // Compute centroid of the polygon
-    const centerLat = positions.reduce((s, p) => s + p[0], 0) / positions.length;
-    const centerLng = positions.reduce((s, p) => s + p[1], 0) / positions.length;
-
-    // Group vertices into 4 quadrants relative to centroid
-    const quads: Record<string, [number, number][]> = { nw: [], ne: [], sw: [], se: [] };
-    for (const p of positions) {
-      const ns = p[0] >= centerLat ? "n" : "s";
-      const ew = p[1] <= centerLng ? "w" : "e";
-      quads[ns + ew].push(p);
-    }
-
-    // Pick the vertex furthest from center in each quadrant
-    const pickFurthest = (verts: [number, number][]): [number, number] | null => {
-      if (verts.length === 0) return null;
-      return verts.reduce((best, v) => {
-        const d = (v[0] - centerLat) ** 2 + (v[1] - centerLng) ** 2;
-        const bd = (best[0] - centerLat) ** 2 + (best[1] - centerLng) ** 2;
-        return d > bd ? v : best;
-      });
-    };
-
-    // Pull the vertex 20% toward center so the badge sits well inside the polygon
-    const inset = (v: [number, number]): [number, number] => [
-      v[0] + (centerLat - v[0]) * 0.20,
-      v[1] + (centerLng - v[1]) * 0.20,
-    ];
-
-    const nw = pickFurthest(quads.nw);
-    const ne = pickFurthest(quads.ne);
-    const sw = pickFurthest(quads.sw);
-    const se = pickFurthest(quads.se);
-
-    // Fallback: offset slightly from center if a quadrant has no vertices
-    const fallback = (latDir: number, lngDir: number): [number, number] => {
-      const lats = positions.map((p) => p[0]);
-      const lngs = positions.map((p) => p[1]);
-      const spread = Math.max(Math.max(...lats) - Math.min(...lats), Math.max(...lngs) - Math.min(...lngs));
-      return [centerLat + latDir * spread * 0.15, centerLng + lngDir * spread * 0.15];
-    };
-
-    return {
-      nw: nw ? inset(nw) : fallback(1, -1),
-      ne: ne ? inset(ne) : fallback(1, 1),
-      sw: sw ? inset(sw) : fallback(-1, -1),
-      se: se ? inset(se) : fallback(-1, 1),
-    };
-  }, [positions]);
+    return getServiceZoneStatBadgePositions(zone);
+  }, [zone]);
 
   // Center label – always shows zone name
   const centerIcon = useMemo(() => {
@@ -1481,11 +1236,17 @@ function ServiceZoneOverlay({ zone, currentZoom }: { zone: ServiceZoneEntity; cu
 
   // Corner stat badge icons
   const cornerIcons = useMemo(() => {
-    if (typeof window === "undefined" || !showCornerStats || !cornerPositions) return null;
+    if (typeof window === "undefined" || !showCornerStats || !cornerPositions)
+      return null;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const L = require("leaflet");
 
-    const makeBadge = (emoji: string, label: string, count: number, bg: string) =>
+    const makeBadge = (
+      emoji: string,
+      label: string,
+      count: number,
+      bg: string,
+    ) =>
       L.divIcon({
         className: "",
         html: `
@@ -1500,10 +1261,30 @@ function ServiceZoneOverlay({ zone, currentZoom }: { zone: ServiceZoneEntity; cu
       });
 
     return {
-      nw: makeBadge("🚨", "SOS chờ", Number(counts.pendingSosRequestCount ?? 0), "rgba(239,68,68,0.88)"),
-      ne: makeBadge("⚡", "Sự cố SOS", Number(counts.incidentSosRequestCount ?? 0), "rgba(249,115,22,0.88)"),
-      sw: makeBadge("⚠️", "Sự cố đội", Number(counts.teamIncidentCount ?? 0), "rgba(202,138,4,0.88)"),
-      se: makeBadge("📍", "TK/Kho", Number(counts.assemblyPointCount ?? 0) + Number(counts.depotCount ?? 0), "rgba(99,102,241,0.88)"),
+      nw: makeBadge(
+        "🚨",
+        "SOS chờ",
+        Number(counts.pendingSosRequestCount ?? 0),
+        "rgba(239,68,68,0.88)",
+      ),
+      ne: makeBadge(
+        "⚡",
+        "Sự cố SOS",
+        Number(counts.incidentSosRequestCount ?? 0),
+        "rgba(249,115,22,0.88)",
+      ),
+      sw: makeBadge(
+        "⚠️",
+        "Sự cố đội",
+        Number(counts.teamIncidentCount ?? 0),
+        "rgba(202,138,4,0.88)",
+      ),
+      se: makeBadge(
+        "📍",
+        "TK/Kho",
+        Number(counts.assemblyPointCount ?? 0) + Number(counts.depotCount ?? 0),
+        "rgba(99,102,241,0.88)",
+      ),
     };
   }, [showCornerStats, cornerPositions, counts]);
 
@@ -1547,10 +1328,26 @@ function ServiceZoneOverlay({ zone, currentZoom }: { zone: ServiceZoneEntity; cu
       {/* Corner stat badges – visible when zoomed in enough */}
       {showCornerStats && cornerPositions && cornerIcons ? (
         <>
-          <Marker position={cornerPositions.nw} icon={cornerIcons.nw} zIndexOffset={600} />
-          <Marker position={cornerPositions.ne} icon={cornerIcons.ne} zIndexOffset={600} />
-          <Marker position={cornerPositions.sw} icon={cornerIcons.sw} zIndexOffset={600} />
-          <Marker position={cornerPositions.se} icon={cornerIcons.se} zIndexOffset={600} />
+          <Marker
+            position={cornerPositions.nw}
+            icon={cornerIcons.nw}
+            zIndexOffset={600}
+          />
+          <Marker
+            position={cornerPositions.ne}
+            icon={cornerIcons.ne}
+            zIndexOffset={600}
+          />
+          <Marker
+            position={cornerPositions.sw}
+            icon={cornerIcons.sw}
+            zIndexOffset={600}
+          />
+          <Marker
+            position={cornerPositions.se}
+            icon={cornerIcons.se}
+            zIndexOffset={600}
+          />
         </>
       ) : null}
     </>
@@ -1822,142 +1619,6 @@ function TeamIncidentMarker({
       icon={iconEl}
       zIndexOffset={950}
       eventHandlers={{ click: onClick }}
-    />
-  );
-}
-
-// Auto-Cluster Marker – shows client-side suggested clusters (dashed border, muted)
-function AutoClusterMarker({
-  group,
-  index,
-  onClick,
-}: {
-  group: SOSRequest[];
-  index: number;
-  onClick?: () => void;
-}) {
-  const count = group.length;
-  const lat = group.reduce((sum, s) => sum + s.location.lat, 0) / count;
-  const lng = group.reduce((sum, s) => sum + s.location.lng, 0) / count;
-
-  // Use highest priority in group for color
-  const priorityOrder = PRIORITY_ORDER;
-  const highestPriority = group.reduce(
-    (best, s) =>
-      priorityOrder[s.priority] < priorityOrder[best] ? s.priority : best,
-    group[0].priority,
-  );
-  const colors: Record<string, string> = {
-    P1: "#ef4444",
-    P2: "#f97316",
-    P3: "#eab308",
-    P4: "#14b8a6",
-  };
-  const color = colors[highestPriority] || "#f97316";
-
-  const size = Math.min(52 + count * 4, 72);
-  const ringSize = size + 20;
-
-  const iconEl = useMemo(() => {
-    if (typeof window === "undefined") return undefined;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const L = require("leaflet");
-
-    return L.divIcon({
-      className: "custom-auto-cluster-marker",
-      html: `
-        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${ringSize}px;height:${ringSize}px;">
-          <div style="position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.12;animation:clusterPulse 2.5s ease-out infinite;"></div>
-          <div style="position:absolute;inset:${(ringSize - size) / 2}px;border-radius:50%;background:${color}11;border:2px dashed ${color}66;"></div>
-          <div style="position:relative;width:${size - 4}px;height:${size - 4}px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
-                      background:linear-gradient(145deg, ${color}dd, ${color}99);border:2px dashed white;
-                      box-shadow:0 2px 10px rgba(0,0,0,0.25), 0 0 0 2px ${color}33;">
-            <span style="font-size:15px;font-weight:800;color:white;line-height:1;">#${index + 1}</span>
-            <span style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.9);line-height:1;margin-top:1px;">${count} SOS</span>
-          </div>
-        </div>
-      `,
-      iconSize: [ringSize, ringSize],
-      iconAnchor: [ringSize / 2, ringSize / 2],
-    });
-  }, [count, index, color, size, ringSize]);
-
-  if (!iconEl) return null;
-
-  return (
-    <Marker
-      position={[lat, lng]}
-      icon={iconEl}
-      zIndexOffset={900}
-      eventHandlers={{ click: () => onClick?.() }}
-    />
-  );
-}
-
-// Cluster Marker Component – shows grouped SOS clusters on the map
-function ClusterMarker({
-  cluster,
-  isMerged = false,
-  onClick,
-}: {
-  cluster: SOSClusterEntity;
-  isMerged?: boolean;
-  onClick?: () => void;
-}) {
-  const severityColors: Record<string, string> = {
-    Critical: "#ef4444",
-    High: "#f97316",
-    Medium: "#eab308",
-    Low: "#14b8a6",
-  };
-
-  const color = severityColors[cluster.severityLevel] || "#14b8a6";
-  // Scale size based on SOS count for visual weight
-  const baseSize = 56;
-  const size = Math.min(baseSize + cluster.sosRequestCount * 4, 80);
-
-  const iconEl = useMemo(() => {
-    if (typeof window === "undefined") return undefined;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const L = require("leaflet");
-
-    // Outer ring width for the pulsing effect
-    const ringSize = size + 20;
-
-    return L.divIcon({
-      className: "custom-cluster-marker",
-      html: `
-        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:${ringSize}px;height:${ringSize}px;">
-          <div style="position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.18;animation:clusterPulse 2s ease-out infinite;"></div>
-          <div style="position:absolute;inset:${(ringSize - size) / 2}px;border-radius:50%;background:${color}22;border:2px solid ${color}55;"></div>
-          <div style="position:relative;width:${size - 4}px;height:${size - 4}px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
-                      background:linear-gradient(145deg, ${color}, ${color}cc);border:3px solid white;
-                      box-shadow:0 3px 14px rgba(0,0,0,0.35), 0 0 0 2px ${color}44;">
-            <span style="font-size:${isMerged ? 18 : 15}px;font-weight:800;color:white;line-height:1;">${isMerged ? cluster.sosRequestCount : `#${cluster.id}`}</span>
-            <span style="font-size:9px;font-weight:600;color:rgba(255,255,255,0.9);line-height:1;margin-top:1px;">${isMerged ? "SOS" : `${cluster.sosRequestCount} SOS`}</span>
-          </div>
-        </div>
-        <style>
-          @keyframes clusterPulse {
-            0% { transform:scale(0.85); opacity:0.25; }
-            70% { transform:scale(1.15); opacity:0; }
-            100% { transform:scale(1.15); opacity:0; }
-          }
-        </style>
-      `,
-      iconSize: [ringSize, ringSize],
-      iconAnchor: [ringSize / 2, ringSize / 2],
-    });
-  }, [cluster.sosRequestCount, cluster.id, isMerged, color, size]);
-
-  if (!iconEl) return null;
-
-  return (
-    <Marker
-      position={[cluster.centerLatitude, cluster.centerLongitude]}
-      icon={iconEl}
-      zIndexOffset={1000}
-      eventHandlers={{ click: () => onClick?.() }}
     />
   );
 }

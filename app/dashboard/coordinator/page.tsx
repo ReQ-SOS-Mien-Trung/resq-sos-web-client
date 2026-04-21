@@ -773,33 +773,26 @@ const CoordinatorDashboardContent = () => {
   }, []);
 
   useEffect(() => {
-    if (!selectedRescuer) return;
-
-    const nextSelected = rescuers.find(
-      (rescuer) => rescuer.id === selectedRescuer.id,
-    );
-    if (nextSelected) {
-      setSelectedRescuer(nextSelected);
-      return;
-    }
-
-    setSelectedRescuer(null);
-  }, [rescuers, selectedRescuer]);
+    setSelectedRescuer((prev) => {
+      if (!prev) return prev;
+      const nextSelected = rescuers.find(
+        (rescuer) => rescuer.id === prev.id,
+      );
+      return nextSelected ?? null;
+    });
+  }, [rescuers]);
 
   useEffect(() => {
-    if (!selectedTeamIncident) return;
-
-    const nextSelected = teamIncidents.find(
-      (incident) => incident.incidentId === selectedTeamIncident.incidentId,
-    );
-    if (nextSelected) {
-      setSelectedTeamIncident(nextSelected);
-      return;
-    }
-
-    setSelectedTeamIncident(null);
-    setTeamIncidentDetailOpen(false);
-  }, [teamIncidents, selectedTeamIncident]);
+    setSelectedTeamIncident((prev) => {
+      if (!prev) return prev;
+      const nextSelected = teamIncidents.find(
+        (incident) => incident.incidentId === prev.incidentId,
+      );
+      if (nextSelected) return nextSelected;
+      setTeamIncidentDetailOpen(false);
+      return null;
+    });
+  }, [teamIncidents]);
 
   // ─── Sidebar auto-collapse when RescuePlanPanel opens ───
   useEffect(() => {

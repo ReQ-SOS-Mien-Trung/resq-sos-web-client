@@ -561,6 +561,26 @@ const SOSSidebar = ({
     );
   }, [sosRequests]);
 
+  // Merge viewport-bounded sosRequests with sidebar incomingRequests so cluster
+  // SOS IDs outside the current viewport can still be resolved.
+  const allKnownSOS = useMemo(() => {
+    const byId = new Map<string, SOSRequest>();
+    // Map-bound SOS (primary source – most up-to-date)
+    for (const sos of sosRequests) {
+      byId.set(normalizeSOSRequestId(sos.id), sos);
+    }
+    // Sidebar/paginated SOS (fills in IDs outside the viewport)
+    if (incomingRequests) {
+      for (const sos of incomingRequests) {
+        const key = normalizeSOSRequestId(sos.id);
+        if (!byId.has(key)) {
+          byId.set(key, sos);
+        }
+      }
+    }
+    return byId;
+  }, [sosRequests, incomingRequests]);
+
   // Show only clusters that are not completed, sorted by severity (Critical -> Low).
   const activeClusters = useMemo(() => {
     return [...backendClusters]
@@ -1205,12 +1225,10 @@ const SOSSidebar = ({
                           (selectedClusterId === cluster.id &&
                             currentSelectionClusterKey !==
                               collapsedSelectionKey);
-                        const clusterSosIdSet = new Set(
-                          cluster.sosRequestIds.map(normalizeSOSRequestId),
-                        );
-                        const clusterSOS = sosRequests.filter((s) =>
-                          clusterSosIdSet.has(normalizeSOSRequestId(s.id)),
-                        );
+                        const clusterSosIds = cluster.sosRequestIds.map(normalizeSOSRequestId);
+                        const clusterSOS = clusterSosIds
+                          .map((id) => allKnownSOS.get(id))
+                          .filter((s): s is SOSRequest => !!s);
                         const unresolvedClusterSOS = clusterSOS.filter((s) => {
                           const bucket = getSOSStatusBucket(s.status);
                           return bucket === "pending" || bucket === "active";

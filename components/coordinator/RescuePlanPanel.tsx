@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
@@ -597,7 +598,11 @@ function pickPreferredMissionSuggestionActivityGroup(
     const hasLeftCreatedAt = Number.isFinite(leftCreatedAt);
     const hasRightCreatedAt = Number.isFinite(rightCreatedAt);
 
-    if (hasLeftCreatedAt && hasRightCreatedAt && leftCreatedAt !== rightCreatedAt) {
+    if (
+      hasLeftCreatedAt &&
+      hasRightCreatedAt &&
+      leftCreatedAt !== rightCreatedAt
+    ) {
       return rightCreatedAt - leftCreatedAt;
     }
 
@@ -614,7 +619,8 @@ function pickPreferredMissionSuggestionActivityGroup(
 function flattenMissionSuggestionActivities(
   suggestion: MissionSuggestionEntity,
 ): ClusterSuggestedActivity[] {
-  const preferredGroup = pickPreferredMissionSuggestionActivityGroup(suggestion);
+  const preferredGroup =
+    pickPreferredMissionSuggestionActivityGroup(suggestion);
 
   return Array.isArray(preferredGroup?.suggestedActivities)
     ? preferredGroup.suggestedActivities
@@ -1638,6 +1644,7 @@ const DepotInventoryCard = ({
                       : item.availableQuantity;
                   const itemId = item.itemModelId;
                   const itemName = item.itemModelName;
+                  const itemImageUrl = item.imageUrl?.trim() || "";
 
                   return (
                     <div
@@ -1683,7 +1690,18 @@ const DepotInventoryCard = ({
                           : "cursor-default",
                       )}
                     >
-                      <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                      <Avatar className="h-9 w-9 shrink-0 rounded-md border border-border/70 bg-slate-100/80 dark:bg-slate-900/60">
+                        <AvatarImage
+                          src={itemImageUrl || undefined}
+                          alt={itemName}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full object-cover"
+                        />
+                        <AvatarFallback className="rounded-md bg-slate-100 text-blue-500 dark:bg-slate-900 dark:text-blue-300">
+                          <Package className="h-4 w-4" weight="fill" />
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">
                           {itemName}
@@ -6954,7 +6972,7 @@ const RescuePlanPanel = ({
             );
           const nextSuggestedTeam = hasAutoAssignedCollectorReason
             ? null
-            : activity.suggestedTeam ?? null;
+            : (activity.suggestedTeam ?? null);
 
           if (
             nextSuggestedTeam === activity.suggestedTeam &&

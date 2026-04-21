@@ -40,6 +40,7 @@ import { activityTypeConfig, depotStatusConfig } from "@/lib/constants";
 import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -220,7 +221,9 @@ function buildSupplySummary(supplies: ManualSupplyItem[]): string {
     .join(", ");
 }
 
-function buildManualSupplyKey(supply: Pick<ManualSupplyItem, "itemId" | "itemName" | "unit">): string {
+function buildManualSupplyKey(
+  supply: Pick<ManualSupplyItem, "itemId" | "itemName" | "unit">,
+): string {
   if (Number.isFinite(supply.itemId) && supply.itemId > 0) {
     return `id:${supply.itemId}`;
   }
@@ -228,7 +231,9 @@ function buildManualSupplyKey(supply: Pick<ManualSupplyItem, "itemId" | "itemNam
   return `name:${supply.itemName.trim().toLowerCase()}|unit:${supply.unit.trim().toLowerCase()}`;
 }
 
-function mergeManualSupplyItems(supplies: ManualSupplyItem[]): ManualSupplyItem[] {
+function mergeManualSupplyItems(
+  supplies: ManualSupplyItem[],
+): ManualSupplyItem[] {
   const buckets = new Map<string, ManualSupplyItem>();
 
   supplies.forEach((supply) => {
@@ -318,7 +323,7 @@ function syncManualDeliverActivities(
     }
 
     const teamId = toValidRescueTeamId(activity.rescueTeamId);
-    const pending = teamId != null ? pendingByTeam.get(teamId) ?? [] : [];
+    const pending = teamId != null ? (pendingByTeam.get(teamId) ?? []) : [];
 
     if (teamId != null && pending.length > 0) {
       pendingByTeam.delete(teamId);
@@ -382,7 +387,9 @@ type AutoReturnGroup = {
   lastCollectIndex: number;
 };
 
-function buildAutoReturnGroups(activities: ManualActivity[]): AutoReturnGroup[] {
+function buildAutoReturnGroups(
+  activities: ManualActivity[],
+): AutoReturnGroup[] {
   const grouped = new Map<
     string,
     AutoReturnGroup & { supplyBuckets: Map<number, ManualSupplyItem> }
@@ -420,41 +427,45 @@ function buildAutoReturnGroups(activities: ManualActivity[]): AutoReturnGroup[] 
     const groupKey = `${depotId}-${teamId}`;
     const existingGroup = grouped.get(groupKey);
     const targetLabel =
-      activity.depotName?.trim() || activity.target.trim() || AUTO_RETURN_TARGET_FALLBACK;
-    const targetLatitude =
-      hasRenderableCoordinates(activity.targetLatitude, activity.targetLongitude)
-        ? activity.targetLatitude
-        : reusableSupplies.find((supply) =>
-            hasRenderableCoordinates(
-              supply.sourceDepotLatitude ?? 0,
-              supply.sourceDepotLongitude ?? 0,
-            ),
-          )?.sourceDepotLatitude ?? 0;
-    const targetLongitude =
-      hasRenderableCoordinates(activity.targetLatitude, activity.targetLongitude)
-        ? activity.targetLongitude
-        : reusableSupplies.find((supply) =>
-            hasRenderableCoordinates(
-              supply.sourceDepotLatitude ?? 0,
-              supply.sourceDepotLongitude ?? 0,
-            ),
-          )?.sourceDepotLongitude ?? 0;
+      activity.depotName?.trim() ||
+      activity.target.trim() ||
+      AUTO_RETURN_TARGET_FALLBACK;
+    const targetLatitude = hasRenderableCoordinates(
+      activity.targetLatitude,
+      activity.targetLongitude,
+    )
+      ? activity.targetLatitude
+      : (reusableSupplies.find((supply) =>
+          hasRenderableCoordinates(
+            supply.sourceDepotLatitude ?? 0,
+            supply.sourceDepotLongitude ?? 0,
+          ),
+        )?.sourceDepotLatitude ?? 0);
+    const targetLongitude = hasRenderableCoordinates(
+      activity.targetLatitude,
+      activity.targetLongitude,
+    )
+      ? activity.targetLongitude
+      : (reusableSupplies.find((supply) =>
+          hasRenderableCoordinates(
+            supply.sourceDepotLatitude ?? 0,
+            supply.sourceDepotLongitude ?? 0,
+          ),
+        )?.sourceDepotLongitude ?? 0);
 
-    const group =
-      existingGroup ??
-      {
-        key: groupKey,
-        depotId,
-        teamId,
-        depotName: activity.depotName ?? null,
-        depotAddress: activity.depotAddress ?? null,
-        target: targetLabel,
-        targetLatitude,
-        targetLongitude,
-        supplies: [],
-        lastCollectIndex: activityIndex,
-        supplyBuckets: new Map<number, ManualSupplyItem>(),
-      };
+    const group = existingGroup ?? {
+      key: groupKey,
+      depotId,
+      teamId,
+      depotName: activity.depotName ?? null,
+      depotAddress: activity.depotAddress ?? null,
+      target: targetLabel,
+      targetLatitude,
+      targetLongitude,
+      supplies: [],
+      lastCollectIndex: activityIndex,
+      supplyBuckets: new Map<number, ManualSupplyItem>(),
+    };
 
     if (activityIndex >= group.lastCollectIndex) {
       group.lastCollectIndex = activityIndex;
@@ -896,8 +907,7 @@ function SortableActivityCard({
   const isSupplyStep = isSupplyActivityType(activity.activityType);
   const isAutoReturnStep = activity.isAutoReturnStep === true;
   const isAutoSyncedDeliveryStep = activity.isAutoSyncedDeliveryStep === true;
-  const isAutoManagedSupplyStep =
-    isAutoReturnStep || isAutoSyncedDeliveryStep;
+  const isAutoManagedSupplyStep = isAutoReturnStep || isAutoSyncedDeliveryStep;
   const hasSupplyBalanceIssues = supplyBalanceIssues.length > 0;
   const primarySupplyBalanceIssue = supplyBalanceIssues[0] ?? null;
   const selectedTeam =
@@ -1204,7 +1214,8 @@ function SortableActivityCard({
 
           {isAutoSyncedDeliveryStep ? (
             <p className="mb-2 rounded-md border border-blue-200/80 bg-blue-100/70 px-2.5 py-1.5 text-xs text-blue-800 dark:border-blue-700/60 dark:bg-blue-900/25 dark:text-blue-200">
-              Bước phân phát đang tự đồng bộ từ các bước tiếp nhận trước đó của cùng đội.
+              Bước phân phát đang tự đồng bộ từ các bước tiếp nhận trước đó của
+              cùng đội.
             </p>
           ) : null}
 
@@ -1277,7 +1288,7 @@ function SortableActivityCard({
                 ? "Bước hoàn trả chỉ tự đồng bộ đồ reusable từ các bước thu gom cùng kho và cùng đội."
                 : isAutoSyncedDeliveryStep
                   ? "Vật phẩm sẽ tự cập nhật từ bước tiếp nhận tương ứng."
-                : "Kéo vật phẩm từ kho bên trái vào đây"}
+                  : "Kéo vật phẩm từ kho bên trái vào đây"}
             </p>
           )}
         </div>
@@ -1522,6 +1533,7 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
               (typeof itemWithUnit.unitName === "string"
                 ? itemWithUnit.unitName.trim()
                 : "");
+            const itemImageUrl = item.imageUrl?.trim() || "";
 
             return (
               <div
@@ -1549,10 +1561,18 @@ function NearbyDepotInventoryCard({ depot }: { depot: DepotByClusterEntity }) {
                 }}
                 className="flex cursor-grab items-center gap-2 rounded-xl border border-border/70 bg-background/90 px-2.5 py-2 transition-colors hover:bg-accent/40 active:cursor-grabbing"
               >
-                <Package
-                  className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-300"
-                  weight="fill"
-                />
+                <Avatar className="h-9 w-9 shrink-0 rounded-md border border-border/70 bg-slate-100/80 dark:bg-slate-900/60">
+                  <AvatarImage
+                    src={itemImageUrl || undefined}
+                    alt={item.itemModelName}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                  <AvatarFallback className="rounded-md bg-slate-100 text-blue-600 dark:bg-slate-900 dark:text-blue-300">
+                    <Package className="h-4 w-4" weight="fill" />
+                  </AvatarFallback>
+                </Avatar>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs font-semibold text-foreground">
                     {item.itemModelName}
@@ -1909,7 +1929,9 @@ const ManualMissionBuilder = ({
   const normalizeManualActivities = useCallback(
     (activities: ManualActivity[]): ManualActivity[] => {
       const baseActivities = syncManualDeliverActivities(
-        activities.filter((activity) => activity.activityType !== "RETURN_SUPPLIES"),
+        activities.filter(
+          (activity) => activity.activityType !== "RETURN_SUPPLIES",
+        ),
       );
       const previousReturnActivities = activities.filter(
         (activity) => activity.activityType === "RETURN_SUPPLIES",
@@ -2081,11 +2103,14 @@ const ManualMissionBuilder = ({
     [normalizeManualActivities],
   );
 
-  const handleRemoveActivity = useCallback((id: string) => {
-    setActivities((prev) =>
-      normalizeManualActivities(prev.filter((a) => a.id !== id)),
-    );
-  }, [normalizeManualActivities]);
+  const handleRemoveActivity = useCallback(
+    (id: string) => {
+      setActivities((prev) =>
+        normalizeManualActivities(prev.filter((a) => a.id !== id)),
+      );
+    },
+    [normalizeManualActivities],
+  );
 
   // ── Apply template ──
   const applyTemplate = useCallback(
@@ -2431,12 +2456,16 @@ const ManualMissionBuilder = ({
               return activity;
             }
 
-            if (activity.isAutoReturnStep || activity.isAutoSyncedDeliveryStep) {
+            if (
+              activity.isAutoReturnStep ||
+              activity.isAutoSyncedDeliveryStep
+            ) {
               return activity;
             }
 
             const existingSupplies = activity.suppliesToCollect ?? [];
-            const activeDepotSource = existingSupplies[0]?.sourceDepotId ?? null;
+            const activeDepotSource =
+              existingSupplies[0]?.sourceDepotId ?? null;
 
             if (
               activeDepotSource != null &&
@@ -2530,7 +2559,10 @@ const ManualMissionBuilder = ({
               return activity;
             }
 
-            if (activity.isAutoReturnStep || activity.isAutoSyncedDeliveryStep) {
+            if (
+              activity.isAutoReturnStep ||
+              activity.isAutoSyncedDeliveryStep
+            ) {
               return activity;
             }
 
@@ -2565,7 +2597,10 @@ const ManualMissionBuilder = ({
               return activity;
             }
 
-            if (activity.isAutoReturnStep || activity.isAutoSyncedDeliveryStep) {
+            if (
+              activity.isAutoReturnStep ||
+              activity.isAutoSyncedDeliveryStep
+            ) {
               return activity;
             }
 
@@ -2589,7 +2624,8 @@ const ManualMissionBuilder = ({
                   nextDepotSource?.sourceDepotLatitude ?? 0,
                   nextDepotSource?.sourceDepotLongitude ?? 0,
                 )
-                  ? (nextDepotSource?.sourceDepotLatitude ?? activity.targetLatitude)
+                  ? (nextDepotSource?.sourceDepotLatitude ??
+                    activity.targetLatitude)
                   : activity.targetLatitude,
               targetLongitude:
                 isDepotLinkedActivityType(activity.activityType) &&
@@ -2597,7 +2633,8 @@ const ManualMissionBuilder = ({
                   nextDepotSource?.sourceDepotLatitude ?? 0,
                   nextDepotSource?.sourceDepotLongitude ?? 0,
                 )
-                  ? (nextDepotSource?.sourceDepotLongitude ?? activity.targetLongitude)
+                  ? (nextDepotSource?.sourceDepotLongitude ??
+                    activity.targetLongitude)
                   : activity.targetLongitude,
               suppliesToCollect: nextSupplies,
               items: buildSupplySummary(nextSupplies),
@@ -2723,7 +2760,10 @@ const ManualMissionBuilder = ({
         return false;
       }
 
-      if (isSupplyActivityType(a.activityType) && a.suppliesToCollect.length > 0) {
+      if (
+        isSupplyActivityType(a.activityType) &&
+        a.suppliesToCollect.length > 0
+      ) {
         const firstDepotId = a.suppliesToCollect[0]?.sourceDepotId ?? null;
         const hasMixedDepotSource = a.suppliesToCollect.some(
           (supply) =>
@@ -2759,7 +2799,12 @@ const ManualMissionBuilder = ({
       return false;
     }
     return true;
-  }, [activities, expectedEndTime, startTime, supplyBalanceAnalysis.firstIssue]);
+  }, [
+    activities,
+    expectedEndTime,
+    startTime,
+    supplyBalanceAnalysis.firstIssue,
+  ]);
 
   // ── Submit ──
   const handleSubmit = useCallback(async () => {
@@ -2814,7 +2859,10 @@ const ManualMissionBuilder = ({
       } catch (error) {
         console.error("Failed to update mission or activities:", error);
         toast.error(
-          getErrorMessage(error, "Không thể cập nhật nhiệm vụ. Vui lòng thử lại."),
+          getErrorMessage(
+            error,
+            "Không thể cập nhật nhiệm vụ. Vui lòng thử lại.",
+          ),
         );
       }
     } else {
@@ -3920,9 +3968,9 @@ const ManualMissionBuilder = ({
                       ? " • cần đội gần cụm"
                       : supplyBalanceAnalysis.hasIssues
                         ? ` • lệch ${supplyBalanceAnalysis.issues.length} cảnh báo vật phẩm`
-                      : !hasAssignedTeamsForAllSteps
-                        ? " • chưa gán đủ đội"
-                        : ""}
+                        : !hasAssignedTeamsForAllSteps
+                          ? " • chưa gán đủ đội"
+                          : ""}
                   </span>
                   {supplyBalanceAnalysis.firstIssue ? (
                     <p className="max-w-md text-right text-xs text-amber-700 dark:text-amber-300">

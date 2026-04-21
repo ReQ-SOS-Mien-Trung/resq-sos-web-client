@@ -40,6 +40,7 @@ import {
   getMedicalSupportNeedLabel,
   getSupplyLabel,
   getSituationLabel,
+  getSosTypeLabel,
   getWaterDurationLabel,
   getWaterRemainingLabel,
 } from "@/lib/sos";
@@ -190,9 +191,7 @@ function getBreakdownNumber(
 ): number {
   const value = breakdown?.[key];
 
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : fallback;
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function compactFormulaDetails(
@@ -231,9 +230,7 @@ function SigmaSymbol() {
     <span className="relative mx-1 inline-flex h-9 w-8 items-center justify-center align-middle font-serif text-3xl leading-none text-foreground">
       <span className="absolute -top-0.5 text-[10px] leading-none">n</span>
       <span>Σ</span>
-      <span className="absolute -bottom-0.5 text-[10px] leading-none">
-        i=1
-      </span>
+      <span className="absolute -bottom-0.5 text-[10px] leading-none">i=1</span>
     </span>
   );
 }
@@ -259,8 +256,7 @@ function PriorityFormulaNotation({
   includeSituationMultiplier: boolean;
   totalScore: string;
 }) {
-  const symbols =
-    additiveSymbols.length > 0 ? additiveSymbols : ["M", "R"];
+  const symbols = additiveSymbols.length > 0 ? additiveSymbols : ["M", "R"];
 
   return (
     <div className="min-w-max font-serif text-2xl leading-none tracking-normal text-foreground">
@@ -904,8 +900,9 @@ const SOSDetailsPanel = ({
     priorityConfigFormula.includes("medical_score");
   const priorityFormulaUsesRelief =
     priorityConfigFormula.includes("relief_score");
-  const priorityFormulaUsesSituation =
-    priorityConfigFormula.includes("situation_multiplier");
+  const priorityFormulaUsesSituation = priorityConfigFormula.includes(
+    "situation_multiplier",
+  );
   const priorityFormulaSymbols = [
     priorityFormulaUsesRequestType ? "T" : null,
     priorityFormulaUsesMedical ? "M" : null,
@@ -1011,13 +1008,16 @@ const SOSDetailsPanel = ({
   const reporterRoleLabel = sosRequest.isSentOnBehalf
     ? "Người gửi hộ"
     : "Người gửi SOS";
+  const sosTypeLabel = sosRequest.sosType
+    ? getSosTypeLabel(sosRequest.sosType)
+    : null;
 
   const renderPanelContent = () => (
     <>
       {/* Header */}
       <div className="p-5 pb-4 border-b shrink-0">
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <div
                 className={cn(
@@ -1027,14 +1027,32 @@ const SOSDetailsPanel = ({
               />
               SOS {sosRequest.id}
             </h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              Chi tiết yêu cầu SOS
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="text-sm text-muted-foreground">
+                Chi tiết yêu cầu SOS
+              </p>
+              {sosTypeLabel && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "max-w-46 px-2 py-0 text-[10px] font-semibold leading-4",
+                    sosRequest.sosType.toUpperCase() === "RESCUE"
+                      ? "border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400"
+                      : sosRequest.sosType.toUpperCase() === "RELIEF"
+                        ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-400"
+                        : "border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-400",
+                  )}
+                  title={sosTypeLabel}
+                >
+                  <span className="block truncate">{sosTypeLabel}</span>
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <Badge
               variant={PRIORITY_BADGE_VARIANT[sosRequest.priority]}
-              className="text-sm px-3"
+              className="text-sm px-3 whitespace-nowrap"
             >
               {PRIORITY_LABELS[sosRequest.priority]}
             </Badge>
@@ -1749,6 +1767,10 @@ const SOSDetailsPanel = ({
                               icon: "ph:package",
                             },
                             WATER: { label: "Nước uống", icon: "ph:drop" },
+                            CLOTHING: {
+                              label: "Quần áo",
+                              icon: "ph:t-shirt",
+                            },
                             BLANKETS: { label: "Chăn mền", icon: "ph:bed" },
                             TRANSPORT_VEHICLE: {
                               label: "Phương tiện vận chuyển",

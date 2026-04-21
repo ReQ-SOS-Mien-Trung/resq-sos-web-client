@@ -1269,7 +1269,8 @@ function AssemblyPointDetails({
     hasActiveEvent && selectedEvent?.status !== "Gathering";
   const shouldShowCreateTeam =
     hasActiveEvent && selectedEvent?.status === "Gathering";
-  const canToggleSchedule = !hasActiveEvent;
+  const isAssemblyPointAvailable = displayAssemblyPoint.status === "Available";
+  const canToggleSchedule = isAssemblyPointAvailable && !hasActiveEvent;
   const effectiveShowScheduleForm = canToggleSchedule && showScheduleForm;
   const canOpenCheckIn =
     shouldShowOpenCheckIn && !isStartingGathering && !!effectiveSelectedEventId;
@@ -1476,7 +1477,7 @@ function AssemblyPointDetails({
           </div>
         </div>
 
-        {!hasActiveEvent && showScheduleForm && (
+        {effectiveShowScheduleForm && (
           <div className="mt-3 rounded-lg border border-[#FF5722]/25 bg-[#FF5722]/5 p-3 space-y-3">
             <div className="space-y-1">
               <p className="text-xs font-medium text-[#FF5722]">
