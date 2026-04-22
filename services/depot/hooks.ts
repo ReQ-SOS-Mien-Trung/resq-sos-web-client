@@ -36,6 +36,7 @@ import {
   getMyDepotClosures,
   getMyDepotClosureDetail,
   getDepotClosureDetailByDepotId,
+  getDepotClosureTransferDetailByDepotId,
   getDepotClosuresListByDepotId,
   getDepotClosureTransfer,
   prepareDepotTransfer,
@@ -91,6 +92,7 @@ import {
   GetMyDepotClosuresResponse,
   GetDepotClosuresListByDepotIdResponse,
   DepotClosureDetail,
+  DepotClosureDetailTransfer,
   DepotClosureTransfer,
   DepotTransferActionRequest,
   DepotTransferActionResponse,
@@ -135,6 +137,9 @@ export const DEPOT_CLOSURE_BY_DEPOT_QUERY_KEY = [
 ] as const;
 export const DEPOT_CLOSURE_DETAIL_BY_DEPOT_QUERY_KEY = [
   "depot-closure-detail-by-depot",
+] as const;
+export const DEPOT_CLOSURE_TRANSFER_DETAIL_BY_DEPOT_QUERY_KEY = [
+  "depot-closure-transfer-detail-by-depot",
 ] as const;
 export const DEPOT_CLOSURE_TRANSFER_SUGGESTIONS_QUERY_KEY = [
   "depot-closure-transfer-suggestions",
@@ -775,9 +780,11 @@ export function useDepotClosureByDepotId(
               snapshotReusableUnits: active.snapshotReusableUnits,
               shippedAt: null,
               shippedBy: null,
+              shippedByName: null,
               shipNote: null,
               receivedAt: null,
               receivedBy: null,
+              receivedByName: null,
               receiveNote: null,
               cancelledAt: null,
               cancelledBy: null,
@@ -832,6 +839,32 @@ export function useDepotClosureDetailByDepotId(
       depotId > 0 &&
       Number.isFinite(closureId) &&
       closureId > 0,
+  });
+}
+
+export function useDepotClosureTransferDetailByDepotId(
+  depotId: number,
+  closureId: number,
+  transferId: number,
+  options?: { enabled?: boolean },
+) {
+  return useQuery<DepotClosureDetailTransfer | null>({
+    queryKey: [
+      ...DEPOT_CLOSURE_TRANSFER_DETAIL_BY_DEPOT_QUERY_KEY,
+      depotId,
+      closureId,
+      transferId,
+    ],
+    queryFn: () =>
+      getDepotClosureTransferDetailByDepotId(depotId, closureId, transferId),
+    enabled:
+      (options?.enabled ?? true) &&
+      Number.isFinite(depotId) &&
+      depotId > 0 &&
+      Number.isFinite(closureId) &&
+      closureId > 0 &&
+      Number.isFinite(transferId) &&
+      transferId > 0,
   });
 }
 

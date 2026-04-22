@@ -381,11 +381,15 @@ function normalizeDepotClosureDetailTransfer(
         : 0,
     shippedAt: typeof candidate.shippedAt === "string" ? candidate.shippedAt : null,
     shippedBy: typeof candidate.shippedBy === "string" ? candidate.shippedBy : null,
+    shippedByName:
+      typeof source.shippedByName === "string" ? source.shippedByName : null,
     shipNote: typeof candidate.shipNote === "string" ? candidate.shipNote : null,
     receivedAt:
       typeof candidate.receivedAt === "string" ? candidate.receivedAt : null,
     receivedBy:
       typeof candidate.receivedBy === "string" ? candidate.receivedBy : null,
+    receivedByName:
+      typeof source.receivedByName === "string" ? source.receivedByName : null,
     receiveNote:
       typeof candidate.receiveNote === "string" ? candidate.receiveNote : null,
     cancelledAt:
@@ -992,6 +996,26 @@ export async function getDepotClosureDetailByDepotId(
   return response.status === 404
     ? null
     : normalizeDepotClosureDetailResponse(response.data);
+}
+
+/**
+ * [Admin] Get specific transfer detail by depotId + closureId + transferId
+ * GET /logistics/depot/{depotId}/closures/{closureId}/transfers/{transferId}
+ */
+export async function getDepotClosureTransferDetailByDepotId(
+  depotId: number,
+  closureId: number,
+  transferId: number,
+): Promise<DepotClosureDetailTransfer | null> {
+  const response = await api.get(
+    `/logistics/depot/${depotId}/closures/${closureId}/transfers/${transferId}`,
+    {
+      validateStatus: (status) => status === 200 || status === 404,
+    },
+  );
+  return response.status === 404
+    ? null
+    : normalizeDepotClosureDetailTransfer(response.data);
 }
 
 // ── Depot Closure Transfer ───────────────────────────────────────────
