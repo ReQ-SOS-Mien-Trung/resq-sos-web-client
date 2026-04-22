@@ -51,6 +51,7 @@ import {
   Eye,
 } from "@phosphor-icons/react";
 import {
+  useInventoryCategories,
   useInventoryItemTypes,
   useInventoryTargetGroups,
   useImportRegularInventory,
@@ -89,6 +90,7 @@ const SYSTEM_CATEGORIES = [
   { label: "Công cụ sửa chữa", value: "RepairTools" },
   { label: "Thiết bị cứu hộ", value: "RescueEquipment" },
   { label: "Sưởi ấm", value: "Heating" },
+  { label: "Khác", value: "Others" },
 ] as const;
 
 const CATEGORY_VI_MAP: Record<string, string> = {
@@ -101,6 +103,7 @@ const CATEGORY_VI_MAP: Record<string, string> = {
   "công cụ sửa chữa": "RepairTools",
   "thiết bị cứu hộ": "RescueEquipment",
   "sưởi ấm": "Heating",
+  khác: "Others",
   food: "Food",
   water: "Water",
   medical: "Medical",
@@ -110,11 +113,9 @@ const CATEGORY_VI_MAP: Record<string, string> = {
   repairtools: "RepairTools",
   rescueequipment: "RescueEquipment",
   heating: "Heating",
+  other: "Others",
+  others: "Others",
 };
-
-const CATEGORY_NAME_BY_CODE = Object.fromEntries(
-  SYSTEM_CATEGORIES.map((category) => [category.value, category.label]),
-) as Record<string, string>;
 
 /** Match category from bilingual format like "Thực phẩm - Food" */
 function matchCategoryCode(rawCategory: string): string {
@@ -766,13 +767,46 @@ export default function ExcelImportRegular() {
 
   const { data: itemTypesData } = useInventoryItemTypes();
   const { data: targetGroupsData } = useInventoryTargetGroups();
+  const { data: inventoryCategoriesData } = useInventoryCategories();
   const importMutation = useImportRegularInventory();
   const { mutateAsync: downloadTemplate } = useDownloadPurchaseImportTemplate();
 
   const itemTypes = useMemo(() => itemTypesData ?? [], [itemTypesData]);
+  const inventoryCategories = useMemo(
+    () => inventoryCategoriesData ?? [],
+    [inventoryCategoriesData],
+  );
   const targetGroups = useMemo(
     () => targetGroupsData ?? [],
     [targetGroupsData],
+  );
+  const itemTypeOptions = useMemo(
+    () => itemTypes.map((t) => ({ label: t.value, value: t.key })),
+    [itemTypes],
+  );
+  const categoryOptions = useMemo(() => {
+    if (inventoryCategories.length > 0) {
+      return inventoryCategories.map((category) => ({
+        label: category.value,
+        value: category.key,
+      }));
+    }
+
+    return SYSTEM_CATEGORIES.map((category) => ({
+      label: category.label,
+      value: category.value,
+    }));
+  }, [inventoryCategories]);
+  const categoryNameByCode = useMemo(
+    () =>
+      Object.fromEntries(
+        categoryOptions.map((category) => [category.value, category.label]),
+      ) as Record<string, string>,
+    [categoryOptions],
+  );
+  const targetGroupOptions = useMemo(
+    () => targetGroups.map((t) => ({ label: t.value, value: t.key })),
+    [targetGroups],
   );
 
   useEffect(() => {
@@ -1387,7 +1421,7 @@ export default function ExcelImportRegular() {
             beforeImportItems,
             afterImportItems,
             (categoryCode) =>
-              CATEGORY_NAME_BY_CODE[categoryCode] ?? categoryCode,
+              categoryNameByCode[categoryCode] ?? categoryCode,
           );
 
           const uploadedImages = await Promise.all(
@@ -1476,17 +1510,9 @@ export default function ExcelImportRegular() {
     totalRows,
     selectedDepotId,
     importMutation,
+    categoryNameByCode,
     router,
   ]);
-
-  const itemTypeOptions = useMemo(
-    () => itemTypes.map((t) => ({ label: t.value, value: t.key })),
-    [itemTypes],
-  );
-  const targetGroupOptions = useMemo(
-    () => targetGroups.map((t) => ({ label: t.value, value: t.key })),
-    [targetGroups],
-  );
 
   const renderInputCell = (
     groupId: string,
@@ -1550,7 +1576,12 @@ export default function ExcelImportRegular() {
           value={currentValue}
           onValueChange={(val) => updateRow(groupId, row.id, field, val)}
         >
-          <SelectTrigger className={cn("text-sm", error && "border-red-500")}>
+          <SelectTrigger
+            className={cn(
+              "h-11 w-full min-w-[180px] rounded-md border-slate-200 bg-white px-4 text-sm shadow-sm",
+              error && "border-red-500 focus-visible:ring-red-500",
+            )}
+          >
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
@@ -2723,10 +2754,7 @@ export default function ExcelImportRegular() {
                                     group.id,
                                     row,
                                     "categoryCode",
-                                    SYSTEM_CATEGORIES.map((c) => ({
-                                      label: c.label,
-                                      value: c.value,
-                                    })),
+                                    categoryOptions,
                                     "Chọn danh mục",
                                   )}
                                 </TableCell>
