@@ -1591,7 +1591,10 @@ export default function FundingRequestPage() {
           onValueChange={(val) => updateRow(row.id, field, val)}
         >
           <SelectTrigger
-            className={cn("h-8 text-sm", error && "border-red-400")}
+            className={cn(
+              "h-8 w-full min-w-[180px] text-sm",
+              error && "border-red-400",
+            )}
           >
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
