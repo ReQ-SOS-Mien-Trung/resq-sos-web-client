@@ -62,6 +62,10 @@ import {
   DecommissionReusableParams,
   DecommissionReusableResponse,
   ReusableItemStatus,
+  SearchDepotReusableUnitsParams,
+  SearchDepotReusableUnitsResponse,
+  UpdateReusableStatusParams,
+  UpdateReusableStatusResponse,
 } from "./type";
 
 type InventoryItemLike = Partial<InventoryItemEntity> & {
@@ -932,6 +936,9 @@ export async function getMyDepotLowStock(
       depotId,
       ...query,
     },
+    paramsSerializer: {
+      indexes: null,
+    },
   });
   return data;
 }
@@ -1031,6 +1038,53 @@ export async function decommissionReusable(
 export async function getReusableItemStatuses(): Promise<ReusableItemStatus[]> {
   const { data } = await api.get(
     "/logistics/inventory/metadata/reusable-item-statuses",
+  );
+  return data;
+}
+
+/**
+ * Search reusable units in a specific depot by item model and serial number(s)
+ * GET /logistics/inventory/depot/{depotId}/reusable-units/search
+ */
+export async function searchDepotReusableUnits(
+  params: SearchDepotReusableUnitsParams,
+): Promise<SearchDepotReusableUnitsResponse> {
+  const { depotId, ...query } = params;
+  const { data } = await api.get(
+    `/logistics/inventory/depot/${depotId}/reusable-units/search`,
+    {
+      params: query,
+    },
+  );
+  return data;
+}
+
+/**
+ * Set a reusable item to maintenance
+ * PATCH /logistics/inventory/depot/{depotId}/reusables/{itemId}/maintenance
+ */
+export async function setReusableMaintenance(
+  params: UpdateReusableStatusParams,
+): Promise<UpdateReusableStatusResponse> {
+  const { depotId, itemId, payload } = params;
+  const { data } = await api.patch(
+    `/logistics/inventory/depot/${depotId}/reusables/${itemId}/maintenance`,
+    payload,
+  );
+  return data;
+}
+
+/**
+ * Set a reusable item to available
+ * PATCH /logistics/inventory/depot/{depotId}/reusables/{itemId}/available
+ */
+export async function setReusableAvailable(
+  params: UpdateReusableStatusParams,
+): Promise<UpdateReusableStatusResponse> {
+  const { depotId, itemId, payload } = params;
+  const { data } = await api.patch(
+    `/logistics/inventory/depot/${depotId}/reusables/${itemId}/available`,
+    payload,
   );
   return data;
 }

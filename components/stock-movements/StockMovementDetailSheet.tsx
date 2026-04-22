@@ -188,7 +188,7 @@ export function StockMovementDetailSheet({
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
-                  <Hash size={18} /> Mã giao dịch
+                  <Hash size={18} /> Mã
                 </span>
                 <span className="font-medium text-sm break-all">
                   {movement.transactionId}
@@ -197,7 +197,7 @@ export function StockMovementDetailSheet({
 
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
-                  <Calendar size={16} /> Thời gian nhập kho
+                  <Calendar size={16} /> Thời gian tạo
                 </span>
                 <span className="font-medium tracking-tighter">
                   {formatDate(movement.createdAt)}
@@ -206,7 +206,7 @@ export function StockMovementDetailSheet({
 
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm text-muted-foreground tracking-tighter flex items-center gap-1">
-                  <Tag size={16} /> Loại nguồn
+                  <Tag size={16} /> Loại hành động
                 </span>
                 <span className="font-medium tracking-tighter">
                   {SOURCE_TYPE_MAP[movement.sourceType] ??

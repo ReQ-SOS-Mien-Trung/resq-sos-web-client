@@ -126,10 +126,10 @@ export function useOperationalRealtime({
 
   useEffect(() => {
     if (!enabled || !accessToken) {
-      void operationalRealtimeClient.stop().catch(() => null);
       return;
     }
 
+    operationalRealtimeClient.retainConnection();
     void operationalRealtimeClient.start().catch((error) => {
       if (isNegotiationAbortError(error)) {
         return;
@@ -139,7 +139,7 @@ export function useOperationalRealtime({
     });
 
     return () => {
-      void operationalRealtimeClient.stop().catch(() => null);
+      void operationalRealtimeClient.releaseConnection().catch(() => null);
     };
   }, [accessToken, enabled]);
 
@@ -147,6 +147,54 @@ export function useOperationalRealtime({
     if (!enabled || !accessToken) {
       return;
     }
+
+    const invalidateActiveRealtimeQueries = () => {
+      void queryClient.invalidateQueries({
+        queryKey: ASSEMBLY_POINTS_QUERY_KEY,
+      });
+
+      const selectedAssemblyPointId = assemblyPointIdRef.current;
+      if (selectedAssemblyPointId) {
+        void queryClient.invalidateQueries({
+          queryKey: [...ASSEMBLY_POINTS_QUERY_KEY, selectedAssemblyPointId],
+        });
+        void queryClient.invalidateQueries({
+          predicate: (query) =>
+            isClusterQuery(
+              query,
+              ASSEMBLY_POINT_EVENTS_QUERY_KEY,
+              selectedAssemblyPointId,
+            ),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ASSEMBLY_POINT_CHECKED_IN_RESCUERS_QUERY_KEY,
+        });
+      }
+
+      if (activeDepotId != null) {
+        void queryClient.invalidateQueries({
+          predicate: (query) => isDepotInventoryQuery(query, activeDepotId),
+        });
+      }
+
+      clusterIdsRef.current.forEach((clusterId) => {
+        void queryClient.invalidateQueries({
+          predicate: (query) =>
+            isClusterQuery(query, DEPOTS_BY_CLUSTER_QUERY_KEY, clusterId),
+        });
+        void queryClient.invalidateQueries({
+          predicate: (query) =>
+            isClusterQuery(query, RESCUE_TEAMS_BY_CLUSTER_QUERY_KEY, clusterId),
+        });
+        void queryClient.invalidateQueries({
+          predicate: (query) =>
+            isAlternativeDepotQuery(query, clusterId),
+        });
+      });
+
+      void queryClient.invalidateQueries({ queryKey: RESCUE_TEAMS_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: DEPOTS_QUERY_KEY });
+    };
 
     const unsubscribeAssemblyPointList =
       operationalRealtimeClient.onAssemblyPointListUpdate(() => {
@@ -230,12 +278,18 @@ export function useOperationalRealtime({
     const unsubscribeLogistics =
       operationalRealtimeClient.onLogisticsUpdate(invalidateLogisticsClusterQueries);
 
+    const unsubscribeReconnected =
+      operationalRealtimeClient.subscribeReconnected(
+        invalidateActiveRealtimeQueries,
+      );
+
     return () => {
       unsubscribeAssemblyPointList();
       unsubscribeDepotInventory();
       unsubscribeLogistics();
+      unsubscribeReconnected();
     };
-  }, [accessToken, enabled, queryClient]);
+  }, [accessToken, activeDepotId, enabled, queryClient]);
 
   useEffect(() => {
     if (!enabled || !accessToken || activeDepotId == null) {

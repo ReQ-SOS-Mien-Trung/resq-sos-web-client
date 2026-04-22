@@ -2086,7 +2086,7 @@ export default function FundingRequestPage() {
                               ))}
                             </div>
                             <p className="mt-2 text-xs text-muted-foreground tracking-tight">
-                              Hai cột thể tích và cân nặng là tùy chọn. Có thể
+                              Hai cột thể tích và khối lượng là tùy chọn. Có thể
                               để trống nếu chưa có dữ liệu.
                             </p>
                           </div>

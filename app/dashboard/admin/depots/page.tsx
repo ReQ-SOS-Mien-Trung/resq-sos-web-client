@@ -912,7 +912,7 @@ export default function DepotsPage() {
                 Hiển thị
               </span>
               <Select value={String(pageSize)} onValueChange={changePageSize}>
-                <SelectTrigger className="h-8 w-16 text-sm tracking-tighter">
+                <SelectTrigger className="h-8 min-w-[76px] justify-between px-3 pr-8 text-sm tracking-tighter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

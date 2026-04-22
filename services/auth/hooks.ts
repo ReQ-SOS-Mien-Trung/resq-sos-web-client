@@ -73,7 +73,11 @@ export function useLogout() {
 
   return useMutation<LogoutResponse, Error, void>({
     mutationKey: LOGOUT_MUTATION_KEY,
-    mutationFn: logout,
+    mutationFn: async () => {
+      // Skip API call — just clear local state.
+      // The server token will expire on its own.
+      return {} as LogoutResponse;
+    },
     onSuccess: async () => {
       await unregisterStoredFcmToken();
       clearAuth();
@@ -81,9 +85,9 @@ export function useLogout() {
     },
     onError: async (error) => {
       await unregisterStoredFcmToken();
-      // Even on error, clear local auth state
       clearAuth();
       console.error("Logout error:", error);
+      router.push("/sign-in");
     },
   });
 }

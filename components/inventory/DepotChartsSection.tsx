@@ -220,7 +220,7 @@ function Chart1Capacity({ depotId }: { depotId: number }) {
             value={data.currentVolume}
             max={data.maxVolume}
             percent={data.volumeUsagePercent}
-            unit="m³"
+            unit="dm³"
             fillColor={volColor}
             trackColor="#e5e7eb"
           />
@@ -601,9 +601,9 @@ function Chart3FundMovement({ depotId }: { depotId: number }) {
 export default function DepotChartsSection({ depotId }: { depotId: number }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-xs font-semibold tracking-tighter text-muted-foreground uppercase">
+      {/* <h2 className="text-base font-semibold tracking-tighter text-muted-foreground uppercase">
         Biểu đồ tổng quan
-      </h2>
+      </h2> */}
       {/* Row 1: Capacity (1 col) + Low Stock Alerts (3 col) */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:items-stretch">
         <div className="lg:h-full">

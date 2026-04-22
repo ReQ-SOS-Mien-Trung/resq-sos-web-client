@@ -22,15 +22,68 @@ export type ReceiveLogisticsUpdatePayload = {
   changedAt: string;
 };
 
+export type ReceiveSupplyRequestUpdatePayload = {
+  requestId: number;
+  requestingDepotId: number;
+  sourceDepotId: number;
+  action: string;
+  sourceStatus: string;
+  requestingStatus: string;
+  rejectedReason: string | null;
+  changedAt: string;
+};
+
+export type ReceiveDepotActivityUpdatePayload = {
+  activityId: number;
+  depotId: number;
+  missionId: number | null;
+  missionTeamId: number | null;
+  rescueTeamId: number | null;
+  activityType: string;
+  action: string;
+  status: string;
+  estimatedTime: number | null;
+  missionExpectedEndTime: string | null;
+  changedAt: string;
+};
+
+export type ReceiveDepotClosureUpdatePayload = {
+  sourceDepotId: number;
+  targetDepotId: number | null;
+  closureId: number | null;
+  transferId: number | null;
+  entityType: string;
+  action: string;
+  status: string;
+  changedAt: string;
+};
+
 export const OPERATIONAL_REALTIME_METHODS = {
   SubscribeDepot: "SubscribeDepot",
   UnsubscribeDepot: "UnsubscribeDepot",
   SubscribeCluster: "SubscribeCluster",
   UnsubscribeCluster: "UnsubscribeCluster",
+  SubscribeSupplyRequests: "SubscribeSupplyRequests",
+  UnsubscribeSupplyRequests: "UnsubscribeSupplyRequests",
+  SubscribeSupplyRequest: "SubscribeSupplyRequest",
+  UnsubscribeSupplyRequest: "UnsubscribeSupplyRequest",
+  SubscribeDepotActivities: "SubscribeDepotActivities",
+  UnsubscribeDepotActivities: "UnsubscribeDepotActivities",
+  SubscribeActivity: "SubscribeActivity",
+  UnsubscribeActivity: "UnsubscribeActivity",
+  SubscribeDepotClosures: "SubscribeDepotClosures",
+  UnsubscribeDepotClosures: "UnsubscribeDepotClosures",
+  SubscribeClosure: "SubscribeClosure",
+  UnsubscribeClosure: "UnsubscribeClosure",
+  SubscribeTransfer: "SubscribeTransfer",
+  UnsubscribeTransfer: "UnsubscribeTransfer",
 } as const;
 
 export const OPERATIONAL_REALTIME_EVENTS = {
   ReceiveAssemblyPointListUpdate: "ReceiveAssemblyPointListUpdate",
   ReceiveDepotInventoryUpdate: "ReceiveDepotInventoryUpdate",
   ReceiveLogisticsUpdate: "ReceiveLogisticsUpdate",
+  ReceiveSupplyRequestUpdate: "ReceiveSupplyRequestUpdate",
+  ReceiveDepotActivityUpdate: "ReceiveDepotActivityUpdate",
+  ReceiveDepotClosureUpdate: "ReceiveDepotClosureUpdate",
 } as const;

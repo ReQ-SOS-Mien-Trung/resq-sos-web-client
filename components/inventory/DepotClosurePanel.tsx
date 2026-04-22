@@ -32,6 +32,7 @@ import {
 import { toast } from "sonner";
 import {
   useDepotById,
+  useDepotExternalResolutionState,
   useMyDepotClosures,
   useMyDepotClosureDetail,
   useMyDepotTransfers,
@@ -41,10 +42,26 @@ import {
   useReceiveDepotTransfer,
   useDownloadDepotClosureExportTemplate,
   useSubmitDepotExternalResolution,
+  useDepotClosureTransferStatuses,
 } from "@/services/depot/hooks";
-import type { DepotExternalResolutionItem } from "@/services/depot/type";
+import type {
+  DepotExternalResolutionItem,
+  DepotTransferListItem,
+} from "@/services/depot/type";
 import { AxiosError } from "axios";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
+import { useInventoryOperationalRealtime } from "@/hooks/useInventoryOperationalRealtime";
+import { notificationRealtimeClient } from "@/services/noti_alert/realtime";
+import type { NotificationRealtimePayload } from "@/services/noti_alert/type";
+import { DepotTransfersListTable } from "@/components/inventory/DepotTransfersListTable";
+import {
+  buildDepotClosureTransferStepItems,
+  buildDepotClosureTransferStatusValueMap,
+  getDepotClosureTransferStatusLabel,
+  getDepotClosureTransferStatusToneClass,
+  normalizeDepotClosureTransferStatus,
+  DEPOT_CLOSURE_TRANSFER_TERMINAL_STATUSES,
+} from "@/lib/depot-closure-transfer-status";
 
 /* ── helpers ──────────────────────────────────────────────────── */
 function getApiError(err: unknown, fallback: string): string {
@@ -53,6 +70,27 @@ function getApiError(err: unknown, fallback: string): string {
     if (typeof msg === "string" && msg.trim()) return msg.trim();
   }
   return fallback;
+}
+
+function normalizeNotificationType(type: unknown): string {
+  return String(type ?? "")
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_")
+    .toLowerCase();
+}
+
+function toPositiveInt(value: unknown): number | null {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : Number.NaN;
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function computeCountdown(deadline: string | null | undefined): string {
@@ -323,39 +361,7 @@ function getExternalResolutionRows(
   return [];
 }
 
-const TERMINAL_TRANSFER_STATUSES = new Set(["Received", "Cancelled"]);
 const TERMINAL_CLOSURE_STATUSES = new Set(["Completed", "Cancelled"]);
-const TRANSFER_STATUS_KEYS = new Set([
-  "AwaitingPreparation",
-  "Preparing",
-  "Shipping",
-  "Completed",
-  "Received",
-  "Cancelled",
-]);
-const LEGACY_TRANSFER_STATUS_MAP: Record<string, string> = {
-  "Chờ chuẩn bị": "AwaitingPreparation",
-  "Đang chuẩn bị": "Preparing",
-  "Đang vận chuyển": "Shipping",
-  "Đã giao": "Completed",
-  "Đã hoàn thành": "Completed",
-  "Đã nhận": "Received",
-  "Đã hủy": "Cancelled",
-};
-function normalizeTransferStatus(raw: string | undefined | null): string {
-  if (!raw) return "AwaitingPreparation";
-  if (TRANSFER_STATUS_KEYS.has(raw)) return raw;
-  return LEGACY_TRANSFER_STATUS_MAP[raw] ?? raw;
-}
-
-const TRANSFER_STEPS = [
-  { key: "AwaitingPreparation", label: "Chờ xử lý" },
-  { key: "Preparing", label: "Chuẩn bị" },
-  { key: "Shipping", label: "Đang vận chuyển" },
-  { key: "Completed", label: "Đã giao" },
-  { key: "Received", label: "Đã nhận" },
-] as const;
-const STEP_ORDER: string[] = TRANSFER_STEPS.map((s) => s.key);
 
 /* ── Props ──────────────────────────────────────────────────────── */
 interface DepotClosurePanelProps {
@@ -388,31 +394,61 @@ export function DepotClosurePanel({
 
   const { data: closureList = [], refetch: refetchClosures } =
     useMyDepotClosures(depotId, { enabled: !!depotId });
-  const { data: transferList = [], refetch: refetchTransfers } =
-    useMyDepotTransfers(depotId, { enabled: !!depotId });
+  const {
+    data: transferList = [],
+    refetch: refetchTransfers,
+    isLoading: transfersLoading,
+    isFetching: transfersFetching,
+  } = useMyDepotTransfers(depotId, { enabled: !!depotId });
+  const { data: transferStatusMetadata = [] } = useDepotClosureTransferStatuses({
+    enabled: !!depotId,
+  });
+  const transferStatusValueMap = useMemo(
+    () => buildDepotClosureTransferStatusValueMap(transferStatusMetadata),
+    [transferStatusMetadata],
+  );
+  const transferSteps = useMemo(
+    () => buildDepotClosureTransferStepItems(transferStatusMetadata),
+    [transferStatusMetadata],
+  );
+  const transferStepOrder = useMemo(
+    () => transferSteps.map((step) => step.key),
+    [transferSteps],
+  );
 
-  const selectedTransfer = useMemo(() => {
-    if (routeTransferId) {
-      return (
-        transferList.find((item) => item.transferId === routeTransferId) ?? null
-      );
+  const [selectedTransferId, setSelectedTransferId] = useState<number | null>(
+    routeTransferId,
+  );
+
+  useEffect(() => {
+    setSelectedTransferId(routeTransferId);
+  }, [routeTransferId]);
+
+  const selectedTransfer = useMemo<DepotTransferListItem | null>(() => {
+    const sortedTransfers = [...transferList].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    const preferredTransferId = selectedTransferId ?? routeTransferId;
+
+    if (preferredTransferId) {
+      const preferredTransfer =
+        transferList.find((item) => item.transferId === preferredTransferId) ??
+        null;
+      if (preferredTransfer) return preferredTransfer;
     }
+
     return (
-      [...transferList]
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        )
-        .find(
-          (item) =>
-            !TERMINAL_TRANSFER_STATUSES.has(
-              normalizeTransferStatus(item.status),
-            ),
-        ) ??
-      transferList[0] ??
+      sortedTransfers.find(
+        (item) =>
+          !DEPOT_CLOSURE_TRANSFER_TERMINAL_STATUSES.has(
+            normalizeDepotClosureTransferStatus(item.status),
+          ),
+      ) ??
+      sortedTransfers[0] ??
       null
     );
-  }, [routeTransferId, transferList]);
+  }, [routeTransferId, selectedTransferId, transferList]);
 
   const selectedClosureSummary = useMemo(() => {
     if (routeClosureId) {
@@ -446,12 +482,27 @@ export function DepotClosurePanel({
     useMyDepotClosureDetail(activeClosureId ?? 0, depotId, {
       enabled: !!activeClosureId,
     });
+  const {
+    data: externalResolutionState,
+    refetch: refetchExternalResolutionState,
+  } = useDepotExternalResolutionState(depotId, {
+    enabled: !!depotId,
+  });
 
   const activeTransferId = selectedTransfer?.transferId ?? null;
   const activeTransfer = activeClosureDetail?.transferDetail ?? null;
   const effectiveClosingTimeoutAt = null;
 
-  const currentTransferStatus = normalizeTransferStatus(
+  useInventoryOperationalRealtime({
+    depotClosures: {
+      depotId,
+      closureId: activeClosureId,
+      transferId: activeTransferId,
+    },
+    enabled: depotId > 0,
+  });
+
+  const currentTransferStatus = normalizeDepotClosureTransferStatus(
     selectedTransfer?.status ?? activeTransfer?.status,
   );
   const sourceDepotName =
@@ -484,8 +535,20 @@ export function DepotClosurePanel({
     selectedTransfer?.userRole === "Target" ||
     selectedTransfer?.targetDepotId === depotId;
   const hasExternalResolutionInstruction = Boolean(
-    activeClosureDetail?.resolutionType === "ExternalResolution",
+    externalResolutionState?.hasActiveExternalResolution ||
+      externalResolutionState?.canDownloadExternalTemplate ||
+      externalResolutionState?.canUploadExternalResolution ||
+      externalResolutionState?.resolutionType === "ExternalResolution" ||
+      activeClosureDetail?.resolutionType === "ExternalResolution",
   );
+  const canDownloadExternalTemplate =
+    externalResolutionState?.canDownloadExternalTemplate ?? false;
+  const canUploadExternalResolution =
+    externalResolutionState?.canUploadExternalResolution ?? false;
+  const externalResolutionNote =
+    externalResolutionState?.externalNote ?? activeClosureDetail?.externalNote;
+  const externalResolutionRemainingItemCount =
+    externalResolutionState?.remainingItemCount ?? null;
 
   /* ── State ── */
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -528,6 +591,7 @@ export function DepotClosurePanel({
       refetchDepot(),
       refetchClosures(),
       refetchTransfers(),
+      refetchExternalResolutionState(),
       ...(activeClosureId ? [refetchClosureDetail()] : []),
     ]).finally(() => setIsRefreshing(false));
   }, [
@@ -535,6 +599,7 @@ export function DepotClosurePanel({
     refetchClosureDetail,
     refetchClosures,
     refetchDepot,
+    refetchExternalResolutionState,
     refetchTransfers,
   ]);
 
@@ -552,8 +617,8 @@ export function DepotClosurePanel({
     const labels: Record<typeof action, string> = {
       prepare: "Đã xác nhận chuẩn bị hàng.",
       ship: "Đã xác nhận xuất hàng.",
-      complete: "Đã xác nhận hoàn tất xuất hàng.",
-      receive: "Đã xác nhận nhận hàng — kho đã đóng chính thức.",
+      complete: "Đã xác nhận hoàn tất giao hàng.",
+      receive: "Đã xác nhận nhận hàng.",
     };
     function onDone() {
       toast.success(labels[action]);
@@ -571,7 +636,21 @@ export function DepotClosurePanel({
     else if (action === "complete")
       completeMutation.mutate(payload, { onSuccess: onDone, onError: onFail });
     else
-      receiveMutation.mutate(payload, { onSuccess: onDone, onError: onFail });
+      receiveMutation.mutate(payload, {
+        onSuccess: (res) => {
+          if (res.requiresFurtherResolution) {
+            toast.info(
+              `Đã nhận hàng. Còn ${res.remainingItemCount ?? "một số"} vật phẩm chưa được giải quyết — admin cần tạo batch tiếp theo hoặc chọn xử lý bên ngoài.`,
+            );
+          } else {
+            toast.success("Đã xác nhận nhận hàng — kho đã đóng chính thức.");
+          }
+          setTransferAction(null);
+          setTransferNote("");
+          handleRefresh();
+        },
+        onError: onFail,
+      });
   }
 
   const resetExternalResolutionState = useCallback(() => {
@@ -581,9 +660,49 @@ export function DepotClosurePanel({
       externalResolutionInputRef.current.value = "";
   }, []);
 
+  useEffect(() => {
+    if (canUploadExternalResolution) {
+      return;
+    }
+
+    resetExternalResolutionState();
+  }, [canUploadExternalResolution, resetExternalResolutionState]);
+
+  useEffect(() => {
+    if (!depotId) {
+      return;
+    }
+
+    const unsubscribe = notificationRealtimeClient.subscribe(
+      (payload: NotificationRealtimePayload) => {
+        if (
+          normalizeNotificationType(payload?.type) !==
+          "depot_closure_external_marked"
+        ) {
+          return;
+        }
+
+        const routeData = payload?.data;
+        const payloadDepotId = toPositiveInt(
+          routeData?.depotId ?? routeData?.sourceDepotId,
+        );
+
+        if (payloadDepotId && payloadDepotId !== depotId) {
+          return;
+        }
+
+        void refetchExternalResolutionState();
+      },
+    );
+
+    return unsubscribe;
+  }, [depotId, refetchExternalResolutionState]);
+
   const handleDownloadExternalResolutionTemplate = useCallback(async () => {
     try {
-      const { blob, filename } = await downloadExternalResolutionTemplate();
+      const { blob, filename } = await downloadExternalResolutionTemplate(
+        depotId,
+      );
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -596,7 +715,7 @@ export function DepotClosurePanel({
     } catch (err) {
       toast.error(getApiError(err, "Không thể tải file mẫu xử lý bên ngoài."));
     }
-  }, [downloadExternalResolutionTemplate]);
+  }, [depotId, downloadExternalResolutionTemplate]);
 
   const parseExternalResolutionFile = useCallback(async (file: File) => {
     if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
@@ -645,6 +764,7 @@ export function DepotClosurePanel({
             res.message || "Đã ghi nhận kết quả xử lý tồn kho bên ngoài.",
           );
           resetExternalResolutionState();
+          void refetchExternalResolutionState();
           handleRefresh();
         },
         onError: (err) => {
@@ -656,6 +776,7 @@ export function DepotClosurePanel({
     depotId,
     externalResolutionItems,
     handleRefresh,
+    refetchExternalResolutionState,
     resetExternalResolutionState,
     submitExternalResolutionMutation,
   ]);
@@ -773,7 +894,7 @@ export function DepotClosurePanel({
             </div>
             <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Snapshot tiêu thụ
+                Vật phẩm tiêu thụ
               </p>
               <p className="mt-1 text-lg font-black tracking-tight text-red-600 dark:text-red-400 tabular-nums">
                 {activeClosureDetail.snapshotConsumableUnits.toLocaleString(
@@ -783,7 +904,7 @@ export function DepotClosurePanel({
             </div>
             <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Snapshot tái sử dụng
+                Vật phẩm tái sử dụng
               </p>
               <p className="mt-1 text-lg font-black tracking-tight text-indigo-600 dark:text-indigo-400 tabular-nums">
                 {activeClosureDetail.snapshotReusableUnits.toLocaleString(
@@ -793,7 +914,7 @@ export function DepotClosurePanel({
             </div>
           </div>
 
-          {(activeClosureDetail.externalNote ||
+          {(externalResolutionNote ||
             activeClosureDetail.driftNote ||
             activeClosureDetail.failureReason) && (
             <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
@@ -801,13 +922,13 @@ export function DepotClosurePanel({
                 Ghi chú bổ sung
               </p>
               <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-3">
-                {activeClosureDetail.externalNote && (
+                {externalResolutionNote && (
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-muted-foreground tracking-tight">
                       Xử lý bên ngoài
                     </p>
                     <p className="mt-1 text-sm font-medium tracking-tight whitespace-pre-wrap wrap-break-word">
-                      {activeClosureDetail.externalNote}
+                      {externalResolutionNote}
                     </p>
                   </div>
                 )}
@@ -920,6 +1041,17 @@ export function DepotClosurePanel({
         </div>
       )}
 
+      <DepotTransfersListTable
+        transfers={transferList}
+        selectedTransferId={selectedTransfer?.transferId ?? null}
+        onSelectTransfer={setSelectedTransferId}
+        isLoading={transfersLoading}
+        isRefreshing={isRefreshing || transfersFetching}
+        onRefresh={handleRefresh}
+        title="Danh sách transfer đóng kho"
+        description="Hiển thị toàn bộ transfer liên quan đến kho hiện tại dưới dạng table list. Chọn một dòng để xem chi tiết và thao tác bên dưới."
+      />
+
       {/* ── Active Transfer Panel ── */}
       {hasActiveTransferPanel ? (
         <div className="overflow-hidden rounded-2xl border-2 border-dashed border-orange-200/80 bg-white shadow-sm dark:border-orange-800/50 dark:bg-background">
@@ -933,31 +1065,17 @@ export function DepotClosurePanel({
                   </span>
                   {(() => {
                     const s = currentTransferStatus;
-                    const cls =
-                      s === "AwaitingPreparation"
-                        ? "bg-orange-500/10 text-orange-700 dark:text-orange-300"
-                        : s === "Preparing"
-                          ? "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
-                          : s === "Shipping"
-                            ? "bg-blue-500/10 text-blue-700 dark:text-blue-300"
-                            : s === "Completed" || s === "Received"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                              : "bg-muted text-muted-foreground";
-                    const lbl: Record<string, string> = {
-                      AwaitingPreparation: "Chờ chuẩn bị",
-                      Preparing: "Đang chuẩn bị",
-                      Shipping: "Đang vận chuyển",
-                      Completed: "Chờ xác nhận nhận",
-                      Received: "Đã nhận",
-                    };
                     return (
                       <span
                         className={cn(
                           "inline-flex items-center rounded-md px-2.5 py-1 text-[13px] font-semibold tracking-tighter",
-                          cls,
+                          getDepotClosureTransferStatusToneClass(s),
                         )}
                       >
-                        {lbl[s] ?? s}
+                        {getDepotClosureTransferStatusLabel(
+                          s,
+                          transferStatusValueMap,
+                        )}
                       </span>
                     );
                   })()}
@@ -1003,9 +1121,9 @@ export function DepotClosurePanel({
           <div className="p-5 space-y-5">
             {/* Step Progress */}
             <div className="flex items-start">
-              {TRANSFER_STEPS.map((step, i) => {
-                const cur = STEP_ORDER.indexOf(currentTransferStatus);
-                const me = STEP_ORDER.indexOf(step.key);
+              {transferSteps.map((step, i) => {
+                const cur = transferStepOrder.indexOf(currentTransferStatus);
+                const me = transferStepOrder.indexOf(step.key);
                 const done = me < cur;
                 const active = me === cur;
                 return (
@@ -1022,7 +1140,7 @@ export function DepotClosurePanel({
                         )}
                       />
                     )}
-                    <div className="flex flex-col items-center gap-1.5 shrink-0 w-20">
+                    <div className="flex w-24 shrink-0 flex-col items-center gap-1.5 md:w-28">
                       <div
                         className={cn(
                           "relative flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all shadow-sm",
@@ -1050,7 +1168,7 @@ export function DepotClosurePanel({
                       </div>
                       <span
                         className={cn(
-                          "text-xs font-medium text-center leading-tight tracking-tighter whitespace-nowrap",
+                          "text-xs font-medium text-center leading-tight tracking-tighter whitespace-normal",
                           active
                             ? "font-semibold text-orange-700 dark:text-orange-300"
                             : done
@@ -1088,14 +1206,10 @@ export function DepotClosurePanel({
                 },
                 {
                   label: "Trạng thái",
-                  value:
-                    currentTransferStatus === "Received"
-                      ? "Hoàn tất"
-                      : currentTransferStatus === "Shipping"
-                        ? "Đang vận chuyển"
-                        : currentTransferStatus === "Preparing"
-                          ? "Đang chuẩn bị"
-                          : "Chờ xử lý",
+                  value: getDepotClosureTransferStatusLabel(
+                    currentTransferStatus,
+                    transferStatusValueMap,
+                  ),
                   tone: "border-orange-200/80 bg-orange-50/90 dark:border-orange-800/50 dark:bg-orange-950/15",
                   accent: true,
                 },
@@ -1139,7 +1253,7 @@ export function DepotClosurePanel({
                     <div className="flex items-center gap-2 rounded-lg border border-dashed border-orange-200/70 bg-white px-3 py-1.5 text-xs tracking-tighter text-orange-700/90 dark:border-orange-800/40 dark:bg-background dark:text-orange-300/90">
                       <span className="h-1.5 w-1.5 rounded-full bg-orange-500 shrink-0" />
                       <span>
-                        Xuất hàng:{" "}
+                        Thời gian xuất hàng:{" "}
                         <strong className="text-foreground">
                           {new Date(activeTransfer.shippedAt).toLocaleString(
                             "vi-VN",
@@ -1157,7 +1271,7 @@ export function DepotClosurePanel({
                     <div className="flex items-center gap-2 rounded-lg border border-dashed border-emerald-200/70 bg-white px-3 py-1.5 text-xs tracking-tighter text-emerald-700/90 dark:border-emerald-800/40 dark:bg-background dark:text-emerald-300/90">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
                       <span>
-                        Nhận hàng:{" "}
+                        Thời gian nhận hàng:{" "}
                         <strong className="text-foreground">
                           {new Date(activeTransfer.receivedAt).toLocaleString(
                             "vi-VN",
@@ -1185,7 +1299,7 @@ export function DepotClosurePanel({
                   action: "prepare",
                 },
                 Preparing: { label: "Xác nhận xuất hàng", action: "ship" },
-                Shipping: { label: "Hoàn tất xuất hàng", action: "complete" },
+                Shipping: { label: "Hoàn tất giao hàng", action: "complete" },
               };
               const targetCfgMap: Record<
                 string,
@@ -1337,28 +1451,37 @@ export function DepotClosurePanel({
                 Tải template xử lý, điền kết quả theo từng dòng vật phẩm, rồi
                 tải file Excel lên để gửi vào hệ thống.
               </p>
+              {externalResolutionNote && (
+                <p className="text-sm text-amber-800 dark:text-amber-200 tracking-tighter whitespace-pre-wrap">
+                  {externalResolutionNote}
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                className="gap-2 tracking-tighter border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/40"
-                onClick={handleDownloadExternalResolutionTemplate}
-                disabled={isDownloadingExternalResolutionTemplate}
-              >
-                <DownloadSimple size={16} />
-                Tải file mẫu
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-2 tracking-tighter border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/40"
-                onClick={() => externalResolutionInputRef.current?.click()}
-                disabled={isParsingExternalFile}
-              >
-                <UploadSimple size={16} />
-                {isParsingExternalFile
-                  ? "Đang đọc file..."
-                  : "Tải file kết quả"}
-              </Button>
+              {canDownloadExternalTemplate && (
+                <Button
+                  variant="outline"
+                  className="gap-2 tracking-tighter border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                  onClick={handleDownloadExternalResolutionTemplate}
+                  disabled={isDownloadingExternalResolutionTemplate}
+                >
+                  <DownloadSimple size={16} />
+                  Tải file mẫu
+                </Button>
+              )}
+              {canUploadExternalResolution && (
+                <Button
+                  variant="outline"
+                  className="gap-2 tracking-tighter border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                  onClick={() => externalResolutionInputRef.current?.click()}
+                  disabled={isParsingExternalFile}
+                >
+                  <UploadSimple size={16} />
+                  {isParsingExternalFile
+                    ? "Đang đọc file..."
+                    : "Tải file kết quả"}
+                </Button>
+              )}
               <input
                 ref={externalResolutionInputRef}
                 type="file"
@@ -1373,7 +1496,10 @@ export function DepotClosurePanel({
             {[
               {
                 label: "Tồn kho cần xử lý",
-                value: `${(snapshotConsumableUnits + snapshotReusableUnits).toLocaleString("vi-VN")} mục`,
+                value:
+                  externalResolutionRemainingItemCount != null
+                    ? `${externalResolutionRemainingItemCount.toLocaleString("vi-VN")} dòng`
+                    : `${(snapshotConsumableUnits + snapshotReusableUnits).toLocaleString("vi-VN")} mục`,
               },
               {
                 label: "File đã nạp",
@@ -1421,7 +1547,7 @@ export function DepotClosurePanel({
             </div>
           )}
 
-          {externalResolutionItems.length > 0 && (
+          {canUploadExternalResolution && externalResolutionItems.length > 0 && (
             <div className="rounded-xl border border-amber-200/70 dark:border-amber-800/60 bg-white/70 dark:bg-amber-950/10 overflow-hidden">
               <div className="px-4 py-3 border-b border-amber-200/70 dark:border-amber-800/60 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -1530,34 +1656,36 @@ export function DepotClosurePanel({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              className="gap-2 tracking-tighter"
-              onClick={resetExternalResolutionState}
-              disabled={
-                isSubmittingExternalResolution ||
-                (!externalResolutionFileName &&
-                  externalResolutionItems.length === 0)
-              }
-            >
-              <Trash size={15} />
-              Xóa dữ liệu đã nạp
-            </Button>
-            <Button
-              className="gap-2 tracking-tighter bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={handleSubmitExternalResolution}
-              disabled={
-                isSubmittingExternalResolution ||
-                externalResolutionItems.length === 0
-              }
-            >
-              <PaperPlaneTilt size={15} />
-              {isSubmittingExternalResolution
-                ? "Đang gửi kết quả..."
-                : "Gửi kết quả xử lý"}
-            </Button>
-          </div>
+          {canUploadExternalResolution && (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                variant="outline"
+                className="gap-2 tracking-tighter"
+                onClick={resetExternalResolutionState}
+                disabled={
+                  isSubmittingExternalResolution ||
+                  (!externalResolutionFileName &&
+                    externalResolutionItems.length === 0)
+                }
+              >
+                <Trash size={15} />
+                Xóa dữ liệu đã nạp
+              </Button>
+              <Button
+                className="gap-2 tracking-tighter bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={handleSubmitExternalResolution}
+                disabled={
+                  isSubmittingExternalResolution ||
+                  externalResolutionItems.length === 0
+                }
+              >
+                <PaperPlaneTilt size={15} />
+                {isSubmittingExternalResolution
+                  ? "Đang gửi kết quả..."
+                  : "Gửi kết quả xử lý"}
+              </Button>
+            </div>
+          )}
         </div>
       ) : depot?.status === "Closing" ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900">

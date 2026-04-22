@@ -781,6 +781,7 @@ export interface GetLowStockResponse {
 export interface GetLowStockParams {
   depotId: number;
   warningLevel?: LowStockLevel;
+  categoryCode?: string[];
   pageNumber?: number;
   pageSize?: number;
   // Legacy filter name kept during backend rollout.
@@ -857,3 +858,51 @@ export interface DecommissionReusableResponse {
 }
 
 export type ReusableItemStatus = InventoryCategory;
+
+export interface SearchDepotReusableUnitsParams {
+  depotId: number;
+  itemModelId: number;
+  serialNumber?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface DepotReusableUnitSearchItem {
+  itemId: number;
+  itemModelId: number;
+  itemModelName: string;
+  imageUrl?: string | null;
+  categoryId: number;
+  categoryName: string;
+  serialNumber: string;
+  status: string;
+  condition: string;
+  note?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SearchDepotReusableUnitsResponse {
+  items: DepotReusableUnitSearchItem[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface UpdateReusableStatusPayload {
+  note: string;
+  condition?: string;
+}
+
+export interface UpdateReusableStatusParams {
+  depotId: number;
+  itemId: number;
+  payload: UpdateReusableStatusPayload;
+}
+
+export interface UpdateReusableStatusResponse {
+  message?: string;
+}

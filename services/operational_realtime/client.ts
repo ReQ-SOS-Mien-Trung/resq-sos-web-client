@@ -13,8 +13,11 @@ import {
   OPERATIONAL_REALTIME_METHODS,
   OperationalRealtimeConnectionState,
   ReceiveAssemblyPointListUpdatePayload,
+  ReceiveDepotActivityUpdatePayload,
+  ReceiveDepotClosureUpdatePayload,
   ReceiveDepotInventoryUpdatePayload,
   ReceiveLogisticsUpdatePayload,
+  ReceiveSupplyRequestUpdatePayload,
 } from "./type";
 
 type ConnectionStateListener = (
@@ -33,6 +36,18 @@ type LogisticsUpdateListener = (
   payload: ReceiveLogisticsUpdatePayload,
 ) => void;
 
+type SupplyRequestUpdateListener = (
+  payload: ReceiveSupplyRequestUpdatePayload,
+) => void;
+
+type DepotActivityUpdateListener = (
+  payload: ReceiveDepotActivityUpdatePayload,
+) => void;
+
+type DepotClosureUpdateListener = (
+  payload: ReceiveDepotClosureUpdatePayload,
+) => void;
+
 const START_RETRY_DELAY_MS = 2000;
 
 export class OperationalRealtimeClient {
@@ -42,13 +57,25 @@ export class OperationalRealtimeClient {
   private isReceiveEventsBound = false;
   private pendingRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private shouldMaintainConnection = false;
+  private connectionRetainers = 0;
   private connectionState: OperationalRealtimeConnectionState = "disconnected";
   private stateListeners = new Set<ConnectionStateListener>();
+  private reconnectListeners = new Set<() => void>();
   private assemblyPointListListeners = new Set<AssemblyPointListUpdateListener>();
   private depotInventoryListeners = new Set<DepotInventoryUpdateListener>();
   private logisticsListeners = new Set<LogisticsUpdateListener>();
+  private supplyRequestListeners = new Set<SupplyRequestUpdateListener>();
+  private depotActivityListeners = new Set<DepotActivityUpdateListener>();
+  private depotClosureListeners = new Set<DepotClosureUpdateListener>();
   private joinedDepots = new Map<number, number>();
   private joinedClusters = new Map<number, number>();
+  private joinedSupplyRequestDepots = new Map<number, number>();
+  private joinedSupplyRequests = new Map<number, number>();
+  private joinedActivityDepots = new Map<number, number>();
+  private joinedActivities = new Map<number, number>();
+  private joinedClosureDepots = new Map<number, number>();
+  private joinedClosures = new Map<number, number>();
+  private joinedTransfers = new Map<number, number>();
 
   private notifyConnectionState(): void {
     this.stateListeners.forEach((listener) => listener(this.connectionState));
@@ -167,7 +194,11 @@ export class OperationalRealtimeClient {
 
       this.connection.onreconnected(() => {
         this.setConnectionState("connected");
-        void this.rejoinSubscriptions();
+        void this.rejoinSubscriptions().finally(() => {
+          this.reconnectListeners.forEach((listener) => {
+            listener();
+          });
+        });
       });
 
       this.connection.onclose(() => {
@@ -205,6 +236,27 @@ export class OperationalRealtimeClient {
         },
       );
 
+      this.connection.on(
+        OPERATIONAL_REALTIME_EVENTS.ReceiveSupplyRequestUpdate,
+        (payload: ReceiveSupplyRequestUpdatePayload) => {
+          this.supplyRequestListeners.forEach((listener) => listener(payload));
+        },
+      );
+
+      this.connection.on(
+        OPERATIONAL_REALTIME_EVENTS.ReceiveDepotActivityUpdate,
+        (payload: ReceiveDepotActivityUpdatePayload) => {
+          this.depotActivityListeners.forEach((listener) => listener(payload));
+        },
+      );
+
+      this.connection.on(
+        OPERATIONAL_REALTIME_EVENTS.ReceiveDepotClosureUpdate,
+        (payload: ReceiveDepotClosureUpdatePayload) => {
+          this.depotClosureListeners.forEach((listener) => listener(payload));
+        },
+      );
+
       this.isReceiveEventsBound = true;
     }
 
@@ -227,6 +279,41 @@ export class OperationalRealtimeClient {
       ...Array.from(this.joinedClusters.keys()).map((clusterId) =>
         connection
           .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeCluster, clusterId)
+          .catch(() => null),
+      ),
+      ...Array.from(this.joinedSupplyRequestDepots.keys()).map((depotId) =>
+        connection
+          .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeSupplyRequests, depotId)
+          .catch(() => null),
+      ),
+      ...Array.from(this.joinedSupplyRequests.keys()).map((requestId) =>
+        connection
+          .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeSupplyRequest, requestId)
+          .catch(() => null),
+      ),
+      ...Array.from(this.joinedActivityDepots.keys()).map((depotId) =>
+        connection
+          .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeDepotActivities, depotId)
+          .catch(() => null),
+      ),
+      ...Array.from(this.joinedActivities.keys()).map((activityId) =>
+        connection
+          .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeActivity, activityId)
+          .catch(() => null),
+      ),
+      ...Array.from(this.joinedClosureDepots.keys()).map((depotId) =>
+        connection
+          .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeDepotClosures, depotId)
+          .catch(() => null),
+      ),
+      ...Array.from(this.joinedClosures.keys()).map((closureId) =>
+        connection
+          .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeClosure, closureId)
+          .catch(() => null),
+      ),
+      ...Array.from(this.joinedTransfers.keys()).map((transferId) =>
+        connection
+          .invoke(OPERATIONAL_REALTIME_METHODS.SubscribeTransfer, transferId)
           .catch(() => null),
       ),
     ]);
@@ -257,6 +344,22 @@ export class OperationalRealtimeClient {
     return this.connectionState;
   }
 
+  retainConnection(): void {
+    this.connectionRetainers += 1;
+    this.shouldMaintainConnection = this.connectionRetainers > 0;
+  }
+
+  async releaseConnection(): Promise<void> {
+    this.connectionRetainers = Math.max(0, this.connectionRetainers - 1);
+    this.shouldMaintainConnection = this.connectionRetainers > 0;
+
+    if (this.shouldMaintainConnection) {
+      return;
+    }
+
+    await this.stop();
+  }
+
   subscribeConnectionState(listener: ConnectionStateListener): () => void {
     this.stateListeners.add(listener);
     listener(this.connectionState);
@@ -266,8 +369,15 @@ export class OperationalRealtimeClient {
     };
   }
 
+  subscribeReconnected(listener: () => void): () => void {
+    this.reconnectListeners.add(listener);
+
+    return () => {
+      this.reconnectListeners.delete(listener);
+    };
+  }
+
   async start(): Promise<void> {
-    this.shouldMaintainConnection = true;
     this.clearPendingRetry();
 
     if (this.startPromise) {
@@ -334,7 +444,6 @@ export class OperationalRealtimeClient {
   }
 
   async stop(): Promise<void> {
-    this.shouldMaintainConnection = false;
     this.clearPendingRetry();
 
     if (!this.connection) {
@@ -448,6 +557,289 @@ export class OperationalRealtimeClient {
 
     return () => {
       this.logisticsListeners.delete(listener);
+    };
+  }
+
+  async subscribeSupplyRequests(depotId: number): Promise<void> {
+    const existingCount = this.joinedSupplyRequestDepots.get(depotId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedSupplyRequestDepots.set(depotId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeSupplyRequests,
+      depotId,
+    );
+    this.joinedSupplyRequestDepots.set(depotId, 1);
+  }
+
+  async unsubscribeSupplyRequests(depotId: number): Promise<void> {
+    const existingCount = this.joinedSupplyRequestDepots.get(depotId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedSupplyRequestDepots.set(depotId, existingCount - 1);
+      return;
+    }
+
+    this.joinedSupplyRequestDepots.delete(depotId);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(OPERATIONAL_REALTIME_METHODS.UnsubscribeSupplyRequests, depotId)
+      .catch(() => null);
+  }
+
+  async subscribeSupplyRequest(requestId: number): Promise<void> {
+    const existingCount = this.joinedSupplyRequests.get(requestId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedSupplyRequests.set(requestId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeSupplyRequest,
+      requestId,
+    );
+    this.joinedSupplyRequests.set(requestId, 1);
+  }
+
+  async unsubscribeSupplyRequest(requestId: number): Promise<void> {
+    const existingCount = this.joinedSupplyRequests.get(requestId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedSupplyRequests.set(requestId, existingCount - 1);
+      return;
+    }
+
+    this.joinedSupplyRequests.delete(requestId);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(OPERATIONAL_REALTIME_METHODS.UnsubscribeSupplyRequest, requestId)
+      .catch(() => null);
+  }
+
+  onSupplyRequestUpdate(listener: SupplyRequestUpdateListener): () => void {
+    this.supplyRequestListeners.add(listener);
+
+    return () => {
+      this.supplyRequestListeners.delete(listener);
+    };
+  }
+
+  async subscribeDepotActivities(depotId: number): Promise<void> {
+    const existingCount = this.joinedActivityDepots.get(depotId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedActivityDepots.set(depotId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeDepotActivities,
+      depotId,
+    );
+    this.joinedActivityDepots.set(depotId, 1);
+  }
+
+  async unsubscribeDepotActivities(depotId: number): Promise<void> {
+    const existingCount = this.joinedActivityDepots.get(depotId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedActivityDepots.set(depotId, existingCount - 1);
+      return;
+    }
+
+    this.joinedActivityDepots.delete(depotId);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(OPERATIONAL_REALTIME_METHODS.UnsubscribeDepotActivities, depotId)
+      .catch(() => null);
+  }
+
+  async subscribeActivity(activityId: number): Promise<void> {
+    const existingCount = this.joinedActivities.get(activityId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedActivities.set(activityId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeActivity,
+      activityId,
+    );
+    this.joinedActivities.set(activityId, 1);
+  }
+
+  async unsubscribeActivity(activityId: number): Promise<void> {
+    const existingCount = this.joinedActivities.get(activityId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedActivities.set(activityId, existingCount - 1);
+      return;
+    }
+
+    this.joinedActivities.delete(activityId);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(OPERATIONAL_REALTIME_METHODS.UnsubscribeActivity, activityId)
+      .catch(() => null);
+  }
+
+  onDepotActivityUpdate(listener: DepotActivityUpdateListener): () => void {
+    this.depotActivityListeners.add(listener);
+
+    return () => {
+      this.depotActivityListeners.delete(listener);
+    };
+  }
+
+  async subscribeDepotClosures(depotId: number): Promise<void> {
+    const existingCount = this.joinedClosureDepots.get(depotId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedClosureDepots.set(depotId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeDepotClosures,
+      depotId,
+    );
+    this.joinedClosureDepots.set(depotId, 1);
+  }
+
+  async unsubscribeDepotClosures(depotId: number): Promise<void> {
+    const existingCount = this.joinedClosureDepots.get(depotId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedClosureDepots.set(depotId, existingCount - 1);
+      return;
+    }
+
+    this.joinedClosureDepots.delete(depotId);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(OPERATIONAL_REALTIME_METHODS.UnsubscribeDepotClosures, depotId)
+      .catch(() => null);
+  }
+
+  async subscribeClosure(closureId: number): Promise<void> {
+    const existingCount = this.joinedClosures.get(closureId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedClosures.set(closureId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeClosure,
+      closureId,
+    );
+    this.joinedClosures.set(closureId, 1);
+  }
+
+  async unsubscribeClosure(closureId: number): Promise<void> {
+    const existingCount = this.joinedClosures.get(closureId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedClosures.set(closureId, existingCount - 1);
+      return;
+    }
+
+    this.joinedClosures.delete(closureId);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(OPERATIONAL_REALTIME_METHODS.UnsubscribeClosure, closureId)
+      .catch(() => null);
+  }
+
+  async subscribeTransfer(transferId: number): Promise<void> {
+    const existingCount = this.joinedTransfers.get(transferId) ?? 0;
+    if (existingCount > 0) {
+      this.joinedTransfers.set(transferId, existingCount + 1);
+      return;
+    }
+
+    await this.invokeWithReconnectRetry(
+      OPERATIONAL_REALTIME_METHODS.SubscribeTransfer,
+      transferId,
+    );
+    this.joinedTransfers.set(transferId, 1);
+  }
+
+  async unsubscribeTransfer(transferId: number): Promise<void> {
+    const existingCount = this.joinedTransfers.get(transferId);
+    if (!existingCount) {
+      return;
+    }
+
+    if (existingCount > 1) {
+      this.joinedTransfers.set(transferId, existingCount - 1);
+      return;
+    }
+
+    this.joinedTransfers.delete(transferId);
+
+    const connection = this.getOrCreateConnection();
+    if (connection.state !== HubConnectionState.Connected) {
+      return;
+    }
+
+    await connection
+      .invoke(OPERATIONAL_REALTIME_METHODS.UnsubscribeTransfer, transferId)
+      .catch(() => null);
+  }
+
+  onDepotClosureUpdate(listener: DepotClosureUpdateListener): () => void {
+    this.depotClosureListeners.add(listener);
+
+    return () => {
+      this.depotClosureListeners.delete(listener);
     };
   }
 }
