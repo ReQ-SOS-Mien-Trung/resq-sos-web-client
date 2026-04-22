@@ -67,6 +67,7 @@ import type {
 import type { ConfirmReturnResponse } from "@/services/mission/type";
 import { toast } from "sonner";
 import { useManagerDepot } from "@/hooks/use-manager-depot";
+import { useInventoryOperationalRealtime } from "@/hooks/useInventoryOperationalRealtime";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -2812,6 +2813,14 @@ function ActivityOperationsPanel({
   const [selectedItem, setSelectedItem] = useState<ActivityEntity | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
 
+  useInventoryOperationalRealtime({
+    depotActivities: {
+      depotId: selectedDepotId,
+      activityId: panelOpen ? selectedItem?.activityId ?? null : null,
+    },
+    enabled: Boolean(selectedDepotId),
+  });
+
   // ── Queries ────────────────────────────────────────────────────────────────
   const {
     data: pickupUpcomingData,
@@ -2821,7 +2830,8 @@ function ActivityOperationsPanel({
   } = useMyDepotUpcomingPickups(
     { depotId: selectedDepotId ?? 0, pageNumber: upcomingPage, pageSize },
     {
-      refetchInterval: isReturnActivity ? false : 30_000,
+      refetchInterval: false,
+      refetchOnWindowFocus: true,
       enabled: !isReturnActivity && Boolean(selectedDepotId),
     },
   );
@@ -2840,7 +2850,8 @@ function ActivityOperationsPanel({
       toDate: appliedTo || undefined,
     },
     {
-      refetchInterval: isReturnActivity ? false : 60_000,
+      refetchInterval: false,
+      refetchOnWindowFocus: true,
       enabled: !isReturnActivity && Boolean(selectedDepotId),
     },
   );
@@ -2858,7 +2869,8 @@ function ActivityOperationsPanel({
       status: returnStatus,
     },
     {
-      refetchInterval: isReturnActivity ? 30_000 : false,
+      refetchInterval: false,
+      refetchOnWindowFocus: true,
       enabled: isReturnActivity && Boolean(selectedDepotId),
     },
   );
@@ -2877,7 +2889,8 @@ function ActivityOperationsPanel({
       toDate: appliedTo || undefined,
     },
     {
-      refetchInterval: isReturnActivity ? 60_000 : false,
+      refetchInterval: false,
+      refetchOnWindowFocus: true,
       enabled: isReturnActivity && Boolean(selectedDepotId),
     },
   );

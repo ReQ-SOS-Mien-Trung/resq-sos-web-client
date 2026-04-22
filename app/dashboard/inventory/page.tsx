@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { mockInventoryItems, mockShipments } from "@/lib/mock-data";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
@@ -48,7 +48,7 @@ import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
 import SupplyRequestTracker from "@/components/inventory/SupplyRequestTracker";
 import DepotChartsSection from "@/components/inventory/DepotChartsSection";
-import { DepotClosurePanel } from "@/components/inventory";
+import { DepotClosureTransferTable } from "@/components/inventory/DepotClosureTransferTable";
 import {
   InventoryItemEntity,
   SupplyRequestListItem,
@@ -73,6 +73,7 @@ import {
   MANAGER_DEPOT_SELECT_ROUTE,
   useManagerDepot,
 } from "@/hooks/use-manager-depot";
+import { useInventoryOperationalRealtime } from "@/hooks/useInventoryOperationalRealtime";
 
 // --- Helpers ---
 
@@ -332,7 +333,10 @@ const InventoryDashboardPage = () => {
         pageNumber: 1,
         pageSize: 1,
       },
-      { enabled: Boolean(selectedDepotId) },
+      {
+        enabled: Boolean(selectedDepotId),
+        refetchOnWindowFocus: true,
+      },
     );
 
   const { data: mediumLowStockData, refetch: refetchMediumLowStock } =
@@ -343,7 +347,10 @@ const InventoryDashboardPage = () => {
         pageNumber: 1,
         pageSize: 1,
       },
-      { enabled: Boolean(selectedDepotId) },
+      {
+        enabled: Boolean(selectedDepotId),
+        refetchOnWindowFocus: true,
+      },
     );
 
   const {
@@ -354,7 +361,7 @@ const InventoryDashboardPage = () => {
   } = useSupplyRequests(
     { depotId: selectedDepotId ?? 0, pageNumber: 1, pageSize: 10 },
     {
-      refetchInterval: 10_000,
+      refetchInterval: false,
       refetchOnWindowFocus: true,
       enabled: Boolean(selectedDepotId),
     },
@@ -371,7 +378,7 @@ const InventoryDashboardPage = () => {
       pageSize: 1,
     },
     {
-      refetchInterval: 10_000,
+      refetchInterval: false,
       refetchOnWindowFocus: true,
       enabled: Boolean(selectedDepotId),
     },
@@ -389,7 +396,7 @@ const InventoryDashboardPage = () => {
       pageSize: 10,
     },
     {
-      refetchInterval: 10_000,
+      refetchInterval: false,
       refetchOnWindowFocus: true,
       enabled: Boolean(selectedDepotId),
     },
@@ -407,6 +414,17 @@ const InventoryDashboardPage = () => {
       null,
     [allRequestsPagedData, trackerRequestId],
   );
+
+  useInventoryOperationalRealtime({
+    supplyRequests: {
+      depotId: selectedDepotId,
+      requestId: trackerOpen ? trackerRequestId : null,
+    },
+    depotInventory: {
+      depotId: selectedDepotId,
+    },
+    enabled: Boolean(selectedDepotId),
+  });
 
   // Use the first depot as the current managed depot
   const currentDepot =
@@ -871,59 +889,51 @@ const InventoryDashboardPage = () => {
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.3 }}
             className="p-6 space-y-6"
           >
-            {/* Page Title — hidden on supply-management tab (it has its own header) */}
-            {activeTab !== "supply-management" && (
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-semibold tracking-tighter">
-                    Dashboard Kho Hàng
-                  </h1>
-                  <p className="text-muted-foreground tracking-tighter">
-                    {selectedDepot?.depotName ??
-                      depotInfo?.name ??
-                      "Đang tải..."}{" "}
-                    • Quản lý bởi {displayName}
-                  </p>
+            {/* Page Title — hidden on supply-management and depot-closure tabs */}
+            {activeTab !== "supply-management" &&
+              activeTab !== "depot-closure" && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-semibold tracking-tighter">
+                      Dashboard Kho Hàng
+                    </h1>
+                    <p className="text-muted-foreground tracking-tighter">
+                      {selectedDepot?.depotName ??
+                        depotInfo?.name ??
+                        "Đang tải..."}{" "}
+                      • Quản lý bởi {displayName}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleRefresh}
+                    disabled={isDepotsFetching || isSupplyRequestsFetching}
+                  >
+                    <ArrowsClockwise
+                      className={cn(
+                        "h-4 w-4",
+                        (isDepotsFetching || isSupplyRequestsFetching) &&
+                          "animate-spin",
+                      )}
+                    />
+                    Làm mới
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={handleRefresh}
-                  disabled={isDepotsFetching || isSupplyRequestsFetching}
-                >
-                  <ArrowsClockwise
-                    className={cn(
-                      "h-4 w-4",
-                      (isDepotsFetching || isSupplyRequestsFetching) &&
-                        "animate-spin",
-                    )}
-                  />
-                  Làm mới
-                </Button>
-              </div>
-            )}
-
-            {/* Depot Closure overlay — floats above the category overview */}
-            <AnimatePresence>
-              {activeTab === "depot-closure" && (
-                <motion.div
-                  key="depot-closure-panel"
-                  initial={{ opacity: 0, y: -16, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -12, scale: 0.98 }}
-                  transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-                  className="relative z-10 -mt-2"
-                >
-                  <DepotClosurePanel
-                    showHeader={false}
-                    onClose={() => handleActiveTabChange("inventory")}
-                  />
-                </motion.div>
               )}
-            </AnimatePresence>
 
-            {activeTab === "supply-management" ? (
+            {activeTab === "depot-closure" ? (
+              <DepotClosureTransferTable
+                depotId={selectedDepotId ?? 0}
+                defaultExpandedTransferId={(() => {
+                  const v = searchParams.get("transferId");
+                  if (!v) return null;
+                  const n = Number(v);
+                  return Number.isInteger(n) && n > 0 ? n : null;
+                })()}
+              />
+            ) : activeTab === "supply-management" ? (
               <SupplyRequestManagement
                 onPanelOpenChange={(open) => setSidebarOpen(!open)}
               />

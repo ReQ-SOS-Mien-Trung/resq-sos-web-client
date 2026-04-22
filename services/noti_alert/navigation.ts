@@ -1,3 +1,4 @@
+import { DEPOT_CLOSURE_NOTIFICATION_TYPES } from "./config";
 import { getDashboardPathByRole, ROLES } from "@/lib/roles";
 import type { NotificationRouteData } from "./type";
 
@@ -32,7 +33,7 @@ export function buildDepotClosureTransferRoute(
     return null;
   }
 
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ tab: "depot-closure" });
   if (closureId) {
     params.set("closureId", String(closureId));
   }
@@ -40,7 +41,7 @@ export function buildDepotClosureTransferRoute(
     params.set("transferId", String(transferId));
   }
 
-  return `/dashboard/inventory/depot-closure?${params.toString()}`;
+  return `/dashboard/inventory?${params.toString()}`;
 }
 
 function buildCoordinatorChatRoute(
@@ -143,16 +144,8 @@ export function resolveNotificationRoute(
     return buildInventoryRequestRoute("outgoing", data);
   }
 
-  if (
-    normalizedType === "depot_closure_transfer_assigned" ||
-    normalizedType === "depot_closure_transfer_ready" ||
-    normalizedType === "depot_closure_transfer_completed" ||
-    normalizedType === "depot_closure_transfer_received" ||
-    normalizedType === "depot_closure_processing_required" ||
-    normalizedType === "depot_closure_processing" ||
-    normalizedType === "depot_closure_completed"
-  ) {
-    return depotClosureRoute ?? "/dashboard/inventory/depot-closure";
+  if (DEPOT_CLOSURE_NOTIFICATION_TYPES.includes(normalizedType as never)) {
+    return depotClosureRoute ?? "/dashboard/inventory?tab=depot-closure";
   }
 
   if (

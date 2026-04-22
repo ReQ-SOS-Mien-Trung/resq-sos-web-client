@@ -220,7 +220,7 @@ function Chart1Capacity({ depotId }: { depotId: number }) {
             value={data.currentVolume}
             max={data.maxVolume}
             percent={data.volumeUsagePercent}
-            unit="m³"
+            unit="dm³"
             fillColor={volColor}
             trackColor="#e5e7eb"
           />

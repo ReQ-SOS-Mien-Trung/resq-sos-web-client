@@ -2,9 +2,7 @@
 
 import React, {
   useCallback,
-  useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
@@ -92,6 +90,7 @@ import type {
   ThresholdScopeType,
   UpdateThresholdPayload,
 } from "@/services/inventory/type";
+import { useInventoryOperationalRealtime } from "@/hooks/useInventoryOperationalRealtime";
 
 const NUMBER_FORMATTER = new Intl.NumberFormat("vi-VN");
 
@@ -417,11 +416,7 @@ export default function ThresholdConfigPage() {
     });
     return map;
   }, [categories]);
-
-  const POLL_INTERVAL_MS = 30_000;
   const [selectedWarningLevel, setSelectedWarningLevel] = useState("all");
-  const [countdown, setCountdown] = useState(POLL_INTERVAL_MS / 1000);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const {
     data: lowStock,
@@ -430,30 +425,18 @@ export default function ThresholdConfigPage() {
     refetch: refetchLowStock,
   } = useMyDepotLowStock(
     selectedDepotId ? { depotId: selectedDepotId } : undefined,
-    { refetchInterval: POLL_INTERVAL_MS },
+    {
+      refetchInterval: false,
+      refetchOnWindowFocus: true,
+    },
   );
 
-  // Reset countdown whenever a fetch completes
-  useEffect(() => {
-    if (fetchingLowStock) {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-      return;
-    }
-    if (countdownRef.current) clearInterval(countdownRef.current);
-    // defer to avoid synchronous setState-in-effect warning
-    const t = setTimeout(() => {
-      setCountdown(POLL_INTERVAL_MS / 1000);
-      countdownRef.current = setInterval(() => {
-        setCountdown((prev) =>
-          prev <= 1 ? POLL_INTERVAL_MS / 1000 : prev - 1,
-        );
-      }, 1000);
-    }, 0);
-    return () => {
-      clearTimeout(t);
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
-  }, [fetchingLowStock]);
+  useInventoryOperationalRealtime({
+    depotInventory: {
+      depotId: selectedDepotId,
+    },
+    enabled: Boolean(selectedDepotId),
+  });
 
   const updateMutation = useUpdateMyDepotThreshold();
   const deleteMutation = useDeleteMyDepotThreshold();

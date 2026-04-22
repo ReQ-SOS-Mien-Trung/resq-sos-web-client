@@ -10,6 +10,7 @@ import {
   DepotStatusMetadata,
   DepotMetadataItem,
   DepotClosureResolutionMetadataItem,
+  DepotClosureTransferStatusMetadata,
   AvailableDepotManager,
   GetAvailableDepotManagersParams,
   DepotActiveManager,
@@ -35,16 +36,24 @@ import {
   MarkDepotClosureExternalResponse,
   SubmitDepotExternalResolutionRequest,
   SubmitDepotExternalResolutionResponse,
+  DepotExternalResolutionState,
   InitiateDepotClosureTransferRequest,
   InitiateDepotClosureTransferResponse,
   DepotClosureTransferSuggestionsResponse,
   GetMyDepotTransfersResponse,
   GetMyDepotClosuresResponse,
+  GetDepotClosuresListByDepotIdResponse,
   DepotClosureDetail,
+  DepotClosureDetailTransfer,
+  DepotClosureDetailTransferItem,
+  DepotClosureRemainingInventoryItem,
   DepotClosureTransfer,
   DepotTransferActionRequest,
   DepotTransferActionResponse,
   DepotReceiveTransferResponse,
+  CancelDepotClosureTransferRequest,
+  CancelDepotClosureTransferResponse,
+  DepotExternalResolvedItem,
 } from "./type";
 
 function parseContentDispositionFilename(
@@ -86,7 +95,366 @@ function normalizeDepotClosureDetailResponse(
     return null;
   }
 
-  return candidate as DepotClosureDetail;
+  const source = payload as Record<string, unknown>;
+  const remainingInventoryItems = normalizeRemainingInventoryItems(
+    source.remainingInventoryItems ?? source.remainingItems,
+  );
+  const transferDetail = normalizeDepotClosureDetailTransfer(
+    source.transferDetail,
+  );
+  const transferDetails = normalizeDepotClosureDetailTransfers(
+    source.transferDetails,
+  );
+
+  return {
+    id: candidate.id,
+    depotId: typeof candidate.depotId === "number" ? candidate.depotId : 0,
+    depotName: typeof candidate.depotName === "string" ? candidate.depotName : "",
+    status: typeof candidate.status === "string" ? candidate.status : "",
+    previousStatus:
+      typeof candidate.previousStatus === "string"
+        ? candidate.previousStatus
+        : null,
+    closeReason:
+      typeof candidate.closeReason === "string" ? candidate.closeReason : "",
+    resolutionType:
+      typeof candidate.resolutionType === "string"
+        ? candidate.resolutionType
+        : null,
+    targetDepotId:
+      typeof candidate.targetDepotId === "number" ? candidate.targetDepotId : null,
+    targetDepotName:
+      typeof candidate.targetDepotName === "string"
+        ? candidate.targetDepotName
+        : null,
+    externalNote:
+      typeof candidate.externalNote === "string" ? candidate.externalNote : null,
+    initiatedBy:
+      typeof candidate.initiatedBy === "string" ? candidate.initiatedBy : "",
+    initiatedByFullName:
+      typeof candidate.initiatedByFullName === "string"
+        ? candidate.initiatedByFullName
+        : null,
+    cancelledBy:
+      typeof candidate.cancelledBy === "string" ? candidate.cancelledBy : null,
+    cancelledByFullName:
+      typeof candidate.cancelledByFullName === "string"
+        ? candidate.cancelledByFullName
+        : null,
+    cancellationReason:
+      typeof candidate.cancellationReason === "string"
+        ? candidate.cancellationReason
+        : null,
+    snapshotConsumableUnits:
+      typeof candidate.snapshotConsumableUnits === "number"
+        ? candidate.snapshotConsumableUnits
+        : 0,
+    snapshotReusableUnits:
+      typeof candidate.snapshotReusableUnits === "number"
+        ? candidate.snapshotReusableUnits
+        : 0,
+    actualConsumableUnits:
+      typeof candidate.actualConsumableUnits === "number"
+        ? candidate.actualConsumableUnits
+        : 0,
+    actualReusableUnits:
+      typeof candidate.actualReusableUnits === "number"
+        ? candidate.actualReusableUnits
+        : 0,
+    driftNote: typeof candidate.driftNote === "string" ? candidate.driftNote : null,
+    failureReason:
+      typeof candidate.failureReason === "string" ? candidate.failureReason : null,
+    isForced: typeof candidate.isForced === "boolean" ? candidate.isForced : false,
+    forceReason:
+      typeof candidate.forceReason === "string" ? candidate.forceReason : null,
+    initiatedAt:
+      typeof candidate.initiatedAt === "string" ? candidate.initiatedAt : "",
+    completedAt:
+      typeof candidate.completedAt === "string" ? candidate.completedAt : null,
+    cancelledAt:
+      typeof candidate.cancelledAt === "string" ? candidate.cancelledAt : null,
+    hasOpenTransfers:
+      typeof candidate.hasOpenTransfers === "boolean"
+        ? candidate.hasOpenTransfers
+        : Boolean(
+            transferDetails.some(
+              (transfer) =>
+                transfer.status !== "Received" && transfer.status !== "Cancelled",
+            ) ||
+              (transferDetail &&
+                transferDetail.status !== "Received" &&
+                transferDetail.status !== "Cancelled"),
+          ),
+    hasRemainingItems:
+      typeof candidate.hasRemainingItems === "boolean"
+        ? candidate.hasRemainingItems
+        : Boolean((remainingInventoryItems?.length ?? 0) > 0),
+    remainingItemCount:
+      typeof candidate.remainingItemCount === "number"
+        ? candidate.remainingItemCount
+        : remainingInventoryItems?.length ?? 0,
+    hasTransferableRemainingItems:
+      typeof candidate.hasTransferableRemainingItems === "boolean"
+        ? candidate.hasTransferableRemainingItems
+        : false,
+    transferableRemainingItemCount:
+      typeof candidate.transferableRemainingItemCount === "number"
+        ? candidate.transferableRemainingItemCount
+        : 0,
+    transferableRemainingUnitCount:
+      typeof candidate.transferableRemainingUnitCount === "number"
+        ? candidate.transferableRemainingUnitCount
+        : 0,
+    blockedRemainingItemCount:
+      typeof candidate.blockedRemainingItemCount === "number"
+        ? candidate.blockedRemainingItemCount
+        : 0,
+    blockedRemainingUnitCount:
+      typeof candidate.blockedRemainingUnitCount === "number"
+        ? candidate.blockedRemainingUnitCount
+        : 0,
+    hasClosingBlockers:
+      typeof candidate.hasClosingBlockers === "boolean"
+        ? candidate.hasClosingBlockers
+        : false,
+    reservedConsumableItemCount:
+      typeof candidate.reservedConsumableItemCount === "number"
+        ? candidate.reservedConsumableItemCount
+        : 0,
+    reservedConsumableUnitCount:
+      typeof candidate.reservedConsumableUnitCount === "number"
+        ? candidate.reservedConsumableUnitCount
+        : 0,
+    nonAvailableReusableItemModelCount:
+      typeof candidate.nonAvailableReusableItemModelCount === "number"
+        ? candidate.nonAvailableReusableItemModelCount
+        : 0,
+    nonAvailableReusableUnitCount:
+      typeof candidate.nonAvailableReusableUnitCount === "number"
+        ? candidate.nonAvailableReusableUnitCount
+        : 0,
+    canSelectResolutionOption:
+      typeof candidate.canSelectResolutionOption === "boolean"
+        ? candidate.canSelectResolutionOption
+        : false,
+    canConfirmClose:
+      typeof candidate.canConfirmClose === "boolean"
+        ? candidate.canConfirmClose
+        : false,
+    canDownloadExternalTemplate:
+      typeof candidate.canDownloadExternalTemplate === "boolean"
+        ? candidate.canDownloadExternalTemplate
+        : false,
+    canUploadExternalResolution:
+      typeof candidate.canUploadExternalResolution === "boolean"
+        ? candidate.canUploadExternalResolution
+        : false,
+    hasTransferRecords:
+      typeof candidate.hasTransferRecords === "boolean"
+        ? candidate.hasTransferRecords
+        : transferDetails.length > 0 || transferDetail != null,
+    hasExternalResolutionRecords:
+      typeof candidate.hasExternalResolutionRecords === "boolean"
+        ? candidate.hasExternalResolutionRecords
+        : false,
+    transferDetail,
+    transferDetails,
+    externalItems: normalizeExternalResolvedItems(source.externalItems),
+    remainingInventoryItems,
+  };
+}
+
+function normalizeRemainingInventoryItems(
+  payload: unknown,
+): DepotClosureRemainingInventoryItem[] | null {
+  if (!Array.isArray(payload)) {
+    return null;
+  }
+
+  return payload.map((item) => {
+    const candidate = (item ?? {}) as Partial<DepotClosureRemainingInventoryItem>;
+    return {
+      itemModelId:
+        typeof candidate.itemModelId === "number" ? candidate.itemModelId : 0,
+      itemName: typeof candidate.itemName === "string" ? candidate.itemName : "",
+      categoryName:
+        typeof candidate.categoryName === "string" ? candidate.categoryName : null,
+      itemType: typeof candidate.itemType === "string" ? candidate.itemType : "",
+      unit: typeof candidate.unit === "string" ? candidate.unit : null,
+      quantity: typeof candidate.quantity === "number" ? candidate.quantity : 0,
+      currentQuantity:
+        typeof candidate.currentQuantity === "number"
+          ? candidate.currentQuantity
+          : null,
+      assignedQuantity:
+        typeof candidate.assignedQuantity === "number"
+          ? candidate.assignedQuantity
+          : null,
+      remainingTransferableQuantity:
+        typeof candidate.remainingTransferableQuantity === "number"
+          ? candidate.remainingTransferableQuantity
+          : null,
+      blockedQuantity:
+        typeof candidate.blockedQuantity === "number"
+          ? candidate.blockedQuantity
+          : null,
+      transferableQuantity:
+        typeof candidate.transferableQuantity === "number"
+          ? candidate.transferableQuantity
+          : null,
+      volumePerUnit:
+        typeof candidate.volumePerUnit === "number" ? candidate.volumePerUnit : null,
+      weightPerUnit:
+        typeof candidate.weightPerUnit === "number"
+          ? candidate.weightPerUnit
+          : typeof candidate.WeightPerUnit === "number"
+            ? candidate.WeightPerUnit
+            : null,
+      WeightPerUnit:
+        typeof candidate.WeightPerUnit === "number" ? candidate.WeightPerUnit : null,
+      imageUrl: typeof candidate.imageUrl === "string" ? candidate.imageUrl : null,
+      receivedDate:
+        typeof candidate.receivedDate === "string" ? candidate.receivedDate : null,
+      expiredDate:
+        typeof candidate.expiredDate === "string" ? candidate.expiredDate : null,
+    };
+  });
+}
+
+function normalizeDepotClosureDetailTransferItems(
+  payload: unknown,
+): DepotClosureDetailTransferItem[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.map((item) => {
+    const candidate = (item ?? {}) as Partial<DepotClosureDetailTransferItem>;
+    return {
+      itemModelId:
+        typeof candidate.itemModelId === "number" ? candidate.itemModelId : 0,
+      itemName: typeof candidate.itemName === "string" ? candidate.itemName : "",
+      itemType: typeof candidate.itemType === "string" ? candidate.itemType : "",
+      unit: typeof candidate.unit === "string" ? candidate.unit : null,
+      quantity: typeof candidate.quantity === "number" ? candidate.quantity : 0,
+    };
+  });
+}
+
+function normalizeDepotClosureDetailTransfer(
+  payload: unknown,
+): DepotClosureDetailTransfer | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidate = payload as Partial<DepotClosureDetailTransfer>;
+  if (typeof candidate.id !== "number" || candidate.id <= 0) {
+    return null;
+  }
+
+  const source = payload as Record<string, unknown>;
+  return {
+    id: candidate.id,
+    closureId: typeof candidate.closureId === "number" ? candidate.closureId : 0,
+    sourceDepotId:
+      typeof candidate.sourceDepotId === "number" ? candidate.sourceDepotId : 0,
+    sourceDepotName:
+      typeof candidate.sourceDepotName === "string"
+        ? candidate.sourceDepotName
+        : null,
+    targetDepotId:
+      typeof candidate.targetDepotId === "number" ? candidate.targetDepotId : 0,
+    targetDepotName:
+      typeof candidate.targetDepotName === "string"
+        ? candidate.targetDepotName
+        : null,
+    status: typeof candidate.status === "string" ? candidate.status : "",
+    createdAt: typeof candidate.createdAt === "string" ? candidate.createdAt : "",
+    snapshotConsumableUnits:
+      typeof candidate.snapshotConsumableUnits === "number"
+        ? candidate.snapshotConsumableUnits
+        : 0,
+    snapshotReusableUnits:
+      typeof candidate.snapshotReusableUnits === "number"
+        ? candidate.snapshotReusableUnits
+        : 0,
+    shippedAt: typeof candidate.shippedAt === "string" ? candidate.shippedAt : null,
+    shippedBy: typeof candidate.shippedBy === "string" ? candidate.shippedBy : null,
+    shipNote: typeof candidate.shipNote === "string" ? candidate.shipNote : null,
+    receivedAt:
+      typeof candidate.receivedAt === "string" ? candidate.receivedAt : null,
+    receivedBy:
+      typeof candidate.receivedBy === "string" ? candidate.receivedBy : null,
+    receiveNote:
+      typeof candidate.receiveNote === "string" ? candidate.receiveNote : null,
+    cancelledAt:
+      typeof candidate.cancelledAt === "string" ? candidate.cancelledAt : null,
+    cancelledBy:
+      typeof candidate.cancelledBy === "string" ? candidate.cancelledBy : null,
+    cancellationReason:
+      typeof candidate.cancellationReason === "string"
+        ? candidate.cancellationReason
+        : null,
+    items: normalizeDepotClosureDetailTransferItems(source.items),
+  };
+}
+
+function normalizeDepotClosureDetailTransfers(
+  payload: unknown,
+): DepotClosureDetailTransfer[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload
+    .map((item) => normalizeDepotClosureDetailTransfer(item))
+    .filter((item): item is DepotClosureDetailTransfer => item != null);
+}
+
+function normalizeExternalResolvedItems(
+  payload: unknown,
+): DepotExternalResolvedItem[] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.map((item) => {
+    const candidate = (item ?? {}) as Partial<DepotExternalResolvedItem>;
+    return {
+      id: typeof candidate.id === "number" ? candidate.id : 0,
+      itemName: typeof candidate.itemName === "string" ? candidate.itemName : "",
+      categoryName:
+        typeof candidate.categoryName === "string" ? candidate.categoryName : "",
+      itemType: typeof candidate.itemType === "string" ? candidate.itemType : "",
+      unit: typeof candidate.unit === "string" ? candidate.unit : "",
+      quantity: typeof candidate.quantity === "number" ? candidate.quantity : 0,
+      unitPrice:
+        typeof candidate.unitPrice === "number" ? candidate.unitPrice : 0,
+      totalPrice:
+        typeof candidate.totalPrice === "number" ? candidate.totalPrice : 0,
+      handlingMethod:
+        typeof candidate.handlingMethod === "string" ? candidate.handlingMethod : "",
+      handlingMethodDisplay:
+        typeof candidate.handlingMethodDisplay === "string"
+          ? candidate.handlingMethodDisplay
+          : typeof candidate.handlingMethod === "string"
+            ? candidate.handlingMethod
+            : "",
+      recipient: typeof candidate.recipient === "string" ? candidate.recipient : "",
+      note: typeof candidate.note === "string" ? candidate.note : null,
+      imageUrl: typeof candidate.imageUrl === "string" ? candidate.imageUrl : null,
+      processedBy:
+        typeof candidate.processedBy === "string" ? candidate.processedBy : "",
+      processedByFullName:
+        typeof candidate.processedByFullName === "string"
+          ? candidate.processedByFullName
+          : null,
+      processedAt:
+        typeof candidate.processedAt === "string" ? candidate.processedAt : "",
+      createdAt: typeof candidate.createdAt === "string" ? candidate.createdAt : "",
+    };
+  });
 }
 
 function normalizeDepotClosureInitiateResponse(
@@ -183,6 +551,19 @@ export async function getDepotClosureResolutionMetadata(): Promise<
   DepotClosureResolutionMetadataItem[]
 > {
   const { data } = await api.get("/logistics/depot/metadata/closure");
+  return data;
+}
+
+/**
+ * Get closure transfer status metadata
+ * GET /logistics/depot/metadata/closure-transfer-statuses
+ */
+export async function getDepotClosureTransferStatuses(): Promise<
+  DepotClosureTransferStatusMetadata[]
+> {
+  const { data } = await api.get(
+    "/logistics/depot/metadata/closure-transfer-statuses",
+  );
   return data;
 }
 
@@ -407,7 +788,7 @@ export async function initiateDepotClosure(
   request: InitiateDepotClosureRequest,
 ): Promise<InitiateDepotClosureResponse> {
   const { id, ...body } = request;
-  const response = await api.post(`/logistics/depot/${id}/close`, body, {
+  const response = await api.post(`/logistics/depot/${id}/closed`, body, {
     validateStatus: (status) => status === 200 || status === 409,
   });
   return normalizeDepotClosureInitiateResponse(response.data, response.status);
@@ -460,16 +841,30 @@ export async function submitDepotExternalResolution(
 }
 
 /**
- * Download depot close external-resolution template
- * Proxied via /api/depot/close-export-template
- * → GET /logistics/depot/close/export-template
+ * [Depot Manager] Get external resolution state for current depot closure
+ * GET /logistics/depot/{id}/close/external-resolution-state
  */
-export async function downloadDepotClosureExportTemplate(): Promise<{
+export async function getDepotExternalResolutionState(
+  id: number,
+): Promise<DepotExternalResolutionState> {
+  const { data } = await api.get(
+    `/logistics/depot/${id}/close/external-resolution-state`,
+  );
+  return data;
+}
+
+/**
+ * Download depot close external-resolution template
+ * Proxied via /api/depot/close-export-template?depotId={id}
+ * → GET /logistics/depot/{id}/close/export-template
+ */
+export async function downloadDepotClosureExportTemplate(id: number): Promise<{
   blob: Blob;
   filename: string;
 }> {
   const token = useAuthStore.getState().accessToken;
-  const response = await fetch("/api/depot/close-export-template", {
+  const query = new URLSearchParams({ depotId: String(id) });
+  const response = await fetch(`/api/depot/close-export-template?${query}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
@@ -515,6 +910,20 @@ export async function getMyDepotTransfers(
 }
 
 /**
+ * [Manager kho đích] Tìm transfer đang chờ nhận
+ * GET /logistics/depot/my-incoming-closure-transfer?depotId={targetDepotId}
+ */
+export async function getMyIncomingClosureTransfer(
+  depotId: number,
+): Promise<GetMyDepotTransfersResponse> {
+  const { data } = await api.get(
+    "/logistics/depot/my-incoming-closure-transfer",
+    { params: { depotId } },
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+/**
  * [Manager] Get closure history/list for current depot
  * GET /logistics/depot/closures
  */
@@ -538,22 +947,22 @@ export async function getMyDepotClosureDetail(
   const { data } = await api.get(`/logistics/depot/closures/${closureId}`, {
     params: { depotId },
   });
-  return data;
+  const normalized = normalizeDepotClosureDetailResponse(data);
+  if (!normalized) {
+    throw new Error("Invalid depot closure detail response");
+  }
+  return normalized;
 }
 
 /**
- * [Admin] Get current/latest closure detail of a depot
- * GET /logistics/depot/{depotId}/closures
+ * [Admin] Get all closures list for a depot
+ * GET /logistics/depot/{depotId}/closures  (returns array)
  */
-export async function getDepotClosureByDepotId(
+export async function getDepotClosuresListByDepotId(
   depotId: number,
-): Promise<DepotClosureDetail | null> {
-  const response = await api.get(`/logistics/depot/${depotId}/closures`, {
-    validateStatus: (status) => status === 200 || status === 404,
-  });
-  return response.status === 404
-    ? null
-    : normalizeDepotClosureDetailResponse(response.data);
+): Promise<GetDepotClosuresListByDepotIdResponse> {
+  const { data } = await api.get(`/logistics/depot/${depotId}/closures`);
+  return Array.isArray(data) ? data : [];
 }
 
 /**
@@ -600,11 +1009,8 @@ export async function prepareDepotTransfer(
 ): Promise<DepotTransferActionResponse> {
   const { transferId, depotId, note } = request;
   const { data } = await api.post(
-    `/logistics/depot/transfer/${transferId}/prepare`,
+    `/logistics/depot/${depotId}/transfer/${transferId}/prepare`,
     note ? { note } : {},
-    {
-      params: { depotId },
-    },
   );
   return data;
 }
@@ -618,11 +1024,8 @@ export async function shipDepotTransfer(
 ): Promise<DepotTransferActionResponse> {
   const { transferId, depotId, note } = request;
   const { data } = await api.post(
-    `/logistics/depot/transfer/${transferId}/ship`,
+    `/logistics/depot/${depotId}/transfer/${transferId}/ship`,
     note ? { note } : {},
-    {
-      params: { depotId },
-    },
   );
   return data;
 }
@@ -636,11 +1039,8 @@ export async function completeDepotTransfer(
 ): Promise<DepotTransferActionResponse> {
   const { transferId, depotId, note } = request;
   const { data } = await api.post(
-    `/logistics/depot/transfer/${transferId}/complete`,
+    `/logistics/depot/${depotId}/transfer/${transferId}/complete`,
     note ? { note } : {},
-    {
-      params: { depotId },
-    },
   );
   return data;
 }
@@ -654,11 +1054,23 @@ export async function receiveDepotTransfer(
 ): Promise<DepotReceiveTransferResponse> {
   const { transferId, depotId, note } = request;
   const { data } = await api.post(
-    `/logistics/depot/transfer/${transferId}/receive`,
+    `/logistics/depot/${depotId}/transfer/${transferId}/receive`,
     note ? { note } : {},
-    {
-      params: { depotId },
-    },
+  );
+  return data;
+}
+
+/**
+ * [Admin] Hủy một transfer thuộc closure hiện tại
+ * DELETE /logistics/depot/{id}/close/transfer/{transferId}
+ */
+export async function cancelDepotClosureTransfer(
+  request: CancelDepotClosureTransferRequest,
+): Promise<CancelDepotClosureTransferResponse> {
+  const { id, transferId, reason } = request;
+  const { data } = await api.delete(
+    `/logistics/depot/${id}/close/transfer/${transferId}`,
+    { data: reason ? { reason } : {} },
   );
   return data;
 }

@@ -24,6 +24,17 @@ export const NOTIFICATION_HUB_CONFIG = {
   reconnectDelaysMs: [0, 1000, 3000, 5000, 10000] as const,
 } as const;
 
+export const DEPOT_CLOSURE_NOTIFICATION_TYPES = [
+  "depot_closure_external_marked",
+  "depot_closure_transfer_assigned",
+  "depot_closure_transfer_ready",
+  "depot_closure_transfer_completed",
+  "depot_closure_transfer_received",
+  "depot_closure_processing_required",
+  "depot_closure_processing",
+  "depot_closure_completed",
+] as const;
+
 export const ROLE_NOTIFICATION_TYPES: Record<number, readonly string[]> = {
   1: [],
   2: [
@@ -45,6 +56,7 @@ export const ROLE_NOTIFICATION_TYPES: Record<number, readonly string[]> = {
     "supply_preparing",
     "supply_shipped",
     "supply_completed",
+    ...DEPOT_CLOSURE_NOTIFICATION_TYPES,
   ],
 };
 
@@ -60,6 +72,7 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   supply_preparing: "Đơn hàng đang được chuẩn bị",
   supply_shipped: "Đơn hàng đã được vận chuyển",
   supply_completed: "Đơn hàng đã hoàn tất",
+  depot_closure_external_marked: "Đã đánh dấu xử lý bên ngoài khi đóng kho",
   depot_closure_transfer_assigned: "Phân công nhận hàng đóng kho",
   depot_closure_transfer_ready: "Phiên chuyển kho sẵn sàng",
   depot_closure_transfer_completed: "Phiên chuyển kho hoàn tất",
@@ -102,6 +115,7 @@ const NOTIFICATION_TYPE_TONES: Record<string, NotificationTone> = {
   supply_preparing: "info",
   supply_shipped: "info",
   supply_completed: "success",
+  depot_closure_external_marked: "warning",
   depot_closure_transfer_assigned: "warning",
   depot_closure_transfer_ready: "info",
   depot_closure_transfer_completed: "success",

@@ -197,7 +197,7 @@ export default function IncomingRequestsSection() {
       pageSize: 100,
     },
     {
-      refetchInterval: 10_000,
+      refetchInterval: false,
       refetchOnWindowFocus: true,
       enabled: Boolean(selectedDepotId),
     },
