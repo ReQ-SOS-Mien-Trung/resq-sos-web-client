@@ -9,7 +9,7 @@ export type DepotStatus =
   | "Closing"
   | "UnderMaintenance";
 
-export type ChangeableDepotStatus = "Available" | "Unavailable" | "Closing";
+export type ChangeableDepotStatus = "Available" | "Unavailable";
 
 // Depot Status Metadata (from /logistics/depot/metadata/depot-statuses)
 export interface DepotStatusMetadata {
@@ -31,6 +31,19 @@ export interface DepotMetadataItem {
 
 export interface DepotClosureResolutionMetadataItem {
   key: "TransferToDepot" | "ExternalResolution" | string;
+  value: string;
+}
+
+export type DepotClosureTransferStatus =
+  | "AwaitingPreparation"
+  | "Preparing"
+  | "Shipping"
+  | "Completed"
+  | "Received"
+  | "Cancelled";
+
+export interface DepotClosureTransferStatusMetadata {
+  key: DepotClosureTransferStatus | string;
   value: string;
 }
 
@@ -109,7 +122,9 @@ export interface DepotEntity {
   latitude: number;
   longitude: number;
   capacity: number;
+  weightCapacity?: number;
   currentUtilization: number;
+  currentWeightUtilization?: number;
   status: DepotStatus;
   imageUrl?: string | null;
   manager: DepotManager | null;
@@ -143,6 +158,7 @@ export interface CreateDepotRequest {
   latitude: number;
   longitude: number;
   capacity: number;
+  weightCapacity: number;
   managerId?: string;
   imageUrl?: string;
 }
@@ -155,6 +171,7 @@ export interface UpdateDepotRequest {
   latitude: number;
   longitude: number;
   capacity: number;
+  weightCapacity?: number;
 }
 
 // Update Depot Status Request
@@ -167,6 +184,17 @@ export interface UpdateDepotStatusRequest {
 export interface UpdateDepotStatusResponse {
   id: number;
   status: ChangeableDepotStatus;
+  message: string;
+}
+
+export interface InitiateDepotClosingRequest {
+  id: number;
+}
+
+export interface InitiateDepotClosingResponse {
+  depotId: number;
+  closureId: number;
+  status: DepotStatus | string;
   message: string;
 }
 
@@ -359,6 +387,10 @@ export interface MarkDepotClosureExternalResponse {
   depotId?: number;
   depotName?: string;
   closureStatus?: DepotClosureStatus | string;
+  /** ExternalResolution once mark-external is confirmed */
+  resolutionType?: string | null;
+  /** Number of remaining item lines at the time of marking */
+  remainingItemCount?: number;
   message: string;
 }
 
@@ -388,8 +420,29 @@ export interface SubmitDepotExternalResolutionRequest {
 export interface SubmitDepotExternalResolutionResponse {
   closureId?: number;
   depotId?: number;
+  depotName?: string;
+  processedItemCount?: number;
+  soldRevenue?: number;
+  snapshotConsumableUnits?: number;
+  snapshotReusableUnits?: number;
+  reusableItemsSkipped?: number;
+  /** Completed once external resolution is uploaded */
+  closureStatus?: string;
+  resolutionType?: string;
   completedAt?: string | null;
   message: string;
+}
+
+export interface DepotExternalResolutionState {
+  depotId: number;
+  closureId: number;
+  hasActiveExternalResolution: boolean;
+  canDownloadExternalTemplate: boolean;
+  canUploadExternalResolution: boolean;
+  closureStatus: string;
+  resolutionType: string | null;
+  externalNote: string | null;
+  remainingItemCount: number;
 }
 
 export interface DepotClosureRemainingInventoryItem {
@@ -399,6 +452,12 @@ export interface DepotClosureRemainingInventoryItem {
   itemType: string;
   unit?: string | null;
   quantity: number;
+  /** Current quantity in depot at query time (new hybrid field) */
+  currentQuantity?: number | null;
+  /** How much was assigned to the current batch (new hybrid field) */
+  assignedQuantity?: number | null;
+  /** How much is still transferable after current batch (new hybrid field) */
+  remainingTransferableQuantity?: number | null;
   blockedQuantity?: number | null;
   transferableQuantity?: number | null;
   volumePerUnit?: number | null;
@@ -413,10 +472,36 @@ export interface DepotClosureTransferSuggestionTargetMetric {
   depotId: number;
   depotName: string;
   capacity: number;
+  weightCapacity?: number;
   currentUtilization: number;
+  currentWeightUtilization?: number;
   remainingVolume: number;
   remainingWeight: number;
+  distanceKm?: number;
+  /** Hạng ưu tiên của kho trong phương án suggest, 1 là tốt nhất */
+  recommendationRank?: number;
+  /** Số dòng hàng được đẩy vào kho này */
+  suggestedItemLineCount?: number;
+  /** Tổng số đơn vị hàng được đẩy vào kho này */
+  suggestedUnitCount?: number;
+  /** Tổng thể tích backend dự tính đưa vào kho này */
+  plannedVolume?: number;
+  /** Tổng khối lượng backend dự tính đưa vào kho này */
+  plannedWeight?: number;
+  /** Thể tích còn trống sau khi áp phương án suggest */
+  projectedRemainingVolume?: number;
+  /** Khối lượng còn trống sau khi áp phương án suggest */
+  projectedRemainingWeight?: number;
+  /** Câu giải thích ngắn vì sao kho này được xếp hạng như vậy */
+  recommendationReason?: string | null;
 }
+
+export type DepotClosureAllocationMode =
+  | "FullFitSingleDepot"
+  | "Consolidated"
+  | "SplitByCapacity"
+  | "Unallocated"
+  | string;
 
 export interface DepotClosureSuggestedTransfer {
   targetDepotId: number | null;
@@ -428,6 +513,11 @@ export interface DepotClosureSuggestedTransfer {
   suggestedQuantity: number;
   totalVolume: number;
   totalWeight: number;
+  distanceKm?: number;
+  /** Hạng của kho đích chứa dòng này */
+  recommendationRank?: number;
+  /** Cách backend phân bổ dòng này */
+  allocationMode?: DepotClosureAllocationMode | null;
 }
 
 export interface DepotClosureTransferSuggestionsResponse {
@@ -437,6 +527,12 @@ export interface DepotClosureTransferSuggestionsResponse {
   totalWeightToTransfer: number;
   unallocatedVolume: number;
   unallocatedWeight: number;
+  /** Số kho đích thực sự được dùng trong phương án suggest */
+  suggestedTargetDepotCount?: number;
+  /** Số dòng hàng chưa phân được */
+  unallocatedItemLineCount?: number;
+  /** Mô tả ngắn chiến lược suggest của backend */
+  recommendationStrategy?: string | null;
   targetDepotMetrics: DepotClosureTransferSuggestionTargetMetric[];
   suggestedTransfers: DepotClosureSuggestedTransfer[];
 }
@@ -458,8 +554,38 @@ export interface InitiateDepotClosureTransferRequest {
   assignments: DepotClosureTransferAssignment[];
 }
 
+/** One item within a transfer batch response */
+export interface DepotClosureTransferBatchItem {
+  itemModelId: number;
+  itemName: string;
+  itemType: string;
+  unit?: string | null;
+  quantity: number;
+}
+
+/** One transfer record inside the batch transfer response */
+export interface DepotClosureTransferBatch {
+  transferId: number;
+  targetDepotId: number;
+  targetDepotName: string;
+  transferStatus: string;
+  snapshotConsumableUnits: number;
+  snapshotReusableUnits: number;
+  items: DepotClosureTransferBatchItem[];
+}
+
 export interface InitiateDepotClosureTransferResponse {
   closureId?: number;
+  sourceDepotId?: number;
+  sourceDepotName?: string;
+  /** New: per-target-depot transfer records */
+  transfers?: DepotClosureTransferBatch[];
+  reusableItemsSkipped?: number;
+  /** New: true when some items could not be allocated in this batch */
+  hasRemainingItems?: boolean;
+  /** New: items left over after this batch (mirrors DepotClosureRemainingInventoryItem) */
+  remainingItems?: DepotClosureRemainingInventoryItem[];
+  // Legacy / compatibility fields
   depotId?: number;
   transferId?: number;
   transferIds?: number[];
@@ -472,8 +598,35 @@ export interface InitiateDepotClosureTransferResponse {
 
 export interface DepotClosureTransferSummary {
   transferId: number;
+  targetDepotId: number | null;
+  targetDepotName: string | null;
   status: string;
 }
+
+export type GetDepotClosuresListByDepotIdResponse = Array<{
+  id: number;
+  depotId: number;
+  depotRole: string | null;
+  status: string;
+  previousStatus: string | null;
+  closeReason: string;
+  resolutionType: string | null;
+  targetDepotId: number | null;
+  targetDepotName: string | null;
+  externalNote: string | null;
+  initiatedBy: string;
+  initiatedByFullName: string | null;
+  cancelledBy: string | null;
+  cancelledByFullName: string | null;
+  cancellationReason: string | null;
+  snapshotConsumableUnits: number;
+  snapshotReusableUnits: number;
+  initiatedAt: string;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  transfer: DepotClosureTransferSummary | null;
+  transfers: DepotClosureTransferSummary[];
+}>;
 
 export interface DepotTransferListItem {
   transferId: number;
@@ -513,28 +666,42 @@ export interface DepotExternalResolvedItem {
   note: string | null;
   imageUrl: string | null;
   processedBy: string;
+  processedByFullName?: string | null;
   processedAt: string;
   createdAt: string;
+}
+
+export interface DepotClosureDetailTransferItem {
+  itemModelId: number;
+  itemName: string;
+  itemType: string;
+  unit: string | null;
+  quantity: number;
 }
 
 export interface DepotClosureDetailTransfer {
   id: number;
   closureId: number;
   sourceDepotId: number;
+  sourceDepotName: string | null;
   targetDepotId: number;
+  targetDepotName: string | null;
   status: string;
   createdAt: string;
   snapshotConsumableUnits: number;
   snapshotReusableUnits: number;
   shippedAt: string | null;
   shippedBy: string | null;
+  shippedByName?: string | null;
   shipNote: string | null;
   receivedAt: string | null;
   receivedBy: string | null;
+  receivedByName?: string | null;
   receiveNote: string | null;
   cancelledAt: string | null;
   cancelledBy: string | null;
   cancellationReason: string | null;
+  items: DepotClosureDetailTransferItem[];
 }
 
 export interface DepotClosureListItem {
@@ -591,19 +758,85 @@ export interface DepotClosureDetail {
   initiatedAt: string;
   completedAt: string | null;
   cancelledAt: string | null;
+  /** true nếu còn transfer chưa hoàn tất */
+  hasOpenTransfers?: boolean;
+  /** true nếu kho vẫn còn hàng tồn cần xử lý */
+  hasRemainingItems?: boolean;
+  /** Số dòng vật phẩm còn lại */
+  remainingItemCount?: number;
+  /** true nếu còn vật phẩm có thể tiếp tục điều chuyển */
+  hasTransferableRemainingItems?: boolean;
+  /** Số dòng vật phẩm còn có thể điều chuyển */
+  transferableRemainingItemCount?: number;
+  /** Số đơn vị còn có thể điều chuyển */
+  transferableRemainingUnitCount?: number;
+  /** Số dòng vật phẩm đang bị chặn */
+  blockedRemainingItemCount?: number;
+  /** Số đơn vị đang bị chặn */
+  blockedRemainingUnitCount?: number;
+  /** true nếu đang có blocker khiến chưa thể đóng kho */
+  hasClosingBlockers?: boolean;
+  /** Số dòng vật phẩm tiêu hao đang bị reserve */
+  reservedConsumableItemCount?: number;
+  /** Số đơn vị vật phẩm tiêu hao đang bị reserve */
+  reservedConsumableUnitCount?: number;
+  /** Số model vật phẩm tái sử dụng chưa ở trạng thái khả dụng */
+  nonAvailableReusableItemModelCount?: number;
+  /** Số đơn vị vật phẩm tái sử dụng chưa ở trạng thái khả dụng */
+  nonAvailableReusableUnitCount?: number;
+  /** true → FE hiện các nút chọn phương án xử lý tồn kho */
+  canSelectResolutionOption?: boolean;
+  /** true → FE hiện nút xác nhận đóng kho (POST /closed) */
+  canConfirmClose?: boolean;
+  /** true → FE cho tải file mẫu xử lý bên ngoài ngay trên detail */
+  canDownloadExternalTemplate?: boolean;
+  /** true → FE cho upload kết quả xử lý bên ngoài ngay trên detail */
+  canUploadExternalResolution?: boolean;
+  /** true nếu closure đã từng có ít nhất một transfer record */
+  hasTransferRecords?: boolean;
+  /** true nếu closure đã từng có ít nhất một external resolution record */
+  hasExternalResolutionRecords?: boolean;
   transferDetail: DepotClosureDetailTransfer | null;
+  /** Danh sách tất cả các transfer trong closure này */
+  transferDetails?: DepotClosureDetailTransfer[];
   externalItems: DepotExternalResolvedItem[];
   remainingInventoryItems?: DepotClosureRemainingInventoryItem[] | null;
 }
 
+// ── Cancel Depot Closure Transfer ────────────────────────────────────────────
+// DELETE /logistics/depot/{id}/close/transfer/{transferId}
+export interface CancelDepotClosureTransferRequest {
+  /** Source depot ID */
+  id: number;
+  transferId: number;
+  reason?: string | null;
+}
+
+export interface CancelDepotClosureTransferResponse {
+  transferId: number;
+  depotId: number;
+  transferStatus: string;
+  closureId?: number;
+  /** Updated closure status: InProgress if more items remain, Completed if done */
+  closureStatus?: string;
+  /** true when admin still needs to create a new batch or mark external */
+  requiresFurtherResolution?: boolean;
+  /** Number of item lines still in depot after cancel */
+  remainingItemCount?: number;
+  cancelledAt?: string;
+  message: string;
+}
+
 // ── Depot Closure Transfer ─────────────────────────────────────
 
-// GET /logistics/depot/{id}/transfer/{transferId}
+// GET /logistics/depot/{id}/close/transfer/{transferId}
 export interface DepotClosureTransfer {
   id: number;
-  closureId?: number;
+  closureId: number;
   sourceDepotId: number;
+  sourceDepotName: string | null;
   targetDepotId: number;
+  targetDepotName: string | null;
   status: string;
   createdAt: string;
   snapshotConsumableUnits: number;
@@ -617,6 +850,7 @@ export interface DepotClosureTransfer {
   cancelledAt: string | null;
   cancelledBy: string | null;
   cancellationReason: string | null;
+  items: DepotClosureDetailTransferItem[];
 }
 
 // POST prepare / ship / complete / receive — shared request & response
@@ -639,8 +873,14 @@ export interface DepotReceiveTransferResponse {
   transferId: number;
   closureId?: number;
   transferStatus: string;
+  /** New: updated closure status after receive */
+  closureStatus?: string;
   consumableUnitsMoved: number;
   reusableItemsMoved: number;
+  /** New: true when more transfers or mark-external is still needed */
+  requiresFurtherResolution?: boolean;
+  /** New: number of item lines still remaining in depot */
+  remainingItemCount?: number;
   completedAt: string;
   message: string;
 }

@@ -75,34 +75,46 @@ export const useAuthStore = create<AuthState>()(
 
         updateTokens: (data: RefreshTokenResponse) =>
           set(
-            {
+            (state) => ({
               accessToken: data.accessToken,
               refreshToken: data.refreshToken,
               expiresIn: data.expiresIn,
               tokenType: data.tokenType,
               tokenObtainedAt: Date.now(),
-            },
+              isAuthenticated: true,
+              user: state.user
+                ? {
+                    ...state.user,
+                    permissions: data.permissions ?? state.user.permissions,
+                  }
+                : state.user,
+            }),
             false,
             "auth/updateTokens",
           ),
 
-        logout: () =>
-          {
-            useManagerDepotStore.getState().clearSelection();
-            set(
-              {
-                accessToken: null,
-                refreshToken: null,
-                expiresIn: null,
-                tokenType: null,
-                tokenObtainedAt: null,
-                user: null,
-                isAuthenticated: false,
-              },
-              false,
-              "auth/logout", // Action name hiển thị trong Redux DevTools
-            );
-          },
+        logout: () => {
+          useManagerDepotStore.getState().clearSelection();
+          // Clear all React Query cache so the next user gets fresh data
+          if (typeof window !== "undefined") {
+            (
+              window as Window & { __queryClient?: { clear: () => void } }
+            ).__queryClient?.clear();
+          }
+          set(
+            {
+              accessToken: null,
+              refreshToken: null,
+              expiresIn: null,
+              tokenType: null,
+              tokenObtainedAt: null,
+              user: null,
+              isAuthenticated: false,
+            },
+            false,
+            "auth/logout", // Action name hiển thị trong Redux DevTools
+          );
+        },
       }),
       {
         name: "auth-storage", // key trong localStorage

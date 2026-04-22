@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getSOSRequests,
+  getSOSRequestsInBounds,
+  getSOSPriorityLevels,
   getSOSRequestById,
   getSOSRequestAnalysis,
   createSOSRequest,
@@ -9,18 +11,28 @@ import {
 import {
   GetSOSRequestsResponse,
   GetSOSRequestsParams,
+  GetSOSRequestsInBoundsParams,
+  SOSPriorityLevelOption,
   GetSOSRequestByIdResponse,
-  RescueSuggestionRequest,
-  RescueSuggestionResponse,
   GetSOSRequestAnalysisResponse,
   CreateSOSRequestPayload,
   SOSRequestEntity,
 } from "./type";
+import { getMapBoundsCacheKey } from "@/lib/coordinator-map-utils";
 
 export const SOS_REQUESTS_QUERY_KEY = ["sos-requests"] as const;
+export const SOS_PRIORITY_LEVELS_QUERY_KEY = [
+  ...SOS_REQUESTS_QUERY_KEY,
+  "priority-levels",
+] as const;
 
 export interface UseSOSRequestsOptions {
   params?: GetSOSRequestsParams;
+}
+
+export interface UseSOSRequestsInBoundsOptions {
+  params?: GetSOSRequestsInBoundsParams;
+  enabled?: boolean;
 }
 
 export interface UseSOSRequestByIdOptions {
@@ -28,6 +40,10 @@ export interface UseSOSRequestByIdOptions {
 }
 
 export interface UseSOSRequestsByIdsOptions {
+  enabled?: boolean;
+}
+
+export interface UseSOSPriorityLevelsOptions {
   enabled?: boolean;
 }
 
@@ -41,13 +57,88 @@ type SOSRequestsByIdsQueryData = {
  */
 export function useSOSRequests(options?: UseSOSRequestsOptions) {
   const params = options?.params;
+  const normalizedStatuses = useMemo(
+    () =>
+      Array.from(new Set((params?.Statuses ?? []).filter(Boolean))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [params?.Statuses],
+  );
+  const normalizedPriorityLevels = useMemo(
+    () =>
+      Array.from(new Set((params?.PriorityLevels ?? []).filter(Boolean))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [params?.PriorityLevels],
+  );
+
   return useQuery<GetSOSRequestsResponse>({
     queryKey: [
       ...SOS_REQUESTS_QUERY_KEY,
       params?.pageNumber ?? 1,
       params?.pageSize ?? 10,
+      normalizedStatuses.join(","),
+      normalizedPriorityLevels.join(","),
     ],
     queryFn: () => getSOSRequests(params),
+  });
+}
+
+export function useSOSRequestsInBounds(
+  options?: UseSOSRequestsInBoundsOptions,
+) {
+  const params = options?.params;
+  const boundsKey = getMapBoundsCacheKey(
+    params
+      ? {
+          south: params.MinLat,
+          north: params.MaxLat,
+          west: params.MinLng,
+          east: params.MaxLng,
+        }
+      : null,
+  );
+  const normalizedStatuses = useMemo(
+    () =>
+      Array.from(new Set((params?.Statuses ?? []).filter(Boolean))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [params?.Statuses],
+  );
+  const normalizedPriorityLevels = useMemo(
+    () =>
+      Array.from(new Set((params?.PriorityLevels ?? []).filter(Boolean))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [params?.PriorityLevels],
+  );
+
+  return useQuery<SOSRequestEntity[]>({
+    queryKey: [
+      ...SOS_REQUESTS_QUERY_KEY,
+      "bounds",
+      boundsKey,
+      normalizedStatuses.join(","),
+      normalizedPriorityLevels.join(","),
+    ],
+    queryFn: () => getSOSRequestsInBounds(params!),
+    enabled:
+      (options?.enabled ?? true) &&
+      Number.isFinite(params?.MinLat) &&
+      Number.isFinite(params?.MaxLat) &&
+      Number.isFinite(params?.MinLng) &&
+      Number.isFinite(params?.MaxLng),
+    placeholderData: (previousData) => previousData,
+    staleTime: 60_000,
+  });
+}
+
+export function useSOSPriorityLevels(options?: UseSOSPriorityLevelsOptions) {
+  return useQuery<SOSPriorityLevelOption[]>({
+    queryKey: SOS_PRIORITY_LEVELS_QUERY_KEY,
+    queryFn: getSOSPriorityLevels,
+    enabled: options?.enabled ?? true,
+    staleTime: 5 * 60_000,
   });
 }
 

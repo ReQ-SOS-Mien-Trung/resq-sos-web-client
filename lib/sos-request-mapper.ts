@@ -56,10 +56,13 @@ export function mapSOSRequestEntityToSOS(entity: SOSRequestEntity): SOSRequest {
   return {
     id: String(entity.id),
     groupId: entity.clusterId ? String(entity.clusterId) : String(entity.id),
+    clusterId: entity.clusterId ?? null,
     location: { lat: entity.latitude, lng: entity.longitude },
     priority: mapSOSPriorityLevelToPriority(entity.priorityLevel),
+    rawPriorityLevel: entity.priorityLevel ?? null,
     needs,
     status: mapSOSRequestStatusToStatus(entity.status),
+    rawStatus: entity.status,
     message: entity.msg,
     createdAt,
     receivedAt: entity.receivedAt ? new Date(entity.receivedAt) : null,

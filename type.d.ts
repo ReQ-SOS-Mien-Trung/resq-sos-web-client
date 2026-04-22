@@ -1,6 +1,8 @@
 import type { PromptType } from "@/services/prompt/type";
 import type {
   MedicalSupportNeedType,
+  SOSPriorityLevel,
+  SOSRequestStatus,
   SOSClothingPerson,
   SOSSpecialDietPerson,
   SOSStructuredData,
@@ -57,14 +59,17 @@ export interface Location {
 export interface SOSRequest {
   id: string;
   groupId: string;
+  clusterId?: number | null;
   location: Location;
   priority: Priority;
+  rawPriorityLevel?: SOSPriorityLevel | null;
   needs: {
     medical: boolean;
     food: boolean;
     boat: boolean;
   };
   status: SOSStatus;
+  rawStatus?: SOSRequestStatus;
   message: string;
   createdAt: Date;
   receivedAt?: Date | null;
@@ -816,7 +821,7 @@ export interface SOSDetailsPanelProps {
   sosRequest: SOSRequest | null;
   onProcessSOS: (sosIds: string[]) => void;
   isProcessing?: boolean;
-  /** SOS requests in the same auto-cluster (within 1 km) */
+  /** SOS requests in the same config-driven auto-cluster suggestion */
   nearbySOSRequests: SOSRequest[];
   allSOSRequests: SOSRequest[];
   /** Hide footer processing CTA when this panel is used in read-only flows */
@@ -837,6 +842,7 @@ export interface RescuePlanPanelProps {
   rescueSuggestion:
     | import("@/services/sos_cluster/type").ClusterRescueSuggestionResponse
     | null;
+  preferSplitSuggestion?: boolean;
   onApprove: () => void;
   onReAnalyze: () => void;
   isReAnalyzing: boolean;
@@ -868,9 +874,10 @@ export interface CoordinatorMapProps {
     | null;
   depots: import("@/services/depot/type").DepotEntity[];
   assemblyPoints?: import("@/services/assembly_points/type").AssemblyPointEntity[];
+  serviceZones?: import("@/services/map/type").ServiceZoneEntity[];
   // SOS Clusters from backend
   clusters?: import("@/services/sos_cluster/type").SOSClusterEntity[];
-  /** Client-side auto-clusters (groups of nearby PENDING SOS) */
+  /** Client-side auto-clusters for PENDING SOS, containing 1-3 SOS each */
   autoClusters?: SOSRequest[][];
   selectedSOS?: SOSRequest | null;
   selectedRescuer?: Rescuer | null;
@@ -894,14 +901,26 @@ export interface CoordinatorMapProps {
   userLocation?: Location | null;
   /** Used to trigger map resize when side panel opens/closes */
   panelOpen?: boolean;
-  /** Called when map view changes (pan/zoom) with center + zoom */
-  onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
+  /** Called when map view changes (pan/zoom) with center, zoom, and visible bounds */
+  onViewChange?: (view: {
+    lat: number;
+    lng: number;
+    zoom: number;
+    bounds?: {
+      south: number;
+      north: number;
+      west: number;
+      east: number;
+    };
+  }) => void;
   /** Whether the map is in a mode where the user is allowed to pick a location */
   isPickingLocation?: boolean;
   /** Callback when the user clicks on the map */
   onMapClick?: (lat: number, lng: number) => void;
   /** Decoded polyline coords [lat, lng][] to draw as a rescue route overlay */
   routeOverlay?: [number, number][];
+  /** SOS marker IDs that should briefly play rise-in animation after map-bound fetch updates */
+  risingSOSMarkerIds?: string[];
   /** Called when route overlay should be cleared */
   onClearRouteOverlay?: () => void;
 }
@@ -921,6 +940,14 @@ export interface AssemblyPoint {
 
 export interface SOSSidebarProps {
   sosRequests: SOSRequest[];
+  incomingRequests?: SOSRequest[];
+  incomingPagination?: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    onPageChange: (page: number) => void;
+  };
+  isIncomingRequestsLoading?: boolean;
   rescuers: Rescuer[];
   teamIncidents?: import("@/services/team_incidents/type").TeamIncidentEntity[];
   missions: Mission[];
@@ -933,7 +960,7 @@ export interface SOSSidebarProps {
   selectedTeamIncident?:
     | import("@/services/team_incidents/type").TeamIncidentEntity
     | null;
-  /** Auto-detected clusters of nearby PENDING SOS requests (within 10 km) */
+  /** Config-driven auto-clusters of PENDING SOS requests, containing 1-3 SOS each */
   autoClusters: SOSRequest[][];
   onCreateCluster: (sosIds: string[]) => void;
   onClusterOnly: (clusterGroups: SOSRequest[][]) => void;
@@ -957,6 +984,8 @@ export interface SOSSidebarProps {
   onViewClusterPlan?: (clusterId: number) => void;
   /** View/edit an existing mission in the builder */
   onViewMission?: (clusterId: number, missionId: number) => void;
+  selectedStatuses?: SOSRequestStatus[];
+  onSelectedStatusesChange?: (statuses: SOSRequestStatus[]) => void;
 }
 
 export type WeatherLayer = "wind" | "temp" | "rain" | "clouds";

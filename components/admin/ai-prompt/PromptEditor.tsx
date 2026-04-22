@@ -418,6 +418,8 @@ function mapPromptTestResponseToReviewResult(
         (activity.activityType as ClusterSuggestedActivity["activityType"]) ||
         "MIXED",
       description: activity.description || "Không có mô tả chi tiết.",
+      targetVictimSummary: activity.targetVictimSummary ?? null,
+      targetVictims: activity.targetVictims ?? [],
       priority: activity.priority || "Medium",
       estimatedTime: activity.estimatedTime || "Chưa xác định",
       executionMode: activity.executionMode ?? null,
@@ -432,12 +434,21 @@ function mapPromptTestResponseToReviewResult(
       assemblyPointName: activity.assemblyPointName ?? null,
       assemblyPointLatitude: activity.assemblyPointLatitude ?? null,
       assemblyPointLongitude: activity.assemblyPointLongitude ?? null,
+      destinationName: activity.destinationName ?? null,
+      destinationLatitude: activity.destinationLatitude ?? null,
+      destinationLongitude: activity.destinationLongitude ?? null,
       suppliesToCollect: activity.suppliesToCollect
         ? activity.suppliesToCollect.map((item) => ({
-            itemId: item.itemId ?? 0,
+            itemId: item.itemId ?? null,
             itemName: item.itemName ?? "Vật phẩm",
+            imageUrl: item.imageUrl ?? null,
             quantity: Number(item.quantity) || 0,
             unit: item.unit ?? "đơn vị",
+            bufferRatio: item.bufferRatio ?? null,
+            bufferQuantity: item.bufferQuantity ?? null,
+            bufferUsedQuantity: item.bufferUsedQuantity ?? null,
+            bufferUsedReason: item.bufferUsedReason ?? null,
+            actualDeliveredQuantity: item.actualDeliveredQuantity ?? null,
           }))
         : null,
       suggestedTeam: activity.suggestedTeam
@@ -450,6 +461,8 @@ function mapPromptTestResponseToReviewResult(
             assemblyPointName: activity.suggestedTeam.assemblyPointName,
             latitude: activity.suggestedTeam.latitude,
             longitude: activity.suggestedTeam.longitude,
+            contactPhone: activity.suggestedTeam.contactPhone,
+            estimatedEtaMinutes: activity.suggestedTeam.estimatedEtaMinutes,
             distanceKm: activity.suggestedTeam.distanceKm,
           }
         : null,
@@ -489,10 +502,25 @@ function mapPromptTestResponseToReviewResult(
       })) ?? [],
     estimatedDuration: response.estimatedDuration || "Chưa xác định",
     specialNotes: response.specialNotes,
+    mixedRescueReliefWarning: response.mixedRescueReliefWarning ?? "",
+    needsAdditionalDepot: Boolean(response.needsAdditionalDepot),
+    supplyShortages:
+      response.supplyShortages?.map((shortage) => ({
+        sosRequestId: shortage.sosRequestId ?? null,
+        itemId: shortage.itemId ?? null,
+        itemName: shortage.itemName,
+        unit: shortage.unit,
+        selectedDepotId: shortage.selectedDepotId ?? null,
+        selectedDepotName: shortage.selectedDepotName ?? null,
+        neededQuantity: shortage.neededQuantity,
+        availableQuantity: shortage.availableQuantity,
+        missingQuantity: shortage.missingQuantity,
+        notes: shortage.notes,
+      })) ?? [],
     confidenceScore: normalizeConfidenceScore(response.confidenceScore),
     needsManualReview: response.needsManualReview,
     lowConfidenceWarning: response.lowConfidenceWarning,
-    multiDepotRecommended: response.multiDepotRecommended,
+    multiDepotRecommended: Boolean(response.multiDepotRecommended),
   };
 }
 

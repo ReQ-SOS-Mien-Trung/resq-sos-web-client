@@ -55,4 +55,5 @@ export interface RefreshTokenResponse {
   refreshToken: string;
   expiresIn: number;
   tokenType: string;
+  permissions?: string[];
 }

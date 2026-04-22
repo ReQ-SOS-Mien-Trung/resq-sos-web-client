@@ -18,14 +18,12 @@ import {
 import {
   CheckCircle,
   XCircle,
-  Eye,
   MagnifyingGlass,
   ShieldCheck,
   ClockCountdown,
   UserCheck,
   UserMinus,
   Envelope,
-  Phone,
   MapPin,
   FirstAid,
   CalendarBlank,
@@ -33,7 +31,6 @@ import {
   ArrowLeft,
   FileText,
   IdentificationCard,
-  Briefcase,
   Certificate,
   Image as ImageIcon,
   UploadSimple,
@@ -43,29 +40,23 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowsDownUp,
-  CaretDown,
-  Check,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { uploadImageToCloudinary } from "@/utils/uploadFile";
 import { DashboardSkeleton } from "@/components/admin";
 import { DashboardLayout } from "@/components/admin/dashboard";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { gsap } from "gsap";
 import { useGSAP } from "@gsap/react";
 import {
   useRescuerApplications,
   useRescuerApplicationDetail,
+  useRescuerApplicationStatusMetadata,
   useReviewRescuerApplication,
 } from "@/services/rescuer_application/hooks";
 import type {
-  RescuerApplicationListItem,
   RescuerApplicationDetail,
+  RescuerApplicationStatusMetadataOption,
 } from "@/services/rescuer_application/type";
 import { useUpdateUserAvatar } from "@/services/user/hooks";
 import {
@@ -81,17 +72,6 @@ type StatusFilter = "all" | "Pending" | "Approved" | "Rejected";
 type SortColumn = "name" | "email" | "region" | "status" | "submittedAt";
 type SortDir = "asc" | "desc";
 type SortState = { column: SortColumn; dir: SortDir } | null;
-
-const STATUS_OPTIONS = [
-  { value: "Pending", label: "Chờ xét duyệt" },
-  { value: "Approved", label: "Đã duyệt" },
-  { value: "Rejected", label: "Đã từ chối" },
-];
-
-const _RESCUER_TYPE_OPTIONS = [
-  { value: "Core", label: "Core" },
-  { value: "Volunteer", label: "Volunteer" },
-];
 
 // ─── Sort helpers ───────────────────────────────────────────────────────────
 
@@ -171,8 +151,7 @@ const RescuerVerificationPage = () => {
     { scope: containerRef, dependencies: [selectedItem] },
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [statusFilterOpen, setStatusFilterOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<StatusFilter>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sort, setSort] = useState<SortState>(null);
@@ -192,6 +171,8 @@ const RescuerVerificationPage = () => {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const { mutateAsync: updateAvatarMutate } = useUpdateUserAvatar();
+
+  const { data: statusMetadata = [] } = useRescuerApplicationStatusMetadata();
 
   const handleConfirmReview = async () => {
     if (!reviewDialog.item) return;
@@ -259,11 +240,10 @@ const RescuerVerificationPage = () => {
         <DialogHeader>
           <div className="flex items-center gap-3 mb-1">
             <div
-              className={`p-2.5 rounded-xl ${
-                reviewDialog.isApproved
-                  ? "bg-emerald-500/10 text-emerald-600"
-                  : "bg-rose-500/10 text-rose-600"
-              }`}
+              className={`p-2.5 rounded-xl ${reviewDialog.isApproved
+                ? "bg-emerald-500/10 text-emerald-600"
+                : "bg-rose-500/10 text-rose-600"
+                }`}
             >
               {reviewDialog.isApproved ? (
                 <CheckCircle size={22} weight="bold" />
@@ -374,7 +354,7 @@ const RescuerVerificationPage = () => {
             {/* Media Content */}
             <div className="w-full flex items-center justify-center">
               {previewDoc.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ||
-              previewDoc.url.startsWith("blob:") ? (
+                previewDoc.url.startsWith("blob:") ? (
                 <img
                   src={previewDoc.url}
                   alt={previewDoc.name}
@@ -396,7 +376,12 @@ const RescuerVerificationPage = () => {
 
   const { data: applicationsData, isLoading: isLoadingApplications } =
     useRescuerApplications({
-      params: { pageNumber: page, pageSize, rescuerType: "Volunteer" },
+      params: {
+        pageNumber: page,
+        pageSize,
+        rescuerType: "Volunteer",
+        status: selectedStatus !== "all" ? selectedStatus : undefined,
+      },
     });
 
   const { mutate: reviewApplication, isPending: isReviewing } =
@@ -416,7 +401,10 @@ const RescuerVerificationPage = () => {
     fetchData();
   }, []);
 
-  const items = applicationsData?.items ?? [];
+  const items = useMemo(
+    () => applicationsData?.items ?? [],
+    [applicationsData?.items],
+  );
 
   const stats = useMemo(() => {
     return {
@@ -426,6 +414,15 @@ const RescuerVerificationPage = () => {
       rejected: items.filter((i) => i.status === "Rejected").length,
     };
   }, [items, applicationsData?.totalCount]);
+
+  const statusLabelMap = useMemo(
+    () =>
+      statusMetadata.reduce<Record<string, string>>((acc, option) => {
+        acc[option.key] = option.value;
+        return acc;
+      }, {}),
+    [statusMetadata],
+  );
 
   const filteredAndSorted = useMemo(() => {
     let result = items;
@@ -439,10 +436,6 @@ const RescuerVerificationPage = () => {
           i.phone.includes(q) ||
           i.province.toLowerCase().includes(q),
       );
-    }
-
-    if (selectedStatuses.length > 0) {
-      result = result.filter((i) => selectedStatuses.includes(i.status));
     }
 
     if (sort) {
@@ -471,9 +464,12 @@ const RescuerVerificationPage = () => {
     }
 
     return result;
-  }, [items, searchQuery, selectedStatuses, sort]);
+  }, [items, searchQuery, sort]);
 
-  const getStatusConfig = (status: string) => {
+  const getStatusConfig = (
+    status: string,
+    labels?: Record<string, string>,
+  ) => {
     const configs: Record<
       string,
       {
@@ -484,21 +480,21 @@ const RescuerVerificationPage = () => {
       }
     > = {
       Pending: {
-        label: "Đang chờ xác nhận",
+        label: labels?.Pending ?? "Chờ duyệt",
         className:
           "bg-amber-500/8 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800",
         dotColor: "bg-amber-500",
         icon: <ClockCountdown size={14} weight="fill" />,
       },
       Approved: {
-        label: "Đã xác nhận",
+        label: labels?.Approved ?? "Đã duyệt",
         className:
           "bg-emerald-500/8 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
         dotColor: "bg-emerald-500",
         icon: <CheckCircle size={14} weight="fill" />,
       },
       Rejected: {
-        label: "Đã từ chối",
+        label: labels?.Rejected ?? "Đã từ chối",
         className:
           "bg-rose-500/8 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800",
         dotColor: "bg-rose-500",
@@ -558,7 +554,7 @@ const RescuerVerificationPage = () => {
         </DashboardLayout>
       );
     }
-    const statusConfig = getStatusConfig(selectedItem.status);
+    const statusConfig = getStatusConfig(selectedItem.status, statusLabelMap);
     return (
       <>
         <DashboardLayout
@@ -657,9 +653,8 @@ const RescuerVerificationPage = () => {
                       label: "Trạng thái",
                       value: (
                         <Badge
-                          className={`mt-1 ${statusConfig.className} border text-sm gap-1.5 font-semibold`}
+                          className={`mt-1 ${statusConfig.className} border text-[13px] gap-1.5 font-semibold`}
                         >
-                          {statusConfig.icon}
                           {statusConfig.label}
                         </Badge>
                       ),
@@ -719,35 +714,35 @@ const RescuerVerificationPage = () => {
                     },
                     ...(selectedItem.reviewedAt
                       ? [
-                          {
-                            icon: (
-                              <Icon icon="mdi:approve" width="20" height="20" />
-                            ),
-                            iconCls:
-                              "text-sky-500 bg-sky-500/10 border-sky-200 dark:border-sky-800",
-                            label: "Ngày xét duyệt",
-                            value: new Date(
-                              selectedItem.reviewedAt,
-                            ).toLocaleString("vi-VN"),
-                          },
-                        ]
+                        {
+                          icon: (
+                            <Icon icon="mdi:approve" width="20" height="20" />
+                          ),
+                          iconCls:
+                            "text-sky-500 bg-sky-500/10 border-sky-200 dark:border-sky-800",
+                          label: "Ngày xét duyệt",
+                          value: new Date(
+                            selectedItem.reviewedAt,
+                          ).toLocaleString("vi-VN"),
+                        },
+                      ]
                       : []),
                     ...(selectedItem.adminNote
                       ? [
-                          {
-                            icon: (
-                              <Icon
-                                icon="fluent:person-note-24-regular"
-                                width="20"
-                                height="20"
-                              />
-                            ),
-                            iconCls:
-                              "text-orange-500 bg-orange-500/10 border-orange-200 dark:border-orange-800",
-                            label: "Ghi chú của quản trị viên",
-                            value: selectedItem.adminNote,
-                          },
-                        ]
+                        {
+                          icon: (
+                            <Icon
+                              icon="fluent:person-note-24-regular"
+                              width="20"
+                              height="20"
+                            />
+                          ),
+                          iconCls:
+                            "text-orange-500 bg-orange-500/10 border-orange-200 dark:border-orange-800",
+                          label: "Ghi chú của quản trị viên",
+                          value: selectedItem.adminNote,
+                        },
+                      ]
                       : []),
                   ].map((field, idx) => (
                     <div key={idx} className="flex items-start gap-3">
@@ -1184,18 +1179,11 @@ const RescuerVerificationPage = () => {
     });
   };
 
-  const toggleStatus = (value: string) => {
-    setPage(1);
-    setSelectedStatuses((prev) =>
-      prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value],
-    );
-  };
-
-  const hasFilters = !!(searchQuery || selectedStatuses.length > 0);
+  const hasFilters = !!(searchQuery || selectedStatus !== "all");
 
   const clearFilters = () => {
     setSearchQuery("");
-    setSelectedStatuses([]);
+    setSelectedStatus("all");
     setPage(1);
   };
 
@@ -1247,21 +1235,21 @@ const RescuerVerificationPage = () => {
                 bgColor: "bg-blue-50 dark:bg-blue-950/30",
               },
               {
-                label: "Chờ xét duyệt",
+                label: statusLabelMap.Pending ?? "Chờ duyệt",
                 value: stats.pending,
                 icon: ClockCountdown,
                 color: "text-amber-600 dark:text-amber-400",
                 bgColor: "bg-amber-50 dark:bg-amber-950/30",
               },
               {
-                label: "Đã duyệt",
+                label: statusLabelMap.Approved ?? "Đã duyệt",
                 value: stats.approved,
                 icon: UserCheck,
                 color: "text-emerald-600 dark:text-emerald-400",
                 bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
               },
               {
-                label: "Đã từ chối",
+                label: statusLabelMap.Rejected ?? "Đã từ chối",
                 value: stats.rejected,
                 icon: UserMinus,
                 color: "text-rose-600 dark:text-rose-400",
@@ -1316,68 +1304,27 @@ const RescuerVerificationPage = () => {
                   />
                 </div>
 
-                {/* Status filter */}
-                <Popover
-                  open={statusFilterOpen}
-                  onOpenChange={setStatusFilterOpen}
+                <Select
+                  value={selectedStatus}
+                  onValueChange={(value: StatusFilter) => {
+                    setSelectedStatus(value);
+                    setPage(1);
+                  }}
                 >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 gap-1.5 font-normal text-sm"
-                    >
-                      Trạng thái
-                      {selectedStatuses.length > 0 ? (
-                        <Badge className="h-4.5 px-1.5 text-xs rounded-full bg-primary text-primary-foreground">
-                          {selectedStatuses.length}
-                        </Badge>
-                      ) : (
-                        <CaretDown
-                          size={13}
-                          className="text-muted-foreground"
-                        />
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 p-1.5" align="start">
-                    {STATUS_OPTIONS.map(({ value, label }) => {
-                      const checked = selectedStatuses.includes(value);
-                      return (
-                        <button
-                          key={value}
-                          onClick={() => toggleStatus(value)}
-                          className="flex items-center gap-2.5 w-full px-3 py-2 text-sm tracking-tighter rounded-md hover:bg-muted/60 transition-colors"
-                        >
-                          <span
-                            className={`flex items-center justify-center size-4 rounded border shrink-0 transition-colors ${
-                              checked
-                                ? "bg-primary border-primary text-primary-foreground"
-                                : "border-border bg-background"
-                            }`}
-                          >
-                            {checked && <Check size={11} weight="bold" />}
-                          </span>
-                          <span className={checked ? "font-medium" : ""}>
-                            {label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                    {selectedStatuses.length > 0 && (
-                      <button
-                        onClick={() => {
-                          setSelectedStatuses([]);
-                          setPage(1);
-                        }}
-                        className="flex items-center gap-2 w-full px-3 py-1.5 mt-1 text-xs text-muted-foreground tracking-tighter border-t border-border/40 hover:text-foreground transition-colors"
-                      >
-                        <X size={11} />
-                        Xóa lọc trạng thái
-                      </button>
+                  <SelectTrigger className="h-9 min-w-44 text-sm tracking-tighter">
+                    <SelectValue placeholder="Trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                    {statusMetadata.map(
+                      (option: RescuerApplicationStatusMetadataOption) => (
+                        <SelectItem key={option.key} value={option.key}>
+                          {option.value}
+                        </SelectItem>
+                      ),
                     )}
-                  </PopoverContent>
-                </Popover>
+                  </SelectContent>
+                </Select>
 
                 {hasFilters && (
                   <Button
@@ -1461,7 +1408,10 @@ const RescuerVerificationPage = () => {
                       </tr>
                     ) : (
                       paginatedItems.map((item) => {
-                        const statusConfig = getStatusConfig(item.status);
+                        const statusConfig = getStatusConfig(
+                          item.status,
+                          statusLabelMap,
+                        );
                         return (
                           <tr
                             key={item.id}
@@ -1484,11 +1434,8 @@ const RescuerVerificationPage = () => {
                             </td>
                             <td className="p-3">
                               <Badge
-                                className={`${statusConfig.className} border gap-1`}
+                                className={`${statusConfig.className} text-[13px]`}
                               >
-                                <span
-                                  className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotColor}`}
-                                />
                                 {statusConfig.label}
                               </Badge>
                             </td>
@@ -1525,6 +1472,7 @@ const RescuerVerificationPage = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="5">5</SelectItem>
                           <SelectItem value="10">10</SelectItem>
                           <SelectItem value="20">20</SelectItem>
                           <SelectItem value="50">50</SelectItem>

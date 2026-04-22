@@ -100,7 +100,7 @@ function DialogContent({
       {/* Content */}
       <div
         className={cn(
-          "relative z-[1] grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 animate-in fade-in-0 zoom-in-95-static sm:rounded-lg",
+          "relative z-[1] grid w-full max-w-lg max-h-[90vh] gap-4 border bg-background p-6 shadow-lg duration-200 animate-in fade-in-0 zoom-in-95-static sm:rounded-lg overflow-hidden",
           className,
         )}
         onClick={(e) => e.stopPropagation()}
@@ -158,7 +158,13 @@ function DialogTitle({ className, ...props }: React.ComponentProps<"h2">) {
 
 function DialogDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
-    <p className={cn("text-sm tracking-tighter text-muted-foreground", className)} {...props} />
+    <p
+      className={cn(
+        "text-sm tracking-tighter text-muted-foreground",
+        className,
+      )}
+      {...props}
+    />
   );
 }
 

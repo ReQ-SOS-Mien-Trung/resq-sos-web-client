@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +55,26 @@ export default function SupplyRequestManagement({
 }: {
   onPanelOpenChange?: (open: boolean) => void;
 }) {
-  const [subTab, setSubTab] = useState<SubTab>("create");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const rawSubTab = searchParams.get("subtab");
+  const subTab: SubTab =
+    rawSubTab === "incoming" ||
+    rawSubTab === "outgoing" ||
+    rawSubTab === "create"
+      ? rawSubTab
+      : "create";
+
+  const setSubTab = (tab: SubTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "create") {
+      params.delete("subtab");
+    } else {
+      params.set("subtab", tab);
+    }
+    router.replace(`/dashboard/inventory?${params.toString()}`);
+  };
 
   return (
     <div className="space-y-5">
@@ -183,13 +203,12 @@ function OutgoingRequestsPanel() {
     {
       depotId: selectedDepotId ?? 0,
       role: "Requester",
-      requestingStatus:
-        statusFilter === "all" ? undefined : statusFilter,
+      requestingStatus: statusFilter === "all" ? undefined : statusFilter,
       pageNumber,
       pageSize,
     },
     {
-      refetchInterval: 10_000,
+      refetchInterval: false,
       refetchOnWindowFocus: true,
       enabled: Boolean(selectedDepotId),
     },
@@ -318,11 +337,12 @@ function OutgoingRequestsPanel() {
                         <td className="px-4 py-3">
                           <Badge
                             variant="outline"
-                            className={
+                            className={cn(
+                              "inline-flex w-max max-w-none shrink-0 whitespace-nowrap px-3 py-1",
                               requestingStatusColors[
                                 request.requestingStatus
-                              ] ?? "bg-gray-100 text-gray-700 border-gray-200"
-                            }
+                              ] ?? "bg-gray-100 text-gray-700 border-gray-200",
+                            )}
                           >
                             {requestingStatusLabels[request.requestingStatus] ??
                               request.requestingStatus}

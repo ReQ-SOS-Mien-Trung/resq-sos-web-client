@@ -8,11 +8,27 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   MagnifyingGlass,
   FloppyDisk,
   CaretDown,
   CaretRight,
   CheckCircle,
+  PencilSimple,
   User as UserIcon,
   X,
 } from "@phosphor-icons/react";
@@ -27,6 +43,7 @@ import {
 import { PermissionEntity } from "@/services/permissions/type";
 import { useUsersForPermission } from "@/services/user/hooks";
 import { UserEntity } from "@/services/user/type";
+import { Icon } from "@iconify/react";
 
 // ── Permission group labels ──────────────────────────────
 const PERMISSION_GROUP_LABELS: Record<string, string> = {
@@ -46,6 +63,14 @@ const PERMISSION_GROUP_ORDER = [
   "activity",
   "sos",
 ];
+
+function areSetsEqual<T>(a: Set<T>, b: Set<T>) {
+  if (a.size !== b.size) return false;
+  for (const value of a) {
+    if (!b.has(value)) return false;
+  }
+  return true;
+}
 
 function groupPermissions(
   permissions: PermissionEntity[],
@@ -90,19 +115,21 @@ const ROLE_FILTERS = [
 ];
 
 const UserPermissionPanel = () => {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserEntity | null>(null);
   const [localCheckedIds, setLocalCheckedIds] = useState<Set<number> | null>(
     null,
   );
-  const [prevUserId, setPrevUserId] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(PERMISSION_GROUP_ORDER),
   );
-  const [hasChanges, setHasChanges] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   // ── Debounce search 400ms ────────────────────────────────
   useEffect(() => {
@@ -114,29 +141,39 @@ const UserPermissionPanel = () => {
   const { data: allPermissions, isLoading: loadingAll } = useAllPermissions();
   const { data: usersForPermission, isLoading: loadingUsers } =
     useUsersForPermission({
+      pageNumber: page,
       search: debouncedSearch,
-      pageSize: 10,
+      pageSize,
       roleId: selectedRoleId ?? undefined,
     });
   const { data: userData, isLoading: loadingUserPerms } = useUserPermissions(
     selectedUser?.id ?? "",
   );
   const updateMutation = useUpdateUserPermissions(selectedUser?.id ?? "");
-
-  // ── Reset local edits when user changes ─────────────────────
-  const currentUserId = selectedUser?.id ?? null;
-  if (currentUserId !== prevUserId) {
-    setPrevUserId(currentUserId);
-    setLocalCheckedIds(null);
-    setHasChanges(false);
-  }
+  const currentRoleId = userData?.roleId ?? selectedUser?.roleId ?? null;
+  const isReadOnlyRole = currentRoleId === ROLES.MANAGER;
+  const effectiveIsEditMode = isEditMode && !isReadOnlyRole;
+  const canEditPermissions = effectiveIsEditMode;
 
   // ── Derive checked IDs: local edits or server data ───────
-  const checkedIds =
-    localCheckedIds ?? new Set(userData?.permissions?.map((p) => p.id) ?? []);
+  const serverCheckedIds = useMemo(
+    () =>
+      new Set([
+        ...(userData?.permissions ?? []).map((p) => p.id),
+        ...(userData?.rolePermissions ?? []).map((p) => p.id),
+      ]),
+    [userData?.permissions, userData?.rolePermissions],
+  );
+  const checkedIds = localCheckedIds ?? serverCheckedIds;
+  const hasChanges = useMemo(() => {
+    if (!localCheckedIds) return false;
+    return !areSetsEqual(localCheckedIds, serverCheckedIds);
+  }, [localCheckedIds, serverCheckedIds]);
 
   // ── Server-filtered user list ──────────────────────────
   const filteredUsers = usersForPermission?.items ?? [];
+  const totalPages = Math.max(1, usersForPermission?.totalPages ?? 1);
+  const totalCount = usersForPermission?.totalCount ?? 0;
 
   // ── Grouped permissions ──────────────────────────────────
   const grouped = useMemo(
@@ -150,7 +187,8 @@ const UserPermissionPanel = () => {
     setSearchTerm("");
     setShowDropdown(false);
     setLocalCheckedIds(null);
-    setHasChanges(false);
+    setIsEditMode(false);
+    setIsConfirmOpen(false);
   }, []);
 
   const handleClearUser = useCallback(() => {
@@ -159,29 +197,29 @@ const UserPermissionPanel = () => {
     setDebouncedSearch("");
     setSelectedRoleId(null);
     setLocalCheckedIds(null);
-    setHasChanges(false);
+    setIsEditMode(false);
+    setIsConfirmOpen(false);
   }, []);
 
   const handleToggle = useCallback(
     (permId: number) => {
+      if (!canEditPermissions) return;
       setLocalCheckedIds((prev) => {
-        const base =
-          prev ?? new Set(userData?.permissions?.map((p) => p.id) ?? []);
+        const base = prev ?? new Set(serverCheckedIds);
         const next = new Set(base);
         if (next.has(permId)) next.delete(permId);
         else next.add(permId);
         return next;
       });
-      setHasChanges(true);
     },
-    [userData],
+    [canEditPermissions, serverCheckedIds],
   );
 
   const handleToggleGroup = useCallback(
     (groupPerms: PermissionEntity[]) => {
+      if (!canEditPermissions) return;
       setLocalCheckedIds((prev) => {
-        const base =
-          prev ?? new Set(userData?.permissions?.map((p) => p.id) ?? []);
+        const base = prev ?? new Set(serverCheckedIds);
         const next = new Set(base);
         const allChecked = groupPerms.every((p) => next.has(p.id));
         if (allChecked) {
@@ -191,9 +229,28 @@ const UserPermissionPanel = () => {
         }
         return next;
       });
-      setHasChanges(true);
     },
-    [userData],
+    [canEditPermissions, serverCheckedIds],
+  );
+
+  const handleRevertAll = useCallback(() => {
+    if (!canEditPermissions) return;
+    setLocalCheckedIds(null);
+  }, [canEditPermissions]);
+
+  const handleRevertGroup = useCallback(
+    (groupPerms: PermissionEntity[]) => {
+      if (!canEditPermissions) return;
+      setLocalCheckedIds((prev) => {
+        const next = new Set(prev ?? serverCheckedIds);
+        groupPerms.forEach((perm) => {
+          if (serverCheckedIds.has(perm.id)) next.add(perm.id);
+          else next.delete(perm.id);
+        });
+        return areSetsEqual(next, serverCheckedIds) ? null : next;
+      });
+    },
+    [canEditPermissions, serverCheckedIds],
   );
 
   const toggleGroupExpand = useCallback((domain: string) => {
@@ -216,8 +273,9 @@ const UserPermissionPanel = () => {
           toast.success(
             `Đã cập nhật quyền cho ${selectedUser.lastName} ${selectedUser.firstName}`,
           );
-          setHasChanges(false);
           setLocalCheckedIds(null);
+          setIsEditMode(false);
+          setIsConfirmOpen(false);
         },
         onError: () => {
           toast.dismiss();
@@ -226,6 +284,11 @@ const UserPermissionPanel = () => {
       },
     );
   };
+
+  const handleCancelEdit = useCallback(() => {
+    setLocalCheckedIds(null);
+    setIsEditMode(false);
+  }, []);
 
   const isLoading = loadingAll || loadingUserPerms;
 
@@ -239,11 +302,14 @@ const UserPermissionPanel = () => {
           checkedIds.has(p.id),
         ).length;
         const allGroupChecked = checkedCount === groupPerms.length;
+        const groupHasChanges = groupPerms.some(
+          (perm) => checkedIds.has(perm.id) !== serverCheckedIds.has(perm.id),
+        );
         return (
           <Card
             key={domain}
             className={cn(
-              "border-border/60 overflow-hidden transition-all duration-300",
+              "border-border/60 overflow-hidden transition-all duration-300 py-0",
               isExpanded ? "" : "self-start",
             )}
           >
@@ -252,7 +318,7 @@ const UserPermissionPanel = () => {
                 if (stopPropagation) e.stopPropagation();
                 toggleGroupExpand(domain);
               }}
-              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-accent/50 transition-colors"
+              className="w-full flex items-center justify-between px-4 pt-4 pb-2 hover:bg-accent/50 transition-colors"
             >
               <div className="flex items-center gap-2">
                 {isExpanded ? (
@@ -266,7 +332,7 @@ const UserPermissionPanel = () => {
                     className="text-muted-foreground tracking-tighter"
                   />
                 )}
-                <span className="text-sm font-bold uppercase tracking-tight">
+                <span className="text-sm font-bold uppercase tracking-tighter">
                   {PERMISSION_GROUP_LABELS[domain] ?? domain}
                 </span>
                 <Badge
@@ -277,21 +343,41 @@ const UserPermissionPanel = () => {
                 </Badge>
               </div>
               {isExpanded && (
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggleGroup(groupPerms);
-                  }}
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground tracking-tighter cursor-pointer transition-colors"
-                >
-                  {allGroupChecked && (
-                    <CheckCircle
-                      size={14}
-                      weight="fill"
-                      className="text-green-500"
-                    />
+                <div className="flex items-center gap-3">
+                  {groupHasChanges && canEditPermissions && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRevertGroup(groupPerms);
+                      }}
+                      className="text-sm tracking-tighter text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Hoàn tác
+                    </button>
                   )}
-                  <span>{allGroupChecked ? "Bỏ chọn" : "Chọn hết"}</span>
+                  <div
+                    onClick={(e) => {
+                      if (!canEditPermissions) return;
+                      e.stopPropagation();
+                      handleToggleGroup(groupPerms);
+                    }}
+                    className={cn(
+                      "flex items-center gap-1.5 text-sm tracking-tighter transition-colors",
+                      canEditPermissions
+                        ? "cursor-pointer text-muted-foreground hover:text-foreground"
+                        : "cursor-not-allowed text-muted-foreground/50",
+                    )}
+                  >
+                    {allGroupChecked && (
+                      <CheckCircle
+                        size={14}
+                        weight="fill"
+                        className="text-green-500"
+                      />
+                    )}
+                    <span>{allGroupChecked ? "Bỏ chọn" : "Chọn hết"}</span>
+                  </div>
                 </div>
               )}
             </button>
@@ -312,6 +398,7 @@ const UserPermissionPanel = () => {
                     <Checkbox
                       checked={checkedIds.has(perm.id)}
                       onCheckedChange={() => handleToggle(perm.id)}
+                      disabled={!canEditPermissions || updateMutation.isPending}
                       className="mt-0.5"
                     />
                     <div className="flex-1 min-w-0">
@@ -351,10 +438,10 @@ const UserPermissionPanel = () => {
                 onClick={() => {
                   const next = isActive ? null : role.id;
                   setSelectedRoleId(next);
+                  setPage(1);
                   if (!isActive) {
                     setSelectedUser(null);
                     setLocalCheckedIds(null);
-                    setHasChanges(false);
                   }
                 }}
                 className={cn(
@@ -375,6 +462,7 @@ const UserPermissionPanel = () => {
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
+              setPage(1);
               setShowDropdown(true);
             }}
             onFocus={() => setShowDropdown(true)}
@@ -410,9 +498,19 @@ const UserPermissionPanel = () => {
                     onMouseDown={() => handleSelectUser(user)}
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent/50 transition-colors text-left border-b border-border/20 last:border-0"
                   >
-                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold tracking-tighter shrink-0">
-                      {user.lastName?.[0]}
-                      {user.firstName?.[0]}
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold tracking-tighter shrink-0 overflow-hidden border border-border/50">
+                      {user.avatarUrl ? (
+                        <img
+                          src={user.avatarUrl}
+                          alt="avatar"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <>
+                          {user.lastName?.[0]}
+                          {user.firstName?.[0]}
+                        </>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm tracking-tighter font-medium truncate">
@@ -435,6 +533,13 @@ const UserPermissionPanel = () => {
         {/* Selected user chip (search mode) */}
         {selectedUser && selectedRoleId === null && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/30 bg-primary/5 text-sm">
+            {selectedUser.avatarUrl && (
+              <img
+                src={selectedUser.avatarUrl}
+                alt="avatar"
+                className="w-5 h-5 rounded-full object-cover border border-primary/20"
+              />
+            )}
             <span className="font-medium tracking-tighter text-primary">
               {selectedUser.lastName} {selectedUser.firstName}
             </span>
@@ -450,12 +555,12 @@ const UserPermissionPanel = () => {
 
       {/* ── User cards + permission panel (shown when role filter is active) ── */}
       {selectedRoleId !== null && (
-        <div className="flex gap-5 items-start">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
           {/* Left: user list — shrinks to 2 cols when a user is selected */}
           <div
             className={cn(
-              "shrink-0 transition-all duration-500 ease-in-out",
-              selectedUser ? "w-56" : "w-full",
+              "w-full space-y-3 transition-all duration-500 ease-in-out",
+              selectedUser && "xl:w-72 xl:shrink-0",
             )}
           >
             {loadingUsers ? (
@@ -514,7 +619,7 @@ const UserPermissionPanel = () => {
                     >
                       <div
                         className={cn(
-                          "rounded-full flex items-center justify-center font-bold tracking-tighter mx-auto transition-all duration-300",
+                          "rounded-full flex items-center justify-center font-bold tracking-tighter mx-auto transition-all duration-300 overflow-hidden",
                           selectedUser
                             ? "w-9 h-9 text-sm mb-1.5"
                             : "w-12 h-12 text-base mb-2.5",
@@ -523,8 +628,18 @@ const UserPermissionPanel = () => {
                             : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary",
                         )}
                       >
-                        {user.lastName?.[0]}
-                        {user.firstName?.[0]}
+                        {user.avatarUrl ? (
+                          <img
+                            src={user.avatarUrl}
+                            alt="avatar"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <>
+                            {user.lastName?.[0]}
+                            {user.firstName?.[0]}
+                          </>
+                        )}
                       </div>
                       <p
                         className={cn(
@@ -548,35 +663,117 @@ const UserPermissionPanel = () => {
                 })}
               </div>
             )}
+
+            <div className="border-t border-border/40 pt-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-xs tracking-tighter text-muted-foreground whitespace-nowrap">
+                    {totalCount} người dùng
+                  </p>
+                  <div className="flex items-center gap-1.5 text-sm tracking-tighter text-muted-foreground whitespace-nowrap">
+                    <span className="shrink-0">Hiển thị</span>
+                    <Select
+                      value={String(pageSize)}
+                      onValueChange={(value) => {
+                        setPage(1);
+                        setPageSize(Number(value));
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-18 text-sm tracking-tighter">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[20, 50, 100].map((size) => (
+                          <SelectItem key={size} value={String(size)}>
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="shrink-0">/ trang</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 text-sm tracking-tighter"
+                    disabled={page <= 1 || loadingUsers}
+                    onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                  >
+                    Trước
+                  </Button>
+                  <span className="min-w-10 text-center text-sm tracking-tighter text-muted-foreground whitespace-nowrap">
+                    {page}/{totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 text-sm tracking-tighter"
+                    disabled={page >= totalPages || loadingUsers}
+                    onClick={() =>
+                      setPage((prev) => Math.min(totalPages, prev + 1))
+                    }
+                  >
+                    Sau
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Right: permission panel — slides in from right */}
-          <div
-            className="flex-1 min-w-0"
-            style={{
-              display: "grid",
-              gridTemplateColumns: selectedUser ? "1fr" : "0fr",
-              transition:
-                "grid-template-columns 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
-            }}
-          >
-            <div className="overflow-hidden">
-              {selectedUser && (
-                <div className="space-y-3">
-                  {/* Slim action bar */}
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground tracking-tighter">
+          {selectedUser && (
+            <div className="w-full min-w-0 flex-1">
+              <div className="space-y-3">
+                {/* Slim action bar */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-0.5">
+                    <p className="text-sm text-muted-foreground tracking-tighter">
                       Đã chọn{" "}
                       <span className="font-semibold tracking-tighter text-foreground">
                         {checkedIds.size}
                       </span>
                       /{allPermissions?.length ?? 0} quyền
                     </p>
-                    <div className="flex items-center gap-2">
-                      {hasChanges && (
-                        <Button
-                          onClick={handleSave}
+                    <p className="text-sm text-muted-foreground tracking-tighter">
+                      Chế độ hiện tại:{" "}
+                      <span className="font-semibold tracking-tighter text-foreground">
+                        {effectiveIsEditMode ? "Chỉnh sửa" : "Chỉ xem"}
+                      </span>
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isReadOnlyRole ? (
+                      <span className="text-sm tracking-tighter text-muted-foreground">
+                        Quản lý kho chỉ được xem
+                      </span>
+                  ) : effectiveIsEditMode ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2.5 text-xs gap-1"
+                        onClick={handleRevertAll}
+                        disabled={!hasChanges || updateMutation.isPending}
+                      >
+                        Hoàn tác tất cả
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2.5 text-xs gap-1"
+                          onClick={handleCancelEdit}
                           disabled={updateMutation.isPending}
+                        >
+                          Hủy
+                        </Button>
+                        <Button
+                          onClick={() => setIsConfirmOpen(true)}
+                          disabled={!hasChanges || updateMutation.isPending}
                           size="sm"
                           className="h-7 px-2.5 track text-xs gap-1"
                         >
@@ -585,26 +782,37 @@ const UserPermissionPanel = () => {
                             ? "Đang lưu..."
                             : "Lưu thay đổi"}
                         </Button>
-                      )}
-                      <button
-                        onClick={() => setSelectedUser(null)}
-                        className="p-1 hover:bg-muted rounded-md transition-colors"
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2.5 text-xs gap-1"
+                        onClick={() => setIsEditMode(true)}
                       >
-                        <X size={14} className="text-muted-foreground" />
-                      </button>
-                    </div>
+                        <PencilSimple size={13} weight="bold" />
+                        Chỉnh sửa
+                      </Button>
+                    )}
+                    <button
+                      onClick={() => setSelectedUser(null)}
+                      className="p-1 hover:bg-muted rounded-md transition-colors"
+                    >
+                      <X size={14} className="text-muted-foreground" />
+                    </button>
                   </div>
-
-                  {/* Permission groups — 2 col grid */}
-                  {isLoading ? (
-                    <PermissionSkeleton />
-                  ) : (
-                    renderPermissionGroups(true)
-                  )}
                 </div>
-              )}
+
+                {/* Permission groups — 2 col grid */}
+                {isLoading ? (
+                  <PermissionSkeleton />
+                ) : (
+                  renderPermissionGroups(true)
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -612,23 +820,68 @@ const UserPermissionPanel = () => {
       {selectedUser && selectedRoleId === null && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs tracking-tighter text-muted-foreground">
-              Đã chọn{" "}
-              <span className="font-semibold tracking-tighter text-foreground">
-                {checkedIds.size}
-              </span>
-              /{allPermissions?.length ?? 0} quyền
-            </p>
+            <div className="space-y-0.5">
+              <p className="text-sm tracking-tighter text-muted-foreground">
+                Đã chọn{" "}
+                <span className="font-semibold tracking-tighter text-foreground">
+                  {checkedIds.size}
+                </span>
+                /{allPermissions?.length ?? 0} quyền
+              </p>
+              <p className="text-sm text-muted-foreground tracking-tighter">
+                Chế độ hiện tại:{" "}
+                <span className="font-semibold tracking-tighter text-foreground">
+                  {effectiveIsEditMode ? "Chỉnh sửa" : "Chỉ xem"}
+                </span>
+              </p>
+            </div>
             <div className="flex items-center gap-2">
-              {hasChanges && (
+              {isReadOnlyRole ? (
+                <span className="text-sm tracking-tighter text-muted-foreground">
+                  Quản lý kho chỉ được xem
+                </span>
+              ) : effectiveIsEditMode ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs gap-1"
+                    onClick={handleRevertAll}
+                    disabled={!hasChanges || updateMutation.isPending}
+                  >
+                    Hoàn tác tất cả
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs gap-1"
+                    onClick={handleCancelEdit}
+                    disabled={updateMutation.isPending}
+                  >
+                    Hủy
+                  </Button>
+                  <Button
+                    onClick={() => setIsConfirmOpen(true)}
+                    disabled={!hasChanges || updateMutation.isPending}
+                    size="sm"
+                    className="h-7 px-2.5 text-xs gap-1"
+                  >
+                    <FloppyDisk size={13} weight="bold" />
+                    {updateMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
+                  </Button>
+                </>
+              ) : (
                 <Button
-                  onClick={handleSave}
-                  disabled={updateMutation.isPending}
+                  type="button"
+                  variant="outline"
                   size="sm"
                   className="h-7 px-2.5 text-xs gap-1"
+                  onClick={() => setIsEditMode(true)}
                 >
-                  <FloppyDisk size={13} weight="bold" />
-                  {updateMutation.isPending ? "Đang lưu..." : "Lưu thay đổi"}
+                  <PencilSimple size={13} weight="bold" />
+                  Chỉnh sửa
                 </Button>
               )}
               <button
@@ -655,6 +908,40 @@ const UserPermissionPanel = () => {
           </p>
         </div>
       )}
+
+      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-red-500 font-medium gap-2 tracking-tighter">
+              <Icon icon="ph:warning-diamond-fill" width="20" height="20" />
+              Xác nhận lưu thay đổi quyền
+            </DialogTitle>
+            <DialogDescription className="pt-1 text-black font-medium text-base leading-relaxed">
+              Lưu ý: Việc thay đổi quyền sẽ tác động trực tiếp đến an toàn dữ
+              liệu của hệ thống. Quản trị viên hoàn toàn chịu trách nhiệm cho
+              thao tác này.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsConfirmOpen(false)}
+              disabled={updateMutation.isPending}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={updateMutation.isPending}
+            >
+              <FloppyDisk size={14} weight="bold" className="mr-1.5" />
+              {updateMutation.isPending ? "Đang lưu..." : "Xác nhận lưu"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

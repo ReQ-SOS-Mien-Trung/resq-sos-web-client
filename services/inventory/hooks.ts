@@ -48,6 +48,14 @@ import {
   getSupplyRequestPriorityConfig,
   updateSupplyRequestPriorityConfig,
   getSupplyRequestPriorityLevels,
+  getExpiringLots,
+  disposeLot,
+  decommissionReusable,
+  getReusableItemStatuses,
+  getInventoryItemModels,
+  searchDepotReusableUnits,
+  setReusableMaintenance,
+  setReusableAvailable,
 } from "./api";
 import {
   GetDepotInventoryParams,
@@ -100,6 +108,17 @@ import {
   UpcomingReturnEntity,
   GetReturnHistoryParams,
   GetReturnHistoryResponse,
+  GetExpiringLotsParams,
+  GetExpiringLotsResponse,
+  DisposeLotParams,
+  DisposeLotResponse,
+  DecommissionReusableParams,
+  DecommissionReusableResponse,
+  ReusableItemStatus,
+  SearchDepotReusableUnitsParams,
+  SearchDepotReusableUnitsResponse,
+  UpdateReusableStatusParams,
+  UpdateReusableStatusResponse,
 } from "./type";
 
 export const INVENTORY_KEYS = {
@@ -151,6 +170,13 @@ export const INVENTORY_KEYS = {
     [...INVENTORY_KEYS.all, "supplyRequestPriorityConfig"] as const,
   supplyRequestPriorityLevels: () =>
     [...INVENTORY_KEYS.all, "supplyRequestPriorityLevels"] as const,
+  expiringLots: (params?: GetExpiringLotsParams) =>
+    [...INVENTORY_KEYS.all, "expiringLots", params] as const,
+  reusableItemStatuses: () =>
+    [...INVENTORY_KEYS.all, "reusableItemStatuses"] as const,
+  itemModels: () => [...INVENTORY_KEYS.all, "itemModels"] as const,
+  reusableUnitSearch: (params: SearchDepotReusableUnitsParams) =>
+    [...INVENTORY_KEYS.all, "reusableUnitSearch", params] as const,
 };
 
 export function useDepotInventory(
@@ -401,9 +427,7 @@ export function useMyDepotUpcomingReturnsByStatuses(
     queryFn: () =>
       getMyDepotUpcomingReturnsByStatuses(depotId, normalizedStatuses),
     enabled:
-      normalizedStatuses.length > 0 &&
-      Number.isFinite(depotId) &&
-      depotId > 0,
+      normalizedStatuses.length > 0 && Number.isFinite(depotId) && depotId > 0,
     ...options,
   });
 }
@@ -727,5 +751,121 @@ export function useSupplyRequestPriorityLevels(
     queryFn: getSupplyRequestPriorityLevels,
     staleTime: Infinity,
     ...options,
+  });
+}
+
+// ─── Disposal / Decommission ───
+
+export function useExpiringLots(
+  params?: GetExpiringLotsParams,
+  options?: Omit<
+    UseQueryOptions<GetExpiringLotsResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<GetExpiringLotsResponse>({
+    queryKey: INVENTORY_KEYS.expiringLots(params),
+    queryFn: () => getExpiringLots(params!),
+    enabled: Number.isFinite(params?.depotId) && (params?.depotId ?? 0) > 0,
+    ...options,
+  });
+}
+
+export function useDisposeLot() {
+  const queryClient = useQueryClient();
+  return useMutation<DisposeLotResponse, Error, DisposeLotParams>({
+    mutationFn: disposeLot,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function useDecommissionReusable() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    DecommissionReusableResponse,
+    Error,
+    DecommissionReusableParams
+  >({
+    mutationFn: decommissionReusable,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function useReusableItemStatuses(
+  options?: Omit<
+    UseQueryOptions<ReusableItemStatus[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<ReusableItemStatus[]>({
+    queryKey: INVENTORY_KEYS.reusableItemStatuses(),
+    queryFn: getReusableItemStatuses,
+    staleTime: Infinity,
+    ...options,
+  });
+}
+
+export function useInventoryItemModels(
+  options?: Omit<
+    UseQueryOptions<{ key: string; value: string }[], Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery({
+    queryKey: INVENTORY_KEYS.itemModels(),
+    queryFn: getInventoryItemModels,
+    staleTime: Infinity,
+    ...options,
+  });
+}
+
+export function useSearchDepotReusableUnits(
+  params: SearchDepotReusableUnitsParams,
+  options?: Omit<
+    UseQueryOptions<SearchDepotReusableUnitsResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
+) {
+  return useQuery<SearchDepotReusableUnitsResponse>({
+    queryKey: INVENTORY_KEYS.reusableUnitSearch(params),
+    queryFn: () => searchDepotReusableUnits(params),
+    enabled:
+      Number.isFinite(params.depotId) &&
+      params.depotId > 0 &&
+      Number.isFinite(params.itemModelId) &&
+      params.itemModelId > 0,
+    ...options,
+  });
+}
+
+export function useSetReusableMaintenance() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    UpdateReusableStatusResponse,
+    Error,
+    UpdateReusableStatusParams
+  >({
+    mutationFn: setReusableMaintenance,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
+  });
+}
+
+export function useSetReusableAvailable() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    UpdateReusableStatusResponse,
+    Error,
+    UpdateReusableStatusParams
+  >({
+    mutationFn: setReusableAvailable,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    },
   });
 }

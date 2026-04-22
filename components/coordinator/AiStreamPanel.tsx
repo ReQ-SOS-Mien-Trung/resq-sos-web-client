@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import gsap from "gsap";
 import { cn } from "@/lib/utils";
+import { formatSupplyBufferPercent } from "@/lib/supply-buffer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,10 +12,16 @@ import {
   resourceTypeIcons,
   severityConfig,
 } from "@/lib/constants";
+import {
+  getClothingGenderLabel,
+  getMedicalIssueLabel,
+  getPersonTypeLabel,
+} from "@/lib/sos";
 import type {
   ClusterRescueSuggestionResponse,
   ClusterSuggestedActivity,
   ClusterSuggestedResource,
+  ClusterTargetVictim,
 } from "@/services/sos_cluster/type";
 import type { StreamLogEntry } from "@/services/sos_cluster/hooks";
 import {
@@ -39,6 +46,8 @@ import {
   FirstAid,
   Truck,
   Anchor,
+  User,
+  Phone,
 } from "@phosphor-icons/react";
 
 /* ═══ Props ═══ */
@@ -99,6 +108,244 @@ const formatTeamTypeLabel = (teamType?: string | null) => {
   const normalized = teamType.trim().toUpperCase();
   return TEAM_TYPE_LABELS[normalized] ?? teamType;
 };
+
+function trimToNull(value?: string | null): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatExecutionModeLabel(value?: string | null): string | null {
+  const normalized = trimToNull(value)?.toUpperCase();
+  if (!normalized) return null;
+
+  const labels: Record<string, string> = {
+    SINGLE_TEAM: "Một đội",
+    SPLIT_ACROSS_TEAMS: "Chia nhiều đội",
+    SPLITACROSSTEAMS: "Chia nhiều đội",
+    PARALLEL: "Song song",
+    SEQUENTIAL: "Tuần tự",
+  };
+
+  return labels[normalized] ?? labels[normalized.replace(/[\s_-]+/g, "")] ?? value!;
+}
+
+function isSplitAcrossTeams(value?: string | null): boolean {
+  const normalized = trimToNull(value)
+    ?.toLowerCase()
+    .replace(/[\s_-]+/g, "");
+  return normalized === "splitacrossteams" || normalized === "parallel";
+}
+
+function hasSuggestedTeam(activity: Pick<ClusterSuggestedActivity, "suggestedTeam">): boolean {
+  const team = activity.suggestedTeam;
+  if (!team) return false;
+
+  const teamId = toFiniteNumber(team.teamId);
+  return (
+    (teamId != null && teamId > 0) ||
+    trimToNull(team.teamName) != null ||
+    trimToNull(team.teamType) != null
+  );
+}
+
+function getVictimDisplayName(victim: ClusterTargetVictim): string {
+  const name = trimToNull(victim.displayName);
+  if (name) return name;
+
+  const personType = trimToNull(victim.personType);
+  const index = toFiniteNumber(victim.index);
+  if (personType && index != null && index > 0) {
+    return `${getPersonTypeLabel(personType)} ${index}`;
+  }
+
+  return "Nạn nhân";
+}
+
+function getVictimMedicalIssues(victim: ClusterTargetVictim): string[] {
+  return Array.isArray(victim.medicalIssues)
+    ? victim.medicalIssues.filter(
+        (issue): issue is string =>
+          typeof issue === "string" && issue.trim().length > 0,
+      )
+    : [];
+}
+
+function formatVictimSeverityLabel(value?: string | null): string | null {
+  const normalized = trimToNull(value)?.toUpperCase();
+  if (!normalized) return null;
+
+  const labels: Record<string, string> = {
+    LOW: "Nhẹ",
+    MILD: "Nhẹ",
+    MODERATE: "Trung bình",
+    HIGH: "Nặng",
+    SEVERE: "Nặng",
+    CRITICAL: "Nguy kịch",
+  };
+
+  return labels[normalized] ?? value!;
+}
+
+function buildVictimFallbackSummary(
+  activity: Pick<
+    ClusterSuggestedActivity,
+    "targetVictimSummary" | "sosRequestId"
+  >,
+): string | null {
+  return (
+    trimToNull(activity.targetVictimSummary) ??
+    (activity.sosRequestId != null
+      ? `Nạn nhân thuộc SOS #${activity.sosRequestId}`
+      : null)
+  );
+}
+
+function ActivityExecutionMeta({
+  activity,
+}: {
+  activity: ClusterSuggestedActivity;
+}) {
+  const executionModeLabel = formatExecutionModeLabel(activity.executionMode);
+  const requiredTeamCount = toFiniteNumber(activity.requiredTeamCount) ?? 0;
+  const hasMissingTeam =
+    isSplitAcrossTeams(activity.executionMode) &&
+    requiredTeamCount > 0 &&
+    !hasSuggestedTeam(activity);
+
+  if (
+    !executionModeLabel &&
+    requiredTeamCount <= 0 &&
+    !activity.coordinationGroupKey &&
+    !hasMissingTeam
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="ml-9 mb-2 flex flex-wrap gap-1.5">
+      {activity.coordinationGroupKey ? (
+        <Badge variant="outline" className="h-5 px-1.5 text-sm">
+          Nhóm: {activity.coordinationGroupKey}
+        </Badge>
+      ) : null}
+      {executionModeLabel ? (
+        <Badge className="h-5 border border-indigo-200 bg-indigo-50 px-1.5 text-sm text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:text-indigo-300">
+          {executionModeLabel}
+        </Badge>
+      ) : null}
+      {requiredTeamCount > 0 ? (
+        <Badge className="h-5 border border-emerald-200 bg-emerald-50 px-1.5 text-sm text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-900/20 dark:text-emerald-300">
+          {requiredTeamCount} đội cần
+        </Badge>
+      ) : null}
+      {hasMissingTeam ? (
+        <Badge className="h-5 border border-amber-300 bg-amber-50 px-1.5 text-sm text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+          Chưa gán đội
+        </Badge>
+      ) : null}
+    </div>
+  );
+}
+
+function TargetVictimsBlock({
+  activity,
+}: {
+  activity: Pick<
+    ClusterSuggestedActivity,
+    "targetVictimSummary" | "targetVictims" | "sosRequestId"
+  >;
+}) {
+  const victims = Array.isArray(activity.targetVictims)
+    ? activity.targetVictims
+    : [];
+  const fallbackSummary = buildVictimFallbackSummary(activity);
+
+  if (victims.length === 0 && !fallbackSummary) return null;
+
+  return (
+    <div className="ml-9 mb-2 rounded-lg border border-rose-200/70 bg-rose-50/60 p-2 dark:border-rose-800/40 dark:bg-rose-950/20">
+      <p className="flex items-center gap-1 text-sm font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+        <Users className="h-3 w-3" weight="fill" />
+        Đối tượng cần hỗ trợ
+      </p>
+      {victims.length === 0 ? (
+        <p className="mt-1 text-sm text-rose-700/85 dark:text-rose-200/85">
+          {fallbackSummary}
+        </p>
+      ) : (
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {victims.map((victim, index) => {
+            const medicalIssues = getVictimMedicalIssues(victim);
+            const personTypeLabel = victim.personType
+              ? getPersonTypeLabel(victim.personType)
+              : "Nạn nhân";
+            const severityLabel = formatVictimSeverityLabel(victim.severity);
+            const phone = trimToNull(victim.personPhone);
+            const diet = trimToNull(victim.specialDietDescription);
+            const clothingGender = trimToNull(victim.clothingGender);
+
+            return (
+              <div
+                key={`${victim.personId ?? "victim"}-${index}`}
+                className="min-w-0 rounded border border-rose-100 bg-background px-2 py-1 text-sm dark:border-rose-900/50"
+              >
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="inline-flex items-center gap-1 font-semibold">
+                    <User className="h-3 w-3 text-rose-500" />
+                    {getVictimDisplayName(victim)}
+                  </span>
+                  <span className="rounded bg-muted/70 px-1.5 py-0.5 text-muted-foreground">
+                    {personTypeLabel}
+                  </span>
+                  {victim.isInjured ? (
+                    <span className="rounded bg-red-50 px-1.5 py-0.5 font-semibold text-red-700 dark:bg-red-900/25 dark:text-red-300">
+                      Bị thương{severityLabel ? `: ${severityLabel}` : ""}
+                    </span>
+                  ) : null}
+                  {phone ? (
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <Phone className="h-3 w-3" />
+                      {phone}
+                    </span>
+                  ) : null}
+                </div>
+                {medicalIssues.length > 0 || diet || victim.clothingNeeded ? (
+                  <div className="mt-1 flex flex-wrap gap-1 text-muted-foreground">
+                    {medicalIssues.slice(0, 3).map((issue) => (
+                      <span key={issue} className="rounded bg-red-50 px-1.5 py-0.5 text-red-700 dark:bg-red-900/25 dark:text-red-300">
+                        <FirstAid className="mr-1 inline h-3 w-3" weight="fill" />
+                        {getMedicalIssueLabel(issue)}
+                      </span>
+                    ))}
+                    {diet ? (
+                      <span className="rounded bg-muted/70 px-1.5 py-0.5">
+                        Ăn: {diet}
+                      </span>
+                    ) : null}
+                    {victim.clothingNeeded ? (
+                      <span className="rounded bg-muted/70 px-1.5 py-0.5">
+                        Quần áo
+                        {clothingGender
+                          ? ` (${getClothingGenderLabel(clothingGender)})`
+                          : ""}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function normalizeAiErrorText(error: string): string {
   const message = error.trim();
@@ -181,6 +428,14 @@ export default function AiStreamPanel({
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const isExpanded = size === "expanded";
+  const canClose = !loading;
+  const handleClose = () => {
+    if (!canClose) {
+      return;
+    }
+
+    onClose();
+  };
 
   useEffect(() => {
     if (!open || !panelRef.current || !overlayRef.current) return;
@@ -234,7 +489,7 @@ export default function AiStreamPanel({
         error={error}
         phase={phase}
         onStop={onStop}
-        onClose={onClose}
+        onClose={handleClose}
         inline={inline}
         expanded={isExpanded}
       />
@@ -279,8 +534,11 @@ export default function AiStreamPanel({
       style={{ opacity: 0 }}
     >
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
+        className={cn(
+          "absolute inset-0 bg-black/50 backdrop-blur-sm",
+          canClose ? "cursor-pointer" : "cursor-not-allowed",
+        )}
+        onClick={handleClose}
       />
       {panelShell}
     </div>
@@ -401,8 +659,12 @@ function TopBar({
             size="icon"
             className={cn(
               expanded ? "h-8 w-8 rounded-md" : "h-7 w-7 rounded-md",
+              loading && "cursor-not-allowed opacity-45",
             )}
             onClick={onClose}
+            disabled={loading}
+            title={loading ? "Đợi AI phân tích xong để đóng panel" : "Đóng"}
+            aria-label={loading ? "Đang phân tích, chưa thể đóng" : "Đóng"}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -1160,15 +1422,17 @@ function MissionBanner({
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-foreground truncate mb-1">
-            {result.suggestedMissionTitle}
+            {result.suggestedMissionTitle || "Kế hoạch AI chưa có tiêu đề"}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             <Badge className="text-sm bg-primary text-white border-primary hover:bg-primary/90">
-              {severityConfig[result.suggestedSeverityLevel]?.label ||
-                result.suggestedSeverityLevel}
+              {result.suggestedSeverityLevel
+                ? (severityConfig[result.suggestedSeverityLevel]?.label ||
+                  result.suggestedSeverityLevel)
+                : "Chưa rõ mức độ"}
             </Badge>
             <span className="text-sm font-mono text-muted-foreground">
-              {result.modelName} • {result.responseTimeMs}ms
+              {(result.modelName || "AI")} • {result.responseTimeMs}ms
             </span>
           </div>
         </div>
@@ -1211,14 +1475,23 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
     {
       icon: Lightning,
       label: "Ưu tiên",
-      value: result.suggestedPriorityScore.toFixed(1),
+      value:
+        typeof result.suggestedPriorityScore === "number"
+          ? result.suggestedPriorityScore.toFixed(1)
+          : "N/A",
       color: "text-orange-400",
     },
     {
       icon: Clock,
       label: "Thời gian",
-      value: result.estimatedDuration,
+      value: result.estimatedDuration || "Chưa rõ",
       color: "text-blue-400",
+    },
+    {
+      icon: TreeStructure,
+      label: "SOS",
+      value: `${result.sosRequestCount || 0}`,
+      color: "text-cyan-400",
     },
     {
       icon: Rocket,
@@ -1229,7 +1502,7 @@ function StatsRow({ result }: { result: ClusterRescueSuggestionResponse }) {
   ];
 
   return (
-    <div ref={ref} className="grid grid-cols-4 gap-2">
+    <div ref={ref} className="grid grid-cols-2 gap-2 md:grid-cols-5">
       {stats.map((s) => {
         const Icon = s.icon;
         return (
@@ -1442,6 +1715,19 @@ function ActivityFlowNode({
           {activity.description}
         </p>
 
+        <ActivityExecutionMeta activity={activity} />
+        <TargetVictimsBlock activity={activity} />
+        {activity.coordinationNotes ? (
+          <div className="ml-9 mb-2 rounded-lg border border-indigo-300/40 bg-indigo-50/50 p-2 dark:border-indigo-700/40 dark:bg-indigo-900/15">
+            <p className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+              Ghi chú phối hợp
+            </p>
+            <p className="mt-0.5 text-sm leading-relaxed text-indigo-700/80 dark:text-indigo-300/80">
+              {activity.coordinationNotes}
+            </p>
+          </div>
+        ) : null}
+
         {activity.suggestedTeam && (
           <div className="ml-9 mb-2 rounded-lg border border-emerald-300/40 bg-emerald-50/50 dark:bg-emerald-900/15 dark:border-emerald-700/40 p-2">
             <p className="text-sm font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
@@ -1562,6 +1848,11 @@ function ActivityFlowNode({
                     ×{supply.quantity}
                   </span>
                   <span className="text-primary/40">{supply.unit}</span>
+                  {normalizedActivityType === "COLLECT_SUPPLIES" ? (
+                    <span className="rounded bg-amber-50 px-1 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                      Dự trù {formatSupplyBufferPercent(supply.bufferRatio)}
+                    </span>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -1684,12 +1975,28 @@ function WarningsBlock({
   if (
     !result.needsManualReview &&
     !result.multiDepotRecommended &&
-    !result.specialNotes
+    !result.specialNotes &&
+    !(result.mixedRescueReliefWarning || "").trim() &&
+    !result.needsAdditionalDepot &&
+    (result.supplyShortages?.length ?? 0) === 0
   )
     return null;
 
   return (
     <div className="space-y-2">
+      {(result.mixedRescueReliefWarning || "").trim() ? (
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/[0.06] border border-rose-500/15">
+          <Warning className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" weight="fill" />
+          <div>
+            <p className="text-sm font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider mb-0.5">
+              Cảnh báo tách nhiệm vụ
+            </p>
+            <p className="text-sm text-rose-600/80 dark:text-rose-400/80 leading-relaxed">
+              {result.mixedRescueReliefWarning}
+            </p>
+          </div>
+        </div>
+      ) : null}
       {result.needsManualReview && (
         <div className="flex items-center gap-2 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/[0.06] border border-yellow-500/15">
           <Warning className="h-4 w-4 text-yellow-500 shrink-0" weight="fill" />
@@ -1708,6 +2015,39 @@ function WarningsBlock({
           <p className="text-sm text-blue-600 dark:text-blue-400/80">
             Kế hoạch yêu cầu phối hợp nhiều kho tiếp tế.
           </p>
+        </div>
+      )}
+      {(result.needsAdditionalDepot ||
+        (result.supplyShortages?.length ?? 0) > 0) && (
+        <div className="flex items-start gap-2 p-3 rounded-xl bg-sky-50 dark:bg-sky-500/[0.06] border border-sky-500/15">
+          <Storefront
+            className="h-4 w-4 text-sky-500 dark:text-sky-400 shrink-0 mt-0.5"
+            weight="fill"
+          />
+          <div>
+            <p className="text-sm font-bold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-0.5">
+              Thiếu vật phẩm / cần thêm kho
+            </p>
+            {result.supplyShortages?.length ? (
+              <div className="space-y-0.5">
+                {result.supplyShortages.map((shortage, index) => (
+                  <p
+                    key={`warning-shortage-${index}`}
+                    className="text-sm text-sky-600/80 dark:text-sky-400/80 leading-relaxed"
+                  >
+                    {`${shortage.itemName} thiếu x${shortage.missingQuantity}${shortage.unit ? ` ${shortage.unit}` : ""}`}
+                    {shortage.selectedDepotName
+                      ? ` • Kho chính: ${shortage.selectedDepotName}`
+                      : ""}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-sky-600/80 dark:text-sky-400/80 leading-relaxed">
+                Kho hiện tại chưa đủ vật phẩm để đáp ứng toàn bộ kế hoạch.
+              </p>
+            )}
+          </div>
         </div>
       )}
       {result.specialNotes && (

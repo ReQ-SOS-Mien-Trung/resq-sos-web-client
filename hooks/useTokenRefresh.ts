@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import axios from "axios";
+import { useEffect, useEffectEvent, useRef } from "react";
 import { useAuthStore } from "@/stores/auth.store";
-import { RefreshTokenResponse } from "@/services/auth/type";
+import { isBackendConnectivityError } from "@/lib/backend-circuit";
+import {
+  AUTH_REFRESH_BUFFER_SECONDS,
+  refreshSessionTokens,
+  shouldRefreshSessionTokens,
+} from "@/services/auth/refresh-session";
 
-const API_URL = process.env.NEXT_PUBLIC_BASE_URL;
-
-// Buffer trước khi hết hạn: 5 phút (giây)
-const REFRESH_BUFFER_SECONDS = 300;
 // Kiểm tra mỗi 30 giây
 const CHECK_INTERVAL_MS = 30_000;
+const AUTH_STORAGE_KEY = "auth-storage";
 
 /**
  * Proactive token refresh hook.
@@ -26,64 +27,69 @@ const CHECK_INTERVAL_MS = 30_000;
 export function useTokenRefresh() {
   const isRefreshingRef = useRef(false);
 
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      // Đọc state mới nhất mỗi tick — tránh stale closure
-      const {
-        isAuthenticated,
-        accessToken,
-        refreshToken,
-        expiresIn,
-        tokenObtainedAt,
-        updateTokens,
-        logout,
-      } = useAuthStore.getState();
+  const rehydratePersistedAuth = useEffectEvent(async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
 
-      if (!isAuthenticated || !accessToken || !refreshToken) return;
-      if (isRefreshingRef.current) return;
+    await useAuthStore.persist.rehydrate();
+  });
 
-      // Tính thời gian còn lại
-      const expirySeconds = expiresIn ?? 3600;
-      const obtainedAt = tokenObtainedAt ?? Date.now();
-      const elapsedSeconds = (Date.now() - obtainedAt) / 1000;
-      const remainingSeconds = expirySeconds - elapsedSeconds;
+  const logoutAndRedirect = useEffectEvent(() => {
+    const { logout } = useAuthStore.getState();
+    logout();
 
-      // Chưa đến lúc refresh
-      if (remainingSeconds > REFRESH_BUFFER_SECONDS) return;
+    if (typeof window !== "undefined") {
+      window.location.href = "/sign-in";
+    }
+  });
 
-      // Token đã hết hạn quá lâu (> 2x lifetime) — không cố refresh nữa
-      if (remainingSeconds < -expirySeconds) {
-        logout();
-        if (typeof window !== "undefined") {
-          window.location.href = "/sign-in";
-        }
+  const refreshIfNeeded = useEffectEvent(async () => {
+    const {
+      isAuthenticated,
+      accessToken,
+      refreshToken,
+    } = useAuthStore.getState();
+
+    if (!isAuthenticated || !accessToken || !refreshToken) return;
+    if (isRefreshingRef.current) return;
+
+    if (!shouldRefreshSessionTokens(AUTH_REFRESH_BUFFER_SECONDS)) return;
+
+    isRefreshingRef.current = true;
+
+    try {
+      await refreshSessionTokens();
+    } catch (error) {
+      if (isBackendConnectivityError(error)) {
         return;
       }
 
-      isRefreshingRef.current = true;
+      await rehydratePersistedAuth();
 
-      try {
-        const secureApiUrl = API_URL?.replace(/\/+$/, "") ?? "";
-        const { data } = await axios.post<RefreshTokenResponse>(
-          `${secureApiUrl}/identity/auth/refresh-token`,
-          { accessToken, refreshToken },
-          { headers: { "Content-Type": "application/json" } },
-        );
-
-        // Chỉ cập nhật nếu token chưa bị thay bởi 401 interceptor
-        const current = useAuthStore.getState();
-        if (current.accessToken === accessToken) {
-          updateTokens(data);
-        }
-      } catch {
-        // Refresh thất bại → logout
-        logout();
-        if (typeof window !== "undefined") {
-          window.location.href = "/sign-in";
-        }
-      } finally {
-        isRefreshingRef.current = false;
+      const currentState = useAuthStore.getState();
+      if (!currentState.isAuthenticated) {
+        return;
       }
+
+      if (
+        currentState.accessToken !== accessToken ||
+        currentState.refreshToken !== refreshToken
+      ) {
+        return;
+      }
+
+      logoutAndRedirect();
+    } finally {
+      isRefreshingRef.current = false;
+    }
+  });
+
+  useEffect(() => {
+    void refreshIfNeeded();
+
+    const interval = setInterval(() => {
+      void refreshIfNeeded();
     }, CHECK_INTERVAL_MS);
 
     return () => clearInterval(interval);
@@ -94,54 +100,29 @@ export function useTokenRefresh() {
     const handleVisibility = () => {
       if (document.visibilityState !== "visible") return;
 
-      const {
-        isAuthenticated,
-        accessToken,
-        refreshToken,
-        expiresIn,
-        tokenObtainedAt,
-        updateTokens,
-        logout,
-      } = useAuthStore.getState();
-
-      if (!isAuthenticated || !accessToken || !refreshToken) return;
-      if (isRefreshingRef.current) return;
-
-      const expirySeconds = expiresIn ?? 3600;
-      const obtainedAt = tokenObtainedAt ?? Date.now();
-      const elapsedSeconds = (Date.now() - obtainedAt) / 1000;
-      const remainingSeconds = expirySeconds - elapsedSeconds;
-
-      if (remainingSeconds > REFRESH_BUFFER_SECONDS) return;
-
-      isRefreshingRef.current = true;
-
-      const secureApiUrl = API_URL?.replace(/\/+$/, "") ?? "";
-      axios
-        .post<RefreshTokenResponse>(
-          `${secureApiUrl}/identity/auth/refresh-token`,
-          { accessToken, refreshToken },
-          { headers: { "Content-Type": "application/json" } },
-        )
-        .then(({ data }) => {
-          const current = useAuthStore.getState();
-          if (current.accessToken === accessToken) {
-            updateTokens(data);
-          }
-        })
-        .catch(() => {
-          logout();
-          if (typeof window !== "undefined") {
-            window.location.href = "/sign-in";
-          }
-        })
-        .finally(() => {
-          isRefreshingRef.current = false;
-        });
+      void (async () => {
+        await rehydratePersistedAuth();
+        await refreshIfNeeded();
+      })();
     };
 
     document.addEventListener("visibilitychange", handleVisibility);
     return () =>
       document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
+
+  // Đồng bộ token khi tab khác refresh/login/logout cùng một user.
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== AUTH_STORAGE_KEY) return;
+
+      void (async () => {
+        await rehydratePersistedAuth();
+        await refreshIfNeeded();
+      })();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
   }, []);
 }

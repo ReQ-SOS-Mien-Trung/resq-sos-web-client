@@ -52,6 +52,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       }),
   );
 
+  // Expose the instance so non-React code (e.g. auth store logout) can clear the cache.
+  if (typeof window !== "undefined") {
+    (window as Window & { __queryClient?: QueryClient }).__queryClient =
+      queryClient;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <NotificationPushProvider>

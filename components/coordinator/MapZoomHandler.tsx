@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import { useMap, useMapEvents } from "react-leaflet";
+import { leafletBoundsToMapBounds } from "@/lib/coordinator-map-utils";
 
 // This component provides zoom/recenter functions to the parent via a ref-like callback
 // and reports map view changes (zoom + pan) for URL synchronization.
@@ -16,8 +17,18 @@ export function MapZoomHandler({
     recenter: () => void;
   }) => void;
   onZoomChange?: (zoom: number) => void;
-  /** Called on moveend/zoomend with the current center + zoom */
-  onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
+  /** Called on moveend/zoomend with the current center, zoom, and visible bounds. */
+  onViewChange?: (view: {
+    lat: number;
+    lng: number;
+    zoom: number;
+    bounds?: {
+      south: number;
+      north: number;
+      west: number;
+      east: number;
+    };
+  }) => void;
 }) {
   const map = useMap();
 
@@ -31,8 +42,9 @@ export function MapZoomHandler({
   const reportView = useCallback(() => {
     const center = map.getCenter();
     const zoom = map.getZoom();
+    const bounds = leafletBoundsToMapBounds(map.getBounds());
     onZoomChange?.(zoom);
-    onViewChange?.({ lat: center.lat, lng: center.lng, zoom });
+    onViewChange?.({ lat: center.lat, lng: center.lng, zoom, bounds });
   }, [map, onZoomChange, onViewChange]);
 
   useMapEvents({

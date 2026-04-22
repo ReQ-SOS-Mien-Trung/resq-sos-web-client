@@ -1,6 +1,7 @@
 import type {
   ClusterSuggestedActivity,
   ClusterSuggestedResource,
+  ClusterSupplyShortage,
 } from "@/services/sos_cluster/type";
 
 export type MissionType = "RESCUE" | "RESCUER" | "RELIEF" | "MIXED" | string;
@@ -42,6 +43,9 @@ export interface MissionTeam {
   locationSource?: string | null;
   assignedAt: string;
   unassignedAt?: string | null;
+  reportStatus?: MissionTeamReportStatus | null;
+  reportLastEditedAt?: string | null;
+  reportSubmittedAt?: string | null;
 }
 
 export interface MissionTeamMember {
@@ -60,6 +64,13 @@ export interface MissionSupplyItem {
   itemName: string | null;
   quantity: number;
   unit: string;
+  plannedPickupLotAllocations?: MissionSupplyLotAllocationRequest[] | null;
+  pickupLotAllocations?: MissionSupplyLotAllocationRequest[] | null;
+  bufferRatio?: number | null;
+  bufferQuantity?: number | null;
+  bufferUsedQuantity?: number | null;
+  bufferUsedReason?: string | null;
+  actualDeliveredQuantity?: number | null;
 }
 
 export interface MissionActivity {
@@ -118,6 +129,16 @@ export interface MissionEntity {
   overallAssessment?: string | null;
   estimatedDuration?: string | null;
   specialNotes?: string | null;
+  mixedRescueReliefWarning?: string | null;
+  needsManualReview?: boolean | null;
+  lowConfidenceWarning?: string | null;
+  needsAdditionalDepot?: boolean | null;
+  multiDepotRecommended?: boolean | null;
+  responseTimeMs?: number | null;
+  sosRequestCount?: number | null;
+  isSuccess?: boolean | null;
+  errorMessage?: string | null;
+  supplyShortages?: ClusterSupplyShortage[] | null;
   suggestedActivities?: ClusterSuggestedActivity[] | null;
   suggestedResources?: ClusterSuggestedResource[];
   aiCreatedAt?: string | null;
@@ -170,6 +191,7 @@ export interface UpdateMissionActivityItemRequest {
 
 export interface UpdateMissionActivityRequest {
   activityId: number;
+  activityType?: string;
   step: number;
   description: string;
   target: string;
@@ -232,16 +254,20 @@ export interface CreateMissionSupplyRequest {
   name: string | null;
   quantity: number;
   unit: string;
+  bufferRatio?: number | null;
 }
 
 export type CreateActivityResponse = MissionActivity;
 
 export interface CreateMissionRequest {
   clusterId: number;
+  aiSuggestionId?: number | null;
   missionType: MissionType;
   priorityScore: number;
   startTime: string;
   expectedEndTime: string;
+  ignoreMixedMissionWarning?: boolean;
+  overrideReason?: string | null;
   activities: CreateMissionActivityRequest[];
 }
 
@@ -285,9 +311,18 @@ export interface UpdateActivityResponse {
   status: ActivityStatus;
 }
 
+export interface ConfirmReturnLotAllocationRequest {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate?: string | null;
+  expiredDate?: string | null;
+}
+
 export interface ConfirmReturnConsumableItemRequest {
   itemModelId: number;
   quantity: number;
+  lotAllocations: ConfirmReturnLotAllocationRequest[];
+  expiredDate?: string | null;
 }
 
 export interface ConfirmReturnReusableUnitRequest {
@@ -307,6 +342,98 @@ export interface ConfirmReturnSuppliesRequest {
   discrepancyNote?: string | null;
   consumableItems: ConfirmReturnConsumableItemRequest[];
   reusableItems: ConfirmReturnReusableItemRequest[];
+}
+
+export interface ConfirmReturnRestoredLotAllocation {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate: string;
+  expiredDate: string;
+  remainingQuantityAfterExecution: number;
+}
+
+export interface ConfirmReturnRestoredReusableUnit {
+  reusableItemId: number;
+  serialNumber: string;
+  condition: string;
+  note: string | null;
+}
+
+export interface ConfirmReturnRestoredItem {
+  itemModelId: number;
+  itemName: string;
+  unit: string;
+  expectedQuantity: number;
+  actualQuantity: number;
+  expectedReturnLotAllocations: ConfirmReturnRestoredLotAllocation[];
+  returnedLotAllocations: ConfirmReturnRestoredLotAllocation[];
+  expectedReusableUnits: ConfirmReturnRestoredReusableUnit[];
+  returnedReusableUnits: ConfirmReturnRestoredReusableUnit[];
+}
+
+export interface ConfirmReturnResponse {
+  activityId: number;
+  missionId: number;
+  depotId: number;
+  message: string;
+  usedLegacyFallback: boolean;
+  discrepancyRecorded: boolean;
+  restoredItems: ConfirmReturnRestoredItem[];
+}
+
+// ── Mission team report types ──
+
+export type MissionTeamReportStatus =
+  | "NotStarted"
+  | "Draft"
+  | "Submitted"
+  | string;
+
+export interface MissionTeamReportActivity {
+  missionActivityId: number;
+  activityType: string | null;
+  activityStatus: string | null;
+  executionStatus: string | null;
+  summary: string | null;
+  issuesJson: string | null;
+  resultJson: string | null;
+  evidenceJson: string | null;
+}
+
+export interface MissionTeamReportMemberEvaluation {
+  rescuerId: string;
+  fullName: string | null;
+  username: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+  rescuerType: string | null;
+  roleInTeam: string | null;
+  responseTimeScore: number | null;
+  rescueEffectivenessScore: number | null;
+  decisionHandlingScore: number | null;
+  safetyMedicalSkillScore: number | null;
+  teamworkCommunicationScore: number | null;
+  overallScore: number | null;
+}
+
+export interface MissionTeamReportResponse {
+  missionId: number;
+  missionTeamId: number;
+  executionStatus: string;
+  reportStatus: MissionTeamReportStatus;
+  canEdit: boolean;
+  canSubmit: boolean;
+  canEvaluateMembers: boolean;
+  startedAt: string | null;
+  lastEditedAt: string | null;
+  submittedAt: string | null;
+  teamSummary: string | null;
+  teamNote: string | null;
+  issuesJson: string | null;
+  resultJson: string | null;
+  evidenceJson: string | null;
+  activities: MissionTeamReportActivity[];
+  memberEvaluations: MissionTeamReportMemberEvaluation[];
 }
 
 // ── Route types ──

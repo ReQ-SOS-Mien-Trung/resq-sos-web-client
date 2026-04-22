@@ -1,6 +1,7 @@
 import type {
   ClusterMissionType,
   ClusterSeverityLevel,
+  ClusterTargetVictim,
 } from "@/services/sos_cluster/type";
 
 export type PromptType =
@@ -140,6 +141,8 @@ export interface PromptTestSuggestedTeam {
   assemblyPointName: string | null;
   latitude: number | null;
   longitude: number | null;
+  contactPhone?: string | null;
+  estimatedEtaMinutes?: number | null;
   distanceKm: number | null;
 }
 
@@ -147,6 +150,8 @@ export interface PromptTestSuggestedActivity {
   step: number;
   activityType: string;
   description: string;
+  targetVictimSummary?: string | null;
+  targetVictims?: ClusterTargetVictim[];
   priority: string;
   estimatedTime: string;
   executionMode: string | null;
@@ -221,8 +226,9 @@ export interface TestPromptRescueSuggestionResponse {
   suggestedResources: PromptTestSuggestedResource[];
   estimatedDuration: string | null;
   specialNotes: string | null;
-  needsAdditionalDepot: boolean;
-  supplyShortages: PromptTestSupplyShortage[];
+  mixedRescueReliefWarning?: string | null;
+  needsAdditionalDepot?: boolean;
+  supplyShortages?: PromptTestSupplyShortage[];
   confidenceScore: number | null;
   needsManualReview: boolean;
   lowConfidenceWarning: string | null;

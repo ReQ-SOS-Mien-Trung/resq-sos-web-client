@@ -4,32 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { getDashboardData } from "@/lib/mock-data/admin-dashboard";
 import { DashboardLayout } from "@/components/admin/dashboard";
 import {
+  AdminMissionSheet,
   SOSClusterTable,
   SOSRequestStats,
 } from "@/components/admin/sos-requests";
 import SOSDetailsPanel from "@/components/coordinator/SOSDetailsPanel";
-import RescuePlanPanel from "@/components/coordinator/RescuePlanPanel";
 import { useSOSRequestsByIds } from "@/services/sos_request/hooks";
 import { useSOSClusters } from "@/services/sos_cluster/hooks";
 import type { SOSRequestEntity } from "@/services/sos_request/type";
 import type { ClusterLifecycleStatus } from "@/services/sos_cluster/type";
 import { mapSOSRequestEntityToSOS } from "@/lib/sos-request-mapper";
 import { Siren } from "@phosphor-icons/react";
-
-function resolveClusterStatus(
-  status: ClusterLifecycleStatus | string,
-): ClusterLifecycleStatus {
-  if (
-    status === "Pending" ||
-    status === "Suggested" ||
-    status === "InProgress" ||
-    status === "Completed"
-  ) {
-    return status;
-  }
-
-  return "Pending";
-}
 
 const SOSRequestsPage = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
@@ -46,28 +31,106 @@ const SOSRequestsPage = () => {
   >(null);
   const [rescuePlanOpen, setRescuePlanOpen] = useState(false);
   const [selectedSOS, setSelectedSOS] = useState<SOSRequestEntity | null>(null);
+  const [clusterPage, setClusterPage] = useState(1);
+  const [clusterPageSize, setClusterPageSize] = useState(10);
+  const [clusterStatusFilter, setClusterStatusFilter] = useState<
+    "all" | ClusterLifecycleStatus
+  >("all");
+
+  const clusterQueryParams = useMemo(
+    () => ({
+      pageNumber: clusterPage,
+      pageSize: clusterPageSize,
+      statuses:
+        clusterStatusFilter === "all" ? undefined : [clusterStatusFilter],
+    }),
+    [clusterPage, clusterPageSize, clusterStatusFilter],
+  );
 
   const {
     data: clustersData,
     isLoading: isClustersLoading,
     isRefetching: isClustersRefetching,
-  } = useSOSClusters();
+  } = useSOSClusters({ params: clusterQueryParams });
+
+  const statsQueryParams = useMemo(
+    () => ({
+      pageNumber: 1,
+      pageSize: 1,
+    }),
+    [],
+  );
+
+  const pendingStatsQueryParams = useMemo(
+    () => ({
+      pageNumber: 1,
+      pageSize: 1,
+      statuses: ["Pending"] as ClusterLifecycleStatus[],
+    }),
+    [],
+  );
+
+  const suggestedStatsQueryParams = useMemo(
+    () => ({
+      pageNumber: 1,
+      pageSize: 1,
+      statuses: ["Suggested"] as ClusterLifecycleStatus[],
+    }),
+    [],
+  );
+
+  const inProgressStatsQueryParams = useMemo(
+    () => ({
+      pageNumber: 1,
+      pageSize: 1,
+      statuses: ["InProgress"] as ClusterLifecycleStatus[],
+    }),
+    [],
+  );
+
+  const completedStatsQueryParams = useMemo(
+    () => ({
+      pageNumber: 1,
+      pageSize: 1,
+      statuses: ["Completed"] as ClusterLifecycleStatus[],
+    }),
+    [],
+  );
+
+  const { data: totalClustersStatsData } = useSOSClusters({
+    params: statsQueryParams,
+  });
+  const { data: pendingClustersStatsData } = useSOSClusters({
+    params: pendingStatsQueryParams,
+  });
+  const { data: suggestedClustersStatsData } = useSOSClusters({
+    params: suggestedStatsQueryParams,
+  });
+  const { data: inProgressClustersStatsData } = useSOSClusters({
+    params: inProgressStatsQueryParams,
+  });
+  const { data: completedClustersStatsData } = useSOSClusters({
+    params: completedStatsQueryParams,
+  });
 
   const clusters = useMemo(() => clustersData?.clusters ?? [], [clustersData]);
 
+  useEffect(() => {
+    const totalPages = clustersData?.totalPages ?? 1;
+    if (clusterPage > totalPages) {
+      setClusterPage(totalPages);
+    }
+  }, [clusterPage, clustersData?.totalPages]);
+
   const requestedClusterIds = useMemo(() => {
     const next = new Set<number>(expandedClusterIds);
-
-    if (rescuePlanOpen && selectedPlanClusterId != null) {
-      next.add(selectedPlanClusterId);
-    }
 
     if (selectedSOS?.clusterId != null) {
       next.add(selectedSOS.clusterId);
     }
 
     return next;
-  }, [expandedClusterIds, rescuePlanOpen, selectedPlanClusterId, selectedSOS]);
+  }, [expandedClusterIds, selectedSOS]);
 
   const requestedSOSIds = useMemo(() => {
     const ids = new Set<number>();
@@ -144,27 +207,25 @@ const SOSRequestsPage = () => {
   }, [clusters, failedSOSIdSet, requestedClusterIds]);
 
   const stats = useMemo(() => {
-    const pending = clusters.filter(
-      (cluster) => resolveClusterStatus(cluster.status) === "Pending",
-    ).length;
-    const inProgress = clusters.filter(
-      (cluster) => resolveClusterStatus(cluster.status) === "InProgress",
-    ).length;
-    const suggested = clusters.filter(
-      (cluster) => resolveClusterStatus(cluster.status) === "Suggested",
-    ).length;
-    const completed = clusters.filter(
-      (cluster) => resolveClusterStatus(cluster.status) === "Completed",
-    ).length;
-
     return {
-      total: clusters.length,
-      pending,
-      inProgress,
-      completed,
-      cancelled: suggested,
+      total:
+        totalClustersStatsData?.totalCount ??
+        clustersData?.totalCount ??
+        clusters.length,
+      pending: pendingClustersStatsData?.totalCount ?? 0,
+      inProgress: inProgressClustersStatsData?.totalCount ?? 0,
+      completed: completedClustersStatsData?.totalCount ?? 0,
+      cancelled: suggestedClustersStatsData?.totalCount ?? 0,
     };
-  }, [clusters]);
+  }, [
+    clusters.length,
+    clustersData?.totalCount,
+    completedClustersStatsData?.totalCount,
+    inProgressClustersStatsData?.totalCount,
+    pendingClustersStatsData?.totalCount,
+    suggestedClustersStatsData?.totalCount,
+    totalClustersStatsData?.totalCount,
+  ]);
 
   const selectedSOSModel = useMemo(
     () => (selectedSOS ? mapSOSRequestEntityToSOS(selectedSOS) : null),
@@ -195,26 +256,6 @@ const SOSRequestsPage = () => {
     [loadedSOSItems],
   );
 
-  const selectedPlanCluster = useMemo(
-    () =>
-      selectedPlanClusterId == null
-        ? null
-        : (clusters.find((cluster) => cluster.id === selectedPlanClusterId) ??
-          null),
-    [clusters, selectedPlanClusterId],
-  );
-
-  const rescuePlanClusterSOSRequests = useMemo(() => {
-    if (!selectedPlanCluster) {
-      return [];
-    }
-
-    return selectedPlanCluster.sosRequestIds
-      .map((sosId) => loadedSOSById.get(sosId))
-      .filter((item): item is SOSRequestEntity => item != null)
-      .map(mapSOSRequestEntityToSOS);
-  }, [selectedPlanCluster, loadedSOSById]);
-
   const handleToggleCluster = (clusterId: number) => {
     setExpandedClusterIds((previous) => {
       const next = new Set(previous);
@@ -233,6 +274,14 @@ const SOSRequestsPage = () => {
     setSelectedSOS(null);
     setSelectedPlanClusterId(clusterId);
     setRescuePlanOpen(true);
+  };
+
+  const handleMissionSheetOpenChange = (open: boolean) => {
+    setRescuePlanOpen(open);
+
+    if (!open) {
+      setSelectedPlanClusterId(null);
+    }
   };
 
   return (
@@ -273,6 +322,29 @@ const SOSRequestsPage = () => {
           clusters={clusters}
           isLoading={isClustersLoading}
           isRefetching={isClustersRefetching}
+          statusFilter={clusterStatusFilter}
+          onStatusFilterChange={(nextStatus) => {
+            setClusterStatusFilter(nextStatus);
+            setClusterPage(1);
+          }}
+          serverPagination={{
+            totalCount: clustersData?.totalCount ?? 0,
+            totalPages: clustersData?.totalPages ?? 1,
+            page: clustersData?.pageNumber ?? clusterPage,
+            pageSize: clustersData?.pageSize ?? clusterPageSize,
+            hasPreviousPage:
+              clustersData?.hasPreviousPage ??
+              (clustersData?.pageNumber ?? clusterPage) > 1,
+            hasNextPage:
+              clustersData?.hasNextPage ??
+              (clustersData?.totalPages ?? 1) >
+                (clustersData?.pageNumber ?? clusterPage),
+            onPageChange: setClusterPage,
+            onPageSizeChange: (size) => {
+              setClusterPageSize(size);
+              setClusterPage(1);
+            },
+          }}
           expandedClusterIds={expandedClusterIds}
           onToggleCluster={handleToggleCluster}
           clusterSOSMap={clusterSOSMap}
@@ -299,21 +371,10 @@ const SOSRequestsPage = () => {
           hideProcessAction
         />
 
-        <RescuePlanPanel
+        <AdminMissionSheet
           open={rescuePlanOpen}
-          onOpenChange={setRescuePlanOpen}
-          clusterSOSRequests={rescuePlanClusterSOSRequests}
+          onOpenChange={handleMissionSheetOpenChange}
           clusterId={selectedPlanClusterId}
-          rescueSuggestion={null}
-          onApprove={() => {
-            setRescuePlanOpen(false);
-          }}
-          onReAnalyze={() => {
-            // Admin view is read-only for completed mission plans.
-          }}
-          isReAnalyzing={false}
-          defaultTab="missions"
-          readOnly
         />
       </div>
     </DashboardLayout>

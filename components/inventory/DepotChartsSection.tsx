@@ -96,7 +96,7 @@ function ChartCard({
         >
           {icon}
         </div>
-        <h3 className="text-sm font-semibold tracking-tighter flex-1">
+        <h3 className="text-base font-semibold tracking-tighter flex-1">
           {title}
         </h3>
         {headerExtra && (
@@ -170,12 +170,12 @@ function CapacityDonut({
           >
             {safe.toFixed(1)}%
           </span>
-          <span className="text-[10px] text-muted-foreground tracking-tighter mt-0.5">
+          <span className="text-[13px] text-foreground/80 tracking-tighter mt-0.5">
             {label}
           </span>
         </div>
       </div>
-      <p className="text-xs tracking-tighter text-center text-muted-foreground">
+      <p className="text-sm tracking-tighter text-center text-muted-foreground">
         <span className="font-semibold text-foreground">
           {value.toLocaleString("vi-VN")}
         </span>
@@ -211,6 +211,7 @@ function Chart1Capacity({ depotId }: { depotId: number }) {
       icon={<Cube className="h-4 w-4" weight="fill" />}
       iconClass="bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400"
       isLoading={isLoading}
+      className="h-full"
     >
       {data ? (
         <div className="flex flex-col items-center gap-6 py-2">
@@ -219,7 +220,7 @@ function Chart1Capacity({ depotId }: { depotId: number }) {
             value={data.currentVolume}
             max={data.maxVolume}
             percent={data.volumeUsagePercent}
-            unit="m³"
+            unit="dm³"
             fillColor={volColor}
             trackColor="#e5e7eb"
           />
@@ -234,7 +235,7 @@ function Chart1Capacity({ depotId }: { depotId: number }) {
           />
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground tracking-tighter">
+        <p className="text-sm text-muted-foreground tracking-tighter">
           Không có dữ liệu
         </p>
       )}
@@ -600,13 +601,15 @@ function Chart3FundMovement({ depotId }: { depotId: number }) {
 export default function DepotChartsSection({ depotId }: { depotId: number }) {
   return (
     <div className="space-y-4">
-      <h2 className="text-xs font-semibold tracking-tighter text-muted-foreground uppercase">
+      {/* <h2 className="text-base font-semibold tracking-tighter text-muted-foreground uppercase">
         Biểu đồ tổng quan
-      </h2>
+      </h2> */}
       {/* Row 1: Capacity (1 col) + Low Stock Alerts (3 col) */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <Chart1Capacity depotId={depotId} />
-        <div className="lg:col-span-3">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:items-stretch">
+        <div className="lg:h-full">
+          <Chart1Capacity depotId={depotId} />
+        </div>
+        <div className="lg:col-span-3 min-h-0">
           <LowStockAlerts />
         </div>
       </div>

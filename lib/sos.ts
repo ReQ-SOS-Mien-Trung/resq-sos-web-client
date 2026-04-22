@@ -211,6 +211,7 @@ function normalizeSituationCode(value: string): string {
 const SUPPLY_LABELS: Record<string, string> = {
   WATER: "Nước uống",
   FOOD: "Thực phẩm",
+  CLOTHING: "Quần áo",
   CLOTHES: "Quần áo",
   BLANKET: "Chăn mền",
   MEDICINE: "Y tế",

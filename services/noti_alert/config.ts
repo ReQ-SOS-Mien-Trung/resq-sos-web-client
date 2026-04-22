@@ -24,6 +24,17 @@ export const NOTIFICATION_HUB_CONFIG = {
   reconnectDelaysMs: [0, 1000, 3000, 5000, 10000] as const,
 } as const;
 
+export const DEPOT_CLOSURE_NOTIFICATION_TYPES = [
+  "depot_closure_external_marked",
+  "depot_closure_transfer_assigned",
+  "depot_closure_transfer_ready",
+  "depot_closure_transfer_completed",
+  "depot_closure_transfer_received",
+  "depot_closure_processing_required",
+  "depot_closure_processing",
+  "depot_closure_completed",
+] as const;
+
 export const ROLE_NOTIFICATION_TYPES: Record<number, readonly string[]> = {
   1: [],
   2: [
@@ -45,6 +56,7 @@ export const ROLE_NOTIFICATION_TYPES: Record<number, readonly string[]> = {
     "supply_preparing",
     "supply_shipped",
     "supply_completed",
+    ...DEPOT_CLOSURE_NOTIFICATION_TYPES,
   ],
 };
 
@@ -60,6 +72,14 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   supply_preparing: "Đơn hàng đang được chuẩn bị",
   supply_shipped: "Đơn hàng đã được vận chuyển",
   supply_completed: "Đơn hàng đã hoàn tất",
+  depot_closure_external_marked: "Đã đánh dấu xử lý bên ngoài khi đóng kho",
+  depot_closure_transfer_assigned: "Phân công nhận hàng đóng kho",
+  depot_closure_transfer_ready: "Phiên chuyển kho sẵn sàng",
+  depot_closure_transfer_completed: "Phiên chuyển kho hoàn tất",
+  depot_closure_transfer_received: "Kho đích đã nhận hàng",
+  depot_closure_processing_required: "Cần xử lý tồn kho khi đóng kho",
+  depot_closure_processing: "Phiên đóng kho đang xử lý",
+  depot_closure_completed: "Phiên đóng kho hoàn tất",
   chat_message: "Tin nhắn chat",
   assembly_checkin: "Thành viên đến điểm tập kết",
   assembly_checkout: "Thành viên rời điểm tập kết",
@@ -69,6 +89,11 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
   flood_warning: "Cảnh báo lũ",
   flood_emergency: "Cảnh báo lũ khẩn cấp",
   evacuation: "Lệnh sơ tán",
+  inventory_maintenance_alert: "Cảnh báo bảo trì kho",
+  inventory_maintenance: "Bảo trì kho",
+  sos_request_new: "Yêu cầu SOS mới",
+  sos_request_assigned: "Yêu cầu SOS được phân công",
+  sos_request_resolved: "Yêu cầu SOS đã giải quyết",
 };
 
 export type NotificationTone =
@@ -90,6 +115,14 @@ const NOTIFICATION_TYPE_TONES: Record<string, NotificationTone> = {
   supply_preparing: "info",
   supply_shipped: "info",
   supply_completed: "success",
+  depot_closure_external_marked: "warning",
+  depot_closure_transfer_assigned: "warning",
+  depot_closure_transfer_ready: "info",
+  depot_closure_transfer_completed: "success",
+  depot_closure_transfer_received: "success",
+  depot_closure_processing_required: "danger",
+  depot_closure_processing: "info",
+  depot_closure_completed: "success",
   chat_message: "info",
   assembly_checkin: "success",
   assembly_checkout: "warning",
@@ -99,6 +132,11 @@ const NOTIFICATION_TYPE_TONES: Record<string, NotificationTone> = {
   flood_warning: "warning",
   flood_emergency: "danger",
   evacuation: "danger",
+  inventory_maintenance_alert: "warning",
+  inventory_maintenance: "warning",
+  sos_request_new: "danger",
+  sos_request_assigned: "info",
+  sos_request_resolved: "success",
 };
 
 function toTitleCase(value: string): string {

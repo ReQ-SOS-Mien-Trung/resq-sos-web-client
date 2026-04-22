@@ -1,10 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Warehouse,
   Package,
@@ -21,9 +30,16 @@ import {
   Cube,
   ShieldWarning,
   ArrowFatLinesRight,
+  LockSimple,
+  FunnelSimple,
+  CaretLeft,
+  CaretRight,
 } from "@phosphor-icons/react";
 import { DepotSidebarProps, InventoryItem, SupplyRequest } from "@/type";
-import { useMyDepotLowStock } from "@/services/inventory/hooks";
+import {
+  useInventoryCategories,
+  useMyDepotLowStock,
+} from "@/services/inventory/hooks";
 import {
   getLowStockWarningLevel,
   compareLowStockItems,
@@ -42,26 +58,43 @@ const DepotSidebar = ({
   selectedItem,
   selectedRequest,
   selectedCategory,
-  apiCategories,
   activeTab,
   onActiveTabChange,
 }: DepotSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [lowStockPage, setLowStockPage] = useState(1);
+  const [selectedLowStockCategoryCodes, setSelectedLowStockCategoryCodes] =
+    useState<string[]>([]);
 
   // ── Real low-stock data ───────────────────────────────────────────────
   const { selectedDepotId } = useManagerDepot();
+  const { data: inventoryCategories = [] } = useInventoryCategories();
   const { data: lowStockData, isLoading: loadingLowStock } = useMyDepotLowStock(
-    selectedDepotId ? { depotId: selectedDepotId } : undefined,
+    selectedDepotId
+      ? {
+          depotId: selectedDepotId,
+          pageNumber: lowStockPage,
+          pageSize: 8,
+          categoryCode:
+            selectedLowStockCategoryCodes.length > 0
+              ? selectedLowStockCategoryCodes
+              : undefined,
+        }
+      : undefined,
   );
 
-  const urgentItems: LowStockItem[] = (lowStockData?.items ?? [])
-    .filter((item) => getLowStockWarningLevel(item) !== "OK")
-    .filter((item) =>
-      searchQuery
-        ? item.itemModelName.toLowerCase().includes(searchQuery.toLowerCase())
-        : true,
-    )
-    .sort(compareLowStockItems);
+  const urgentItems: LowStockItem[] = useMemo(
+    () =>
+      (lowStockData?.items ?? [])
+        .filter((item) => getLowStockWarningLevel(item) !== "OK")
+        .filter((item) =>
+          searchQuery
+            ? item.itemModelName.toLowerCase().includes(searchQuery.toLowerCase())
+            : true,
+        )
+        .sort(compareLowStockItems),
+    [lowStockData?.items, searchQuery],
+  );
 
   // ── Derived data (normal items from prop) ────────────────────────────
   const filteredItems = inventoryItems.filter((item) => {
@@ -104,6 +137,20 @@ const DepotSidebar = ({
     .slice(0, 2);
 
   const hasUrgent = urgentItems.length > 0;
+
+  const selectedLowStockCategoryLabels = useMemo(
+    () =>
+      inventoryCategories
+        .filter((category) => selectedLowStockCategoryCodes.includes(category.key))
+        .map((category) => category.value),
+    [inventoryCategories, selectedLowStockCategoryCodes],
+  );
+
+  const lowStockTotalCount = lowStockData?.totalCount ?? 0;
+  const shouldShowLowStockSection =
+    lowStockTotalCount > 0 ||
+    selectedLowStockCategoryCodes.length > 0 ||
+    searchQuery.trim().length > 0;
 
   return (
     <div className="h-full flex flex-col bg-sidebar border-r border-sidebar-border overflow-hidden">
@@ -184,79 +231,191 @@ const DepotSidebar = ({
             label="Quản lý tiếp tế"
             icon={<Truck className="h-4 w-4" />}
           />
+          {/* Navigation shortcuts – styled to match tabs */}
+          <TabsTrigger
+            value="depot-closure"
+            className="relative w-full flex flex-row items-center gap-3 px-3 py-2.5 text-sm font-medium tracking-tighter text-left justify-start rounded-none
+              text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground hover:translate-x-1 transition-all duration-200
+              data-[state=active]:bg-linear-to-r data-[state=active]:from-red-500/10 data-[state=active]:to-orange-500/10
+              data-[state=active]:text-red-600 dark:data-[state=active]:text-red-400
+              data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-red-500/10
+              data-[state=inactive]:border data-[state=inactive]:border-transparent
+              leading-none shadow-none"
+          >
+            <span className="shrink-0">
+              <LockSimple className="h-4 w-4" />
+            </span>
+            <span className="flex-1">Đóng kho</span>
+          </TabsTrigger>
         </TabsList>
 
-        {/* ── Inventory Tab ─────────────────────────────────────────────── */}
-        <TabsContent
-          value="inventory"
-          className="flex-1 overflow-hidden m-0 flex flex-col min-h-0"
-        >
-          <div className="px-3 pt-2 pb-2 shrink-0">
-            <div className="relative">
-              <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Tìm kiếm hàng hóa..."
-                className="pl-8 h-8 text-xs bg-muted/30 border-border/50 focus-visible:ring-primary/30"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <ScrollArea className="flex-1 min-h-0">
-            <div className="px-3 pb-4 space-y-4">
-              {loadingLowStock && (
-                <div className="space-y-2">
-                  <Skeleton className="h-3 w-28" />
-                  <Skeleton className="h-14 w-full rounded-lg" />
-                  <Skeleton className="h-14 w-full rounded-lg" />
-                </div>
-              )}
-
-              {!loadingLowStock && urgentItems.length > 0 && (
-                <div>
-                  <SectionHeader
-                    label={`Cần bổ sung (${urgentItems.length})`}
-                    color="text-red-500"
-                    icon={<ShieldWarning className="h-3 w-3" weight="fill" />}
-                  />
-                  <div className="space-y-1.5 mt-2">
-                    {urgentItems.map((item) => (
-                      <LowStockItemRow key={item.itemModelId} item={item} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {normalItems.length > 0 && (
-                <div>
-                  <SectionHeader
-                    label={`Bình thường (${normalItems.length})`}
-                    color="text-green-600"
-                    icon={<CheckCircle className="h-3 w-3" weight="fill" />}
-                  />
-                  <div className="space-y-1.5 mt-2">
-                    {normalItems.map((item) => (
-                      <InventoryItemRow
-                        key={item.id}
-                        item={item}
-                        isSelected={selectedItem?.id === item.id}
-                        onClick={() => onItemSelect(item)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {filteredItems.length === 0 && (
-                <EmptyState
-                  icon={<Package className="h-7 w-7" />}
-                  label="Không tìm thấy hàng hóa"
+        {/* ── Inventory Tab + Depot Closure tab share the same sidebar content ── */}
+        {["inventory", "depot-closure"].map((tabValue) => (
+          <TabsContent
+            key={tabValue}
+            value={tabValue}
+            className="flex-1 overflow-hidden m-0 flex flex-col min-h-0"
+          >
+            <div className="px-3 pt-2 pb-2 shrink-0">
+              <div className="relative">
+                <MagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Tìm kiếm hàng hóa..."
+                  className="pl-8 h-8 text-xs bg-muted/30 border-border/50 focus-visible:ring-primary/30"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
-              )}
+              </div>
             </div>
-          </ScrollArea>
-        </TabsContent>
+
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="px-3 pb-4 space-y-4">
+                {loadingLowStock && (
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-14 w-full rounded-lg" />
+                    <Skeleton className="h-14 w-full rounded-lg" />
+                  </div>
+                )}
+
+                {!loadingLowStock && shouldShowLowStockSection && (
+                  <div>
+                    <SectionHeader
+                      label={`Cần bổ sung (${lowStockTotalCount})`}
+                      color="text-red-500"
+                      icon={<ShieldWarning className="h-3 w-3" weight="fill" />}
+                    />
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 justify-start gap-2 px-2.5 text-xs tracking-tighter"
+                          >
+                            <FunnelSimple className="h-3.5 w-3.5" />
+                            {selectedLowStockCategoryLabels.length > 0
+                              ? `${selectedLowStockCategoryLabels.length} danh mục`
+                              : "Lọc danh mục"}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-64">
+                          <DropdownMenuLabel className="tracking-tighter">
+                            Danh mục cảnh báo
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {inventoryCategories.map((category) => (
+                            <DropdownMenuCheckboxItem
+                              key={category.key}
+                              checked={selectedLowStockCategoryCodes.includes(
+                                category.key,
+                              )}
+                              onCheckedChange={() => {
+                                setLowStockPage(1);
+                                setSelectedLowStockCategoryCodes((prev) =>
+                                  prev.includes(category.key)
+                                    ? prev.filter((code) => code !== category.key)
+                                    : [...prev, category.key],
+                                );
+                              }}
+                              className="tracking-tighter"
+                            >
+                              {category.value}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                          {selectedLowStockCategoryCodes.length > 0 && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="mx-1 mt-1 h-8 w-[calc(100%-0.5rem)] justify-center text-xs tracking-tighter"
+                                onClick={() => {
+                                  setSelectedLowStockCategoryCodes([]);
+                                  setLowStockPage(1);
+                                }}
+                              >
+                                Xóa lọc
+                              </Button>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <span className="text-[11px] text-muted-foreground tracking-tighter">
+                        Trang {lowStockData?.pageNumber ?? 1}/
+                        {Math.max(lowStockData?.totalPages ?? 1, 1)}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 mt-2">
+                      {urgentItems.length > 0 ? (
+                        urgentItems.map((item) => (
+                          <LowStockItemRow key={item.itemModelId} item={item} />
+                        ))
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-border/60 px-3 py-3 text-xs tracking-tighter text-muted-foreground">
+                          Không có vật phẩm phù hợp với bộ lọc hiện tại.
+                        </div>
+                      )}
+                    </div>
+                    {(lowStockData?.totalPages ?? 1) > 1 && (
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 px-2.5 text-xs tracking-tighter"
+                          onClick={() =>
+                            setLowStockPage((prev) => Math.max(prev - 1, 1))
+                          }
+                          disabled={!lowStockData?.hasPreviousPage}
+                        >
+                          <CaretLeft className="h-3.5 w-3.5" />
+                          Trước
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 px-2.5 text-xs tracking-tighter"
+                          onClick={() => setLowStockPage((prev) => prev + 1)}
+                          disabled={!lowStockData?.hasNextPage}
+                        >
+                          Sau
+                          <CaretRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {normalItems.length > 0 && (
+                  <div>
+                    <SectionHeader
+                      label={`Bình thường (${normalItems.length})`}
+                      color="text-green-600"
+                      icon={<CheckCircle className="h-3 w-3" weight="fill" />}
+                    />
+                    <div className="space-y-1.5 mt-2">
+                      {normalItems.map((item) => (
+                        <InventoryItemRow
+                          key={item.id}
+                          item={item}
+                          isSelected={selectedItem?.id === item.id}
+                          onClick={() => onItemSelect(item)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {filteredItems.length === 0 && (
+                  <EmptyState
+                    icon={<Package className="h-7 w-7" />}
+                    label="Không tìm thấy hàng hóa"
+                  />
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        ))}
 
         {/* ── Requests Tab ──────────────────────────────────────────────── */}
         <TabsContent

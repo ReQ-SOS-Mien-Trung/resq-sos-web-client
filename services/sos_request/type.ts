@@ -11,6 +11,13 @@ export type SOSRequestStatus =
 // SOS Request Priority Level
 export type SOSPriorityLevel = "Low" | "Medium" | "High" | "Critical";
 
+export interface SOSMetadataOption<T extends string = string> {
+  key: T;
+  value: string;
+}
+
+export type SOSPriorityLevelOption = SOSMetadataOption<SOSPriorityLevel>;
+
 // SOS Situation Type
 export type SOSSituation =
   | "FLOODING"
@@ -222,6 +229,17 @@ export interface GetSOSRequestsResponse {
 export interface GetSOSRequestsParams {
   pageNumber?: number;
   pageSize?: number;
+  Statuses?: SOSRequestStatus[];
+  PriorityLevels?: SOSPriorityLevel[];
+}
+
+export interface GetSOSRequestsInBoundsParams {
+  MinLat: number;
+  MaxLat: number;
+  MinLng: number;
+  MaxLng: number;
+  Statuses?: SOSRequestStatus[];
+  PriorityLevels?: SOSPriorityLevel[];
 }
 
 // Get SOS Request By ID Response
@@ -329,6 +347,8 @@ export interface ScoreWeights {
 
 export interface RuleEvaluation {
   id: number;
+  configId?: number | null;
+  configVersion?: string | null;
   medicalScore: number;
   injuryScore: number;
   mobilityScore: number;
@@ -338,6 +358,7 @@ export interface RuleEvaluation {
   priorityLevel: SOSPriorityLevel;
   ruleVersion: string;
   itemsNeeded: string[];
+  breakdown?: Record<string, unknown> | null;
   createdAt: string;
   priorityThresholds: PriorityThresholds;
   scoreWeights: ScoreWeights;

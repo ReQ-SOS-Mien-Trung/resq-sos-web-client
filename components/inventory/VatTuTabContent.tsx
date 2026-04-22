@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   useMyDepotInventory,
@@ -20,10 +20,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { InventoryItemEntity } from "@/services/inventory/type";
 
 interface VatTuSectionProps {
+  refreshNonce?: number;
   onItemSelect?: (item: InventoryItemEntity) => void;
 }
 
-export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
+export function VatTuSection({
+  refreshNonce = 0,
+  onItemSelect,
+}: VatTuSectionProps) {
   const { selectedDepotId } = useManagerDepot();
   const [page, setPage] = useState(1);
   const [selectedCategoryCodes, setSelectedCategoryCodes] = useState<string[]>(
@@ -44,17 +48,29 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
     data: inventoryData,
     isLoading,
     isError,
-  } = useMyDepotInventory({
-    depotId: selectedDepotId ?? 0,
-    pageNumber: page,
-    pageSize: 10,
-    categoryCode:
-      selectedCategoryCodes.length > 0 ? selectedCategoryCodes : undefined,
-    itemTypes: selectedItemTypes.length > 0 ? selectedItemTypes : undefined,
-    targetGroups: selectedTargetGroups ? [selectedTargetGroups] : undefined,
-  }, {
-    enabled: Boolean(selectedDepotId),
-  });
+    refetch: refetchInventory,
+  } = useMyDepotInventory(
+    {
+      depotId: selectedDepotId ?? 0,
+      pageNumber: page,
+      pageSize: 10,
+      categoryCode:
+        selectedCategoryCodes.length > 0 ? selectedCategoryCodes : undefined,
+      itemTypes: selectedItemTypes.length > 0 ? selectedItemTypes : undefined,
+      targetGroups: selectedTargetGroups ? [selectedTargetGroups] : undefined,
+    },
+    {
+      enabled: Boolean(selectedDepotId),
+    },
+  );
+
+  useEffect(() => {
+    if (!selectedDepotId) {
+      return;
+    }
+
+    refetchInventory();
+  }, [refreshNonce, refetchInventory, selectedDepotId]);
 
   const toggleCategory = (code: string) => {
     setSelectedCategoryCodes((prev) =>
@@ -323,13 +339,13 @@ export function VatTuSection({ onItemSelect }: VatTuSectionProps) {
                             <div className="flex gap-0.5 items-center">
                               {(item.reusableBreakdown?.inUseUnits ?? 0) >
                                 0 && (
-                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded tracking-tighter">
+                                <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-1 rounded tracking-tighter">
                                   {item.reusableBreakdown?.inUseUnits} đang dùng
                                 </span>
                               )}
                               {(item.reusableBreakdown?.maintenanceUnits ?? 0) >
                                 0 && (
-                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded tracking-tighter">
+                                <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-1 rounded tracking-tighter">
                                   {item.reusableBreakdown?.maintenanceUnits} bảo
                                   trì
                                 </span>

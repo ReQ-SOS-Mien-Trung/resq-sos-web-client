@@ -4,9 +4,12 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
 export async function GET(request: NextRequest) {
   const authorization = request.headers.get("authorization");
+  const depotId = request.nextUrl.searchParams.get("depotId")?.trim();
 
   const backendUrl = new URL(
-    "/logistics/depot/close/export-template",
+    depotId
+      ? `/logistics/depot/${depotId}/close/export-template`
+      : "/logistics/depot/close/export-template",
     BACKEND_URL,
   );
 

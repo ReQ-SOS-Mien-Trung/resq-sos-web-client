@@ -1,23 +1,33 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { Fragment, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   UsersThree,
-  MapPin,
-  UserCircle,
+  Eye,
   ListChecks,
-  ChartPie,
   CaretDown,
   CaretRight,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Spinner,
+  Crown,
 } from "@phosphor-icons/react";
 import { Doughnut } from "react-chartjs-2";
 import {
@@ -33,6 +43,7 @@ import {
   MissionActivity,
 } from "@/services/admin_dashboard/team-overview.type";
 import RescuerScoreSheet from "./RescuerScoreSheet";
+import { Icon } from "@iconify/react";
 
 ChartJS.register(ArcElement, ChartTooltip, Legend);
 
@@ -52,16 +63,6 @@ const getStatusBadge = (status: string) => {
   return map[status] || { className: "bg-gray-500/10 text-gray-700" };
 };
 
-const getMissionStatusIcon = (status: string) => {
-  if (status === "Completed")
-    return <CheckCircle size={14} className="text-emerald-500" weight="fill" />;
-  if (status === "Incompleted" || status === "Failed")
-    return <XCircle size={14} className="text-rose-500" weight="fill" />;
-  if (status === "InProgress")
-    return <Spinner size={14} className="text-blue-500 animate-spin" />;
-  return <Clock size={14} className="text-muted-foreground" />;
-};
-
 // ─── Inline Detail Panel ─────────────────────────────────────────────────────
 
 interface TeamDetailPanelProps {
@@ -75,9 +76,15 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
   const [expandedMission, setExpandedMission] = useState<number | null>(null);
   const [rescuerSheet, setRescuerSheet] = useState<{
     open: boolean;
-    rescuerId: string;
+    rescuerId: number | null;
     name: string;
-  }>({ open: false, rescuerId: "", name: "" });
+  }>({
+    open: false,
+    rescuerId: null,
+    name: "",
+  });
+
+  const [isMissionSheetOpen, setIsMissionSheetOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -94,7 +101,7 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
   return (
     <>
       <motion.div
-        className="p-4 space-y-4"
+        className="p-4 space-y-4 tracking-tighter"
         initial="hidden"
         animate="visible"
         variants={{
@@ -103,86 +110,39 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
         }}
       >
         {/* ── Top row: info + pie chart + members ────────────────────────── */}
-        <div className="grid grid-cols-3 gap-4">
-          {/* Basic info */}
-          <motion.div
-            variants={{
-              hidden: { opacity: 0, y: 16 },
-              visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-            }}
-          >
-            <Card className="border-border/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <MapPin size={15} className="text-red-500" />
-                  Thông tin cơ bản
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground shrink-0">
-                    Điểm tập kết
-                  </span>
-                  <span className="font-medium text-right">
-                    {data.assemblyPointName}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground shrink-0">
-                    Quản lý
-                  </span>
-                  <span className="font-medium text-right">
-                    {data.managedByName}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground shrink-0">
-                    Thành viên
-                  </span>
-                  <span className="font-medium">
-                    {data.members.length} / {data.maxMembers}
-                  </span>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground shrink-0">Loại</span>
-                  <Badge variant="outline" className="text-sm">
-                    {data.teamType}
-                  </Badge>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground shrink-0">
-                    Ngày tạo
-                  </span>
-                  <span className="text-sm font-medium">
-                    {new Date(data.createdAt).toLocaleDateString("vi-VN")}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
+        <div className="grid grid-cols-2 gap-4">
           {/* Pie chart */}
           <motion.div
+            className="h-full"
             variants={{
               hidden: { opacity: 0, y: 16 },
               visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
             }}
           >
-            <Card className="border-border/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <ChartPie size={15} className="text-blue-500" />
+            <Card className="h-full border-border/50">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Icon
+                    icon="uim:chart-pie"
+                    width="24"
+                    height="24"
+                    className="text-primary"
+                  />
                   Tỉ lệ hoàn thành nhiệm vụ
                 </CardTitle>
+                <Button variant="outline" size="sm" className="h-8 text-xs shrink-0 px-3" onClick={() => setIsMissionSheetOpen(true)}>
+                  Xem chi tiết
+                  <CaretRight size={14} className="ml-1" />
+                </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="">
                 {data.completionRate.totalMissions === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-6">
                     Chưa có nhiệm vụ
                   </p>
                 ) : (
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-44 h-44 shrink-0">
+                  <div className="flex flex-row items-center justify-center gap-4">
+                    <div className="h-52 w-52 shrink-0 xl:h-60 xl:w-60 tracking-normal -m-4 relative z-10">
                       <Doughnut
                         data={{
                           labels: ["Hoàn thành", "Chưa hoàn thành"],
@@ -201,10 +161,17 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                         }}
                         options={{
                           cutout: "62%",
+                          layout: { padding: { left: 24, right: 24, top: 16, bottom: 16 } },
                           plugins: {
                             legend: { display: false },
                             tooltip: {
+                              padding: 10,
+                              bodyFont: { size: 14 },
+                              boxPadding: 4,
+                              yAlign: "bottom",
+                              caretPadding: 6,
                               callbacks: {
+                                title: () => [] as any,
                                 label: (ctx) => {
                                   const total = (
                                     ctx.dataset.data as number[]
@@ -213,7 +180,7 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                                     total > 0
                                       ? ((ctx.parsed / total) * 100).toFixed(0)
                                       : 0;
-                                  return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+                                  return `${ctx.label}: ${ctx.parsed} (${pct}%)`;
                                 },
                               },
                             },
@@ -221,22 +188,22 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
                         }}
                       />
                     </div>
-                    <div className="flex flex-col items-center gap-1.5 text-sm w-full">
+                    <div className="flex flex-col gap-2.5 text-sm">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                        <span>
+                        <span className="whitespace-nowrap">
                           Hoàn thành: {data.completionRate.completedCount} (
                           {data.completionRate.completedPercent.toFixed(0)}%)
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-                        <span>
-                          Chưa HT: {data.completionRate.incompletedCount} (
+                        <span className="whitespace-nowrap">
+                          Chưa hoàn thành: {data.completionRate.incompletedCount} (
                           {data.completionRate.incompletedPercent.toFixed(0)}%)
                         </span>
                       </div>
-                      <div className="text-muted-foreground pt-1 border-t border-border/40">
+                      <div className="whitespace-nowrap">
                         Tổng: {data.completionRate.totalMissions} nhiệm vụ
                       </div>
                     </div>
@@ -248,200 +215,67 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
 
           {/* Members */}
           <motion.div
+            className="h-full"
             variants={{
               hidden: { opacity: 0, y: 16 },
               visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
             }}
           >
-            <Card className="border-border/50">
+            <Card className="h-full border-border/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <UsersThree size={15} className="text-violet-500" />
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <UsersThree size={20} className="text-violet-500" />
                   Thành viên ({data.members.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
-                {data.members.map((m: TeamMember) => (
-                  <button
-                    key={m.userId}
-                    onClick={() =>
-                      setRescuerSheet({
-                        open: true,
-                        rescuerId: m.userId,
-                        name: `${m.lastName} ${m.firstName}`,
-                      })
-                    }
-                    className="w-full flex items-center gap-2.5 p-2 rounded-lg border border-border/40 hover:bg-muted/40 transition-colors text-left"
-                  >
-                    <Avatar className="h-7 w-7 shrink-0">
-                      {m.avatarUrl ? <AvatarImage src={m.avatarUrl} /> : null}
-                      <AvatarFallback className="text-sm bg-linear-to-br from-red-400 to-orange-500 text-white">
-                        {m.lastName?.charAt(0)}
-                        {m.firstName?.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-sm font-medium truncate">
-                          {m.lastName} {m.firstName}
-                        </span>
-                        {m.isLeader && (
-                          <Badge className="text-sm py-0 px-1 bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                            Leader
-                          </Badge>
-                        )}
+              <CardContent className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto pr-1 md:grid-cols-2">
+                {[...data.members]
+                  .sort((a, b) => (b.isLeader ? 1 : 0) - (a.isLeader ? 1 : 0))
+                  .map((m: TeamMember) => (
+                    <button
+                      key={m.userId}
+                      onClick={() =>
+                        setRescuerSheet({
+                          open: true,
+                          rescuerId: m.userId,
+                          name: `${m.lastName} ${m.firstName}`,
+                        })
+                      }
+                      className="flex w-full items-center gap-2.5 rounded-lg border border-border/40 p-2 text-left transition-colors hover:bg-muted/40"
+                    >
+                      <Avatar className="h-7 w-7 shrink-0">
+                        {m.avatarUrl ? <AvatarImage src={m.avatarUrl} /> : null}
+                        <AvatarFallback className="text-sm bg-linear-to-br from-violet-400 to-purple-500 text-white">
+                          {m.lastName?.charAt(0)}
+                          {m.firstName?.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-medium truncate">
+                            {m.lastName} {m.firstName}
+                          </span>
+                          {m.isLeader && (
+                            <Crown
+                              size={14}
+                              weight="fill"
+                              className="text-amber-500 shrink-0"
+                            />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <UserCircle
-                      size={15}
-                      className="text-muted-foreground shrink-0"
-                    />
-                  </button>
-                ))}
+                      <Eye
+                        size={15}
+                        className="text-muted-foreground shrink-0"
+                      />
+                    </button>
+                  ))}
               </CardContent>
             </Card>
           </motion.div>
         </div>
 
-        {/* ── Missions ──────────────────────────────────────────────────────── */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 16 },
-            visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-          }}
-        >
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <ListChecks size={15} className="text-emerald-500" />
-                Nhiệm vụ ({data.missions.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.missions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Chưa có nhiệm vụ nào
-                </p>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {data.missions.map((mission: TeamMission) => (
-                    <div
-                      key={mission.missionTeamId}
-                      className="border border-border/40 rounded-lg overflow-hidden"
-                    >
-                      <button
-                        onClick={() =>
-                          setExpandedMission(
-                            expandedMission === mission.missionTeamId
-                              ? null
-                              : mission.missionTeamId,
-                          )
-                        }
-                        className="w-full flex items-center justify-between p-3 hover:bg-muted/30 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {getMissionStatusIcon(mission.missionStatus)}
-                          <span className="text-sm font-medium">
-                            Mission #{mission.missionId}
-                          </span>
-                          <Badge variant="outline" className="text-sm">
-                            {mission.missionType}
-                          </Badge>
-                          <Badge
-                            className={`text-sm ${
-                              mission.missionStatus === "Completed"
-                                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                : mission.missionStatus === "InProgress"
-                                  ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
-                                  : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
-                            }`}
-                          >
-                            {mission.missionStatus}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(mission.assignedAt).toLocaleDateString(
-                              "vi-VN",
-                            )}
-                          </span>
-                          {expandedMission === mission.missionTeamId ? (
-                            <CaretDown size={13} />
-                          ) : (
-                            <CaretRight size={13} />
-                          )}
-                        </div>
-                      </button>
 
-                      {expandedMission === mission.missionTeamId && (
-                        <div className="px-3 pb-3 border-t border-border/30">
-                          <div className="flex flex-wrap items-center gap-3 mt-2 mb-3 text-sm text-muted-foreground">
-                            <span>
-                              Giao:{" "}
-                              {new Date(mission.assignedAt).toLocaleString(
-                                "vi-VN",
-                              )}
-                            </span>
-                            {mission.missionCompletedAt && (
-                              <span>
-                                Xong:{" "}
-                                {new Date(
-                                  mission.missionCompletedAt,
-                                ).toLocaleString("vi-VN")}
-                              </span>
-                            )}
-                            <Badge variant="outline" className="text-sm">
-                              Báo cáo: {mission.reportStatus}
-                            </Badge>
-                          </div>
-                          {mission.activities.length > 0 ? (
-                            <div className="space-y-1.5">
-                              {mission.activities.map(
-                                (act: MissionActivity) => (
-                                  <div
-                                    key={act.id}
-                                    className="flex items-start gap-2 p-2 rounded-md bg-muted/20"
-                                  >
-                                    <span className="shrink-0 w-5 h-5 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                                      {act.step}
-                                    </span>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="font-medium text-sm">
-                                          {act.activityType}
-                                        </span>
-                                        <Badge
-                                          className={`text-sm ${
-                                            act.status === "Completed"
-                                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                              : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
-                                          }`}
-                                        >
-                                          {act.status}
-                                        </Badge>
-                                      </div>
-                                      <p className="text-sm text-muted-foreground mt-0.5">
-                                        {act.description}
-                                      </p>
-                                    </div>
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-muted-foreground">
-                              Không có hoạt động
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
       </motion.div>
 
       <RescuerScoreSheet
@@ -450,6 +284,208 @@ const TeamDetailPanel = ({ teamId }: TeamDetailPanelProps) => {
         rescuerId={rescuerSheet.rescuerId}
         rescuerName={rescuerSheet.name}
       />
+
+      <Sheet
+        open={isMissionSheetOpen}
+        onOpenChange={(open) => {
+          setIsMissionSheetOpen(open);
+          if (!open) setExpandedMission(null);
+        }}
+      >
+        <SheetContent
+          side="bottom"
+          className="flex h-[82vh] flex-col rounded-t-[28px] border-x-0 border-b-0 border-t border-border/60 px-0 pt-0 sm:h-[82vh]"
+        >
+          <SheetHeader className="shrink-0 border-b border-border/50 px-6 pb-4 pt-6 text-left">
+            <SheetTitle className="flex items-center gap-2 text-lg">
+              <ListChecks size={20} className="text-emerald-500" />
+              Chi tiết nhiệm vụ ({data.missions.length})
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 flex-1 overflow-auto px-6 pb-6">
+            <div className="overflow-hidden rounded-2xl border border-border/50 bg-background">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-muted/50">
+                <TableRow>
+                    <TableHead className="w-11" />
+                    <TableHead className="w-[110px]">Mã NV</TableHead>
+                  <TableHead>Loại</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead>Báo cáo</TableHead>
+                  <TableHead>Ngày giao</TableHead>
+                  <TableHead>Ngày hoàn thành</TableHead>
+                </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.missions.map((mission: TeamMission) => {
+                    const isExpanded = expandedMission === mission.missionTeamId;
+                    return (
+                      <Fragment key={mission.missionTeamId}>
+                        <TableRow
+                          onClick={() =>
+                            setExpandedMission((prev) =>
+                              prev === mission.missionTeamId
+                                ? null
+                                : mission.missionTeamId,
+                            )
+                          }
+                          className={`cursor-pointer transition-colors hover:bg-muted/30 ${
+                            isExpanded ? "bg-muted/40" : ""
+                          }`}
+                        >
+                          <TableCell className="text-muted-foreground">
+                            {isExpanded ? (
+                              <CaretDown size={15} />
+                            ) : (
+                              <CaretRight size={15} />
+                            )}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap font-medium">
+                            #{mission.missionId}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="whitespace-nowrap font-normal"
+                            >
+                              {mission.missionType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              className={`whitespace-nowrap text-xs ${
+                                mission.missionStatus === "Completed"
+                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                  : mission.missionStatus === "InProgress"
+                                    ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                                    : "bg-rose-500/10 text-rose-700 dark:text-rose-400"
+                              }`}
+                            >
+                              {mission.missionStatus}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {mission.reportStatus ? (
+                              <Badge variant="outline" className="font-normal">
+                                {mission.reportStatus}
+                              </Badge>
+                            ) : (
+                              "-"
+                            )}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-sm text-foreground/80">
+                            {new Date(mission.assignedAt).toLocaleString(
+                              "vi-VN",
+                            )}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-sm text-foreground/80">
+                            {mission.missionCompletedAt
+                              ? new Date(
+                                  mission.missionCompletedAt,
+                                ).toLocaleString("vi-VN")
+                              : "-"}
+                          </TableCell>
+                        </TableRow>
+
+                        <AnimatePresence initial={false}>
+                          {isExpanded && (
+                            <TableRow>
+                              <TableCell colSpan={7} className="p-0">
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{
+                                    duration: 0.24,
+                                    ease: "easeInOut",
+                                  }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="border-t border-border/40 bg-muted/15 px-5 py-4">
+                                    <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                      <Badge variant="outline" className="font-normal">
+                                        Báo cáo: {mission.reportStatus || "-"}
+                                      </Badge>
+                                      <span>
+                                        Giao lúc:{" "}
+                                        {new Date(
+                                          mission.assignedAt,
+                                        ).toLocaleString("vi-VN")}
+                                      </span>
+                                      <span>
+                                        Hoàn thành:{" "}
+                                        {mission.missionCompletedAt
+                                          ? new Date(
+                                              mission.missionCompletedAt,
+                                            ).toLocaleString("vi-VN")
+                                          : "Chưa hoàn thành"}
+                                      </span>
+                                    </div>
+
+                                    {mission.activities.length > 0 ? (
+                                      <div className="space-y-2">
+                                        {mission.activities.map(
+                                          (act: MissionActivity) => (
+                                            <div
+                                              key={act.id}
+                                              className="flex items-start gap-3 rounded-xl border border-border/40 bg-background px-3 py-2.5"
+                                            >
+                                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                                                {act.step}
+                                              </span>
+                                              <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                  <span className="text-sm font-medium text-foreground">
+                                                    {act.activityType}
+                                                  </span>
+                                                  <Badge
+                                                    className={`text-xs ${
+                                                      act.status === "Completed"
+                                                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                                        : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                                                    }`}
+                                                  >
+                                                    {act.status}
+                                                  </Badge>
+                                                </div>
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                  {act.description}
+                                                </p>
+                                              </div>
+                                            </div>
+                                          ),
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <p className="text-sm text-muted-foreground">
+                                        Chưa có hoạt động nào cho nhiệm vụ này
+                                      </p>
+                                    )}
+                                  </div>
+                                </motion.div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </AnimatePresence>
+                      </Fragment>
+                    );
+                  })}
+                  {data.missions.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="py-8 text-center text-muted-foreground"
+                      >
+                        Chưa có nhiệm vụ nào
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 };

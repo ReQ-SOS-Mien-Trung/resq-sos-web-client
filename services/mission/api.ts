@@ -1,4 +1,5 @@
 import api from "@/config/axios";
+import { resolveSupplyBufferRatio } from "@/lib/supply-buffer";
 import {
   CreateActivityResponse,
   ActivityStatus,
@@ -23,6 +24,8 @@ import {
   MissionTeamRouteLeg,
   MissionTeamRouteResponse,
   ConfirmReturnSuppliesRequest,
+  ConfirmReturnResponse,
+  MissionTeamReportResponse,
 } from "./type";
 
 function toNumberOrZero(value: unknown): number {
@@ -49,6 +52,21 @@ function toTrimmedStringOrNull(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeMissionActivityType(value: unknown): string {
+  const normalized = String(value || "ASSESS")
+    .trim()
+    .toUpperCase();
+
+  if (
+    normalized === "RETURN_TO_ASSEMBLY_POINT" ||
+    normalized === "RETURN_ASSEMBLY"
+  ) {
+    return "RETURN_ASSEMBLY_POINT";
+  }
+
+  return normalized;
 }
 
 function formatRouteDistanceText(distanceMeters: number): string {
@@ -190,59 +208,87 @@ function normalizeCreateMissionRequest(
 ): CreateMissionRequest {
   return {
     clusterId: toNumberOrZero(request.clusterId),
+    aiSuggestionId:
+      request.aiSuggestionId == null
+        ? null
+        : toNumberOrZero(request.aiSuggestionId),
     missionType: String(request.missionType || "RESCUE").toUpperCase(),
     priorityScore: toNumberOrZero(request.priorityScore),
     startTime: request.startTime,
     expectedEndTime: request.expectedEndTime,
-    activities: (request.activities ?? []).map((activity, index) => ({
-      step: toNumberOrZero(activity.step) || index + 1,
-      activityCode:
-        typeof activity.activityCode === "string" && activity.activityCode
-          ? activity.activityCode
-          : `${String(activity.activityType || "TASK").toUpperCase()}_${index + 1}`,
-      activityType: String(activity.activityType || "ASSESS").toUpperCase(),
-      description: String(activity.description || "").trim(),
-      priority: String(activity.priority || "Medium"),
-      estimatedTime: toNumberOrZero(activity.estimatedTime),
-      sosRequestId:
-        activity.sosRequestId == null
-          ? null
-          : toNumberOrZero(activity.sosRequestId),
-      depotId:
-        activity.depotId == null ? null : toNumberOrZero(activity.depotId),
-      depotName: activity.depotName ? String(activity.depotName) : null,
-      depotAddress: activity.depotAddress
-        ? String(activity.depotAddress)
+    ignoreMixedMissionWarning: Boolean(request.ignoreMixedMissionWarning),
+    overrideReason:
+      typeof request.overrideReason === "string" &&
+      request.overrideReason.trim()
+        ? request.overrideReason.trim()
         : null,
-      assemblyPointId:
-        activity.assemblyPointId == null
-          ? null
-          : toNumberOrZero(activity.assemblyPointId),
-      assemblyPointName: activity.assemblyPointName
-        ? String(activity.assemblyPointName)
-        : null,
-      assemblyPointLatitude:
-        activity.assemblyPointLatitude == null
-          ? null
-          : toNumberOrZero(activity.assemblyPointLatitude),
-      assemblyPointLongitude:
-        activity.assemblyPointLongitude == null
-          ? null
-          : toNumberOrZero(activity.assemblyPointLongitude),
-      suppliesToCollect: (activity.suppliesToCollect ?? []).map((supply) => ({
-        id: supply.id == null ? null : toNumberOrZero(supply.id),
-        name: supply.name ? String(supply.name) : null,
-        quantity: toNumberOrZero(supply.quantity),
-        unit: String(supply.unit || "").trim(),
-      })),
-      target: String(activity.target || "").trim(),
-      targetLatitude: toNumberOrZero(activity.targetLatitude),
-      targetLongitude: toNumberOrZero(activity.targetLongitude),
-      rescueTeamId:
-        activity.rescueTeamId == null
-          ? null
-          : toNumberOrZero(activity.rescueTeamId),
-    })),
+    activities: (request.activities ?? []).map((activity, index) => {
+      const normalizedActivityType = normalizeMissionActivityType(
+        activity.activityType,
+      );
+      const providedActivityCode =
+        typeof activity.activityCode === "string"
+          ? activity.activityCode.trim()
+          : "";
+      const normalizedActivityCode = providedActivityCode
+        ? providedActivityCode
+            .toUpperCase()
+            .replace(/^RETURN_TO_ASSEMBLY_POINT_/, "RETURN_ASSEMBLY_POINT_")
+            .replace(/^RETURN_ASSEMBLY_/, "RETURN_ASSEMBLY_POINT_")
+        : `${normalizedActivityType}_${index + 1}`;
+      const shouldSendSupplyBuffer =
+        normalizedActivityType === "COLLECT_SUPPLIES";
+
+      return {
+        step: toNumberOrZero(activity.step) || index + 1,
+        activityCode: normalizedActivityCode,
+        activityType: normalizedActivityType,
+        description: String(activity.description || "").trim(),
+        priority: String(activity.priority || "Medium"),
+        estimatedTime: toNumberOrZero(activity.estimatedTime),
+        sosRequestId:
+          activity.sosRequestId == null
+            ? null
+            : toNumberOrZero(activity.sosRequestId),
+        depotId:
+          activity.depotId == null ? null : toNumberOrZero(activity.depotId),
+        depotName: activity.depotName ? String(activity.depotName) : null,
+        depotAddress: activity.depotAddress
+          ? String(activity.depotAddress)
+          : null,
+        assemblyPointId:
+          activity.assemblyPointId == null
+            ? null
+            : toNumberOrZero(activity.assemblyPointId),
+        assemblyPointName: activity.assemblyPointName
+          ? String(activity.assemblyPointName)
+          : null,
+        assemblyPointLatitude:
+          activity.assemblyPointLatitude == null
+            ? null
+            : toNumberOrZero(activity.assemblyPointLatitude),
+        assemblyPointLongitude:
+          activity.assemblyPointLongitude == null
+            ? null
+            : toNumberOrZero(activity.assemblyPointLongitude),
+        suppliesToCollect: (activity.suppliesToCollect ?? []).map((supply) => ({
+          id: supply.id == null ? null : toNumberOrZero(supply.id),
+          name: supply.name ? String(supply.name) : null,
+          quantity: toNumberOrZero(supply.quantity),
+          unit: String(supply.unit || "").trim(),
+          ...(shouldSendSupplyBuffer
+            ? { bufferRatio: resolveSupplyBufferRatio(supply.bufferRatio) }
+            : {}),
+        })),
+        target: String(activity.target || "").trim(),
+        targetLatitude: toNumberOrZero(activity.targetLatitude),
+        targetLongitude: toNumberOrZero(activity.targetLongitude),
+        rescueTeamId:
+          activity.rescueTeamId == null
+            ? null
+            : toNumberOrZero(activity.rescueTeamId),
+      };
+    }),
   };
 }
 
@@ -287,40 +333,81 @@ function normalizeMissionReusableUnit(
 
 function normalizeUpdateMissionActivityItem(
   item: UpdateMissionActivityItemPayload,
+  shouldSendSupplyBuffer = true,
 ): UpdateMissionActivityItemPayload {
-  return {
+  const normalizedItem: UpdateMissionActivityItemPayload = {
     itemId: toNumberOrNull(item?.itemId),
     itemName: toTrimmedStringOrNull(item?.itemName),
     imageUrl: toTrimmedStringOrNull(item?.imageUrl),
     quantity: toNumberOrZero(item?.quantity),
     unit: String(item?.unit ?? "").trim(),
-    plannedPickupLotAllocations: Array.isArray(
-      item?.plannedPickupLotAllocations,
-    )
-      ? item.plannedPickupLotAllocations.map(normalizeMissionLotAllocation)
-      : [],
-    plannedPickupReusableUnits: Array.isArray(item?.plannedPickupReusableUnits)
-      ? item.plannedPickupReusableUnits.map(normalizeMissionReusableUnit)
-      : [],
-    pickupLotAllocations: Array.isArray(item?.pickupLotAllocations)
-      ? item.pickupLotAllocations.map(normalizeMissionLotAllocation)
-      : [],
-    pickedReusableUnits: Array.isArray(item?.pickedReusableUnits)
-      ? item.pickedReusableUnits.map(normalizeMissionReusableUnit)
-      : [],
-    expectedReturnUnits: Array.isArray(item?.expectedReturnUnits)
-      ? item.expectedReturnUnits.map(normalizeMissionReusableUnit)
-      : [],
-    returnedReusableUnits: Array.isArray(item?.returnedReusableUnits)
-      ? item.returnedReusableUnits.map(normalizeMissionReusableUnit)
-      : [],
-    actualReturnedQuantity: toNumberOrZero(item?.actualReturnedQuantity),
-    bufferRatio: toNumberOrZero(item?.bufferRatio),
-    bufferQuantity: toNumberOrZero(item?.bufferQuantity),
-    bufferUsedQuantity: toNumberOrZero(item?.bufferUsedQuantity),
-    bufferUsedReason: toTrimmedStringOrNull(item?.bufferUsedReason),
-    actualDeliveredQuantity: toNumberOrZero(item?.actualDeliveredQuantity),
   };
+
+  if (Array.isArray(item?.plannedPickupLotAllocations)) {
+    normalizedItem.plannedPickupLotAllocations =
+      item.plannedPickupLotAllocations.map(normalizeMissionLotAllocation);
+  }
+
+  if (Array.isArray(item?.plannedPickupReusableUnits)) {
+    normalizedItem.plannedPickupReusableUnits =
+      item.plannedPickupReusableUnits.map(normalizeMissionReusableUnit);
+  }
+
+  if (Array.isArray(item?.pickupLotAllocations)) {
+    normalizedItem.pickupLotAllocations = item.pickupLotAllocations.map(
+      normalizeMissionLotAllocation,
+    );
+  }
+
+  if (Array.isArray(item?.pickedReusableUnits)) {
+    normalizedItem.pickedReusableUnits = item.pickedReusableUnits.map(
+      normalizeMissionReusableUnit,
+    );
+  }
+
+  if (Array.isArray(item?.expectedReturnUnits)) {
+    normalizedItem.expectedReturnUnits = item.expectedReturnUnits.map(
+      normalizeMissionReusableUnit,
+    );
+  }
+
+  if (Array.isArray(item?.returnedReusableUnits)) {
+    normalizedItem.returnedReusableUnits = item.returnedReusableUnits.map(
+      normalizeMissionReusableUnit,
+    );
+  }
+
+  if (item?.actualReturnedQuantity != null) {
+    normalizedItem.actualReturnedQuantity = toNumberOrZero(
+      item.actualReturnedQuantity,
+    );
+  }
+
+  if (shouldSendSupplyBuffer && item?.bufferRatio != null) {
+    normalizedItem.bufferRatio = toNumberOrZero(item.bufferRatio);
+  }
+
+  if (shouldSendSupplyBuffer && item?.bufferQuantity != null) {
+    normalizedItem.bufferQuantity = toNumberOrZero(item.bufferQuantity);
+  }
+
+  if (shouldSendSupplyBuffer && item?.bufferUsedQuantity != null) {
+    normalizedItem.bufferUsedQuantity = toNumberOrZero(item.bufferUsedQuantity);
+  }
+
+  if (shouldSendSupplyBuffer && item?.bufferUsedReason !== undefined) {
+    normalizedItem.bufferUsedReason = toTrimmedStringOrNull(
+      item.bufferUsedReason,
+    );
+  }
+
+  if (item?.actualDeliveredQuantity != null) {
+    normalizedItem.actualDeliveredQuantity = toNumberOrZero(
+      item.actualDeliveredQuantity,
+    );
+  }
+
+  return normalizedItem;
 }
 
 function normalizeUpdateMissionRequest(
@@ -333,6 +420,10 @@ function normalizeUpdateMissionRequest(
           parsedAssemblyPointId != null && parsedAssemblyPointId > 0
             ? parsedAssemblyPointId
             : null;
+        const shouldSendSupplyBuffer =
+          activity?.activityType == null ||
+          normalizeMissionActivityType(activity.activityType) ===
+            "COLLECT_SUPPLIES";
 
         return {
           activityId: toNumberOrZero(activity?.activityId),
@@ -347,7 +438,9 @@ function normalizeUpdateMissionRequest(
               }
             : {}),
           items: Array.isArray(activity?.items)
-            ? activity.items.map(normalizeUpdateMissionActivityItem)
+            ? activity.items.map((item) =>
+                normalizeUpdateMissionActivityItem(item, shouldSendSupplyBuffer),
+              )
             : [],
         };
       })
@@ -418,6 +511,80 @@ function normalizeActivityStatusInput(status: string): ActivityStatus | string {
   return status;
 }
 
+function normalizeConfirmReturnSuppliesRequest(
+  request: ConfirmReturnSuppliesRequest,
+): ConfirmReturnSuppliesRequest {
+  const normalizedConsumableItems = Array.isArray(request?.consumableItems)
+    ? request.consumableItems.map((item) => ({
+        itemModelId: toNumberOrZero(item?.itemModelId),
+        quantity: toNumberOrZero(item?.quantity),
+        lotAllocations: Array.isArray(item?.lotAllocations)
+          ? item.lotAllocations.map((allocation) => ({
+              lotId: toNumberOrZero(allocation?.lotId),
+              quantityTaken: toNumberOrZero(allocation?.quantityTaken),
+              receivedDate: String(allocation?.receivedDate ?? ""),
+              expiredDate: String(allocation?.expiredDate ?? ""),
+              remainingQuantityAfterExecution: toNumberOrZero(
+                allocation?.remainingQuantityAfterExecution,
+              ),
+            }))
+          : [],
+        expiredDate: toTrimmedStringOrNull(item?.expiredDate),
+      }))
+    : [];
+
+  const normalizedReusableItems = Array.isArray(request?.reusableItems)
+    ? request.reusableItems.map((item) => ({
+        itemModelId: toNumberOrZero(item?.itemModelId),
+        quantity: toNumberOrZero(item?.quantity),
+        units: Array.isArray(item?.units)
+          ? item.units.map((unit) => ({
+              reusableItemId: toNumberOrZero(unit?.reusableItemId),
+              serialNumber: String(unit?.serialNumber ?? "").trim(),
+              condition: String(unit?.condition ?? "").trim(),
+              note: toTrimmedStringOrNull(unit?.note),
+            }))
+          : [],
+      }))
+    : [];
+
+  return {
+    discrepancyNote: toTrimmedStringOrNull(request?.discrepancyNote),
+    consumableItems: normalizedConsumableItems,
+    reusableItems: normalizedReusableItems,
+  };
+}
+
+function normalizeMissionTeamReportResponse(
+  response: MissionTeamReportResponse,
+): MissionTeamReportResponse {
+  return {
+    ...response,
+    reportStatus: toTrimmedStringOrNull(response?.reportStatus) ?? "NotStarted",
+    executionStatus: toTrimmedStringOrNull(response?.executionStatus) ?? "",
+    teamSummary: toTrimmedStringOrNull(response?.teamSummary),
+    teamNote: toTrimmedStringOrNull(response?.teamNote),
+    issuesJson: toTrimmedStringOrNull(response?.issuesJson),
+    resultJson: toTrimmedStringOrNull(response?.resultJson),
+    evidenceJson: toTrimmedStringOrNull(response?.evidenceJson),
+    activities: Array.isArray(response?.activities)
+      ? response.activities.map((activity) => ({
+          ...activity,
+          activityType: toTrimmedStringOrNull(activity?.activityType),
+          activityStatus: toTrimmedStringOrNull(activity?.activityStatus),
+          executionStatus: toTrimmedStringOrNull(activity?.executionStatus),
+          summary: toTrimmedStringOrNull(activity?.summary),
+          issuesJson: toTrimmedStringOrNull(activity?.issuesJson),
+          resultJson: toTrimmedStringOrNull(activity?.resultJson),
+          evidenceJson: toTrimmedStringOrNull(activity?.evidenceJson),
+        }))
+      : [],
+    memberEvaluations: Array.isArray(response?.memberEvaluations)
+      ? response.memberEvaluations
+      : [],
+  };
+}
+
 export async function getMissions(
   params: GetMissionsParams,
 ): Promise<GetMissionsResponse> {
@@ -440,6 +607,16 @@ export async function getMissionById(
 ): Promise<MissionEntity> {
   const { data } = await api.get(`/operations/missions/${missionId}`);
   return data;
+}
+
+export async function getMissionTeamReport(
+  missionId: number,
+  missionTeamId: number,
+): Promise<MissionTeamReportResponse> {
+  const { data } = await api.get(
+    `/operations/missions/${missionId}/teams/${missionTeamId}/report`,
+  );
+  return normalizeMissionTeamReportResponse(data as MissionTeamReportResponse);
 }
 
 export async function updateMission(
@@ -547,12 +724,12 @@ export async function getMissionTeamRoute(
 }
 
 export async function confirmReturnSupplies(
-  missionId: number,
   activityId: number,
   request: ConfirmReturnSuppliesRequest,
-): Promise<void> {
-  await api.post(
-    `/operations/missions/${missionId}/activities/${activityId}/confirm-return`,
+): Promise<ConfirmReturnResponse> {
+  const { data } = await api.post<ConfirmReturnResponse>(
+    `/logistics/inventory/activities/${activityId}/confirm-return`,
     request,
   );
+  return data;
 }

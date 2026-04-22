@@ -11,6 +11,7 @@ import {
   updateAdminUser,
   getUsersForPermission,
   getRoleMetadata,
+  getRescuerTypeMetadata,
   getAbilityCategoryMetadata,
 } from "./api";
 import {
@@ -27,6 +28,7 @@ import {
   GetUsersForPermissionParams,
   GetUsersForPermissionResponse,
   RoleMetadataOption,
+  RescuerTypeMetadataOption,
   AbilityCategoryMetadataOption,
 } from "./type";
 
@@ -43,6 +45,10 @@ export interface UseRoleMetadataOptions {
 }
 
 export interface UseAbilityCategoryMetadataOptions {
+  enabled?: boolean;
+}
+
+export interface UseRescuerTypeMetadataOptions {
   enabled?: boolean;
 }
 
@@ -145,10 +151,28 @@ export const ABILITY_CATEGORY_METADATA_QUERY_KEY = [
   "metadata",
 ] as const;
 
+export const RESCUER_TYPE_METADATA_QUERY_KEY = [
+  "identity",
+  "rescuer",
+  "metadata",
+  "types",
+] as const;
+
 export function useRoleMetadata(options?: UseRoleMetadataOptions) {
   return useQuery<RoleMetadataOption[], Error>({
     queryKey: ROLE_METADATA_QUERY_KEY,
     queryFn: getRoleMetadata,
+    enabled: options?.enabled ?? true,
+    staleTime: Infinity,
+  });
+}
+
+export function useRescuerTypeMetadata(
+  options?: UseRescuerTypeMetadataOptions,
+) {
+  return useQuery<RescuerTypeMetadataOption[], Error>({
+    queryKey: RESCUER_TYPE_METADATA_QUERY_KEY,
+    queryFn: getRescuerTypeMetadata,
     enabled: options?.enabled ?? true,
     staleTime: Infinity,
   });
@@ -187,7 +211,7 @@ export function useUsersForPermission(params?: GetUsersForPermissionParams) {
   return useQuery<GetUsersForPermissionResponse, Error>({
     queryKey: [...USERS_FOR_PERMISSION_QUERY_KEY, params],
     queryFn: () => getUsersForPermission(params),
-    enabled: !!params?.search?.trim() || !!params?.roleId,
+    enabled: true,
     staleTime: 30_000,
     placeholderData: (prev) => prev,
   });

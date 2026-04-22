@@ -4,12 +4,22 @@ export interface Coordinate {
   longitude: number;
 }
 
+export interface ServiceZoneCounts {
+  pendingSosRequestCount: number;
+  incidentSosRequestCount: number;
+  teamIncidentCount: number;
+  assemblyPointCount: number;
+  depotCount: number;
+}
+
 /** Service zone entity returned from the API */
 export interface ServiceZoneEntity {
   id: number;
   name: string;
   coordinates: Coordinate[];
   isActive: boolean;
+  counts: ServiceZoneCounts;
+  updatedBy?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -1591,7 +1591,10 @@ export default function FundingRequestPage() {
           onValueChange={(val) => updateRow(row.id, field, val)}
         >
           <SelectTrigger
-            className={cn("h-8 text-sm", error && "border-red-400")}
+            className={cn(
+              "h-8 w-full min-w-[180px] text-sm",
+              error && "border-red-400",
+            )}
           >
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
@@ -2086,7 +2089,7 @@ export default function FundingRequestPage() {
                               ))}
                             </div>
                             <p className="mt-2 text-xs text-muted-foreground tracking-tight">
-                              Hai cột thể tích và cân nặng là tùy chọn. Có thể
+                              Hai cột thể tích và khối lượng là tùy chọn. Có thể
                               để trống nếu chưa có dữ liệu.
                             </p>
                           </div>
@@ -2452,11 +2455,8 @@ export default function FundingRequestPage() {
                                   </TableCell>
                                   <TableCell>
                                     <Badge
-                                      className={`${st.className} border gap-1.5 px-2 py-0.5 text-sm`}
+                                      className={`${st.className} border px-2 py-0.5 text-sm font-medium`}
                                     >
-                                      <span
-                                        className={`w-1.5 h-1.5 rounded-full ${st.dotColor}`}
-                                      />
                                       {st.label}
                                     </Badge>
                                   </TableCell>

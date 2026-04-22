@@ -285,10 +285,6 @@ export const AI_PROVIDER_OPTIONS = [
       "Dùng Google AI Studio API key hoặc default Gemini config của server.",
     models: [
       {
-        label: "Gemini 3.1 Pro Preview",
-        code: "gemini-3.1-pro-preview",
-      },
-      {
         label: "Gemini 3.1 Flash Lite Preview",
         code: "gemini-3.1-flash-lite-preview",
       },
@@ -300,10 +296,7 @@ export const AI_PROVIDER_OPTIONS = [
         label: "Gemini 2.5 Flash",
         code: "gemini-2.5-flash",
       },
-      {
-        label: "Gemini 2.5 Pro",
-        code: "gemini-2.5-pro",
-      },
+
       {
         label: "Gemini 2 Flash",
         code: "gemini-2-flash",
@@ -311,14 +304,6 @@ export const AI_PROVIDER_OPTIONS = [
       {
         label: "Gemini 2 Flash Lite",
         code: "gemini-2-flash-lite",
-      },
-      {
-        label: "Gemini 2.5 Flash TTS",
-        code: "gemini-2.5-flash-tts",
-      },
-      {
-        label: "Gemini 2.5 Pro TTS",
-        code: "gemini-2.5-pro-tts",
       },
     ],
   },
@@ -463,7 +448,14 @@ export const timeFrames: Array<"1D" | "1W" | "1M" | "6M" | "1Y" | "ALL"> = [
 
 export const navigationItems = [
   {
-    icon: SquaresFour,
+    icon: ({ className }: { size?: number; className?: string }) => (
+      <IconifyIcon
+        icon="fluent-mdl2:b-i-dashboard"
+        width={20}
+        height={20}
+        className={className}
+      />
+    ),
     label: "Tổng quan",
     href: "/dashboard/admin",
   },
@@ -530,18 +522,6 @@ export const navigationItems = [
         ),
         label: "Cấu hình AI Prompt",
         href: "/dashboard/admin/ai-prompt",
-      },
-      {
-        icon: ({ className }: { size?: number; className?: string }) => (
-          <IconifyIcon
-            icon="proicons:chat"
-            width={20}
-            height={20}
-            className={className}
-          />
-        ),
-        label: "Cấu hình phòng chat",
-        href: "/dashboard/admin/chat-config",
       },
     ],
   },
@@ -720,15 +700,15 @@ export const WINDY_LAYERS: {
   label: string;
   icon: React.ReactNode;
 }[] = [
-  { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
-  { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
-  {
-    id: "rain",
-    label: "Mưa",
-    icon: <Drop className="h-4 w-4" weight="fill" />,
-  },
-  { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
-];
+    { id: "wind", label: "Gió", icon: <Wind className="h-4 w-4" /> },
+    { id: "temp", label: "Nhiệt độ", icon: <Thermometer className="h-4 w-4" /> },
+    {
+      id: "rain",
+      label: "Mưa",
+      icon: <Drop className="h-4 w-4" weight="fill" />,
+    },
+    { id: "clouds", label: "Mây", icon: <Cloud className="h-4 w-4" /> },
+  ];
 
 // ════════════════════════════════
 // Location Details Panel - Status Configs

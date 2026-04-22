@@ -19,7 +19,12 @@ import {
   LocationPanelData,
   Mission,
 } from "@/type";
-import { useSOSRequests } from "@/services/sos_request/hooks";
+import type { MapViewState } from "@/hooks/useMapUrlSync";
+import {
+  useSOSRequests,
+  useSOSRequestsInBounds,
+} from "@/services/sos_request/hooks";
+import type { SOSRequestStatus } from "@/services/sos_request/type";
 import {
   useCreateSOSCluster,
   useClusterRescueSuggestion,
@@ -34,8 +39,10 @@ import type {
 import { useDepots } from "@/services/depot/hooks";
 import { useAssemblyPoints } from "@/services/assembly_points/hooks";
 import { useRescueTeams } from "@/services/rescue_teams/hooks";
+import { useAllServiceZones } from "@/services/map/hooks";
 import type { DepotEntity } from "@/services/depot/type";
 import type { AssemblyPointEntity } from "@/services/assembly_points/type";
+import type { ServiceZoneEntity } from "@/services/map/type";
 import type {
   RescueTeamEntity,
   RescueTeamTypeKey,
@@ -44,6 +51,13 @@ import type { TeamIncidentEntity } from "@/services/team_incidents/type";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { NotificationBell } from "@/components/ui/notification-bell";
 import {
   DropdownMenu,
@@ -58,8 +72,7 @@ import {
   Gear,
   User,
   ArrowsClockwise,
-  WifiHigh,
-  WifiSlash,
+  Broadcast,
   Sun,
   Moon,
   CloudSun,
@@ -68,6 +81,7 @@ import {
   Phone,
   UsersThree,
   ChatCircleDots,
+  Warning,
 } from "@phosphor-icons/react";
 import {
   SOSDetailsPanel,
@@ -85,8 +99,10 @@ import { useThemeStore } from "@/stores/theme.store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMapUrlSync } from "@/hooks/useMapUrlSync";
 import { useOperationalRealtime } from "@/hooks/useOperationalRealtime";
-import { mapSOSRequestEntityToSOS } from "@/lib/sos-request-mapper";
+import { getMapBoundsCacheKey } from "@/lib/coordinator-map-utils";
+import { mapSOSRequestEntitiesToSOS } from "@/lib/sos-request-mapper";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
+import { useSosClusterGroupingConfig } from "@/services/config/hooks";
 
 // ── Lazy-loaded map components ──
 
@@ -134,59 +150,189 @@ function haversine(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/** Group nearby PENDING SOS requests within 10km using Union-Find */
+const AUTO_CLUSTER_MAX_SIZE = 3;
+const AUTO_CLUSTER_RADIUS_STEP_KM = 1;
+const SOS_PRIORITY_ORDER: Record<SOSRequest["priority"], number> = {
+  P1: 0,
+  P2: 1,
+  P3: 2,
+  P4: 3,
+};
+
+function getSortTime(value: Date): number {
+  const timestamp = value.getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function compareSOSIds(leftId: string, rightId: string): number {
+  const leftNumber = Number(leftId);
+  const rightNumber = Number(rightId);
+
+  if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+    return leftNumber - rightNumber;
+  }
+
+  return leftId.localeCompare(rightId);
+}
+
+function compareSOSSeeds(left: SOSRequest, right: SOSRequest): number {
+  const priorityDelta =
+    SOS_PRIORITY_ORDER[left.priority] - SOS_PRIORITY_ORDER[right.priority];
+
+  if (priorityDelta !== 0) {
+    return priorityDelta;
+  }
+
+  const createdAtDelta =
+    getSortTime(left.createdAt) - getSortTime(right.createdAt);
+  if (createdAtDelta !== 0) {
+    return createdAtDelta;
+  }
+
+  return compareSOSIds(left.id, right.id);
+}
+
+function buildRadiusScanSteps(maximumDistanceKm: number): number[] {
+  if (!Number.isFinite(maximumDistanceKm) || maximumDistanceKm <= 0) {
+    return [];
+  }
+
+  const normalizedMaximumDistanceKm = Math.max(maximumDistanceKm, 0);
+  const steps: number[] = [];
+  const wholeKilometers = Math.floor(normalizedMaximumDistanceKm);
+
+  for (
+    let kilometer = AUTO_CLUSTER_RADIUS_STEP_KM;
+    kilometer <= wholeKilometers;
+    kilometer += AUTO_CLUSTER_RADIUS_STEP_KM
+  ) {
+    steps.push(kilometer);
+  }
+
+  if (
+    steps.length === 0 ||
+    steps[steps.length - 1] < normalizedMaximumDistanceKm
+  ) {
+    steps.push(normalizedMaximumDistanceKm);
+  }
+
+  return steps;
+}
+
+type AutoClusterCandidate = {
+  request: SOSRequest;
+  distanceKm: number;
+};
+
+function compareAutoClusterCandidates(
+  left: AutoClusterCandidate,
+  right: AutoClusterCandidate,
+): number {
+  const distanceDelta = left.distanceKm - right.distanceKm;
+  if (distanceDelta !== 0) {
+    return distanceDelta;
+  }
+
+  const priorityDelta =
+    SOS_PRIORITY_ORDER[left.request.priority] -
+    SOS_PRIORITY_ORDER[right.request.priority];
+  if (priorityDelta !== 0) {
+    return priorityDelta;
+  }
+
+  const createdAtDelta =
+    getSortTime(left.request.createdAt) - getSortTime(right.request.createdAt);
+  if (createdAtDelta !== 0) {
+    return createdAtDelta;
+  }
+
+  return compareSOSIds(left.request.id, right.request.id);
+}
+
+/** Build client-side auto-clusters using config-driven incremental radius scans. */
 function buildAutoClusters(
   sosRequests: SOSRequest[],
   backendClusters: SOSClusterEntity[],
+  maximumDistanceKm: number,
 ): SOSRequest[][] {
+  if (!Number.isFinite(maximumDistanceKm) || maximumDistanceKm <= 0) {
+    return [];
+  }
+
   const backendClusteredIds = new Set(
     backendClusters.flatMap((cluster) =>
       cluster.sosRequestIds.map((id) => String(id)),
     ),
   );
-  const pending = sosRequests.filter(
-    (s) =>
-      s.status === "PENDING" &&
-      s.groupId === s.id &&
-      !backendClusteredIds.has(String(s.id)),
-  );
-  const n = pending.length;
-  if (n < 2) return [];
 
-  const parent = Array.from({ length: n }, (_, i) => i);
-  const find = (x: number): number =>
-    parent[x] === x ? x : (parent[x] = find(parent[x]));
-  const union = (a: number, b: number) => {
-    parent[find(a)] = find(b);
-  };
+  const pending = sosRequests
+    .filter(
+      (s) =>
+        s.status === "PENDING" &&
+        s.groupId === s.id &&
+        !backendClusteredIds.has(String(s.id)) &&
+        Number.isFinite(s.location.lat) &&
+        Number.isFinite(s.location.lng),
+    )
+    .sort(compareSOSSeeds);
 
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const d = haversine(
-        pending[i].location.lat,
-        pending[i].location.lng,
-        pending[j].location.lat,
-        pending[j].location.lng,
-      );
-      if (d <= 10) union(i, j);
+  const radiusSteps = buildRadiusScanSteps(maximumDistanceKm);
+  if (radiusSteps.length === 0) return [];
+
+  const clusteredIds = new Set<string>();
+  const clusters: SOSRequest[][] = [];
+
+  for (const seed of pending) {
+    if (clusteredIds.has(seed.id)) {
+      continue;
     }
+
+    let selectedNeighbors: AutoClusterCandidate[] = [];
+    let hasFoundNeighbor = false;
+
+    for (const radiusKm of radiusSteps) {
+      const neighborsWithinRadius = pending
+        .filter(
+          (candidate) =>
+            candidate.id !== seed.id && !clusteredIds.has(candidate.id),
+        )
+        .map((candidate) => ({
+          request: candidate,
+          distanceKm: haversine(
+            seed.location.lat,
+            seed.location.lng,
+            candidate.location.lat,
+            candidate.location.lng,
+          ),
+        }))
+        .filter((candidate) => candidate.distanceKm <= radiusKm)
+        .sort(compareAutoClusterCandidates)
+        .slice(0, AUTO_CLUSTER_MAX_SIZE - 1);
+
+      if (neighborsWithinRadius.length > 0) {
+        hasFoundNeighbor = true;
+        selectedNeighbors = neighborsWithinRadius;
+      }
+
+      if (
+        hasFoundNeighbor &&
+        selectedNeighbors.length >= AUTO_CLUSTER_MAX_SIZE - 1
+      ) {
+        break;
+      }
+    }
+
+    const cluster = hasFoundNeighbor
+      ? [seed, ...selectedNeighbors.map((candidate) => candidate.request)]
+      : [seed];
+
+    cluster.forEach((request) => {
+      clusteredIds.add(request.id);
+    });
+    clusters.push(cluster);
   }
 
-  const groups = new Map<number, SOSRequest[]>();
-  for (let i = 0; i < n; i++) {
-    const root = find(i);
-    if (!groups.has(root)) groups.set(root, []);
-    groups.get(root)!.push(pending[i]);
-  }
-
-  const priorityOrder = { P1: 0, P2: 1, P3: 2, P4: 3 };
-  return Array.from(groups.values())
-    .filter((g) => g.length >= 2)
-    .sort(
-      (a, b) =>
-        Math.min(...a.map((s) => priorityOrder[s.priority])) -
-        Math.min(...b.map((s) => priorityOrder[s.priority])),
-    );
+  return clusters;
 }
 
 /** Get SOS requests belonging to a specific cluster */
@@ -200,6 +346,11 @@ function getClusterSOSRequests(
   if (!cluster) return [];
   const idSet = new Set(cluster.sosRequestIds.map(String));
   return sosRequests.filter((s) => idSet.has(s.id));
+}
+
+function isClusterMissionLocked(cluster?: SOSClusterEntity | null): boolean {
+  const status = String(cluster?.status ?? "").toLowerCase();
+  return status === "inprogress" || status === "completed";
 }
 
 function mapTeamTypeToRescuerType(
@@ -255,6 +406,8 @@ function mapRescueTeamToRescuer(
   };
 }
 
+const SIDEBAR_SOS_PAGE_SIZE = 8;
+
 // ── Main Dashboard Content ──
 
 const CoordinatorDashboardContent = () => {
@@ -280,6 +433,15 @@ const CoordinatorDashboardContent = () => {
   const [flyToLocation, setFlyToLocation] = useState<Location | null>(null);
   const [flyToZoom, setFlyToZoom] = useState<number | undefined>(undefined);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
+  const [mapViewState, setMapViewState] = useState<MapViewState | null>(null);
+  const [mapFetchBounds, setMapFetchBounds] = useState<
+    MapViewState["bounds"] | null
+  >(null);
+  const [risingSOSMarkerIds, setRisingSOSMarkerIds] = useState<string[]>([]);
+  const [selectedSOSStatuses, setSelectedSOSStatuses] = useState<
+    SOSRequestStatus[]
+  >([]);
+  const [sidebarSOSPage, setSidebarSOSPage] = useState(1);
   /** Decoded route coords [lat,lng][] drawn on map from ActivityRoutePreview */
   const [routeOverlay, setRouteOverlay] = useState<[number, number][]>([]);
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
@@ -292,8 +454,11 @@ const CoordinatorDashboardContent = () => {
   const [rescuePlanDefaultTab, setRescuePlanDefaultTab] = useState<
     "plan" | "missions" | undefined
   >(undefined);
+  const [rescuePlanPreferSplitSuggestion, setRescuePlanPreferSplitSuggestion] =
+    useState(false);
   const [rescueSuggestion, setRescueSuggestion] =
     useState<ClusterRescueSuggestionResponse | null>(null);
+  const [mixedWarningDialogOpen, setMixedWarningDialogOpen] = useState(false);
   const [activeClusterId, setActiveClusterId] = useState<number | null>(null);
   // Cache of rescue suggestions per cluster ID
   const suggestionCacheRef = useRef<
@@ -320,15 +485,60 @@ const CoordinatorDashboardContent = () => {
   const [analyzingClusterId, setAnalyzingClusterId] = useState<number | null>(
     null,
   );
+  const [recentlyClusteredSOSIds, setRecentlyClusteredSOSIds] = useState<
+    Set<string>
+  >(() => new Set());
 
   // ─── Refs ───
   const sidebarBeforeRescuePlanRef = useRef(true);
   const lastAppliedSelectionSignatureRef = useRef<string | null>(null);
+  const previousMapSosIdsRef = useRef<Set<string> | null>(null);
+  const risingMarkerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  const markSOSRequestsAsClustered = useCallback(
+    (sosRequestIds: Array<number | string>) => {
+      if (sosRequestIds.length === 0) {
+        return;
+      }
+
+      setRecentlyClusteredSOSIds((current) => {
+        const next = new Set(current);
+        sosRequestIds.forEach((id) => {
+          next.add(String(id));
+        });
+        return next;
+      });
+    },
+    [],
+  );
+
+  const statusQueryFilter = useMemo(
+    () => (selectedSOSStatuses.length > 0 ? selectedSOSStatuses : undefined),
+    [selectedSOSStatuses],
+  );
 
   // ─── Data Fetching ───
-  const { data: sosData } = useSOSRequests({
-    // Keep enough rows in-memory so cluster cards can resolve sosRequestIds.
-    params: { pageSize: 1000 },
+  const { data: sidebarSosData, isLoading: isSidebarSosLoading } =
+    useSOSRequests({
+      params: {
+        pageNumber: sidebarSOSPage,
+        pageSize: SIDEBAR_SOS_PAGE_SIZE,
+        Statuses: statusQueryFilter,
+      },
+    });
+  const { data: mapSosData } = useSOSRequestsInBounds({
+    params: mapFetchBounds
+      ? {
+          MinLat: mapFetchBounds.south,
+          MaxLat: mapFetchBounds.north,
+          MinLng: mapFetchBounds.west,
+          MaxLng: mapFetchBounds.east,
+          Statuses: statusQueryFilter,
+        }
+      : undefined,
+    enabled: !isWeatherMode && !!mapFetchBounds,
   });
   const { data: depotsData } = useDepots({ params: { pageSize: 100 } });
   const { data: assemblyPointsData } = useAssemblyPoints({
@@ -339,11 +549,92 @@ const CoordinatorDashboardContent = () => {
     params: { pageSize: 200 },
   });
   const { data: clustersData } = useSOSClusters();
+  const sosClusterGroupingConfigQuery = useSosClusterGroupingConfig();
+  const { data: serviceZonesData } = useAllServiceZones({
+    enabled: !isWeatherMode,
+    staleTime: 5 * 60_000,
+  });
 
   const sosRequests = useMemo(
-    () => sosData?.items?.map(mapSOSRequestEntityToSOS) ?? [],
-    [sosData],
+    () => mapSOSRequestEntitiesToSOS(mapSosData ?? []),
+    [mapSosData],
   );
+
+  useEffect(() => {
+    const nextIds = new Set(sosRequests.map((sos) => sos.id));
+
+    if (!previousMapSosIdsRef.current) {
+      previousMapSosIdsRef.current = nextIds;
+      return;
+    }
+
+    const previousIds = previousMapSosIdsRef.current;
+    previousMapSosIdsRef.current = nextIds;
+
+    if (nextIds.size === 0) {
+      setRisingSOSMarkerIds([]);
+      return;
+    }
+
+    const enteringIds: string[] = [];
+    nextIds.forEach((id) => {
+      if (!previousIds.has(id)) {
+        enteringIds.push(id);
+      }
+    });
+
+    if (enteringIds.length === 0) {
+      return;
+    }
+
+    setRisingSOSMarkerIds(enteringIds);
+
+    if (risingMarkerTimeoutRef.current) {
+      clearTimeout(risingMarkerTimeoutRef.current);
+    }
+
+    risingMarkerTimeoutRef.current = setTimeout(() => {
+      setRisingSOSMarkerIds([]);
+      risingMarkerTimeoutRef.current = null;
+    }, 380);
+  }, [sosRequests]);
+
+  useEffect(
+    () => () => {
+      if (risingMarkerTimeoutRef.current) {
+        clearTimeout(risingMarkerTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  const sidebarSOSRequests = useMemo(
+    () => mapSOSRequestEntitiesToSOS(sidebarSosData?.items ?? []),
+    [sidebarSosData],
+  );
+
+  useEffect(() => {
+    if (!selectedSOS) {
+      return;
+    }
+
+    if (selectedSOSStatuses.length === 0) {
+      return;
+    }
+
+    const matchesStatus =
+      selectedSOS.rawStatus != null &&
+      selectedSOSStatuses.includes(selectedSOS.rawStatus);
+
+    if (!matchesStatus) {
+      setSelectedSOS(null);
+      setSOSDetailOpen(false);
+    }
+  }, [selectedSOS, selectedSOSStatuses]);
+
+  useEffect(() => {
+    setSidebarSOSPage(1);
+  }, [selectedSOSStatuses]);
   const depots = useMemo<DepotEntity[]>(
     () => depotsData?.items ?? [],
     [depotsData],
@@ -371,6 +662,39 @@ const CoordinatorDashboardContent = () => {
   const clusters = useMemo<SOSClusterEntity[]>(
     () => clustersData?.clusters ?? [],
     [clustersData],
+  );
+  useEffect(() => {
+    if (recentlyClusteredSOSIds.size === 0) {
+      return;
+    }
+
+    const backendClusteredIds = new Set(
+      clusters.flatMap((cluster) =>
+        cluster.sosRequestIds.map((id) => String(id)),
+      ),
+    );
+
+    if (backendClusteredIds.size === 0) {
+      return;
+    }
+
+    setRecentlyClusteredSOSIds((current) => {
+      let changed = false;
+      const next = new Set(current);
+
+      current.forEach((id) => {
+        if (backendClusteredIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
+  }, [clusters, recentlyClusteredSOSIds.size]);
+  const serviceZones = useMemo<ServiceZoneEntity[]>(
+    () => serviceZonesData ?? [],
+    [serviceZonesData],
   );
   const activeRealtimeDepotId = useMemo(() => {
     if (!locationPanelOpen || locationPanelData?.type !== "depot") {
@@ -409,17 +733,64 @@ const CoordinatorDashboardContent = () => {
   const isReconnecting = operationalConnectionState === "reconnecting";
   const isConnectingLike = isConnecting || isReconnecting;
   const connectionLabel = isConnected
-    ? "Đang kết nối"
+    ? "Realtime đang hoạt động"
     : isConnecting
       ? "Đang kết nối realtime"
       : isReconnecting
-      ? "Đang kết nối lại"
-      : "Mất kết nối";
+        ? "Đang kết nối lại realtime"
+        : "Realtime tạm ngắt";
+  const clusterGroupingStatus = sosClusterGroupingConfigQuery.status;
+  const maximumAutoClusterDistanceKm =
+    sosClusterGroupingConfigQuery.data?.maximumDistanceKm ?? 0;
 
   const autoClusters = useMemo(
-    () => buildAutoClusters(sosRequests, clusters),
-    [sosRequests, clusters],
+    () => {
+      if (clusterGroupingStatus !== "success") {
+        return [];
+      }
+
+      const clusterableSOSRequests =
+        recentlyClusteredSOSIds.size === 0
+          ? sosRequests
+          : sosRequests.filter((sos) => !recentlyClusteredSOSIds.has(sos.id));
+
+      return buildAutoClusters(
+        clusterableSOSRequests,
+        clusters,
+        maximumAutoClusterDistanceKm,
+      );
+    },
+    [
+      clusterGroupingStatus,
+      clusters,
+      maximumAutoClusterDistanceKm,
+      recentlyClusteredSOSIds,
+      sosRequests,
+    ],
   );
+
+  useEffect(() => {
+    if (isWeatherMode) {
+      return;
+    }
+
+    const visibleBounds = mapViewState?.bounds;
+    if (!visibleBounds) {
+      return;
+    }
+
+    setMapFetchBounds((currentBounds) => {
+      if (
+        currentBounds &&
+        getMapBoundsCacheKey(currentBounds) ===
+          getMapBoundsCacheKey(visibleBounds)
+      ) {
+        return currentBounds;
+      }
+
+      return visibleBounds;
+    });
+  }, [isWeatherMode, mapViewState]);
 
   // ─── Auth ───
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
@@ -468,33 +839,26 @@ const CoordinatorDashboardContent = () => {
   }, []);
 
   useEffect(() => {
-    if (!selectedRescuer) return;
-
-    const nextSelected = rescuers.find(
-      (rescuer) => rescuer.id === selectedRescuer.id,
-    );
-    if (nextSelected) {
-      setSelectedRescuer(nextSelected);
-      return;
-    }
-
-    setSelectedRescuer(null);
-  }, [rescuers, selectedRescuer]);
+    setSelectedRescuer((prev) => {
+      if (!prev) return prev;
+      const nextSelected = rescuers.find(
+        (rescuer) => rescuer.id === prev.id,
+      );
+      return nextSelected ?? null;
+    });
+  }, [rescuers]);
 
   useEffect(() => {
-    if (!selectedTeamIncident) return;
-
-    const nextSelected = teamIncidents.find(
-      (incident) => incident.incidentId === selectedTeamIncident.incidentId,
-    );
-    if (nextSelected) {
-      setSelectedTeamIncident(nextSelected);
-      return;
-    }
-
-    setSelectedTeamIncident(null);
-    setTeamIncidentDetailOpen(false);
-  }, [teamIncidents, selectedTeamIncident]);
+    setSelectedTeamIncident((prev) => {
+      if (!prev) return prev;
+      const nextSelected = teamIncidents.find(
+        (incident) => incident.incidentId === prev.incidentId,
+      );
+      if (nextSelected) return nextSelected;
+      setTeamIncidentDetailOpen(false);
+      return null;
+    });
+  }, [teamIncidents]);
 
   // ─── Sidebar auto-collapse when RescuePlanPanel opens ───
   useEffect(() => {
@@ -562,6 +926,7 @@ const CoordinatorDashboardContent = () => {
           const cachedSuggestion = suggestionCacheRef.current.get(cluster.id);
           setRescueSuggestion(cachedSuggestion ?? null);
           setRescuePlanDefaultTab(planTab);
+          setRescuePlanPreferSplitSuggestion(false);
           setRescuePlanOpen(true);
           setSOSDetailOpen(false);
           setLocationPanelOpen(false);
@@ -667,10 +1032,53 @@ const CoordinatorDashboardContent = () => {
   const handleRescuePlanOpenChange = useCallback(
     (nextOpen: boolean) => {
       setRescuePlanOpen(nextOpen);
+      if (!nextOpen) {
+        setRescuePlanPreferSplitSuggestion(false);
+      }
       syncRescuePlanUrlState(nextOpen, activeClusterId, rescuePlanDefaultTab);
     },
     [activeClusterId, rescuePlanDefaultTab, syncRescuePlanUrlState],
   );
+
+  const openRescuePlanFromAiResult = useCallback(
+    (preferSplit: boolean) => {
+      const targetClusterId = activeClusterId ?? aiStreamClusterId;
+      if (!targetClusterId) {
+        return;
+      }
+      const latestSuggestion = aiStream.result ?? rescueSuggestion;
+
+      setMixedWarningDialogOpen(false);
+      setAiStreamOpen(false);
+      if (latestSuggestion) {
+        setRescueSuggestion(latestSuggestion);
+        suggestionCacheRef.current.set(targetClusterId, latestSuggestion);
+      }
+      setRescuePlanDefaultTab("plan");
+      setRescuePlanPreferSplitSuggestion(preferSplit);
+      setRescuePlanOpen(true);
+      syncRescuePlanUrlState(true, targetClusterId, "plan");
+    },
+    [
+      activeClusterId,
+      aiStream.result,
+      aiStreamClusterId,
+      rescueSuggestion,
+      syncRescuePlanUrlState,
+    ],
+  );
+
+  const handleAiStreamPrimaryAction = useCallback(() => {
+    const mixedWarningMessage =
+      aiStream.result?.mixedRescueReliefWarning?.trim() ?? "";
+
+    if (mixedWarningMessage) {
+      setMixedWarningDialogOpen(true);
+      return;
+    }
+
+    openRescuePlanFromAiResult(false);
+  }, [aiStream.result?.mixedRescueReliefWarning, openRescuePlanFromAiResult]);
 
   const handleSOSSelect = useCallback(
     (sos: SOSRequest) => {
@@ -766,6 +1174,7 @@ const CoordinatorDashboardContent = () => {
       const cached = suggestionCacheRef.current.get(clusterId);
       setRescueSuggestion(cached ?? null);
       setRescuePlanDefaultTab(undefined);
+      setRescuePlanPreferSplitSuggestion(false);
       setRescuePlanOpen(true);
       syncRescuePlanUrlState(true, clusterId);
       setSOSDetailOpen(false);
@@ -776,22 +1185,31 @@ const CoordinatorDashboardContent = () => {
 
   const handleClusterOnly = useCallback(
     (clusterGroups: SOSRequest[][]) => {
+      const validClusterGroups = clusterGroups
+        .map((group) =>
+          group
+            .filter((s) => s.status === "PENDING")
+            .map((s) => Number(s.id))
+            .filter(Boolean),
+        )
+        .filter((ids) => ids.length > 0);
+
+      if (validClusterGroups.length === 0) {
+        toast.error("Không còn SOS chờ xử lý để gom cụm.");
+        return;
+      }
+
       let created = 0;
       let failed = 0;
-      const total = clusterGroups.length;
+      const total = validClusterGroups.length;
 
-      clusterGroups.forEach((group) => {
-        const ids = group
-          .filter((s) => s.status === "PENDING")
-          .map((s) => Number(s.id))
-          .filter(Boolean);
-        if (ids.length < 2) return;
-
+      validClusterGroups.forEach((ids) => {
         createCluster(
           { sosRequestIds: ids },
           {
             onSuccess: (data) => {
               created++;
+              markSOSRequestsAsClustered(data.sosRequestIds);
               setActiveClusterId(data.clusterId);
               if (created + failed === total) {
                 toast.success(`Đã gom thành công ${created} cụm SOS`);
@@ -814,7 +1232,7 @@ const CoordinatorDashboardContent = () => {
         );
       });
     },
-    [createCluster],
+    [createCluster, markSOSRequestsAsClustered],
   );
 
   const handleProcessSOS = useCallback(
@@ -839,9 +1257,11 @@ const CoordinatorDashboardContent = () => {
         { sosRequestIds: ids },
         {
           onSuccess: (clusterData) => {
+            markSOSRequestsAsClustered(clusterData.sosRequestIds);
             setActiveClusterId(clusterData.clusterId);
             setAnalyzingClusterId(clusterData.clusterId);
             setAiStreamClusterId(clusterData.clusterId);
+            setRescuePlanPreferSplitSuggestion(false);
             setAiStreamOpen(true);
             aiStream.startStream(clusterData.clusterId);
             setProcessingClusterIndex(null);
@@ -856,18 +1276,33 @@ const CoordinatorDashboardContent = () => {
         },
       );
     },
-    [sosRequests, autoClusters, createCluster, aiStream],
+    [
+      sosRequests,
+      autoClusters,
+      createCluster,
+      aiStream,
+      markSOSRequestsAsClustered,
+    ],
   );
 
   const handleAnalyzeCluster = useCallback(
     (clusterId: number) => {
+      const cluster = clusters.find((item) => item.id === clusterId);
+      if (isClusterMissionLocked(cluster)) {
+        toast.info(
+          "Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.",
+        );
+        return;
+      }
+
       setAnalyzingClusterId(clusterId);
       setActiveClusterId(clusterId);
       setAiStreamClusterId(clusterId);
+      setRescuePlanPreferSplitSuggestion(false);
       setAiStreamOpen(true);
       aiStream.startStream(clusterId);
     },
-    [aiStream],
+    [aiStream, clusters],
   );
 
   // When stream produces a result, cache it and update sidebar state
@@ -898,12 +1333,21 @@ const CoordinatorDashboardContent = () => {
     setSOSDetailOpen(false);
     setSelectedSOS(null);
     setRescueSuggestion(null);
+    setRescuePlanPreferSplitSuggestion(false);
     setActiveClusterId(null);
     clearSelection();
   }, [clearSelection]);
 
   const handleOpenManualMission = useCallback(
     (clusterId: number) => {
+      const cluster = clusters.find((item) => item.id === clusterId);
+      if (isClusterMissionLocked(cluster)) {
+        toast.info(
+          "Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.",
+        );
+        return;
+      }
+
       setManualMissionClusterId(clusterId);
       setExistingMissionId(null);
       setManualMissionOpen(true);
@@ -912,7 +1356,7 @@ const CoordinatorDashboardContent = () => {
       syncRescuePlanUrlState(false, activeClusterId);
       setLocationPanelOpen(false);
     },
-    [activeClusterId, syncRescuePlanUrlState],
+    [activeClusterId, clusters, syncRescuePlanUrlState],
   );
 
   const handleViewMission = useCallback(
@@ -936,14 +1380,31 @@ const CoordinatorDashboardContent = () => {
 
   const handleReAnalyze = useCallback(() => {
     if (!activeClusterId) return;
+    const cluster = clusters.find((item) => item.id === activeClusterId);
+    if (isClusterMissionLocked(cluster)) {
+      toast.info("Cụm này đã có nhiệm vụ đang thực hiện hoặc đã hoàn thành.");
+      return;
+    }
+
     setAiStreamClusterId(activeClusterId);
     setAiStreamOpen(true);
     setRescuePlanOpen(false);
+    setRescuePlanPreferSplitSuggestion(false);
     syncRescuePlanUrlState(false, activeClusterId);
     aiStream.startStream(activeClusterId);
-  }, [activeClusterId, aiStream, syncRescuePlanUrlState]);
+  }, [activeClusterId, aiStream, clusters, syncRescuePlanUrlState]);
 
   // ─── Derived data for panels ───
+
+  const activeRescuePlanCluster = useMemo(
+    () =>
+      activeClusterId
+        ? (clusters.find((cluster) => cluster.id === activeClusterId) ?? null)
+        : null,
+    [activeClusterId, clusters],
+  );
+  const isActiveRescuePlanClusterLocked =
+    isClusterMissionLocked(activeRescuePlanCluster);
 
   const rescuePlanSOSRequests = useMemo(
     () => getClusterSOSRequests(activeClusterId, sosRequests, clusters),
@@ -973,12 +1434,32 @@ const CoordinatorDashboardContent = () => {
   );
 
   useEffect(() => {
-    document.body.classList.add("coordinator-dashboard-readable");
+    document.documentElement.classList.add(
+      "coordinator-dashboard-viewport-lock",
+    );
+    document.body.classList.add(
+      "coordinator-dashboard-readable",
+      "coordinator-dashboard-viewport-lock",
+    );
 
     return () => {
-      document.body.classList.remove("coordinator-dashboard-readable");
+      document.documentElement.classList.remove(
+        "coordinator-dashboard-viewport-lock",
+      );
+      document.body.classList.remove(
+        "coordinator-dashboard-readable",
+        "coordinator-dashboard-viewport-lock",
+      );
     };
   }, []);
+
+  const handleCoordinatorMapViewChange = useCallback(
+    (view: MapViewState) => {
+      handleMapViewChange(view);
+      setMapViewState(view);
+    },
+    [handleMapViewChange],
+  );
 
   // ── Render ──
 
@@ -986,7 +1467,7 @@ const CoordinatorDashboardContent = () => {
     <div
       data-coordinator-dashboard-root
       className={cn(
-        "coordinator-dashboard h-screen flex flex-col overflow-hidden",
+        "coordinator-dashboard fixed inset-0 flex min-h-0 flex-col overflow-hidden bg-background",
         isDarkMode && "dark",
       )}
     >
@@ -1086,11 +1567,11 @@ const CoordinatorDashboardContent = () => {
               <span className="absolute -top-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white/70 bg-red-500 dark:border-zinc-900/70" />
             )}
             {isConnected ? (
-              <WifiHigh className="h-4 w-4" weight="bold" />
+              <Broadcast className="h-4 w-4" weight="fill" />
             ) : isConnectingLike ? (
               <ArrowsClockwise className="h-4 w-4 animate-spin" weight="bold" />
             ) : (
-              <WifiSlash className="h-4 w-4" weight="bold" />
+              <Broadcast className="h-4 w-4" weight="bold" />
             )}
             <span className="sr-only">{connectionLabel}</span>
           </div>
@@ -1178,17 +1659,25 @@ const CoordinatorDashboardContent = () => {
       </header>
 
       {/* ━━━ Main Content ━━━ */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside
           className={cn(
-            "shrink-0 transition-all duration-300 ease-in-out overflow-hidden",
+            "h-full min-h-0 shrink-0 overflow-hidden transition-all duration-300 ease-in-out",
             sidebarOpen ? "w-88" : "w-0",
           )}
         >
           {sidebarOpen && (
             <SOSSidebar
               sosRequests={sosRequests}
+              incomingRequests={sidebarSOSRequests}
+              incomingPagination={{
+                page: sidebarSosData?.pageNumber ?? sidebarSOSPage,
+                pageSize: sidebarSosData?.pageSize ?? SIDEBAR_SOS_PAGE_SIZE,
+                totalCount: sidebarSosData?.totalCount ?? 0,
+                onPageChange: setSidebarSOSPage,
+              }}
+              isIncomingRequestsLoading={isSidebarSosLoading}
               rescuers={rescuers}
               teamIncidents={teamIncidents}
               missions={sidebarMissions}
@@ -1211,12 +1700,14 @@ const CoordinatorDashboardContent = () => {
               onManualMission={handleOpenManualMission}
               onViewClusterPlan={handleViewClusterPlan}
               onViewMission={handleViewMission}
+              selectedStatuses={selectedSOSStatuses}
+              onSelectedStatusesChange={setSelectedSOSStatuses}
             />
           )}
         </aside>
 
         {/* Map Container */}
-        <main className="flex-1 relative overflow-hidden">
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
           {isWeatherMode ? (
             <WindyLeafletMap
               sosRequests={sosRequests}
@@ -1238,6 +1729,7 @@ const CoordinatorDashboardContent = () => {
                 selectedTeamIncident={selectedTeamIncident}
                 depots={depots}
                 assemblyPoints={assemblyPoints}
+                serviceZones={serviceZones}
                 clusters={clusters}
                 autoClusters={autoClusters}
                 selectedSOS={selectedSOS}
@@ -1253,8 +1745,9 @@ const CoordinatorDashboardContent = () => {
                 flyToZoom={flyToZoom}
                 userLocation={userLocation}
                 panelOpen={aiStreamOpen}
-                onViewChange={handleMapViewChange}
+                onViewChange={handleCoordinatorMapViewChange}
                 routeOverlay={routeOverlay}
+                risingSOSMarkerIds={risingSOSMarkerIds}
               />
 
               {/* Floating Action Buttons */}
@@ -1302,17 +1795,23 @@ const CoordinatorDashboardContent = () => {
                 clusterSOSRequests={rescuePlanSOSRequests}
                 clusterId={activeClusterId}
                 rescueSuggestion={rescueSuggestion}
+                preferSplitSuggestion={rescuePlanPreferSplitSuggestion}
                 onApprove={handleApproveDecision}
                 onReAnalyze={handleReAnalyze}
                 isReAnalyzing={isFetchingSuggestion || aiStream.loading}
                 onShowRoute={setRouteOverlay}
                 defaultTab={rescuePlanDefaultTab}
+                readOnly={isActiveRescuePlanClusterLocked}
               />
 
               {/* AI Stream Panel */}
               <AiStreamPanel
                 open={aiStreamOpen}
                 onClose={() => {
+                  if (aiStream.loading) {
+                    return;
+                  }
+
                   setAiStreamOpen(false);
                   aiStream.stopStream();
                 }}
@@ -1330,17 +1829,37 @@ const CoordinatorDashboardContent = () => {
                     aiStream.startStream(aiStreamClusterId);
                   }
                 }}
-                onViewPlan={() => {
-                  setAiStreamOpen(false);
-                  setRescuePlanDefaultTab("plan");
-                  setRescuePlanOpen(true);
-                  syncRescuePlanUrlState(
-                    true,
-                    activeClusterId ?? aiStreamClusterId,
-                    "plan",
-                  );
-                }}
+                onViewPlan={() => openRescuePlanFromAiResult(false)}
+                onPrimaryAction={handleAiStreamPrimaryAction}
               />
+
+              <Dialog
+                open={mixedWarningDialogOpen}
+                onOpenChange={setMixedWarningDialogOpen}
+              >
+                <DialogContent className="sm:max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Warning
+                        className="h-5 w-5 text-rose-500"
+                        weight="fill"
+                      />
+                      Cảnh báo gộp cứu hộ và cứu trợ
+                    </DialogTitle>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => openRescuePlanFromAiResult(true)}
+                    >
+                      Tách thành nhiệm vụ riêng
+                    </Button>
+                    <Button onClick={() => openRescuePlanFromAiResult(false)}>
+                      Tiếp tục chỉnh sửa nhiệm vụ
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               {/* Location Details Panel */}
               <LocationDetailsPanel
@@ -1373,7 +1892,7 @@ const CoordinatorDashboardPage = () => {
   return (
     <Suspense
       fallback={
-        <div className="h-screen flex flex-col overflow-hidden animate-in fade-in duration-300">
+        <div className="fixed inset-0 flex min-h-0 flex-col overflow-hidden bg-background animate-in fade-in duration-300">
           {/* Header Skeleton */}
           <header className="h-14 border-b bg-background flex items-center justify-between px-4 shrink-0">
             <div className="flex items-center gap-4">
@@ -1390,8 +1909,8 @@ const CoordinatorDashboardPage = () => {
             </div>
           </header>
           {/* Body Skeleton */}
-          <div className="flex-1 flex overflow-hidden">
-            <aside className="w-88 shrink-0 border-r bg-background p-4 space-y-4">
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <aside className="w-88 h-full min-h-0 shrink-0 border-r bg-background p-4 space-y-4">
               <Skeleton className="h-10 w-full rounded-lg" />
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -1406,7 +1925,7 @@ const CoordinatorDashboardPage = () => {
                 ))}
               </div>
             </aside>
-            <main className="flex-1 relative">
+            <main className="relative min-h-0 min-w-0 flex-1">
               <Skeleton className="w-full h-full rounded-none" />
             </main>
           </div>

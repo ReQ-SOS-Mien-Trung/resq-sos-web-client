@@ -568,15 +568,28 @@ export interface ReturnReusableUnit {
   note: string | null;
 }
 
+export interface PickupLotAllocation {
+  lotId: number;
+  quantityTaken: number;
+  receivedDate?: string | null;
+  expiredDate?: string | null;
+  remainingQuantityAfterExecution?: number | null;
+}
+
 export interface UpcomingReturnItem {
   itemId: number;
+  itemModelId?: number | null;
   itemName: string;
   imageUrl: string | null;
   quantity: number;
   unit: string;
   actualReturnedQuantity: number;
+  expiredDate?: string | null;
   expectedReturnUnits: ReturnReusableUnit[];
   returnedReusableUnits: ReturnReusableUnit[];
+  expectedReturnLotAllocations?: PickupLotAllocation[];
+  returnedLotAllocations?: PickupLotAllocation[];
+  pickupLotAllocations?: PickupLotAllocation[];
 }
 
 interface ReturnActivityEntityBase {
@@ -768,6 +781,7 @@ export interface GetLowStockResponse {
 export interface GetLowStockParams {
   depotId: number;
   warningLevel?: LowStockLevel;
+  categoryCode?: string[];
   pageNumber?: number;
   pageSize?: number;
   // Legacy filter name kept during backend rollout.
@@ -791,3 +805,104 @@ export interface UpdateSupplyRequestPriorityConfigPayload {
 }
 
 export type SupplyRequestPriorityLevel = InventoryCategory;
+
+// ─── Disposal / Decommission ───
+
+export interface ExpiringLotItem {
+  lotId: number;
+  itemModelId: number;
+  itemModelName: string;
+  remainingQuantity: number;
+  expiredDate: string;
+  receivedDate: string;
+  sourceType: string;
+  isExpired: boolean;
+}
+
+export interface GetExpiringLotsParams {
+  depotId: number;
+  daysAhead?: number;
+}
+
+export type GetExpiringLotsResponse = ExpiringLotItem[];
+
+export interface DisposeLotPayload {
+  lotId: number;
+  quantity: number;
+  reason: string;
+  note?: string;
+}
+
+export interface DisposeLotParams {
+  depotId: number;
+  lotId: number;
+  payload: DisposeLotPayload;
+}
+
+export interface DisposeLotResponse {
+  message: string;
+}
+
+export interface DecommissionReusablePayload {
+  note: string;
+}
+
+export interface DecommissionReusableParams {
+  depotId: number;
+  itemId: number;
+  payload: DecommissionReusablePayload;
+}
+
+export interface DecommissionReusableResponse {
+  message: string;
+}
+
+export type ReusableItemStatus = InventoryCategory;
+
+export interface SearchDepotReusableUnitsParams {
+  depotId: number;
+  itemModelId: number;
+  serialNumber?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface DepotReusableUnitSearchItem {
+  itemId: number;
+  itemModelId: number;
+  itemModelName: string;
+  imageUrl?: string | null;
+  categoryId: number;
+  categoryName: string;
+  serialNumber: string;
+  status: string;
+  condition: string;
+  note?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SearchDepotReusableUnitsResponse {
+  items: DepotReusableUnitSearchItem[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export interface UpdateReusableStatusPayload {
+  note: string;
+  condition?: string;
+}
+
+export interface UpdateReusableStatusParams {
+  depotId: number;
+  itemId: number;
+  payload: UpdateReusableStatusPayload;
+}
+
+export interface UpdateReusableStatusResponse {
+  message?: string;
+}

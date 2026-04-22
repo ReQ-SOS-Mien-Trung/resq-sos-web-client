@@ -191,7 +191,7 @@ function MemberCard({
   canRemove: boolean;
 }) {
   const initials =
-    `${member.firstName?.[0] || ""}${member.lastName?.[0] || ""}`.toUpperCase() ||
+    `${member.lastName?.[0] || ""}${member.firstName?.[0] || ""}`.toUpperCase() ||
     "?";
   const status = memberStatusMap[member.status] || {
     label: member.status,
@@ -200,7 +200,7 @@ function MemberCard({
   const rescuerTypeBadge =
     member.rescuerType === "Core"
       ? {
-          label: "Nhân viên cố định",
+          label: "Nhân viên nòng cốt",
           className: "border-sky-500 bg-sky-100 text-sky-900",
         }
       : {
@@ -223,7 +223,7 @@ function MemberCard({
             <div className="flex flex-wrap items-center gap-1.5 justify-between">
               <div className="flex flex-wrap items-center gap-1.5">
                 <p className="text-sm font-semibold truncate">
-                  {member.firstName} {member.lastName}
+                  {member.lastName} {member.firstName}
                 </p>
                 {member.isLeader && (
                   <Badge className="h-5 rounded-none bg-[#FF5722] px-1.5 text-[10px] text-white hover:bg-[#e64a19]">
@@ -406,7 +406,7 @@ export default function RescueTeamDetailPage() {
     if (!memberPendingRemove) return;
 
     const member = memberPendingRemove;
-    const memberName = `${member.firstName} ${member.lastName}`.trim();
+    const memberName = `${member.lastName} ${member.firstName}`.trim();
     setRemovingUserId(member.userId);
     removeMember(
       {
@@ -673,7 +673,7 @@ export default function RescueTeamDetailPage() {
                         ) : (
                           availableRescuers.map((rescuer) => (
                             <SelectItem key={rescuer.id} value={rescuer.id}>
-                              {rescuer.firstName} {rescuer.lastName}
+                              {rescuer.lastName} {rescuer.firstName}
                             </SelectItem>
                           ))
                         )}
@@ -713,8 +713,8 @@ export default function RescueTeamDetailPage() {
                   {selectedCandidate ? (
                     <div className="border border-[#FF5722]/30 bg-[#FFF8F4] px-3 py-2 text-sm text-black/80">
                       <span className="font-semibold text-black">
-                        Đã chọn: {selectedCandidate.firstName}{" "}
-                        {selectedCandidate.lastName}
+                        Đã chọn: {selectedCandidate.lastName}{" "}
+                        {selectedCandidate.firstName}
                       </span>
                       {selectedCandidate.phone
                         ? ` - ${selectedCandidate.phone}`
@@ -830,7 +830,7 @@ export default function RescueTeamDetailPage() {
               <p className="mt-2 text-sm leading-relaxed text-black/70">
                 Bạn có chắc muốn xóa
                 <span className="font-semibold text-black">
-                  {` ${memberPendingRemove.firstName} ${memberPendingRemove.lastName} `}
+                  {` ${memberPendingRemove.lastName} ${memberPendingRemove.firstName} `}
                 </span>
                 khỏi đội cứu hộ này không?
               </p>

@@ -11,7 +11,7 @@ interface SheetContextValue {
 }
 
 const SheetContext = React.createContext<SheetContextValue | undefined>(
-  undefined
+  undefined,
 );
 
 function useSheet() {
@@ -47,7 +47,7 @@ function Sheet({
       }
       onOpenChange?.(newOpen);
     },
-    [isControlled, onOpenChange]
+    [isControlled, onOpenChange],
   );
 
   return (
@@ -149,13 +149,12 @@ function SheetContent({
         className={cn(
           "fixed z-101 gap-4 bg-background p-6 shadow-lg",
           sideClasses[side],
-          className
+          className,
         )}
         style={{
           transform: panelTransform[side],
           transition: "transform 300ms cubic-bezier(0.32, 0.72, 0, 1)",
           willChange: isEntered ? "auto" : "transform",
-          contain: "layout style paint",
         }}
         {...props}
       >
@@ -171,7 +170,7 @@ function SheetContent({
         )}
       </div>
     </>,
-    document.body
+    document.body,
   );
 }
 
@@ -180,7 +179,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       className={cn(
         "flex flex-col space-y-2 text-center sm:text-left",
-        className
+        className,
       )}
       {...props}
     />
@@ -192,7 +191,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       className={cn(
         "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
-        className
+        className,
       )}
       {...props}
     />

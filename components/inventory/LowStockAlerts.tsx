@@ -24,6 +24,7 @@ import {
   getResolvedThresholdScopeLabel,
   getWarningLevelPriority,
 } from "@/services/inventory/utils";
+import { Icon } from "@iconify/react";
 
 const MAX_VISIBLE = 5;
 
@@ -82,7 +83,7 @@ const LowStockAlerts = () => {
   };
 
   return (
-    <Card className="flex h-full flex-col">
+    <Card className="flex h-full flex-col overflow-hidden">
       <CardHeader className="pb-0.5">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -127,7 +128,7 @@ const LowStockAlerts = () => {
             ))}
           </div>
         ) : items.length > 0 ? (
-          <ScrollArea className="min-h-0 flex-1 px-6">
+          <ScrollArea className="px-6" style={{ maxHeight: 340 }}>
             <div className="space-y-2 pb-4">
               {items.slice(0, MAX_VISIBLE).map((item) => {
                 const level = getLowStockWarningLevel(item);
@@ -150,10 +151,12 @@ const LowStockAlerts = () => {
                     )}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="shrink-0 rounded-lg bg-white/80 p-2 dark:bg-background/60">
-                        <Wrench
-                          className="h-4 w-4 text-current"
-                          weight="fill"
+                      <div className="shrink-0 rounded-2xl bg-white/80 p-2 dark:bg-background/60">
+                        <Icon
+                          icon="solar:box-linear"
+                          width="24"
+                          height="24"
+                          className="text-current"
                         />
                       </div>
 
@@ -173,46 +176,45 @@ const LowStockAlerts = () => {
                           </Badge>
                         </div>
 
-                        <div className="mt-0.5 flex items-center justify-between gap-2">
-                          <span className="truncate text-xs font-medium text-muted-foreground tracking-tighter">
-                            Danh mục: {item.categoryName ?? "Chưa rõ danh mục"}
-                          </span>
-                          <span className="text-xs font-medium">
-                            Khả dụng {item.availableQuantity}
-                            {item.unit ? ` ${item.unit}` : ""}
-                            {item.minimumThreshold != null
-                              ? ` / Ngưỡng ${item.minimumThreshold}${item.unit ? ` ${item.unit}` : ""}`
-                              : ""}
-                          </span>
-                        </div>
-
-                        <div className="mt-1 flex items-center justify-between font-medium gap-2 text-xs tracking-tighter text-muted-foreground">
-                          <span className="truncate">
-                            Cấu hình:{" "}
-                            {getResolvedThresholdScopeLabel(
-                              item.resolvedThresholdScope,
-                            )}
-                            {item.isUsingGlobalDefault
-                              ? " · Mặc định hệ thống"
-                              : ""}
-                          </span>
-                          <span>
-                            {item.minimumThreshold != null
-                              ? `ratio ${severity.toFixed(2)}`
-                              : "chưa cấu hình ngưỡng"}
-                          </span>
-                        </div>
-
-                        {shortage != null ? (
-                          <div className="mt-1 text-xs text-muted-foreground tracking-tighter">
-                            Thiếu{" "}
-                            <strong className="text-black">
-                              {shortage}
-                              {item.unit ? ` ${item.unit}` : ""}
-                            </strong>{" "}
-                            để đạt ngưỡng tối thiểu
+                        <div className="mt-1 flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <span className="truncate text-[13px] font-medium tracking-tighter text-foreground/80">
+                              Danh mục:{" "}
+                              <span className="font-medium">
+                                {item.categoryName ?? "Chưa rõ danh mục"}
+                              </span>
+                            </span>
+                            <span className="truncate text-[13px] font-medium tracking-tighter text-foreground/80">
+                              Cấu hình:{" "}
+                              {getResolvedThresholdScopeLabel(
+                                item.resolvedThresholdScope,
+                              )}
+                              {item.isUsingGlobalDefault
+                                ? " · Mặc định hệ thống"
+                                : ""}
+                            </span>
                           </div>
-                        ) : null}
+
+                          <div className="flex shrink-0 flex-col items-end gap-1 text-right">
+                            <span className="text-[13px] font-default tracking-tighter">
+                              Khả dụng {item.availableQuantity}
+                              {item.unit ? ` ${item.unit}` : ""}
+                              {item.minimumThreshold != null
+                                ? ` / Ngưỡng ${item.minimumThreshold}${item.unit ? ` ${item.unit}` : ""}`
+                                : ""}
+                            </span>
+                            {shortage != null ? (
+                              <span className="text-[13px] tracking-tighter text-muted-foreground">
+                                Thiếu{" "}
+                                <strong className="text-foreground">
+                                  {shortage}
+                                  {item.unit ? ` ${item.unit}` : ""}
+                                </strong>{" "}
+                                để đạt ngưỡng tối thiểu
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
 
                       <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />

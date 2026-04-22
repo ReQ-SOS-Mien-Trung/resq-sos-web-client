@@ -7,6 +7,7 @@ import {
 import {
   getRescuerApplications,
   getRescuerApplicationDetail,
+  getRescuerApplicationStatusMetadata,
   reviewRescuerApplication,
 } from "./api";
 import {
@@ -15,14 +16,25 @@ import {
   RescuerApplicationDetail,
   ReviewRescuerApplicationRequest,
   ReviewRescuerApplicationResponse,
+  RescuerApplicationStatusMetadataOption,
 } from "./type";
 
 export const RESCUER_APPLICATIONS_QUERY_KEY = [
   "rescuer-applications",
 ] as const;
 
+export const RESCUER_APPLICATION_STATUS_METADATA_QUERY_KEY = [
+  "rescuer-applications",
+  "metadata",
+  "statuses",
+] as const;
+
 export interface UseRescuerApplicationsOptions {
   params?: GetRescuerApplicationsParams;
+  enabled?: boolean;
+}
+
+export interface UseRescuerApplicationStatusMetadataOptions {
   enabled?: boolean;
 }
 
@@ -36,6 +48,17 @@ export function useRescuerApplications(
     queryKey: [...RESCUER_APPLICATIONS_QUERY_KEY, "list", options?.params],
     queryFn: () => getRescuerApplications(options?.params),
     enabled: options?.enabled ?? true,
+  });
+}
+
+export function useRescuerApplicationStatusMetadata(
+  options?: UseRescuerApplicationStatusMetadataOptions,
+) {
+  return useQuery<RescuerApplicationStatusMetadataOption[]>({
+    queryKey: RESCUER_APPLICATION_STATUS_METADATA_QUERY_KEY,
+    queryFn: getRescuerApplicationStatusMetadata,
+    enabled: options?.enabled ?? true,
+    staleTime: Infinity,
   });
 }
 

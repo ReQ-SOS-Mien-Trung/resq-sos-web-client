@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import { mockInventoryItems, mockShipments } from "@/lib/mock-data";
 import { getUserAvatarInitials, getUserDisplayName } from "@/lib/user-avatar";
 import { cn } from "@/lib/utils";
@@ -35,7 +36,6 @@ import {
   WalletIcon,
   SunIcon,
   MoonIcon,
-  LockIcon,
   WarehouseIcon,
 } from "@phosphor-icons/react";
 import {
@@ -48,11 +48,14 @@ import { VatTuSection } from "@/components/inventory/VatTuTabContent";
 import { VatTuDetailsSheet } from "@/components/inventory/VatTuDetailsSheet";
 import SupplyRequestTracker from "@/components/inventory/SupplyRequestTracker";
 import DepotChartsSection from "@/components/inventory/DepotChartsSection";
+import { DepotClosureTransferTable } from "@/components/inventory/DepotClosureTransferTable";
 import {
   InventoryItemEntity,
   SupplyRequestListItem,
 } from "@/services/inventory/type";
 import {
+  INVENTORY_KEYS,
+  useMyDepotLowStock,
   useMyDepotQuantityByCategory,
   useSupplyRequests,
 } from "@/services/inventory/hooks";
@@ -70,6 +73,7 @@ import {
   MANAGER_DEPOT_SELECT_ROUTE,
   useManagerDepot,
 } from "@/hooks/use-manager-depot";
+import { useInventoryOperationalRealtime } from "@/hooks/useInventoryOperationalRealtime";
 
 // --- Helpers ---
 
@@ -78,6 +82,8 @@ const mapDepotEntityToInfo = (
   depot: DepotEntity,
   managerName: string,
   totalCategories: number,
+  criticalAlerts: number,
+  lowStockAlerts: number,
   pendingRequests: number,
 ): DepotInfo => ({
   id: String(depot.id),
@@ -87,10 +93,8 @@ const mapDepotEntityToInfo = (
   manager: managerName,
   totalItems: mockInventoryItems.length,
   totalCategories,
-  criticalAlerts: mockInventoryItems.filter((i) => i.stockLevel === "CRITICAL")
-    .length,
-  lowStockAlerts: mockInventoryItems.filter((i) => i.stockLevel === "LOW")
-    .length,
+  criticalAlerts,
+  lowStockAlerts,
   pendingRequests,
   activeShipments: mockShipments.filter(
     (s) => s.status === "PREPARING" || s.status === "IN_TRANSIT",
@@ -180,6 +184,7 @@ const INVENTORY_TABS = new Set([
   "vattu",
   "shipments",
   "supply-management",
+  "depot-closure",
 ]);
 
 function resolveInventoryTab(rawTab: string | null): string {
@@ -206,6 +211,7 @@ const InventoryDashboardPage = () => {
   const [vatTuSelectedItem, setVatTuSelectedItem] =
     useState<InventoryItemEntity | null>(null);
   const [vatTuSheetOpen, setVatTuSheetOpen] = useState(false);
+  const [vatTuRefreshNonce, setVatTuRefreshNonce] = useState(0);
   const [requestsPageNumber, setRequestsPageNumber] = useState(1);
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const toggleDarkMode = useThemeStore((state) => state.toggleDarkMode);
@@ -214,6 +220,7 @@ const InventoryDashboardPage = () => {
   const sidebarRef = useRef<HTMLElement>(null);
 
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const handleActiveTabChange = useCallback(
     (tab: string) => {
@@ -241,6 +248,23 @@ const InventoryDashboardPage = () => {
       );
     },
     [router, searchParams],
+  );
+
+  const navigateFromInventory = useCallback(
+    (destination: string) => {
+      if (activeTab === "depot-closure" && typeof window !== "undefined") {
+        window.history.replaceState(
+          window.history.state,
+          "",
+          "/dashboard/inventory",
+        );
+        window.location.assign(destination);
+        return;
+      }
+
+      router.push(destination);
+    },
+    [activeTab, router],
   );
 
   // ── Auth ──
@@ -301,6 +325,34 @@ const InventoryDashboardPage = () => {
       { enabled: Boolean(selectedDepotId) },
     );
 
+  const { data: criticalLowStockData, refetch: refetchCriticalLowStock } =
+    useMyDepotLowStock(
+      {
+        depotId: selectedDepotId ?? 0,
+        warningLevel: "CRITICAL",
+        pageNumber: 1,
+        pageSize: 1,
+      },
+      {
+        enabled: Boolean(selectedDepotId),
+        refetchOnWindowFocus: true,
+      },
+    );
+
+  const { data: mediumLowStockData, refetch: refetchMediumLowStock } =
+    useMyDepotLowStock(
+      {
+        depotId: selectedDepotId ?? 0,
+        warningLevel: "MEDIUM",
+        pageNumber: 1,
+        pageSize: 1,
+      },
+      {
+        enabled: Boolean(selectedDepotId),
+        refetchOnWindowFocus: true,
+      },
+    );
+
   const {
     data: supplyRequestsData,
     isLoading: isSupplyRequestsLoading,
@@ -309,7 +361,24 @@ const InventoryDashboardPage = () => {
   } = useSupplyRequests(
     { depotId: selectedDepotId ?? 0, pageNumber: 1, pageSize: 10 },
     {
-      refetchInterval: 10_000,
+      refetchInterval: false,
+      refetchOnWindowFocus: true,
+      enabled: Boolean(selectedDepotId),
+    },
+  );
+
+  const {
+    data: waitingApprovalRequestsData,
+    refetch: refetchWaitingApprovalRequests,
+  } = useSupplyRequests(
+    {
+      depotId: selectedDepotId ?? 0,
+      requestingStatus: "WaitingForApproval",
+      pageNumber: 1,
+      pageSize: 1,
+    },
+    {
+      refetchInterval: false,
       refetchOnWindowFocus: true,
       enabled: Boolean(selectedDepotId),
     },
@@ -327,7 +396,7 @@ const InventoryDashboardPage = () => {
       pageSize: 10,
     },
     {
-      refetchInterval: 10_000,
+      refetchInterval: false,
       refetchOnWindowFocus: true,
       enabled: Boolean(selectedDepotId),
     },
@@ -346,6 +415,17 @@ const InventoryDashboardPage = () => {
     [allRequestsPagedData, trackerRequestId],
   );
 
+  useInventoryOperationalRealtime({
+    supplyRequests: {
+      depotId: selectedDepotId,
+      requestId: trackerOpen ? trackerRequestId : null,
+    },
+    depotInventory: {
+      depotId: selectedDepotId,
+    },
+    enabled: Boolean(selectedDepotId),
+  });
+
   // Use the first depot as the current managed depot
   const currentDepot =
     depotsData?.items?.find((depot) => depot.id === selectedDepotId) ?? null;
@@ -357,11 +437,16 @@ const InventoryDashboardPage = () => {
   const depotInfo = useMemo<DepotInfo | null>(() => {
     if (!currentDepot && !selectedDepot) return null;
 
-    const pendingCount = (supplyRequestsData?.items ?? []).filter(
-      (request) =>
-        request.sourceStatus === "Pending" &&
-        request.requestingStatus === "WaitingForApproval",
-    ).length;
+    const criticalCount =
+      criticalLowStockData?.totalCount ??
+      criticalLowStockData?.items?.length ??
+      0;
+    const mediumCount =
+      mediumLowStockData?.totalCount ?? mediumLowStockData?.items?.length ?? 0;
+    const pendingCount =
+      waitingApprovalRequestsData?.totalCount ??
+      waitingApprovalRequestsData?.items?.length ??
+      0;
 
     const resolvedName = selectedDepot?.depotName ?? currentDepot?.name ?? "—";
 
@@ -370,6 +455,8 @@ const InventoryDashboardPage = () => {
         currentDepot,
         displayName,
         totalCategories,
+        criticalCount,
+        mediumCount,
         pendingCount,
       );
       return { ...info, name: resolvedName };
@@ -384,17 +471,19 @@ const InventoryDashboardPage = () => {
       manager: displayName,
       totalItems: 0,
       totalCategories,
-      criticalAlerts: 0,
-      lowStockAlerts: 0,
+      criticalAlerts: criticalCount,
+      lowStockAlerts: mediumCount,
       pendingRequests: pendingCount,
       activeShipments: 0,
     };
   }, [
+    criticalLowStockData,
     currentDepot,
     selectedDepot,
     displayName,
+    mediumLowStockData,
     totalCategories,
-    supplyRequestsData,
+    waitingApprovalRequestsData,
   ]);
 
   const sidebarSupplyRequests = useMemo(
@@ -447,7 +536,24 @@ const InventoryDashboardPage = () => {
     refetchDepots();
     refetchCategories();
     refetchQuantityByCategory();
-  }, [refetchDepots, refetchCategories, refetchQuantityByCategory]);
+    refetchSupplyRequests();
+    refetchAllRequests();
+    refetchCriticalLowStock();
+    refetchMediumLowStock();
+    refetchWaitingApprovalRequests();
+    queryClient.invalidateQueries({ queryKey: INVENTORY_KEYS.all });
+    setVatTuRefreshNonce((prev) => prev + 1);
+  }, [
+    queryClient,
+    refetchDepots,
+    refetchCategories,
+    refetchQuantityByCategory,
+    refetchSupplyRequests,
+    refetchAllRequests,
+    refetchCriticalLowStock,
+    refetchMediumLowStock,
+    refetchWaitingApprovalRequests,
+  ]);
 
   // ── Loading state ──
   if (isDepotsLoading || isCategoriesLoading || isSupplyRequestsLoading) {
@@ -594,7 +700,9 @@ const InventoryDashboardPage = () => {
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem
                 className="gap-2 cursor-pointer tracking-tighter"
-                onClick={() => router.push("/dashboard/inventory/import")}
+                onClick={() =>
+                  navigateFromInventory("/dashboard/inventory/import")
+                }
               >
                 <BuildingsIcon className="h-4 w-4" />
                 Nhập kho từ thiện
@@ -602,7 +710,7 @@ const InventoryDashboardPage = () => {
               <DropdownMenuItem
                 className="gap-2 cursor-pointer tracking-tighter"
                 onClick={() =>
-                  router.push("/dashboard/inventory/import-regular")
+                  navigateFromInventory("/dashboard/inventory/import-regular")
                 }
               >
                 <PackageIcon className="h-4 w-4" />
@@ -614,7 +722,9 @@ const InventoryDashboardPage = () => {
             variant="outline"
             size="sm"
             className="hidden md:flex gap-2"
-            onClick={() => router.push("/dashboard/inventory/export-report")}
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/export-report")
+            }
           >
             <FileArrowDownIcon className="h-4 w-4" />
             Xuất báo cáo
@@ -623,7 +733,9 @@ const InventoryDashboardPage = () => {
             variant="outline"
             size="sm"
             className="hidden md:flex gap-2"
-            onClick={() => router.push("/dashboard/inventory/stock-movements")}
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/stock-movements")
+            }
           >
             <FileTextIcon className="h-4 w-4" />
             Xem biến động kho
@@ -631,8 +743,10 @@ const InventoryDashboardPage = () => {
           <Button
             variant="outline"
             size="sm"
-            className="hidden md:flex gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
-            onClick={() => router.push("/dashboard/inventory/pickups")}
+            className="hidden md:flex gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/pickups")
+            }
           >
             <TruckIcon className="h-4 w-4" />
             Quản lý giao nhận
@@ -640,8 +754,10 @@ const InventoryDashboardPage = () => {
           <Button
             variant="outline"
             size="sm"
-            className="hidden md:flex gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
-            onClick={() => router.push("/dashboard/inventory/funding-request")}
+            className="hidden md:flex gap-2 border-green-200 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-950/30"
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/funding-request")
+            }
           >
             <WalletIcon className="h-4 w-4" />
             Quản lý quỹ kho
@@ -649,11 +765,13 @@ const InventoryDashboardPage = () => {
           <Button
             variant="outline"
             size="sm"
-            className="hidden md:flex gap-2 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30"
-            onClick={() => router.push("/dashboard/inventory/depot-closure")}
+            className="hidden md:flex gap-2 border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-950/30"
+            onClick={() =>
+              navigateFromInventory("/dashboard/inventory/disposal")
+            }
           >
-            <LockIcon className="h-4 w-4" />
-            Đóng kho
+            <WarehouseIcon className="h-4 w-4" />
+            Xử lý hết hạn
           </Button>
 
           {/* Notifications */}
@@ -771,45 +889,57 @@ const InventoryDashboardPage = () => {
             transition={{ duration: 0.5, ease: "easeOut", delay: 0.3 }}
             className="p-6 space-y-6"
           >
-            {/* Page Title — hidden on supply-management tab (it has its own header) */}
-            {activeTab !== "supply-management" && (
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-semibold tracking-tighter">
-                    Dashboard Kho Hàng
-                  </h1>
-                  <p className="text-muted-foreground tracking-tighter">
-                    {selectedDepot?.depotName ??
-                      depotInfo?.name ??
-                      "Đang tải..."}{" "}
-                    • Quản lý bởi {displayName}
-                  </p>
+            {/* Page Title — hidden on supply-management and depot-closure tabs */}
+            {activeTab !== "supply-management" &&
+              activeTab !== "depot-closure" && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h1 className="text-2xl font-semibold tracking-tighter">
+                      Dashboard Kho Hàng
+                    </h1>
+                    <p className="text-muted-foreground tracking-tighter">
+                      {selectedDepot?.depotName ??
+                        depotInfo?.name ??
+                        "Đang tải..."}{" "}
+                      • Quản lý bởi {displayName}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleRefresh}
+                    disabled={isDepotsFetching || isSupplyRequestsFetching}
+                  >
+                    <ArrowsClockwise
+                      className={cn(
+                        "h-4 w-4",
+                        (isDepotsFetching || isSupplyRequestsFetching) &&
+                          "animate-spin",
+                      )}
+                    />
+                    Làm mới
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={handleRefresh}
-                  disabled={isDepotsFetching || isSupplyRequestsFetching}
-                >
-                  <ArrowsClockwise
-                    className={cn(
-                      "h-4 w-4",
-                      (isDepotsFetching || isSupplyRequestsFetching) &&
-                        "animate-spin",
-                    )}
-                  />
-                  Làm mới
-                </Button>
-              </div>
-            )}
+              )}
 
-            {activeTab === "supply-management" ? (
+            {activeTab === "depot-closure" ? (
+              <DepotClosureTransferTable
+                depotId={selectedDepotId ?? 0}
+                defaultExpandedTransferId={(() => {
+                  const v = searchParams.get("transferId");
+                  if (!v) return null;
+                  const n = Number(v);
+                  return Number.isInteger(n) && n > 0 ? n : null;
+                })()}
+              />
+            ) : activeTab === "supply-management" ? (
               <SupplyRequestManagement
                 onPanelOpenChange={(open) => setSidebarOpen(!open)}
               />
             ) : activeTab === "vattu" ? (
               <VatTuSection
+                refreshNonce={vatTuRefreshNonce}
                 onItemSelect={(item) => {
                   setVatTuSelectedItem(item);
                   setVatTuSheetOpen(true);
@@ -1005,6 +1135,7 @@ const InventoryDashboardPage = () => {
 
       {/* Vat Tu Details Sheet - rendered at page level for full overlay */}
       <VatTuDetailsSheet
+        key={vatTuSelectedItem?.itemModelId ?? "empty-vattu-sheet"}
         item={vatTuSelectedItem}
         open={vatTuSheetOpen}
         onOpenChange={setVatTuSheetOpen}

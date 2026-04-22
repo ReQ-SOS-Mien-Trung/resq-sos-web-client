@@ -1,6 +1,10 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useMemo,
+  useState,
+} from "react";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -39,6 +43,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ArrowLeft,
+  ArrowClockwise,
   ChartBar,
   CheckCircle,
   Funnel,
@@ -52,6 +57,9 @@ import {
   Package,
   Scales,
   ListDashes,
+  ArrowUp,
+  ArrowDown,
+  ArrowsDownUp,
 } from "@phosphor-icons/react";
 import {
   Tooltip,
@@ -62,6 +70,7 @@ import {
 import {
   useDeleteMyDepotThreshold,
   useInventoryCategories,
+  useInventoryItemModels,
   useMyDepotLowStock,
   useMyDepotThresholds,
   useUpdateMyDepotThreshold,
@@ -81,6 +90,7 @@ import type {
   ThresholdScopeType,
   UpdateThresholdPayload,
 } from "@/services/inventory/type";
+import { useInventoryOperationalRealtime } from "@/hooks/useInventoryOperationalRealtime";
 
 const NUMBER_FORMATTER = new Intl.NumberFormat("vi-VN");
 
@@ -109,7 +119,7 @@ const WARNING_LEVEL_COLORS: Record<string, string> = {
   CRITICAL: "bg-red-100 text-red-700",
   HIGH: "bg-orange-100 text-orange-700",
   MEDIUM: "bg-amber-100 text-amber-700",
-  LOW: "bg-yellow-100 text-yellow-700",
+  LOW: "bg-green-100 text-green-700",
   OK: "bg-emerald-100 text-emerald-700",
   UNCONFIGURED: "bg-slate-100 text-slate-700",
 };
@@ -156,7 +166,7 @@ function getWarningBadge(level?: string | null) {
   return (
     <Badge
       className={cn(
-        "border-0 shadow-none hover:bg-transparent",
+        "border-0 shadow-none hover:bg-transparent text-[13px]",
         WARNING_LEVEL_COLORS[normalized] ?? "bg-slate-100 text-slate-700",
       )}
     >
@@ -174,7 +184,7 @@ function getLowStockRowTone(level: string): string {
     case "MEDIUM":
       return "bg-amber-50 text-amber-700";
     case "LOW":
-      return "bg-yellow-50 text-yellow-700";
+      return "bg-green-50 text-green-700";
     case "OK":
       return "bg-emerald-50 text-emerald-700";
     default:
@@ -398,6 +408,7 @@ export default function ThresholdConfigPage() {
     { enabled: Boolean(selectedDepotId) },
   );
   const { data: categories } = useInventoryCategories();
+  const { data: itemModels } = useInventoryItemModels();
   const categoryMap = useMemo(() => {
     const map: Record<number, string> = {};
     categories?.forEach((category) => {
@@ -405,11 +416,27 @@ export default function ThresholdConfigPage() {
     });
     return map;
   }, [categories]);
-
   const [selectedWarningLevel, setSelectedWarningLevel] = useState("all");
-  const { data: lowStock, isLoading: loadingLowStock } = useMyDepotLowStock(
+
+  const {
+    data: lowStock,
+    isLoading: loadingLowStock,
+    isFetching: fetchingLowStock,
+    refetch: refetchLowStock,
+  } = useMyDepotLowStock(
     selectedDepotId ? { depotId: selectedDepotId } : undefined,
+    {
+      refetchInterval: false,
+      refetchOnWindowFocus: true,
+    },
   );
+
+  useInventoryOperationalRealtime({
+    depotInventory: {
+      depotId: selectedDepotId,
+    },
+    enabled: Boolean(selectedDepotId),
+  });
 
   const updateMutation = useUpdateMyDepotThreshold();
   const deleteMutation = useDeleteMyDepotThreshold();
@@ -653,15 +680,92 @@ export default function ThresholdConfigPage() {
     }, {});
   }, [lowStockItems]);
 
+  type SortKey =
+    | "itemModelName"
+    | "categoryName"
+    | "availableQuantity"
+    | "minimumThreshold"
+    | "severity"
+    | "level"
+    | "scope"
+    | "source";
+
+  const [sortConfig, setSortConfig] = useState<{
+    key: SortKey;
+    direction: "asc" | "desc";
+  } | null>(null);
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig((current) => {
+      if (current?.key === key) {
+        if (current.direction === "asc") return { key, direction: "desc" };
+        return null;
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
   const filteredLowStockItems = useMemo(() => {
-    if (selectedWarningLevel === "all") {
-      return lowStockItems;
+    let items = lowStockItems;
+    
+    if (selectedWarningLevel !== "all") {
+      items = items.filter(
+        (item) => getLowStockWarningLevel(item) === selectedWarningLevel,
+      );
     }
 
-    return lowStockItems.filter(
-      (item) => getLowStockWarningLevel(item) === selectedWarningLevel,
-    );
-  }, [lowStockItems, selectedWarningLevel]);
+    if (sortConfig !== null) {
+      items = [...items].sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        switch (sortConfig.key) {
+          case "itemModelName":
+            aValue = a.itemModelName;
+            bValue = b.itemModelName;
+            break;
+          case "categoryName":
+            aValue = a.categoryName ?? "";
+            bValue = b.categoryName ?? "";
+            break;
+          case "availableQuantity":
+            aValue = a.availableQuantity;
+            bValue = b.availableQuantity;
+            break;
+          case "minimumThreshold":
+            aValue = a.minimumThreshold ?? 0;
+            bValue = b.minimumThreshold ?? 0;
+            break;
+          case "severity":
+            aValue = getLowStockSeverityRatio(a);
+            bValue = getLowStockSeverityRatio(b);
+            break;
+          case "level":
+            aValue = getWarningLevelPriority(getLowStockWarningLevel(a));
+            bValue = getWarningLevelPriority(getLowStockWarningLevel(b));
+            break;
+          case "scope":
+            aValue = getResolvedThresholdScopeLabel(a.resolvedThresholdScope);
+            bValue = getResolvedThresholdScopeLabel(b.resolvedThresholdScope);
+            break;
+          case "source":
+            aValue = getThresholdSourceLabel(a);
+            bValue = getThresholdSourceLabel(b);
+            break;
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === "asc" ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
+    return items;
+  }, [lowStockItems, selectedWarningLevel, sortConfig]);
 
   const entranceTransition = prefersReducedMotion
     ? { duration: 0 }
@@ -770,7 +874,7 @@ export default function ThresholdConfigPage() {
               transition={tabTransition}
             >
               {loadingThresholds ? (
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 items-start">
                   {(
                     ["Global", "Depot", "DepotCategory", "DepotItem"] as const
                   ).map((scope) => (
@@ -810,7 +914,7 @@ export default function ThresholdConfigPage() {
                 />
               ) : (
                 <motion.div
-                  className="grid gap-3 grid-cols-2 lg:grid-cols-4"
+                  className="grid gap-3 grid-cols-2 lg:grid-cols-4 items-start"
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={cardTransition}
@@ -864,20 +968,41 @@ export default function ThresholdConfigPage() {
                   </span>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {availableWarningLevels.map((level) => (
                     <Badge
                       key={level}
                       className={cn(
                         "border-0 shadow-none",
                         WARNING_LEVEL_COLORS[level] ??
-                          "bg-slate-100 text-slate-700",
+                        "bg-slate-100 text-slate-700",
                       )}
                     >
                       {getLowStockWarningLabel(level)}:{" "}
                       {warningLevelCounts[level] ?? 0}
                     </Badge>
                   ))}
+                  <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 h-7 px-2 text-sm"
+                          onClick={() => refetchLowStock()}
+                          disabled={fetchingLowStock}
+                        >
+                          <ArrowClockwise
+                            className={cn(
+                              "h-3.5 w-3.5",
+                              fetchingLowStock && "animate-spin",
+                            )}
+                          />
+                          {fetchingLowStock ? "Đang tải..." : `Làm mới`}
+                        </Button>
+                      </TooltipTrigger>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
 
@@ -898,17 +1023,46 @@ export default function ThresholdConfigPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-12.5">#</TableHead>
-                        <TableHead>Vật phẩm</TableHead>
-                        <TableHead>Danh mục</TableHead>
-                        <TableHead>Kho</TableHead>
-                        <TableHead className="text-right">Khả dụng</TableHead>
-                        <TableHead className="text-right">
-                          Ngưỡng tối thiểu
-                        </TableHead>
-                        <TableHead className="text-right">Severity</TableHead>
-                        <TableHead>Mức cảnh báo</TableHead>
-                        <TableHead>Phạm vi áp dụng</TableHead>
-                        <TableHead>Nguồn</TableHead>
+                        {[
+                          { key: "itemModelName", label: "Vật phẩm" },
+                          { key: "categoryName", label: "Danh mục" },
+                          { key: "availableQuantity", label: "Khả dụng", alignRight: true },
+                          { key: "minimumThreshold", label: "Ngưỡng tối thiểu", alignRight: true },
+                          { key: "severity", label: "Severity", alignRight: true },
+                          { key: "level", label: "Mức cảnh báo" },
+                          { key: "scope", label: "Phạm vi áp dụng" },
+                          { key: "source", label: "Nguồn" },
+                        ].map((col) => {
+                          const isActive = sortConfig?.key === col.key;
+                          return (
+                            <TableHead
+                              key={col.key}
+                              className={cn(
+                                "group whitespace-nowrap",
+                                col.alignRight && "text-right"
+                              )}
+                            >
+                              <button
+                                onClick={() => handleSort(col.key as SortKey)}
+                                className={cn(
+                                  "inline-flex items-center gap-1 font-semibold text-foreground tracking-tighter hover:text-foreground/70 transition-colors",
+                                  col.alignRight ? "flex-row-reverse" : ""
+                                )}
+                              >
+                                {col.label}
+                                {isActive ? (
+                                  sortConfig.direction === "asc" ? (
+                                    <ArrowUp size={13} className="text-primary shrink-0" />
+                                  ) : (
+                                    <ArrowDown size={13} className="text-primary shrink-0" />
+                                  )
+                                ) : (
+                                  <ArrowsDownUp size={13} className="text-muted-foreground/30 shrink-0" />
+                                )}
+                              </button>
+                            </TableHead>
+                          );
+                        })}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -927,16 +1081,14 @@ export default function ThresholdConfigPage() {
                               {item.itemModelName}
                             </TableCell>
                             <TableCell>{item.categoryName ?? "—"}</TableCell>
-                            <TableCell>
-                              {item.depotName ?? "Kho hiện tại"}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
+
+                            <TableCell className="text-right">
                               {formatNumber(item.availableQuantity)}
                             </TableCell>
-                            <TableCell className="text-right font-mono">
+                            <TableCell className="text-right">
                               {formatNumber(item.minimumThreshold)}
                             </TableCell>
-                            <TableCell className="text-right font-mono">
+                            <TableCell className="text-right">
                               {item.minimumThreshold != null
                                 ? severity.toFixed(2)
                                 : "—"}
@@ -945,7 +1097,7 @@ export default function ThresholdConfigPage() {
                             <TableCell>
                               <Badge
                                 className={cn(
-                                  "border-0 shadow-none",
+                                  "border-0 shadow-none text-[13px]",
                                   getLowStockRowTone(level),
                                 )}
                               >
@@ -954,7 +1106,7 @@ export default function ThresholdConfigPage() {
                                 )}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-muted-foreground">
+                            <TableCell className="text-foreground/80">
                               {getThresholdSourceLabel(item)}
                             </TableCell>
                           </TableRow>
@@ -1013,102 +1165,113 @@ export default function ThresholdConfigPage() {
 
           {/* Body */}
           <div className="flex flex-col gap-4 px-5 py-4">
-            <AnimatePresence initial={false}>
-              {!editConfig && form.scopeType === "DepotCategory" ? (
-                <motion.div
-                  key="modal-depot-category"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.25, ease: "easeInOut" }}
-                  className="overflow-hidden"
-                >
-                  <div className="space-y-1.5 pb-1">
-                    <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-semibold text-amber-600">
-                      <Folders className="h-4 w-4" weight="fill" />
-                      Danh mục áp dụng
-                    </Label>
-                    <Select
-                      value={form.categoryId || undefined}
-                      onValueChange={(value) =>
-                        setForm((previous) => ({
-                          ...previous,
-                          categoryId: value,
-                        }))
-                      }
-                      disabled={!!editConfig}
-                    >
-                      <SelectTrigger className="mt-1.5">
-                        <SelectValue placeholder="Chọn danh mục" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories?.map((category) => (
-                          <SelectItem
-                            key={category.key}
-                            value={String(Number(category.key))}
-                          >
-                            {category.value}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </motion.div>
-              ) : null}
+            <div className="flex flex-col sm:flex-row gap-4 w-full">
+              <AnimatePresence initial={false} mode="popLayout">
+                {!editConfig && form.scopeType === "DepotCategory" && (
+                  <motion.div
+                    key="modal-depot-category"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className="flex-1 min-w-0"
+                  >
+                    <div className="space-y-1.5">
+                      <Label className="flex items-center gap-1.5 text-sm font-semibold tracking-tighter text-amber-600">
+                        <Folders className="h-4 w-4" weight="fill" />
+                        Danh mục áp dụng
+                      </Label>
+                      <Select
+                        value={form.categoryId === "" ? undefined : form.categoryId}
+                        onValueChange={(value) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            categoryId: value,
+                          }))
+                        }
+                        disabled={!!editConfig}
+                      >
+                        <SelectTrigger className="h-9 w-full bg-white text-sm">
+                          <SelectValue placeholder="Chọn danh mục" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="max-h-[300px]">
+                          {categories?.map((category) => (
+                            <SelectItem
+                              key={category.key}
+                              value={String(category.key)}
+                            >
+                              {category.value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </motion.div>
+                )}
 
-              {!editConfig && form.scopeType === "DepotItem" ? (
-                <motion.div
-                  key="modal-depot-item"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.25, ease: "easeInOut" }}
-                  className="overflow-hidden"
-                >
-                  <div className="space-y-1.5 pb-1">
-                    <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-semibold text-emerald-600">
-                      <Package className="h-4 w-4" weight="fill" />
-                      Vật phẩm áp dụng (Mã ID)
-                    </Label>
-                    <Input
-                      type="number"
-                      className="mt-1.5"
-                      placeholder="VD: 101"
-                      value={form.itemModelId}
-                      onChange={(event) =>
-                        setForm((previous) => ({
-                          ...previous,
-                          itemModelId: event.target.value,
-                        }))
-                      }
-                      disabled={!!editConfig}
-                    />
-                  </div>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
+                {!editConfig && form.scopeType === "DepotItem" && (
+                  <motion.div
+                    key="modal-depot-item"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className="flex-1 min-w-0"
+                  >
+                    <div className="space-y-1.5">
+                      <Label className="flex items-center gap-1.5 text-sm font-semibold tracking-tighter text-emerald-600">
+                        <Package className="h-4 w-4" weight="fill" />
+                        Vật phẩm (Mã ID)
+                      </Label>
+                      <Select
+                        value={form.itemModelId === "" ? undefined : form.itemModelId}
+                        onValueChange={(value) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            itemModelId: value,
+                          }))
+                        }
+                        disabled={!!editConfig}
+                      >
+                        <SelectTrigger className="h-9 w-full bg-white text-sm">
+                          <SelectValue placeholder="Chọn vật phẩm" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="max-h-[300px]">
+                          {itemModels?.map((model) => (
+                            <SelectItem key={model.key} value={String(model.key)}>
+                              {model.value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5 text-sm tracking-tighter font-medium text-slate-800">
-                <Scales className="h-4 w-4 text-blue-500" weight="fill" />
-                Ngưỡng tối thiểu
-                <span className="ml-auto font-normal text-muted-foreground text-[10px] uppercase tracking-widest">
-                  số nguyên &gt; 0
-                </span>
-              </Label>
-              <Input
-                type="number"
-                min={1}
-                step={1}
-                placeholder="VD: 80"
-                value={form.minimumThreshold}
-                onChange={(event) =>
-                  setForm((previous) => ({
-                    ...previous,
-                    minimumThreshold: event.target.value,
-                  }))
-                }
-              />
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-sm font-medium tracking-tighter text-slate-800">
+                  <Scales className="h-4 w-4 text-blue-500" weight="fill" />
+                  Ngưỡng tối thiểu
+                  <span className="ml-auto whitespace-nowrap text-[10px] font-normal uppercase tracking-widest text-muted-foreground">
+                    &gt; 0
+                  </span>
+                </Label>
+                <Input
+                  type="number"
+                  min={1}
+                  step={1}
+                  placeholder="VD: 80"
+                  className="h-9 w-full"
+                  value={form.minimumThreshold}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      minimumThreshold: event.target.value,
+                    }))
+                  }
+                />
+              </div>
             </div>
 
             {form.minimumThreshold ? (
