@@ -726,25 +726,25 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                             ).toLocaleString("vi-VN"),
                             hint: detail.hasRemainingItems
                               ? "Cần xử lý tiếp"
-                              : "Đã hết tồn",
+                              : "Đã hết vật phẩm tồn",
                           },
                           {
-                            label: "Số lượng còn lại có thể chuyển tiếp",
+                            label: "Số lượng còn lại có thể điều chuyển",
                             value: (
                               detail.transferableRemainingItemCount ?? 0
                             ).toLocaleString("vi-VN"),
-                            hint: `${(
-                              detail.transferableRemainingUnitCount ?? 0
-                            ).toLocaleString("vi-VN")} đơn vị`,
+                            // hint: `${(
+                            //   detail.transferableRemainingUnitCount ?? 0
+                            // ).toLocaleString("vi-VN")} đơn vị`,
                           },
                           {
-                            label: "Số lượng còn lại bị chặn",
+                            label: "Số lượng chưa thể xuất",
                             value: (
                               detail.blockedRemainingItemCount ?? 0
                             ).toLocaleString("vi-VN"),
-                            hint: `${(
-                              detail.blockedRemainingUnitCount ?? 0
-                            ).toLocaleString("vi-VN")} đơn vị`,
+                            // hint: `${(
+                            //   detail.blockedRemainingUnitCount ?? 0
+                            // ).toLocaleString("vi-VN")} đơn vị`,
                           },
                           {
                             label: "Ghi nhận hoàn tất",
@@ -786,37 +786,37 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                     const closureSignals = detail
                       ? [
                           {
-                            label: "Còn transfer mở",
+                            label: "Còn đơn điều chuyển",
                             active: detail.hasOpenTransfers ?? false,
                             activeClass:
                               "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/60 dark:bg-blue-950/30 dark:text-blue-300",
                           },
                           {
-                            label: "Còn hàng tồn",
+                            label: "Còn vật phẩm tồn kho",
                             active: detail.hasRemainingItems ?? false,
                             activeClass:
                               "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300",
                           },
                           {
-                            label: "Có blocker đóng kho",
+                            label: "Có vật phẩm chưa thể xuất",
                             active: detail.hasClosingBlockers ?? false,
                             activeClass:
                               "border-red-200 bg-red-50 text-red-700 dark:border-red-800/60 dark:bg-red-950/30 dark:text-red-300",
                           },
                           {
-                            label: "Có thể xác nhận đóng",
+                            label: "Xác nhận có thể đóng kho",
                             active: detail.canConfirmClose ?? false,
                             activeClass:
                               "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300",
                           },
                           {
-                            label: "Có record transfer",
+                            label: "Có record đơn điều chuyển",
                             active: detail.hasTransferRecords ?? false,
                             activeClass:
                               "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800/60 dark:bg-sky-950/30 dark:text-sky-300",
                           },
                           {
-                            label: "Có record xử lý ngoài",
+                            label: "Có record xử lý bên ngoài",
                             active:
                               detail.hasExternalResolutionRecords ?? false,
                             activeClass:
@@ -847,7 +847,7 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                             setExpandedId(isExpanded ? null : closure.id)
                           }
                         >
-                          <td className="p-3 text-sm font-medium tracking-tighter text-muted-foreground">
+                          <td className="p-3 text-sm font-medium tracking-tighter text-foreground/80">
                             #{closure.id}
                           </td>
                           <td className="p-3">
@@ -856,18 +856,18 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                             </span>
                           </td>
                           <td className="p-3">
-                            <span className="text-sm tracking-tighter text-foreground/70">
+                            <span className="text-sm tracking-tighter">
                               {getClosureResolutionLabel(
                                 closure.resolutionType,
                               )}
                             </span>
                           </td>
                           <td className="p-3">
-                            <span className="text-sm tracking-tighter text-foreground/80">
+                            <span className="text-sm tracking-tighter">
                               {closure.initiatedByFullName || "—"}
                             </span>
                           </td>
-                          <td className="p-3 text-sm tracking-tighter text-foreground/60">
+                          <td className="p-3 text-sm tracking-tighter">
                             {formatDateTimeValue(closure.initiatedAt)}
                           </td>
                           <td className="p-3">
@@ -927,39 +927,39 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                   ) : (
                                     <>
                                       {/* Meta info */}
-                                        <div
-                                          className={cn(
-                                            "grid gap-3",
-                                            detail
-                                              ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
-                                              : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3",
-                                          )}
-                                        >
-                                          {closureMetrics.map((item) => (
-                                            <div
-                                              key={item.label}
-                                              className="rounded-xl border border-dashed border-border/60 bg-background px-3.5 py-3"
-                                            >
-                                              <p className="text-xs tracking-tighter text-muted-foreground">
-                                                {item.label}
-                                              </p>
-                                              <p className="text-sm font-semibold tracking-tighter mt-1 text-foreground">
-                                                {item.value}
-                                              </p>
-                                              <p className="mt-1 text-[11px] tracking-tighter text-muted-foreground">
-                                                {item.hint}
-                                              </p>
-                                            </div>
-                                          ))}
-                                        </div>
+                                      <div
+                                        className={cn(
+                                          "grid gap-3",
+                                          detail
+                                            ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+                                            : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3",
+                                        )}
+                                      >
+                                        {closureMetrics.map((item) => (
+                                          <div
+                                            key={item.label}
+                                            className="rounded-xl border border-dashed border-border/60 bg-background px-3.5 py-3"
+                                          >
+                                            <p className="text-[13px] font-medium tracking-tighter text-foreground/80">
+                                              {item.label}
+                                            </p>
+                                            <p className="text-base font-semibold tracking-tighter mt-0.5 text-foreground">
+                                              {item.value}
+                                            </p>
+                                            <p className="mt-1 text-xs tracking-tighter text-muted-foreground">
+                                              {item.hint}
+                                            </p>
+                                          </div>
+                                        ))}
+                                      </div>
 
-                                        {detail && closureSignals.length > 0 && (
-                                        <div className="flex flex-wrap gap-2">
+                                      {detail && closureSignals.length > 0 && (
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-6">
                                           {closureSignals.map((signal) => (
                                             <div
                                               key={signal.label}
                                               className={cn(
-                                                "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium tracking-tighter",
+                                                "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium tracking-tighter",
                                                 signal.active
                                                   ? signal.activeClass
                                                   : "border-border/60 bg-background text-muted-foreground",
@@ -986,14 +986,14 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
 
                                       {/* Notes */}
                                       {closureNotes.length > 0 && (
-                                        <div className="flex flex-wrap gap-2">
+                                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                                           {(detail?.externalNote ??
                                             closure.externalNote) && (
-                                            <div className="flex items-center gap-2 rounded-lg border border-dashed border-blue-200/70 bg-white px-3 py-1.5 text-xs tracking-tighter text-blue-700/90 dark:border-blue-800/40 dark:bg-background dark:text-blue-300/90">
+                                            <div className="flex w-full items-center gap-2 rounded-lg border border-dashed border-blue-200/70 bg-blue-50 px-3 py-2 tracking-tighter text-blue-700/90 dark:border-blue-800/40 dark:bg-background dark:text-blue-300/90">
                                               <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
-                                              <span>
-                                                Ghi chú ngoài:{" "}
-                                                <strong className="text-foreground">
+                                              <span className="min-w-0 flex-1 font-medium text-[13px]">
+                                                Ghi chú xử lý ngoài:{" "}
+                                                <strong className="text-foreground font-medium text-[13px]">
                                                   {detail?.externalNote ??
                                                     closure.externalNote}
                                                 </strong>
@@ -1001,47 +1001,12 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                             </div>
                                           )}
                                           {detail?.driftNote && (
-                                            <div className="flex items-center gap-2 rounded-lg border border-dashed border-amber-200/70 bg-white px-3 py-1.5 text-xs tracking-tighter text-amber-700/90 dark:border-amber-800/40 dark:bg-background dark:text-amber-300/90">
+                                            <div className="flex w-full items-center gap-2 rounded-lg border border-dashed border-amber-200/70 bg-amber-50 px-3 py-2 tracking-tighter text-amber-700/90 dark:border-amber-800/40 dark:bg-background dark:text-amber-300/90">
                                               <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                                              <span>
+                                              <span className="min-w-0 flex-1 font-medium text-[13px]">
                                                 Ghi chú chênh lệch:{" "}
-                                                <strong className="text-foreground">
+                                                <strong className="text-foreground font-medium text-[13px]">
                                                   {detail.driftNote}
-                                                </strong>
-                                              </span>
-                                            </div>
-                                          )}
-                                          {detail?.failureReason && (
-                                            <div className="flex items-center gap-2 rounded-lg border border-dashed border-red-200/70 bg-white px-3 py-1.5 text-xs tracking-tighter text-red-700/90 dark:border-red-800/40 dark:bg-background dark:text-red-300/90">
-                                              <span className="h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
-                                              <span>
-                                                Lý do thất bại:{" "}
-                                                <strong className="text-foreground">
-                                                  {detail.failureReason}
-                                                </strong>
-                                              </span>
-                                            </div>
-                                          )}
-                                          {detail?.forceReason && (
-                                            <div className="flex items-center gap-2 rounded-lg border border-dashed border-purple-200/70 bg-white px-3 py-1.5 text-xs tracking-tighter text-purple-700/90 dark:border-purple-800/40 dark:bg-background dark:text-purple-300/90">
-                                              <span className="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0" />
-                                              <span>
-                                                Lý do ép đóng:{" "}
-                                                <strong className="text-foreground">
-                                                  {detail.forceReason}
-                                                </strong>
-                                              </span>
-                                            </div>
-                                          )}
-                                          {(detail?.cancellationReason ??
-                                            closure.cancellationReason) && (
-                                            <div className="flex items-center gap-2 rounded-lg border border-dashed border-red-200/70 bg-white px-3 py-1.5 text-xs tracking-tighter text-red-700/90 dark:border-red-800/40 dark:bg-background dark:text-red-300/90">
-                                              <span className="h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
-                                              <span>
-                                                Lý do hủy:{" "}
-                                                <strong className="text-foreground">
-                                                  {detail?.cancellationReason ??
-                                                    closure.cancellationReason}
                                                 </strong>
                                               </span>
                                             </div>
