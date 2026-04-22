@@ -231,6 +231,7 @@ export interface MissionSuggestionEntity {
   needsAdditionalDepot: boolean;
   supplyShortages: ClusterSupplyShortage[];
   suggestedResources: ClusterSuggestedResource[];
+  suggestedActivities?: ClusterSuggestedActivity[] | null;
   multiDepotRecommended?: boolean | null;
   suggestionScope: string | null;
   createdAt: string | null;

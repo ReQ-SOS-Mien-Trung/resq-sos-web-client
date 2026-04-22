@@ -26,6 +26,12 @@ import {
 } from "@/lib/sos";
 import { analyzeMissionSupplyBalance } from "@/lib/mission-supply-balance";
 import { PRIORITY_BADGE_VARIANT, PRIORITY_LABELS } from "@/lib/priority";
+import {
+  formatSupplyBufferPercent,
+  getSupplyBufferPercentInputValue,
+  resolveSupplyBufferRatio,
+  supplyBufferPercentToRatio,
+} from "@/lib/supply-buffer";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -98,6 +104,10 @@ import {
 } from "@/services/sos_cluster/type";
 import { useDepotInventory } from "@/services/inventory/hooks";
 import { useSOSRequestAnalysis } from "@/services/sos_request/hooks";
+import MissionTeamReportSheet, {
+  getMissionReportStats,
+  getMissionReportStatusMeta,
+} from "@/components/coordinator/MissionTeamReportSheet";
 import type {
   RescueTeamByClusterEntity,
   RescueTeamStatusKey,
@@ -584,7 +594,9 @@ function formatExecutionModeLabel(value?: string | null): string | null {
     SEQUENTIAL: "Tuần tự",
   };
 
-  return labels[normalized] ?? labels[normalized.replace(/[\s_-]+/g, "")] ?? value!;
+  return (
+    labels[normalized] ?? labels[normalized.replace(/[\s_-]+/g, "")] ?? value!
+  );
 }
 
 function isSplitAcrossTeams(value?: string | null): boolean {
@@ -594,12 +606,16 @@ function isSplitAcrossTeams(value?: string | null): boolean {
   return normalized === "splitacrossteams" || normalized === "parallel";
 }
 
-function getRequiredTeamCount(activity: Pick<ClusterSuggestedActivity, "requiredTeamCount">): number {
+function getRequiredTeamCount(
+  activity: Pick<ClusterSuggestedActivity, "requiredTeamCount">,
+): number {
   const count = toFiniteNumber(activity.requiredTeamCount);
   return count != null && count > 0 ? count : 0;
 }
 
-function hasSuggestedTeam(activity: Pick<ClusterSuggestedActivity, "suggestedTeam">): boolean {
+function hasSuggestedTeam(
+  activity: Pick<ClusterSuggestedActivity, "suggestedTeam">,
+): boolean {
   const team = activity.suggestedTeam;
   if (!team) return false;
 
@@ -693,7 +709,10 @@ function ActivityExecutionMeta({
   const warningMessage = getActivityExecutionWarning(activity);
   const destinationLabel =
     trimToNull(activity.destinationName) ??
-    formatCoordinateLabel(activity.destinationLatitude, activity.destinationLongitude);
+    formatCoordinateLabel(
+      activity.destinationLatitude,
+      activity.destinationLongitude,
+    );
 
   if (
     !executionModeLabel &&
@@ -799,7 +818,10 @@ function CoordinationNotesBlock({
   return (
     <div className="mt-2 rounded-md border border-indigo-200/80 bg-indigo-50/70 px-2.5 py-2 dark:border-indigo-800/50 dark:bg-indigo-950/20">
       <p className="text-sm font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-        Phối hợp{activity.coordinationGroupKey ? `: ${activity.coordinationGroupKey}` : ""}
+        Phối hợp
+        {activity.coordinationGroupKey
+          ? `: ${activity.coordinationGroupKey}`
+          : ""}
       </p>
       <p className="mt-0.5 text-sm leading-relaxed text-indigo-700/85 dark:text-indigo-200/85">
         {notes}
@@ -866,7 +888,9 @@ function TargetVictimsBlock({
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="inline-flex min-w-0 items-center gap-1 font-semibold text-foreground">
                     <User className="h-3.5 w-3.5 shrink-0 text-rose-500" />
-                    <span className="truncate">{getVictimDisplayName(victim)}</span>
+                    <span className="truncate">
+                      {getVictimDisplayName(victim)}
+                    </span>
                   </span>
                   <Badge variant="outline" className="h-5 px-1.5 text-sm">
                     {personTypeLabel}
@@ -967,20 +991,21 @@ function buildCoordinationSummaryEntries(
     const groupKey = trimToNull(activity.coordinationGroupKey);
     if (!groupKey) continue;
 
-    const existing =
-      groups.get(groupKey) ??
-      {
-        activities: [],
-        sosIds: new Set<number>(),
-        executionModes: new Set<string>(),
-        requiredTeamCount: 0,
-        assignedTeams: new Set<string>(),
-        notes: null,
-      };
+    const existing = groups.get(groupKey) ?? {
+      activities: [],
+      sosIds: new Set<number>(),
+      executionModes: new Set<string>(),
+      requiredTeamCount: 0,
+      assignedTeams: new Set<string>(),
+      notes: null,
+    };
 
     existing.activities.push(activity);
 
-    if (activity.sosRequestId != null && Number.isFinite(activity.sosRequestId)) {
+    if (
+      activity.sosRequestId != null &&
+      Number.isFinite(activity.sosRequestId)
+    ) {
       existing.sosIds.add(activity.sosRequestId);
     }
 
@@ -1115,10 +1140,16 @@ function getMissionSuggestionPhasePriority(phase?: string | null): number {
   return 2;
 }
 
+function getMissionSuggestionActivityGroups(
+  suggestion: MissionSuggestionEntity,
+): MissionSuggestionEntity["activities"] {
+  return Array.isArray(suggestion.activities) ? suggestion.activities : [];
+}
+
 function pickPreferredMissionSuggestionActivityGroup(
   suggestion: MissionSuggestionEntity,
 ): MissionSuggestionEntity["activities"][number] | null {
-  const nonEmptyGroups = suggestion.activities.filter(
+  const nonEmptyGroups = getMissionSuggestionActivityGroups(suggestion).filter(
     (activityGroup) =>
       Array.isArray(activityGroup.suggestedActivities) &&
       activityGroup.suggestedActivities.length > 0,
@@ -1166,8 +1197,15 @@ function flattenMissionSuggestionActivities(
   const preferredGroup =
     pickPreferredMissionSuggestionActivityGroup(suggestion);
 
-  return Array.isArray(preferredGroup?.suggestedActivities)
-    ? preferredGroup.suggestedActivities
+  if (
+    Array.isArray(preferredGroup?.suggestedActivities) &&
+    preferredGroup.suggestedActivities.length > 0
+  ) {
+    return preferredGroup.suggestedActivities;
+  }
+
+  return Array.isArray(suggestion.suggestedActivities)
+    ? suggestion.suggestedActivities
     : [];
 }
 
@@ -1175,6 +1213,12 @@ function hasRenderableMissionSuggestion(
   suggestion: MissionSuggestionEntity,
 ): boolean {
   const activities = flattenMissionSuggestionActivities(suggestion);
+  const suggestedResources = Array.isArray(suggestion.suggestedResources)
+    ? suggestion.suggestedResources
+    : [];
+  const supplyShortages = Array.isArray(suggestion.supplyShortages)
+    ? suggestion.supplyShortages
+    : [];
 
   return (
     activities.length > 0 ||
@@ -1183,8 +1227,8 @@ function hasRenderableMissionSuggestion(
     trimToNull(suggestion.specialNotes) != null ||
     trimToNull(suggestion.mixedRescueReliefWarning) != null ||
     trimToNull(suggestion.lowConfidenceWarning) != null ||
-    suggestion.suggestedResources.length > 0 ||
-    suggestion.supplyShortages.length > 0 ||
+    suggestedResources.length > 0 ||
+    supplyShortages.length > 0 ||
     typeof suggestion.suggestedPriorityScore === "number" ||
     typeof suggestion.confidenceScore === "number"
   );
@@ -2928,6 +2972,7 @@ interface WaypointMeta {
 type SupplyDisplayItem = {
   name: string;
   quantityLabel: string;
+  bufferRatioLabel: string | null;
   pickedQuantityLabel: string | null;
   deliveredQuantityLabel: string | null;
   lotSourceLabel: string | null;
@@ -2959,6 +3004,10 @@ type SupplyDisplaySource = {
   unit: string;
   plannedPickupLotAllocations?: SupplyLotAllocationLike[] | null;
   pickupLotAllocations?: SupplyLotAllocationLike[] | null;
+  bufferRatio?: number | null;
+  bufferQuantity?: number | null;
+  bufferUsedQuantity?: number | null;
+  bufferUsedReason?: string | null;
   actualDeliveredQuantity?: number | null;
 };
 
@@ -3133,6 +3182,7 @@ function buildSupplyDisplayItem(
   const hasPickupLots = pickupLots.length > 0;
   const isCollectStep = normalizedActivityType === "collectsupplies";
   const isDeliverStep = normalizedActivityType === "deliversupplies";
+  const hasBufferPlanning = isCollectStep;
 
   const lotRows =
     isCollectStep && (hasPickupLots || plannedLots.length > 0)
@@ -3146,6 +3196,9 @@ function buildSupplyDisplayItem(
   return {
     name: getSupplyDisplayName(supply),
     quantityLabel: formatSupplyQuantityLabel(plannedQuantity, unit) ?? "-",
+    bufferRatioLabel: hasBufferPlanning
+      ? formatSupplyBufferPercent(supply.bufferRatio)
+      : null,
     pickedQuantityLabel:
       isCollectStep && hasPickupLots
         ? formatSupplyQuantityLabel(getLotQuantityTotal(pickupLots), unit)
@@ -3478,6 +3531,27 @@ function cloneSupplyCollections(
             ...unit,
           })),
         }
+      : {}),
+    bufferRatio: resolveSupplyBufferRatio(supply.bufferRatio),
+    ...(toFiniteNumber(supply.bufferQuantity) != null
+      ? {
+          bufferQuantity: Math.max(
+            0,
+            toFiniteNumber(supply.bufferQuantity) ?? 0,
+          ),
+        }
+      : {}),
+    ...(toFiniteNumber(supply.bufferUsedQuantity) != null
+      ? {
+          bufferUsedQuantity: Math.max(
+            0,
+            toFiniteNumber(supply.bufferUsedQuantity) ?? 0,
+          ),
+        }
+      : {}),
+    ...(typeof supply.bufferUsedReason === "string" &&
+    supply.bufferUsedReason.trim()
+      ? { bufferUsedReason: supply.bufferUsedReason.trim() }
       : {}),
     ...(toFiniteNumber(supply.actualDeliveredQuantity) != null
       ? {
@@ -3974,6 +4048,7 @@ function parseSupplyItemsFromDescription(
         return {
           name: value,
           quantityLabel: "",
+          bufferRatioLabel: null,
           pickedQuantityLabel: null,
           deliveredQuantityLabel: null,
           lotSourceLabel: null,
@@ -3990,6 +4065,7 @@ function parseSupplyItemsFromDescription(
       return {
         name: name || value,
         quantityLabel: `${quantity} ${unit}`.trim(),
+        bufferRatioLabel: null,
         pickedQuantityLabel: null,
         deliveredQuantityLabel: null,
         lotSourceLabel: null,
@@ -7210,10 +7286,7 @@ const SuggestionCard = ({
               </div>
             ) : null}
 
-            <CoordinationSummaryPanel
-              entries={coordinationEntries}
-              compact
-            />
+            <CoordinationSummaryPanel entries={coordinationEntries} compact />
 
             {suggestion.supplyShortages.length > 0 ? (
               <div className="rounded-md border border-sky-200 bg-sky-50/80 px-2.5 py-2 dark:border-sky-800/40 dark:bg-sky-900/10">
@@ -7283,10 +7356,7 @@ const SuggestionCard = ({
                           activity={act}
                           className="mt-1"
                         />
-                        <ActivityExecutionWarningBlock
-                          activity={act}
-                          compact
-                        />
+                        <ActivityExecutionWarningBlock activity={act} compact />
                         <TargetVictimsBlock
                           activity={act}
                           compact
@@ -7362,20 +7432,33 @@ const SuggestionCard = ({
                         {act.suppliesToCollect &&
                         act.suppliesToCollect.length > 0 ? (
                           <div className="mt-1 space-y-0.5">
-                            {act.suppliesToCollect.map((supply, sIdx) => (
-                              <div
-                                key={sIdx}
-                                className="flex items-center gap-1.5 text-sm text-blue-700 dark:text-blue-400"
-                              >
-                                <Package className="h-3 w-3 shrink-0" />
-                                <span className="font-medium">
-                                  {getSupplyDisplayName(supply)}
-                                </span>
-                                <span className="font-bold bg-blue-50 dark:bg-blue-900/20 px-1 rounded">
-                                  {supply.quantity} {supply.unit}
-                                </span>
-                              </div>
-                            ))}
+                            {act.suppliesToCollect.map((supply, sIdx) => {
+                              const showSupplyBuffer =
+                                act.activityType === "COLLECT_SUPPLIES";
+
+                              return (
+                                <div
+                                  key={sIdx}
+                                  className="flex items-center gap-1.5 text-sm text-blue-700 dark:text-blue-400"
+                                >
+                                  <Package className="h-3 w-3 shrink-0" />
+                                  <span className="font-medium">
+                                    {getSupplyDisplayName(supply)}
+                                  </span>
+                                  <span className="font-bold bg-blue-50 dark:bg-blue-900/20 px-1 rounded">
+                                    {supply.quantity} {supply.unit}
+                                  </span>
+                                  {showSupplyBuffer ? (
+                                    <span className="rounded bg-amber-50 px-1 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                      Dự trù{" "}
+                                      {formatSupplyBufferPercent(
+                                        supply.bufferRatio,
+                                      )}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : null}
                       </div>
@@ -8081,6 +8164,40 @@ const RescuePlanPanel = ({
     ],
   );
 
+  const handleUpdateSupplyBufferRatio = useCallback(
+    (activityId: string, supplyIndex: number, percent: number) => {
+      const targetActivity = editActivities.find((a) => a._id === activityId);
+      if (targetActivity?.activityType === "RETURN_SUPPLIES") {
+        toast.info(
+          "Tỉ lệ dự trù ở bước Hoàn trả được đồng bộ theo bước Thu gom vật phẩm.",
+        );
+        return;
+      }
+
+      clearEditActivityErrors();
+      setEditActivities((prev) =>
+        syncReturnActivitiesWithCollectors(
+          prev.map((a) => {
+            if (a._id !== activityId) return a;
+            const next = [...(a.suppliesToCollect ?? [])];
+            if (next[supplyIndex]) {
+              next[supplyIndex] = {
+                ...next[supplyIndex],
+                bufferRatio: supplyBufferPercentToRatio(percent),
+              };
+            }
+            return { ...a, suppliesToCollect: next };
+          }),
+        ),
+      );
+    },
+    [
+      clearEditActivityErrors,
+      editActivities,
+      syncReturnActivitiesWithCollectors,
+    ],
+  );
+
   const handleRemoveActivityWithConfirm = useCallback(
     (activity: EditableActivity, displayStep: number) => {
       setPendingRemoval({
@@ -8417,6 +8534,9 @@ const RescuePlanPanel = ({
                   : null,
               quantity: s.quantity,
               unit: normalizeSupplyUnit(s.unit),
+              ...(activity.activityType === "COLLECT_SUPPLIES"
+                ? { bufferRatio: resolveSupplyBufferRatio(s.bufferRatio) }
+                : {}),
               ...(plannedPickupLotAllocations
                 ? { plannedPickupLotAllocations }
                 : {}),
@@ -8469,6 +8589,7 @@ const RescuePlanPanel = ({
                     typeof sourceActivityId === "number" && sourceActivityId > 0
                       ? sourceActivityId
                       : 0,
+                  activityType: createRequest.activityType,
                   step: createRequest.step,
                   description: createRequest.description,
                   target: createRequest.target,
@@ -8497,6 +8618,13 @@ const RescuePlanPanel = ({
                       itemName: supply.name,
                       quantity: supply.quantity,
                       unit: normalizeSupplyUnit(supply.unit),
+                      ...(createRequest.activityType === "COLLECT_SUPPLIES"
+                        ? {
+                            bufferRatio: resolveSupplyBufferRatio(
+                              supply.bufferRatio,
+                            ),
+                          }
+                        : {}),
                       ...(plannedPickupLotAllocations
                         ? { plannedPickupLotAllocations }
                         : {}),
@@ -8979,6 +9107,10 @@ const RescuePlanPanel = ({
     step: number;
     activityLabel: string;
   } | null>(null);
+  const [activeMissionTeamReport, setActiveMissionTeamReport] = useState<{
+    mission: MissionEntity;
+    team: MissionTeam;
+  } | null>(null);
 
   useEffect(() => {
     if (open && defaultTab) setActiveTab(defaultTab);
@@ -9011,6 +9143,19 @@ const RescuePlanPanel = ({
       if (!nextOpen) {
         setActiveMissionReportImage(null);
       }
+    },
+    [],
+  );
+
+  const handleMissionTeamReportOpenChange = useCallback((nextOpen: boolean) => {
+    if (!nextOpen) {
+      setActiveMissionTeamReport(null);
+    }
+  }, []);
+
+  const handleOpenMissionTeamReport = useCallback(
+    (mission: MissionEntity, team: MissionTeam) => {
+      setActiveMissionTeamReport({ mission, team });
     },
     [],
   );
@@ -10014,23 +10159,6 @@ const RescuePlanPanel = ({
                           <ListChecks className="h-3.5 w-3.5" weight="bold" />
                           Nhiệm vụ đã tạo cho cụm này
                         </h3>
-                        {sortedMissions.length > 0 && (
-                          <>
-                            <Badge
-                              variant="outline"
-                              className="text-sm h-5 px-1.5 border-emerald-300/70 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
-                            >
-                              Đã phân công: {assignedMissionCount}
-                            </Badge>
-                            <Badge
-                              variant="outline"
-                              className="text-sm h-5 px-1.5 border-amber-300/70 text-amber-700 dark:border-amber-700 dark:text-amber-300"
-                            >
-                              Chờ phân công:{" "}
-                              {sortedMissions.length - assignedMissionCount}
-                            </Badge>
-                          </>
-                        )}
                       </div>
                       <Button
                         variant="outline"
@@ -10059,6 +10187,8 @@ const RescuePlanPanel = ({
                             getActiveMissionTeams(mission);
                           const hasAssignedTeams =
                             activeMissionTeams.length > 0;
+                          const missionReportStats =
+                            getMissionReportStats(activeMissionTeams);
                           const editableActivitiesCount =
                             mission.activities?.filter(
                               (activity) =>
@@ -10159,47 +10289,39 @@ const RescuePlanPanel = ({
                                       : "border-amber-200/80 bg-amber-50/60 dark:border-amber-700/50 dark:bg-amber-900/15",
                                   )}
                                 >
-                                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                                    <p
-                                      className={cn(
-                                        "text-sm font-bold uppercase tracking-wider flex items-center gap-1",
-                                        hasAssignedTeams
-                                          ? "text-emerald-700 dark:text-emerald-300"
-                                          : "text-amber-700 dark:text-amber-300",
-                                      )}
-                                    >
-                                      <ShieldCheck
-                                        className="h-3.5 w-3.5"
-                                        weight="fill"
-                                      />
-                                      {hasAssignedTeams
-                                        ? `Đã phân công ${activeMissionTeams.length} đội cứu hộ`
-                                        : "Chưa phân công đội cứu hộ"}
-                                    </p>
-                                    <Badge
-                                      variant="outline"
-                                      className={cn(
-                                        "text-sm h-5 px-1.5",
-                                        hasAssignedTeams
-                                          ? "border-emerald-300/80 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
-                                          : "border-amber-300/80 text-amber-700 dark:border-amber-700 dark:text-amber-300",
-                                      )}
-                                    >
-                                      {hasAssignedTeams
-                                        ? "Giám sát đang hoạt động"
-                                        : "Cần phân công"}
-                                    </Badge>
-                                  </div>
                                   {hasAssignedTeams && (
-                                    <p className="text-sm text-foreground/75 mt-1 line-clamp-2">
-                                      {activeMissionTeams
-                                        .map(
-                                          (team) =>
-                                            team.teamName ||
-                                            `Đội #${team.rescueTeamId}`,
-                                        )
-                                        .join(" • ")}
-                                    </p>
+                                    <>
+                                      <p className="text-sm text-foreground/75 mt-1 line-clamp-2">
+                                        {activeMissionTeams
+                                          .map(
+                                            (team) =>
+                                              team.teamName ||
+                                              `Đội #${team.rescueTeamId}`,
+                                          )
+                                          .join(" • ")}
+                                      </p>
+                                      <div className="mt-2 flex flex-wrap gap-1.5">
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 border-emerald-300/80 px-1.5 text-sm text-emerald-700 dark:border-emerald-700 dark:text-emerald-300"
+                                        >
+                                          Đã gửi: {missionReportStats.submitted}
+                                        </Badge>
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 border-amber-300/80 px-1.5 text-sm text-amber-700 dark:border-amber-700 dark:text-amber-300"
+                                        >
+                                          Nháp: {missionReportStats.draft}
+                                        </Badge>
+                                        <Badge
+                                          variant="outline"
+                                          className="h-5 border-slate-300/80 px-1.5 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                                        >
+                                          Chưa báo cáo:{" "}
+                                          {missionReportStats.notStarted}
+                                        </Badge>
+                                      </div>
+                                    </>
                                   )}
                                 </div>
 
@@ -10820,6 +10942,10 @@ const RescuePlanPanel = ({
                                                                         ) &&
                                                                         normalizedRescueTeamStatus !==
                                                                           normalizedAssignmentStatus;
+                                                                      const reportStatusMeta =
+                                                                        getMissionReportStatusMeta(
+                                                                          team.reportStatus,
+                                                                        );
 
                                                                       return (
                                                                         <div
@@ -10899,6 +11025,39 @@ const RescuePlanPanel = ({
                                                                                 viên
                                                                               </Badge>
                                                                             )}
+                                                                            <Badge
+                                                                              variant="outline"
+                                                                              className={cn(
+                                                                                "h-5 px-1.5 text-sm font-semibold",
+                                                                                reportStatusMeta.className,
+                                                                              )}
+                                                                            >
+                                                                              Báo
+                                                                              cáo:{" "}
+                                                                              {
+                                                                                reportStatusMeta.label
+                                                                              }
+                                                                            </Badge>
+                                                                            <Button
+                                                                              type="button"
+                                                                              variant="outline"
+                                                                              size="sm"
+                                                                              className="h-6 gap-1 px-2 text-sm border-sky-300 text-sky-700 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-300 dark:hover:bg-sky-900/20"
+                                                                              onClick={() =>
+                                                                                handleOpenMissionTeamReport(
+                                                                                  mission,
+                                                                                  team,
+                                                                                )
+                                                                              }
+                                                                            >
+                                                                              <Info
+                                                                                className="h-3 w-3"
+                                                                                weight="fill"
+                                                                              />
+                                                                              Xem
+                                                                              báo
+                                                                              cáo
+                                                                            </Button>
                                                                           </div>
                                                                         </div>
                                                                       );
@@ -10969,9 +11128,20 @@ const RescuePlanPanel = ({
                                                                                 }
                                                                               </span>
                                                                             </div>
-                                                                            <div className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                                                                              {supply.quantityLabel ||
-                                                                                "-"}
+                                                                            <div className="flex shrink-0 items-center gap-1">
+                                                                              <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                                                                                {supply.quantityLabel ||
+                                                                                  "-"}
+                                                                              </span>
+                                                                              {supply.bufferRatioLabel ? (
+                                                                                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                                                                  Dự
+                                                                                  trù{" "}
+                                                                                  {
+                                                                                    supply.bufferRatioLabel
+                                                                                  }
+                                                                                </span>
+                                                                              ) : null}
                                                                             </div>
                                                                           </div>
 
@@ -11558,6 +11728,9 @@ const RescuePlanPanel = ({
                                         const isReturnSuppliesActivity =
                                           activity.activityType ===
                                           "RETURN_SUPPLIES";
+                                        const isCollectSuppliesActivity =
+                                          activity.activityType ===
+                                          "COLLECT_SUPPLIES";
                                         const isAutoManagedSupplyStep =
                                           isReturnSuppliesActivity;
                                         const isAutoManagedTeamStep =
@@ -12308,7 +12481,9 @@ const RescuePlanPanel = ({
                                                                 >
                                                                   <div
                                                                     className={cn(
-                                                                      "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm",
+                                                                      isCollectSuppliesActivity
+                                                                        ? "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_76px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm"
+                                                                        : "grid min-w-0 grid-cols-[minmax(0,1fr)_64px_44px_24px] items-center gap-2 rounded border px-2 py-1 text-sm shadow-sm",
                                                                       hasActivityError
                                                                         ? "border-red-200 bg-red-50 dark:border-red-800/60 dark:bg-red-950/10"
                                                                         : "bg-background",
@@ -12370,6 +12545,46 @@ const RescuePlanPanel = ({
                                                                         supply.unit,
                                                                       )}
                                                                     </span>
+                                                                    {isCollectSuppliesActivity ? (
+                                                                      <div className="relative min-w-0">
+                                                                        <Input
+                                                                          type="number"
+                                                                          min={
+                                                                            0
+                                                                          }
+                                                                          max={
+                                                                            100
+                                                                          }
+                                                                          step={
+                                                                            1
+                                                                          }
+                                                                          value={getSupplyBufferPercentInputValue(
+                                                                            supply.bufferRatio,
+                                                                          )}
+                                                                          onChange={(
+                                                                            event,
+                                                                          ) =>
+                                                                            handleUpdateSupplyBufferRatio(
+                                                                              activity._id,
+                                                                              sIdx,
+                                                                              parseFloat(
+                                                                                event
+                                                                                  .target
+                                                                                  .value,
+                                                                              ),
+                                                                            )
+                                                                          }
+                                                                          disabled={
+                                                                            lockGeneralActivityEdits
+                                                                          }
+                                                                          title="Dự trù (%)"
+                                                                          className="h-6 w-full pr-4 pl-1 text-center text-sm"
+                                                                        />
+                                                                        <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                                                          %
+                                                                        </span>
+                                                                      </div>
+                                                                    ) : null}
                                                                     <Button
                                                                       variant="ghost"
                                                                       size="icon"
@@ -13004,9 +13219,19 @@ const RescuePlanPanel = ({
                                                               {supply.name}
                                                             </span>
                                                           </div>
-                                                          <div className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                                                            {supply.quantityLabel ||
-                                                              "-"}
+                                                          <div className="flex shrink-0 items-center gap-1">
+                                                            <span className="rounded bg-blue-50 px-1.5 py-0.5 font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                                                              {supply.quantityLabel ||
+                                                                "-"}
+                                                            </span>
+                                                            {supply.bufferRatioLabel ? (
+                                                              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                                                Dự trù{" "}
+                                                                {
+                                                                  supply.bufferRatioLabel
+                                                                }
+                                                              </span>
+                                                            ) : null}
                                                           </div>
                                                         </div>
                                                       </div>
@@ -13630,6 +13855,13 @@ const RescuePlanPanel = ({
             ) : null}
           </div>
         </div>
+
+        <MissionTeamReportSheet
+          open={Boolean(activeMissionTeamReport)}
+          onOpenChange={handleMissionTeamReportOpenChange}
+          mission={activeMissionTeamReport?.mission ?? null}
+          team={activeMissionTeamReport?.team ?? null}
+        />
 
         <Dialog
           open={Boolean(activeMissionReportImage)}

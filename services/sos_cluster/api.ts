@@ -8,6 +8,7 @@ import {
   CreateSOSClusterResponse,
   GetMissionSuggestionsResponse,
   ClusterRescueSuggestionResponse,
+  MissionSuggestionEntity,
   AlternativeDepotsResponse,
   SseMissionEvent,
 } from "./type";
@@ -219,6 +220,73 @@ function normalizeSOSClustersPage(
   };
 }
 
+function normalizeArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+type MissionSuggestionActivityGroup =
+  MissionSuggestionEntity["activities"][number];
+
+function normalizeMissionSuggestionActivity(
+  activityGroup: MissionSuggestionActivityGroup | null | undefined,
+): MissionSuggestionActivityGroup | null {
+  if (!activityGroup || typeof activityGroup !== "object") {
+    return null;
+  }
+
+  return {
+    ...activityGroup,
+    suggestedActivities: normalizeArray(activityGroup.suggestedActivities),
+  };
+}
+
+function normalizeMissionSuggestion(
+  suggestion: MissionSuggestionEntity | null | undefined,
+): MissionSuggestionEntity | null {
+  if (!suggestion || typeof suggestion !== "object") {
+    return null;
+  }
+
+  return {
+    ...suggestion,
+    suggestedActivities: normalizeArray(suggestion.suggestedActivities),
+    activities: normalizeArray(suggestion.activities)
+      .map(normalizeMissionSuggestionActivity)
+      .filter(
+        (
+          activityGroup,
+        ): activityGroup is MissionSuggestionActivityGroup =>
+          activityGroup != null,
+      ),
+    supplyShortages: normalizeArray(suggestion.supplyShortages),
+    suggestedResources: normalizeArray(suggestion.suggestedResources),
+  };
+}
+
+function normalizeMissionSuggestionsResponse(
+  payload: GetMissionSuggestionsResponse | null | undefined,
+  fallbackClusterId: number,
+): GetMissionSuggestionsResponse {
+  const missionSuggestions = normalizeArray(payload?.missionSuggestions)
+    .map(normalizeMissionSuggestion)
+    .filter(
+      (suggestion): suggestion is MissionSuggestionEntity => suggestion != null,
+    );
+
+  return {
+    ...(payload ?? {}),
+    clusterId:
+      typeof payload?.clusterId === "number"
+        ? payload.clusterId
+        : fallbackClusterId,
+    totalSuggestions:
+      typeof payload?.totalSuggestions === "number"
+        ? payload.totalSuggestions
+        : missionSuggestions.length,
+    missionSuggestions,
+  };
+}
+
 export function formatAiAnalysisErrorMessage(
   rawError: unknown,
   statusCode?: number,
@@ -396,7 +464,7 @@ export async function getMissionSuggestions(
   const { data } = await api.get(
     `/emergency/sos-clusters/${clusterId}/mission-suggestions`,
   );
-  return data;
+  return normalizeMissionSuggestionsResponse(data, clusterId);
 }
 
 /**

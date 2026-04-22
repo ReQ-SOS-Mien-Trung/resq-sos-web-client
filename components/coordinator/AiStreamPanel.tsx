@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import gsap from "gsap";
 import { cn } from "@/lib/utils";
+import { formatSupplyBufferPercent } from "@/lib/supply-buffer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -1847,6 +1848,11 @@ function ActivityFlowNode({
                     ×{supply.quantity}
                   </span>
                   <span className="text-primary/40">{supply.unit}</span>
+                  {normalizedActivityType === "COLLECT_SUPPLIES" ? (
+                    <span className="rounded bg-amber-50 px-1 font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                      Dự trù {formatSupplyBufferPercent(supply.bufferRatio)}
+                    </span>
+                  ) : null}
                 </div>
               ))}
             </div>
