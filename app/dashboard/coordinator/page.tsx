@@ -485,6 +485,9 @@ const CoordinatorDashboardContent = () => {
   const [analyzingClusterId, setAnalyzingClusterId] = useState<number | null>(
     null,
   );
+  const [recentlyClusteredSOSIds, setRecentlyClusteredSOSIds] = useState<
+    Set<string>
+  >(() => new Set());
 
   // ─── Refs ───
   const sidebarBeforeRescuePlanRef = useRef(true);
@@ -492,6 +495,23 @@ const CoordinatorDashboardContent = () => {
   const previousMapSosIdsRef = useRef<Set<string> | null>(null);
   const risingMarkerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
+  );
+
+  const markSOSRequestsAsClustered = useCallback(
+    (sosRequestIds: Array<number | string>) => {
+      if (sosRequestIds.length === 0) {
+        return;
+      }
+
+      setRecentlyClusteredSOSIds((current) => {
+        const next = new Set(current);
+        sosRequestIds.forEach((id) => {
+          next.add(String(id));
+        });
+        return next;
+      });
+    },
+    [],
   );
 
   const statusQueryFilter = useMemo(
@@ -643,6 +663,35 @@ const CoordinatorDashboardContent = () => {
     () => clustersData?.clusters ?? [],
     [clustersData],
   );
+  useEffect(() => {
+    if (recentlyClusteredSOSIds.size === 0) {
+      return;
+    }
+
+    const backendClusteredIds = new Set(
+      clusters.flatMap((cluster) =>
+        cluster.sosRequestIds.map((id) => String(id)),
+      ),
+    );
+
+    if (backendClusteredIds.size === 0) {
+      return;
+    }
+
+    setRecentlyClusteredSOSIds((current) => {
+      let changed = false;
+      const next = new Set(current);
+
+      current.forEach((id) => {
+        if (backendClusteredIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
+  }, [clusters, recentlyClusteredSOSIds.size]);
   const serviceZones = useMemo<ServiceZoneEntity[]>(
     () => serviceZonesData ?? [],
     [serviceZonesData],
@@ -695,14 +744,27 @@ const CoordinatorDashboardContent = () => {
     sosClusterGroupingConfigQuery.data?.maximumDistanceKm ?? 0;
 
   const autoClusters = useMemo(
-    () =>
-      clusterGroupingStatus === "success"
-        ? buildAutoClusters(sosRequests, clusters, maximumAutoClusterDistanceKm)
-        : [],
+    () => {
+      if (clusterGroupingStatus !== "success") {
+        return [];
+      }
+
+      const clusterableSOSRequests =
+        recentlyClusteredSOSIds.size === 0
+          ? sosRequests
+          : sosRequests.filter((sos) => !recentlyClusteredSOSIds.has(sos.id));
+
+      return buildAutoClusters(
+        clusterableSOSRequests,
+        clusters,
+        maximumAutoClusterDistanceKm,
+      );
+    },
     [
       clusterGroupingStatus,
       clusters,
       maximumAutoClusterDistanceKm,
+      recentlyClusteredSOSIds,
       sosRequests,
     ],
   );
@@ -1147,6 +1209,7 @@ const CoordinatorDashboardContent = () => {
           {
             onSuccess: (data) => {
               created++;
+              markSOSRequestsAsClustered(data.sosRequestIds);
               setActiveClusterId(data.clusterId);
               if (created + failed === total) {
                 toast.success(`Đã gom thành công ${created} cụm SOS`);
@@ -1169,7 +1232,7 @@ const CoordinatorDashboardContent = () => {
         );
       });
     },
-    [createCluster],
+    [createCluster, markSOSRequestsAsClustered],
   );
 
   const handleProcessSOS = useCallback(
@@ -1194,6 +1257,7 @@ const CoordinatorDashboardContent = () => {
         { sosRequestIds: ids },
         {
           onSuccess: (clusterData) => {
+            markSOSRequestsAsClustered(clusterData.sosRequestIds);
             setActiveClusterId(clusterData.clusterId);
             setAnalyzingClusterId(clusterData.clusterId);
             setAiStreamClusterId(clusterData.clusterId);
@@ -1212,7 +1276,13 @@ const CoordinatorDashboardContent = () => {
         },
       );
     },
-    [sosRequests, autoClusters, createCluster, aiStream],
+    [
+      sosRequests,
+      autoClusters,
+      createCluster,
+      aiStream,
+      markSOSRequestsAsClustered,
+    ],
   );
 
   const handleAnalyzeCluster = useCallback(
@@ -1738,6 +1808,10 @@ const CoordinatorDashboardContent = () => {
               <AiStreamPanel
                 open={aiStreamOpen}
                 onClose={() => {
+                  if (aiStream.loading) {
+                    return;
+                  }
+
                   setAiStreamOpen(false);
                   aiStream.stopStream();
                 }}

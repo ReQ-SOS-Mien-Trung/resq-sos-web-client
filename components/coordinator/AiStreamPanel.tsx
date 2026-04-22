@@ -427,6 +427,14 @@ export default function AiStreamPanel({
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const isExpanded = size === "expanded";
+  const canClose = !loading;
+  const handleClose = () => {
+    if (!canClose) {
+      return;
+    }
+
+    onClose();
+  };
 
   useEffect(() => {
     if (!open || !panelRef.current || !overlayRef.current) return;
@@ -480,7 +488,7 @@ export default function AiStreamPanel({
         error={error}
         phase={phase}
         onStop={onStop}
-        onClose={onClose}
+        onClose={handleClose}
         inline={inline}
         expanded={isExpanded}
       />
@@ -525,8 +533,11 @@ export default function AiStreamPanel({
       style={{ opacity: 0 }}
     >
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
+        className={cn(
+          "absolute inset-0 bg-black/50 backdrop-blur-sm",
+          canClose ? "cursor-pointer" : "cursor-not-allowed",
+        )}
+        onClick={handleClose}
       />
       {panelShell}
     </div>
@@ -647,8 +658,12 @@ function TopBar({
             size="icon"
             className={cn(
               expanded ? "h-8 w-8 rounded-md" : "h-7 w-7 rounded-md",
+              loading && "cursor-not-allowed opacity-45",
             )}
             onClick={onClose}
+            disabled={loading}
+            title={loading ? "Đợi AI phân tích xong để đóng panel" : "Đóng"}
+            aria-label={loading ? "Đang phân tích, chưa thể đóng" : "Đóng"}
           >
             <X className="h-4 w-4" />
           </Button>
