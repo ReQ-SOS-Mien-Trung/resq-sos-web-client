@@ -124,6 +124,17 @@ export interface ClusterSupplyCollection {
 }
 
 export interface ClusterTargetVictim {
+  personId?: string | null;
+  displayName?: string | null;
+  personType?: string | null;
+  personPhone?: string | null;
+  index?: number | null;
+  isInjured?: boolean | null;
+  severity?: string | null;
+  medicalIssues?: string[] | null;
+  clothingNeeded?: boolean | null;
+  clothingGender?: string | null;
+  specialDietDescription?: string | null;
   [key: string]: unknown;
 }
 
@@ -198,8 +209,13 @@ export interface ClusterSupplyShortage {
 export interface MissionSuggestionEntity {
   id: number;
   clusterId: number | null;
+  suggestionId?: number | null;
+  isSuccess?: boolean | null;
+  errorMessage?: string | null;
   modelName: string | null;
   analysisType: string | null;
+  responseTimeMs?: number | null;
+  sosRequestCount?: number | null;
   suggestedMissionTitle: string | null;
   suggestedMissionType: ClusterMissionType | string | null;
   suggestedPriorityScore: number | null;
@@ -214,6 +230,7 @@ export interface MissionSuggestionEntity {
   needsAdditionalDepot: boolean;
   supplyShortages: ClusterSupplyShortage[];
   suggestedResources: ClusterSuggestedResource[];
+  multiDepotRecommended?: boolean | null;
   suggestionScope: string | null;
   createdAt: string | null;
   activities: MissionSuggestionActivity[];
