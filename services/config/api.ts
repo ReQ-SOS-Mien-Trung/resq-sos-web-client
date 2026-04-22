@@ -75,6 +75,11 @@ export async function getSosPriorityRuleConfig(): Promise<SosPriorityRuleConfigE
   return data;
 }
 
+export async function getSosFormPriorityRuleConfig(): Promise<SosPriorityRuleConfigEntity> {
+  const { data } = await api.get("/emergency/sos-form-config");
+  return data;
+}
+
 export async function getSosPriorityRuleConfigById(
   id: number,
 ): Promise<SosPriorityRuleConfigEntity> {

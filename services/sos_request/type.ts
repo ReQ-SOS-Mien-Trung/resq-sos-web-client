@@ -347,6 +347,8 @@ export interface ScoreWeights {
 
 export interface RuleEvaluation {
   id: number;
+  configId?: number | null;
+  configVersion?: string | null;
   medicalScore: number;
   injuryScore: number;
   mobilityScore: number;
@@ -356,6 +358,7 @@ export interface RuleEvaluation {
   priorityLevel: SOSPriorityLevel;
   ruleVersion: string;
   itemsNeeded: string[];
+  breakdown?: Record<string, unknown> | null;
   createdAt: string;
   priorityThresholds: PriorityThresholds;
   scoreWeights: ScoreWeights;

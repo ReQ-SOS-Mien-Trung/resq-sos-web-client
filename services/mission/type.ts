@@ -123,7 +123,14 @@ export interface MissionEntity {
   estimatedDuration?: string | null;
   specialNotes?: string | null;
   mixedRescueReliefWarning?: string | null;
+  needsManualReview?: boolean | null;
+  lowConfidenceWarning?: string | null;
   needsAdditionalDepot?: boolean | null;
+  multiDepotRecommended?: boolean | null;
+  responseTimeMs?: number | null;
+  sosRequestCount?: number | null;
+  isSuccess?: boolean | null;
+  errorMessage?: string | null;
   supplyShortages?: ClusterSupplyShortage[] | null;
   suggestedActivities?: ClusterSuggestedActivity[] | null;
   suggestedResources?: ClusterSuggestedResource[];
