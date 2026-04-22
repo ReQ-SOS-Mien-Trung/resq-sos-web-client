@@ -412,6 +412,16 @@ function normalizeDepotClosureDetailTransfers(
     .filter((item): item is DepotClosureDetailTransfer => item != null);
 }
 
+function normalizeDepotClosureTransferResponse(
+  payload: unknown,
+): DepotClosureTransfer {
+  const normalized = normalizeDepotClosureDetailTransfer(payload);
+  if (!normalized) {
+    throw new Error("Invalid depot closure transfer response");
+  }
+  return normalized;
+}
+
 function normalizeExternalResolvedItems(
   payload: unknown,
 ): DepotExternalResolvedItem[] {
@@ -988,16 +998,16 @@ export async function getDepotClosureDetailByDepotId(
 
 /**
  * Get transfer record
- * GET /logistics/depot/{id}/transfer/{transferId}
+ * GET /logistics/depot/{id}/close/transfer/{transferId}
  */
 export async function getDepotClosureTransfer(
   id: number,
   transferId: number,
 ): Promise<DepotClosureTransfer> {
   const { data } = await api.get(
-    `/logistics/depot/${id}/transfer/${transferId}`,
+    `/logistics/depot/${id}/close/transfer/${transferId}`,
   );
-  return data;
+  return normalizeDepotClosureTransferResponse(data);
 }
 
 /**

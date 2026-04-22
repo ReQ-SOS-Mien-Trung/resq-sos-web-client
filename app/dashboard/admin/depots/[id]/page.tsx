@@ -177,6 +177,59 @@ function isConsumableItemType(value: string | null | undefined): boolean {
   return value?.trim().toLocaleLowerCase("en-US") === "consumable";
 }
 
+function getInventoryItemTypeLabel(
+  value: string | null | undefined,
+  itemTypeValueMap: Record<string, string>,
+): string {
+  if (!value) return "—";
+  return itemTypeValueMap[String(value)] ?? value;
+}
+
+const TRANSFER_RECORD_TONES = [
+  {
+    accentBorder: "border-l-emerald-400",
+    headerBg: "bg-emerald-50/85",
+    headerBorder: "border-emerald-100/80",
+    tableHeadBg: "bg-emerald-50/70",
+    tableHeadStickyBg: "bg-emerald-50/95",
+  },
+  {
+    accentBorder: "border-l-sky-400",
+    headerBg: "bg-sky-50/85",
+    headerBorder: "border-sky-100/80",
+    tableHeadBg: "bg-sky-50/70",
+    tableHeadStickyBg: "bg-sky-50/95",
+  },
+  {
+    accentBorder: "border-l-violet-400",
+    headerBg: "bg-violet-50/85",
+    headerBorder: "border-violet-100/80",
+    tableHeadBg: "bg-violet-50/70",
+    tableHeadStickyBg: "bg-violet-50/95",
+  },
+  {
+    accentBorder: "border-l-amber-400",
+    headerBg: "bg-amber-50/85",
+    headerBorder: "border-amber-100/80",
+    tableHeadBg: "bg-amber-50/70",
+    tableHeadStickyBg: "bg-amber-50/95",
+  },
+  {
+    accentBorder: "border-l-rose-400",
+    headerBg: "bg-rose-50/85",
+    headerBorder: "border-rose-100/80",
+    tableHeadBg: "bg-rose-50/70",
+    tableHeadStickyBg: "bg-rose-50/95",
+  },
+  {
+    accentBorder: "border-l-orange-400",
+    headerBg: "bg-orange-50/85",
+    headerBorder: "border-orange-100/80",
+    tableHeadBg: "bg-orange-50/70",
+    tableHeadStickyBg: "bg-orange-50/95",
+  },
+] as const;
+
 interface TransferCapacityLoad {
   requiredVolume: number;
   requiredWeight: number;
@@ -597,6 +650,14 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
     refetch,
     isFetching,
   } = useDepotClosuresListByDepotId(depotId);
+  const { data: itemTypes = [] } = useInventoryItemTypes();
+  const itemTypeValueMap = useMemo(
+    () =>
+      Object.fromEntries(
+        itemTypes.map((itemType) => [String(itemType.key), itemType.value]),
+      ),
+    [itemTypes],
+  );
   const { data: transferStatusMetadata = [] } = useDepotClosureTransferStatuses(
     {
       enabled: depotId > 0,
@@ -1015,70 +1076,57 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                       )}
 
                                       {detail && (
-                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-5">
+                                        <div className="grid grid-cols-3 gap-3">
                                           {[
                                             {
-                                              label: "Tiêu hao đang reserve",
+                                              label:
+                                                "Số lượng vật phẩm đang tạm giữ",
                                               value: (
                                                 detail.reservedConsumableItemCount ??
                                                 0
                                               ).toLocaleString("vi-VN"),
-                                              hint: `${(
-                                                detail.reservedConsumableUnitCount ??
-                                                0
-                                              ).toLocaleString(
-                                                "vi-VN",
-                                              )} đơn vị`,
+                                              // hint: `${(
+                                              //   detail.reservedConsumableUnitCount ??
+                                              //   0
+                                              // ).toLocaleString(
+                                              //   "vi-VN",
+                                              // )} đơn vị`,
                                             },
                                             {
-                                              label: "Reusable chưa sẵn sàng",
+                                              label:
+                                                "Số lượng vật phẩm đang không sẵn sàng",
                                               value: (
                                                 detail.nonAvailableReusableItemModelCount ??
                                                 0
                                               ).toLocaleString("vi-VN"),
-                                              hint: `${(
-                                                detail.nonAvailableReusableUnitCount ??
-                                                0
-                                              ).toLocaleString(
-                                                "vi-VN",
-                                              )} đơn vị`,
+                                              // hint: `${(
+                                              //   detail.nonAvailableReusableUnitCount ??
+                                              //   0
+                                              // ).toLocaleString(
+                                              //   "vi-VN",
+                                              // )} đơn vị`,
                                             },
                                             {
-                                              label: "Có thể chọn phương án",
+                                              label:
+                                                "Có thể chọn phương án xử lý",
                                               value:
                                                 detail.canSelectResolutionOption
                                                   ? "Có"
                                                   : "Không",
-                                              hint: "Dựa trên trạng thái closure",
-                                            },
-                                            {
-                                              label: "Tải template ngoài",
-                                              value:
-                                                detail.canDownloadExternalTemplate
-                                                  ? "Có"
-                                                  : "Không",
-                                              hint: "Quyền tải mẫu xử lý",
-                                            },
-                                            {
-                                              label: "Upload xử lý ngoài",
-                                              value:
-                                                detail.canUploadExternalResolution
-                                                  ? "Có"
-                                                  : "Không",
-                                              hint: "Quyền nộp kết quả xử lý",
+                                              hint: "Dựa trên trạng thái phiên đóng",
                                             },
                                           ].map((item) => (
                                             <div
                                               key={item.label}
-                                              className="rounded-xl border border-border/50 bg-white px-3.5 py-3"
+                                              className="min-w-0 rounded-xl border border-border/50 bg-white px-3.5 py-3"
                                             >
-                                              <p className="text-xs tracking-tighter text-muted-foreground">
+                                              <p className="text-[13px] font-medium tracking-tighter text-foreground/80">
                                                 {item.label}
                                               </p>
-                                              <p className="mt-1 text-sm font-semibold tracking-tighter text-foreground">
+                                              <p className="text-base font-semibold tracking-tighter mt-0.5 text-foreground">
                                                 {item.value}
                                               </p>
-                                              <p className="mt-1 text-[11px] tracking-tighter text-muted-foreground">
+                                              <p className="mt-1 text-xs tracking-tighter text-muted-foreground">
                                                 {item.hint}
                                               </p>
                                             </div>
@@ -1139,7 +1187,10 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                                           </p>
                                                         </td>
                                                         <td className="px-3 py-2 text-sm tracking-tighter text-foreground">
-                                                          {item.itemType}
+                                                          {getInventoryItemTypeLabel(
+                                                            item.itemType,
+                                                            itemTypeValueMap,
+                                                          )}
                                                         </td>
                                                         <td className="px-3 py-2 text-right text-sm tracking-tighter text-foreground">
                                                           {(
@@ -1187,154 +1238,200 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                       {(transferRecords.length > 0 ||
                                         allTransfers.length > 0) && (
                                         <div>
-                                          <p className="text-xs font-semibold tracking-tighter text-muted-foreground mb-2 uppercase">
-                                            Các transfer (
+                                          <p className="text-base font-semibold tracking-tighter text-muted-foreground mb-2 uppercase">
+                                            Các đợt điều chuyển (
                                             {transferRecords.length ||
                                               allTransfers.length}
                                             )
                                           </p>
                                           <div className="space-y-3">
                                             {transferRecords.length > 0 ? (
-                                              transferRecords.map((t) => (
-                                                <div
-                                                  key={t.id}
-                                                  className="rounded-xl border border-border/40 bg-white overflow-hidden"
-                                                >
-                                                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/40 bg-muted/20 px-4 py-3">
-                                                    <div className="space-y-1">
-                                                      <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-bold tracking-tighter text-foreground">
-                                                          Transfer #{t.id}
-                                                        </span>
-                                                        <Badge
-                                                          className={cn(
-                                                            "text-xs font-medium tracking-tighter",
-                                                            getDepotClosureTransferStatusToneClass(
-                                                              t.status,
-                                                            ),
-                                                          )}
-                                                        >
-                                                          {getDepotClosureTransferStatusLabel(
-                                                            t.status,
-                                                            transferStatusValueMap,
-                                                          )}
-                                                        </Badge>
+                                              transferRecords.map(
+                                                (t, index) => {
+                                                  const tone =
+                                                    TRANSFER_RECORD_TONES[
+                                                      index %
+                                                        TRANSFER_RECORD_TONES.length
+                                                    ];
+
+                                                  return (
+                                                    <div
+                                                      key={t.id}
+                                                      className={cn(
+                                                        "overflow-hidden rounded-xl border border-border/40 border-l-4 bg-white",
+                                                        tone.accentBorder,
+                                                      )}
+                                                    >
+                                                      <div
+                                                        className={cn(
+                                                          "flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3",
+                                                          tone.headerBg,
+                                                          tone.headerBorder,
+                                                        )}
+                                                      >
+                                                        <div className="space-y-2">
+                                                          <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-semibold tracking-tighter text-foreground">
+                                                              Đơn điều chuyển số{" "}
+                                                              {t.id}
+                                                            </span>
+                                                            <Badge
+                                                              className={cn(
+                                                                "text-xs font-medium tracking-tighter",
+                                                                getDepotClosureTransferStatusToneClass(
+                                                                  t.status,
+                                                                ),
+                                                              )}
+                                                            >
+                                                              {getDepotClosureTransferStatusLabel(
+                                                                t.status,
+                                                                transferStatusValueMap,
+                                                              )}
+                                                            </Badge>
+                                                          </div>
+                                                          <p className="text-xs tracking-tighter font-medium text-foreground/80">
+                                                            {t.sourceDepotName ||
+                                                              `Kho #${t.sourceDepotId}`}{" "}
+                                                            →{" "}
+                                                            {t.targetDepotName ||
+                                                              `Kho #${t.targetDepotId}`}
+                                                          </p>
+                                                        </div>
+                                                        <div className="text-right text-xs tracking-tighter font-medium text-foreground/80">
+                                                          <p>
+                                                            Tạo lúc{" "}
+                                                            {formatDateTimeValue(
+                                                              t.createdAt,
+                                                            )}
+                                                          </p>
+                                                          <p>
+                                                            Vận chuyển lúc:{" "}
+                                                            {formatDateTimeValue(
+                                                              t.shippedAt,
+                                                            )}
+                                                          </p>
+                                                          <p>
+                                                            Nhận lúc:{" "}
+                                                            {formatDateTimeValue(
+                                                              t.receivedAt,
+                                                            )}
+                                                          </p>
+                                                        </div>
                                                       </div>
-                                                      <p className="text-xs tracking-tighter text-muted-foreground">
-                                                        {t.sourceDepotName ||
-                                                          `Kho #${t.sourceDepotId}`}{" "}
-                                                        →{" "}
-                                                        {t.targetDepotName ||
-                                                          `Kho #${t.targetDepotId}`}
-                                                      </p>
-                                                    </div>
-                                                    <div className="text-right text-xs tracking-tighter text-muted-foreground">
-                                                      <p>
-                                                        Tạo lúc{" "}
-                                                        {formatDateTimeValue(
-                                                          t.createdAt,
-                                                        )}
-                                                      </p>
-                                                      <p>
-                                                        Ship:{" "}
-                                                        {formatDateTimeValue(
-                                                          t.shippedAt,
-                                                        )}
-                                                      </p>
-                                                      <p>
-                                                        Receive:{" "}
-                                                        {formatDateTimeValue(
-                                                          t.receivedAt,
-                                                        )}
-                                                      </p>
-                                                    </div>
-                                                  </div>
-                                                  <div className="grid grid-cols-2 gap-3 border-b border-border/30 px-4 py-3 sm:grid-cols-4">
-                                                    {[
-                                                      {
-                                                        label: "Consumable",
-                                                        value:
-                                                          t.snapshotConsumableUnits.toLocaleString(
-                                                            "vi-VN",
-                                                          ),
-                                                      },
-                                                      {
-                                                        label: "Reusable",
-                                                        value:
-                                                          t.snapshotReusableUnits.toLocaleString(
-                                                            "vi-VN",
-                                                          ),
-                                                      },
-                                                      {
-                                                        label: "Người xuất",
-                                                        value:
-                                                          t.shippedBy || "—",
-                                                      },
-                                                      {
-                                                        label: "Người nhận",
-                                                        value:
-                                                          t.receivedBy || "—",
-                                                      },
-                                                    ].map((item) => (
-                                                      <div key={item.label}>
-                                                        <p className="text-[11px] tracking-tighter text-muted-foreground">
-                                                          {item.label}
-                                                        </p>
-                                                        <p className="mt-1 text-sm font-semibold tracking-tighter text-foreground">
-                                                          {item.value}
-                                                        </p>
+                                                      <div className="grid grid-cols-2 gap-3 border-b border-border/30 px-4 py-3 sm:grid-cols-4">
+                                                        {[
+                                                          {
+                                                            label:
+                                                              "Số lượng vật phẩm tiêu thụ",
+                                                            value:
+                                                              t.snapshotConsumableUnits.toLocaleString(
+                                                                "vi-VN",
+                                                              ),
+                                                          },
+                                                          {
+                                                            label:
+                                                              "Số lượng vật phẩm tái sử dụng",
+                                                            value:
+                                                              t.snapshotReusableUnits.toLocaleString(
+                                                                "vi-VN",
+                                                              ),
+                                                          },
+                                                          {
+                                                            label:
+                                                              "Người xuất kho",
+                                                            value:
+                                                              t.shippedBy ||
+                                                              "—",
+                                                          },
+                                                          {
+                                                            label: "Người nhận",
+                                                            value:
+                                                              t.receivedBy ||
+                                                              "—",
+                                                          },
+                                                        ].map((item) => (
+                                                          <div key={item.label}>
+                                                            <p className="text-[13px] tracking-tighter text-muted-foreground">
+                                                              {item.label}
+                                                            </p>
+                                                            <p className="mt-1 text-sm font-semibold tracking-tighter text-foreground">
+                                                              {item.value}
+                                                            </p>
+                                                          </div>
+                                                        ))}
                                                       </div>
-                                                    ))}
-                                                  </div>
-                                                  {t.items.length > 0 && (
-                                                    <div className="overflow-x-auto">
-                                                      <table className="w-full">
-                                                        <thead>
-                                                          <tr className="border-b border-border/30 bg-muted/10">
-                                                            <th className="text-left px-4 py-2 text-xs font-semibold tracking-tighter text-foreground">
-                                                              Vật phẩm
-                                                            </th>
-                                                            <th className="text-left px-4 py-2 text-xs font-semibold tracking-tighter text-foreground">
-                                                              Loại
-                                                            </th>
-                                                            <th className="text-right px-4 py-2 text-xs font-semibold tracking-tighter text-foreground">
-                                                              Số lượng
-                                                            </th>
-                                                          </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                          {t.items.map(
-                                                            (item) => (
+                                                      {t.items.length > 0 && (
+                                                        <div className="max-h-80 overflow-auto">
+                                                          <table className="w-full">
+                                                            <thead>
                                                               <tr
-                                                                key={`${t.id}-${item.itemModelId}-${item.itemType}`}
-                                                                className="border-b border-border/20 last:border-0"
+                                                                className={cn(
+                                                                  "border-b border-border/30",
+                                                                  tone.tableHeadBg,
+                                                                )}
                                                               >
-                                                                <td className="px-4 py-2 text-sm tracking-tighter text-foreground">
-                                                                  {
-                                                                    item.itemName
-                                                                  }
-                                                                </td>
-                                                                <td className="px-4 py-2 text-sm tracking-tighter text-muted-foreground">
-                                                                  {
-                                                                    item.itemType
-                                                                  }
-                                                                </td>
-                                                                <td className="px-4 py-2 text-right text-sm tracking-tighter text-foreground">
-                                                                  {item.quantity.toLocaleString(
-                                                                    "vi-VN",
-                                                                  )}{" "}
-                                                                  {item.unit ||
-                                                                    ""}
-                                                                </td>
+                                                                <th
+                                                                  className={cn(
+                                                                    "sticky top-0 z-10 text-left px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
+                                                                    tone.tableHeadStickyBg,
+                                                                  )}
+                                                                >
+                                                                  Vật phẩm
+                                                                </th>
+                                                                <th
+                                                                  className={cn(
+                                                                    "sticky top-0 z-10 text-left px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
+                                                                    tone.tableHeadStickyBg,
+                                                                  )}
+                                                                >
+                                                                  Loại
+                                                                </th>
+                                                                <th
+                                                                  className={cn(
+                                                                    "sticky top-0 z-10 text-right px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
+                                                                    tone.tableHeadStickyBg,
+                                                                  )}
+                                                                >
+                                                                  Số lượng
+                                                                </th>
                                                               </tr>
-                                                            ),
-                                                          )}
-                                                        </tbody>
-                                                      </table>
+                                                            </thead>
+                                                            <tbody>
+                                                              {t.items.map(
+                                                                (item) => (
+                                                                  <tr
+                                                                    key={`${t.id}-${item.itemModelId}-${item.itemType}`}
+                                                                    className="border-b border-border/20 last:border-0"
+                                                                  >
+                                                                    <td className="px-4 py-2 text-sm tracking-tighter text-foreground">
+                                                                      {
+                                                                        item.itemName
+                                                                      }
+                                                                    </td>
+                                                                    <td className="px-4 py-2 text-sm tracking-tighter text-muted-foreground">
+                                                                      {getInventoryItemTypeLabel(
+                                                                        item.itemType,
+                                                                        itemTypeValueMap,
+                                                                      )}
+                                                                    </td>
+                                                                    <td className="px-4 py-2 text-right text-sm tracking-tighter text-foreground">
+                                                                      {item.quantity.toLocaleString(
+                                                                        "vi-VN",
+                                                                      )}{" "}
+                                                                      {item.unit ||
+                                                                        ""}
+                                                                    </td>
+                                                                  </tr>
+                                                                ),
+                                                              )}
+                                                            </tbody>
+                                                          </table>
+                                                        </div>
+                                                      )}
                                                     </div>
-                                                  )}
-                                                </div>
-                                              ))
+                                                  );
+                                                },
+                                              )
                                             ) : (
                                               <div className="rounded-xl border border-border/40 overflow-hidden">
                                                 <table className="w-full">
@@ -1392,7 +1489,7 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                       {detail?.externalItems &&
                                         detail.externalItems.length > 0 && (
                                           <div>
-                                            <p className="text-xs font-semibold tracking-tighter text-muted-foreground mb-2 uppercase">
+                                            <p className="text-base font-semibold tracking-tighter text-muted-foreground mb-2 uppercase">
                                               Xử lý bên ngoài (
                                               {detail.externalItems.length})
                                             </p>
@@ -1407,10 +1504,10 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                                       Xử lý / người nhận
                                                     </th>
                                                     <th className="text-left px-3 py-2 text-xs font-semibold tracking-tighter text-foreground">
-                                                      Người xử lý
+                                                      Thời gian xử lý
                                                     </th>
                                                     <th className="text-right px-3 py-2 text-xs font-semibold tracking-tighter text-foreground">
-                                                      SL / tiền
+                                                      Số lượng / tiền
                                                     </th>
                                                   </tr>
                                                 </thead>
@@ -1447,15 +1544,15 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                                         </td>
                                                         <td className="px-3 py-2">
                                                           <p className="text-sm tracking-tighter text-foreground">
-                                                            {item.processedByFullName ||
-                                                              item.processedBy ||
-                                                              "—"}
-                                                          </p>
-                                                          <p className="text-xs tracking-tighter text-muted-foreground">
                                                             {formatDateTimeValue(
                                                               item.processedAt,
                                                             )}
                                                           </p>
+                                                          {/* <p className="text-xs tracking-tighter text-muted-foreground">
+                                                            {item.processedByFullName ||
+                                                              item.processedBy ||
+                                                              "—"}
+                                                          </p> */}
                                                         </td>
                                                         <td className="px-3 py-2 text-right">
                                                           <p className="text-sm tracking-tighter text-foreground">
@@ -1549,6 +1646,13 @@ export default function DepotDetailPage() {
   const [managerHistoryPage, setManagerHistoryPage] = useState(1);
   const [managerHistoryPageSize, setManagerHistoryPageSize] = useState(10);
   const { data: itemTypes = [] } = useInventoryItemTypes();
+  const itemTypeValueMap = useMemo(
+    () =>
+      Object.fromEntries(
+        itemTypes.map((itemType) => [String(itemType.key), itemType.value]),
+      ),
+    [itemTypes],
+  );
   const {
     data: managerHistoryData,
     isLoading: managerHistoryLoading,
@@ -2766,10 +2870,10 @@ export default function DepotDetailPage() {
                     const searchHaystack = [
                       inventoryItem.itemName,
                       inventoryItem.itemType,
-                      itemTypes.find(
-                        (type) =>
-                          String(type.key) === String(inventoryItem.itemType),
-                      )?.value,
+                      getInventoryItemTypeLabel(
+                        inventoryItem.itemType,
+                        itemTypeValueMap,
+                      ),
                       inventoryItem.unit,
                       inventoryItem.categoryName,
                     ]
@@ -3102,11 +3206,10 @@ export default function DepotDetailPage() {
                                         item.itemKey === inventoryItem.itemKey,
                                     ) ?? null;
                                   const itemTypeLabel =
-                                    itemTypes.find(
-                                      (type) =>
-                                        String(type.key) ===
-                                        String(inventoryItem.itemType),
-                                    )?.value ?? inventoryItem.itemType;
+                                    getInventoryItemTypeLabel(
+                                      inventoryItem.itemType,
+                                      itemTypeValueMap,
+                                    );
                                   const currentQuantity = Number(
                                     assignmentItem?.quantity ?? "",
                                   );
@@ -3264,7 +3367,7 @@ export default function DepotDetailPage() {
       hasUnallocatedSuggestion,
       isTransferDialogExpanded,
       isCurrentDepotChoice,
-      itemTypes,
+      itemTypeValueMap,
       mergedTargetDepotChoices,
       mergedTargetDepotChoiceMap,
       removeTransferAssignment,
@@ -4892,9 +4995,10 @@ export default function DepotDetailPage() {
                                           : "bg-rose-500/10 text-rose-700 dark:text-rose-400",
                                       )}
                                     >
-                                      {item.itemType === "Reusable"
-                                        ? "Tái sử dụng"
-                                        : "Tiêu hao"}
+                                      {getInventoryItemTypeLabel(
+                                        item.itemType,
+                                        itemTypeValueMap,
+                                      )}
                                     </Badge>
                                   </TableCell>
                                   <TableCell className="p-3 text-right text-sm font-bold tracking-tighter tabular-nums">

@@ -188,11 +188,19 @@ function UtilBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-sm tabular-nums shrink-0 w-9 text-right">
+      <span className="text-sm tracking-tighter shrink-0 w-9 text-right">
         {pct}%
       </span>
     </div>
   );
+}
+
+function formatDepotMetric(
+  value: number | null | undefined,
+  unit: "kg" | "dm³",
+): string {
+  const safeValue = Number.isFinite(value) ? Number(value) : 0;
+  return `${safeValue.toLocaleString("vi-VN")} ${unit}`;
 }
 
 /* ── Table skeleton ──────────────────────────────────────────── */
@@ -213,6 +221,9 @@ function TableSkeleton({ rows = 5 }: { rows?: number }) {
           </td>
           <td className="py-3.5 px-4 hidden md:table-cell">
             <Skeleton className="h-4 w-44" />
+          </td>
+          <td className="py-3.5 px-4 hidden lg:table-cell">
+            <Skeleton className="h-3 w-32" />
           </td>
           <td className="py-3.5 px-4 hidden lg:table-cell">
             <Skeleton className="h-3 w-32" />
@@ -248,19 +259,22 @@ function DepotTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="w-full min-w-[1180px]">
         <thead>
           <tr className="border-b border-border/60 bg-muted/40">
-            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter ">
+            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter whitespace-nowrap">
               Kho hàng
             </th>
-            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter hidden md:table-cell">
+            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter hidden md:table-cell whitespace-nowrap">
               Địa chỉ
             </th>
-            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter hidden lg:table-cell">
-              Tồn kho
+            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter hidden lg:table-cell whitespace-nowrap">
+              Khối lượng (kg)
             </th>
-            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter">
+            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter hidden lg:table-cell whitespace-nowrap">
+              Thể tích (dm³)
+            </th>
+            <th className="py-3 px-4 text-left text-sm font-semibold tracking-tighter whitespace-nowrap">
               Trạng thái
             </th>
             <th className="py-3 px-4 w-12" />
@@ -271,7 +285,7 @@ function DepotTable({
             <TableSkeleton rows={skeletonRows} />
           ) : items.length === 0 ? (
             <tr>
-              <td colSpan={5} className="py-16 text-center">
+              <td colSpan={6} className="py-16 text-center">
                 <Warehouse
                   size={36}
                   className="mx-auto text-muted-foreground/30 mb-3"
@@ -316,14 +330,31 @@ function DepotTable({
                   </td>
 
                   <td className="py-3.5 px-4 hidden lg:table-cell">
-                    <div className="space-y-1 w-36">
+                    <div className="w-56 min-w-56 space-y-1.5">
+                      <UtilBar
+                        used={depot.currentWeightUtilization ?? 0}
+                        cap={depot.weightCapacity ?? 0}
+                      />
+                      <p className="whitespace-nowrap text-sm text-foreground tracking-tighter">
+                        {formatDepotMetric(
+                          depot.currentWeightUtilization ?? 0,
+                          "kg",
+                        )}{" "}
+                        / {formatDepotMetric(depot.weightCapacity ?? 0, "kg")}
+                      </p>
+                    </div>
+                  </td>
+
+                  <td className="py-3.5 px-4 hidden lg:table-cell">
+                    <div className="w-56 min-w-56 space-y-1.5">
                       <UtilBar
                         used={depot.currentUtilization}
                         cap={depot.capacity}
                       />
-                      {/* <p className="text-sm text-muted-foreground tracking-tight">
-                        {depot.currentUtilization}/{depot.capacity}
-                      </p> */}
+                      <p className="whitespace-nowrap text-sm text-foreground tracking-tighter">
+                        {formatDepotMetric(depot.currentUtilization, "dm³")} /{" "}
+                        {formatDepotMetric(depot.capacity, "dm³")}
+                      </p>
                     </div>
                   </td>
 
