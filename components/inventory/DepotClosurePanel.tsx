@@ -44,6 +44,7 @@ import {
   useSubmitDepotExternalResolution,
   useDepotClosureTransferStatuses,
 } from "@/services/depot/hooks";
+import { useInventoryItemTypes } from "@/services/inventory/hooks";
 import type {
   DepotExternalResolutionItem,
   DepotTransferListItem,
@@ -91,6 +92,14 @@ function toPositiveInt(value: unknown): number | null {
         : Number.NaN;
 
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function getInventoryItemTypeLabel(
+  value: string | null | undefined,
+  itemTypeValueMap: Record<string, string>,
+): string {
+  if (!value) return "—";
+  return itemTypeValueMap[String(value)] ?? value;
 }
 
 function computeCountdown(deadline: string | null | undefined): string {
@@ -382,6 +391,14 @@ export function DepotClosurePanel({
   closureId: routeClosureId = null,
   transferId: routeTransferId = null,
 }: DepotClosurePanelProps) {
+  const { data: itemTypes = [] } = useInventoryItemTypes();
+  const itemTypeValueMap = useMemo(
+    () =>
+      Object.fromEntries(
+        itemTypes.map((itemType) => [String(itemType.key), itemType.value]),
+      ),
+    [itemTypes],
+  );
   const { selectedDepotId } = useManagerDepot();
   const depotId = selectedDepotId ?? 0;
 
@@ -1619,7 +1636,10 @@ export function DepotClosurePanel({
                           {item.targetGroup || "—"}
                         </td>
                         <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                          {item.itemType || "—"}
+                          {getInventoryItemTypeLabel(
+                            item.itemType,
+                            itemTypeValueMap,
+                          )}
                         </td>
                         <td className="px-4 py-3 text-foreground whitespace-nowrap">
                           {item.unit || "—"}

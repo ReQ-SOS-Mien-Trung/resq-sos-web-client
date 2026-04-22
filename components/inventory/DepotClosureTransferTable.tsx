@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+} from "react";
 import * as XLSX from "xlsx";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -9,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { useInventoryItemTypes } from "@/services/inventory/hooks";
 import {
   useMyDepotTransfers,
   useDepotClosureTransfer,
@@ -83,6 +90,14 @@ function toPositiveInt(value: unknown): number | null {
         : Number.NaN;
 
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function getInventoryItemTypeLabel(
+  value: string | null | undefined,
+  itemTypeValueMap: Record<string, string>,
+): string {
+  if (!value) return "—";
+  return itemTypeValueMap[String(value)] ?? value;
 }
 
 type ExternalResolutionColumnKey =
@@ -256,7 +271,9 @@ function findExternalResolutionHeaderLayout(rows: unknown[][]): {
       if (!normalized) return;
 
       (
-        Object.keys(EXTERNAL_RESOLUTION_COLUMN_ALIASES) as ExternalResolutionColumnKey[]
+        Object.keys(
+          EXTERNAL_RESOLUTION_COLUMN_ALIASES,
+        ) as ExternalResolutionColumnKey[]
       ).forEach((key) => {
         if (columnIndexes[key] != null) return;
         if (EXTERNAL_RESOLUTION_COLUMN_ALIASES[key].includes(normalized)) {
@@ -305,7 +322,8 @@ function getExternalResolutionRows(
       const quantity = parseExcelNumber(getCell("QUANTITY"));
       const unitPrice = parseExcelNumber(getCell("UNIT_PRICE"));
       const totalPriceCell = parseExcelNumber(getCell("TOTAL_PRICE"));
-      const totalPrice = totalPriceCell > 0 ? totalPriceCell : quantity * unitPrice;
+      const totalPrice =
+        totalPriceCell > 0 ? totalPriceCell : quantity * unitPrice;
 
       return {
         rowNumber:
@@ -375,6 +393,14 @@ function TransferDetailPanel({
   statusValueMap,
   transferSteps,
 }: TransferDetailPanelProps) {
+  const { data: itemTypes = [] } = useInventoryItemTypes();
+  const itemTypeValueMap = useMemo(
+    () =>
+      Object.fromEntries(
+        itemTypes.map((itemType) => [String(itemType.key), itemType.value]),
+      ),
+    [itemTypes],
+  );
   const {
     data: transfer,
     isLoading,
@@ -610,8 +636,12 @@ function TransferDetailPanel({
           {
             label: isTargetManager ? "Kho nguồn" : "Kho nhận",
             value: isTargetManager
-              ? transferItem.sourceDepotName
-              : transferItem.targetDepotName,
+              ? (transfer?.sourceDepotName ??
+                transferItem.sourceDepotName ??
+                "—")
+              : (transfer?.targetDepotName ??
+                transferItem.targetDepotName ??
+                "—"),
             tone: "border-blue-200/70 bg-blue-50/70 dark:border-blue-800/40 dark:bg-blue-950/10",
           },
           {
@@ -714,6 +744,63 @@ function TransferDetailPanel({
             )}
           </motion.div>
         )}
+
+      {transfer && transfer.items.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.3, ease: "easeOut" }}
+          className="space-y-2.5"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-tighter text-muted-foreground">
+              Danh sách vật phẩm
+            </p>
+            <span className="text-xs tracking-tighter text-muted-foreground">
+              {transfer.items.length} dòng
+            </span>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-border/40 bg-background">
+            <table className="w-full min-w-[520px]">
+              <thead>
+                <tr className="border-b border-border/30 bg-muted/10">
+                  <th className="px-4 py-2 text-left text-xs font-semibold tracking-tighter text-foreground">
+                    Vật phẩm
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold tracking-tighter text-foreground">
+                    Loại
+                  </th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold tracking-tighter text-foreground">
+                    Số lượng
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {transfer.items.map((item) => (
+                  <tr
+                    key={`${transfer.id}-${item.itemModelId}-${item.itemType}`}
+                    className="border-b border-border/20 last:border-0"
+                  >
+                    <td className="px-4 py-2 text-sm tracking-tighter text-foreground">
+                      {item.itemName || `Vật phẩm #${item.itemModelId}`}
+                    </td>
+                    <td className="px-4 py-2 text-sm tracking-tighter text-muted-foreground">
+                      {getInventoryItemTypeLabel(
+                        item.itemType,
+                        itemTypeValueMap,
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-right text-sm tracking-tighter text-foreground">
+                      {item.quantity.toLocaleString("vi-VN")} {item.unit || ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
 
       {/* Action */}
       {(() => {
@@ -861,9 +948,19 @@ export function DepotClosureTransferTable({
   } = useDepotExternalResolutionState(resolvedDepotId, {
     enabled: resolvedDepotId > 0,
   });
-  const { data: transferStatusMetadata = [] } = useDepotClosureTransferStatuses({
-    enabled: resolvedDepotId > 0,
-  });
+  const { data: transferStatusMetadata = [] } = useDepotClosureTransferStatuses(
+    {
+      enabled: resolvedDepotId > 0,
+    },
+  );
+  const { data: itemTypes = [] } = useInventoryItemTypes();
+  const itemTypeValueMap = useMemo(
+    () =>
+      Object.fromEntries(
+        itemTypes.map((itemType) => [String(itemType.key), itemType.value]),
+      ),
+    [itemTypes],
+  );
   const {
     mutateAsync: downloadExternalResolutionTemplate,
     isPending: isDownloadingExternalResolutionTemplate,
@@ -887,9 +984,9 @@ export function DepotClosureTransferTable({
 
   const hasExternalResolutionInstruction = Boolean(
     externalResolutionState?.hasActiveExternalResolution ||
-      externalResolutionState?.canDownloadExternalTemplate ||
-      externalResolutionState?.canUploadExternalResolution ||
-      externalResolutionState?.resolutionType === "ExternalResolution",
+    externalResolutionState?.canDownloadExternalTemplate ||
+    externalResolutionState?.canUploadExternalResolution ||
+    externalResolutionState?.resolutionType === "ExternalResolution",
   );
   const canDownloadExternalTemplate =
     externalResolutionState?.canDownloadExternalTemplate ?? false;
@@ -952,9 +1049,8 @@ export function DepotClosureTransferTable({
 
   const handleDownloadExternalTemplate = useCallback(async () => {
     try {
-      const { blob, filename } = await downloadExternalResolutionTemplate(
-        resolvedDepotId,
-      );
+      const { blob, filename } =
+        await downloadExternalResolutionTemplate(resolvedDepotId);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -1171,114 +1267,118 @@ export function DepotClosureTransferTable({
               ))}
             </div>
 
-            {canUploadExternalResolution && externalResolutionItems.length > 0 && (
-              <div className="rounded-xl border border-amber-200/70 bg-white/70 overflow-hidden dark:border-amber-800/60 dark:bg-amber-950/10">
-                <div className="px-4 py-3 border-b border-amber-200/70 dark:border-amber-800/60 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <FileXls size={18} className="text-emerald-600" />
-                    <div>
-                      <p className="text-sm font-bold tracking-tighter text-amber-900 dark:text-amber-100">
-                        Xem nhanh dữ liệu đã nạp
-                      </p>
-                      <p className="text-xs text-amber-700 dark:text-amber-300 tracking-tighter">
-                        Hiển thị 5 dòng đầu để kiểm tra trước khi gửi.
-                      </p>
+            {canUploadExternalResolution &&
+              externalResolutionItems.length > 0 && (
+                <div className="rounded-xl border border-amber-200/70 bg-white/70 overflow-hidden dark:border-amber-800/60 dark:bg-amber-950/10">
+                  <div className="px-4 py-3 border-b border-amber-200/70 dark:border-amber-800/60 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <FileXls size={18} className="text-emerald-600" />
+                      <div>
+                        <p className="text-sm font-bold tracking-tighter text-amber-900 dark:text-amber-100">
+                          Xem nhanh dữ liệu đã nạp
+                        </p>
+                        <p className="text-xs text-amber-700 dark:text-amber-300 tracking-tighter">
+                          Hiển thị 5 dòng đầu để kiểm tra trước khi gửi.
+                        </p>
+                      </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 tracking-tighter text-amber-700 dark:text-amber-300"
+                      onClick={resetExternalResolutionState}
+                    >
+                      <Trash size={14} />
+                      Bỏ file
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-1.5 tracking-tighter text-amber-700 dark:text-amber-300"
-                    onClick={resetExternalResolutionState}
-                  >
-                    <Trash size={14} />
-                    Bỏ file
-                  </Button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-375 w-full text-sm">
-                    <thead className="bg-amber-50/80 dark:bg-amber-950/20">
-                      <tr className="border-b border-amber-200/70 dark:border-amber-800/60">
-                        {[
-                          "Dòng",
-                          "Vật phẩm",
-                          "Danh mục",
-                          "Đối tượng",
-                          "Loại vật phẩm",
-                          "Đơn vị",
-                          "Ngày nhập",
-                          "Hạn sử dụng",
-                          "Số lượng",
-                          "Đơn giá",
-                          "Thành tiền",
-                          "Cách xử lý",
-                          "Người nhận / đơn vị nhận",
-                          "Ghi chú",
-                        ].map((label) => (
-                          <th
-                            key={label}
-                            className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-amber-700 dark:text-amber-300 whitespace-nowrap"
-                          >
-                            {label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {externalResolutionItems.slice(0, 5).map((item) => (
-                        <tr
-                          key={`${item.rowNumber}-${item.itemName}`}
-                          className="border-b border-amber-200/70 dark:border-amber-800/60 align-top"
-                        >
-                          <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
-                            #{item.rowNumber}
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-foreground min-w-44">
-                            {item.itemName || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-foreground min-w-32">
-                            {item.categoryName || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-foreground min-w-64">
-                            {item.targetGroup || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                            {item.itemType || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                            {item.unit || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                            {formatExcelPreviewDate(item.receivedDate)}
-                          </td>
-                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                            {formatExcelPreviewDate(item.expiredDate)}
-                          </td>
-                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                            {item.quantity.toLocaleString("vi-VN")}
-                          </td>
-                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                            {item.unitPrice.toLocaleString("vi-VN")}
-                          </td>
-                          <td className="px-4 py-3 text-foreground whitespace-nowrap">
-                            {item.totalPrice.toLocaleString("vi-VN")}
-                          </td>
-                          <td className="px-4 py-3 text-foreground min-w-72">
-                            {formatHandlingMethodLabel(item.handlingMethod)}
-                          </td>
-                          <td className="px-4 py-3 text-foreground min-w-64">
-                            {item.recipient || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-foreground min-w-40">
-                            {item.note || "—"}
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-375 w-full text-sm">
+                      <thead className="bg-amber-50/80 dark:bg-amber-950/20">
+                        <tr className="border-b border-amber-200/70 dark:border-amber-800/60">
+                          {[
+                            "Dòng",
+                            "Vật phẩm",
+                            "Danh mục",
+                            "Đối tượng",
+                            "Loại vật phẩm",
+                            "Đơn vị",
+                            "Ngày nhập",
+                            "Hạn sử dụng",
+                            "Số lượng",
+                            "Đơn giá",
+                            "Thành tiền",
+                            "Cách xử lý",
+                            "Người nhận / đơn vị nhận",
+                            "Ghi chú",
+                          ].map((label) => (
+                            <th
+                              key={label}
+                              className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-amber-700 dark:text-amber-300 whitespace-nowrap"
+                            >
+                              {label}
+                            </th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {externalResolutionItems.slice(0, 5).map((item) => (
+                          <tr
+                            key={`${item.rowNumber}-${item.itemName}`}
+                            className="border-b border-amber-200/70 dark:border-amber-800/60 align-top"
+                          >
+                            <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
+                              #{item.rowNumber}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-foreground min-w-44">
+                              {item.itemName || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-foreground min-w-32">
+                              {item.categoryName || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-foreground min-w-64">
+                              {item.targetGroup || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                              {getInventoryItemTypeLabel(
+                                item.itemType,
+                                itemTypeValueMap,
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                              {item.unit || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                              {formatExcelPreviewDate(item.receivedDate)}
+                            </td>
+                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                              {formatExcelPreviewDate(item.expiredDate)}
+                            </td>
+                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                              {item.quantity.toLocaleString("vi-VN")}
+                            </td>
+                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                              {item.unitPrice.toLocaleString("vi-VN")}
+                            </td>
+                            <td className="px-4 py-3 text-foreground whitespace-nowrap">
+                              {item.totalPrice.toLocaleString("vi-VN")}
+                            </td>
+                            <td className="px-4 py-3 text-foreground min-w-72">
+                              {formatHandlingMethodLabel(item.handlingMethod)}
+                            </td>
+                            <td className="px-4 py-3 text-foreground min-w-64">
+                              {item.recipient || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-foreground min-w-40">
+                              {item.note || "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {canUploadExternalResolution && (
               <div className="flex flex-wrap items-center justify-end gap-2">

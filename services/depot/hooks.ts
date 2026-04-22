@@ -869,7 +869,7 @@ export const DEPOT_TRANSFER_QUERY_KEY = ["depot-closure-transfer"] as const;
 
 /**
  * Hook to fetch a transfer record
- * GET /logistics/depot/{id}/transfer/{transferId}
+ * GET /logistics/depot/{id}/close/transfer/{transferId}
  */
 export function useDepotClosureTransfer(
   id: number,

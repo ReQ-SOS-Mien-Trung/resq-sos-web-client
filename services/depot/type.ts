@@ -827,12 +827,14 @@ export interface CancelDepotClosureTransferResponse {
 
 // ── Depot Closure Transfer ─────────────────────────────────────
 
-// GET /logistics/depot/{id}/transfer/{transferId}
+// GET /logistics/depot/{id}/close/transfer/{transferId}
 export interface DepotClosureTransfer {
   id: number;
-  closureId?: number;
+  closureId: number;
   sourceDepotId: number;
+  sourceDepotName: string | null;
   targetDepotId: number;
+  targetDepotName: string | null;
   status: string;
   createdAt: string;
   snapshotConsumableUnits: number;
@@ -846,6 +848,7 @@ export interface DepotClosureTransfer {
   cancelledAt: string | null;
   cancelledBy: string | null;
   cancellationReason: string | null;
+  items: DepotClosureDetailTransferItem[];
 }
 
 // POST prepare / ship / complete / receive — shared request & response
