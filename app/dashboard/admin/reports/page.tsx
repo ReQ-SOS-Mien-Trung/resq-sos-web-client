@@ -997,7 +997,7 @@ export default function FundingRequestsPage() {
                         <div
                           key={`${fund.depotId}-${fund.depotName}-${fund.funds.length}-${index}`}
                           onClick={() => openDepotFundPanel(fund)}
-                          className={`rounded-2xl border bg-card p-4 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 hover:border-border hover:bg-muted/10 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.22)] ${
+                          className={`flex h-full flex-col rounded-2xl border bg-card p-4 cursor-pointer transition-all duration-200 active:scale-[0.97] hover:-translate-y-0.5 hover:border-border hover:bg-muted/10 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.22)] ${
                             selectedDepotFund?.depotId === fund.depotId &&
                             depotTxPanelOpen
                               ? "border-primary ring-1 ring-primary/25 shadow-sm"
@@ -1064,7 +1064,7 @@ export default function FundingRequestsPage() {
                             </div>
                           )}
 
-                          <p className="mt-1 text-right text-xs tracking-tighter text-muted-foreground">
+                          <p className="mt-auto pt-3 text-right text-xs tracking-tighter text-muted-foreground">
                             Cập nhật gần nhất:{" "}
                             {getDepotFundLatestUpdatedAt(fund)
                               ? new Date(

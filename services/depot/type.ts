@@ -692,9 +692,11 @@ export interface DepotClosureDetailTransfer {
   snapshotReusableUnits: number;
   shippedAt: string | null;
   shippedBy: string | null;
+  shippedByName?: string | null;
   shipNote: string | null;
   receivedAt: string | null;
   receivedBy: string | null;
+  receivedByName?: string | null;
   receiveNote: string | null;
   cancelledAt: string | null;
   cancelledBy: string | null;

@@ -78,6 +78,7 @@ import {
   useDepotClosureTransferSuggestions,
   useDepotClosureByDepotId,
   useDepotClosureDetailByDepotId,
+  useDepotClosureTransferDetailByDepotId,
   useDepotClosuresListByDepotId,
   useCancelDepotClosureTransfer,
   useDepotClosureTransferStatuses,
@@ -85,6 +86,7 @@ import {
 import { useDepotManagers } from "@/services/depot_manager";
 import { useInventoryItemTypes } from "@/services/inventory/hooks";
 import type {
+  DepotClosureDetailTransfer,
   DepotClosureRemainingInventoryItem,
   DepotClosureSuggestedTransfer,
   DepotClosureTransferSuggestionTargetMetric,
@@ -229,6 +231,177 @@ const TRANSFER_RECORD_TONES = [
     tableHeadStickyBg: "bg-orange-50/95",
   },
 ] as const;
+
+function ClosureTransferRecordCard({
+  depotId,
+  closureId,
+  transfer,
+  index,
+  itemTypeValueMap,
+  transferStatusValueMap,
+}: {
+  depotId: number;
+  closureId: number;
+  transfer: DepotClosureDetailTransfer;
+  index: number;
+  itemTypeValueMap: Record<string, string>;
+  transferStatusValueMap: Record<string, string>;
+}) {
+  const tone = TRANSFER_RECORD_TONES[index % TRANSFER_RECORD_TONES.length];
+  const { data: transferDetail } = useDepotClosureTransferDetailByDepotId(
+    depotId,
+    closureId,
+    transfer.id,
+    {
+      enabled: depotId > 0 && closureId > 0 && transfer.id > 0,
+    },
+  );
+  const resolvedTransfer = transferDetail ?? transfer;
+
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-xl border border-border/40 border-l-4 bg-white",
+        tone.accentBorder,
+      )}
+    >
+      <div
+        className={cn(
+          "flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3",
+          tone.headerBg,
+          tone.headerBorder,
+        )}
+      >
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold tracking-tighter text-foreground">
+              Đơn điều chuyển số {resolvedTransfer.id}
+            </span>
+            <Badge
+              className={cn(
+                "text-xs font-medium tracking-tighter",
+                getDepotClosureTransferStatusToneClass(resolvedTransfer.status),
+              )}
+            >
+              {getDepotClosureTransferStatusLabel(
+                resolvedTransfer.status,
+                transferStatusValueMap,
+              )}
+            </Badge>
+          </div>
+          <p className="text-xs tracking-tighter font-medium text-foreground/80">
+            {resolvedTransfer.sourceDepotName ||
+              `Kho #${resolvedTransfer.sourceDepotId}`}{" "}
+            →{" "}
+            {resolvedTransfer.targetDepotName ||
+              `Kho #${resolvedTransfer.targetDepotId}`}
+          </p>
+        </div>
+        <div className="text-right text-xs tracking-tighter font-medium text-foreground/80">
+          <p>Tạo lúc {formatDateTimeValue(resolvedTransfer.createdAt)}</p>
+          <p>
+            Vận chuyển lúc: {formatDateTimeValue(resolvedTransfer.shippedAt)}
+          </p>
+          <p>Nhận lúc: {formatDateTimeValue(resolvedTransfer.receivedAt)}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 border-b border-border/30 px-4 py-3 sm:grid-cols-4">
+        {[
+          {
+            label: "Số lượng vật phẩm tiêu thụ",
+            value: resolvedTransfer.snapshotConsumableUnits.toLocaleString(
+              "vi-VN",
+            ),
+          },
+          {
+            label: "Số lượng vật phẩm tái sử dụng",
+            value: resolvedTransfer.snapshotReusableUnits.toLocaleString(
+              "vi-VN",
+            ),
+          },
+          {
+            label: "Người xuất kho",
+            value:
+              resolvedTransfer.shippedByName ||
+              resolvedTransfer.shippedBy ||
+              "—",
+          },
+          {
+            label: "Người nhận",
+            value:
+              resolvedTransfer.receivedByName ||
+              resolvedTransfer.receivedBy ||
+              "—",
+          },
+        ].map((item) => (
+          <div key={item.label}>
+            <p className="text-[13px] tracking-tighter text-muted-foreground">
+              {item.label}
+            </p>
+            <p className="mt-1 text-sm font-semibold tracking-tighter text-foreground">
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+      {resolvedTransfer.items.length > 0 && (
+        <div className="max-h-80 overflow-auto">
+          <table className="w-full">
+            <thead>
+              <tr className={cn("border-b border-border/30", tone.tableHeadBg)}>
+                <th
+                  className={cn(
+                    "sticky top-0 z-10 text-left px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
+                    tone.tableHeadStickyBg,
+                  )}
+                >
+                  Vật phẩm
+                </th>
+                <th
+                  className={cn(
+                    "sticky top-0 z-10 text-left px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
+                    tone.tableHeadStickyBg,
+                  )}
+                >
+                  Loại
+                </th>
+                <th
+                  className={cn(
+                    "sticky top-0 z-10 text-right px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
+                    tone.tableHeadStickyBg,
+                  )}
+                >
+                  Số lượng
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {resolvedTransfer.items.map((item) => (
+                <tr
+                  key={`${resolvedTransfer.id}-${item.itemModelId}-${item.itemType}`}
+                  className="border-b border-border/20 last:border-0"
+                >
+                  <td className="px-4 py-2 text-sm tracking-tighter text-foreground">
+                    {item.itemName}
+                  </td>
+                  <td className="px-4 py-2 text-sm tracking-tighter text-muted-foreground">
+                    {getInventoryItemTypeLabel(
+                      item.itemType,
+                      itemTypeValueMap,
+                    )}
+                  </td>
+                  <td className="px-4 py-2 text-right text-sm tracking-tighter text-foreground">
+                    {item.quantity.toLocaleString("vi-VN")} {item.unit || ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface TransferCapacityLoad {
   requiredVolume: number;
@@ -1246,192 +1419,21 @@ function DepotClosuresListPanel({ depotId }: { depotId: number }) {
                                           </p>
                                           <div className="space-y-3">
                                             {transferRecords.length > 0 ? (
-                                              transferRecords.map(
-                                                (t, index) => {
-                                                  const tone =
-                                                    TRANSFER_RECORD_TONES[
-                                                      index %
-                                                        TRANSFER_RECORD_TONES.length
-                                                    ];
-
-                                                  return (
-                                                    <div
-                                                      key={t.id}
-                                                      className={cn(
-                                                        "overflow-hidden rounded-xl border border-border/40 border-l-4 bg-white",
-                                                        tone.accentBorder,
-                                                      )}
-                                                    >
-                                                      <div
-                                                        className={cn(
-                                                          "flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3",
-                                                          tone.headerBg,
-                                                          tone.headerBorder,
-                                                        )}
-                                                      >
-                                                        <div className="space-y-2">
-                                                          <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-semibold tracking-tighter text-foreground">
-                                                              Đơn điều chuyển số{" "}
-                                                              {t.id}
-                                                            </span>
-                                                            <Badge
-                                                              className={cn(
-                                                                "text-xs font-medium tracking-tighter",
-                                                                getDepotClosureTransferStatusToneClass(
-                                                                  t.status,
-                                                                ),
-                                                              )}
-                                                            >
-                                                              {getDepotClosureTransferStatusLabel(
-                                                                t.status,
-                                                                transferStatusValueMap,
-                                                              )}
-                                                            </Badge>
-                                                          </div>
-                                                          <p className="text-xs tracking-tighter font-medium text-foreground/80">
-                                                            {t.sourceDepotName ||
-                                                              `Kho #${t.sourceDepotId}`}{" "}
-                                                            →{" "}
-                                                            {t.targetDepotName ||
-                                                              `Kho #${t.targetDepotId}`}
-                                                          </p>
-                                                        </div>
-                                                        <div className="text-right text-xs tracking-tighter font-medium text-foreground/80">
-                                                          <p>
-                                                            Tạo lúc{" "}
-                                                            {formatDateTimeValue(
-                                                              t.createdAt,
-                                                            )}
-                                                          </p>
-                                                          <p>
-                                                            Vận chuyển lúc:{" "}
-                                                            {formatDateTimeValue(
-                                                              t.shippedAt,
-                                                            )}
-                                                          </p>
-                                                          <p>
-                                                            Nhận lúc:{" "}
-                                                            {formatDateTimeValue(
-                                                              t.receivedAt,
-                                                            )}
-                                                          </p>
-                                                        </div>
-                                                      </div>
-                                                      <div className="grid grid-cols-2 gap-3 border-b border-border/30 px-4 py-3 sm:grid-cols-4">
-                                                        {[
-                                                          {
-                                                            label:
-                                                              "Số lượng vật phẩm tiêu thụ",
-                                                            value:
-                                                              t.snapshotConsumableUnits.toLocaleString(
-                                                                "vi-VN",
-                                                              ),
-                                                          },
-                                                          {
-                                                            label:
-                                                              "Số lượng vật phẩm tái sử dụng",
-                                                            value:
-                                                              t.snapshotReusableUnits.toLocaleString(
-                                                                "vi-VN",
-                                                              ),
-                                                          },
-                                                          {
-                                                            label:
-                                                              "Người xuất kho",
-                                                            value:
-                                                              t.shippedBy ||
-                                                              "—",
-                                                          },
-                                                          {
-                                                            label: "Người nhận",
-                                                            value:
-                                                              t.receivedBy ||
-                                                              "—",
-                                                          },
-                                                        ].map((item) => (
-                                                          <div key={item.label}>
-                                                            <p className="text-[13px] tracking-tighter text-muted-foreground">
-                                                              {item.label}
-                                                            </p>
-                                                            <p className="mt-1 text-sm font-semibold tracking-tighter text-foreground">
-                                                              {item.value}
-                                                            </p>
-                                                          </div>
-                                                        ))}
-                                                      </div>
-                                                      {t.items.length > 0 && (
-                                                        <div className="max-h-80 overflow-auto">
-                                                          <table className="w-full">
-                                                            <thead>
-                                                              <tr
-                                                                className={cn(
-                                                                  "border-b border-border/30",
-                                                                  tone.tableHeadBg,
-                                                                )}
-                                                              >
-                                                                <th
-                                                                  className={cn(
-                                                                    "sticky top-0 z-10 text-left px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
-                                                                    tone.tableHeadStickyBg,
-                                                                  )}
-                                                                >
-                                                                  Vật phẩm
-                                                                </th>
-                                                                <th
-                                                                  className={cn(
-                                                                    "sticky top-0 z-10 text-left px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
-                                                                    tone.tableHeadStickyBg,
-                                                                  )}
-                                                                >
-                                                                  Loại
-                                                                </th>
-                                                                <th
-                                                                  className={cn(
-                                                                    "sticky top-0 z-10 text-right px-4 py-2 text-xs font-semibold tracking-tighter text-foreground",
-                                                                    tone.tableHeadStickyBg,
-                                                                  )}
-                                                                >
-                                                                  Số lượng
-                                                                </th>
-                                                              </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                              {t.items.map(
-                                                                (item) => (
-                                                                  <tr
-                                                                    key={`${t.id}-${item.itemModelId}-${item.itemType}`}
-                                                                    className="border-b border-border/20 last:border-0"
-                                                                  >
-                                                                    <td className="px-4 py-2 text-sm tracking-tighter text-foreground">
-                                                                      {
-                                                                        item.itemName
-                                                                      }
-                                                                    </td>
-                                                                    <td className="px-4 py-2 text-sm tracking-tighter text-muted-foreground">
-                                                                      {getInventoryItemTypeLabel(
-                                                                        item.itemType,
-                                                                        itemTypeValueMap,
-                                                                      )}
-                                                                    </td>
-                                                                    <td className="px-4 py-2 text-right text-sm tracking-tighter text-foreground">
-                                                                      {item.quantity.toLocaleString(
-                                                                        "vi-VN",
-                                                                      )}{" "}
-                                                                      {item.unit ||
-                                                                        ""}
-                                                                    </td>
-                                                                  </tr>
-                                                                ),
-                                                              )}
-                                                            </tbody>
-                                                          </table>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  );
-                                                },
-                                              )
+                                              transferRecords.map((t, index) => (
+                                                <ClosureTransferRecordCard
+                                                  key={t.id}
+                                                  depotId={depotId}
+                                                  closureId={closure.id}
+                                                  transfer={t}
+                                                  index={index}
+                                                  itemTypeValueMap={
+                                                    itemTypeValueMap
+                                                  }
+                                                  transferStatusValueMap={
+                                                    transferStatusValueMap
+                                                  }
+                                                />
+                                              ))
                                             ) : (
                                               <div className="rounded-xl border border-border/40 overflow-hidden">
                                                 <table className="w-full">
